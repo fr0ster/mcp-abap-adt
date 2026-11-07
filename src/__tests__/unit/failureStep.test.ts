@@ -33,7 +33,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
-import { exactPackages } from '../helpers/sourceReaderFake';
+import { exactPackages, listing } from '../helpers/sourceReaderFake';
 
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({
@@ -179,7 +179,7 @@ describe('a refusal is not swallowed', () => {
     expect(body.error).toEqual(expectedPayload('read node structure'));
   });
 
-  it('SearchSource: a refused source read is the method error with its step, not a skipped source', async () => {
+  it('SearchSource: a refused source read is skipped by owner decision (DO17): nothing is yielded', async () => {
     fakeClient = fakeClientOf({ read: async () => forbidden() });
     const deps = createSourceReaderDeps(context as any);
     const units = readSourceUnits(deps, {
@@ -188,26 +188,10 @@ describe('a refusal is not swallowed', () => {
       object_name: 'ZPROG',
       code: 'PROG/P',
     });
-    const first = await units.next();
-    expect(first.done).toBe(false);
-    expect(first.value).toEqual({
-      ok: false,
-      failure: {
-        kind: 'source',
-        devclass: 'ZPKG',
-        object_type: 'PROG',
-        object_name: 'ZPROG',
-        source: {
-          name: 'ZPROG',
-          uri: '/sap/bc/adt/programs/programs/zprog/source/main',
-        },
-        step: 'read program',
-        error: expectedPayload('read program'),
-      },
-    });
+    expect((await units.next()).done).toBe(true);
   });
 
-  it('SearchSource: a listed source that is not there is reported, not skipped', async () => {
+  it('SearchSource: a listed source that is not there is skipped (DO17): nothing is yielded', async () => {
     fakeClient = fakeClientOf({ read: async () => notThere() });
     const deps = createSourceReaderDeps(context as any);
     const units = readSourceUnits(deps, {
@@ -215,11 +199,6 @@ describe('a refusal is not swallowed', () => {
       object_type: 'PROG',
       object_name: 'ZPROG',
       code: 'PROG/P',
-    });
-    const first = await units.next();
-    expect(first.value).toMatchObject({
-      ok: false,
-      failure: { kind: 'source', step: 'read program' },
     });
     expect((await units.next()).done).toBe(true);
   });
@@ -453,8 +432,8 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
     const failure = credential();
     const run = runSearchSource(
       {
-        fetchPackageContents: async () =>
-          [target('ZA'), target('ZB'), target('ZC')] as never,
+        fetchPackageContents: async (name) =>
+          listing(name, [target('ZA'), target('ZB'), target('ZC')]),
         sourceReader: {
           async readSource(read_) {
             read.push(read_.name);
@@ -489,7 +468,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
     );
     const run = runSearchSource(
       {
-        fetchPackageContents: async () => [target('ZA')] as never,
+        fetchPackageContents: async (name) => listing(name, [target('ZA')]),
         sourceReader: {
           readSource: async () => {
             throw unauthorized;
@@ -600,7 +579,7 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
   });
 });
 
-describe('SearchSource: a refused object is its own answer, the scan goes on', () => {
+describe('SearchSource: a refused object is skipped, the scan goes on (DO17)', () => {
   const target = (name: string) => ({
     name,
     type: 'PROG/P',
@@ -619,7 +598,7 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
       step,
     );
 
-  it('collects the refusal with its object beside the others, and the pool keeps going', async () => {
+  it('skips the refused object with no entry, and the pool keeps going', async () => {
     const read: string[] = [];
     const sourceReader: ReadSourceUnitsDeps = {
       async readSource(read_) {
@@ -633,8 +612,8 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
     };
     const result = await runSearchSource(
       {
-        fetchPackageContents: async () =>
-          [target('ZA'), target('ZB'), target('ZC')] as never,
+        fetchPackageContents: async (name) =>
+          listing(name, [target('ZA'), target('ZB'), target('ZC')]),
         sourceReader,
         lineMatch: substringLineMatch,
         resolvePackages: exactPackages,
@@ -649,36 +628,8 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
     // One pump: ZC was read after ZB's refusal.
     expect(read).toEqual(['ZA', 'ZB', 'ZC']);
     expect(result.results.map((h) => h.object_name)).toEqual(['ZA', 'ZC']);
-    expect(result.failures).toEqual([
-      {
-        kind: 'source',
-        devclass: 'ZPKG',
-        object_type: 'PROG',
-        object_name: 'ZB',
-        source: {
-          name: 'ZB',
-          uri: '/sap/bc/adt/programs/programs/zb/source/main',
-        },
-        step: 'read program',
-        error: expectedPayload('read program'),
-      },
-    ]);
-  });
-
-  it('answers no failures field when nothing failed', async () => {
-    const result = await runSearchSource(
-      {
-        fetchPackageContents: async () => [target('ZA')] as never,
-        sourceReader: {
-          readSource: async () => ({ ok: true, value: 'marker' }),
-          readStructure: async () => ({ ok: true, value: [] }),
-        },
-        lineMatch: substringLineMatch,
-        resolvePackages: exactPackages,
-      },
-      { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
-    );
-    expect(result.failures).toBeUndefined();
+    expect(Object.keys(result)).not.toContain('failures');
+    expect(result.scanned.objects).toBe(2);
   });
 
   it("a function group include and module are read through adt-clients at the call's version, a refusal answered with SAP's error", async () => {

@@ -25,13 +25,6 @@ import {
 } from '../strategies/functionGroupStructure';
 import { ourUtils } from '../strategies/resultSets';
 import { carryingFailure } from '../strategies/step';
-import {
-  answeredFacts,
-  type FailureFacts,
-  type SourceFailure,
-  type SourceIdentity,
-  thrownFacts,
-} from './failures';
 import type { EnumeratedObject } from './packageEnumerator';
 
 /** The version a source read names: the call's, active by default. */
@@ -165,7 +158,7 @@ export function sourceUriOf(read: SourceRead): string {
   }
 }
 
-/** The step a failed read names: which read it was. */
+/** The step a read names, on a credential failure it ends the call with. */
 const STEP: Readonly<Record<Read['reader'], string>> = {
   program: 'read program',
   include: 'read include',
@@ -188,84 +181,44 @@ export function sourceReadKey(read: Read): string {
     : `${sourceUriOf(read)}|${read.version}`;
 }
 
-/** What `readSourceUnits` yields: a source read, or a source that was not. */
-export type UnitOutcome =
-  | { ok: true; unit: SourceUnit }
-  | { ok: false; failure: SourceFailure };
-
-/** The failure entry of a source of `target`. */
-function sourceFailure(
-  target: EnumeratedObject,
-  source: SourceIdentity,
-  step: string,
-  facts: FailureFacts,
-): UnitOutcome {
-  return {
-    ok: false,
-    failure: {
-      kind: 'source',
-      devclass: target.devclass,
-      object_type: target.object_type,
-      object_name: target.object_name,
-      source,
-      step,
-      ...facts,
-    },
-  };
-}
-
 /** A failed answer as a thrown failure, with its step. */
 function thrownOf(error: IAdtError, step: string): Error {
   return carryingFailure(new Error(error.message), error, step);
 }
 
 /**
- * A failed answer SAP gave. A credential failure is thrown — it ends the
- * call; any other is the source's failure.
+ * What a read answered, when it could be read: its value; `undefined` for a
+ * read not answered yet, a failed answer or a read that threw — a source
+ * that cannot be read is skipped (DO17). A credential failure, answered or
+ * thrown, ends the call, thrown.
  */
-function refused(
-  target: EnumeratedObject,
-  source: SourceIdentity,
+async function readable<T>(
   step: string,
-  error: IAdtError,
-): UnitOutcome {
-  const thrown = thrownOf(error, step);
+  read: () => Promise<ReadAnswer<T> | undefined>,
+): Promise<T | undefined> {
+  let answer: ReadAnswer<T> | undefined;
+  try {
+    answer = await read();
+  } catch (error) {
+    if (isCredentialFailure(error)) throw error;
+    return undefined;
+  }
+  if (answer === undefined) return undefined;
+  if (answer.ok) return answer.value;
+  const thrown = thrownOf(answer.error, step);
   if (isCredentialFailure(thrown)) throw thrown;
-  return sourceFailure(target, source, step, answeredFacts(error, step));
+  return undefined;
 }
 
-/**
- * One source of `target`, read. `listed`: SAP named the source (the walk,
- * the function group's structure), so a `404` is its failure; a probe read
- * (a class's local include) that SAP answers `404` is a source that is not
- * there, and yields nothing.
- */
+/** One source of an object, read: its unit, or nothing when it cannot be read. */
 async function* readOne(
   deps: ReadSourceUnitsDeps,
-  target: EnumeratedObject,
   read: SourceRead,
   unitName: string,
-  listed: boolean,
-): AsyncGenerator<UnitOutcome> {
-  const source: SourceIdentity = { name: read.name, uri: sourceUriOf(read) };
-  const step = STEP[read.reader];
-  let answer: ReadAnswer<string> | undefined;
-  try {
-    answer = await deps.readSource(read);
-  } catch (error) {
-    yield sourceFailure(target, source, step, thrownFacts(error, step));
-    return;
-  }
-  if (answer === undefined) return;
-  if (answer.ok) {
-    yield {
-      ok: true,
-      unit: { include: unitName, lines: linesOf(answer.value) },
-    };
-    return;
-  }
-  if (!listed && answer.error.response?.status === 404) return;
-  yield refused(target, source, step, answer.error);
+): AsyncGenerator<SourceUnit> {
+  const text = await readable(STEP[read.reader], () => deps.readSource(read));
+  if (text === undefined) return;
+  yield { include: unitName, lines: linesOf(text) };
 }
 
 /** A source of a function group's structure: its read. */
@@ -396,29 +349,26 @@ function ownReaderOf(code: EnumeratedObject['code']): NamedReader | undefined {
 }
 
 /**
- * Every source of `target`, each read at `version`, in order: a source read
- * is a unit, a source SAP refused (or a read that threw) a failure, and the
- * reads go on after it. A credential failure ends the call, thrown.
+ * Every source of `target` that can be read, each read at `version`, in
+ * order; a source that cannot be read is skipped and the reads go on after
+ * it (DO17). A credential failure ends the call, thrown.
  */
 export async function* readSourceUnits(
   deps: ReadSourceUnitsDeps,
   target: EnumeratedObject,
   version: SourceVersion = 'active',
-): AsyncGenerator<UnitOutcome> {
+): AsyncGenerator<SourceUnit> {
   const own = ownReaderOf(target.code);
   if (own !== undefined) {
     yield* readOne(
       deps,
-      target,
       { reader: own, name: target.object_name, version },
       target.object_name,
-      true,
     );
     if (own === 'class') {
       for (const include of CLASS_INCLUDES) {
         yield* readOne(
           deps,
-          target,
           {
             reader: 'classInclude',
             name: target.object_name,
@@ -426,7 +376,6 @@ export async function* readSourceUnits(
             version,
           },
           include,
-          false,
         );
       }
     }
@@ -435,33 +384,15 @@ export async function* readSourceUnits(
 
   // A function group: its structure, then every source it names.
   const group = target.object_name;
-  const structureSource: SourceIdentity = {
-    name: group,
-    uri: functionGroupUri(group),
-  };
-  const structureStep = STEP.functionGroupStructure;
-  let structure: ReadAnswer<FugrChild[]> | undefined;
-  try {
-    structure = await deps.readStructure(group);
-  } catch (error) {
-    yield sourceFailure(
-      target,
-      structureSource,
-      structureStep,
-      thrownFacts(error, structureStep),
-    );
-    return;
-  }
+  const structure = await readable(STEP.functionGroupStructure, () =>
+    deps.readStructure(group),
+  );
   if (structure === undefined) return;
-  if (!structure.ok) {
-    yield refused(target, structureSource, structureStep, structure.error);
-    return;
-  }
   // One read per source: an include is named by every element inside it,
   // so the structure lists it under several types.
   const seen = new Set<string>();
   const sources: FugrSource[] = [];
-  for (const node of structure.value) {
+  for (const node of structure) {
     if (!node.objecttype.startsWith('FUGR/')) continue;
     const source = fugrSourceOf(group, node, version);
     if (source === undefined) continue;
@@ -471,7 +402,7 @@ export async function* readSourceUnits(
     sources.push(source);
   }
   for (const source of sortFugrSources(sources)) {
-    yield* readOne(deps, target, source.read, source.read.name, true);
+    yield* readOne(deps, source.read, source.read.name);
   }
 }
 

@@ -20,7 +20,11 @@ import {
   type Repository,
   standOn,
 } from '../../helpers/searchSourceStand';
-import { exactPackages, sourcesFrom } from '../../helpers/sourceReaderFake';
+import {
+  exactPackages,
+  listing,
+  sourcesFrom,
+} from '../../helpers/sourceReaderFake';
 
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
@@ -61,14 +65,15 @@ describe('the orchestrator matches lines through the strategy it is given', () =
     const result = await runSearchSource(
       {
         lineMatch: strategy,
-        fetchPackageContents: async () => [
-          {
-            name: 'ZPROG',
-            type: 'PROG/P',
-            packageName: 'ZPKG',
-            isPackage: false,
-          },
-        ],
+        fetchPackageContents: async (name) =>
+          listing(name, [
+            {
+              name: 'ZPROG',
+              type: 'PROG/P',
+              packageName: 'ZPKG',
+              isPackage: false,
+            },
+          ]),
         sourceReader: sourcesFrom({ 'PROG:ZPROG': 'first\nsecond' }),
         resolvePackages: exactPackages,
       },

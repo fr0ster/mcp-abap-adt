@@ -4340,11 +4340,9 @@
       "occurrences",
       "statement",
       "packages",
-      "cursor",
-      "continue",
-      "next_start_at"
+      "package mask"
     ],
-    "semantic": "Search the source code of the programs, classes and function groups in a package for a text or statement; a scan that stops early answers a cursor to continue from."
+    "semantic": "Search the source code of the programs, classes, function groups and other source objects in packages or package masks for a text or statement; the answer lists every hit with its line."
   },
   "SessionClose": {
     "keywords": [

@@ -432,15 +432,17 @@ it arose. A tool never rewrites it:
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:
 
-- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
-  its failure (`failures[]` for `SearchSource`, each with its `kind`: `source` names the object
-  and the source, `operation` a mask's resolution or a package's walk; `{ name, error }` for
-  `DescribeByList`, `unreadable` beside the tree for
-  `GetIncludesList`) beside the other items' results, and the rest are read on — except a
-  credential failure (an authentication failure, a `401`): the credentials are the same for
-  every item, so it ends the whole call, as it came, and no further request is sent
-  (`DescribeByList` sends no second, untyped search after it; `GetObjectInfo` reads no tree
-  after its enrichment search was refused so);
+- a tool that reads a list of items — `DescribeByList`, `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
+  its failure (`{ name, error }` for `DescribeByList`, `unreadable` beside the tree for
+  `GetIncludesList`) beside the other items' results, and the rest are read on;
+  `SearchSource` skips what it cannot read — a source, an object, a refused mask search, a
+  package whose root is refused or missing, and below the root a refused type node or
+  subpackage with everything under it — with no entry, and reads the rest on (its `scanned`
+  counters count only what was read). Every one of them ends on a credential failure (an
+  authentication failure, a `401`): the credentials are the same for every item, so it ends
+  the whole call, as it came, and no further request is sent (`DescribeByList` sends no
+  second, untyped search after it; `GetObjectInfo` reads no tree after its enrichment search
+  was refused so);
 - a tool that tries two endpoints — `GetStructuresList` reads a name as a structure, then as a
   table — answers both failures in one array (`read structure`, `read table`) when neither
   has it; a `404` from both stays absence; an append candidate that where-used named and SAP

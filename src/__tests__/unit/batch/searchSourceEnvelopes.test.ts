@@ -1,10 +1,9 @@
 /**
- * `SearchSource`'s source reads in envelopes of at most 300 reads (#89): the
- * slice's targets in chunks of 300, each chunk read through all its rounds
+ * `SearchSource`'s source reads in envelopes of at most 300 reads (#89):
+ * every target, in chunks of 300, each chunk read through all its rounds
  * (main sources and function group structures, then the function groups'
  * includes and function modules), each round's unique reads in envelopes of
- * at most 300; the call ends on its result, paged by `start_at` and
- * `max_objects`.
+ * at most 300; the call ends on its result, every target read in one run.
  *
  * On the batch stand-in (`helpers/searchSourceStand.ts`): real handler, real
  * clients, real `AdtBatchConnection`; only the connection is a fake.
@@ -114,13 +113,7 @@ const search = (
   packages: string[],
   args: Record<string, unknown> = {},
   absent = false,
-) =>
-  searchOn(
-    fake,
-    { query: 'marker', max_objects: 1000, packages, ...args },
-    absent,
-    TURNS,
-  );
+) => searchOn(fake, { query: 'marker', packages, ...args }, absent, TURNS);
 
 /** The envelopes after the walk's `walkEnvelopes`: their sizes. */
 const sourceSizes = (fake: Fake, walkEnvelopes: number) =>
@@ -156,12 +149,8 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
     ).toEqual(Array.from({ length: 650 }, (_, i) => `ZP${pad(i)}`));
     const p = payloadOf(result);
     expect(p.results).toHaveLength(650);
-    expect(p.total_targets).toBe(650);
-    expect('next_start_at' in p).toBe(false);
-    expect(p.truncated).toEqual({
-      by_object_cap: false,
-      by_max_objects: false,
-    });
+    expect(p.scanned.objects).toBe(650);
+    expect(p.truncated).toEqual({ by_object_cap: false });
   });
 
   it("a function group's second round of 400 reads goes as 300 + 100; nothing dropped", async () => {
@@ -174,15 +163,8 @@ describe('SearchSource: source reads in envelopes of at most 300', () => {
   });
 
   it('the hits over envelopes are the hits of the same targets read one by one', async () => {
-    const batched = await search(on(programs(650)), ['ZBIG'], {
-      emit_no_hits: true,
-    });
-    const sequential = await search(
-      on(programs(650)),
-      ['ZBIG'],
-      { emit_no_hits: true },
-      true,
-    );
+    const batched = await search(on(programs(650)), ['ZBIG']);
+    const sequential = await search(on(programs(650)), ['ZBIG'], {}, true);
     expect(textOf(batched)).toBe(textOf(sequential));
     const all = { max_hits_per_object: 1000 };
     const group = await search(on(bigGroup()), ['ZFGP'], all);

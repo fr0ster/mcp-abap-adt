@@ -29,13 +29,13 @@ interface SearchSourceResult {
     line: number;
     snippet: string;
   }>;
-  no_hits?: Array<{
-    devclass: string;
-    object_type: string;
-    object_name: string;
-  }>;
-  scanned: { packages: number; objects: number; sources: number };
-  truncated: { by_object_cap: boolean; by_max_objects: boolean };
+  scanned: {
+    packages: number;
+    objects: number;
+    sources: number;
+    objects_with_hits: number;
+  };
+  truncated: { by_object_cap: boolean };
 }
 
 /**
@@ -121,7 +121,6 @@ describe('SearchSource Handler Integration', () => {
           query,
           packages: [pkg],
           max_hits_per_object: 5,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -157,7 +156,6 @@ describe('SearchSource Handler Integration', () => {
           query2: q2,
           packages: [pkg],
           max_hits_per_object: 5,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -194,7 +192,6 @@ describe('SearchSource Handler Integration', () => {
           exclude: [excl],
           packages: [pkg],
           max_hits_per_object: 50,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -228,7 +225,6 @@ describe('SearchSource Handler Integration', () => {
           packages: [pkg],
           exclude_comments: true,
           max_hits_per_object: 50,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -263,7 +259,6 @@ describe('SearchSource Handler Integration', () => {
           query: q,
           packages: [pkg],
           max_hits_per_object: 1,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -290,7 +285,7 @@ describe('SearchSource Handler Integration', () => {
   );
 
   it(
-    'emit_no_hits=true populates no_hits for unmatched targets and never mixes them into results',
+    'an object without a hit is not listed: no results, no no_hits, the objects read still counted',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const { connection, params } = context;
@@ -299,9 +294,7 @@ describe('SearchSource Handler Integration', () => {
         const args = {
           query: 'ABSOLUTELY_UNLIKELY_SUBSTRING_XYZQ_42',
           packages: [pkg],
-          emit_no_hits: true,
           max_hits_per_object: 1,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -315,7 +308,10 @@ describe('SearchSource Handler Integration', () => {
         expect(result.isError).toBe(false);
         const data = parseResult(result);
         expect(data.results).toEqual([]);
-        expect(Array.isArray(data.no_hits)).toBe(true);
+        expect(Object.keys(data)).not.toContain('no_hits');
+        expect(Object.keys(data)).not.toContain('failures');
+        expect(data.scanned.objects).toBeGreaterThan(0);
+        expect(data.scanned.objects_with_hits).toBe(0);
       });
     },
     getTimeout('long'),
@@ -341,7 +337,6 @@ describe('SearchSource Handler Integration', () => {
           packages: [pkg],
           object_filter: glob,
           max_hits_per_object: 5,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -376,7 +371,6 @@ describe('SearchSource Handler Integration', () => {
           packages: [mask],
           include_subpackages: true,
           max_hits_per_object: 5,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -410,7 +404,6 @@ describe('SearchSource Handler Integration', () => {
           packages: [mask],
           include_subpackages: false,
           max_hits_per_object: 5,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -442,7 +435,6 @@ describe('SearchSource Handler Integration', () => {
         const args = {
           query,
           packages: ['ZZZ_NONEXISTENT_NAMESPACE_XYZ*'],
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',
@@ -476,7 +468,6 @@ describe('SearchSource Handler Integration', () => {
           packages: [pkg, mask],
           include_subpackages: true,
           max_hits_per_object: 5,
-          max_objects: 50,
         };
         const result = await tester.invokeToolOrHandler(
           'SearchSource',

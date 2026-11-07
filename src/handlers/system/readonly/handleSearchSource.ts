@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'SearchSource',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    "[read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and `*` masks (Z*, /NS/Z*); a mask is resolved by one repository quick search of up to 1000 packages. `object_types`, `object_filter`, `start_at` and `max_objects` select the scan targets of the resolved packages, in order of package, type and name. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `\"` comment lines. The answer lists each hit (`results`: package, object type, object name, include, line, snippet), `scanned` (packages, objects, sources), `total_targets`, `truncated.by_object_cap` (an object had more hits than `max_hits_per_object`), `truncated.by_max_objects` and `next_start_at` (the `start_at` of the next page, present while targets remain), and `failures` when anything was left unread: `kind` `source` names the object, the source (name and URI), the read and SAP's T100 key; `kind` `operation` names the step (a package mask's resolution, a package's walk), the mask or the package, and SAP's T100 key. Sources are read in ADT batch envelopes where the system offers them, each source once per call.",
+    '[read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call\'s `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages; every target is read in one run. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given. The answer lists each hit (`results`: package, object type, object name, include, line, snippet); `scanned.packages` counts the packages walked, `scanned.objects` the objects read, `scanned.sources` the sources read and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. A source, an object or a package whose read fails is skipped, and a type node or subpackage whose read fails is skipped with everything under it. Sources are read in ADT batch envelopes where the system offers them, each source once per call.',
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
       .array(z.string().min(1))
       .min(1)
       .describe(
-        'Packages to scan. Each entry is either an exact dev-class name or a `*` mask, where `*` stands for any characters and a namespace prefix may lead it.',
+        'Packages to scan. Each entry is an exact package name or a mask: `*` stands for zero or more characters, `?` for one character, and a namespace prefix may lead it; `+`, `_`, `%` and `#` are characters of the name.',
       ),
     include_subpackages: z
       .boolean()
@@ -72,29 +72,7 @@ export const TOOL_DEFINITION = {
       .min(1)
       .optional()
       .describe(
-        'Cap hits per root object across its source units (default 100). When exceeded, truncated.by_object_cap=true is set. Raise this value if you need more hits per object.',
-      ),
-    emit_no_hits: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true, list zero-hit targets in a separate no_hits array. Default false.',
-      ),
-    max_objects: z
-      .number()
-      .int()
-      .min(1)
-      .optional()
-      .describe(
-        'Cap the total objects scanned across all packages (default 500). Setting truncated.by_max_objects=true when exceeded.',
-      ),
-    start_at: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        'Index of the first scan target to read, from `next_start_at` of the previous answer; 0 by default.',
+        'The most hits answered per object, across its sources; absent, no limit. When an object has more, truncated.by_object_cap is true.',
       ),
     version: z
       .enum(['active', 'inactive', 'workingArea'])

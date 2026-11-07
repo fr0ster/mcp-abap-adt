@@ -28,6 +28,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { listing } from '../helpers/sourceReaderFake';
 
 let fakeClient: unknown;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -139,14 +140,11 @@ describe('SearchSource: a source read through adt-clients rejects with AuthRefus
     });
     const run = runSearchSource(
       {
-        fetchPackageContents: async () =>
-          [target('ZA'), target('ZB'), target('ZC')] as never,
+        fetchPackageContents: async (name) =>
+          listing(name, [target('ZA'), target('ZB'), target('ZC')]),
         sourceReader: createSourceReaderDeps(context as any),
         lineMatch: substringLineMatch,
-        resolvePackages: async (entries) => ({
-          packages: entries,
-          failures: [],
-        }),
+        resolvePackages: async (entries) => ({ packages: entries }),
       },
       {
         query: 'marker',

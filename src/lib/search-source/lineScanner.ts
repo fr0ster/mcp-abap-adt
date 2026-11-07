@@ -50,7 +50,7 @@ export function scanLines(
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     if (!lineMatches(raw, needle1, needle2, excludes, skipComments)) continue;
-    if (hits.length >= input.max_hits) {
+    if (input.max_hits !== undefined && hits.length >= input.max_hits) {
       capped = true;
       break;
     }

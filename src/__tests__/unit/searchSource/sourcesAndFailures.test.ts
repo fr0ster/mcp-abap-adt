@@ -267,9 +267,9 @@ const searchOne = (
   };
 };
 
-describe('SearchSource: no object is lost silently', () => {
+describe('SearchSource: what cannot be read is skipped, the reads go on (DO17)', () => {
   it.each(PATHS)(
-    'a 404 on a source the walk listed is reported, not taken as absent (%s)',
+    'a listed source that answers 404 is skipped: no entry, no count (%s)',
     async (batch) => {
       const { result } = searchOne(
         {
@@ -284,27 +284,18 @@ describe('SearchSource: no object is lost silently', () => {
       expect(
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZHERE']);
-      expect(payload.failures).toHaveLength(1);
-      const [failure] = payload.failures;
-      expect(failure).toMatchObject({
-        kind: 'source',
-        devclass: 'ZONE',
-        object_type: 'PROG',
-        object_name: 'ZGONE',
-        source: {
-          name: 'ZGONE',
-          uri: '/sap/bc/adt/programs/programs/zgone/source/main',
-        },
-        step: 'read program',
-        t100: { id: 'SADT_RESOURCE', no: '002' },
+      expect(payload.failures).toBeUndefined();
+      expect(payload.scanned).toEqual({
+        packages: 1,
+        objects: 1,
+        sources: 1,
+        objects_with_hits: 1,
       });
-      expect(failure.error.status).toBe(404);
-      expect(failure.error.step).toBe('read program');
     },
   );
 
   it.each(PATHS)(
-    'when the first child of a function group fails and a later one succeeds, the failure is recorded and the reads go on (%s)',
+    'when the first child of a function group fails and a later one succeeds, the later one is searched (%s)',
     async (batch) => {
       const { fake, result } = searchOne(
         { refuse: { 'FM Z_FM_A': 500 } },
@@ -323,23 +314,11 @@ describe('SearchSource: no object is lost silently', () => {
             `${h.object_name}/${h.include}`,
         ),
       ).toEqual(['ZFG/Z_FM_B']);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'source',
-        object_type: 'FUGR',
-        object_name: 'ZFG',
-        source: {
-          name: 'Z_FM_A',
-          uri: '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm_a/source/main',
-        },
-        step: 'read function module',
-      });
-      expect(payload.failures[0].error.status).toBe(500);
-      expect(payload.failures[0].t100).toBeUndefined();
+      expect(payload.failures).toBeUndefined();
     },
   );
 
-  it('a non-SAP error is reported, not logged and dropped', async () => {
+  it('a non-SAP error is skipped: no entry', async () => {
     const { result } = searchOne(
       { throwOn: { 'PROGRAM ZGONE': 'socket hang up' } },
       true,
@@ -349,21 +328,11 @@ describe('SearchSource: no object is lost silently', () => {
     expect(
       payload.results.map((h: { object_name: string }) => h.object_name),
     ).toEqual(['ZHERE']);
-    expect(payload.failures).toHaveLength(1);
-    expect(payload.failures[0]).toMatchObject({
-      kind: 'source',
-      object_name: 'ZGONE',
-      source: {
-        name: 'ZGONE',
-        uri: '/sap/bc/adt/programs/programs/zgone/source/main',
-      },
-      step: 'read program',
-    });
-    expect(payload.failures[0].error.step).toBe('read program');
+    expect(payload.failures).toBeUndefined();
   });
 });
 
-describe('SearchSource: the failure contract', () => {
+describe('SearchSource: package-level outcomes are skipped (DO17)', () => {
   it.each(PATHS)(
     'a mask whose quick search SAP refuses is skipped: no entry; the other packages are scanned (%s)',
     async (batch) => {
@@ -382,7 +351,7 @@ describe('SearchSource: the failure contract', () => {
   );
 
   it.each(PATHS)(
-    'a package walk SAP refuses is an OperationFailure with its package; the others are scanned (%s)',
+    'a package walk SAP refuses is skipped: no entry, not counted; the others are scanned (%s)',
     async (batch) => {
       const { result } = searchOne(
         { refuse: { [nodeKey('ZONE')]: 500 } },
@@ -393,13 +362,8 @@ describe('SearchSource: the failure contract', () => {
       expect(
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'operation',
-        step: 'walk package',
-        package: 'ZONE',
-      });
-      expect(payload.failures[0].error.status).toBe(500);
+      expect(payload.failures).toBeUndefined();
+      expect(payload.scanned.packages).toBe(1);
     },
   );
 
@@ -428,12 +392,12 @@ describe('SearchSource: the failure contract', () => {
   );
 });
 
-describe('SearchSource: every scope it did not read is named (review round 1)', () => {
+describe('SearchSource: a missing level is skipped; below the root only its branch (DO17, DO19)', () => {
   /** SAP's 404 with its T100 key, as the stand answers a request. */
   const keyed404 = { status: 404, body: NOT_FOUND_BODY };
 
   it.each(PATHS)(
-    "a package's root SAP answers 404 is a walk failure with SAP's key, not an empty package (%s)",
+    "a package's root SAP answers 404 is skipped: no entry, not counted (%s)",
     async (batch) => {
       const { result } = searchOne(
         { refuseWith: { [nodeKey('ZONE')]: keyed404 } },
@@ -444,47 +408,34 @@ describe('SearchSource: every scope it did not read is named (review round 1)', 
       expect(
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'operation',
-        step: 'walk package',
-        package: 'ZONE',
-        failed_level: { package: 'ZONE' },
-        t100: { id: 'SADT_RESOURCE', no: '002' },
-      });
-      expect(payload.failures[0].failed_level.node).toBeUndefined();
-      expect(payload.failures[0].error.status).toBe(404);
+      expect(payload.failures).toBeUndefined();
+      expect(payload.scanned.packages).toBe(1);
     },
   );
 
   it.each(PATHS)(
-    "a type node the root listed that SAP answers 404 is a walk failure with SAP's key (%s)",
+    'a type node the root listed that SAP answers 404 excludes only that node (%s)',
     async (batch) => {
       const { result } = searchOne(
         { refuseWith: { [nodeKey('ZONE', '1')]: keyed404 } },
         batch === 'absent',
-        { packages: ['ZONE', 'ZTWO'], object_types: ['PROG'] },
+        { packages: ['ZONE', 'ZTWO'] },
       );
       const payload = payloadOf(await result);
+      // ZONE's programs are excluded; its function group is searched.
       expect(
-        payload.results.map((h: { object_name: string }) => h.object_name),
-      ).toEqual(['ZTWOP']);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'operation',
-        step: 'walk package',
-        package: 'ZONE',
-        failed_level: {
-          package: 'ZONE',
-          node: { id: '1', type: 'PROG/P' },
-        },
-        t100: { id: 'SADT_RESOURCE', no: '002' },
-      });
+        payload.results.map(
+          (h: { object_name: string; include: string }) =>
+            `${h.object_name}/${h.include}`,
+        ),
+      ).toEqual(['ZFG/Z_FM_B', 'ZTWOP/ZTWOP']);
+      expect(payload.failures).toBeUndefined();
+      expect(payload.scanned.packages).toBe(2);
     },
   );
 
   it.each(PATHS)(
-    'a subpackage SAP answers 404 is named as the level that failed, beside the package asked for (%s)',
+    'a subpackage SAP answers 404 excludes only that subpackage (%s)',
     async (batch) => {
       const fake = standOn(
         {
@@ -515,19 +466,14 @@ describe('SearchSource: every scope it did not read is named (review round 1)', 
       expect(
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'operation',
-        step: 'walk package',
-        package: 'ZPAR',
-        failed_level: { package: 'ZKID' },
-        t100: { id: 'SADT_RESOURCE', no: '002' },
-      });
+      expect(payload.failures).toBeUndefined();
+      // ZPAR and ZTWO walked; ZKID not.
+      expect(payload.scanned.packages).toBe(2);
     },
   );
 
   it.each(PATHS)(
-    'an early source fills the hit cap, a later child fails: the child is read and its failure named (%s)',
+    'an early source fills the hit cap, a later child fails: the child is read and skipped (%s)',
     async (batch) => {
       const fake = standOn(
         {
@@ -559,13 +505,7 @@ describe('SearchSource: every scope it did not read is named (review round 1)', 
         ),
       ).toEqual(['Z_FM_A:1']);
       expect(payload.truncated.by_object_cap).toBe(true);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'source',
-        object_name: 'ZFG',
-        source: { name: 'Z_FM_B' },
-        step: 'read function module',
-      });
+      expect(payload.failures).toBeUndefined();
     },
   );
 
@@ -621,11 +561,7 @@ const searchShared = (model: Model, absent: boolean) => {
   const fake = standOn(SHARED, model);
   return {
     fake,
-    result: searchOn(
-      fake,
-      { query: 'marker', packages: ['ZSHR'], emit_no_hits: true },
-      absent,
-    ),
+    result: searchOn(fake, { query: 'marker', packages: ['ZSHR'] }, absent),
   };
 };
 
@@ -658,12 +594,16 @@ describe('SearchSource: one read per source', () => {
   it.each(PATHS)('a cache hit counts for both owners (%s)', async (batch) => {
     const { result } = searchShared({}, batch === 'absent');
     const payload = payloadOf(await result);
-    expect(payload.scanned).toEqual({ packages: 1, objects: 2, sources: 2 });
-    expect(payload.no_hits).toEqual([]);
+    expect(payload.scanned).toEqual({
+      packages: 1,
+      objects: 2,
+      sources: 2,
+      objects_with_hits: 2,
+    });
   });
 
   it.each(PATHS)(
-    'a shared failure is recorded for both owners (%s)',
+    'a shared failure is skipped for both owners: one request, no entry (%s)',
     async (batch) => {
       const { fake, result } = searchShared(
         { refuse: { 'INCLUDE LSHARED': 500 } },
@@ -673,15 +613,9 @@ describe('SearchSource: one read per source', () => {
       expect(sharedReads(fake)).toEqual([
         '/sap/bc/adt/programs/includes/lshared/source/main?version=active',
       ]);
-      expect(
-        payload.failures.map(
-          (f: {
-            kind: string;
-            object_name: string;
-            source: { name: string };
-          }) => `${f.kind} ${f.object_name}/${f.source.name}`,
-        ),
-      ).toEqual(['source ZFG1/LSHARED', 'source ZFG2/LSHARED']);
+      expect(payload.failures).toBeUndefined();
+      expect(payload.results).toEqual([]);
+      expect(payload.scanned.objects).toBe(0);
     },
   );
 });
@@ -690,7 +624,7 @@ describe('SearchSource: one read per source', () => {
 // No deadline of the server's (owner decision DO11, option b)
 // ---------------------------------------------------------------------------
 
-describe('SearchSource: paging by start_at and max_objects only', () => {
+describe("SearchSource: no deadline of the server's", () => {
   it('the schema declares neither time_budget_ms nor timeout', () => {
     const keys = Object.keys(TOOL_DEFINITION.inputSchema.shape);
     expect(keys).not.toContain('time_budget_ms');
@@ -712,28 +646,10 @@ describe('SearchSource: paging by start_at and max_objects only', () => {
         });
         const payload = payloadOf(result);
         expect(payload.scanned.objects).toBe(9);
-        expect(payload.next_start_at).toBeUndefined();
-        expect(payload.truncated).toEqual({
-          by_object_cap: false,
-          by_max_objects: false,
-        });
+        expect(payload.truncated).toEqual({ by_object_cap: false });
       } finally {
         spy.mockRestore();
       }
-    },
-  );
-
-  it.each(PATHS)(
-    'next_start_at comes only from max_objects (%s)',
-    async (batch) => {
-      const fake = standOn(ALL);
-      const result = await searchAll(fake, batch === 'absent', {
-        max_objects: 4,
-      });
-      const payload = payloadOf(result);
-      expect(payload.next_start_at).toBe(4);
-      expect(payload.total_targets).toBe(9);
-      expect(payload.truncated.by_max_objects).toBe(true);
     },
   );
 });
@@ -753,11 +669,21 @@ describe('SearchSource: the description is functional', () => {
     'timeout',
     'best-effort',
     'always go against the active version',
+    'of up to 1000 packages',
+    'emit_no_hits',
+    'no_hits',
+    'failures',
+    'start_at',
+    'max_objects',
+    'total_targets',
+    'next_start_at',
+    'by_max_objects',
+    'default 100',
   ])('carries no advice or stale contract: %s', (text) => {
     expect(description).not.toContain(text);
   });
 
-  it('names what it reads, its version, its paging and its failures', () => {
+  it('names what it reads, its version, its masks, what it skips and its counters', () => {
     for (const text of [
       'programs, program includes',
       'function groups (function modules and includes)',
@@ -768,10 +694,24 @@ describe('SearchSource: the description is functional', () => {
       'metadata extensions',
       'service definitions',
       '`version`',
-      '`next_start_at`',
-      '`failures`',
+      '`*` (zero or more characters) and `?` (one character) are the wildcards',
+      '`+`, `_`, `%` and `#` are characters of the name',
+      'every package it matches',
+      'every target is read in one run',
+      'skipped',
+      '`scanned.packages`',
+      '`scanned.objects`',
+      '`scanned.sources`',
+      '`scanned.objects_with_hits`',
+      'only when given',
     ]) {
       expect(description).toContain(text);
     }
+  });
+
+  it('max_hits_per_object states no default', () => {
+    const field = TOOL_DEFINITION.inputSchema.shape.max_hits_per_object;
+    expect(field.description).not.toContain('default');
+    expect(field.description).toContain('absent, no limit');
   });
 });

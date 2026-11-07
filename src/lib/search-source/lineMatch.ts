@@ -11,8 +11,8 @@ export interface ScanInput {
   query2?: string | undefined;
   exclude?: string[] | undefined;
   exclude_comments?: boolean | undefined;
-  /** The most hits to answer; past it, `capped` is set. */
-  max_hits: number;
+  /** The most hits to answer, past which `capped` is set; absent, no limit. */
+  max_hits?: number | undefined;
 }
 
 /** A matched line: its 1-based number and its text. */

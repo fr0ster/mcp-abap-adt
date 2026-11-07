@@ -1,18 +1,17 @@
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { tableCodeOf } from '../adtTypeCode';
+import { isCredentialFailure } from '../answer';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { globMatches } from '../plainText';
 import {
   assembleList,
-  failedLevelOf,
   nodeStructureOn,
   type PackageItem,
   walkPackage,
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
-import { type OperationFailure, thrownFacts } from './failures';
 
 /**
  * The codes a scan reads: every source-bearing object a package lists —
@@ -65,10 +64,21 @@ export interface EnumerateInput {
   object_types: readonly ScanObjectType[];
 }
 
+/** One asked package's walk: its items, and every package whose own level was read. */
+export interface PackageContents {
+  items: PackageContentItem[];
+  walked: ReadonlySet<string>;
+}
+
+/**
+ * The walk of one asked package. It throws when the package's own root was
+ * refused or is not there; a refused level below it excludes only its
+ * branch (DO19).
+ */
 export type PackageContentsFetcher = (
   packageName: string,
   options: { includeSubpackages: boolean },
-) => Promise<PackageContentItem[]>;
+) => Promise<PackageContents>;
 
 /** The family of each code a scan reads, by the tables' main type. */
 const FAMILY_OF: Readonly<Record<ScanCode, ScanObjectType>> = {
@@ -106,10 +116,11 @@ export const SCAN_OBJECT_TYPES = [
   'SRVD',
 ] as const satisfies readonly ScanObjectType[];
 
-/** The scan targets of a walk, and the packages whose walk failed. */
+/** The scan targets of a walk, and how many packages were walked. */
 export interface EnumeratedTargets {
   targets: EnumeratedObject[];
-  failures: OperationFailure[];
+  /** The packages whose own level was read, each once. */
+  packages: number;
 }
 
 export async function enumerateScanTargets(
@@ -119,26 +130,21 @@ export async function enumerateScanTargets(
   const wantedFamilies = new Set<ScanObjectType>(input.object_types);
   const filter = input.object_filter;
   const seen = new Set<string>();
+  const walked = new Set<string>();
   const out: EnumeratedObject[] = [];
-  const failures: OperationFailure[] = [];
 
   for (const pkg of input.packages) {
     let items: PackageContentItem[];
     try {
-      items = await fetch(pkg.toUpperCase(), {
+      const contents = await fetch(pkg.toUpperCase(), {
         includeSubpackages: input.include_subpackages,
       });
+      items = contents.items;
+      for (const name of contents.walked) walked.add(name.toUpperCase());
     } catch (error) {
-      // The walk SAP refused is this package's answer; the other packages
-      // are walked on. A credential failure ends the call (`thrownFacts`).
-      const level = failedLevelOf(error);
-      failures.push({
-        kind: 'operation',
-        step: 'walk package',
-        package: pkg.toUpperCase(),
-        ...(level !== undefined ? { failed_level: level } : {}),
-        ...thrownFacts(error, 'walk package'),
-      });
+      // A package whose root SAP refused, or that is not there, is skipped;
+      // the other packages are walked on. A credential failure ends the call.
+      if (isCredentialFailure(error)) throw error;
       continue;
     }
     for (const item of items) {
@@ -167,7 +173,7 @@ export async function enumerateScanTargets(
     return a.object_name < b.object_name ? -1 : 1;
   });
 
-  return { targets: out, failures };
+  return { targets: out, packages: walked.size };
 }
 
 /**
@@ -181,14 +187,19 @@ export function createPackageContentsFetcher(
 ): PackageContentsFetcher {
   const client = createAdtClient(ctx.connection, ctx.logger);
   const utils = nodeStructureOn(ctx, client.getUtils(ourUtils));
-  return async (packageName, options) =>
-    assembleList(
+  return async (packageName, options) => {
+    const walked = new Set<string>();
+    const items = assembleList(
       packageName,
       await walkPackage(utils, packageName, {
         includeSubpackages: options.includeSubpackages,
-        // A level SAP answers 404 is scope the scan did not read: the walk's
-        // failure, never an empty level.
+        // A level SAP answers 404 is scope the scan did not read: the root's
+        // refusal, never an empty level; below the root, only that branch
+        // is excluded.
         missingLevel: 'refused',
+        branchRule: { walked },
       }),
     );
+    return { items, walked };
+  };
 }

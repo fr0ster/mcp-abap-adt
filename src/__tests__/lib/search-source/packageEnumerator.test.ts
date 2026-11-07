@@ -3,6 +3,7 @@ import {
   type PackageContentItem,
   type PackageContentsFetcher,
 } from '../../../lib/search-source/packageEnumerator';
+import { listing } from '../../helpers/sourceReaderFake';
 
 function item(
   name: string,
@@ -15,13 +16,14 @@ function item(
 
 describe('enumerateScanTargets', () => {
   it('returns only objects of requested families and drops subpackage rows', async () => {
-    const fetch: PackageContentsFetcher = async () => [
-      item('ZPKG_SUB', 'DEVC/K', 'ZPKG', true),
-      item('ZP_FOO', 'PROG/P', 'ZPKG'),
-      item('ZF_BAR', 'FUGR/F', 'ZPKG'),
-      item('ZC_BAZ', 'CLAS/OC', 'ZPKG'),
-      item('ZD_QUX', 'DTEL/D', 'ZPKG'),
-    ];
+    const fetch: PackageContentsFetcher = async (name) =>
+      listing(name, [
+        item('ZPKG_SUB', 'DEVC/K', 'ZPKG', true),
+        item('ZP_FOO', 'PROG/P', 'ZPKG'),
+        item('ZF_BAR', 'FUGR/F', 'ZPKG'),
+        item('ZC_BAZ', 'CLAS/OC', 'ZPKG'),
+        item('ZD_QUX', 'DTEL/D', 'ZPKG'),
+      ]);
     const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZPKG'],
       include_subpackages: false,
@@ -51,7 +53,8 @@ describe('enumerateScanTargets', () => {
         item('ZA_PROG_1', 'PROG/P', 'ZA_SUB'),
       ],
     };
-    const fetch: PackageContentsFetcher = async (name) => byPkg[name] ?? [];
+    const fetch: PackageContentsFetcher = async (name) =>
+      listing(name, byPkg[name] ?? []);
     const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZB', 'ZA'],
       include_subpackages: true,
@@ -65,11 +68,12 @@ describe('enumerateScanTargets', () => {
   });
 
   it('applies object_filter glob ("Z_FOO*" matches Z_FOO_1 and Z_FOO_BAR, not Y_FOO)', async () => {
-    const fetch: PackageContentsFetcher = async () => [
-      item('Z_FOO_1', 'PROG/P', 'ZPKG'),
-      item('Z_FOO_BAR', 'PROG/P', 'ZPKG'),
-      item('Y_FOO', 'PROG/P', 'ZPKG'),
-    ];
+    const fetch: PackageContentsFetcher = async (name) =>
+      listing(name, [
+        item('Z_FOO_1', 'PROG/P', 'ZPKG'),
+        item('Z_FOO_BAR', 'PROG/P', 'ZPKG'),
+        item('Y_FOO', 'PROG/P', 'ZPKG'),
+      ]);
     const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZPKG'],
       include_subpackages: false,
@@ -82,9 +86,12 @@ describe('enumerateScanTargets', () => {
   it('deduplicates objects appearing in overlapping subpackage results', async () => {
     const fetch: PackageContentsFetcher = async (name) => {
       if (name === 'ZA')
-        return [item('ZP', 'PROG/P', 'ZA_SUB'), item('ZP', 'PROG/P', 'ZA_SUB')];
-      if (name === 'ZB') return [item('ZP', 'PROG/P', 'ZA_SUB')];
-      return [];
+        return listing(name, [
+          item('ZP', 'PROG/P', 'ZA_SUB'),
+          item('ZP', 'PROG/P', 'ZA_SUB'),
+        ]);
+      if (name === 'ZB') return listing(name, [item('ZP', 'PROG/P', 'ZA_SUB')]);
+      return listing(name, []);
     };
     const { targets: out } = await enumerateScanTargets(fetch, {
       packages: ['ZA', 'ZB'],
@@ -102,10 +109,11 @@ describe('enumerateScanTargets', () => {
   });
 
   it('a program include is a PROG target read by its own code', async () => {
-    const fetch: PackageContentsFetcher = async () => [
-      item('ZINCL', 'PROG/I', 'ZPKG'),
-      item('ZIF', 'INTF/OI', 'ZPKG'),
-    ];
+    const fetch: PackageContentsFetcher = async (name) =>
+      listing(name, [
+        item('ZINCL', 'PROG/I', 'ZPKG'),
+        item('ZIF', 'INTF/OI', 'ZPKG'),
+      ]);
     const { targets } = await enumerateScanTargets(fetch, {
       packages: ['ZPKG'],
       include_subpackages: false,
@@ -125,5 +133,22 @@ describe('enumerateScanTargets', () => {
         code: 'PROG/I',
       },
     ]);
+  });
+
+  it('a package whose walk fails is skipped and not counted; a package reached twice is counted once', async () => {
+    const fetch: PackageContentsFetcher = async (name) => {
+      if (name === 'ZGONE') throw new Error('root refused');
+      return {
+        items: [item(`P_${name}`, 'PROG/P', name)],
+        walked: new Set([name, 'ZSHARED_SUB']),
+      };
+    };
+    const { targets, packages } = await enumerateScanTargets(fetch, {
+      packages: ['ZA', 'ZGONE', 'ZB'],
+      include_subpackages: true,
+      object_types: ['PROG'],
+    });
+    expect(targets.map((t) => t.object_name)).toEqual(['P_ZA', 'P_ZB']);
+    expect(packages).toBe(3);
   });
 });

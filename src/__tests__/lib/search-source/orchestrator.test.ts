@@ -10,19 +10,23 @@ import type {
 } from '../../../lib/search-source/packageEnumerator';
 import {
   exactPackages,
+  listing,
   sourcesFrom as sourceFor,
 } from '../../helpers/sourceReaderFake';
 
 function pkg(
   items: Array<Partial<PackageContentItem>>,
 ): PackageContentsFetcher {
-  return async () =>
-    items.map((it) => ({
-      name: it.name ?? '',
-      type: it.type ?? 'PROG/P',
-      packageName: it.packageName ?? 'ZPKG',
-      isPackage: it.isPackage ?? false,
-    }));
+  return async (name) =>
+    listing(
+      name,
+      items.map((it) => ({
+        name: it.name ?? '',
+        type: it.type ?? 'PROG/P',
+        packageName: it.packageName ?? 'ZPKG',
+        isPackage: it.isPackage ?? false,
+      })),
+    );
 }
 
 const identityResolver = exactPackages;
@@ -54,11 +58,13 @@ describe('runSearchSource', () => {
     expect(
       result.results.map((r) => `${r.devclass}/${r.object_name}:${r.line}`),
     ).toEqual(['ZA/ZA_CLAS:3', 'ZA/ZA_PROG:1', 'ZB/ZB_PROG:2']);
-    expect(result.scanned).toEqual({ packages: 1, objects: 3, sources: 3 });
-    expect(result.truncated).toEqual({
-      by_object_cap: false,
-      by_max_objects: false,
+    expect(result.scanned).toEqual({
+      packages: 1,
+      objects: 3,
+      sources: 3,
+      objects_with_hits: 3,
     });
+    expect(result.truncated).toEqual({ by_object_cap: false });
   });
 
   it('caps hits per object and flips truncated.by_object_cap', async () => {
@@ -78,7 +84,6 @@ describe('runSearchSource', () => {
     });
     expect(result.results).toHaveLength(2);
     expect(result.truncated.by_object_cap).toBe(true);
-    expect(result.truncated.by_max_objects).toBe(false);
   });
 
   it('does not flip truncated.by_object_cap when an object has exactly max_hits_per_object matches', async () => {
@@ -121,32 +126,38 @@ describe('runSearchSource', () => {
     expect(result.truncated.by_object_cap).toBe(true);
   });
 
-  it('caps enumerated targets via max_objects and flips truncated.by_max_objects', async () => {
+  it('orders the hits by the walk, whatever order the package answers in', async () => {
     const deps: OrchestratorDeps = {
+      lineMatch: substringLineMatch,
       fetchPackageContents: pkg([
-        { name: 'Z_P1', type: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P2', type: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P3', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'ZPROG_B', type: 'PROG/P', packageName: 'ZROOT' },
+        { name: 'ZCL_A', type: 'CLAS/OC', packageName: 'ZSUB' },
+        { name: 'ZPROG_O', type: 'PROG/P', packageName: 'ZOTHER' },
+        { name: 'ZPROG_A', type: 'PROG/P', packageName: 'ZROOT' },
       ]),
       sourceReader: sourceFor({
-        'PROG:Z_P1': 'marker',
-        'PROG:Z_P2': 'marker',
-        'PROG:Z_P3': 'marker',
+        'PROG:ZPROG_B': 'marker',
+        'CLAS:ZCL_A': 'marker',
+        'PROG:ZPROG_O': 'marker',
+        'PROG:ZPROG_A': 'marker',
       }),
-      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
       ...baseInput,
-      max_objects: 1,
+      concurrency: 1,
     });
-    expect(result.scanned.objects).toBe(1);
-    expect(result.results).toHaveLength(1);
-    expect(result.truncated.by_max_objects).toBe(true);
+    expect(result.results.map((h) => h.object_name)).toEqual([
+      'ZPROG_O',
+      'ZPROG_A',
+      'ZPROG_B',
+      'ZCL_A',
+    ]);
   });
 
-  it('emit_no_hits=true emits a separate entry for zero-hit targets and never mixes them into results', async () => {
+  it('an object without a hit is not in the answer, and counts as read', async () => {
     const deps: OrchestratorDeps = {
+      lineMatch: substringLineMatch,
       fetchPackageContents: pkg([
         { name: 'Z_HIT', type: 'PROG/P', packageName: 'ZPKG' },
         { name: 'Z_MISS', type: 'PROG/P', packageName: 'ZPKG' },
@@ -155,17 +166,17 @@ describe('runSearchSource', () => {
         'PROG:Z_HIT': 'marker line',
         'PROG:Z_MISS': 'nothing here',
       }),
-      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
-    const result = await runSearchSource(deps, {
-      ...baseInput,
-      emit_no_hits: true,
-    });
+    const result = await runSearchSource(deps, baseInput);
     expect(result.results.map((r) => r.object_name)).toEqual(['Z_HIT']);
-    expect(result.no_hits).toEqual([
-      { devclass: 'ZPKG', object_type: 'PROG', object_name: 'Z_MISS' },
-    ]);
+    expect(Object.keys(result)).not.toContain('no_hits');
+    expect(result.scanned).toEqual({
+      packages: 1,
+      objects: 2,
+      sources: 2,
+      objects_with_hits: 1,
+    });
   });
 });
 
@@ -181,7 +192,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
         'PROG:ZB_PROG': 'marker',
       }),
       lineMatch: substringLineMatch,
-      resolvePackages: async () => ({ packages: ['ZA', 'ZB'], failures: [] }),
+      resolvePackages: async () => ({ packages: ['ZA', 'ZB'] }),
     };
     const result = await runSearchSource(deps, {
       ...baseInput,
@@ -197,18 +208,20 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
       },
       sourceReader: sourceFor({}),
       lineMatch: substringLineMatch,
-      resolvePackages: async () => ({ packages: [], failures: [] }),
+      resolvePackages: async () => ({ packages: [] }),
     };
     const result = await runSearchSource(deps, {
       ...baseInput,
       packages: ['ZZZ_NONEXISTENT*'],
     });
     expect(result.results).toEqual([]);
-    expect(result.scanned).toEqual({ packages: 0, objects: 0, sources: 0 });
-    expect(result.truncated).toEqual({
-      by_object_cap: false,
-      by_max_objects: false,
+    expect(result.scanned).toEqual({
+      packages: 0,
+      objects: 0,
+      sources: 0,
+      objects_with_hits: 0,
     });
+    expect(result.truncated).toEqual({ by_object_cap: false });
   });
 
   it('collapses case-duplicate exact entries before enumeration', async () => {
@@ -216,7 +229,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: async (name) => {
         fetchedFor = name;
-        return [];
+        return listing(name, []);
       },
       sourceReader: sourceFor({}),
       lineMatch: substringLineMatch,
@@ -230,7 +243,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
             out.push(e);
           }
         }
-        return { packages: out, failures: [] };
+        return { packages: out };
       },
     };
     const result = await runSearchSource(deps, {
@@ -242,25 +255,24 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
   });
 });
 
-describe('runSearchSource — default max_hits_per_object=100 (Fix B)', () => {
-  it('returns all hits when count is below default 100 cap, and by_object_cap stays false', async () => {
+describe('runSearchSource — max_hits_per_object absent: no limit (DO20)', () => {
+  it('answers every hit of an object, and by_object_cap stays false', async () => {
     const deps: OrchestratorDeps = {
+      lineMatch: substringLineMatch,
       fetchPackageContents: pkg([
         { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
-        'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3',
+        'PROG:Z_PROG': Array.from({ length: 120 }, () => 'marker').join('\n'),
       }),
-      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
-    // Do NOT pass max_hits_per_object — rely on default (100)
     const result = await runSearchSource(deps, {
       query: 'marker',
       packages: ['ZPKG'],
       object_types: ['PROG'],
     });
-    expect(result.results).toHaveLength(3);
+    expect(result.results).toHaveLength(120);
     expect(result.truncated.by_object_cap).toBe(false);
   });
 });

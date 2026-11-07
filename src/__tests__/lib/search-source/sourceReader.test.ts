@@ -4,7 +4,7 @@ import {
   type FugrChild,
   type ReadSourceUnitsDeps,
   readSourceUnits,
-  type UnitOutcome,
+  type SourceUnit,
 } from '../../../lib/search-source/sourceReader';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import { fakeKeyOf, sapAnswered } from '../../helpers/sourceReaderFake';
@@ -37,18 +37,13 @@ function makeDeps(
   return { deps, calls };
 }
 
-async function collect(
-  gen: AsyncGenerator<UnitOutcome>,
-): Promise<UnitOutcome[]> {
-  const out: UnitOutcome[] = [];
+async function collect(gen: AsyncGenerator<SourceUnit>): Promise<SourceUnit[]> {
+  const out: SourceUnit[] = [];
   for await (const u of gen) out.push(u);
   return out;
 }
 
-const includes = (outcomes: UnitOutcome[]) =>
-  outcomes.map((o) =>
-    o.ok ? o.unit.include : `failed ${o.failure.source.name}`,
-  );
+const includes = (units: SourceUnit[]) => units.map((u) => u.include);
 
 const PROG: EnumeratedObject = {
   devclass: 'ZPKG',
@@ -74,10 +69,7 @@ describe('readSourceUnits', () => {
     const { deps, calls } = makeDeps();
     const units = await collect(readSourceUnits(deps, PROG));
     expect(units).toEqual([
-      {
-        ok: true,
-        unit: { include: 'Z_PROG', lines: ['PROG:Z_PROG', 'line2'] },
-      },
+      { include: 'Z_PROG', lines: ['PROG:Z_PROG', 'line2'] },
     ]);
     expect(calls).toEqual(['PROG:Z_PROG']);
   });
@@ -242,37 +234,59 @@ describe('readSourceUnits', () => {
     ]);
   });
 
-  it('a class main source SAP answers 404 is a failure: SAP listed it', async () => {
-    const { deps } = makeDeps({ absent: 'CLAS:Z_CLAS' });
+  it('a class main source SAP answers 404 is skipped; the four local includes are still read', async () => {
+    const { deps, calls } = makeDeps({ absent: 'CLAS:Z_CLAS' });
     const units = await collect(readSourceUnits(deps, CLAS));
     expect(includes(units)).toEqual([
-      'failed Z_CLAS',
       'definitions',
       'implementations',
       'macros',
       'testclasses',
     ]);
+    expect(calls).toHaveLength(5);
   });
 
-  it('a unit whose read throws is a failure; the reads go on with the rest', async () => {
+  it('a unit whose read throws is skipped; the reads go on with the rest', async () => {
     const structure: FugrChild[] = [
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_A' },
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_B' },
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_C' },
     ];
-    const { deps } = makeDeps({ structure, failing: 'FM:Z_FG/Z_FM_B' });
+    const { deps, calls } = makeDeps({ structure, failing: 'FM:Z_FG/Z_FM_B' });
     const units = await collect(readSourceUnits(deps, FUGR));
-    expect(includes(units)).toEqual(['Z_FM_A', 'failed Z_FM_B', 'Z_FM_C']);
-    const failed = units[1];
-    expect(failed?.ok).toBe(false);
-    if (failed !== undefined && !failed.ok) {
-      expect(failed.failure).toMatchObject({
-        kind: 'source',
-        object_name: 'Z_FG',
-        step: 'read function module',
-        error: { error: 'client_threw', message: 'boom' },
-      });
-    }
+    expect(units).toEqual([
+      { include: 'Z_FM_A', lines: ['FM:Z_FG/Z_FM_A', 'line2'] },
+      { include: 'Z_FM_C', lines: ['FM:Z_FG/Z_FM_C', 'line2'] },
+    ]);
+    expect(calls).toEqual([
+      'FM:Z_FG/Z_FM_A',
+      'FM:Z_FG/Z_FM_B',
+      'FM:Z_FG/Z_FM_C',
+    ]);
+  });
+
+  it('a function group whose structure SAP refuses yields nothing', async () => {
+    const deps: ReadSourceUnitsDeps = {
+      async readSource() {
+        throw new Error('no source is read without the structure');
+      },
+      async readStructure() {
+        return { ok: false, error: sapAnswered(500) };
+      },
+    };
+    expect(await collect(readSourceUnits(deps, FUGR))).toEqual([]);
+  });
+
+  it('a credential failure SAP answered ends the reads, thrown', async () => {
+    const deps: ReadSourceUnitsDeps = {
+      async readSource() {
+        return { ok: false, error: sapAnswered(401) };
+      },
+      async readStructure() {
+        return { ok: true, value: [] };
+      },
+    };
+    await expect(collect(readSourceUnits(deps, PROG))).rejects.toBeDefined();
   });
 
   it('lazy iteration: aborting after the first FUGR unit prevents later fetches', async () => {

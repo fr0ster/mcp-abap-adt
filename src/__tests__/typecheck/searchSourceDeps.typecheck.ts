@@ -5,11 +5,15 @@
  * optional.
  */
 import type { OrchestratorDeps } from '../../lib/search-source/orchestrator';
-import { exactPackages, sourcesFrom } from '../helpers/sourceReaderFake';
+import {
+  exactPackages,
+  listing,
+  sourcesFrom,
+} from '../helpers/sourceReaderFake';
 
 // @ts-expect-error the orchestrator has no line match of its own
 export const withoutStrategy: OrchestratorDeps = {
-  fetchPackageContents: async () => [],
+  fetchPackageContents: async (name) => listing(name, []),
   sourceReader: sourcesFrom({}),
   resolvePackages: exactPackages,
 };

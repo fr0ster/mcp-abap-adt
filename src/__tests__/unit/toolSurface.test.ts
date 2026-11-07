@@ -244,9 +244,19 @@ describe('the MCP tool surface', () => {
       //
       // **24.0.0, decided by the owner (DO11).** No deadline of the server's
       // ends a scan: `SearchSource`'s `time_budget_ms` and `timeout` are
-      // removed; a large scan is paged by `start_at` and `max_objects`.
+      // removed.
+      //
+      // **24.0.0, decided by the owner (DO15, DO20).** `SearchSource` answers
+      // hits only and reads every target in one run: `emit_no_hits` and
+      // `max_objects` are removed (and `start_at`, never in this fixture).
       const REMOVED: Record<string, string[]> = {
-        'search/SearchSource': ['concurrency', 'time_budget_ms', 'timeout'],
+        'search/SearchSource': [
+          'concurrency',
+          'time_budget_ms',
+          'timeout',
+          'emit_no_hits',
+          'max_objects',
+        ],
         'high/CreateClass': ['abstract'],
         'high/CreateProgram': ['program_type'],
         'high/UpdateBehaviorDefinition': ['lock_handle'],
@@ -315,8 +325,6 @@ describe('the MCP tool surface', () => {
         // the caller's choice, `include_descriptions` (default false), as in
         // GetPackageContents and GetPackageTree.
         'system/GetObjectInfo': ['include_descriptions'],
-        // 19.0.0: SearchSource's cursor, `start_at` (from `next_start_at`), optional.
-        'search/SearchSource': ['start_at'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
         // part per call, `part` (source | metadata, default source), optional.
         'high/GetClass': ['part', 'start_line', 'end_line'],

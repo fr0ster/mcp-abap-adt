@@ -11,6 +11,10 @@
  */
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type {
+  PackageContentItem,
+  PackageContents,
+} from '../../lib/search-source/packageEnumerator';
+import type {
   FugrChild,
   ReadAnswer,
   SourceRead,
@@ -88,5 +92,10 @@ export function sourcesFrom(
 /** The resolution of exact package names: the entries as they are. */
 export const exactPackages = async (entries: string[]) => ({
   packages: entries,
-  failures: [],
 });
+
+/** A walk of `packageName` that read its own level and found `items`. */
+export const listing = (
+  packageName: string,
+  items: PackageContentItem[],
+): PackageContents => ({ items, walked: new Set([packageName]) });

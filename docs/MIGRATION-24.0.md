@@ -237,10 +237,11 @@ Streamable HTTP instance did in 23.x — and sends a write, a delete or an unloc
   on a plain `McpServer` has no held locks: there `HandlerLock` is refused, sending nothing
   (`locks are not kept by this server instance: …`), and so is every call under a `lock_handle`.
 
-## Callers of `SearchSource`: every source, typed failures, no deadline
+## Callers of `SearchSource`: every source, hits only, complete masks, one run, no deadline
 
 **Changed:** `SearchSource` scans every source-bearing object SAP lists, each source at the
-call's `version`, each once per call, and names everything it could not read.
+call's `version`, each once per call; it resolves a package mask completely, reads every target
+in one run, answers only the hits with counters of what it did, and skips what it cannot read.
 
 **What changes for you:**
 - **`object_types` is wider, and so is the default.** It takes `PROG` (programs and program
@@ -252,27 +253,39 @@ call's `version`, each once per call, and names everything it could not read.
 - **`version` applies to every source**, a function group's includes and modules included
   (they were read active).
 - **Function modules named `VIEW…` are scanned** (they were skipped by name).
-- **`failures` entries carry `kind`.** `kind: 'source'` keeps `devclass`, `object_type`,
-  `object_name` and `error`, and adds `source` (`name`, `uri`), `step` (the read) and `t100`
-  (`id`, `no`) where SAP gave a T100 key; an object may have several, one per source.
-  `kind: 'operation'` names no object: `step` is `resolve package mask` (with `mask`) or
-  `walk package` (with `package`, the package the call asked for, and `failed_level`: the level
-  SAP refused — its `package`, that package or a subpackage, and for a type node `node`
-  `{ id, type }`), with `t100` where there is one and `error`. A mask SAP refused
-  or a package whose walk SAP refused is such an entry, and the other packages are scanned; it
-  ended the call before; a package level SAP answers `404` (root, type node, subpackage) is a
-  `walk package` entry too (it was read as empty). A `404` on a listed source is an entry (it was skipped as absent), and
-  so is a read that threw without SAP's answer (it was dropped). A credential failure still ends
-  the call. An object with a failure is not listed in `no_hits`. Past `max_hits_per_object` an
-  object's sources are still read, so their failures are named; only the hits are capped.
-- **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan: a
-  call answers when every target of its page is read. `truncated.by_timeout` is gone,
-  `total_targets` is always present, and `next_start_at` is present only while targets remain
-  after `start_at + max_objects`. To keep a large scan short, page it: call with `max_objects`
-  (say 100), then again with `start_at` set to the `next_start_at` answered, until no
-  `next_start_at` comes back. To bound a call in time, cancel it from your client.
-  `SearchSource` runs as every long tool runs: on an ABAP session of its own, in the background
-  by default — see "Callers of the long tools" below.
+- **A mask is `*` / `?`.** `*` stands for zero or more characters and `?` for one; `+`, `_`,
+  `%` and `#` are characters of the name. An entry holding neither `*` nor `?` is an exact
+  package name — so an entry with `+` is an exact name now: write `*` where `+` was meant as a
+  wildcard. A mask answers every matching package (it was cut at 1000 without a word).
+- **Only hits are answered.** Drop `emit_no_hits` (a call that still sends it has it dropped)
+  and read the objects with hits from `results`: an object without a hit is no longer listed,
+  and `no_hits` is gone.
+- **The `failures` list is gone, both kinds.** A source or object that cannot be read, a mask
+  search SAP refuses and a package that does not exist (its root refused or `404`) are skipped
+  with no entry. Below the root, a refused or missing type node or subpackage excludes only its
+  branch: the package's other type nodes, subpackages and objects are walked and searched. A
+  readable source of an object is still searched when another of its sources failed. A
+  credential failure still ends the call.
+- **The counters count only what was done.** `scanned.packages` the packages walked (their own
+  level read, subpackages included), `scanned.objects` the objects read (at least one source),
+  `scanned.sources` the sources read, and the new `scanned.objects_with_hits` the objects with
+  a hit in `results`.
+- **No paging.** Drop `max_objects` and `start_at` (a call that still sends them has them
+  dropped); `total_targets`, `next_start_at` and `truncated.by_max_objects` are gone. Every
+  target is read in one run — run it in the background (the default) and read the
+  `run_handle` with `GetBackgroundRun`, or end it with `DiscardBackgroundRun`.
+- **`max_hits_per_object` limits each object only when given** (it was 100 by default).
+  `truncated.by_object_cap` is set when a given limit cut an object's hits.
+- **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan;
+  `truncated.by_timeout` is gone. To bound a call in time, run it in the background and end it
+  with `DiscardBackgroundRun`, or cancel it from your client. `SearchSource` runs as every long
+  tool runs: on an ABAP session of its own, in the background by default — see "Callers of the
+  long tools" below.
+- **Embedders of `runSearchSource` / `runSearchSourceWithContext` pass the line-match
+  strategy:** `OrchestratorDeps.lineMatch`, and the third argument of
+  `runSearchSourceWithContext`. The shipped `substringLineMatch` keeps the match as it was. A
+  `PackageContentsFetcher` answers `{ items, walked }` (the packages whose own level was read)
+  where it answered the items alone.
 
 ## Callers of the long tools: background by default, no timeout
 

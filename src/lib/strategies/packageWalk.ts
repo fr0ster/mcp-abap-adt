@@ -577,30 +577,24 @@ export interface WalkOptions {
    * step — for a caller that must name every scope it did not read.
    */
   missingLevel?: MissingLevel;
+  /** A refused level below the root excludes only its branch (`BranchRule`); absent, it ends the package's walk. */
+  branchRule?: BranchRule;
 }
 
 /** What a `404` on a level of a walk answers. */
 export type MissingLevel = 'empty' | 'refused';
 
-/** The level of a walk whose read failed: its package and, for a type node, the node. */
-export interface FailedLevel {
-  package: string;
-  node?: { id: string; type: string };
-}
-
-/** The level each failure of a walk arose at, by the thrown value. */
-const FAILED_LEVEL = new WeakMap<object, FailedLevel>();
-
-/** Records the level `thrown` arose at, unless a deeper level was recorded already. */
-function markLevel(thrown: unknown, level: FailedLevel): void {
-  if (thrown === null || typeof thrown !== 'object') return;
-  if (!FAILED_LEVEL.has(thrown)) FAILED_LEVEL.set(thrown, level);
-}
-
-/** The level of a walk a failure arose at; `undefined` when it is none of a walk's. */
-export function failedLevelOf(thrown: unknown): FailedLevel | undefined {
-  if (thrown === null || typeof thrown !== 'object') return undefined;
-  return FAILED_LEVEL.get(thrown);
+/**
+ * The branch rule of a walk that reads what it can (`SearchSource`, DO19): a
+ * refused level below the asked package's root — a type node, or a
+ * subpackage's root, its `404` included under `missingLevel: 'refused'` —
+ * excludes only that branch, and the walk goes on with the next node or
+ * subpackage; a refused root of the asked package still settles the package
+ * as refused; a credential failure still ends the walk. Every package whose
+ * own level was read is added to `walked`.
+ */
+export interface BranchRule {
+  walked: Set<string>;
 }
 
 /** A package of a walk: what was found in it, and the subpackages walked from it. */
@@ -673,6 +667,8 @@ export async function walkPackages(
     subs: [],
   }));
 
+  // The branches the branch rule excluded: a subpackage whose root was refused.
+  const excluded = new Set<PackageWalk>();
   /** The level an answer carries, or undefined once its package failed. */
   const settle = (
     walk: PackageWalk,
@@ -682,21 +678,27 @@ export async function walkPackages(
     if (failures.has(walk.root)) return undefined;
     try {
       if (!result.ok) throw result.error;
-      return levelOf(result.value, options.missingLevel);
+      const level = levelOf(result.value, options.missingLevel);
+      if (node === undefined) options.branchRule?.walked.add(walk.name);
+      return level;
     } catch (error) {
       // A credential failure is every root's: it ends the walk as it came.
       if (endsTheCall(error)) throw error;
-      markLevel(
-        error,
-        node === undefined
-          ? { package: walk.name }
-          : { package: walk.name, node },
-      );
+      // Under the branch rule, a refused level below the asked package's
+      // root excludes only its branch.
+      if (
+        options.branchRule !== undefined &&
+        (node !== undefined || walk.depth > 1)
+      ) {
+        if (node === undefined) excluded.add(walk);
+        return undefined;
+      }
       failures.set(walk.root, error);
       return undefined;
     }
   };
-  const alive = (walk: PackageWalk) => !failures.has(walk.root);
+  const alive = (walk: PackageWalk) =>
+    !failures.has(walk.root) && !excluded.has(walk);
 
   let level = walks;
   let first = roots;
@@ -791,16 +793,11 @@ export async function walkPackage(
   seen.add(pkg);
 
   const withShortDescriptions = options.includeDescriptions === true;
-  let root: NodeLevel;
-  try {
-    root = levelOf(
-      await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
-      options.missingLevel,
-    );
-  } catch (error) {
-    markLevel(error, { package: pkg });
-    throw error;
-  }
+  const root = levelOf(
+    await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
+    options.missingLevel,
+  );
+  options.branchRule?.walked.add(pkg);
 
   // A description only when asked for: SAP sends some without it.
   const owned = (o: WalkedItem): WalkedItem => {
@@ -811,23 +808,15 @@ export async function walkPackage(
   };
   const found: WalkedItem[] = root.objects.map(owned);
   for (const child of root.childNodes) {
-    let level: NodeLevel;
-    try {
-      level = levelOf(
-        await utils.fetchNodeStructure('DEVC/K', pkg, {
+    const level = await underBranchRule(options, () =>
+      utils
+        .fetchNodeStructure('DEVC/K', pkg, {
           nodeId: child.nodeId,
           withShortDescriptions,
-        }),
-        options.missingLevel,
-      );
-    } catch (error) {
-      markLevel(error, {
-        package: pkg,
-        node: { id: child.nodeId, type: child.type },
-      });
-      throw error;
-    }
-    found.push(...level.objects.map(owned));
+        })
+        .then((answer) => levelOf(answer, options.missingLevel)),
+    );
+    if (level !== undefined) found.push(...level.objects.map(owned));
   }
 
   if (!options.includeSubpackages) return found;
@@ -837,11 +826,30 @@ export async function walkPackage(
   for (const item of found) {
     if (kindOf(item.type) !== 'package') continue;
     if (depth >= limit) continue;
-    out.push(
-      ...(await walkPackage(utils, item.name, options, depth + 1, seen)),
+    const sub = await underBranchRule(options, () =>
+      walkPackage(utils, item.name, options, depth + 1, seen),
     );
+    if (sub !== undefined) out.push(...sub);
   }
   return out;
+}
+
+/**
+ * A level below the asked package's root: its answer, or — under the branch
+ * rule — `undefined` for a level SAP refused, which excludes only that
+ * branch. Without the rule, and for a failure that ends the call, the
+ * failure is thrown as it came.
+ */
+async function underBranchRule<T>(
+  options: WalkOptions,
+  read: () => Promise<T>,
+): Promise<T | undefined> {
+  try {
+    return await read();
+  } catch (error) {
+    if (options.branchRule === undefined || endsTheCall(error)) throw error;
+    return undefined;
+  }
 }
 
 /**

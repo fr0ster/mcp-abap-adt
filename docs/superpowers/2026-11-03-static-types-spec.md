@@ -457,8 +457,9 @@ on-premise system disagree, the live measurement holds.
 - **SearchSource rework (owner, 2026-11-07, plan D23):** masks resolved completely or
   named as incomplete; every source-bearing object SAP lists is scanned through the existing
   readers; no `VIEW*` name skip; no object dropped silently; SAP's text search first when
-  offered, decided by its key; one read per source; a functional description. Live parts
-  are owed. `time_budget_ms` / `timeout` is an open owner decision.
+  offered, decided by its key; one read per source; a functional description. D23a (sources,
+  versions, failures, dedup, description) needs no SAP; D23b (masks, text search) is
+  measurement-first and owed until the systems are restored. `time_budget_ms` / `timeout` is an open owner decision.
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

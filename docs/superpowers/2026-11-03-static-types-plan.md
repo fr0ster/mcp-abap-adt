@@ -2541,71 +2541,127 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 - **adt-clients** (43.x): `AdtUtils.search(criteria)` sends one quick search with `maxResults`
   (default 100); it offers no paging.
 
-**Live parts are owed.** Every live step below waits until the owner restores the on-premise
-tunnel and the trial session, and is marked *owed*. Nothing is run before then.
+**The task is in two parts.** **D23a** needs no SAP and starts now. **D23b** holds the masks and
+the text search, whose design depends on measurements; it waits until the owner restores
+the on-premise tunnel and the trial session, and nothing of it runs before then.
 
-- [ ] **Step 1: Masks are resolved completely, or the answer says they were not.**
-  - Red tests first, on `recordingConnection` with corpus quick-search answers:
-    - `'a mask whose search fills the window is not taken as complete'`: an answer with as
-      many hits as `maxResults` asked;
-    - `'an incomplete mask is named in the answer'`: the answer carries
-      `incomplete_masks: [{ mask, reason }]` and scans what it did resolve;
-    - `'a mask resolved under the window is complete'`.
-  - The resolution, in plain code with SAP doing the matching: a quick search answering fewer
-    hits than asked is complete. A search that fills the window is narrowed by SAP: the mask
-    is split by its next character (`Z*` → `ZA*` … `Z_*`, `Z/*`), each searched in turn,
-    recursively, until every answer is under the window. A mask that cannot be narrowed
-    further and still fills the window is named in `incomplete_masks`. No package is dropped
-    without being named.
-  - Pins: the quick-search requests of a narrowing, by literal.
-- [ ] **Step 2: Every source-bearing object SAP lists is scanned.**
-  - Red tests over corpus node-structure answers. The walked package's object list is
-    scanned for every type that has a source the server already reads:
-    - program includes (`PROG/I`);
-    - a class's local includes (definitions, implementations, macros, test classes, through
-      the existing class-include readers);
-    - interfaces (`INTF/OI`);
-    - CDS (`DDLS/DF`), BDEF (`BDEF/BDO`), DDLX (`DDLX/EX`), SRVD (`SRVD/SRV`);
-    - and any other type with an existing source reader (listed at the step from the
-      `Get<Type>` source reads).
-  - Each type is read through the server's existing reader for it, with the call's
-    `version` where that reader takes one. Function-group includes are read in the asked
-    version where their reader takes one; if a reader cannot (the include endpoint reads the
-    active version alone), the answer says so per object, and nothing is assumed.
-  - `object_types` widens to these types. Listed-schema fixture, and MIGRATION: the default
-    scan now covers them.
-- [ ] **Step 3: The `VIEW*` skip goes.** Red test: `'a function module named VIEW… is scanned'`.
+#### D23a. Sources, versions, failures, dedup, description (no SAP; starts now)
+
+- [ ] **Step 1: Every source-bearing object SAP lists is scanned, each in the asked version.**
+  The reader per type (adt-clients 43, `AdtClient`), each taking the call's `version`:
+
+  | Type | Reader |
+  | --- | --- |
+  | program `PROG/P` | `getProgram().read` |
+  | program include `PROG/I` and function-group include | `getInclude().read` (the function-group include through `getFunctionInclude().read` where the server reads it so) |
+  | class `CLAS/OC` | `getClass().read` (main), plus the four local includes: `getLocalDefinitions().read`, `getLocalTypes().read`, `getLocalMacros().read`, `getLocalTestClass().read` |
+  | interface `INTF/OI` | `getInterface().read` |
+  | function module (in a walked `FUGR/F`) | `getFunctionModule().read` |
+  | CDS `DDLS/DF`, BDEF `BDEF/BDO`, DDLX `DDLX/EX`, SRVD `SRVD/SRV` | `getDdl().read`, `getBehaviorDefinition().read`, `getMetadataExtension().read`, `getServiceDefinition().read` |
+
+  - **Version.** Today the function-group include and function-module reads are hardcoded to
+    `active` (`sourceReader.ts`). Every source path, these included, passes the requested
+    version. A type reported as "active only" is reported so only where a measurement shows
+    its reader ignores the version — none is assumed.
+  - **Red tests,** on `recordingConnection` over corpus node-structure answers:
+    - every listed type above is read, through its reader;
+    - every source GET carries the asked `version` (`inactive` in the test), the function
+      module and the function-group include included;
+    - `object_types` accepts the new types.
+  - `object_types` widens to these types: listed-schema fixture; MIGRATION (the default scan
+    now covers them).
+- [ ] **Step 2: The `VIEW*` skip goes.** Red test: `'a function module named VIEW… is scanned'`.
   The name skip is removed. If such modules must not be scanned, that is decided from
-  something SAP states — a measurement, *owed* live (what distinguishes them in the
-  function group's structure). Until then they are scanned.
-- [ ] **Step 4: No object is dropped silently.** Red tests: a source read that fails (a corpus
-  error answer with a T100 key; a transport failure without one) puts the object in the
-  answer's `failed` list with its `step` and SAP's key where there is one, never only a debug
-  log. `safe()` is removed; every read's failure is answered.
-- [ ] **Step 5: SAP's text search first, by key.**
-  - Red tests: `'an SRIS_SEARCH 006 answer means unavailable, and the scan runs'` (decided by
-    the T100 key read with the parser, never by words); `'any other failure of the text
-    search is in failed and the scan runs'`.
-  - When the system answers the text search, its result is used and the scan is the
-    fallback. Its request and answer shape are measured live once a system offers it —
-    *owed*. Until then the code holds only the key check and the fallback, and no guessed
-    request shape is pinned.
-- [ ] **Step 6: One read per source.** Red test: `'an include named by two objects is read
-  once'` — the recorded requests hold one GET per source URI, and both objects' hits come
-  from it. The batch envelopes stay; no timer is added.
-- [ ] **Step 7: The description.** `SearchSource`'s description says what the tool does, its
+  something SAP states — a measurement, *owed* live (D23b). Until then they are scanned.
+- [ ] **Step 3: No object is lost silently.** Today three paths lose sources:
+  - `safe()` logs a non-SAP error at debug level and drops the object;
+  - `refusedOrAbsent()` (`sourceReader.ts`) turns every `404` into `null`, even for a source
+    SAP listed in the walk;
+  - a child read that throws ends the function group's generator (`readSourceUnits`), so the
+    group's later sources are never read.
+
+  Red tests:
+  - `'a 404 on a source the walk listed is reported, not taken as absent'`;
+  - `'when the first child of a function group fails and a later one succeeds, the failure
+    is recorded and the reads go on'`: both children's requests pinned, the second's hits in
+    the answer, the first in `failures`;
+  - `'a non-SAP error is reported, not logged and dropped'`.
+
+  Then `safe()` goes; `refusedOrAbsent` answers absent only for what was not listed (a probe
+  read), and a listed source's 404 is a failure; the generator records a child's failure and
+  goes on.
+- [ ] **Step 4: The failure contract.** The answer keeps the field name `failures` (today
+  `failures?: FailedObject[]`, each an object identity and a nested `error: FailureEntry`).
+  It holds two typed entry kinds:
+  - **`SourceFailure`:** `kind: 'source'`, the object's identity (`object_type`,
+    `object_name`), the source's identity (the include's or source's name and URI), the
+    `step` (which read), and SAP's T100 key (message class and number) where SAP gave one,
+    with the existing `error` entry;
+  - **`OperationFailure`:** `kind: 'operation'`, no object identity, the `step` (package
+    resolution, the text search, a walk level) and SAP's key where there is one.
+
+  Red tests for each kind, and that a credential failure still ends the call as today.
+  MIGRATION: the entries gain `kind`, the source identity and the key.
+- [ ] **Step 5: One read per source, in both paths.** A call-scoped cache, keyed by the
+  canonical source identity (the source URI) plus version, serves the sequential path and
+  the batched path alike.
+  - Red tests:
+    - `'an include named by two objects is read once'`: one GET per source URI in both paths,
+      and both owners' hits come from it;
+    - `'a cache hit counts for both owners'` (each object's hit count and listing);
+    - `'a shared failure is recorded for both owners'`: one failed read, a `SourceFailure` per
+      owner, one request.
+  - The batch envelopes stay; no timer is added.
+- [ ] **Step 6: The description.** `SearchSource`'s description says what the tool does, its
   arguments and its answer — functionally. The advice lines go: "Run only ONE SearchSource
   per destination at a time…", "Prefer combining terms…", "For certainty, pass concrete
-  package names", and the other recommendations. A description test, under the
-  functional-descriptions guard.
-- [ ] **Step 8: Pins and CHANGELOG / MIGRATION.** Pins over corpus answers for each new type's
-  read and for the narrowing. CHANGELOG (Fixed: masks resolved completely or named; every
-  source-bearing type scanned; no object dropped silently; Changed: the description).
-  MIGRATION-24.0: `object_types`' wider set and default, `incomplete_masks`, the `failed`
-  entries, the `VIEW*` modules scanned.
-- [ ] **Step 9: Live cases, owed.** On both systems, once restored: a mask that fills the
-  window is narrowed to completion; a class's local include and a program include are
-  scanned; a failing read appears in `failed`; the text-search key check.
+  package names", and the other recommendations. The mask sentence states what D23b will
+  measure only after D23b; until then it states today's behaviour plainly. A description
+  test, under the functional-descriptions guard.
+- [ ] **Step 7: Pins, CHANGELOG / MIGRATION.** Pins over corpus answers for each new type's read
+  and version, the dedup and the failure kinds. CHANGELOG (Fixed: every source-bearing type
+  scanned in the asked version; no object lost silently; one read per source; Changed: the
+  description). MIGRATION-24.0: `object_types`' wider set and default, the failure entries'
+  shape, and the `VIEW*` modules scanned.
+
+#### D23b. Masks and SAP's text search (owed: measurement first, after the systems are restored)
+
+- [ ] **Step 1: Measure the quick search (owed).** On both systems, read-only:
+  - how it treats case, a `/NS/` namespace, `+`, several `*`, and a `*` that matches zero
+    characters;
+  - the full set of characters a package name may hold, and the maximum name length SAP
+    allows (from the system's own definition, read through an existing tool);
+  - what it answers when the hits reach `maxResults`.
+
+  Recorded in this task.
+- [ ] **Step 2: Define the resolution from the measurement.**
+  - **Disjoint partitions:** a mask that fills the window is split by its next character
+    position into the measured character set, each part disjoint from the others, so no
+    package is counted in two parts;
+  - **the terminal name:** the mask itself without `*` (the exact name the mask also
+    matches) is checked as its own query, once;
+  - **maximum depth:** the measured maximum name length, never a guessed number;
+  - **query dedup:** a query already sent in the call is not sent again;
+  - **incomplete:** any part that still fills the window at the maximum depth is named in
+    the answer as incomplete (an `OperationFailure` of step `package resolution`, with the
+    mask and the part). No package is dropped without being named.
+  - Red tests, on `recordingConnection` over captured answers: the partitions are disjoint and
+    cover the mask; the terminal name is queried once; depth stops at the measured length;
+    no query repeats; the **request count** for a given window-filling mask equals the
+    number of distinct parts; an unresolvable part is reported incomplete.
+- [ ] **Step 3: SAP's text search first, by key (owed for its success shape).** It completes
+  only after the request and the success answer are measured on a system that offers it, and
+  then it must keep package scope, `version`, the filters (`query2`, `exclude`,
+  `object_types`, `object_filter`, comments) and paging (`start_at`, `max_objects`); where it
+  cannot carry one, the scan runs instead, and the reason is recorded. Red tests:
+  - `'exactly SRIS_SEARCH 006 means unavailable, and the scan runs'` (the T100 key read with
+    the parser, never words);
+  - `'an unrelated failure of the text search is recorded as an OperationFailure, then the
+    scan runs'`;
+  - `'a text-search success answers without a fallback scan'` (over the measured answer).
+- [ ] **Step 4: Live cases (owed),** on both systems: a mask that fills the window resolves to
+  completion or names its incomplete part; the text-search key check; a `VIEW*` measurement
+  (D23a Step 2).
 
 **Owner decision to flag, not decided here (DO11):** `time_budget_ms` and the tool's `timeout`
 field are deadlines inside the server, which the no-built-in-timeouts rule covers. The

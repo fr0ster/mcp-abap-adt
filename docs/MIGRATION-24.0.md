@@ -274,6 +274,12 @@ in one run, answers only the hits with counters of what it did, and skips what i
   dropped); `total_targets`, `next_start_at` and `truncated.by_max_objects` are gone. Every
   target is read in one run — run it in the background (the default) and read the
   `run_handle` with `GetBackgroundRun`, or end it with `DiscardBackgroundRun`.
+- **A hit in a function module is the module's own object.** It names the module: `object_type`
+  `FUGR/FF`, `object_name` the module, `function_group_name` its group, and no `include` — read
+  it with `GetFunctionModule` (`function_module_name` = `object_name`, `function_group_name`),
+  where 23.x answered it as the group's hit with the module in `include`. A hit in the group's own
+  includes stays the group's (`FUGR`, `include`). The group and its modules are counted apart,
+  and each has its own `max_hits_per_object`.
 - **`max_hits_per_object` limits each object only when given** (it was 100 by default).
   `truncated.by_object_cap` is set when a given limit cut an object's hits.
 - **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan;

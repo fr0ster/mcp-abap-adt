@@ -356,8 +356,15 @@ export const searchOn = (
     turns,
   );
 
+/** A hit as one label: `object/include`, or `module@group` for a function module's hit (DO18). */
+export const hitLabel = (h: {
+  object_name: string;
+  include?: string;
+  function_group_name?: string;
+}) =>
+  h.include === undefined
+    ? `${h.object_name}@${h.function_group_name}`
+    : `${h.object_name}/${h.include}`;
+
 export const hitNames = (result: unknown) =>
-  payloadOf(result).results.map(
-    (h: { object_name: string; include: string }) =>
-      `${h.object_name}/${h.include}`,
-  );
+  payloadOf(result).results.map(hitLabel);

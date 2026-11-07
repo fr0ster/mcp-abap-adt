@@ -10,6 +10,20 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { TOOL_DEFINITION as BDEFT } from '../../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
+import { TOOL_DEFINITION as CLAST } from '../../../handlers/class/high/handleGetClass';
+import { TOOL_DEFINITION as LDEF } from '../../../handlers/class/high/handleGetLocalDefinitions';
+import { TOOL_DEFINITION as LMAC } from '../../../handlers/class/high/handleGetLocalMacros';
+import { TOOL_DEFINITION as LTST } from '../../../handlers/class/high/handleGetLocalTestClass';
+import { TOOL_DEFINITION as LTYP } from '../../../handlers/class/high/handleGetLocalTypes';
+import { TOOL_DEFINITION as DDLT } from '../../../handlers/ddl/high/handleGetDdl';
+import { TOOL_DEFINITION as FINC } from '../../../handlers/function_include/readonly/handleGetFunctionInclude';
+import { TOOL_DEFINITION as FM } from '../../../handlers/function_module/high/handleGetFunctionModule';
+import { TOOL_DEFINITION as INC } from '../../../handlers/include/readonly/handleGetInclude';
+import { TOOL_DEFINITION as INTFT } from '../../../handlers/interface/high/handleGetInterface';
+import { TOOL_DEFINITION as DDLXT } from '../../../handlers/metadata_extension/high/handleGetMetadataExtension';
+import { TOOL_DEFINITION as PROGT } from '../../../handlers/program/high/handleGetProgram';
+import { TOOL_DEFINITION as SRVDT } from '../../../handlers/service_definition/high/handleGetServiceDefinition';
 import { TOOL_DEFINITION } from '../../../handlers/system/readonly/handleSearchSource';
 import type {
   LineMatchStrategy,
@@ -27,6 +41,7 @@ import { recordingConnection } from '../../helpers/recordingConnection';
 import {
   contextOn,
   type Fake,
+  hitLabel,
   isError,
   type Model,
   type NodeDoc,
@@ -43,6 +58,27 @@ import {
   listing,
   sourcesFrom,
 } from '../../helpers/sourceReaderFake';
+
+/** The read tools a hit's fields must fill, by name: their argument schemas. */
+const READ_TOOLS: Record<
+  string,
+  { safeParse(value: unknown): { success: boolean } }
+> = {
+  GetFunctionModule: FM.inputSchema,
+  GetFunctionInclude: FINC.inputSchema,
+  GetInclude: INC.inputSchema,
+  GetProgram: PROGT.inputSchema,
+  GetClass: CLAST.inputSchema,
+  GetLocalDefinitions: LDEF.inputSchema,
+  GetLocalTypes: LTYP.inputSchema,
+  GetLocalMacros: LMAC.inputSchema,
+  GetLocalTestClass: LTST.inputSchema,
+  GetInterface: INTFT.inputSchema,
+  GetDdl: DDLT.inputSchema,
+  GetBehaviorDefinition: BDEFT.inputSchema,
+  GetMetadataExtension: DDLXT.inputSchema,
+  GetServiceDefinition: SRVDT.inputSchema,
+};
 
 // The process declares its system type, as every launcher requires.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
@@ -164,10 +200,15 @@ describe('SearchSource: every source-bearing type, at the asked version', () => 
         '/sap/bc/adt/repository/objectstructure?objecttype=FUGR%2FF&objectname=ZFG',
       ]);
       const hits = payloadOf(result).results.map(
-        (h: { object_type: string; object_name: string; include: string }) =>
-          `${h.object_type} ${h.object_name}/${h.include}`,
+        (h: {
+          object_type: string;
+          object_name: string;
+          include?: string;
+          function_group_name?: string;
+        }) => `${h.object_type} ${hitLabel(h)}`,
       );
       expect(hits).toEqual([
+        'FUGR/FF VIEWPROC_ZFG@ZFG',
         'BDEF ZBDEF/ZBDEF',
         'CLAS ZCL/ZCL',
         'CLAS ZCL/definitions',
@@ -178,12 +219,11 @@ describe('SearchSource: every source-bearing type, at the asked version', () => 
         'DDLX ZDDLX/ZDDLX',
         'FUGR ZFG/LZFGNOURI',
         'FUGR ZFG/LZFGTOP',
-        'FUGR ZFG/VIEWPROC_ZFG',
-        'FUGR ZFG/Z_FM',
         'INTF ZIF/ZIF',
         'PROG ZINCL/ZINCL',
         'PROG ZPROG/ZPROG',
         'SRVD ZSRVD/ZSRVD',
+        'FUGR/FF Z_FM@ZFG',
       ]);
       expect(payloadOf(result).failures).toBeUndefined();
     },
@@ -230,9 +270,9 @@ describe('SearchSource: every source-bearing type, at the asked version', () => 
         object_types: ['FUGR'],
         query: 'view module',
       });
-      expect(
-        payloadOf(result).results.map((h: { include: string }) => h.include),
-      ).toEqual(['VIEWPROC_ZFG']);
+      expect(payloadOf(result).results.map(hitLabel)).toEqual([
+        'VIEWPROC_ZFG@ZFG',
+      ]);
     },
   );
 });
@@ -332,10 +372,13 @@ describe('SearchSource: what cannot be read is skipped, the reads go on (DO17)',
       ]);
       expect(
         payload.results.map(
-          (h: { object_name: string; include: string }) =>
-            `${h.object_name}/${h.include}`,
+          (h: {
+            object_name: string;
+            include?: string;
+            function_group_name?: string;
+          }) => hitLabel(h),
         ),
-      ).toEqual(['ZFG/Z_FM_B']);
+      ).toEqual(['Z_FM_B@ZFG']);
       expect(payload.failures).toBeUndefined();
     },
   );
@@ -447,10 +490,13 @@ describe('SearchSource: a missing level is skipped; below the root only its bran
       // ZONE's programs are excluded; its function group is searched.
       expect(
         payload.results.map(
-          (h: { object_name: string; include: string }) =>
-            `${h.object_name}/${h.include}`,
+          (h: {
+            object_name: string;
+            include?: string;
+            function_group_name?: string;
+          }) => hitLabel(h),
         ),
-      ).toEqual(['ZFG/Z_FM_B', 'ZTWOP/ZTWOP']);
+      ).toEqual(['Z_FM_B@ZFG', 'ZTWOP/ZTWOP']);
       expect(payload.failures).toBeUndefined();
       expect(payload.scanned.packages).toBe(2);
     },
@@ -523,9 +569,14 @@ describe('SearchSource: a missing level is skipped; below the root only its bran
       ]);
       expect(
         payload.results.map(
-          (h: { include: string; line: number }) => `${h.include}:${h.line}`,
+          (h: {
+            object_name: string;
+            include?: string;
+            function_group_name?: string;
+            line: number;
+          }) => `${hitLabel(h)}:${h.line}`,
         ),
-      ).toEqual(['Z_FM_A:1']);
+      ).toEqual(['Z_FM_A@ZFG:1']);
       expect(payload.truncated.by_object_cap).toBe(true);
       expect(payload.failures).toBeUndefined();
     },
@@ -601,8 +652,12 @@ describe('SearchSource: one read per source', () => {
       ]);
       expect(
         payload.results.map(
-          (h: { object_name: string; include: string; line: number }) =>
-            `${h.object_name}/${h.include}:${h.line}`,
+          (h: {
+            object_name: string;
+            include?: string;
+            function_group_name?: string;
+            line: number;
+          }) => `${hitLabel(h)}:${h.line}`,
         ),
       ).toEqual([
         'ZFG1/LSHARED:1',
@@ -670,7 +725,8 @@ describe("SearchSource: no deadline of the server's", () => {
           time_budget_ms: 1,
         });
         const payload = payloadOf(result);
-        expect(payload.scanned.objects).toBe(9);
+        // Nine objects and the function group's two modules (DO18).
+        expect(payload.scanned.objects).toBe(11);
         expect(payload.truncated).toEqual({ by_object_cap: false });
       } finally {
         spy.mockRestore();
@@ -729,6 +785,7 @@ describe('SearchSource: the description is functional', () => {
       '`scanned.sources` the sources read (each once)',
       '`scanned.objects_with_hits`',
       'only when given',
+      'a hit in a function module names the module: `object_type` `FUGR/FF`, its name and `function_group_name`',
     ]) {
       expect(description).toContain(text);
     }
@@ -1162,8 +1219,13 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
   ) => searchOn(fake, { query: 'marker', packages: ['ZPKG'], ...args }, absent);
 
   const hits = (payload: {
-    results: Array<{ object_name: string; include: string; line: number }>;
-  }) => payload.results.map((h) => `${h.object_name}/${h.include}:${h.line}`);
+    results: Array<{
+      object_name: string;
+      include?: string;
+      function_group_name?: string;
+      line: number;
+    }>;
+  }) => payload.results.map((h) => `${hitLabel(h)}:${h.line}`);
 
   describe('SearchSource: only hits are answered (DO15)', () => {
     it('SearchSource does not declare emit_no_hits', () => {
@@ -1202,8 +1264,8 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         expect(payload.failures).toBeUndefined();
         expect(hits(payload)).toEqual([
           'ZCL/ZCL:1',
-          'ZFG/Z_FM_B:1',
           'ZHIT/ZHIT:1',
+          'Z_FM_B@ZFG:1',
         ]);
         // A readable source beside a refused one of the same object is searched:
         // the function group's second module after its first was refused, the
@@ -1225,7 +1287,7 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
       });
       const payload = payloadOf(await search(fake, true));
       expect(payload.failures).toBeUndefined();
-      expect(hits(payload)).toEqual(['ZCL/ZCL:1', 'ZFG/Z_FM_B:1']);
+      expect(hits(payload)).toEqual(['ZCL/ZCL:1', 'Z_FM_B@ZFG:1']);
     });
 
     it.each(PATHS)(
@@ -1386,7 +1448,7 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
           '/sap/bc/adt/programs/includes/lshared/source/main?version=active',
         ]);
         expect(payload.failures).toBeUndefined();
-        expect(hits(payload)).toEqual(['ZFG1/Z_ONE:1', 'ZFG2/Z_TWO:1']);
+        expect(hits(payload)).toEqual(['Z_ONE@ZFG1:1', 'Z_TWO@ZFG2:1']);
       },
     );
   });
@@ -1779,4 +1841,232 @@ describe('D23b: the package masks on the wire', () => {
       expect(packages).toEqual(['Z_PKG']);
     });
   });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: a function module is its own scan object (DO18)
+// ---------------------------------------------------------------------------
+
+describe('D23b: a function module is its own scan object (DO18)', () => {
+  const GG = '/sap/bc/adt/functions/groups/zfg';
+  /**
+   * `ZGRP` holds the function group `ZFG`: modules `Z_FM_A` (three hits) and
+   * `Z_FM_B` (one), the function include `LZFGTOP` (one) and the include
+   * `LZFGNOURI` (none).
+   */
+  const GROUP: Repository = {
+    nodes: {
+      [nodeKey('ZGRP')]: { types: [{ type: 'FUGR/F', nodeId: '000001' }] },
+      [nodeKey('ZGRP', '1')]: { objects: [{ type: 'FUGR/F', name: 'ZFG' }] },
+    },
+    sources: {
+      'FM Z_FM_A': 'marker a1\nmarker a2\nmarker a3',
+      'FM Z_FM_B': 'marker b',
+      'FINCLUDE ZFG/LZFGTOP': 'marker top',
+      'INCLUDE LZFGNOURI': 'nothing here',
+    },
+    fugrChildren: {
+      ZFG: [
+        ['FUGR/FF', 'Z_FM_A', `${GG}/fmodules/z_fm_a`],
+        ['FUGR/FF', 'Z_FM_B', `${GG}/fmodules/z_fm_b`],
+        ['FUGR/I', 'LZFGTOP', `${GG}/includes/lzfgtop`],
+        ['FUGR/I', 'LZFGNOURI'],
+      ],
+    },
+    masks: {},
+  };
+  const searchGroup = (absent: boolean, args: Record<string, unknown> = {}) =>
+    searchOn(
+      standOn(GROUP),
+      { query: 'marker', packages: ['ZGRP'], ...args },
+      absent,
+    );
+  const PATHS2 = [['served'], ['absent']] as const;
+
+  it.each(PATHS2)(
+    "a hit in a function module is the module's object, with function_group_name (%s)",
+    async (batch) => {
+      const payload = payloadOf(await searchGroup(batch === 'absent'));
+      const moduleB = payload.results.filter(
+        (h: { object_name: string }) => h.object_name === 'Z_FM_B',
+      );
+      expect(moduleB).toEqual([
+        {
+          devclass: 'ZGRP',
+          object_type: 'FUGR/FF',
+          object_name: 'Z_FM_B',
+          function_group_name: 'ZFG',
+          line: 1,
+          snippet: 'marker b',
+        },
+      ]);
+      // Not listed under the group.
+      expect(
+        payload.results.some(
+          (h: { object_name: string; include?: string }) =>
+            h.object_name === 'ZFG' && h.include === 'Z_FM_B',
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it.each(PATHS2)(
+    "a hit in a group include stays FUGR: the group's, with include (%s)",
+    async (batch) => {
+      const payload = payloadOf(await searchGroup(batch === 'absent'));
+      expect(
+        payload.results.filter(
+          (h: { object_name: string }) => h.object_name === 'ZFG',
+        ),
+      ).toEqual([
+        {
+          devclass: 'ZGRP',
+          object_type: 'FUGR',
+          object_name: 'ZFG',
+          include: 'LZFGTOP',
+          line: 1,
+          snippet: 'marker top',
+        },
+      ]);
+    },
+  );
+
+  it.each(PATHS2)(
+    'a group and its modules are counted as separate objects (%s)',
+    async (batch) => {
+      const payload = payloadOf(await searchGroup(batch === 'absent'));
+      expect(payload.scanned).toEqual({
+        packages: 1,
+        objects: 3,
+        sources: 4,
+        objects_with_hits: 3,
+      });
+    },
+  );
+
+  it.each(PATHS2)(
+    'each object has its own max_hits_per_object (%s)',
+    async (batch) => {
+      const absent = batch === 'absent';
+      const capped = payloadOf(
+        await searchGroup(absent, { max_hits_per_object: 2 }),
+      );
+      const counts = (payload: { results: Array<{ object_name: string }> }) => {
+        const out: Record<string, number> = {};
+        for (const h of payload.results) {
+          out[h.object_name] = (out[h.object_name] ?? 0) + 1;
+        }
+        return out;
+      };
+      expect(counts(capped)).toEqual({ Z_FM_A: 2, Z_FM_B: 1, ZFG: 1 });
+      expect(capped.truncated.by_object_cap).toBe(true);
+      // No object passes 3 while their sum (5) does.
+      const within = payloadOf(
+        await searchGroup(absent, { max_hits_per_object: 3 }),
+      );
+      expect(counts(within)).toEqual({ Z_FM_A: 3, Z_FM_B: 1, ZFG: 1 });
+      expect(within.truncated.by_object_cap).toBe(false);
+    },
+  );
+
+  it.each(PATHS)(
+    'each hit carries the arguments its read tool requires (%s)',
+    async (batch) => {
+      const payload = payloadOf(
+        await searchAll(standOn(ALL), batch === 'absent'),
+      );
+      const LOCAL: Record<string, string> = {
+        definitions: 'GetLocalDefinitions',
+        implementations: 'GetLocalTypes',
+        macros: 'GetLocalMacros',
+        testclasses: 'GetLocalTestClass',
+      };
+      const checked: string[] = [];
+      for (const hit of payload.results as Array<{
+        object_type: string;
+        object_name: string;
+        include?: string;
+        function_group_name?: string;
+      }>) {
+        let tool: string;
+        let args: Record<string, unknown>;
+        switch (hit.object_type) {
+          case 'FUGR/FF':
+            tool = 'GetFunctionModule';
+            args = {
+              function_module_name: hit.object_name,
+              function_group_name: hit.function_group_name,
+            };
+            break;
+          case 'FUGR':
+            tool = 'GetFunctionInclude';
+            args = {
+              function_group_name: hit.object_name,
+              include_name: hit.include,
+            };
+            break;
+          case 'PROG':
+            tool = hit.object_name === 'ZINCL' ? 'GetInclude' : 'GetProgram';
+            args =
+              tool === 'GetInclude'
+                ? { include_name: hit.include }
+                : { program_name: hit.object_name };
+            break;
+          case 'CLAS':
+            tool =
+              hit.include === hit.object_name
+                ? 'GetClass'
+                : (LOCAL[hit.include ?? ''] ?? 'none');
+            args = { class_name: hit.object_name };
+            break;
+          case 'INTF':
+            tool = 'GetInterface';
+            args = { interface_name: hit.object_name };
+            break;
+          case 'DDLS':
+            tool = 'GetDdl';
+            args = { ddl_name: hit.object_name };
+            break;
+          case 'BDEF':
+            tool = 'GetBehaviorDefinition';
+            args = { behavior_definition_name: hit.object_name };
+            break;
+          case 'DDLX':
+            tool = 'GetMetadataExtension';
+            args = { metadata_extension_name: hit.object_name };
+            break;
+          case 'SRVD':
+            tool = 'GetServiceDefinition';
+            args = { service_definition_name: hit.object_name };
+            break;
+          default:
+            throw new Error(`unexpected type ${hit.object_type}`);
+        }
+        const schema = READ_TOOLS[tool];
+        expect({ tool, ok: schema?.safeParse(args).success }).toEqual({
+          tool,
+          ok: true,
+        });
+        checked.push(tool);
+      }
+      expect(new Set(checked)).toEqual(
+        new Set([
+          'GetFunctionModule',
+          'GetFunctionInclude',
+          'GetInclude',
+          'GetProgram',
+          'GetClass',
+          'GetLocalDefinitions',
+          'GetLocalTypes',
+          'GetLocalMacros',
+          'GetLocalTestClass',
+          'GetInterface',
+          'GetDdl',
+          'GetBehaviorDefinition',
+          'GetMetadataExtension',
+          'GetServiceDefinition',
+        ]),
+      );
+    },
+  );
 });

@@ -23,9 +23,11 @@ import { createHandlerContext } from '../../helpers/testHelpers';
 interface SearchSourceResult {
   results: Array<{
     devclass: string;
-    object_type: 'PROG' | 'FUGR' | 'CLAS';
+    object_type: string;
     object_name: string;
-    include: string;
+    /** Absent on a function module's hit, which names its group instead (DO18). */
+    include?: string;
+    function_group_name?: string;
     line: number;
     snippet: string;
   }>;

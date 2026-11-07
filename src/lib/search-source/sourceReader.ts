@@ -35,6 +35,18 @@ export interface SourceUnit {
   lines: string[];
   /** The source's identity in the call (`sourceReadKey`): the same for every object that names it. */
   source: string;
+  /**
+   * The function module whose main source this is (DO18): it is its own scan
+   * object, named by the module and the group it is addressed under. Absent
+   * for every other source, which belongs to the object read.
+   */
+  module?: FunctionModuleOwner | undefined;
+}
+
+/** A function module as its own scan object: its name and its group. */
+export interface FunctionModuleOwner {
+  name: string;
+  group: string;
 }
 
 export type { FugrChild };
@@ -224,6 +236,10 @@ async function* readOne(
     include: unitName,
     lines: linesOf(text),
     source: sourceReadKey(read),
+    module:
+      read.reader === 'functionModule'
+        ? { name: read.name, group: read.group }
+        : undefined,
   };
 }
 

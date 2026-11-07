@@ -1,3 +1,4 @@
+import type { AdtCodes } from '../adtProjections';
 import { isCredentialFailure } from '../answer';
 import { appendAll } from '../appendAll';
 import { type PhaseResult, withSequentialFallback } from '../batch/phases';
@@ -41,6 +42,7 @@ import {
   readingOnce,
   readSourcesInPhase,
   readSourceUnits,
+  type SourceUnit,
   type SourceVersion,
   sourceReadKey,
 } from './sourceReader';
@@ -60,7 +62,8 @@ export interface OrchestratorInput {
   version?: SourceVersion;
 }
 
-export interface SearchHit {
+/** A hit in a source of a scanned object: its include names the source. */
+export interface ObjectHit {
   devclass: string;
   object_type: ScanObjectType;
   object_name: string;
@@ -68,6 +71,28 @@ export interface SearchHit {
   line: number;
   snippet: string;
 }
+
+/**
+ * The ADT code a function module is answered under (DO18, measured on
+ * premise: the quick search and the group's node structure name a module
+ * `FUGR/FF`).
+ */
+export const FUNCTION_MODULE_TYPE: AdtCodes<'FUGR/FF'> = 'FUGR/FF';
+
+/**
+ * A hit in a function module, its own object (DO18): the module's name and
+ * its group — what `GetFunctionModule` takes —, no include.
+ */
+export interface FunctionModuleHit {
+  devclass: string;
+  object_type: typeof FUNCTION_MODULE_TYPE;
+  object_name: string;
+  function_group_name: string;
+  line: number;
+  snippet: string;
+}
+
+export type SearchHit = ObjectHit | FunctionModuleHit;
 
 /**
  * The answer: the hits, and counters of what was done — the packages walked
@@ -108,12 +133,19 @@ const DEFAULTS = {
   version: DEFAULT_VERSION,
 };
 
-/** One target's answer: what it adds to the result. */
-interface TargetAnswer {
+/** A hit's include, for the order of the answer: a module's hit has none. */
+function includeOf(hit: SearchHit): string {
+  return 'include' in hit ? hit.include : '';
+}
+
+/** One object's answer: what it adds to the result. */
+interface ObjectAnswer {
   hits: SearchHit[];
   capped: boolean;
   /** This object's sources read: none, and the object was not read. */
   sources: number;
+  /** The hits answered so far, against `max_hits_per_object`. */
+  total: number;
 }
 
 async function runWithLimit<T>(
@@ -195,7 +227,7 @@ export async function runSearchSource(
   const sourcesRead = new Set<string>();
 
   // Each target's answer, by its index.
-  const answers: Array<TargetAnswer | undefined> = Array.from(
+  const answers: Array<ObjectAnswer[] | undefined> = Array.from(
     { length: targets.length },
     () => undefined,
   );
@@ -206,10 +238,44 @@ export async function runSearchSource(
     async (index) => {
       const target = targets[index];
       if (target === undefined) return;
-      let totalForTarget = 0;
-      let capHitForTarget = false;
-      let sources = 0;
-      const targetHits: SearchHit[] = [];
+      // Each object of the target its own bookkeeping (DO18): the target
+      // itself, and every function module read under it.
+      const objects = new Map<string, ObjectAnswer>();
+      const objectOf = (unit: SourceUnit): ObjectAnswer => {
+        const key = unit.module === undefined ? '' : unit.module.name;
+        const found = objects.get(key);
+        if (found !== undefined) return found;
+        const created: ObjectAnswer = {
+          hits: [],
+          capped: false,
+          sources: 0,
+          total: 0,
+        };
+        objects.set(key, created);
+        return created;
+      };
+      const hitOf = (
+        unit: SourceUnit,
+        line: number,
+        snippet: string,
+      ): SearchHit =>
+        unit.module === undefined
+          ? {
+              devclass: target.devclass,
+              object_type: target.object_type,
+              object_name: target.object_name,
+              include: unit.include,
+              line,
+              snippet,
+            }
+          : {
+              devclass: target.devclass,
+              object_type: FUNCTION_MODULE_TYPE,
+              object_name: unit.module.name,
+              function_group_name: unit.module.group,
+              line,
+              snippet,
+            };
 
       // A source that cannot be read is skipped by the reader and its other
       // sources are read on; a credential failure is thrown by the reader
@@ -219,7 +285,8 @@ export async function runSearchSource(
         target,
         version,
       )) {
-        sources++;
+        const object = objectOf(unit);
+        object.sources++;
         sourcesRead.add(unit.source);
         const terms = {
           query: input.query,
@@ -229,39 +296,27 @@ export async function runSearchSource(
         };
         // A given limit caps the hits answered, never the reads. Past it a
         // source is only probed for a hit, which marks the cap.
-        if (maxHits !== undefined && totalForTarget >= maxHits) {
-          if (capHitForTarget) continue;
+        if (maxHits !== undefined && object.total >= maxHits) {
+          if (object.capped) continue;
           const probe = deps.lineMatch.match(unit.lines, {
             ...terms,
             max_hits: 1,
           });
-          if (probe.hits.length > 0) capHitForTarget = true;
+          if (probe.hits.length > 0) object.capped = true;
           continue;
         }
         const scan = deps.lineMatch.match(unit.lines, {
           ...terms,
-          max_hits:
-            maxHits === undefined ? undefined : maxHits - totalForTarget,
+          max_hits: maxHits === undefined ? undefined : maxHits - object.total,
         });
         for (const h of scan.hits) {
-          targetHits.push({
-            devclass: target.devclass,
-            object_type: target.object_type,
-            object_name: target.object_name,
-            include: unit.include,
-            line: h.line,
-            snippet: h.snippet,
-          });
+          object.hits.push(hitOf(unit, h.line, h.snippet));
         }
-        totalForTarget += scan.hits.length;
-        if (scan.capped) capHitForTarget = true;
+        object.total += scan.hits.length;
+        if (scan.capped) object.capped = true;
       }
 
-      answers[index] = {
-        hits: targetHits,
-        capped: capHitForTarget,
-        sources,
-      };
+      answers[index] = [...objects.values()];
     },
   );
 
@@ -270,18 +325,21 @@ export async function runSearchSource(
   let objectsWithHits = 0;
   let truncatedByObjectCap = false;
   for (const answer of answers) {
-    if (answer === undefined) continue;
-    if (answer.sources > 0) objectsRead++;
-    if (answer.hits.length > 0) objectsWithHits++;
-    if (answer.capped) truncatedByObjectCap = true;
-    appendAll(allHits, answer.hits);
+    for (const object of answer ?? []) {
+      if (object.sources > 0) objectsRead++;
+      if (object.hits.length > 0) objectsWithHits++;
+      if (object.capped) truncatedByObjectCap = true;
+      appendAll(allHits, object.hits);
+    }
   }
 
   allHits.sort((a, b) => {
     if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
     if (a.object_name !== b.object_name)
       return a.object_name < b.object_name ? -1 : 1;
-    if (a.include !== b.include) return a.include < b.include ? -1 : 1;
+    const x = includeOf(a);
+    const y = includeOf(b);
+    if (x !== y) return x < y ? -1 : 1;
     return a.line - b.line;
   });
 

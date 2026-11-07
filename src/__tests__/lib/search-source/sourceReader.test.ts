@@ -73,6 +73,7 @@ describe('readSourceUnits', () => {
         include: 'Z_PROG',
         lines: ['PROG:Z_PROG', 'line2'],
         source: '/sap/bc/adt/programs/programs/z_prog/source/main|active',
+        module: undefined,
       },
     ]);
     expect(calls).toEqual(['PROG:Z_PROG']);
@@ -264,12 +265,14 @@ describe('readSourceUnits', () => {
         lines: ['FM:Z_FG/Z_FM_A', 'line2'],
         source:
           '/sap/bc/adt/functions/groups/z_fg/fmodules/z_fm_a/source/main|active',
+        module: { name: 'Z_FM_A', group: 'Z_FG' },
       },
       {
         include: 'Z_FM_C',
         lines: ['FM:Z_FG/Z_FM_C', 'line2'],
         source:
           '/sap/bc/adt/functions/groups/z_fg/fmodules/z_fm_c/source/main|active',
+        module: { name: 'Z_FM_C', group: 'Z_FG' },
       },
     ]);
     expect(calls).toEqual([

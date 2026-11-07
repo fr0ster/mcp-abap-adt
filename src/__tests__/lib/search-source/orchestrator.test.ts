@@ -106,16 +106,17 @@ describe('runSearchSource', () => {
   });
 
   it('probes later source units and flips truncated.by_object_cap when matches are omitted after the per-object budget is filled', async () => {
+    // Two includes of one function group: one object, one allowance.
     const deps: OrchestratorDeps = {
+      lineMatch: substringLineMatch,
       fetchPackageContents: pkg([
         { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
-        'FUGRSTR:Z_FG': 'FUGR/FF|Z_FM_A\nFUGR/FF|Z_FM_B',
-        'FM:Z_FG/Z_FM_A': 'marker 1',
-        'FM:Z_FG/Z_FM_B': 'marker 2',
+        'FUGRSTR:Z_FG': 'FUGR/I|LZ_A\nFUGR/I|LZ_B',
+        'INC:LZ_A': 'marker 1',
+        'INC:LZ_B': 'marker 2',
       }),
-      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -124,6 +125,30 @@ describe('runSearchSource', () => {
     });
     expect(result.results).toHaveLength(1);
     expect(result.truncated.by_object_cap).toBe(true);
+  });
+
+  it('two function modules of one group each have their own allowance (DO18)', async () => {
+    const deps: OrchestratorDeps = {
+      lineMatch: substringLineMatch,
+      fetchPackageContents: pkg([
+        { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'FUGRSTR:Z_FG': 'FUGR/FF|Z_FM_A\nFUGR/FF|Z_FM_B',
+        'FM:Z_FG/Z_FM_A': 'marker 1',
+        'FM:Z_FG/Z_FM_B': 'marker 2',
+      }),
+      resolvePackages: identityResolver,
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      max_hits_per_object: 1,
+    });
+    expect(result.results.map((h) => h.object_name)).toEqual([
+      'Z_FM_A',
+      'Z_FM_B',
+    ]);
+    expect(result.truncated.by_object_cap).toBe(false);
   });
 
   it('orders the hits by the walk, whatever order the package answers in', async () => {

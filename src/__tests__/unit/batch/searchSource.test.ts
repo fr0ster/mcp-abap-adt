@@ -135,18 +135,19 @@ describe('SearchSource on internal batches', () => {
     expect(hitNames(a)).toEqual([
       'ZPROG_O/ZPROG_O',
       'ZFG_A/LZFG_ATOP',
-      'ZFG_A/Z_FM_A',
       'ZPROG_A/ZPROG_A',
       'ZPROG_A/ZPROG_A',
+      'Z_FM_A@ZFG_A',
       'ZCL_A/ZCL_A',
     ]);
-    // ZPROG_B has no hit: it is not listed, and it counts as read.
+    // ZPROG_B and the module VIEWFRAME_ZFG have no hit: they are not
+    // listed, and they count as read; the group and its modules count apart.
     expect(payloadOf(a).no_hits).toBeUndefined();
     expect(payloadOf(a).scanned).toEqual({
       packages: 3,
-      objects: 5,
+      objects: 7,
       sources: 8,
-      objects_with_hits: 4,
+      objects_with_hits: 5,
     });
     expect(batched.directs).toHaveLength(0);
     expect(sequential.envelopes).toHaveLength(0);
@@ -229,7 +230,7 @@ describe('SearchSource on internal batches', () => {
     expect(hitNames(result)).toEqual([
       'ZPROG_O/ZPROG_O',
       'ZFG_A/LZFG_ATOP',
-      'ZFG_A/Z_FM_A',
+      'Z_FM_A@ZFG_A',
       'ZCL_A/ZCL_A',
     ]);
     const sequential = await search(system(model), {}, true);

@@ -64,12 +64,6 @@ export interface EnumerateInput {
   object_types: readonly ScanObjectType[];
 }
 
-/** One asked package's walk: its items, and every package whose own level was read. */
-export interface PackageContents {
-  items: PackageContentItem[];
-  walked: ReadonlySet<string>;
-}
-
 /**
  * The walk of one asked package. It throws when the package's own root was
  * refused or is not there; a refused level below it excludes only its
@@ -78,7 +72,7 @@ export interface PackageContents {
 export type PackageContentsFetcher = (
   packageName: string,
   options: { includeSubpackages: boolean },
-) => Promise<PackageContents>;
+) => Promise<PackageContentItem[]>;
 
 /** The family of each code a scan reads, by the tables' main type. */
 const FAMILY_OF: Readonly<Record<ScanCode, ScanObjectType>> = {
@@ -116,11 +110,9 @@ export const SCAN_OBJECT_TYPES = [
   'SRVD',
 ] as const satisfies readonly ScanObjectType[];
 
-/** The scan targets of a walk, and how many packages were walked. */
+/** The scan targets of a walk. */
 export interface EnumeratedTargets {
   targets: EnumeratedObject[];
-  /** The packages whose own level was read, each once. */
-  packages: number;
 }
 
 export async function enumerateScanTargets(
@@ -130,18 +122,15 @@ export async function enumerateScanTargets(
   const wantedFamilies = new Set<ScanObjectType>(input.object_types);
   const filter = input.object_filter;
   const seen = new Set<string>();
-  const walked = new Set<string>();
   const out: EnumeratedObject[] = [];
 
   for (const pkg of input.packages) {
     // A failed read of the walk is decided at its place (the walker's
     // branch rule, `failedRead`): a skipped package answers nothing, any
     // other outcome passes through as decided.
-    const contents = await fetch(pkg.toUpperCase(), {
+    const items = await fetch(pkg.toUpperCase(), {
       includeSubpackages: input.include_subpackages,
     });
-    const items = contents.items;
-    for (const name of contents.walked) walked.add(name.toUpperCase());
     for (const item of items) {
       if (item.isPackage) continue;
       const code = scanCodeOf(item.type);
@@ -168,7 +157,7 @@ export async function enumerateScanTargets(
     return a.object_name < b.object_name ? -1 : 1;
   });
 
-  return { targets: out, packages: walked.size };
+  return { targets: out };
 }
 
 /**
@@ -183,9 +172,8 @@ export function createPackageContentsFetcher(
 ): PackageContentsFetcher {
   const client = createAdtClient(ctx.connection, ctx.logger);
   const utils = nodeStructureOn(ctx, client.getUtils(ourUtils));
-  return async (packageName, options) => {
-    const walked = new Set<string>();
-    const items = assembleList(
+  return async (packageName, options) =>
+    assembleList(
       packageName,
       await walkPackage(utils, packageName, {
         includeSubpackages: options.includeSubpackages,
@@ -194,11 +182,8 @@ export function createPackageContentsFetcher(
         // is excluded.
         missingLevel: 'refused',
         branchRule: {
-          walked,
           onFailure: (failure, place) => failedRead(sapAnswers, failure, place),
         },
       }),
     );
-    return { items, walked };
-  };
 }

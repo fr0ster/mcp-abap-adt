@@ -185,6 +185,8 @@ export interface Model {
   throwOn?: Record<string, string>;
   /** The first request of a key answered with this status; later ones as usual. */
   refuseOnce?: Record<string, number>;
+  /** Keys answered `200` with an empty body: what SAP answers for a package that does not exist (DO26, measured). */
+  emptyBody?: string[];
 }
 
 /** The keys of `refuseOnce` already answered with their status, per model. */
@@ -201,6 +203,9 @@ function answerOf(
   const round = key.startsWith('SEARCH ')
     ? `${key}@${searchParamsOf(url, params).get('maxResults')}`
     : key;
+  if (model.emptyBody?.includes(key) === true) {
+    return { status: 200, statusText: 'OK', body: '' };
+  }
   const once = model.refuseOnce?.[key];
   if (once !== undefined) {
     const used = refusedOnce.get(model) ?? new Set<string>();

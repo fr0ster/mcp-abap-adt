@@ -146,37 +146,48 @@ describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
 });
 
 describe('batch mode', () => {
-  it('SearchSource in an open batch is refused batch_not_recordable before its handler: no recorded context carries a search (measured)', async () => {
-    const owner = new InstanceBatch({ keepRawParts: false });
-    const target = new LateBoundConnection();
-    const batch = new AdtBatchConnection(target, { endpoint: 'communication' });
-    owner.begin('communication', { connection: batch, target, recorded: [] });
-    const exporter = new HandlerExporter({ systemType: 'onprem' });
-    const server = new EmbeddableMcpServer({
-      connection: built,
-      handlersRegistry: exporter.createRegistry(),
-      systemType: 'onprem',
-      logger: silent,
-      batch: owner,
-      sapAnswerStrategy: serverSap,
-      lineMatchStrategy: serverLines,
-    });
-    const client = await clientOf(server);
-    try {
-      const answer = await client.callTool({
-        name: 'SearchSource',
-        arguments: ARGS,
+  it.each([
+    ['the SAP-answer strategy given', { sapAnswerStrategy: serverSap }],
+    ['the line match given', { lineMatchStrategy: serverLines }],
+    [
+      'both given',
+      { sapAnswerStrategy: serverSap, lineMatchStrategy: serverLines },
+    ],
+  ])(
+    'SearchSource in an open batch is refused batch_not_recordable before its handler, %s (DO26: it is no batch entry)',
+    async (_name, strategies) => {
+      const owner = new InstanceBatch({ keepRawParts: false });
+      const target = new LateBoundConnection();
+      const batch = new AdtBatchConnection(target, {
+        endpoint: 'communication',
       });
-      expect(answer.isError).toBe(true);
-      const content = answer.content;
-      const text =
-        Array.isArray(content) && typeof content[0]?.text === 'string'
-          ? content[0].text
-          : '';
-      expect(JSON.parse(text).error).toBe('batch_not_recordable');
-      expect(seen).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
+      owner.begin('communication', { connection: batch, target, recorded: [] });
+      const exporter = new HandlerExporter({ systemType: 'onprem' });
+      const server = new EmbeddableMcpServer({
+        connection: built,
+        handlersRegistry: exporter.createRegistry(),
+        systemType: 'onprem',
+        logger: silent,
+        batch: owner,
+        ...strategies,
+      });
+      const client = await clientOf(server);
+      try {
+        const answer = await client.callTool({
+          name: 'SearchSource',
+          arguments: ARGS,
+        });
+        expect(answer.isError).toBe(true);
+        const content = answer.content;
+        const text =
+          Array.isArray(content) && typeof content[0]?.text === 'string'
+            ? content[0].text
+            : '';
+        expect(JSON.parse(text).error).toBe('batch_not_recordable');
+        expect(seen).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    },
+  );
 });

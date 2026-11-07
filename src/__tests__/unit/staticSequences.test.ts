@@ -283,8 +283,7 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
       includeSubpackages: false,
     });
     expect(walked).toContain('ZMCP_SHR_PKG');
-    expect(contents.items).toEqual([]);
-    expect([...contents.walked]).toEqual(['ZMCP_SHR_PKG']);
+    expect(contents).toEqual([]);
   });
 });
 

@@ -1,25 +1,30 @@
 /**
  * `SearchSource`, live (plan D23b, Step 7): what the search answers on the
- * systems, read-only.
+ * systems, read-only. No package is counted (DO26): what the cases claim is
+ * that a search answers no object that holds nothing of what was searched.
  *
  * - **Package masks, on premise:** a mask with several `*`, a `*` that
- *   matches zero characters, a `?` and an exact name with a literal `_`.
- *   Each walks exactly the packages the quick search
- *   names for it: `SearchObject` over `DEVC` is read first, then the search
- *   runs without subpackages and with an object filter no object matches,
- *   so only the packages are walked and `scanned.packages` is their count.
- *   A mask past 1000 packages is not among them: walking the 1140 packages
- *   such a mask names on premise took longer than a test may run (more than
- *   600 s, measured), so the doubling is pinned, not run live here.
+ *   matches zero characters, a `?` and an exact name with a literal `_`,
+ *   each searched without subpackages: every hit's package is among the
+ *   packages `SearchObject` over `DEVC` names for the mask (read first), the
+ *   known hit of the shared package is returned, and every hit's line, read
+ *   back with the hit object's own read tool, contains the query. Which
+ *   packages are walked is pinned on the stand-in (the unit suites), not
+ *   here. A mask past 1000 packages is not among them: walking the 1140
+ *   packages such a mask names on premise took longer than a test may run
+ *   (more than 600 s, measured), so the doubling is pinned, not run live.
  * - **A known hit, on both systems:** the shared function module the test
  *   config names, searched by its own name — on premise in the shared
- *   package, on ABAP Cloud in the configured build package (its tree holds
- *   the shared package). The answer carries no `no_hits` and no `failures`;
- *   `scanned.objects_with_hits` is the number of objects in `results`; the
- *   module's hit names the module and its group, and `GetFunctionModule`
- *   reads that line with exactly those fields. A package that does not
- *   exist is skipped and not counted; the three `answer` levels have their
- *   shapes; `max_hits` stops the scan with `truncated.by_max_hits`.
+ *   package, on ABAP Cloud in the configured build package, with its
+ *   subpackages. Every hit's package is the named package or one of its
+ *   descendants (`GetPackageContents` with subpackages, read first); on ABAP
+ *   Cloud the shared package must be one of them, else the case fails
+ *   naming that prerequisite. The answer carries no `no_hits` and no
+ *   `failures`; `scanned.objects_with_hits` is the number of objects in
+ *   `results`; the module's hit names the module and its group, and every
+ *   hit's line, read back, contains the query. A package that does not exist
+ *   yields no hit; the three `answer` levels have their shapes; `max_hits`
+ *   stops the scan with `truncated.by_max_hits`.
  * - **Measurements, on both systems (their shape only, the values logged):**
  *   what a SAP `404` on a source read is through adt-clients (`origin`, the
  *   response's status, `adtType`), and the function modules named `VIEW*`
@@ -127,11 +132,6 @@ function listOf(value: unknown, key: string): unknown[] {
   return list;
 }
 
-/** A counter of the answer's `scanned`. */
-function scanned(payload: unknown, counter: string): unknown {
-  return member(member(payload, 'scanned'), counter);
-}
-
 /** The packages the quick search names for `mask` (`SearchObject` over `DEVC`). */
 async function quickSearchPackages(mask: string): Promise<string[]> {
   const answer = await livePrepare('SearchObject', {
@@ -149,13 +149,241 @@ async function quickSearchPackages(mask: string): Promise<string[]> {
     .map((cells) => cells[0] ?? '');
 }
 
-/** The search answer walked the packages `named` and read no object. */
-function expectWalked(payload: unknown, named: readonly string[]): void {
-  expect({
-    packages: scanned(payload, 'packages'),
-    objects: scanned(payload, 'objects'),
-    results: listOf(payload, 'results').length,
-  }).toEqual({ packages: named.length, objects: 0, results: 0 });
+/** Every hit's package is among `packages` (DO26: no hit from a package the search did not name). */
+function expectHitsWithin(
+  results: readonly unknown[],
+  packages: readonly string[],
+): void {
+  const named = new Set(packages.map((name) => name.toUpperCase()));
+  expect(
+    results.filter(
+      (hit) => !named.has(String(member(hit, 'devclass')).toUpperCase()),
+    ),
+  ).toEqual([]);
+}
+
+/**
+ * The named package and every package under it: `GetPackageContents` with
+ * subpackages (its walk has no depth limit), its package entries and the
+ * root.
+ */
+async function treeOf(root: string): Promise<string[]> {
+  const answer = await livePrepare('GetPackageContents', {
+    package_name: root,
+    include_subpackages: true,
+  });
+  if (answer.isError) {
+    throw new Error(`GetPackageContents ${root}: ${answer.text}`);
+  }
+  const listed: unknown = JSON.parse(answer.text);
+  if (!Array.isArray(listed)) {
+    throw new Error(`GetPackageContents ${root} answered no list`);
+  }
+  return [
+    root.toUpperCase(),
+    ...listed
+      .filter((entry) => member(entry, 'isPackage') === true)
+      .map((entry) => String(member(entry, 'name')).toUpperCase()),
+  ];
+}
+
+/** The source text a read answered; the case fails naming the read when there is none. */
+function sourceOf(read: string, answer: LiveAnswer): string {
+  const source = member(payloadOf(read, answer), 'source');
+  if (typeof source !== 'string') {
+    throw new Error(`${read} answered no source: ${answer.text}`);
+  }
+  return source;
+}
+
+/**
+ * The hit's line, read back with the hit object's own read tool (a function
+ * module with its group; a group's include as a function include, else as
+ * an include; a program, else a program include; a class, or its local
+ * include; an interface; a CDS, BDEF, DDLX or SRVD source).
+ */
+async function hitLine(hit: unknown): Promise<string> {
+  const type = member(hit, 'object_type');
+  const name = member(hit, 'object_name');
+  const include = member(hit, 'include');
+  const line = member(hit, 'line');
+  if (typeof name !== 'string' || typeof line !== 'number') {
+    throw new Error(`the hit has no object and line: ${JSON.stringify(hit)}`);
+  }
+  switch (type) {
+    case 'FUGR/FF':
+      return sourceOf(
+        'GetFunctionModule',
+        await livePrepare('GetFunctionModule', {
+          function_module_name: name,
+          function_group_name: member(hit, 'function_group_name'),
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    case 'FUGR': {
+      const asFunctionInclude = await livePrepare('GetFunctionInclude', {
+        function_group_name: name,
+        include_name: include,
+        part: 'source',
+        start_line: line,
+        end_line: line,
+      });
+      if (!asFunctionInclude.isError) {
+        return sourceOf('GetFunctionInclude', asFunctionInclude);
+      }
+      return sourceOf(
+        'GetInclude',
+        await livePrepare('GetInclude', {
+          include_name: include,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    }
+    case 'PROG': {
+      const asProgram = await livePrepare('GetProgram', {
+        program_name: name,
+        part: 'source',
+        start_line: line,
+        end_line: line,
+      });
+      if (!asProgram.isError) return sourceOf('GetProgram', asProgram);
+      return sourceOf(
+        'GetInclude',
+        await livePrepare('GetInclude', {
+          include_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    }
+    case 'CLAS':
+      switch (include) {
+        case 'definitions':
+          return sourceOf(
+            'GetLocalDefinitions',
+            await livePrepare('GetLocalDefinitions', {
+              class_name: name,
+              start_line: line,
+              end_line: line,
+            }),
+          );
+        case 'implementations':
+          return sourceOf(
+            'GetLocalTypes',
+            await livePrepare('GetLocalTypes', {
+              class_name: name,
+              start_line: line,
+              end_line: line,
+            }),
+          );
+        case 'macros':
+          return sourceOf(
+            'GetLocalMacros',
+            await livePrepare('GetLocalMacros', {
+              class_name: name,
+              start_line: line,
+              end_line: line,
+            }),
+          );
+        case 'testclasses':
+          return sourceOf(
+            'GetLocalTestClass',
+            await livePrepare('GetLocalTestClass', {
+              class_name: name,
+              start_line: line,
+              end_line: line,
+            }),
+          );
+        default:
+          return sourceOf(
+            'GetClass',
+            await livePrepare('GetClass', {
+              class_name: name,
+              part: 'source',
+              start_line: line,
+              end_line: line,
+            }),
+          );
+      }
+    case 'INTF':
+      return sourceOf(
+        'GetInterface',
+        await livePrepare('GetInterface', {
+          interface_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    case 'DDLS':
+      return sourceOf(
+        'GetDdl',
+        await livePrepare('GetDdl', {
+          ddl_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    case 'BDEF':
+      return sourceOf(
+        'GetBehaviorDefinition',
+        await livePrepare('GetBehaviorDefinition', {
+          behavior_definition_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    case 'DDLX':
+      return sourceOf(
+        'GetMetadataExtension',
+        await livePrepare('GetMetadataExtension', {
+          metadata_extension_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    case 'SRVD':
+      return sourceOf(
+        'GetServiceDefinition',
+        await livePrepare('GetServiceDefinition', {
+          service_definition_name: name,
+          part: 'source',
+          start_line: line,
+          end_line: line,
+        }),
+      );
+    default:
+      throw new Error(`a hit of an unknown type: ${JSON.stringify(hit)}`);
+  }
+}
+
+/** Every hit is real: its line, read back, contains `query`. */
+async function expectHitsReal(
+  results: readonly unknown[],
+  query: string,
+): Promise<void> {
+  for (const hit of results) {
+    expect({
+      hit: `${member(hit, 'object_name')}:${member(hit, 'line')}`,
+      holds: (await hitLine(hit)).toUpperCase().includes(query.toUpperCase()),
+    }).toEqual({
+      hit: `${member(hit, 'object_name')}:${member(hit, 'line')}`,
+      holds: true,
+    });
+  }
+}
+
+/** A counter of the answer's `scanned`. */
+function scanned(payload: unknown, counter: string): unknown {
+  return member(member(payload, 'scanned'), counter);
 }
 
 /** The distinct objects of hits: a module and its group count apart. */
@@ -190,54 +418,71 @@ function expectHitsOnly(payload: unknown): void {
   }).toEqual({ no_hits: undefined, failures: undefined });
 }
 
-/** An object filter no object matches: the walk reads no object. */
-const NO_OBJECT = `ZZMCP_NO_OBJECT_${randomBytes(3).toString('hex').toUpperCase()}`;
-
 // ---------------------------------------------------------------------------
 // The cases
 
 liveSuite(['onprem'], 'SearchSource package masks', () => {
-  it('a mask with several * walks the packages the quick search names', async () => {
+  /**
+   * The mask searched without subpackages, for the shared module in its
+   * group: every hit's package is among `named`, the module's hit is there,
+   * and every hit's line holds the query.
+   */
+  async function expectMaskAnswer(
+    payload: unknown,
+    named: readonly string[],
+  ): Promise<void> {
+    expectHitsOnly(payload);
+    const results = listOf(payload, 'results');
+    expectHitsWithin(results, named);
+    moduleHit(results);
+    await expectHitsReal(results, sharedModule());
+  }
+
+  it('a mask with several *: hits only from the packages the quick search names', async () => {
     const shared = sharedPackage();
     const mask = `*${shared.slice(1, 4)}*${shared.slice(-3)}*`;
     const named = await quickSearchPackages(mask);
     expect(named.length).toBeGreaterThan(1);
+    expect(named).toContain(shared);
     const answer = await liveCall('SearchSource', {
       packages: [mask],
       include_subpackages: false,
-      object_filter: NO_OBJECT,
-      query: 'FUNCTION',
+      object_types: ['FUGR'],
+      object_filter: sharedGroup(),
+      query: sharedModule(),
     });
-    expectWalked(payloadOf('SearchSource', answer), named);
+    await expectMaskAnswer(payloadOf('SearchSource', answer), named);
   });
 
-  it('a * matching zero characters walks the package of exactly that name', async () => {
+  it('a * matching zero characters: hits only from the packages the quick search names', async () => {
     const mask = `${sharedPackage()}*`;
     const named = await quickSearchPackages(mask);
     expect(named).toContain(sharedPackage());
     const answer = await liveCall('SearchSource', {
       packages: [mask],
       include_subpackages: false,
-      object_filter: NO_OBJECT,
-      query: 'FUNCTION',
+      object_types: ['FUGR'],
+      object_filter: sharedGroup(),
+      query: sharedModule(),
     });
-    expectWalked(payloadOf('SearchSource', answer), named);
+    await expectMaskAnswer(payloadOf('SearchSource', answer), named);
   });
 
-  it('a mask with ? walks the packages the quick search names', async () => {
+  it('a mask with ?: hits only from the packages the quick search names', async () => {
     const mask = `${sharedPackage().slice(0, -1)}?`;
     const named = await quickSearchPackages(mask);
     expect(named).toContain(sharedPackage());
     const answer = await liveCall('SearchSource', {
       packages: [mask],
       include_subpackages: false,
-      object_filter: NO_OBJECT,
-      query: 'FUNCTION',
+      object_types: ['FUGR'],
+      object_filter: sharedGroup(),
+      query: sharedModule(),
     });
-    expectWalked(payloadOf('SearchSource', answer), named);
+    await expectMaskAnswer(payloadOf('SearchSource', answer), named);
   });
 
-  it('an exact name with a literal _ walks that package alone', async () => {
+  it('an exact name with a literal _: hits only from that package', async () => {
     const exact = sharedPackage();
     expect(exact).toContain('_');
     const named = await quickSearchPackages(exact);
@@ -245,15 +490,22 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
     const answer = await liveCall('SearchSource', {
       packages: [exact],
       include_subpackages: false,
-      object_filter: NO_OBJECT,
-      query: 'FUNCTION',
+      object_types: ['FUGR'],
+      object_filter: sharedGroup(),
+      query: sharedModule(),
     });
-    expectWalked(payloadOf('SearchSource', answer), named);
+    await expectMaskAnswer(payloadOf('SearchSource', answer), named);
   });
 });
 
 liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
-  it('the shared function module is a hit of its own, read back with GetFunctionModule', async () => {
+  it('the shared function module is a hit of its own: hits only from the named tree, each real', async () => {
+    const tree = await treeOf(hitPackage());
+    if (!tree.includes(sharedPackage().toUpperCase())) {
+      throw new Error(
+        'the configured shared package must be a descendant of the configured build package on ABAP Cloud',
+      );
+    }
     const answer = await liveCall('SearchSource', {
       packages: [hitPackage()],
       object_types: ['FUGR'],
@@ -263,11 +515,16 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
     expectHitsOnly(payload);
     const results = listOf(payload, 'results');
     expect(scanned(payload, 'objects_with_hits')).toBe(objectsOf(results));
+    expectHitsWithin(results, tree);
     const hit = moduleHit(results);
     expect({
       function_group_name: member(hit, 'function_group_name'),
       include: member(hit, 'include'),
     }).toEqual({ function_group_name: sharedGroup(), include: undefined });
+    await expectHitsReal(results, sharedModule());
+
+    // The module's hit, read with exactly the fields it names: the case
+    // GetFunctionModule#source stands for live.
     const line = member(hit, 'line');
     const snippet = member(hit, 'snippet');
     if (typeof line !== 'number' || typeof snippet !== 'string') {
@@ -275,8 +532,6 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
         `the hit has no line and snippet: ${JSON.stringify(hit)}`,
       );
     }
-    expect(snippet.toUpperCase()).toContain(sharedModule());
-
     const read = await liveCall('GetFunctionModule', {
       function_module_name: member(hit, 'object_name'),
       function_group_name: member(hit, 'function_group_name'),
@@ -284,29 +539,35 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       start_line: line,
       end_line: line,
     });
-    const source = member(payloadOf('GetFunctionModule', read), 'source');
-    if (typeof source !== 'string') {
-      throw new Error(`GetFunctionModule answered no source: ${read.text}`);
-    }
+    const source = sourceOf('GetFunctionModule', read);
     expect(source.toUpperCase()).toContain(sharedModule());
     expect(source).toContain(snippet.trim());
   });
 
-  it('a package that does not exist is skipped and not counted', async () => {
-    const answer = await liveCall('SearchSource', {
+  it('a package that does not exist yields no hit', async () => {
+    const both = await liveCall('SearchSource', {
       packages: [sharedPackage(), MISSING],
       include_subpackages: false,
       object_types: ['FUGR'],
       query: sharedModule(),
     });
-    const payload = payloadOf('SearchSource', answer);
+    const payload = payloadOf('SearchSource', both);
     expectHitsOnly(payload);
-    expect(scanned(payload, 'packages')).toBe(1);
     const results = listOf(payload, 'results');
     moduleHit(results);
-    expect(
-      results.filter((hit) => member(hit, 'devclass') !== sharedPackage()),
-    ).toEqual([]);
+    expectHitsWithin(results, [sharedPackage()]);
+
+    const alone = await liveCall('SearchSource', {
+      packages: [MISSING],
+      include_subpackages: false,
+      object_types: ['FUGR'],
+      query: sharedModule(),
+    });
+    const missing = payloadOf('SearchSource', alone);
+    expect({
+      results: listOf(missing, 'results'),
+      objects: scanned(missing, 'objects'),
+    }).toEqual({ results: [], objects: 0 });
   });
 
   it('answer objects names each object with its hit count', async () => {

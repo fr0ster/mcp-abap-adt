@@ -112,6 +112,9 @@ environment:
   # database_system: "HDB"                  # the system's database, stated (e.g. ABAP cloud,
                                              # whose system information names none); the AMDP
                                              # tests read SAP's DBSystem when omitted
+  # On ABAP Cloud this is the build package SearchSource's live known-hit case searches with its
+  # subpackages: shared_dependencies.package must be a descendant of it, or that case fails
+  # naming the prerequisite.
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   cleanup_after: true                        # Clean up objects after test
@@ -131,6 +134,9 @@ environment:
 # Manage with: npm run shared:setup / shared:teardown / shared:check
 
 shared_dependencies:
+  # On ABAP Cloud this package must be a descendant of environment.default_package (the build
+  # package): SearchSource's live known-hit case searches the build package's tree for it, and
+  # fails naming the prerequisite when it is not there.
   package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
   super_package: ""                          # super package (optional, leave "" if none)
   software_component: "ZLOCAL"               # ← CHANGE: "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem

@@ -3,6 +3,7 @@ import {
   type OrchestratorDeps,
   type OrchestratorInput,
   runSearchSource,
+  runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
 import type {
   PackageContentItem,
@@ -10,10 +11,21 @@ import type {
 } from '../../../lib/search-source/packageEnumerator';
 import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import {
+  contextOn,
+  type Fake,
+  nodeKey,
+  type Repository,
+  sentUrls,
+  standOn,
+} from '../../helpers/searchSourceStand';
+import {
   exactPackages,
   listing,
   sourcesFrom as sourceFor,
 } from '../../helpers/sourceReaderFake';
+
+// The process declares its system type, as every launcher requires.
+process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 function pkg(
   items: Array<Partial<PackageContentItem>>,
@@ -63,7 +75,6 @@ describe('runSearchSource', () => {
       ),
     ).toEqual(['ZA/ZA_CLAS:3', 'ZA/ZA_PROG:1', 'ZB/ZB_PROG:2']);
     expect(result.scanned).toEqual({
-      packages: 1,
       objects: 3,
       sources: 3,
       objects_with_hits: 3,
@@ -207,7 +218,6 @@ describe('runSearchSource', () => {
     expect(result.results.map((r) => r.object_name)).toEqual(['Z_HIT']);
     expect(Object.keys(result)).not.toContain('no_hits');
     expect(result.scanned).toEqual({
-      packages: 1,
       objects: 2,
       sources: 2,
       objects_with_hits: 1,
@@ -215,13 +225,14 @@ describe('runSearchSource', () => {
   });
 });
 
-describe('runSearchSource — scanned.packages reflects resolved count', () => {
-  it('counts resolved packages, not raw input, when patterns expand', async () => {
+describe('runSearchSource — the resolved packages are walked; no package counter (DO26)', () => {
+  it('walks the resolved packages, not the raw input, when patterns expand', async () => {
+    const walked: string[] = [];
     const deps: OrchestratorDeps = {
-      fetchPackageContents: pkg([
-        { name: 'ZA_PROG', type: 'PROG/P', packageName: 'ZA' },
-        { name: 'ZB_PROG', type: 'PROG/P', packageName: 'ZB' },
-      ]),
+      fetchPackageContents: async (name) => {
+        walked.push(name);
+        return listing(name, []);
+      },
       sourceReader: sourceFor({
         'PROG:ZA_PROG': 'marker',
         'PROG:ZB_PROG': 'marker',
@@ -234,10 +245,11 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
       ...baseInput,
       packages: ['Z*'],
     });
-    expect(result.scanned.packages).toBe(2);
+    expect(walked).toEqual(['ZA', 'ZB']);
+    expect(Object.keys(result.scanned)).not.toContain('packages');
   });
 
-  it('returns empty result with scanned.packages: 0 when resolution is empty', async () => {
+  it('returns an empty result when resolution is empty', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: async () => {
         throw new Error('must not enumerate when resolved set is empty');
@@ -253,7 +265,6 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
     });
     expect(result.results).toEqual([]);
     expect(result.scanned).toEqual({
-      packages: 0,
       objects: 0,
       sources: 0,
       objects_with_hits: 0,
@@ -288,7 +299,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
       ...baseInput,
       packages: ['ZPKG', 'zpkg'],
     });
-    expect(result.scanned.packages).toBe(1);
+    expect(Object.keys(result.scanned)).not.toContain('packages');
     expect(fetchedFor).toBe('ZPKG');
   });
 });
@@ -338,4 +349,59 @@ describe('runSearchSource — an object of any number of hits', () => {
     });
     expect(result.results).toHaveLength(300_000);
   });
+});
+
+describe('runSearchSourceWithContext — the packages walked are exactly those named (DO26)', () => {
+  /**
+   * `ZQ*` resolves to `ZQA` (a program with a hit) and `ZQB` (empty); `ZEMPTY`
+   * is named and empty, `ZMISSING` is named and does not exist — SAP answers
+   * its node structure `200` with an empty body; `ZQC` exists but no entry
+   * names it.
+   */
+  const REPO: Repository = {
+    nodes: {
+      [nodeKey('ZQA')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+      [nodeKey('ZQA', '1')]: { objects: [{ type: 'PROG/P', name: 'ZQAP' }] },
+      [nodeKey('ZQB')]: {},
+      [nodeKey('ZQC')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+      [nodeKey('ZEMPTY')]: {},
+    },
+    sources: { 'PROGRAM ZQAP': 'marker' },
+    fugrChildren: {},
+    masks: { 'ZQ*': ['ZQA', 'ZQB'] },
+  };
+
+  /** The package roots requested, by name: every node-structure request without a node. */
+  const rootsOf = (fake: Fake): string[] =>
+    sentUrls(fake)
+      .map((url) => new URL(url, 'https://system.invalid'))
+      .filter(
+        (url) =>
+          url.pathname.endsWith('/repository/nodestructure') &&
+          !url.searchParams.has('node_id'),
+      )
+      .map((url) => url.searchParams.get('parent_name') ?? '')
+      .sort();
+
+  it.each([
+    ['served', false],
+    ['absent', true],
+  ] as const)(
+    'node structures are requested for the resolved and the exact names only, each once (%s)',
+    async (_path, absent) => {
+      const fake = standOn(REPO, { emptyBody: [nodeKey('ZMISSING')] });
+      const result = await runSearchSourceWithContext(
+        contextOn(fake, absent ? 'absent' : 'served'),
+        {
+          query: 'marker',
+          packages: ['ZQ*', 'ZEMPTY', 'ZMISSING'],
+          include_subpackages: false,
+        },
+        { lineMatch: substringLineMatch, sapAnswers: skipSapAnswers },
+      );
+      expect(rootsOf(fake)).toEqual(['ZEMPTY', 'ZMISSING', 'ZQA', 'ZQB']);
+      expect(result.results.map((h) => h.object_name)).toEqual(['ZQAP']);
+      expect(Object.keys(result.scanned)).not.toContain('packages');
+    },
+  );
 });

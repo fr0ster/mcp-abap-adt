@@ -371,7 +371,6 @@ describe('SearchSource: what cannot be read is skipped, the reads go on (DO17)',
       ).toEqual(['ZHERE']);
       expect(payload.failures).toBeUndefined();
       expect(payload.scanned).toEqual({
-        packages: 1,
         objects: 1,
         sources: 1,
         objects_with_hits: 1,
@@ -432,7 +431,7 @@ describe('SearchSource: package-level outcomes are skipped (DO17)', () => {
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
       expect(payload.failures).toBeUndefined();
-      expect(payload.scanned.packages).toBe(1);
+      expect(Object.keys(payload.scanned)).not.toContain('packages');
     },
   );
 
@@ -449,7 +448,7 @@ describe('SearchSource: package-level outcomes are skipped (DO17)', () => {
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
       expect(payload.failures).toBeUndefined();
-      expect(payload.scanned.packages).toBe(1);
+      expect(Object.keys(payload.scanned)).not.toContain('packages');
     },
   );
 
@@ -495,7 +494,7 @@ describe('SearchSource: a missing level is skipped; below the root only its bran
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
       expect(payload.failures).toBeUndefined();
-      expect(payload.scanned.packages).toBe(1);
+      expect(Object.keys(payload.scanned)).not.toContain('packages');
     },
   );
 
@@ -519,7 +518,7 @@ describe('SearchSource: a missing level is skipped; below the root only its bran
         ),
       ).toEqual(['Z_FM_B@ZFG', 'ZTWOP/ZTWOP']);
       expect(payload.failures).toBeUndefined();
-      expect(payload.scanned.packages).toBe(2);
+      expect(Object.keys(payload.scanned)).not.toContain('packages');
     },
   );
 
@@ -557,7 +556,7 @@ describe('SearchSource: a missing level is skipped; below the root only its bran
       ).toEqual(['ZTWOP']);
       expect(payload.failures).toBeUndefined();
       // ZPAR and ZTWO walked; ZKID not.
-      expect(payload.scanned.packages).toBe(2);
+      expect(Object.keys(payload.scanned)).not.toContain('packages');
     },
   );
 
@@ -695,7 +694,6 @@ describe('SearchSource: one read per source', () => {
       const { result } = searchShared({}, batch === 'absent');
       const payload = payloadOf(await result);
       expect(payload.scanned).toEqual({
-        packages: 1,
         objects: 2,
         sources: 1,
         objects_with_hits: 2,
@@ -781,6 +779,7 @@ describe('SearchSource: the description is functional', () => {
     'next_start_at',
     'by_max_objects',
     'default 100',
+    'scanned.packages',
   ])('carries no advice or stale contract: %s', (text) => {
     expect(description).not.toContain(text);
   });
@@ -808,7 +807,6 @@ describe('SearchSource: the description is functional', () => {
       '`truncated.by_max_hits`',
       'the sources of the last batch read, those read past the stop included',
       'skipped',
-      '`scanned.packages`',
       '`scanned.objects`',
       '`scanned.sources` the sources read (each once)',
       '`scanned.objects_with_hits`',
@@ -914,7 +912,8 @@ describe('D23b: package masks (DO12)', () => {
         ['ZA*', 2000],
       ]);
       const answer = payloadOf(result);
-      expect(answer.scanned.packages).toBe(1001);
+      expect(new Set(walkedRoots(fake, sequential)).size).toBe(1001);
+      expect(Object.keys(answer.scanned)).not.toContain('packages');
       expect(
         answer.results.map((h: { devclass: string }) => h.devclass),
       ).toEqual([all[1000]]);
@@ -938,7 +937,8 @@ describe('D23b: package masks (DO12)', () => {
         ['ZB*', 4000],
       ]);
       const answer = payloadOf(result);
-      expect(answer.scanned.packages).toBe(2001);
+      expect(new Set(walkedRoots(fake, sequential)).size).toBe(2001);
+      expect(Object.keys(answer.scanned)).not.toContain('packages');
       expect(
         answer.results.map((h: { devclass: string }) => h.devclass),
       ).toEqual([all[2000]]);
@@ -953,7 +953,8 @@ describe('D23b: package masks (DO12)', () => {
         ['ZC*', 1000],
         ['ZC*', 2000],
       ]);
-      expect(payloadOf(result).scanned.packages).toBe(1000);
+      expect(new Set(walkedRoots(fake, sequential)).size).toBe(1000);
+      expect(Object.keys(payloadOf(result).scanned)).not.toContain('packages');
     });
 
     it('masks of different depths resolve together, no search sent twice', async () => {
@@ -983,7 +984,8 @@ describe('D23b: package masks (DO12)', () => {
         ]);
       }
       const answer = payloadOf(result);
-      expect(answer.scanned.packages).toBe(2006);
+      expect(new Set(walkedRoots(fake, sequential)).size).toBe(2006);
+      expect(Object.keys(answer.scanned)).not.toContain('packages');
       expect(
         answer.results.map((h: { devclass: string }) => h.devclass).sort(),
       ).toEqual([shallow[4], deep[2000]]);
@@ -1011,7 +1013,8 @@ describe('D23b: package masks (DO12)', () => {
       );
       const answer = payloadOf(result);
       expect(answer.failures).toBeUndefined();
-      expect(answer.scanned.packages).toBe(1);
+      expect(walkedRoots(fake, sequential)).toEqual(['ZG000001']);
+      expect(Object.keys(answer.scanned)).not.toContain('packages');
       expect(walkedRoots(fake, sequential)).toEqual(['ZG000001']);
       expect(
         answer.results.map((h: { devclass: string }) => h.devclass),
@@ -1331,7 +1334,6 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         // main source), ZFG (its second module) — not ZGONE nor ZBAD; one
         // source each; with hits: ZHIT, ZCL, ZFG.
         expect(payload.scanned).toEqual({
-          packages: 1,
           objects: 4,
           sources: 4,
           objects_with_hits: 3,
@@ -1349,7 +1351,6 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         );
         expect(payload.results).toEqual([]);
         expect(payload.scanned).toEqual({
-          packages: 1,
           objects: 0,
           sources: 0,
           objects_with_hits: 0,
@@ -1358,7 +1359,7 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
     );
 
     it.each(PATHS)(
-      'a named package that does not exist (its root answers 404) is skipped: no entry, not in scanned.packages (%s)',
+      'a named package that does not exist (its root answers 404) is skipped: no entry, no package counted (%s)',
       async (batch) => {
         const fake = standOn(REPO, { refuse: { [nodeKey('ZNONE')]: 404 } });
         const payload = payloadOf(
@@ -1368,12 +1369,12 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         );
         expect(payload.failures).toBeUndefined();
         expect(hits(payload)).toEqual(['ZTWOP/ZTWOP:1']);
-        expect(payload.scanned.packages).toBe(1);
+        expect(Object.keys(payload.scanned)).not.toContain('packages');
       },
     );
 
     it.each(PATHS)(
-      'a refused root is skipped: no entry, not in scanned.packages (%s)',
+      'a refused root is skipped: no entry, no package counted (%s)',
       async (batch) => {
         const fake = standOn(REPO, { refuse: { [nodeKey('ZPKG')]: 500 } });
         const payload = payloadOf(
@@ -1383,7 +1384,7 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         );
         expect(payload.failures).toBeUndefined();
         expect(hits(payload)).toEqual(['ZTWOP/ZTWOP:1']);
-        expect(payload.scanned.packages).toBe(1);
+        expect(Object.keys(payload.scanned)).not.toContain('packages');
       },
     );
 
@@ -1397,7 +1398,6 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         );
         expect(payload.results).toEqual([]);
         expect(payload.scanned).toEqual({
-          packages: 0,
           objects: 0,
           sources: 0,
           objects_with_hits: 0,
@@ -1559,7 +1559,7 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
         expect(sentUrls(fake).some((url) => url.includes('ztprog'))).toBe(
           false,
         );
-        expect(payload.scanned.packages).toBe(1);
+        expect(Object.keys(payload.scanned)).not.toContain('packages');
         expect(payload.failures).toBeUndefined();
       },
     );
@@ -1583,7 +1583,7 @@ describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
           sentUrls(fake).some((url) => url.includes('parent_name=ZKB&node_id')),
         ).toBe(false);
         // ZPAR and ZKA walked; ZKB not.
-        expect(payload.scanned.packages).toBe(2);
+        expect(Object.keys(payload.scanned)).not.toContain('packages');
         expect(payload.failures).toBeUndefined();
       },
     );
@@ -1967,7 +1967,6 @@ describe('D23b: a function module is its own scan object (DO18)', () => {
     async (batch) => {
       const payload = payloadOf(await searchGroup(batch === 'absent'));
       expect(payload.scanned).toEqual({
-        packages: 1,
         objects: 3,
         sources: 4,
         objects_with_hits: 3,
@@ -2357,7 +2356,6 @@ describe('D23b: the caller sets how much the answer holds (DO23)', () => {
       // Sequential: ZP1 alone was read. Batched: the stopped chunk's
       // sources were read, ZP2 and ZP3 included.
       expect(payload.scanned).toEqual({
-        packages: 1,
         objects: 1,
         sources: absent ? 1 : 3,
         objects_with_hits: 1,

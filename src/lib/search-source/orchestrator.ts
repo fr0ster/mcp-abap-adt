@@ -149,15 +149,14 @@ function answeredAs(
 }
 
 /**
- * The answer: the hits, and counters of what was done — the packages walked
- * (their own level read), the objects read (at least one source), the
- * sources read and the objects with a hit. What cannot be read is skipped
- * and not counted (DO17).
+ * The answer: the hits, and counters of what was done — the objects read (at
+ * least one source), the sources read and the objects with a hit. What
+ * cannot be read is skipped and not counted (DO17). No package is counted
+ * (DO26): SAP answers a package that does not exist as an empty one.
  */
 export interface OrchestratorResult {
   results: SearchHit[] | LineHit[] | ObjectEntry[];
   scanned: {
-    packages: number;
     objects: number;
     sources: number;
     objects_with_hits: number;
@@ -283,7 +282,7 @@ export async function runSearchSource(
   };
   const enumerated =
     resolvedPackages.length === 0
-      ? { targets: [], packages: 0 }
+      ? { targets: [] }
       : await enumerateScanTargets(deps.fetchPackageContents, enumerateInput);
   // One run reads every target.
   const targets = enumerated.targets;
@@ -442,7 +441,6 @@ export async function runSearchSource(
   const result: OrchestratorResult = {
     results: answeredAs(input.answer ?? 'snippets', allHits),
     scanned: {
-      packages: enumerated.packages,
       objects: objectsRead,
       sources: sourcesRead.size,
       objects_with_hits: objectsWithHits,
@@ -530,9 +528,6 @@ async function runSearchSourceInPhases(
     if (envelope.failed) envelopeFailure(envelope.error);
     return results;
   };
-  // Every package whose own level was read: the asked ones' walks together
-  // (a package two asked packages reach is counted once, `enumerateScanTargets`).
-  const walkedPackages = new Set<string>();
   const walked: PhaseResult<WalkedItem[]>[] =
     names.length === 0
       ? []
@@ -541,19 +536,15 @@ async function runSearchSourceInPhases(
             input.include_subpackages ?? DEFAULTS.include_subpackages,
           missingLevel: 'refused',
           branchRule: {
-            walked: walkedPackages,
             onFailure: (failure, place) =>
               failedRead(sapAnswers, failure, place),
           },
         });
   const fetchPackageContents: PackageContentsFetcher = async (packageName) => {
     const answer = walked[names.indexOf(packageName.toUpperCase())];
-    if (answer === undefined) return { items: [], walked: new Set() };
+    if (answer === undefined) return [];
     if (!answer.ok) throw answer.error;
-    return {
-      items: assembleList(packageName, answer.value),
-      walked: walkedPackages,
-    };
+    return assembleList(packageName, answer.value);
   };
   const enumerateInput: EnumerateInput = {
     packages: resolved,
@@ -564,7 +555,7 @@ async function runSearchSourceInPhases(
   };
   const enumerated =
     resolved.length === 0
-      ? { targets: [], packages: 0 }
+      ? { targets: [] }
       : await enumerateScanTargets(fetchPackageContents, enumerateInput);
   // Every target: the final scan below (`runSearchSource`) reads the same
   // ones, so the reads sent here are the reads it answers from.

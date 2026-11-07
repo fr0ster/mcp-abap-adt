@@ -591,11 +591,9 @@ export type MissingLevel = 'empty' | 'refused';
  * subpackage's root, its `404` included under `missingLevel: 'refused'` —
  * excludes only that branch, and the walk goes on with the next node or
  * subpackage; a refused root of the asked package still settles the package
- * as refused; a credential failure still ends the walk. Every package whose
- * own level was read is added to `walked`.
+ * as refused; a credential failure still ends the walk.
  */
 export interface BranchRule {
-  walked: Set<string>;
   /**
    * A refused read of the walk, at its place: returns when what the place
    * names is skipped (the package, or the branch below it); throws to end
@@ -696,7 +694,6 @@ export async function walkPackages(
     try {
       if (!result.ok) throw result.error;
       const level = levelOf(result.value, options.missingLevel);
-      if (node === undefined) options.branchRule?.walked.add(walk.name);
       return level;
     } catch (error) {
       const rule = options.branchRule;
@@ -842,7 +839,6 @@ export async function walkPackage(
       ),
   );
   if (root === undefined) return [];
-  options.branchRule?.walked.add(pkg);
 
   // A description only when asked for: SAP sends some without it.
   const owned = (o: WalkedItem): WalkedItem => {

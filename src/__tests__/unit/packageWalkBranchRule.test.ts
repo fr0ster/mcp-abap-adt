@@ -126,34 +126,30 @@ describe.each([
   ],
 ] as const)(
   'under the branch rule, %s excludes only its branch',
-  (_case, refused, found, walked) => {
+  (_case, refused, found, _walked) => {
     it('walkPackage', async () => {
-      const recorded = new Set<string>();
       const { utils, asked } = source(refused);
       const options = {
         includeSubpackages: true,
         missingLevel: 'refused' as const,
-        branchRule: { walked: recorded, onFailure: classified },
+        branchRule: { onFailure: classified },
       };
       expect(names(await walkPackage(utils, 'P', options))).toEqual(found);
-      expect([...recorded].sort()).toEqual(walked);
       expect(asked.some((k) => k.startsWith('SB|') && k !== 'SB|root')).toBe(
         !('SB|root' in refused),
       );
     });
 
     it('walkPackages', async () => {
-      const recorded = new Set<string>();
       const { read, asked } = levelReader(refused);
       const options = {
         includeSubpackages: true,
         missingLevel: 'refused' as const,
-        branchRule: { walked: recorded, onFailure: classified },
+        branchRule: { onFailure: classified },
       };
       const [settled] = await walkPackages(read, ['P'], options);
       expect(settled?.ok).toBe(true);
       if (settled?.ok) expect(names(settled.value)).toEqual(found);
-      expect([...recorded].sort()).toEqual(walked);
       expect(asked.some((k) => k.startsWith('SB|') && k !== 'SB|root')).toBe(
         !('SB|root' in refused),
       );
@@ -169,7 +165,6 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
       includeSubpackages: true,
       missingLevel: 'refused' as const,
       branchRule: {
-        walked: new Set<string>(),
         onFailure: (failure: unknown, place: WalkFailurePlace) => {
           places.push(place);
           classified(failure, place);
@@ -178,7 +173,6 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
     };
     expect(await walkPackage(utils, 'P', options)).toEqual([]);
     expect(places).toEqual([{ kind: 'package', package: 'P' }]);
-    expect([...options.branchRule.walked]).toEqual([]);
   });
 
   it('walkPackages: a SAP-refused root is the package place; skipped, it settles empty', async () => {
@@ -188,7 +182,6 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
       includeSubpackages: true,
       missingLevel: 'refused' as const,
       branchRule: {
-        walked: new Set<string>(),
         onFailure: (failure: unknown, place: WalkFailurePlace) => {
           places.push(place);
           classified(failure, place);
@@ -207,7 +200,6 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
       includeSubpackages: true,
       missingLevel: 'refused',
       branchRule: {
-        walked: new Set<string>(),
         onFailure: (failure, place) => {
           places.push(place);
           classified(failure, place);
@@ -231,7 +223,7 @@ describe('under the branch rule, a credential refusal at any level ends the walk
     const options = {
       includeSubpackages: true,
       missingLevel: 'refused' as const,
-      branchRule: { walked: new Set<string>(), onFailure: classified },
+      branchRule: { onFailure: classified },
     };
     await expect(walkPackage(utils, 'P', options)).rejects.toBeDefined();
   });
@@ -241,7 +233,7 @@ describe('under the branch rule, a credential refusal at any level ends the walk
     const options = {
       includeSubpackages: true,
       missingLevel: 'refused' as const,
-      branchRule: { walked: new Set<string>(), onFailure: classified },
+      branchRule: { onFailure: classified },
     };
     await expect(walkPackages(read, ['P'], options)).rejects.toBeDefined();
   });
@@ -329,7 +321,6 @@ describe('under the branch rule, a raw 401 at the root or a level ends the walk,
           includeSubpackages: true,
           missingLevel: 'refused',
           branchRule: {
-            walked: new Set<string>(),
             onFailure: (failure, place) =>
               failedRead(
                 {

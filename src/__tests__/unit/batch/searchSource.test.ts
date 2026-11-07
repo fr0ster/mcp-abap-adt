@@ -144,7 +144,6 @@ describe('SearchSource on internal batches', () => {
     // listed, and they count as read; the group and its modules count apart.
     expect(payloadOf(a).no_hits).toBeUndefined();
     expect(payloadOf(a).scanned).toEqual({
-      packages: 3,
       objects: 7,
       sources: 8,
       objects_with_hits: 5,

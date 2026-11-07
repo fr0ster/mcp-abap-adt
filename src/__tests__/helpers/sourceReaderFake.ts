@@ -10,10 +10,7 @@
  * `<objecttype>|<objectname>` per line.
  */
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  PackageContentItem,
-  PackageContents,
-} from '../../lib/search-source/packageEnumerator';
+import type { PackageContentItem } from '../../lib/search-source/packageEnumerator';
 import type {
   FugrChild,
   ReadAnswer,
@@ -94,8 +91,8 @@ export const exactPackages = async (entries: string[]) => ({
   packages: entries,
 });
 
-/** A walk of `packageName` that read its own level and found `items`. */
+/** A walk of `_packageName` that found `items`. */
 export const listing = (
-  packageName: string,
+  _packageName: string,
   items: PackageContentItem[],
-): PackageContents => ({ items, walked: new Set([packageName]) });
+): PackageContentItem[] => items;

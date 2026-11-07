@@ -261,8 +261,8 @@ in one run, answers only the hits with counters of what it did, and skips what i
   and read the objects with hits from `results`: an object without a hit is no longer listed,
   and `no_hits` is gone.
 - **The `failures` list is gone, both kinds.** A source or object that cannot be read, a mask
-  search SAP refuses and a package that does not exist (its root refused or `404`) are skipped
-  with no entry. Below the root, a refused or missing type node or subpackage excludes only its
+  search SAP refuses and a package whose root SAP refuses (`404` included) are skipped with no
+  entry; a package that does not exist yields no hit (SAP answers it as an empty package). Below the root, a refused or missing type node or subpackage excludes only its
   branch: the package's other type nodes, subpackages and objects are walked and searched. A
   readable source of an object is still searched when another of its sources failed. A
   credential failure still ends the call.
@@ -271,8 +271,9 @@ in one run, answers only the hits with counters of what it did, and skips what i
   host, a network failure), a defect of the server, and a failed batch envelope end the call as
   an error, as a credential refusal does; the outer `404` of a batch envelope falls back to
   single requests.
-- **The counters count only what was done.** `scanned.packages` the packages walked (their own
-  level read, subpackages included), `scanned.objects` the objects read (at least one source),
+- **The counters count only what was done.** `scanned.packages` is gone: no package is
+  counted, since SAP answers a package that does not exist as an empty one — such a package
+  yields no hit (DO26). `scanned.objects` counts the objects read (at least one source),
   `scanned.sources` the sources read (each once, however many objects name it), and the new `scanned.objects_with_hits` the objects with
   a hit in `results`.
 - **No paging.** Drop `max_objects` and `start_at` (a call that still sends them has them

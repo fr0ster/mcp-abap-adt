@@ -469,7 +469,10 @@ on-premise system disagree, the live measurement holds.
   own `background` default; `DiscardBackgroundRun` cancels a running read run by logging off
   its session — the run's one connection held by the instance, `cancelled` final, recorded
   through the store's existing `finish` (a running code run is still refused) — and the run
-  answers gain `cancelled`. `time_budget_ms` / `timeout` go in D24.
+  answers gain `cancelled`. A finished read run's answer is removed once `GetBackgroundRun` answers it (code
+  runs are kept until discarded); with no background-run strategy a long tool runs
+  synchronously; `HandlerGet`'s run-reading parts (unit-test results, activation status and
+  results) stay synchronous and take no `background`. `time_budget_ms` / `timeout` go in D24.
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

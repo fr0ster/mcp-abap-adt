@@ -2761,13 +2761,25 @@ by `DiscardBackgroundRun`. D23 does not touch either field; D24 removes them.
   - **embedders (MIGRATION):** a custom strategy keeps the answer it is given in `finish` (as
     today) and answers `state: 'cancelled'` for a kept answer with `cancelled: true`; nothing
     else changes for it.
-- **No strategy.** Today, with no strategy, `background` is refused. **Proposed (to confirm
-  with the owner):** with no strategy, a long tool runs synchronously, as with
-  `background: false`, so a host without a strategy keeps working; the code-running tools
-  stay as today.
+- **No strategy (owner, 2026-11-07).** Today, with no strategy, `background` is refused. From
+  D24, with no strategy a long tool runs synchronously, as with `background: false`, so a
+  host without a strategy keeps working; the code-running tools stay as today.
 5. **State.** `GetBackgroundRun` answers `running`, `finished` with the answer, or `cancelled`.
    `ListBackgroundRuns` lists the caller's runs with that state. Both answers gain
    `cancelled`.
+6. **Reading a finished read run consumes it (owner, 2026-11-07).** A finished background
+   **read** run's kept answer is removed the moment `GetBackgroundRun` (or the compact
+   `HandlerBackgroundRunGet`) answers it as `finished` or `cancelled`, so the per-caller limit
+   does not fill up. Code runs (`RuntimeRunClass`, `RuntimeRunProgram`, `HandlerProfileRun`)
+   keep today's retention until `DiscardBackgroundRun`. No timers. The store contract needs
+   no new method: the owner calls the store's existing `discard` right after a read run's
+   finished answer is handed to the caller (the run's kind is known to the owner from the
+   tool that started it).
+7. **`HandlerGet`'s run-reading parts are not background (owner, 2026-11-07).** The parts that
+   read a run — `UNIT_TEST` / `CDS_UNIT_TEST` results, `activation_status`,
+   `activation_results` — stay synchronous: they do not take `background`, and keep today's
+   session policy (the instance's connection, long-polled reads). `HandlerGet`'s other parts
+   take `background` like every long tool.
 
 **Files:** the helper users listed under decision 1, `src/lib/longTools.ts`, `tools/long-handlers.json`,
 `src/lib/longCall.ts` (`runLongCall`), `src/lib/backgroundRuns/{tools,run,answers,port,contract}.ts`,
@@ -2813,8 +2825,16 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
     from `runLongCall`.
   - **The contract:** with a custom strategy (a test double implementing `IBackgroundRuns`), the
     cancel arrives as `finish` with `cancelled: true` and its listing answers `cancelled`;
-    with no strategy, a long tool answers its result in the call (the proposal above, once
-    confirmed).
+    with no strategy, a long tool answers its result in the call.
+  - **Read consumes:**
+    - `'a second Get after a finished read answers not available'` (full and compact);
+    - `'seventeen sequential default-background reads, each read once, never hit the
+      limit'`;
+    - `'a code run is still kept after Get'` (until Discard).
+  - **`HandlerGet`'s run parts:** `'background with a run-reading part is refused'` (or not
+    declared for it — whichever the schema can state per part; the test asserts the one
+    chosen), and `'a run-reading part answers in the call, on the instance's connection'`,
+    for the unit-test and CDS-unit-test results and both activation parts.
   - **Compact:** the same cancel, get and list cases through `HandlerBackgroundRunGet` and
     `HandlerBackgroundRunDiscard`, and the compact long tools' `background` default.
 - [ ] **Step 2:** Remove `timeout` from the schemas, handlers and `runLongCall` (full and
@@ -2835,7 +2855,9 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   - `DiscardBackgroundRun`: "Ends the run named by run_handle: a running read is cancelled
     and its session logged off; a finished run's answer is removed; a running code run is
     refused.";
-  - `GetBackgroundRun` / `ListBackgroundRuns`: the states, `cancelled` included.
+  - `GetBackgroundRun` / `ListBackgroundRuns`: the states, `cancelled` included, and that a
+    read run's finished or cancelled answer is answered once and then removed, while a code
+    run's answer is kept until `DiscardBackgroundRun`.
 
   Description tests under the functional-descriptions guard; the advice text that went with
   `timeout` goes.
@@ -2845,8 +2867,10 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
     answers; Changed — `DiscardBackgroundRun` cancels a running read; `SearchSource` runs on
     its own session.
   - MIGRATION-24.0 for embedders: the `IBackgroundRuns` change (`cancelled?: true`, the
-    `'cancelled'` state) and what a custom strategy does with it; the no-strategy behaviour
-    once confirmed.
+    `'cancelled'` state) and what a custom strategy does with it; with no strategy a long tool
+    runs synchronously; a finished read run's answer is removed once it is read (a second Get
+    answers "not available"), while a code run's is kept until Discard; `HandlerGet`'s
+    run-reading parts take no `background`.
   - **MIGRATION-24.0, breaking:** today a call to a long tool answers its result directly. From
     24.0.0 a call **without** `background` answers a `run_handle` at once, and the result is
     read with `GetBackgroundRun`. A caller that wants the result in the call passes

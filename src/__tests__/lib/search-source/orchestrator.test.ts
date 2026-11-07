@@ -56,7 +56,9 @@ describe('runSearchSource', () => {
     };
     const result = await runSearchSource(deps, baseInput);
     expect(
-      result.results.map((r) => `${r.devclass}/${r.object_name}:${r.line}`),
+      result.results.map(
+        (r) => `${r.devclass}/${r.object_name}:${'line' in r ? r.line : ''}`,
+      ),
     ).toEqual(['ZA/ZA_CLAS:3', 'ZA/ZA_PROG:1', 'ZB/ZB_PROG:2']);
     expect(result.scanned).toEqual({
       packages: 1,

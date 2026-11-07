@@ -280,6 +280,10 @@ in one run, answers only the hits with counters of what it did, and skips what i
   where 23.x answered it as the group's hit with the module in `include`. A hit in the group's own
   includes stays the group's (`FUGR`, `include`). The group and its modules are counted apart,
   and each has its own `max_hits_per_object`.
+- **New, nothing to do:** without them the answer is the hits with lines and snippets. To keep a
+  large answer small, pass `answer: 'objects'` (one entry per object and include with its number
+  of hits) or `'lines'` (no snippets), `max_hits` (the scan stops once the answer holds that many;
+  `truncated.by_max_hits` says anything was left), or `max_hits_per_object`.
 - **`max_hits_per_object` limits each object only when given** (it was 100 by default).
   `truncated.by_object_cap` is set when a given limit cut an object's hits.
 - **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan;

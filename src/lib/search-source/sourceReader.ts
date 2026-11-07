@@ -41,6 +41,8 @@ export interface SourceUnit {
    * for every other source, which belongs to the object read.
    */
   module?: FunctionModuleOwner | undefined;
+  /** Whether this is the last source the object's reads name: none follows it. */
+  last: boolean;
 }
 
 /** A function module as its own scan object: its name and its group. */
@@ -229,6 +231,7 @@ async function* readOne(
   deps: ReadSourceUnitsDeps,
   read: SourceRead,
   unitName: string,
+  last: boolean,
 ): AsyncGenerator<SourceUnit> {
   const text = await readable(STEP[read.reader], () => deps.readSource(read));
   if (text === undefined) return;
@@ -240,6 +243,7 @@ async function* readOne(
       read.reader === 'functionModule'
         ? { name: read.name, group: read.group }
         : undefined,
+    last,
   };
 }
 
@@ -386,9 +390,10 @@ export async function* readSourceUnits(
       deps,
       { reader: own, name: target.object_name, version },
       target.object_name,
+      own !== 'class',
     );
     if (own === 'class') {
-      for (const include of CLASS_INCLUDES) {
+      for (const [at, include] of CLASS_INCLUDES.entries()) {
         yield* readOne(
           deps,
           {
@@ -398,6 +403,7 @@ export async function* readSourceUnits(
             version,
           },
           include,
+          at === CLASS_INCLUDES.length - 1,
         );
       }
     }
@@ -423,8 +429,14 @@ export async function* readSourceUnits(
     seen.add(key);
     sources.push(source);
   }
-  for (const source of sortFugrSources(sources)) {
-    yield* readOne(deps, source.read, source.read.name);
+  const ordered = sortFugrSources(sources);
+  for (const [at, source] of ordered.entries()) {
+    yield* readOne(
+      deps,
+      source.read,
+      source.read.name,
+      at === ordered.length - 1,
+    );
   }
 }
 

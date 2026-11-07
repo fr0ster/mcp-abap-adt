@@ -778,7 +778,14 @@ describe('SearchSource: the description is functional', () => {
       '`*` (zero or more characters) and `?` (one character) are the wildcards',
       '`+`, `_`, `%` and `#` are characters of the name',
       'every package it matches',
-      'every target is read in one run',
+      'every target is read in one run, unless `max_hits` is reached',
+      '`answer`',
+      '`objects`',
+      '`lines`',
+      '`snippets` (the default)',
+      '`max_hits`',
+      '`truncated.by_max_hits`',
+      'the sources of the last batch read, those read past the stop included',
       'skipped',
       '`scanned.packages`',
       '`scanned.objects`',
@@ -1123,9 +1130,9 @@ describe('D23b: the line match is a strategy (DO14)', () => {
         exclude_comments: true,
         max_hits: 7,
       });
-      expect(result.results.map((h) => h.snippet)).toEqual([
-        'chosen by the strategy',
-      ]);
+      expect(
+        result.results.map((h) => ('snippet' in h ? h.snippet : '')),
+      ).toEqual(['chosen by the strategy']);
     });
   });
 
@@ -1651,8 +1658,10 @@ describe('D23b: no paging (DO20)', () => {
       expect(keys).not.toContain('max_objects');
       expect(keys).not.toContain('start_at');
       expect(keys).not.toContain('maxResults');
+      // The two limits are hit limits (DO23), none of packages or objects.
       expect(keys.filter((k) => k.startsWith('max_'))).toEqual([
         'max_hits_per_object',
+        'max_hits',
       ]);
     });
 
@@ -2069,4 +2078,300 @@ describe('D23b: a function module is its own scan object (DO18)', () => {
       );
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// D23b: the caller sets how much the answer holds (DO23)
+// ---------------------------------------------------------------------------
+
+describe('D23b: the caller sets how much the answer holds (DO23)', () => {
+  /**
+   * `ZLIM` holds a class `ZCL` (one hit in its main source, one in its local
+   * definitions), a function group `ZFG` (one hit in its module `Z_FM`) and
+   * programs `ZP1` (three hits), `ZP2` (two) and `ZP3` (one). In the scan's
+   * order: ZCL, ZFG, ZP1, ZP2, ZP3.
+   */
+  const LIM: Repository = {
+    nodes: {
+      [nodeKey('ZLIM')]: {
+        types: [
+          { type: 'CLAS/OC', nodeId: '000001' },
+          { type: 'FUGR/F', nodeId: '000002' },
+          { type: 'PROG/P', nodeId: '000003' },
+        ],
+      },
+      [nodeKey('ZLIM', '1')]: { objects: [{ type: 'CLAS/OC', name: 'ZCL' }] },
+      [nodeKey('ZLIM', '2')]: { objects: [{ type: 'FUGR/F', name: 'ZFG' }] },
+      [nodeKey('ZLIM', '3')]: {
+        objects: [
+          { type: 'PROG/P', name: 'ZP1' },
+          { type: 'PROG/P', name: 'ZP2' },
+          { type: 'PROG/P', name: 'ZP3' },
+        ],
+      },
+    },
+    sources: {
+      'CLASS ZCL': 'marker main',
+      'CLASSINCLUDE ZCL/DEFINITIONS': 'marker definitions',
+      'FM Z_FM': 'marker module',
+      'PROGRAM ZP1': 'marker 1\nmarker 2\nmarker 3',
+      'PROGRAM ZP2': 'marker 1\nmarker 2',
+      'PROGRAM ZP3': 'marker 1',
+    },
+    fugrChildren: { ZFG: [['FUGR/FF', 'Z_FM']] },
+    masks: {},
+  };
+  const lim = (absent: boolean, args: Record<string, unknown> = {}) => {
+    const fake = standOn(LIM);
+    return {
+      fake,
+      result: searchOn(
+        fake,
+        { query: 'marker', packages: ['ZLIM'], ...args },
+        absent,
+      ),
+    };
+  };
+  const sourceRequests = (fake: Fake) =>
+    sentUrls(fake).filter(
+      (url) =>
+        !url.includes('/repository/nodestructure') &&
+        !url.includes('/repository/objectstructure'),
+    );
+  const P = [['served'], ['absent']] as const;
+
+  it('the schema offers answer, max_hits and max_hits_per_object; a wrong answer is refused', () => {
+    const shape = TOOL_DEFINITION.inputSchema.shape;
+    expect(Object.keys(shape)).toEqual(
+      expect.arrayContaining(['answer', 'max_hits', 'max_hits_per_object']),
+    );
+    const ok = { query: 'x', packages: ['Z'] };
+    for (const answer of ['objects', 'lines', 'snippets']) {
+      expect(
+        TOOL_DEFINITION.inputSchema.safeParse({ ...ok, answer }).success,
+      ).toBe(true);
+    }
+    expect(
+      TOOL_DEFINITION.inputSchema.safeParse({ ...ok, answer: 'words' }).success,
+    ).toBe(false);
+  });
+
+  it.each(P)(
+    'with no control the answer is the snippets level (%s)',
+    async (batch) => {
+      const absent = batch === 'absent';
+      const plain = payloadOf(await lim(absent).result);
+      const snippets = payloadOf(
+        await lim(absent, { answer: 'snippets' }).result,
+      );
+      expect(snippets).toEqual(plain);
+      expect(plain.results[0]).toEqual({
+        devclass: 'ZLIM',
+        object_type: 'CLAS',
+        object_name: 'ZCL',
+        include: 'ZCL',
+        line: 1,
+        snippet: 'marker main',
+      });
+      expect(plain.truncated).toEqual({ by_object_cap: false });
+    },
+  );
+
+  it.each(P)(
+    'answer objects names each object and include with its hit count (%s)',
+    async (batch) => {
+      const payload = payloadOf(
+        await lim(batch === 'absent', { answer: 'objects' }).result,
+      );
+      expect(payload.results).toEqual([
+        {
+          devclass: 'ZLIM',
+          object_type: 'CLAS',
+          object_name: 'ZCL',
+          include: 'ZCL',
+          hits: 1,
+        },
+        {
+          devclass: 'ZLIM',
+          object_type: 'CLAS',
+          object_name: 'ZCL',
+          include: 'definitions',
+          hits: 1,
+        },
+        {
+          devclass: 'ZLIM',
+          object_type: 'PROG',
+          object_name: 'ZP1',
+          include: 'ZP1',
+          hits: 3,
+        },
+        {
+          devclass: 'ZLIM',
+          object_type: 'PROG',
+          object_name: 'ZP2',
+          include: 'ZP2',
+          hits: 2,
+        },
+        {
+          devclass: 'ZLIM',
+          object_type: 'PROG',
+          object_name: 'ZP3',
+          include: 'ZP3',
+          hits: 1,
+        },
+        {
+          devclass: 'ZLIM',
+          object_type: 'FUGR/FF',
+          object_name: 'Z_FM',
+          function_group_name: 'ZFG',
+          hits: 1,
+        },
+      ]);
+    },
+  );
+
+  it.each(P)(
+    'answer lines carries line numbers and no snippets (%s)',
+    async (batch) => {
+      const payload = payloadOf(
+        await lim(batch === 'absent', { answer: 'lines' }).result,
+      );
+      expect(payload.results[0]).toEqual({
+        devclass: 'ZLIM',
+        object_type: 'CLAS',
+        object_name: 'ZCL',
+        include: 'ZCL',
+        line: 1,
+      });
+      expect(
+        payload.results.some((h: { snippet?: string }) => 'snippet' in h),
+      ).toBe(false);
+      expect(payload.results).toHaveLength(9);
+    },
+  );
+
+  it.each(P)(
+    'max_hits stops reading; by_max_hits is set when anything is left (%s)',
+    async (batch) => {
+      const absent = batch === 'absent';
+      const all = lim(absent);
+      await all.result;
+      const limited = lim(absent, { max_hits: 2 });
+      const payload = payloadOf(await limited.result);
+      // ZCL's main source and its definitions hold the two hits.
+      expect(payload.results.map(hitLabel)).toEqual([
+        'ZCL/ZCL',
+        'ZCL/definitions',
+      ]);
+      expect(payload.truncated).toEqual({
+        by_object_cap: false,
+        by_max_hits: true,
+      });
+      if (absent) {
+        expect(sourceRequests(limited.fake).length).toBeLessThan(
+          sourceRequests(all.fake).length,
+        );
+      }
+    },
+  );
+
+  it.each(P)(
+    'max_hits exactly at the end leaves by_max_hits false (%s)',
+    async (batch) => {
+      const payload = payloadOf(
+        await lim(batch === 'absent', { max_hits: 9 }).result,
+      );
+      expect(payload.results).toHaveLength(9);
+      expect(payload.truncated).toEqual({
+        by_object_cap: false,
+        by_max_hits: false,
+      });
+    },
+  );
+
+  it.each(P)(
+    'max_hits counts hits after max_hits_per_object (%s)',
+    async (batch) => {
+      const payload = payloadOf(
+        await lim(batch === 'absent', {
+          object_types: ['PROG'],
+          max_hits_per_object: 1,
+          max_hits: 2,
+        }).result,
+      );
+      expect(payload.results.map(hitLabel)).toEqual(['ZP1/ZP1', 'ZP2/ZP2']);
+      expect(payload.truncated).toEqual({
+        by_object_cap: true,
+        by_max_hits: true,
+      });
+    },
+  );
+
+  it.each(P)('objects counts only the hits answered (%s)', async (batch) => {
+    const payload = payloadOf(
+      await lim(batch === 'absent', {
+        object_types: ['PROG'],
+        answer: 'objects',
+        max_hits_per_object: 2,
+        max_hits: 3,
+      }).result,
+    );
+    expect(
+      payload.results.map(
+        (e: { object_name: string; hits: number }) =>
+          `${e.object_name}:${e.hits}`,
+      ),
+    ).toEqual(['ZP1:2', 'ZP2:1']);
+  });
+
+  it.each(P)(
+    'the counters report what was done until the stop (%s)',
+    async (batch) => {
+      const absent = batch === 'absent';
+      const payload = payloadOf(
+        await lim(absent, { object_types: ['PROG'], max_hits: 3 }).result,
+      );
+      expect(payload.results).toHaveLength(3);
+      // Sequential: ZP1 alone was read. Batched: the stopped chunk's
+      // sources were read, ZP2 and ZP3 included.
+      expect(payload.scanned).toEqual({
+        packages: 1,
+        objects: 1,
+        sources: absent ? 1 : 3,
+        objects_with_hits: 1,
+      });
+    },
+  );
+
+  it('the batched path stops at a chunk boundary: no envelope of a later chunk is sent', async () => {
+    const names = Array.from(
+      { length: 305 },
+      (_, i) => `ZQ${String(i + 1).padStart(4, '0')}`,
+    );
+    const repo: Repository = {
+      nodes: {
+        [nodeKey('ZBIGL')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+        [nodeKey('ZBIGL', '1')]: {
+          objects: names.map((name) => ({ type: 'PROG/P', name })),
+        },
+      },
+      sources: Object.fromEntries(
+        names.map((name) => [`PROGRAM ${name}`, 'marker']),
+      ),
+      fugrChildren: {},
+      masks: {},
+    };
+    const batched = standOn(repo);
+    const sequential = standOn(repo);
+    const args = { query: 'marker', packages: ['ZBIGL'], max_hits: 2 };
+    const a = payloadOf(await searchOn(batched, args, false, 4000));
+    const b = payloadOf(await searchOn(sequential, args, true, 4000));
+    expect(sourceRequests(batched)).toHaveLength(300);
+    expect(sourceRequests(sequential)).toHaveLength(2);
+    expect(a.results).toEqual(b.results);
+    expect(a.truncated).toEqual({ by_object_cap: false, by_max_hits: true });
+    expect(b.truncated).toEqual(a.truncated);
+    expect(a.scanned.sources).toBe(300);
+    expect(b.scanned.sources).toBe(2);
+  });
 });

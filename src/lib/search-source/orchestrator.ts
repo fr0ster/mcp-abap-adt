@@ -15,6 +15,7 @@ import {
   walkPackages,
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
+import type { AnswerLevel } from './answerLevel';
 import type { LineMatchStrategy } from './lineMatch';
 import {
   createPackageContentsFetcher,
@@ -58,6 +59,10 @@ export interface OrchestratorInput {
   exclude_comments?: boolean;
   /** The most hits answered per object; absent, an object's hits are not limited. */
   max_hits_per_object?: number;
+  /** The most hits of the whole answer; reached, the scan stops. Absent, no limit. */
+  max_hits?: number;
+  /** What each hit is answered as (`snippets` when absent). */
+  answer?: AnswerLevel;
   concurrency?: number;
   version?: SourceVersion;
 }
@@ -94,6 +99,47 @@ export interface FunctionModuleHit {
 
 export type SearchHit = ObjectHit | FunctionModuleHit;
 
+/** A hit answered at the `lines` level: no snippet. */
+export type LineHit =
+  | Omit<ObjectHit, 'snippet'>
+  | Omit<FunctionModuleHit, 'snippet'>;
+
+/** One object and include with hits, at the `objects` level: the hits answered for it. */
+export type ObjectEntry =
+  | (Omit<ObjectHit, 'line' | 'snippet'> & { hits: number })
+  | (Omit<FunctionModuleHit, 'line' | 'snippet'> & { hits: number });
+
+/** The hits as the level asks them. */
+function answeredAs(
+  level: AnswerLevel,
+  hits: readonly SearchHit[],
+): SearchHit[] | LineHit[] | ObjectEntry[] {
+  switch (level) {
+    case 'snippets':
+      return [...hits];
+    case 'lines':
+      return hits.map((hit): LineHit => {
+        const { snippet: _snippet, ...line } = hit;
+        return line;
+      });
+    case 'objects': {
+      const entries = new Map<string, ObjectEntry>();
+      for (const hit of hits) {
+        const { line: _line, snippet: _snippet, ...object } = hit;
+        const key = JSON.stringify(object);
+        const found = entries.get(key);
+        if (found !== undefined) found.hits += 1;
+        else entries.set(key, { ...object, hits: 1 });
+      }
+      return [...entries.values()];
+    }
+    default: {
+      const unreachable: never = level;
+      return unreachable;
+    }
+  }
+}
+
 /**
  * The answer: the hits, and counters of what was done — the packages walked
  * (their own level read), the objects read (at least one source), the
@@ -101,7 +147,7 @@ export type SearchHit = ObjectHit | FunctionModuleHit;
  * and not counted (DO17).
  */
 export interface OrchestratorResult {
-  results: SearchHit[];
+  results: SearchHit[] | LineHit[] | ObjectEntry[];
   scanned: {
     packages: number;
     objects: number;
@@ -111,6 +157,8 @@ export interface OrchestratorResult {
   truncated: {
     /** A given `max_hits_per_object` left out an object's further hits. */
     by_object_cap: boolean;
+    /** Present when `max_hits` was given: the scan stopped with anything left. */
+    by_max_hits?: boolean;
   };
 }
 
@@ -152,6 +200,7 @@ async function runWithLimit<T>(
   items: T[],
   limit: number,
   worker: (item: T) => Promise<void>,
+  stopped: () => boolean = () => false,
 ): Promise<void> {
   let next = 0;
   // A failure the worker does not answer as its item's (a credential
@@ -161,7 +210,7 @@ async function runWithLimit<T>(
   let failed: { error: unknown } | undefined;
   async function pump(): Promise<void> {
     while (true) {
-      if (failed) return;
+      if (failed || stopped()) return;
       const idx = next++;
       if (idx >= items.length) return;
       const item = items[idx];
@@ -200,10 +249,17 @@ export async function runSearchSource(
 
   // Absent, an object's hits are not limited.
   const maxHits = input.max_hits_per_object;
-  const concurrency = Math.min(
-    16,
-    Math.max(1, input.concurrency ?? DEFAULTS.concurrency),
-  );
+  // Absent, the answer's hits are not limited. Given, the hits count in the
+  // scan's order, so the targets are read one after another.
+  const maxTotal = input.max_hits;
+  const concurrency =
+    maxTotal !== undefined
+      ? 1
+      : Math.min(16, Math.max(1, input.concurrency ?? DEFAULTS.concurrency));
+  // The hits answered so far, and whether the scan stopped at `max_hits`.
+  let answered = 0;
+  let stopped = false;
+  let stoppedWithMore = false;
   const version = input.version ?? DEFAULTS.version;
 
   const resolution = await deps.resolvePackages(input.packages);
@@ -236,6 +292,7 @@ export async function runSearchSource(
     targets.map((_, index) => index),
     concurrency,
     async (index) => {
+      if (stopped) return;
       const target = targets[index];
       if (target === undefined) return;
       // Each object of the target its own bookkeeping (DO18): the target
@@ -305,19 +362,45 @@ export async function runSearchSource(
           if (probe.hits.length > 0) object.capped = true;
           continue;
         }
+        const ownRoom =
+          maxHits === undefined ? undefined : maxHits - object.total;
+        const answerRoom =
+          maxTotal === undefined ? undefined : maxTotal - answered;
+        const room =
+          ownRoom === undefined
+            ? answerRoom
+            : answerRoom === undefined
+              ? ownRoom
+              : Math.min(ownRoom, answerRoom);
         const scan = deps.lineMatch.match(unit.lines, {
           ...terms,
-          max_hits: maxHits === undefined ? undefined : maxHits - object.total,
+          max_hits: room,
         });
         for (const h of scan.hits) {
           object.hits.push(hitOf(unit, h.line, h.snippet));
         }
         object.total += scan.hits.length;
-        if (scan.capped) object.capped = true;
+        answered += scan.hits.length;
+        if (
+          scan.capped &&
+          ownRoom !== undefined &&
+          (answerRoom === undefined || ownRoom <= answerRoom)
+        ) {
+          object.capped = true;
+        }
+        // The answer holds `max_hits`: the scan stops, with anything left —
+        // a further hit of this source, a source or a target not read.
+        if (maxTotal !== undefined && answered >= maxTotal) {
+          stopped = true;
+          stoppedWithMore =
+            scan.capped || !unit.last || index < targets.length - 1;
+          break;
+        }
       }
 
       answers[index] = [...objects.values()];
     },
+    () => stopped,
   );
 
   const allHits: SearchHit[] = [];
@@ -344,14 +427,17 @@ export async function runSearchSource(
   });
 
   const result: OrchestratorResult = {
-    results: allHits,
+    results: answeredAs(input.answer ?? 'snippets', allHits),
     scanned: {
       packages: enumerated.packages,
       objects: objectsRead,
       sources: sourcesRead.size,
       objects_with_hits: objectsWithHits,
     },
-    truncated: { by_object_cap: truncatedByObjectCap },
+    truncated:
+      maxTotal === undefined
+        ? { by_object_cap: truncatedByObjectCap }
+        : { by_object_cap: truncatedByObjectCap, by_max_hits: stoppedWithMore },
   };
   return result;
 }
@@ -463,6 +549,18 @@ async function runSearchSourceInPhases(
   // yet — every source once, whichever objects name it — in envelopes of at
   // most READS_PER_ENVELOPE.
   const sources = noAnsweredReads();
+  // The scan over the answers read so far: `runSearchSource` over the
+  // phases' answers, the sequential version's own.
+  const scanAnswered = (asked: OrchestratorInput) =>
+    runSearchSource(
+      {
+        lineMatch,
+        fetchPackageContents,
+        sourceReader: answeredReaderDeps(sources, []),
+        resolvePackages: async () => resolution,
+      },
+      { ...asked, concurrency: 1 },
+    );
   for (let at = 0; at < targets.length; at += TARGETS_PER_CHUNK) {
     const chunk = targets.slice(at, at + TARGETS_PER_CHUNK);
     for (;;) {
@@ -486,18 +584,23 @@ async function runSearchSourceInPhases(
         );
       }
     }
+    // `max_hits` (DO23): the scan stops at a chunk boundary — once the
+    // chunks read hold `max_hits` hits, no envelope of a later chunk is sent.
+    if (input.max_hits !== undefined) {
+      const sofar = await scanAnswered({ ...input, answer: 'snippets' });
+      if (sofar.results.length >= input.max_hits) break;
+    }
   }
 
-  // The scan, over the phases' answers: the sequential version's own.
-  return runSearchSource(
-    {
-      lineMatch,
-      fetchPackageContents,
-      sourceReader: answeredReaderDeps(sources, []),
-      resolvePackages: async () => resolution,
-    },
-    { ...input, concurrency: 1 },
-  );
+  // The scan, over the phases' answers: the sequential version's own. With
+  // `max_hits`, `scanned.sources` counts the sources read — those of the
+  // chunk the scan stopped in included, read but not scanned.
+  const scanned = await scanAnswered(input);
+  if (input.max_hits === undefined) return scanned;
+  const read = [...sources.sources.values()].filter(
+    (answer) => answer.ok && answer.value.ok,
+  ).length;
+  return { ...scanned, scanned: { ...scanned.scanned, sources: read } };
 }
 
 /**

@@ -48,7 +48,9 @@ import {
   isBackgroundTool,
   readBackground,
   readObjectOf,
+  runToolsOf,
   withoutBackground,
+  withoutBackgroundParameter,
 } from '../lib/backgroundRuns/tools.js';
 import {
   type BatchAvailability,
@@ -328,6 +330,13 @@ export abstract class BaseMcpServer extends McpServer {
    * instance's own). Never a module's.
    */
   protected readonly runOwner: BackgroundRunOwner;
+
+  /**
+   * The listed long tools this instance lists without `background`: it
+   * holds no strategy, or serves no tool that reads their runs. They answer
+   * in the call.
+   */
+  private readonly longToolsInTheCall = new Set<string>();
 
   /**
    * The owner of this instance's batch state (`batch` option), given by the
@@ -1404,6 +1413,17 @@ export abstract class BaseMcpServer extends McpServer {
       // Where the instance has a batch owner, every tool's description but
       // a batch tool's ends with its batch sentence (spec §3).
       const sentenced = this.batch !== undefined;
+      // A listed long tool offers `background` only where its run can be
+      // read: this instance holds a strategy and serves the tool that reads
+      // its runs. Elsewhere it is listed without the parameter and answers
+      // in the call.
+      const served = new Set(
+        groups.flatMap((group) =>
+          group
+            .getHandlers()
+            .map((entry: HandlerEntry) => entry.toolDefinition.name),
+        ),
+      );
 
       for (const group of groups) {
         const handlers = group.getHandlers();
@@ -1421,7 +1441,20 @@ export abstract class BaseMcpServer extends McpServer {
           const environment = statedEnvironment(
             this.systemType ?? process.env.SAP_SYSTEM_TYPE,
           );
-          const listed = listedTool(entry.toolDefinition, environment);
+          const name = entry.toolDefinition.name;
+          if (
+            isLongTool(name) &&
+            (this.backgroundRuns === undefined ||
+              !served.has(runToolsOf(name).get))
+          ) {
+            this.longToolsInTheCall.add(name);
+          }
+          const listed = listedTool(
+            this.longToolsInTheCall.has(name)
+              ? withoutBackgroundParameter(entry.toolDefinition)
+              : entry.toolDefinition,
+            environment,
+          );
           if (!listed.listed) {
             this.logger.debug(
               listed.reason === 'not-served'
@@ -2105,6 +2138,7 @@ export abstract class BaseMcpServer extends McpServer {
     const background = readLongBackground(args);
     if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
     if (this.backgroundRuns === undefined) return false;
+    if (this.longToolsInTheCall.has(tool)) return false;
     if (this.batchOpenFor(tool) && !this.inDebuggerBatch(tool)) return false;
     return background;
   }

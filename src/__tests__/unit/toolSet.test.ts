@@ -123,12 +123,13 @@ describe('the four tool sets', () => {
     );
   });
 
-  it('core-ro: readonly (with system), search, the leftover-session list, batch mode', () => {
+  it('core-ro: readonly (with system), search, background runs, the leftover-session list, batch mode', () => {
     expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
       shape([
         new ReadOnlyHandlersGroup(context),
         new SystemHandlersGroup(context),
         new SearchHandlersGroup(context),
+        new BackgroundRunHandlersGroup(context),
         new LeftoverSessionListHandlersGroup(context),
         new BatchHandlersGroup(context),
       ]),
@@ -169,11 +170,19 @@ describe('the four tool sets', () => {
     ]);
   });
 
-  it('compact-ro: the 17 that change nothing, the leftover-session list, HandlerBatch', () => {
+  it('compact-ro: the 17 that change nothing, background runs, the leftover-session list, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
     expect(half).toHaveLength(17);
     expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
       { group: 'CompactReadOnlyHandlers', tools: half },
+      {
+        group: 'CompactBackgroundRunHandlers',
+        tools: [
+          'HandlerBackgroundRunGet',
+          'HandlerBackgroundRunList',
+          'HandlerBackgroundRunDiscard',
+        ],
+      },
       {
         group: 'CompactLeftoverSessionListHandlers',
         tools: ['HandlerLeftoverSessionList'],
@@ -192,14 +201,14 @@ describe('the four tool sets', () => {
     }
   });
 
-  it('only a write set serves background runs, so only its launcher creates a store', () => {
+  it('every set serves background runs (a -ro set those of its long reads), so every launcher creates a store', () => {
     expect(
       SETS.map(([kind, set]) => [kind, set.kind, set.backgroundRuns]),
     ).toEqual([
       ['core', 'core', true],
-      ['core-ro', 'core-ro', false],
+      ['core-ro', 'core-ro', true],
       ['compact', 'compact', true],
-      ['compact-ro', 'compact-ro', false],
+      ['compact-ro', 'compact-ro', true],
     ]);
   });
 
@@ -302,10 +311,11 @@ describe('the leftover-session tools are served on stdio only', () => {
 
 /**
  * What a `-ro` set must not hold: every tool that writes (the high group,
- * the compact modify half), debugs (the debugger groups) or runs in the
- * background (the background-run tools).
+ * the compact modify half) or debugs (the debugger groups). Since 24.0.0
+ * (D24, the owner) it serves the background-run tools: its long reads run
+ * in the background, and only reads run there.
  */
-describe('a -ro set holds no write, debugger or background-run tool; a write set holds its -ro set', () => {
+describe('a -ro set holds no write or debugger tool, and the background-run tools; a write set holds its -ro set', () => {
   // A high tool the readonly group also defines reads (GetUnitTestResult,
   // the Get<Type> object reads): the high group's copy replaces it in core,
   // and it is no write.
@@ -342,9 +352,27 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
       kind,
       write: names.filter((n) => FORBIDDEN.write.includes(n)),
       debug: names.filter((n) => FORBIDDEN.debug.includes(n)),
-      background: names.filter((n) => FORBIDDEN.background.includes(n)),
-    }).toEqual({ kind, write: [], debug: [], background: [] });
+    }).toEqual({ kind, write: [], debug: [] });
   });
+
+  it.each([
+    ['core-ro', fullReadOnlyToolSet, 'GetBackgroundRun'],
+    ['compact-ro', compactRo, 'HandlerBackgroundRunGet'],
+  ] as const)(
+    '%s serves the background-run tools of its long reads',
+    (kind, set, get) => {
+      const names = toolsOf(set);
+      const own = FORBIDDEN.background.filter((n) =>
+        get === 'GetBackgroundRun'
+          ? !n.startsWith('Handler')
+          : n.startsWith('Handler'),
+      );
+      expect({ kind, missing: own.filter((n) => !names.includes(n)) }).toEqual({
+        kind,
+        missing: [],
+      });
+    },
+  );
 
   it.each([
     ['core', fullToolSet],

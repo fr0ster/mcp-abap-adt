@@ -18,7 +18,11 @@ import { isBackgroundTool } from '../../../lib/backgroundRuns/tools';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
+import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
+import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
+import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   HandlerContext,
@@ -40,6 +44,33 @@ const listed = (): Listed[] =>
   JSON.parse(
     fs.readFileSync(path.join(REPO, 'tools/long-handlers.json'), 'utf8'),
   ) as Listed[];
+
+/**
+ * Every tool definition the groups declare, as a server holding background
+ * runs lists them: full and compact. (The exporter hands its long tools out
+ * without `background`: it keeps no background runs.)
+ */
+function groupDefinitions(): ToolDefinition[] {
+  return [
+    new ReadOnlyHandlersGroup(noConnectionContext()),
+    new HighLevelHandlersGroup(noConnectionContext()),
+    new SystemHandlersGroup(noConnectionContext()),
+    new SearchHandlersGroup(noConnectionContext()),
+    new RuntimeRunHandlersGroup(noConnectionContext()),
+    new BackgroundRunHandlersGroup(noConnectionContext()),
+    new DebugHandlersGroup(noConnectionContext()),
+  ]
+    .flatMap((group) => group.getHandlers().map((e) => e.toolDefinition))
+    .concat(
+      new CompactReadOnlyHandlersGroup(noConnectionContext())
+        .getHandlers()
+        .map((e) => e.toolDefinition),
+      new CompactModifyHandlersGroup(noConnectionContext())
+        .getHandlers()
+        .map((e) => e.toolDefinition),
+      compactDebugEntries().map((e) => e.toolDefinition),
+    );
+}
 
 /** Every tool definition the packages ship: full groups, low included, and compact. */
 function shippedDefinitions(): ToolDefinition[] {
@@ -148,7 +179,7 @@ describe('the approved list of long tools', () => {
 
   it('SearchSource is listed and still declares neither time_budget_ms nor timeout', () => {
     expect(names.has('SearchSource')).toBe(true);
-    const found = definitions.filter((d) => d.name === 'SearchSource');
+    const found = groupDefinitions().filter((d) => d.name === 'SearchSource');
     expect(found.length).toBeGreaterThan(0);
     for (const definition of found) {
       const shape = definition.inputSchema.shape;
@@ -179,7 +210,7 @@ describe('the approved list of long tools', () => {
 
   it('every listed tool is shipped, declares background and carries the long-tool words', () => {
     for (const tool of names) {
-      const found = definitions.filter((d) => d.name === tool);
+      const found = groupDefinitions().filter((d) => d.name === tool);
       expect({ tool, shipped: found.length > 0 }).toEqual({
         tool,
         shipped: true,

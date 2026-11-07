@@ -22,6 +22,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
+import { withoutBackgroundParameter } from '../../../src/lib/backgroundRuns/tools';
 import { createAdtClient } from '../../../src/lib/clients';
 import { createAbapConnection } from '../../../src/lib/connectionFactory';
 import type {
@@ -30,6 +31,7 @@ import type {
 } from '../../../src/lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../src/lib/handlers/registry/CompositeHandlersRegistry';
 import { logger } from '../../../src/lib/logger';
+import { isLongTool } from '../../../src/lib/longTools';
 import {
   defaultSystemContextResolver,
   runWithRequestContext,
@@ -844,14 +846,18 @@ function exporterWith(
 }
 
 describe('HandlerExporter.getHandlerEntries', () => {
-  it("hands out every entry with its group's definition", () => {
+  it("hands out every entry with its group's definition, a listed long tool's without background", () => {
     const exporter = new HandlerExporter({ systemType: 'onprem' });
     const raw = (
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());
     const wrapped = exporter.getHandlerEntries();
     expect(wrapped.map((e) => e.toolDefinition)).toEqual(
-      raw.map((e) => e.toolDefinition),
+      raw.map((e) =>
+        isLongTool(e.toolDefinition.name)
+          ? withoutBackgroundParameter(e.toolDefinition)
+          : e.toolDefinition,
+      ),
     );
   });
 

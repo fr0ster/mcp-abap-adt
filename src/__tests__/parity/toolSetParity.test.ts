@@ -203,10 +203,11 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
  * not, so those two no longer share a failure path.
  */
 /**
- * The sample read, in the call (`background: false`): a long tool answers a
- * `run_handle` by default where the set keeps background runs (the write
- * sets) and its result where it keeps none (the `-ro` sets); in the call it
- * answers alike on all four.
+ * The sample read, in the call (`background: false`). Every set keeps
+ * background runs, so by default all four would answer a `run_handle`
+ * alike; the read is asked in the call so each observation counts its
+ * requests — and their credentials — when the call answers, not when a
+ * background run gets to them.
  */
 const readCall = (
   set: SetName,
@@ -918,10 +919,17 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ]),
       );
       // core-ro: the readonly tools with system and search, the three batch
-      // tools (and, on stdio, the leftover-session list; on http SessionOpen
-      // and SessionClose); no write, run, debugger, background run, logoff
-      // or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 72 : onHttp ? 73 : 71);
+      // tools, the three background-run tools of the long reads (and, on
+      // stdio, the leftover-session list; on http SessionOpen and
+      // SessionClose); no write, run, debugger, logoff or resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 75 : onHttp ? 76 : 74);
+      for (const name of [
+        'GetBackgroundRun',
+        'ListBackgroundRuns',
+        'DiscardBackgroundRun',
+      ]) {
+        expect(fullRo.tools).toContain(name);
+      }
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',
@@ -947,7 +955,6 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       for (const name of [
         'CreateClass',
         'DebugStartListener',
-        'GetBackgroundRun',
         'ResumeLeftoverSession',
         'DebugBatchBegin',
         'DebugBatchEnd',
@@ -975,11 +982,13 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'HandlerBatch',
         ]),
       );
-      // compact-ro: the 17 that change nothing, HandlerBatch, and on stdio
-      // the leftover-session list.
+      // compact-ro: the 17 that change nothing, the three background-run
+      // tools of the long reads, HandlerBatch, and on stdio the
+      // leftover-session list.
       expect(compactRo.tools).toHaveLength(
-        17 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
+        17 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
       );
+      expect(compactRo.tools).toContain('HandlerBackgroundRunGet');
       expect(compactRo.tools).toContain('HandlerGet');
       expect(compactRo.tools).toContain('HandlerDeletionCheck');
       expect(compactRo.tools).toContain('HandlerBatch');
@@ -992,7 +1001,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       for (const name of [
         ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),
         ...COMPACT_DEBUG,
-        'HandlerBackgroundRunGet',
+        'HandlerProfileRun',
         'HandlerLeftoverSessionResume',
         'HandlerLeftoverSessionLogoff',
         'HandlerDebugBatch',

@@ -914,9 +914,9 @@ async function launchStdio(
       leftoverSessions: new LeftoverSessions({
         directory: runtimeDirectory(getPlatformPaths(config.authBrokerPath)[0]),
       }),
-      // Background runs of the run tools, kept in this process's memory;
-      // they end with the process. Only where the set serves them: a -ro
-      // command has none, so a run's `background: true` is refused.
+      // Background runs of the long reads (and, in the write sets, of the
+      // run tools), kept in this process's memory; they end with the
+      // process. Every set serves them.
       ...(options.toolSet.backgroundRuns && {
         backgroundRuns: new InMemoryBackgroundRuns(),
       }),

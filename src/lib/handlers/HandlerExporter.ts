@@ -5,6 +5,7 @@ import type { HandlerContext } from '../../handlers/interfaces.js';
 import { ServerRefusal } from '../auth/serverRefusal.js';
 import { withoutBackgroundParameter } from '../backgroundRuns/tools.js';
 import { noopLogger } from '../handlerLogger.js';
+import { isLongTool } from '../longTools.js';
 import {
   isCredentialFailure,
   type SystemContextResolver,
@@ -228,7 +229,20 @@ export class HandlerExporter {
     const entries: HandlerEntry[] = [];
     for (const group of this.handlerGroups) {
       for (const entry of group.getHandlers()) {
-        entries.push(this.wrapEntry(entry));
+        // The exporter keeps no background runs: a listed long tool is
+        // handed out without `background`, as the run tools are.
+        entries.push(
+          this.wrapEntry(
+            isLongTool(entry.toolDefinition.name)
+              ? {
+                  ...entry,
+                  toolDefinition: withoutBackgroundParameter(
+                    entry.toolDefinition,
+                  ),
+                }
+              : entry,
+          ),
+        );
       }
     }
     return entries;

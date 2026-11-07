@@ -27,7 +27,11 @@ import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
+import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
+import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
+import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   HandlerContext,
@@ -206,7 +210,7 @@ describe('a group registered on its own (no server instance, no strategy)', () =
   });
 });
 
-describe('where the background-run tools are served: beside the run tools', () => {
+describe('where the background-run tools are served: beside the run tools and the long reads', () => {
   const FULL = [
     'GetBackgroundRun',
     'ListBackgroundRuns',
@@ -236,7 +240,7 @@ describe('where the background-run tools are served: beside the run tools', () =
   // The binary fixes its set: the four kinds of binary.
   it.each<[string, ToolSet, boolean]>([
     ['core', fullToolSet, true],
-    ['core-ro', fullReadOnlyToolSet, false],
+    ['core-ro', fullReadOnlyToolSet, true],
   ])('%s: served %s', (_kind, set, served) => {
     for (const transport of ['stdio', 'http', 'sse'] as const) {
       const tools = namesOf(registryOf(set, transport).getHandlerGroups());
@@ -255,12 +259,12 @@ describe('where the background-run tools are served: beside the run tools', () =
       }),
       true,
     ],
-  ])('%s: served %s, as HandlerProfileRun is', (_kind, set, served) => {
-    expect(set.backgroundRuns).toBe(served);
+  ])('%s: served, HandlerProfileRun %s', (_kind, set, runs) => {
+    expect(set.backgroundRuns).toBe(true);
     for (const transport of ['stdio', 'http', 'sse'] as const) {
       const tools = namesOf(registryOf(set, transport).getHandlerGroups());
-      expect(tools.includes('HandlerProfileRun')).toBe(served);
-      for (const name of COMPACT) expect(tools.includes(name)).toBe(served);
+      expect(tools.includes('HandlerProfileRun')).toBe(runs);
+      for (const name of COMPACT) expect(tools.includes(name)).toBe(true);
     }
   });
 
@@ -268,6 +272,26 @@ describe('where the background-run tools are served: beside the run tools', () =
     const names = new HandlerExporter({ systemType: 'onprem' }).getToolNames();
     expect(names).toContain('RuntimeRunClass');
     expect(names.filter((name) => FULL.includes(name))).toEqual([]);
+  });
+
+  it('the exporter hands out every listed long tool without background: its read answers in the call', () => {
+    const entries = new HandlerExporter({
+      systemType: 'onprem',
+    }).getHandlerEntries();
+    const long = entries.filter((e) =>
+      LONG_TOOLS.includes(e.toolDefinition.name),
+    );
+    expect(long.length).toBeGreaterThan(10);
+    expect(
+      long
+        .filter((e) =>
+          Object.hasOwn(
+            listedJson(e.toolDefinition.inputSchema).properties ?? {},
+            'background',
+          ),
+        )
+        .map((e) => e.toolDefinition.name),
+    ).toEqual([]);
   });
 });
 
@@ -285,8 +309,13 @@ describe('which tools take background', () => {
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
-    // What the exporter leaves out (no store, no debugger): the groups' own.
+    // What the exporter leaves out (no store, no debugger; its long tools
+    // without `background`): the groups' own.
     ...[
+      new ReadOnlyHandlersGroup(noConnectionContext()),
+      new SystemHandlersGroup(noConnectionContext()),
+      new SearchHandlersGroup(noConnectionContext()),
+      new HighLevelHandlersGroup(noConnectionContext()),
       new RuntimeRunHandlersGroup(noConnectionContext()),
       new BackgroundRunHandlersGroup(noConnectionContext()),
       new DebugHandlersGroup(noConnectionContext()),

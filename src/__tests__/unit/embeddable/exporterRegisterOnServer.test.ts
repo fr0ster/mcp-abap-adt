@@ -375,15 +375,14 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
 });
 
 /**
- * A call the path refuses for its arguments — a `background` on a long
- * tool's run mode — is refused before the call's context is asked for: the
- * provider is not called. No exporter tool has a run mode (the schema
- * refuses an invalid `background` before the path sees it), so this goes
- * through the path `registerOnServer` registers by
- * (`registerHandlersOnCall`), on the compact group that has one.
+ * A group registered on its own keeps no background runs: a listed long
+ * tool is listed there without `background`, so the parameter never reaches
+ * the path — the call runs in the call, its run mode on the call's
+ * connection. This goes through the path `registerOnServer` registers by
+ * (`registerHandlersOnCall`), on the compact group that has a run mode.
  */
 describe('registerHandlersOnCall (the path registerOnServer registers by)', () => {
-  it('a background on a run mode is refused before the call context is asked for', async () => {
+  it('lists HandlerGet without background, and a run mode runs in the call on the call context', async () => {
     let asked = 0;
     const counting = countingConnection('document', undefined);
     const server = new McpServer({ name: 'per-call', version: '1.0.0' });
@@ -398,14 +397,22 @@ describe('registerHandlersOnCall (the path registerOnServer registers by)', () =
         systemType: 'onprem',
       };
     });
+    const client = await clientOf(server);
+    try {
+      const listed = await client.listTools();
+      const get = listed.tools.find((t) => t.name === 'HandlerGet');
+      expect(Object.keys(get?.inputSchema.properties ?? {})).not.toContain(
+        'background',
+      );
+    } finally {
+      await client.close();
+    }
     const answer = await call(server, 'HandlerGet', {
       object_type: 'UNIT_TEST',
       run_id: 'run-placeholder-1',
       background: true,
     });
-    expect(answer).toContain('"isError":true');
-    expect(answer).toContain(BACKGROUND_NOT_FOR_RUN_WORDS);
-    expect(asked).toBe(0);
-    expect(counting.sent).toEqual([]);
+    expect(answer).not.toContain(BACKGROUND_NOT_FOR_RUN_WORDS);
+    expect(asked).toBe(1);
   });
 });

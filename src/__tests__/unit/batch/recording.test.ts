@@ -29,6 +29,7 @@ import {
 import { createRecorder, untilSent } from '../../../lib/batch/recorder';
 import { callTransportRequest } from '../../../lib/callTransport';
 import { createAdtClient } from '../../../lib/clients';
+import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import type {
@@ -38,6 +39,7 @@ import type {
   IHandlersRegistry,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import * as longCall from '../../../lib/longCall';
 import * as packageSessions from '../../../lib/packageSessions';
 import { currentRequestSignal } from '../../../lib/requestSignal';
@@ -449,7 +451,14 @@ describe('recording in batch mode', () => {
   });
 
   it('background: true given in batch mode is refused batch_no_background before recording', async () => {
-    const s = await stand([shipped('SearchObject')]);
+    // A server that lists `background`: a strategy and the tool reading its runs.
+    const s = await stand(
+      [
+        shipped('SearchObject'),
+        new BackgroundRunHandlersGroup(noConnectionContext()),
+      ],
+      { backgroundRuns: true },
+    );
     const refused = refusalOf(
       await s.call('SearchObject', {
         object_name: 'ZPLACEHOLDER*',

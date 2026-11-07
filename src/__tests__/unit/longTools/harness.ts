@@ -144,6 +144,8 @@ export interface LongStand {
   isToolRequest(request: StandInRequest): boolean;
   /** Calls a tool; the promise settles with the answer (or the error). */
   call(name: string, args: Record<string, unknown>): Promise<CallAnswer>;
+  /** The input properties the server lists for `name`. */
+  inputs(name: string): Promise<string[]>;
   close(): Promise<void>;
 }
 
@@ -163,6 +165,8 @@ export async function longStand(
   options: {
     injected?: 'built' | 'bare';
     backgroundRuns?: IBackgroundRuns;
+    /** With a strategy: serve the background-run tools (default true). */
+    runTools?: boolean;
   } = {},
 ): Promise<LongStand> {
   if (!LONG_TOOLS.includes(tool)) throw new Error(`${tool} is not listed`);
@@ -183,7 +187,7 @@ export async function longStand(
     handlersRegistry: new CompositeHandlersRegistry([
       oneToolGroup(tool),
       probeGroup(),
-      ...(options.backgroundRuns !== undefined
+      ...(options.backgroundRuns !== undefined && options.runTools !== false
         ? [
             new BackgroundRunHandlersGroup(placeholderContext),
             new CompactBackgroundRunHandlersGroup(placeholderContext),
@@ -214,6 +218,11 @@ export async function longStand(
           timeout: 120_000,
         })
         .then((answer) => answer as CallAnswer),
+    inputs: async (name) => {
+      const listed = await client.listTools();
+      const tool = listed.tools.find((t) => t.name === name);
+      return Object.keys(tool?.inputSchema.properties ?? {});
+    },
     close: async () => {
       await client.close().catch(() => undefined);
       await (built as unknown as { disconnect(): Promise<void> })

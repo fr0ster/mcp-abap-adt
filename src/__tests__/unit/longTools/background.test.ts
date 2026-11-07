@@ -154,15 +154,47 @@ describe.each(LONG_TOOLS)('%s', (tool) => {
     }
   });
 
-  it('with no strategy, a long tool answers its result in the call', async () => {
+  it('with no strategy, a long tool lists no background and answers its result in the call', async () => {
     const stand = await longStand(tool);
     try {
+      expect(await stand.inputs(tool)).not.toContain('background');
       const answer = await stand.call(tool, args);
       expect(payloadOf(answer).run_handle).toBeUndefined();
       expect(
         stand.standIn.requests.filter(stand.isToolRequest).length,
       ).toBeGreaterThan(0);
       await until(() => stand.standIn.loggedOff().length === 1);
+    } finally {
+      await stand.close();
+    }
+  });
+});
+
+describe('a strategy without the tools that read its runs', () => {
+  it.each(['GetSqlQuery', 'HandlerGetData'])(
+    '%s lists no background and answers in the call: nothing could read a run_handle',
+    async (tool) => {
+      const stand = await longStand(tool, {
+        backgroundRuns: new InMemoryBackgroundRuns(),
+        runTools: false,
+      });
+      try {
+        expect(await stand.inputs(tool)).not.toContain('background');
+        const answer = await stand.call(tool, LONG_TOOL_ARGS[tool] ?? {});
+        expect(payloadOf(answer).run_handle).toBeUndefined();
+        await until(() => stand.standIn.loggedOff().length === 1);
+      } finally {
+        await stand.close();
+      }
+    },
+  );
+
+  it('with them, the tool lists background', async () => {
+    const stand = await longStand('GetSqlQuery', {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    });
+    try {
+      expect(await stand.inputs('GetSqlQuery')).toContain('background');
     } finally {
       await stand.close();
     }

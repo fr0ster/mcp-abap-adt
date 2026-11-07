@@ -386,10 +386,12 @@
         "BatchBegin",
         "BatchEnd",
         "DescribeByList",
+        "DiscardBackgroundRun",
         "GetATCFindings",
         "GetATCResult",
         "GetATCRunStatus",
         "GetAdtTypes",
+        "GetBackgroundRun",
         "GetBehaviorDefinition",
         "GetBehaviorImplementation",
         "GetClass",
@@ -438,6 +440,7 @@
         "GetUnitTestResult",
         "GetWhereUsed",
         "ListATCResults",
+        "ListBackgroundRuns",
         "ListFunctionGroupIncludes",
         "ListFunctionModules",
         "ListLeftoverSessions",
@@ -1063,6 +1066,9 @@
     },
     "compact-ro": {
       "tools": [
+        "HandlerBackgroundRunDiscard",
+        "HandlerBackgroundRunGet",
+        "HandlerBackgroundRunList",
         "HandlerBatch",
         "HandlerCdsUnitTestResult",
         "HandlerCdsUnitTestStatus",
@@ -1644,10 +1650,12 @@
         "BatchBegin",
         "BatchEnd",
         "DescribeByList",
+        "DiscardBackgroundRun",
         "GetATCFindings",
         "GetATCResult",
         "GetATCRunStatus",
         "GetAdtTypes",
+        "GetBackgroundRun",
         "GetBehaviorDefinition",
         "GetBehaviorImplementation",
         "GetClass",
@@ -1695,6 +1703,7 @@
         "GetUnitTestResult",
         "GetWhereUsed",
         "ListATCResults",
+        "ListBackgroundRuns",
         "ListFunctionGroupIncludes",
         "ListFunctionModules",
         "ListLeftoverSessions",
@@ -2295,6 +2304,9 @@
     },
     "compact-ro": {
       "tools": [
+        "HandlerBackgroundRunDiscard",
+        "HandlerBackgroundRunGet",
+        "HandlerBackgroundRunList",
         "HandlerBatch",
         "HandlerCdsUnitTestResult",
         "HandlerCdsUnitTestStatus",
@@ -2523,6 +2535,9 @@
         "BatchAnswers",
         "BatchBegin",
         "BatchEnd",
+        "DiscardBackgroundRun",
+        "GetBackgroundRun",
+        "ListBackgroundRuns",
         "ListLeftoverSessions"
       ],
       "members": {},
@@ -2546,6 +2561,9 @@
     },
     "compact-ro": {
       "tools": [
+        "HandlerBackgroundRunDiscard",
+        "HandlerBackgroundRunGet",
+        "HandlerBackgroundRunList",
         "HandlerBatch",
         "HandlerLeftoverSessionList"
       ],

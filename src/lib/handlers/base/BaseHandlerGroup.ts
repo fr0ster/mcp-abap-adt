@@ -7,16 +7,11 @@ import {
   isBackgroundTool,
   readBackground,
   withoutBackground,
+  withoutBackgroundParameter,
 } from '../../backgroundRuns/tools.js';
 import { listedTool, statedEnvironment } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
-import {
-  BACKGROUND_NOT_FOR_RUN_WORDS,
-  isLongRead,
-  isLongTool,
-  readLongBackground,
-  statesBackground,
-} from '../../longTools.js';
+import { isLongRead, isLongTool } from '../../longTools.js';
 import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
@@ -97,7 +92,14 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     entry: HandlerEntry,
     callContext: CallContext = () => Promise.resolve(this.context),
   ): void {
-    const listed = listedTool(entry.toolDefinition, this.statedSystemType());
+    // A group registered on its own keeps no background runs: a listed long
+    // tool is listed without `background` and answers in the call.
+    const listed = listedTool(
+      isLongTool(entry.toolDefinition.name)
+        ? withoutBackgroundParameter(entry.toolDefinition)
+        : entry.toolDefinition,
+      this.statedSystemType(),
+    );
     if (!listed.listed) return;
     this.registerToolOnServer(
       server,
@@ -155,18 +157,9 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // call asks for none (no provider is called).
           const listed = isLongTool(toolName);
           const read = listed && isLongRead(toolName, args);
-          if (listed) {
-            if (!read && statesBackground(args)) {
-              // A listed tool's run mode is read in the call.
-              return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
-            }
-            if (readLongBackground(args) === null) {
-              return return_error(new Error(BACKGROUND_INVALID_WORDS));
-            }
-            // A group registered on its own has no strategy: a listed long
-            // read answers its result in the call, whatever `background`.
-            args = withoutBackground(args);
-          }
+          // A listed long tool is listed here without `background` (a group
+          // registered on its own keeps no background runs): its read
+          // answers in the call.
           // The call's context, asked for now: the group's own, or one made
           // for this call (its provider's connection). Its rejection is
           // this call's answer (the catch below); the handler does not run.

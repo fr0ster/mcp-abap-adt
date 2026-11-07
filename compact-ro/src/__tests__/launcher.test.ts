@@ -69,12 +69,12 @@ describe('mcp-abap-adt-compact-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 19 tools (HandlerBatch among them), none of a background run or a leftover-session logoff', () => {
+  it('serves the read-only set: 22 tools (HandlerBatch among them), the background-run tools, none of a leftover-session logoff', () => {
     expect(shape(readOnlyToolSet)).toEqual(
       shape(compactReadOnlyToolSetOf(compactReadOnlyEntries)),
     );
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(19);
-    expect(readOnlyToolSet.backgroundRuns).toBe(false);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(22);
+    expect(readOnlyToolSet.backgroundRuns).toBe(true);
   });
 
   it('stops on --exposition, naming the write binary its words ask for', async () => {

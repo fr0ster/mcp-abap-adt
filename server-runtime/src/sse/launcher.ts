@@ -178,10 +178,9 @@ export async function launch(
     enableDnsRebindingProtection: config.enableDnsRebindingProtection,
     // No runtime session file and no leftover-session tool: one server holds
     // the sessions of many users, so they are stdio's only.
-    // Background runs of the run tools, kept in this process's memory and
-    // handed to every SSE session's instance; they end with the process.
-    // Only where the set serves them: a -ro command has none, so a run's
-    // `background: true` is refused.
+    // Background runs of the long reads (and, in the write sets, of the
+    // run tools), kept in this process's memory and handed to every SSE
+    // session's instance; they end with the process. Every set serves them.
     ...(options.toolSet.backgroundRuns && {
       backgroundRuns: new InMemoryBackgroundRuns(),
     }),

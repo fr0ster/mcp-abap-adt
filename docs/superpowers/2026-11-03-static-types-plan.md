@@ -3186,7 +3186,7 @@ Step 4 names.
   - **The contract is exported.** The strategy's interface, its place union and its answer
     union (typed, closed), and the shipped strategy, are exported from
     `@mcp-abap-adt/lib/embeddable` (`src/embeddable/index.ts`), where `IBackgroundRuns` is
-    exported today. The line-match strategy stays internal (DO22, open).
+    exported today. The line-match strategy is the consumer's too (Step 4e3, DO24).
   - **How it reaches `SearchSource`'s handler — the `backgroundRuns` path, followed:**
     - `EmbeddableMcpServer`'s options (`src/embeddable/EmbeddableMcpServer.ts`, beside
       `backgroundRuns?: IBackgroundRuns`) gain the strategy; the constructor hands it to
@@ -3213,8 +3213,8 @@ Step 4 names.
       shipped one where the handler reads it (`context.<field> ?? shipped`, in
       `handleSearchSource.ts`, the one place the default lives — the orchestrator still takes
       it explicitly), and `HandlerExporter` takes it as an option and adds it to the context it
-      passes (`wrapEntry`) when the embedder's context has none. *This placement of the default
-      is the plan's reading, put to the owner with this step.*
+      passes (`wrapEntry`) when the embedder's context has none. This placement of the default is
+      approved by the owner (DO24).
   - **`EmbeddableMcpServer` without the option:** the server supplies the shipped one in the
     context (absent = the shipped strategy, as above); an embedder that passes its own gets
     its own on every path.
@@ -3245,6 +3245,44 @@ Step 4 names.
   Affected suites: Step 4e's, plus the embeddable suites that build an
   `EmbeddableMcpServer` or a launcher server for `SearchSource`, the `HandlerExporter`
   suites, and the type tests of `@mcp-abap-adt/lib/embeddable`'s exports.
+- [ ] **Step 4e3: The line-match strategy is the consumer's too (DO24, owner).** Exactly like
+  the SAP-answer strategy of Step 4e2. The contract is today's (`src/lib/search-source/lineMatch.ts`:
+  `LineMatchStrategy`, one source's lines and the `ScanInput` — `query`, `query2`, `exclude`,
+  `exclude_comments`, `max_hits` — in, `ScanResult` — the `ScanHit`s and `capped` — out);
+  the shipped one is `substringLineMatch` (`lineScanner.ts`, today's match).
+  - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the three
+    `HandlerContext`s it builds (dispatch, `recordedContext`, the run tools'), kept in every
+    derived context; `HandlerExporter` takes it as its own option and adds it in `wrapEntry`
+    when the embedder's context has none; the binaries' launchers (stdio, HTTP per-request,
+    SSE session) pass `substringLineMatch`; `handleSearchSource.ts` reads
+    `context.<field> ?? substringLineMatch` (the one place the default lives) and hands it to
+    the orchestrator, which takes it explicitly.
+  - **Exported:** `LineMatchStrategy`, `ScanInput`, `ScanHit`, `ScanResult` and
+    `substringLineMatch`, from `@mcp-abap-adt/lib/embeddable`.
+
+  Red tests first:
+  - `'an embedder's line match is used for every source on both paths'`: an
+    `EmbeddableMcpServer` with a recording line match and a stand-in connection; every source
+    read (program, include, class includes, a function module, a group include) is handed to
+    it with all its lines and the call's terms, on the sequential and the batched path; its
+    hits are the answer's, its `capped` sets `truncated.by_object_cap`;
+  - `'without the option the line match is today's'`: the shipped `substringLineMatch` cases
+    (case folding, `query2`, `exclude`, comment lines, the snippet cut, `max_hits` and
+    `capped`) through an `EmbeddableMcpServer` with no option, and through a launcher-built
+    server;
+  - `'the HandlerExporter option is used, and the shipped one without it'`; a plain-group
+    registration uses the shipped one;
+  - `'the line-match contract is exported'`: a type test importing the types and
+    `substringLineMatch` from `@mcp-abap-adt/lib/embeddable`.
+
+  Docs: `docs/architecture/HANDLER_EXPORTER.md` and the embedding docs describe the option;
+  MIGRATION-24.0 for embedders: the optional line-match strategy, `substringLineMatch` as the
+  default; CHANGELOG (24.0.0) Added — the `SearchSource` line-match strategy option on
+  `EmbeddableMcpServer` and `HandlerExporter`, its exported contract and `substringLineMatch`.
+
+  Affected suites: Step 3's line-match suites, the embeddable, launcher and `HandlerExporter`
+  suites that run `SearchSource`, and the type tests of `@mcp-abap-adt/lib/embeddable`'s
+  exports.
 - [ ] **Step 4f: The caller sets how much the answer holds (DO23).** Three optional controls;
   with none given the answer is exactly Steps 4–4e's (every hit with its line number and
   snippet).
@@ -3370,10 +3408,11 @@ Step 4 names.
     `run_handle` with `GetBackgroundRun`, or end it with `DiscardBackgroundRun`; the section's
     "page it with `max_objects` … `next_start_at`" text is rewritten (24.0.0 is unreleased);
     `max_hits_per_object` limits each object only when given (it was 100 by default);
-    the orchestrator (`src/lib/search-source/`) is not in any entry of the package's
-    `exports`, so the line-match strategy stays internal; the SAP-answer strategy is the
-    embedder's option (Step 4e2), and a caller of `SearchSource` sees that a server defect
-    while reading is an error, not a skip (DO22).
+    for embedders: the SAP-answer strategy (Step 4e2) and the line-match strategy (Step 4e3)
+    are optional `EmbeddableMcpServer` and `HandlerExporter` options, their contracts and the
+    shipped ones (skip; `substringLineMatch`) exported from `@mcp-abap-adt/lib/embeddable`;
+    without them the search behaves as shipped; a caller of `SearchSource` sees that a server
+    defect while reading is an error, not a skip (DO22).
 - [ ] **Step 7: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
   live-run safety:
   - on premise: a mask with `*` (several, and one matching zero characters), a mask with `?`,
@@ -4119,8 +4158,14 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   failures never reach it. The embedder passes it in `EmbeddableMcpServer`'s options, carried
   to `SearchSource` in the handler context like `backgroundRuns`; the binaries' launchers pass
   the shipped one (skip); its contract and the shipped strategy are exported from
-  `@mcp-abap-adt/lib/embeddable`. **Open:** whether the line-match strategy is the consumer's
-  too (it stays internal until the owner decides).
+  `@mcp-abap-adt/lib/embeddable`. **Closed (DO24):** the line-match strategy is the
+  consumer's too.
+- **DO24 (2026-11-07, D23b Steps 4e2 and 4e3):** "a default strategy, and the means to change
+  the search at will". The default's placement is approved: `SearchSource`'s handler uses
+  `context.<field> ?? shipped` (the one place a default lives; the orchestrator takes it
+  explicitly), `HandlerExporter` has its own option, the launchers pass the shipped one. The
+  line-match strategy is the consumer's exactly like the SAP-answer strategy: the same option
+  path, its contract and `substringLineMatch` exported from `@mcp-abap-adt/lib/embeddable`.
 - **DO23 (2026-11-07, D23b Step 4f):** the caller sets how much the answer holds, with three
   optional controls; with none, the answer is every hit with line and snippet. `answer`:
   `'objects'` (each object and include with hits, `function_group_name` for `FUGR/FF`, and the

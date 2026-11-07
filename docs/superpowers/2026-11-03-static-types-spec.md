@@ -532,8 +532,9 @@ on-premise system disagree, the live measurement holds.
     handler in its context like `backgroundRuns`; the binaries' launchers pass the shipped one
     (skip); a context no host fills (a `HandlerExporter` entry's, a plain group's) gets the
     shipped one. Its contract and the shipped strategy are exported from
-    `@mcp-abap-adt/lib/embeddable`. Whether the line-match strategy is the consumer's too is
-    open.
+    `@mcp-abap-adt/lib/embeddable`. The line-match strategy is the consumer's the same way (owner,
+    DO24): the same option path, the handler's default `substringLineMatch` (today's match),
+    its contract and the shipped strategy exported from `@mcp-abap-adt/lib/embeddable`.
   - **The caller sets how much the answer holds (owner, DO23).** Three optional controls; with
     none, every hit with line and snippet. `answer`: `objects` (each object and include with
     hits, `function_group_name` for a `FUGR/FF` hit, and the number of hits answered),

@@ -219,3 +219,43 @@ describe('the other walking tools are unchanged: without the branch rule a refus
     ).toEqual(['SA', 'SAPROG', 'SB', 'SBPROG']);
   });
 });
+
+describe('a level of any size', () => {
+  /** `P` holds the subpackage `S`, whose program node lists 300 000 programs. */
+  const huge = Array.from({ length: 300_000 }, (_, i) => ({
+    name: `P${i}`,
+    type: 'PROG/P',
+  }));
+  const big: Record<string, unknown> = {
+    'P|root': { objects: [], childNodes: [{ type: 'DEVC/K', nodeId: '1' }] },
+    'P|1': { objects: [{ name: 'S', type: 'DEVC/K' }], childNodes: [] },
+    'S|root': { objects: [], childNodes: [{ type: 'PROG/P', nodeId: '2' }] },
+    'S|2': { objects: huge, childNodes: [] },
+  };
+  const level = (key: string): NodeAnswer =>
+    succeeded(big[key] ?? { objects: [], childNodes: [] });
+
+  it('walkPackage answers every object', async () => {
+    const utils: NodeStructureSource = {
+      async fetchNodeStructure(_type, name, options) {
+        return level(keyOf(name, options?.nodeId));
+      },
+    };
+    const found = await walkPackage(utils, 'P', { includeSubpackages: true });
+    expect(found).toHaveLength(300_001);
+  });
+
+  it('walkPackages answers every object', async () => {
+    const read = async (
+      requests: readonly NodeRequest[],
+    ): Promise<PhaseResult<NodeAnswer>[]> =>
+      requests.map((request) => ({
+        ok: true,
+        value: level(keyOf(request.parentName, request.nodeId)),
+      }));
+    const [settled] = await walkPackages(read, ['P'], {
+      includeSubpackages: true,
+    });
+    expect(settled?.ok && settled.value).toHaveLength(300_001);
+  });
+});

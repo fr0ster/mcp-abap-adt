@@ -3,6 +3,7 @@ import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes, TableMainOf } from '../adtProjections';
 import { isCredentialFailure } from '../answer';
+import { appendAll } from '../appendAll';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -100,7 +101,7 @@ export async function resolvePackagePatterns(
       continue;
     }
     try {
-      resolved.push(...((await resolveMask(deps, entry)) ?? []));
+      appendAll(resolved, (await resolveMask(deps, entry)) ?? []);
     } catch (error) {
       if (isCredentialFailure(error)) throw error;
     }
@@ -200,8 +201,14 @@ export async function searchPackagesInPhase(
   ctx: HandlerContext,
   asked: readonly SearchObjectsArgs[],
 ): Promise<Map<string, PhaseResult<string[]>>> {
-  const results = await runPhase(ctx, asked, (args, connection) =>
+  // One request per distinct search: a mask named twice is one search, so
+  // no answer of it can stand in for another's (a later success hiding a
+  // credential refusal).
+  const distinct = [
+    ...new Map(asked.map((args) => [searchKey(args), args])).values(),
+  ];
+  const results = await runPhase(ctx, distinct, (args, connection) =>
     createPackagePatternResolver({ ...ctx, connection })(args),
   );
-  return new Map(asked.map((args, i) => [searchKey(args), results[i]]));
+  return new Map(distinct.map((args, i) => [searchKey(args), results[i]]));
 }

@@ -20,6 +20,7 @@ import {
   isCredentialFailure,
   isCredentialPayload,
 } from '../answer';
+import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
@@ -721,7 +722,10 @@ export async function walkPackages(
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      walk.found.push(...root.objects.map((o) => objectOf(o, walk.name)));
+      appendAll(
+        walk.found,
+        root.objects.map((o) => objectOf(o, walk.name)),
+      );
       for (const child of root.childNodes) {
         typeNodes.push({ walk, nodeId: child.nodeId, type: child.type });
       }
@@ -739,7 +743,10 @@ export async function walkPackages(
       typeNodes.forEach(({ walk, nodeId, type }, i) => {
         const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
-        walk.found.push(...typed.objects.map((o) => objectOf(o, walk.name)));
+        appendAll(
+          walk.found,
+          typed.objects.map((o) => objectOf(o, walk.name)),
+        );
       });
     }
 
@@ -816,7 +823,7 @@ export async function walkPackage(
         })
         .then((answer) => levelOf(answer, options.missingLevel)),
     );
-    if (level !== undefined) found.push(...level.objects.map(owned));
+    if (level !== undefined) appendAll(found, level.objects.map(owned));
   }
 
   if (!options.includeSubpackages) return found;
@@ -829,7 +836,7 @@ export async function walkPackage(
     const sub = await underBranchRule(options, () =>
       walkPackage(utils, item.name, options, depth + 1, seen),
     );
-    if (sub !== undefined) out.push(...sub);
+    if (sub !== undefined) appendAll(out, sub);
   }
   return out;
 }

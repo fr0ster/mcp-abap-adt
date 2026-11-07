@@ -33,6 +33,8 @@ export type SourceVersion = ReadVersion;
 export interface SourceUnit {
   include: string;
   lines: string[];
+  /** The source's identity in the call (`sourceReadKey`): the same for every object that names it. */
+  source: string;
 }
 
 export type { FugrChild };
@@ -218,7 +220,11 @@ async function* readOne(
 ): AsyncGenerator<SourceUnit> {
   const text = await readable(STEP[read.reader], () => deps.readSource(read));
   if (text === undefined) return;
-  yield { include: unitName, lines: linesOf(text) };
+  yield {
+    include: unitName,
+    lines: linesOf(text),
+    source: sourceReadKey(read),
+  };
 }
 
 /** A source of a function group's structure: its read. */

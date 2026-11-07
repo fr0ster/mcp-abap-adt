@@ -276,3 +276,26 @@ describe('runSearchSource — max_hits_per_object absent: no limit (DO20)', () =
     expect(result.truncated.by_object_cap).toBe(false);
   });
 });
+
+describe('runSearchSource — an object of any number of hits', () => {
+  it('answers 300 000 hits of one object', async () => {
+    const hits = Array.from({ length: 300_000 }, (_, i) => ({
+      line: i + 1,
+      snippet: 'marker',
+    }));
+    const deps: OrchestratorDeps = {
+      lineMatch: { match: () => ({ hits, capped: false }) },
+      fetchPackageContents: pkg([
+        { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({ 'PROG:Z_PROG': 'marker' }),
+      resolvePackages: identityResolver,
+    };
+    const result = await runSearchSource(deps, {
+      query: 'marker',
+      packages: ['ZPKG'],
+      object_types: ['PROG'],
+    });
+    expect(result.results).toHaveLength(300_000);
+  });
+});

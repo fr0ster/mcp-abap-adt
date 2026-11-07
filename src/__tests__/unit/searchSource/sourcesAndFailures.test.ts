@@ -613,16 +613,19 @@ describe('SearchSource: one read per source', () => {
     },
   );
 
-  it.each(PATHS)('a cache hit counts for both owners (%s)', async (batch) => {
-    const { result } = searchShared({}, batch === 'absent');
-    const payload = payloadOf(await result);
-    expect(payload.scanned).toEqual({
-      packages: 1,
-      objects: 2,
-      sources: 2,
-      objects_with_hits: 2,
-    });
-  });
+  it.each(PATHS)(
+    'a cache hit counts for both owners; the source read once counts once (%s)',
+    async (batch) => {
+      const { result } = searchShared({}, batch === 'absent');
+      const payload = payloadOf(await result);
+      expect(payload.scanned).toEqual({
+        packages: 1,
+        objects: 2,
+        sources: 1,
+        objects_with_hits: 2,
+      });
+    },
+  );
 
   it.each(PATHS)(
     'a shared failure is skipped for both owners: one request, no entry (%s)',
@@ -723,7 +726,7 @@ describe('SearchSource: the description is functional', () => {
       'skipped',
       '`scanned.packages`',
       '`scanned.objects`',
-      '`scanned.sources`',
+      '`scanned.sources` the sources read (each once)',
       '`scanned.objects_with_hits`',
       'only when given',
     ]) {
@@ -939,6 +942,15 @@ describe('D23b: package masks (DO12)', () => {
       expect(payloadOf(result).status).toBe(401);
       expect(walkedRoots(fake, sequential)).toEqual([]);
     });
+  });
+  it('a mask named twice is searched once; a credential refusal of that search ends the call (served)', async () => {
+    const fake = standOn(repositoryOf({ 'ZD*': names('ZD', 3) }), {
+      refuseOnce: { 'SEARCH ZD*': 401 },
+    });
+    const result = await run(fake, ['ZD*', 'ZD*'], false);
+    expect(searchesOf(fake)).toEqual([['ZD*', 1000]]);
+    expect(isError(result)).toBe(true);
+    expect(payloadOf(result).status).toBe(401);
   });
 });
 

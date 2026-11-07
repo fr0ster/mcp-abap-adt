@@ -183,7 +183,12 @@ export interface Model {
   refuseWith?: Record<string, { status: number; body: string }>;
   /** Direct requests that throw this plain error, no answer (a key of `keyOf`). */
   throwOn?: Record<string, string>;
+  /** The first request of a key answered with this status; later ones as usual. */
+  refuseOnce?: Record<string, number>;
 }
+
+/** The keys of `refuseOnce` already answered with their status, per model. */
+const refusedOnce = new WeakMap<Model, Set<string>>();
 
 function answerOf(
   repo: Repository,
@@ -196,6 +201,15 @@ function answerOf(
   const round = key.startsWith('SEARCH ')
     ? `${key}@${searchParamsOf(url, params).get('maxResults')}`
     : key;
+  const once = model.refuseOnce?.[key];
+  if (once !== undefined) {
+    const used = refusedOnce.get(model) ?? new Set<string>();
+    refusedOnce.set(model, used);
+    if (!used.has(key)) {
+      used.add(key);
+      return { status: once, statusText: 'Refused', body: '' };
+    }
+  }
   const refused = model.refuse?.[round] ?? model.refuse?.[key];
   if (refused !== undefined) {
     return { status: refused, statusText: 'Refused', body: '' };

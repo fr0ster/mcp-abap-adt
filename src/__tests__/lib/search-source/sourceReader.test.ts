@@ -69,7 +69,11 @@ describe('readSourceUnits', () => {
     const { deps, calls } = makeDeps();
     const units = await collect(readSourceUnits(deps, PROG));
     expect(units).toEqual([
-      { include: 'Z_PROG', lines: ['PROG:Z_PROG', 'line2'] },
+      {
+        include: 'Z_PROG',
+        lines: ['PROG:Z_PROG', 'line2'],
+        source: '/sap/bc/adt/programs/programs/z_prog/source/main|active',
+      },
     ]);
     expect(calls).toEqual(['PROG:Z_PROG']);
   });
@@ -255,8 +259,18 @@ describe('readSourceUnits', () => {
     const { deps, calls } = makeDeps({ structure, failing: 'FM:Z_FG/Z_FM_B' });
     const units = await collect(readSourceUnits(deps, FUGR));
     expect(units).toEqual([
-      { include: 'Z_FM_A', lines: ['FM:Z_FG/Z_FM_A', 'line2'] },
-      { include: 'Z_FM_C', lines: ['FM:Z_FG/Z_FM_C', 'line2'] },
+      {
+        include: 'Z_FM_A',
+        lines: ['FM:Z_FG/Z_FM_A', 'line2'],
+        source:
+          '/sap/bc/adt/functions/groups/z_fg/fmodules/z_fm_a/source/main|active',
+      },
+      {
+        include: 'Z_FM_C',
+        lines: ['FM:Z_FG/Z_FM_C', 'line2'],
+        source:
+          '/sap/bc/adt/functions/groups/z_fg/fmodules/z_fm_c/source/main|active',
+      },
     ]);
     expect(calls).toEqual([
       'FM:Z_FG/Z_FM_A',

@@ -1,4 +1,5 @@
 import { isCredentialFailure } from '../answer';
+import { appendAll } from '../appendAll';
 import { type PhaseResult, withSequentialFallback } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -111,7 +112,7 @@ const DEFAULTS = {
 interface TargetAnswer {
   hits: SearchHit[];
   capped: boolean;
-  /** The sources read: none, and the object was not read. */
+  /** This object's sources read: none, and the object was not read. */
   sources: number;
 }
 
@@ -189,6 +190,10 @@ export async function runSearchSource(
   // One run reads every target.
   const targets = enumerated.targets;
 
+  // Every source read, once however many objects name it (DO17: the
+  // counters count the work done).
+  const sourcesRead = new Set<string>();
+
   // Each target's answer, by its index.
   const answers: Array<TargetAnswer | undefined> = Array.from(
     { length: targets.length },
@@ -215,6 +220,7 @@ export async function runSearchSource(
         version,
       )) {
         sources++;
+        sourcesRead.add(unit.source);
         const terms = {
           query: input.query,
           query2: input.query2,
@@ -260,17 +266,15 @@ export async function runSearchSource(
   );
 
   const allHits: SearchHit[] = [];
-  let sourcesScanned = 0;
   let objectsRead = 0;
   let objectsWithHits = 0;
   let truncatedByObjectCap = false;
   for (const answer of answers) {
     if (answer === undefined) continue;
-    sourcesScanned += answer.sources;
     if (answer.sources > 0) objectsRead++;
     if (answer.hits.length > 0) objectsWithHits++;
     if (answer.capped) truncatedByObjectCap = true;
-    allHits.push(...answer.hits);
+    appendAll(allHits, answer.hits);
   }
 
   allHits.sort((a, b) => {
@@ -286,7 +290,7 @@ export async function runSearchSource(
     scanned: {
       packages: enumerated.packages,
       objects: objectsRead,
-      sources: sourcesScanned,
+      sources: sourcesRead.size,
       objects_with_hits: objectsWithHits,
     },
     truncated: { by_object_cap: truncatedByObjectCap },

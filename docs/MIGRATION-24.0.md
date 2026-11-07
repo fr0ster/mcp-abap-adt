@@ -268,7 +268,7 @@ in one run, answers only the hits with counters of what it did, and skips what i
   credential failure still ends the call.
 - **The counters count only what was done.** `scanned.packages` the packages walked (their own
   level read, subpackages included), `scanned.objects` the objects read (at least one source),
-  `scanned.sources` the sources read, and the new `scanned.objects_with_hits` the objects with
+  `scanned.sources` the sources read (each once, however many objects name it), and the new `scanned.objects_with_hits` the objects with
   a hit in `results`.
 - **No paging.** Drop `max_objects` and `start_at` (a call that still sends them has them
   dropped); `total_targets`, `next_start_at` and `truncated.by_max_objects` are gone. Every
@@ -278,7 +278,8 @@ in one run, answers only the hits with counters of what it did, and skips what i
   `truncated.by_object_cap` is set when a given limit cut an object's hits.
 - **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan;
   `truncated.by_timeout` is gone. To bound a call in time, run it in the background and end it
-  with `DiscardBackgroundRun`, or cancel it from your client. `SearchSource` runs as every long
+  with `DiscardBackgroundRun`, which is what ends a background run: it logs off the run's ABAP
+  session. `SearchSource` runs as every long
   tool runs: on an ABAP session of its own, in the background by default — see "Callers of the
   long tools" below.
 - **Embedders of `runSearchSource` / `runSearchSourceWithContext` pass the line-match

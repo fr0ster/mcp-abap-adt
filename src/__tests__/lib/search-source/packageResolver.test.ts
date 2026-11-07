@@ -284,3 +284,16 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
     ]);
   });
 });
+
+describe('resolvePackagePatterns — a mask of any size', () => {
+  it('a mask answering 300 000 packages resolves to all of them, none skipped', async () => {
+    const all = namesOf('Z', 300_000);
+    const { packages } = await resolvePackagePatterns(
+      {
+        searchObjects: async (args) => all.slice(0, args.maxResults),
+      },
+      ['Z*'],
+    );
+    expect(packages).toHaveLength(300_000);
+  });
+});

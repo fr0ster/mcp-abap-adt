@@ -74,6 +74,7 @@ export const PIN_PORT_OWNERS: Readonly<Record<string, number>> = {
   'src/__tests__/unit/coverage/pinCases.test.ts': 47100,
   'src/__tests__/unit/systemKind/programOnJwtOnPremise.test.ts': 47101,
   'src/__tests__/unit/pins/backgroundRuns.pins.test.ts': 47102,
+  'src/__tests__/unit/pins/searchSource.pins.test.ts': 47103,
 };
 
 /** The repository root, from this helper's place. */

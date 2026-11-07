@@ -138,6 +138,14 @@ same apart from object names), copied from adt-clients' corpus (`corpus/adt/answ
 sidecars hold the request and the status, and no response header but the content type.
 `GetObjectOutline` reads them.
 
+| Case | What provoked it | What came back |
+|---|---|---|
+| `read-package-quick-search-mask` | `GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query={shared package}*&maxResults=1000&objectType=DEVC`, Accept `application/xml`, an on-premise system, 2026-11-07 (plan D23b, Step 7) | 200, `adtcore:objectReferences` holding one `adtcore:objectReference` — `uri`, `type="DEVC/K"`, `name`, `packageName`, `description` — the package the `*` matches with zero characters; no count, no "more" marker |
+
+The body is the answer byte for byte; it names no user. The sidecar keeps the response
+headers with `sap-adt-saplb` set to `REDACTED`. It was taken by a direct GET from a live
+test's connection, the request `searchObjects` (adt-clients) sends.
+
 ## Refusals
 
 | Case | What provoked it | How SAP refused |

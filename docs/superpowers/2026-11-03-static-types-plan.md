@@ -2688,9 +2688,13 @@ Step 4 names.
   doubling, that second run would find the next round unanswered, read the `[]` as a short
   answer and stop: the mask would be cut at the first window without a word. Red tests
   first, on the batched path (`ctx` with batch envelopes, recorded answers):
-  - `'a mask that fills maxResults twice is resolved on the batched path'`: the first phase
+  - `'a mask whose first answer is full is resolved on the batched path'`: the first phase
     sends `maxResults` 1000, the answer fills it; a second phase is actually sent with 2000,
-    and its answer's packages are the ones walked (the requests of both phases pinned);
+    its answer holds fewer than 2000, and its packages are the ones walked (the requests of
+    both phases pinned);
+  - `'a mask that fills maxResults twice is resolved on the batched path'`: answers full at
+    1000 and at 2000; a third phase is actually sent with 4000, its answer holds fewer than
+    4000, and only its packages are walked (the requests of all three phases pinned);
   - `'a search not answered yet is not taken as a short answer'`: the resolver never ends a
     mask on a round with no answer;
   - `'masks of different depths resolve together'`: a mask done in one round and a mask that

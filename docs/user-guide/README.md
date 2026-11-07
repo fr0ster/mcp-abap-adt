@@ -93,8 +93,10 @@ own; `background: false` answers the result in the call, on a session of its own
   read, cancels it: its session is logged off, SAP ends the read, and the run reads `cancelled`
   until Get answers it; on a finished run, removes its answer.
 
-A server without background runs (the `-ro` binaries, an embedder without a store) answers a long
-read in the call. `HandlerGet`'s run-reading parts (the `UNIT_TEST` / `CDS_UNIT_TEST` results,
+Every binary serves these tools, the `-ro` ones included: their runs are reads alone, and a
+`-ro` binary's `DiscardBackgroundRun` cancels or removes reads only. A server without background
+runs (an embedder without a store) lists a long tool without `background` and answers its read in
+the call. `HandlerGet`'s run-reading parts (the `UNIT_TEST` / `CDS_UNIT_TEST` results,
 `activation_status`, `activation_results`) are read in the call on the instance's connection and
 take no `background`. In batch mode a long read is recorded; `background: true` there is refused
 `batch_no_background`. Details: [MIGRATION-24.0](../MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).

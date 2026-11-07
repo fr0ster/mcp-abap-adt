@@ -309,8 +309,12 @@ its own, logged off after SAP's answer.
 - **Batch mode** records a long read without `background`; `background: true` there is refused
   `batch_no_background` (the refusal was `batch_no_timeout`).
 - **The 16 runs per caller** count reads too; a read that was answered no longer counts.
-- **A server without background runs** — the `-ro` binaries, an embedder without
-  `backgroundRuns` — answers a long tool in the call, whatever its `background`.
+- **Every binary serves background runs, the `-ro` ones included** (`GetBackgroundRun`,
+  `ListBackgroundRuns`, `DiscardBackgroundRun`; compact `HandlerBackgroundRunGet`, `…List`,
+  `…Discard`): a long tool only reads, so a `-ro` binary's runs are reads alone, and its
+  discard cancels or removes reads only. The `-ro` tool counts grow by three.
+- **A server without background runs** — an embedder without `backgroundRuns`, or one that serves
+  no tool reading the runs — lists a long tool without `background` and answers it in the call.
 
 ## Embedders: `IBackgroundRuns` knows `cancelled`; a long tool runs synchronously without a strategy
 
@@ -330,9 +334,14 @@ its own, logged off after SAP's answer.
   hands it to every instance (`backgroundRunOwner`), as the HTTP and SSE servers do, so a discard
   reaching any of them cancels a running read. Without it, a discard reaching an instance that
   did not start the read is refused while the read runs.
-- **With no strategy** (`backgroundRuns` not given), a long tool runs synchronously, as with
-  `background: false`; a code run's `background: true` is refused, as before. `HandlerExporter` and
-  a group registered on its own `McpServer` have no strategy.
+- **With no strategy** (`backgroundRuns` not given), or without the tool that reads its runs
+  among the instance's tools (`GetBackgroundRun`; compact `HandlerBackgroundRunGet`), a long tool
+  is listed without `background` and runs synchronously, as with `background: false`; a code run's
+  `background: true` is refused, as before. `HandlerExporter` (every path: `getHandlerEntries()`,
+  `createRegistry()`, `registerOnServer`) and a group registered on its own `McpServer` keep no
+  background runs: they hand out the long tools without `background`, as they hand out the run
+  tools. To serve long reads in the background, register the groups on a server instance with a
+  strategy and the background-run tools (`BackgroundRunHandlersGroup`), as the binaries do.
 - **Removed from `@mcp-abap-adt/lib`'s modules:** `TIMEOUT_FIELD`, `timeoutField`,
   `TIMEOUT_DESCRIPTION`, `timedOutAnswer`, `timedOutWords`, `TimedOutAnswer`, `readTimeout`,
   `withoutTimeout`, `TIMEOUT_INVALID_WORDS`, `TIMEOUT_NOT_FOR_RUN_WORDS`, `MAX_TIMEOUT_SECONDS`,

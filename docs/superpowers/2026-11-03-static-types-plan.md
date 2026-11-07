@@ -3312,7 +3312,7 @@ Step 4 names.
   `LineMatchStrategy`, one source's lines and the `ScanInput` — `query`, `query2`, `exclude`,
   `exclude_comments`, `max_hits` — in, `ScanResult` — the `ScanHit`s and `capped` — out);
   the shipped one is `substringLineMatch` (`lineScanner.ts`, today's match).
-  - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the three
+  - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the
     `HandlerContext`s it builds for `SearchSource` (dispatch, the run tools'; batch mode refuses
     it, `batch_not_recordable`), kept in every
     derived context; `HandlerExporter` takes it as its own option, its one public path, and
@@ -3471,8 +3471,10 @@ Step 4 names.
     the objects with hits from `results` — an object without a hit is no longer listed;
     the `failures` list is gone, both kinds (24.0.0 is unreleased, so the section's D23a text
     about it is rewritten, not kept beside): a source or object that cannot be read, a mask
-    search SAP refuses, a package that does not exist (its root refused or `404`) are
-    skipped with no entry; a refused or missing type node or subpackage excludes only its
+    search SAP refuses, and a package root SAP actually refuses or answers `404`, are skipped
+    with no entry (DO17 / DO19); a named package that does not exist is no refusal at all — SAP
+    answers its node structure `200` with an empty body, as for an empty package — and simply
+    yields no hit (DO26); a refused or missing type node or subpackage excludes only its
     branch — the package's other nodes, subpackages and objects are walked and searched
     (DO19); a readable source of an object is still searched when another failed; a named
     package that does not exist yields no hit; `scanned.packages` is removed (DO26: no package
@@ -3504,6 +3506,25 @@ Step 4 names.
     `failures`; a named package that does not exist yields no hit (no `scanned.packages`); `scanned.objects_with_hits` matches the objects in `results`; a hit
     in a function module names the module and its group, and `GetFunctionModule` reads it
     with exactly those fields;
+  - **the existing live suite is rewritten without `scanned.packages` (DO26):**
+    `src/__tests__/integration/coverage/searchSource.live.test.ts` asserts package counts today
+    — the mask cases (`expectWalked`: the search, with an object filter no object matches,
+    answers `scanned.packages` equal to the packages `SearchObject` over `DEVC` names), and
+    "a package that does not exist is skipped and not counted" (`scanned.packages` `1`). They
+    are replaced by evidence that reads no package counter:
+    - **masks:** `livePrepare` reads the packages `SearchObject` over `DEVC` names for the mask
+      and, for each, its scan objects (`GetPackageContents`, without subpackages, the scan
+      types); the search runs with the mask, `include_subpackages: false` and `answer:
+      'objects'` over a query that matches nothing, and asserts `scanned.objects` equals the
+      number of scan objects those packages hold (every named package walked, none other) —
+      and, in a second call with a query the prepared objects hold, that every `devclass` in
+      the answer is among the named packages;
+    - **the missing package:** "a named package that does not exist yields no hit" — the
+      shared package and the missing one searched together answer the module's hit from the
+      shared package only, and the missing one alone answers no hit and `scanned.objects` `0`;
+    - the suite stays under the live-test guards: `liveSuite` with its systems, `liveCall`
+      and `livePrepare` with literal tool names and arguments, the shared fixtures read-only;
+      its header comment is rewritten to match (no `scanned.packages`);
   - the `VIEW*` measurement owed by D23a Step 2;
   - the shape of a real SAP refusal (DO22, owed): the `origin`, the `response` status and the
     `adtType` a SAP `404` refusal of a source read gets through adt-clients, on premise and on
@@ -4541,9 +4562,11 @@ stand-in.
   object that cannot be read is skipped: no entry, no count; a readable source of the same
   object is still searched and its hits kept. A credential refusal still ends the call.
   Supersedes D23a's failure contract. **Closed (owner, 2026-11-07):** the package-level
-  outcomes follow the same rule — a refused mask search, a package that does not exist
-  (`404`), a refused walk of a package, type node or subpackage are skipped with no entry (a
-  type node or subpackage excludes only its branch, DO19); the answer has no `failures` list. The counters count only what was done: `scanned.objects`
+  outcomes follow the same rule — a refused mask search, a package root SAP refuses or answers
+  `404`, a refused walk of a package, type node or subpackage are skipped with no entry (a
+  type node or subpackage excludes only its branch, DO19); a named package that does not exist
+  is answered by SAP `200` with an empty body and yields no hit (DO26); the answer has no
+  `failures` list. The counters count only what was done: `scanned.objects`
   the objects read (at least one source),
   `scanned.sources` the sources read, `scanned.objects_with_hits`; `truncated.by_object_cap`
   stays (the paging fields go, DO20).

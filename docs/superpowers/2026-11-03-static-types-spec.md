@@ -482,7 +482,8 @@ on-premise system disagree, the live measurement holds.
     with no `failures` list. A source or object that cannot be read is skipped — no entry, no
     count; a readable source of the same object is still searched and its hits kept. The
     package-level outcomes follow the same rule: a mask search SAP refuses, a named package
-    that does not exist (its root refused or `404`) are skipped with no entry. A refused level
+    whose root SAP refuses or answers `404` are skipped with no entry; a named package that does
+    not exist is no refusal (SAP answers it `200` with an empty body) and yields no hit (DO26). A refused level
     of a walk (a type node or a subpackage, its `404` included) excludes only that branch —
     the node and everything under it; the package's other nodes, subpackages and objects are
     walked and searched (owner, DO19; today it ends the package's whole walk). The other

@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D22 (spec §9), then C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D23 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -2513,6 +2513,110 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
   - an unknown structure name answers not found.
 - [ ] **Step 7:** Commit.
 
+### D23. SearchSource rework (owner, 2026-11-07)
+
+**The owner's rules for it:** never guess; no silent failure; SAP does what SAP can.
+
+**What the code does today** (`src/lib/search-source/`, `src/handlers/system/readonly/handleSearchSource.ts`):
+- **`packageResolver.ts`:** a mask is resolved by one quick search over `DEVC`
+  (`maxResults` 1000). Anything beyond that window, or anything the search misses, is dropped
+  silently.
+- **`packageEnumerator.ts`:** walks the package (node structure) with its subpackages and keeps
+  only `PROG/P`, `FUGR/F` and `CLAS/OC`.
+- **`sourceReader.ts`:**
+  - a program is read by its main source only; program includes (`PROG/I`) are never
+    scanned;
+  - a class is read by `source/main` only; its local includes (definitions,
+    implementations, macros, test classes) are never scanned;
+  - a function group is read by its object structure, then its modules and includes; the
+    includes always in the active version; modules named `VIEW*` are skipped by name;
+  - `safe()` logs any non-SAP error at debug level and drops the object silently.
+- **`lineScanner.ts`:** a case-insensitive substring match per line (`query`, `query2`,
+  `exclude`, comment skipping).
+- **`orchestrator.ts`:** `time_budget_ms` is checked before each envelope; the tool also takes
+  `timeout`.
+- **SAP's own text search** (`/sap/bc/adt/repository/informationsystem/textsearch`) is in the
+  discovery document but answered `500` with the key `SRIS_SEARCH 006` ("Source Search is not
+  supported") on both systems (measured, read-only).
+- **adt-clients** (43.x): `AdtUtils.search(criteria)` sends one quick search with `maxResults`
+  (default 100); it offers no paging.
+
+**Live parts are owed.** Every live step below waits until the owner restores the on-premise
+tunnel and the trial session, and is marked *owed*. Nothing is run before then.
+
+- [ ] **Step 1: Masks are resolved completely, or the answer says they were not.**
+  - Red tests first, on `recordingConnection` with corpus quick-search answers:
+    - `'a mask whose search fills the window is not taken as complete'`: an answer with as
+      many hits as `maxResults` asked;
+    - `'an incomplete mask is named in the answer'`: the answer carries
+      `incomplete_masks: [{ mask, reason }]` and scans what it did resolve;
+    - `'a mask resolved under the window is complete'`.
+  - The resolution, in plain code with SAP doing the matching: a quick search answering fewer
+    hits than asked is complete. A search that fills the window is narrowed by SAP: the mask
+    is split by its next character (`Z*` → `ZA*` … `Z_*`, `Z/*`), each searched in turn,
+    recursively, until every answer is under the window. A mask that cannot be narrowed
+    further and still fills the window is named in `incomplete_masks`. No package is dropped
+    without being named.
+  - Pins: the quick-search requests of a narrowing, by literal.
+- [ ] **Step 2: Every source-bearing object SAP lists is scanned.**
+  - Red tests over corpus node-structure answers. The walked package's object list is
+    scanned for every type that has a source the server already reads:
+    - program includes (`PROG/I`);
+    - a class's local includes (definitions, implementations, macros, test classes, through
+      the existing class-include readers);
+    - interfaces (`INTF/OI`);
+    - CDS (`DDLS/DF`), BDEF (`BDEF/BDO`), DDLX (`DDLX/EX`), SRVD (`SRVD/SRV`);
+    - and any other type with an existing source reader (listed at the step from the
+      `Get<Type>` source reads).
+  - Each type is read through the server's existing reader for it, with the call's
+    `version` where that reader takes one. Function-group includes are read in the asked
+    version where their reader takes one; if a reader cannot (the include endpoint reads the
+    active version alone), the answer says so per object, and nothing is assumed.
+  - `object_types` widens to these types. Listed-schema fixture, and MIGRATION: the default
+    scan now covers them.
+- [ ] **Step 3: The `VIEW*` skip goes.** Red test: `'a function module named VIEW… is scanned'`.
+  The name skip is removed. If such modules must not be scanned, that is decided from
+  something SAP states — a measurement, *owed* live (what distinguishes them in the
+  function group's structure). Until then they are scanned.
+- [ ] **Step 4: No object is dropped silently.** Red tests: a source read that fails (a corpus
+  error answer with a T100 key; a transport failure without one) puts the object in the
+  answer's `failed` list with its `step` and SAP's key where there is one, never only a debug
+  log. `safe()` is removed; every read's failure is answered.
+- [ ] **Step 5: SAP's text search first, by key.**
+  - Red tests: `'an SRIS_SEARCH 006 answer means unavailable, and the scan runs'` (decided by
+    the T100 key read with the parser, never by words); `'any other failure of the text
+    search is in failed and the scan runs'`.
+  - When the system answers the text search, its result is used and the scan is the
+    fallback. Its request and answer shape are measured live once a system offers it —
+    *owed*. Until then the code holds only the key check and the fallback, and no guessed
+    request shape is pinned.
+- [ ] **Step 6: One read per source.** Red test: `'an include named by two objects is read
+  once'` — the recorded requests hold one GET per source URI, and both objects' hits come
+  from it. The batch envelopes stay; no timer is added.
+- [ ] **Step 7: The description.** `SearchSource`'s description says what the tool does, its
+  arguments and its answer — functionally. The advice lines go: "Run only ONE SearchSource
+  per destination at a time…", "Prefer combining terms…", "For certainty, pass concrete
+  package names", and the other recommendations. A description test, under the
+  functional-descriptions guard.
+- [ ] **Step 8: Pins and CHANGELOG / MIGRATION.** Pins over corpus answers for each new type's
+  read and for the narrowing. CHANGELOG (Fixed: masks resolved completely or named; every
+  source-bearing type scanned; no object dropped silently; Changed: the description).
+  MIGRATION-24.0: `object_types`' wider set and default, `incomplete_masks`, the `failed`
+  entries, the `VIEW*` modules scanned.
+- [ ] **Step 9: Live cases, owed.** On both systems, once restored: a mask that fills the
+  window is narrowed to completion; a class's local include and a program include are
+  scanned; a failing read appears in `failed`; the text-search key check.
+
+**Owner decision to flag, not decided here (DO11):** `time_budget_ms` and the tool's `timeout`
+field are deadlines inside the server, which the no-built-in-timeouts rule covers. The
+options:
+- (a) keep both, as named exceptions;
+- (b) remove both in favour of paging by `start_at` / `max_objects`, the call ending on its
+  result;
+- (c) keep only the consumer's abort (the MCP cancel), with neither field.
+
+The choice is the owner's. D23's steps do not touch either field until it is made.
+
 ### Defect-stage owner decisions (decided 2026-11-04)
 
 - **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
@@ -2537,6 +2641,9 @@ are `AdtUtils.getStructureElementInfo` / `getServiceDefinitionElementInfo`
 - **DO8:** the outline tool is `GetObjectOutline`.
 - **DO10 (#25):** `content_uri` comes from the object's version list and is read as given;
   the version tools' contracts do not change.
+- **DO11 (open, D23):** `SearchSource`'s `time_budget_ms` and `timeout` — keep as named
+  exceptions, remove in favour of `start_at` / `max_objects` paging, or keep only the
+  consumer's abort.
 - **DO9:** the prose guard recognises SAP-derived values by type and flow, with no allowlist;
   values that cross modules are left to review.
 

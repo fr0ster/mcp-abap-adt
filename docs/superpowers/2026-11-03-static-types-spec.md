@@ -454,6 +454,11 @@ on-premise system disagree, the live measurement holds.
   `version` (element info answers only the active structure, measured; an inactive structure
   is read through the source read with `version: inactive`); only
   `GetIncludesList`'s tree stays on a plain scanner (D22).
+- **SearchSource rework (owner, 2026-11-07, plan D23):** masks resolved completely or
+  named as incomplete; every source-bearing object SAP lists is scanned through the existing
+  readers; no `VIEW*` name skip; no object dropped silently; SAP's text search first when
+  offered, decided by its key; one read per source; a functional description. Live parts
+  are owed. `time_budget_ms` / `timeout` is an open owner decision.
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`

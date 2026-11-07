@@ -94,8 +94,8 @@ const segmentAfter = (path: string, marker: string): string => {
   return decodeURIComponent(end < 0 ? rest : rest.slice(0, end)).toUpperCase();
 };
 
-/** The key of any request the scan makes. */
-export function keyOf(url: string, params?: unknown): string {
+/** A request's query parameters: its URL's, then `params`. */
+function searchParamsOf(url: string, params?: unknown): URLSearchParams {
   const parsed = new URL(url, 'https://system.invalid');
   const query = new URLSearchParams(parsed.search);
   for (const [k, v] of Object.entries(
@@ -103,7 +103,34 @@ export function keyOf(url: string, params?: unknown): string {
   )) {
     query.set(k, String(v));
   }
-  const path = parsed.pathname;
+  return query;
+}
+
+/** Every quick search a fake received, as `[query, maxResults]`, in order (envelopes first). */
+export function searchesOf(fake: {
+  envelopes: SeenEnvelope[];
+  directs: IAbapRequestOptions[];
+}): Array<[string, number]> {
+  const urls: Array<{ url: string; params?: unknown }> = [
+    ...fake.envelopes.flatMap((e) => e.parts.map((p) => ({ url: p.url }))),
+    ...fake.directs.map((r) => ({ url: r.url, params: r.params })),
+  ];
+  return urls
+    .filter(({ url }) =>
+      new URL(url, 'https://system.invalid').pathname.endsWith(
+        '/informationsystem/search',
+      ),
+    )
+    .map(({ url, params }) => {
+      const query = searchParamsOf(url, params);
+      return [query.get('query') ?? '', Number(query.get('maxResults'))];
+    });
+}
+
+/** The key of any request the scan makes. */
+export function keyOf(url: string, params?: unknown): string {
+  const query = searchParamsOf(url, params);
+  const path = new URL(url, 'https://system.invalid').pathname;
   if (path.endsWith('/repository/nodestructure')) {
     return nodeKey(query.get('parent_name') ?? '', query.get('node_id'));
   }
@@ -150,7 +177,7 @@ export function keyOf(url: string, params?: unknown): string {
 }
 
 export interface Model {
-  /** Requests answered with this status instead (a key of `keyOf`). */
+  /** Requests answered with this status instead (a key of `keyOf`; a quick search's round also as `SEARCH <mask>@<maxResults>`). */
   refuse?: Record<string, number>;
   /** Requests answered with this status and body instead (a key of `keyOf`). */
   refuseWith?: Record<string, { status: number; body: string }>;
@@ -165,7 +192,11 @@ function answerOf(
   params?: unknown,
 ): PartAnswer {
   const key = keyOf(url, params);
-  const refused = model.refuse?.[key];
+  // A quick search is also refused by its round: `SEARCH <mask>@<maxResults>`.
+  const round = key.startsWith('SEARCH ')
+    ? `${key}@${searchParamsOf(url, params).get('maxResults')}`
+    : key;
+  const refused = model.refuse?.[round] ?? model.refuse?.[key];
   if (refused !== undefined) {
     return { status: refused, statusText: 'Refused', body: '' };
   }
@@ -182,11 +213,17 @@ function answerOf(
   const text = { 'content-type': 'text/plain' };
   if (key.startsWith('SEARCH ')) {
     const mask = key.slice('SEARCH '.length);
+    // The quick search answers the first `maxResults` packages by name, with
+    // no "more" marker (measured).
+    const limit = Number(searchParamsOf(url, params).get('maxResults'));
+    const found = repo.masks[mask] ?? [];
     return {
       status: 200,
       statusText: 'OK',
       headers: xml,
-      body: searchXml(repo.masks[mask] ?? []),
+      body: searchXml(
+        Number.isInteger(limit) && limit > 0 ? found.slice(0, limit) : found,
+      ),
     };
   }
   if (key.startsWith('STRUCTURE ')) {

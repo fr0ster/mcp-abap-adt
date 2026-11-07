@@ -365,10 +365,10 @@ describe('SearchSource: no object is lost silently', () => {
 
 describe('SearchSource: the failure contract', () => {
   it.each(PATHS)(
-    'a package mask SAP refuses is an OperationFailure; the other packages are scanned (%s)',
+    'a mask whose quick search SAP refuses is skipped: no entry; the other packages are scanned (%s)',
     async (batch) => {
       const { result } = searchOne(
-        { refuse: { 'SEARCH ZO*': 500 } },
+        { refuseWith: { 'SEARCH ZO*': { status: 404, body: NOT_FOUND_BODY } } },
         batch === 'absent',
         { packages: ['ZO*', 'ZTWO'], object_types: ['PROG'] },
       );
@@ -376,14 +376,8 @@ describe('SearchSource: the failure contract', () => {
       expect(
         payload.results.map((h: { object_name: string }) => h.object_name),
       ).toEqual(['ZTWOP']);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'operation',
-        step: 'resolve package mask',
-        mask: 'ZO*',
-      });
-      expect(payload.failures[0].object_name).toBeUndefined();
-      expect(payload.failures[0].error.status).toBe(500);
+      expect(payload.failures).toBeUndefined();
+      expect(payload.scanned.packages).toBe(1);
     },
   );
 
@@ -527,25 +521,6 @@ describe('SearchSource: every scope it did not read is named (review round 1)', 
         step: 'walk package',
         package: 'ZPAR',
         failed_level: { package: 'ZKID' },
-        t100: { id: 'SADT_RESOURCE', no: '002' },
-      });
-    },
-  );
-
-  it.each(PATHS)(
-    "a package mask SAP refuses carries SAP's key (%s)",
-    async (batch) => {
-      const { result } = searchOne(
-        { refuseWith: { 'SEARCH ZO*': keyed404 } },
-        batch === 'absent',
-        { packages: ['ZO*', 'ZTWO'], object_types: ['PROG'] },
-      );
-      const payload = payloadOf(await result);
-      expect(payload.failures).toHaveLength(1);
-      expect(payload.failures[0]).toMatchObject({
-        kind: 'operation',
-        step: 'resolve package mask',
-        mask: 'ZO*',
         t100: { id: 'SADT_RESOURCE', no: '002' },
       });
     },

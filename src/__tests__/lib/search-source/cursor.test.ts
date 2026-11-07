@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { TOOL_DEFINITION } from '../../../handlers/system/readonly/handleSearchSource';
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
   type OrchestratorDeps,
   type OrchestratorInput,
@@ -34,6 +35,7 @@ const deps = (items: PackageContentItem[] = ITEMS): OrchestratorDeps => ({
       return { ok: true, value: [] };
     },
   },
+  lineMatch: substringLineMatch,
   resolvePackages: async (entries) => ({ packages: entries, failures: [] }),
 });
 

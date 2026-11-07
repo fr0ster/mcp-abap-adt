@@ -1,20 +1,11 @@
-export interface ScanInput {
-  query: string;
-  query2?: string;
-  exclude?: string[];
-  exclude_comments?: boolean;
-  max_hits: number;
-}
+import type {
+  LineMatchStrategy,
+  ScanHit,
+  ScanInput,
+  ScanResult,
+} from './lineMatch';
 
-export interface ScanHit {
-  line: number;
-  snippet: string;
-}
-
-export interface ScanResult {
-  hits: ScanHit[];
-  capped: boolean;
-}
+export type { ScanHit, ScanInput, ScanResult } from './lineMatch';
 
 const SNIPPET_MAX = 255;
 
@@ -71,3 +62,11 @@ export function scanLines(
 
   return { hits, capped };
 }
+
+/**
+ * The shipped line match: a case-insensitive substring per line — `query`,
+ * and `query2` on the same line when given; a line holding an `exclude`
+ * entry is dropped; with `exclude_comments`, col-1 `*` and full-line `"`
+ * comment lines are skipped; a snippet is cut at 255 characters.
+ */
+export const substringLineMatch: LineMatchStrategy = { match: scanLines };

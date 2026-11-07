@@ -15,6 +15,7 @@ import { handleGetPackageContents } from '../../handlers/package/readonly/handle
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import {
   createSourceReaderDeps,
@@ -462,6 +463,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
           },
           readStructure: async () => ({ ok: true, value: [] }),
         },
+        lineMatch: substringLineMatch,
         resolvePackages: exactPackages,
       },
       {
@@ -494,6 +496,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
           },
           readStructure: async () => ({ ok: true, value: [] }),
         },
+        lineMatch: substringLineMatch,
         resolvePackages: exactPackages,
       },
       { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
@@ -633,6 +636,7 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
         fetchPackageContents: async () =>
           [target('ZA'), target('ZB'), target('ZC')] as never,
         sourceReader,
+        lineMatch: substringLineMatch,
         resolvePackages: exactPackages,
       },
       {
@@ -669,6 +673,7 @@ describe('SearchSource: a refused object is its own answer, the scan goes on', (
           readSource: async () => ({ ok: true, value: 'marker' }),
           readStructure: async () => ({ ok: true, value: [] }),
         },
+        lineMatch: substringLineMatch,
         resolvePackages: exactPackages,
       },
       { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },

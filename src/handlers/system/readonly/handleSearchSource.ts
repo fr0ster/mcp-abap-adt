@@ -5,6 +5,7 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
   type OrchestratorInput,
   runSearchSourceWithContext,
@@ -121,6 +122,7 @@ export async function handleSearchSource(
     const result = await runSearchSourceWithContext(
       context,
       isRfcConnection(context.connection) ? { ...args, concurrency: 1 } : args,
+      substringLineMatch,
     );
     return {
       isError: false,

@@ -18,7 +18,7 @@ import {
   type ScanFailure,
   type SourceFailure,
 } from './failures';
-import { scanLines } from './lineScanner';
+import type { LineMatchStrategy } from './lineMatch';
 import {
   createPackageContentsFetcher,
   type EnumerateInput,
@@ -101,6 +101,8 @@ export interface OrchestratorResult {
 }
 
 export interface OrchestratorDeps {
+  /** Which lines of a source are hits: required, the orchestrator has no match of its own. */
+  lineMatch: LineMatchStrategy;
   fetchPackageContents: PackageContentsFetcher;
   sourceReader: ReadSourceUnitsDeps;
   resolvePackages: (entries: string[]) => Promise<ResolvedPackages>;
@@ -261,7 +263,7 @@ export async function runSearchSource(
         const remaining = maxHits - totalForTarget;
         if (remaining <= 0) {
           if (capHitForTarget) continue;
-          const probe = scanLines(unit.lines, {
+          const probe = deps.lineMatch.match(unit.lines, {
             query: input.query,
             query2: input.query2,
             exclude: input.exclude,
@@ -271,7 +273,7 @@ export async function runSearchSource(
           if (probe.hits.length > 0) capHitForTarget = true;
           continue;
         }
-        const scan = scanLines(unit.lines, {
+        const scan = deps.lineMatch.match(unit.lines, {
           query: input.query,
           query2: input.query2,
           exclude: input.exclude,
@@ -305,10 +307,7 @@ export async function runSearchSource(
 
   const allHits: SearchHit[] = [];
   const noHits: NoHitEntry[] = [];
-  const failures: ScanFailure[] = [
-    ...resolution.failures,
-    ...enumerated.failures,
-  ];
+  const failures: ScanFailure[] = [...enumerated.failures];
   let sourcesScanned = 0;
   let truncatedByObjectCap = false;
   answers.forEach((answer, index) => {
@@ -395,24 +394,28 @@ function endOnCredential(answers: Iterable<PhaseResult<unknown>>): void {
 async function runSearchSourceInPhases(
   ctx: HandlerContext,
   input: OrchestratorInput,
+  lineMatch: LineMatchStrategy,
 ): Promise<OrchestratorResult> {
   checkInput(input);
   const maxObjects = input.max_objects ?? DEFAULTS.max_objects;
   const startAt = input.start_at ?? 0;
   const version = input.version ?? DEFAULTS.version;
-  // (1) The quickSearch of every package mask.
+  // (1) The quickSearch of every package mask, a phase per round: each run
+  // of the resolver names the next round of every mask not resolved yet; the
+  // phases repeat until a run asks nothing — every mask resolved or refused.
   const searches = new Map<string, PhaseResult<string[]>>();
-  const askedSearches: SearchObjectsArgs[] = [];
-  const resolverDeps: PackageResolverDeps = {
-    searchObjects: answeredSearch(searches, askedSearches),
-  };
-  await resolvePackagePatterns(resolverDeps, input.packages);
-  if (askedSearches.length > 0) {
+  let resolution: ResolvedPackages;
+  for (;;) {
+    const askedSearches: SearchObjectsArgs[] = [];
+    resolution = await resolvePackagePatterns(
+      { searchObjects: answeredSearch(searches, askedSearches) },
+      input.packages,
+    );
+    if (askedSearches.length === 0) break;
     const answered = await searchPackagesInPhase(ctx, askedSearches);
     endOnCredential(answered.values());
     for (const [key, answer] of answered) searches.set(key, answer);
   }
-  const resolution = await resolvePackagePatterns(resolverDeps, input.packages);
   const resolved = resolution.packages;
 
   // (2) The package walk's levels.
@@ -491,6 +494,7 @@ async function runSearchSourceInPhases(
   // The scan, over the phases' answers: the sequential version's own.
   return runSearchSource(
     {
+      lineMatch,
       fetchPackageContents,
       sourceReader: answeredReaderDeps(sources, []),
       resolvePackages: async () => resolution,
@@ -508,15 +512,17 @@ async function runSearchSourceInPhases(
 export function runSearchSourceWithContext(
   ctx: HandlerContext,
   input: OrchestratorInput,
+  lineMatch: LineMatchStrategy,
 ): Promise<OrchestratorResult> {
   return withSequentialFallback(
     ctx,
-    () => runSearchSourceInPhases(ctx, input),
+    () => runSearchSourceInPhases(ctx, input, lineMatch),
     () => {
       const searchObjects = createPackagePatternResolver(ctx);
       const resolverDeps: PackageResolverDeps = { searchObjects };
       return runSearchSource(
         {
+          lineMatch,
           fetchPackageContents: createPackageContentsFetcher(ctx),
           sourceReader: readingOnce(createSourceReaderDeps(ctx)),
           resolvePackages: (entries) =>

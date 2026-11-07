@@ -19,6 +19,7 @@ import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonl
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
+import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
 import {
@@ -141,6 +142,7 @@ describe('SearchSource: a source read through adt-clients rejects with AuthRefus
         fetchPackageContents: async () =>
           [target('ZA'), target('ZB'), target('ZC')] as never,
         sourceReader: createSourceReaderDeps(context as any),
+        lineMatch: substringLineMatch,
         resolvePackages: async (entries) => ({
           packages: entries,
           failures: [],

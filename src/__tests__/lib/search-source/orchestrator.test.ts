@@ -1,3 +1,4 @@
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
   type OrchestratorDeps,
   type OrchestratorInput,
@@ -46,6 +47,7 @@ describe('runSearchSource', () => {
         'PROG:ZA_PROG': 'marker top',
         'CLAS:ZA_CLAS': 'a\nb\nmarker mid',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, baseInput);
@@ -67,6 +69,7 @@ describe('runSearchSource', () => {
       sourceReader: sourceFor({
         'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3\nmarker 4\nmarker 5',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -86,6 +89,7 @@ describe('runSearchSource', () => {
       sourceReader: sourceFor({
         'PROG:Z_PROG': 'marker 1\nno match\nstill no match',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -106,6 +110,7 @@ describe('runSearchSource', () => {
         'FM:Z_FG/Z_FM_A': 'marker 1',
         'FM:Z_FG/Z_FM_B': 'marker 2',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -128,6 +133,7 @@ describe('runSearchSource', () => {
         'PROG:Z_P2': 'marker',
         'PROG:Z_P3': 'marker',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -149,6 +155,7 @@ describe('runSearchSource', () => {
         'PROG:Z_HIT': 'marker line',
         'PROG:Z_MISS': 'nothing here',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, {
@@ -173,6 +180,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
         'PROG:ZA_PROG': 'marker',
         'PROG:ZB_PROG': 'marker',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: async () => ({ packages: ['ZA', 'ZB'], failures: [] }),
     };
     const result = await runSearchSource(deps, {
@@ -188,6 +196,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
         throw new Error('must not enumerate when resolved set is empty');
       },
       sourceReader: sourceFor({}),
+      lineMatch: substringLineMatch,
       resolvePackages: async () => ({ packages: [], failures: [] }),
     };
     const result = await runSearchSource(deps, {
@@ -210,6 +219,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
         return [];
       },
       sourceReader: sourceFor({}),
+      lineMatch: substringLineMatch,
       resolvePackages: async (entries) => {
         const seen = new Set<string>();
         const out: string[] = [];
@@ -241,6 +251,7 @@ describe('runSearchSource — default max_hits_per_object=100 (Fix B)', () => {
       sourceReader: sourceFor({
         'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3',
       }),
+      lineMatch: substringLineMatch,
       resolvePackages: identityResolver,
     };
     // Do NOT pass max_hits_per_object — rely on default (100)

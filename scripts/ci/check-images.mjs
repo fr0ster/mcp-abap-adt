@@ -258,8 +258,14 @@ const callOf = (variant) => ({
   id: 3,
   method: 'tools/call',
   params: variant.startsWith('compact')
-    ? { name: 'HandlerSearch', arguments: { query: 'ZIMAGE_CHECK*' } }
-    : { name: 'SearchObject', arguments: { object_name: 'ZIMAGE_CHECK*' } },
+    ? {
+        name: 'HandlerSearch',
+        arguments: { query: 'ZIMAGE_CHECK*', background: false },
+      }
+    : {
+        name: 'SearchObject',
+        arguments: { object_name: 'ZIMAGE_CHECK*', background: false },
+      },
 });
 const USER = 'IMAGE_CHECK';
 const PASSWORD = 'image-check-password';

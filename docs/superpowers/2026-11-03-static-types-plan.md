@@ -3518,9 +3518,16 @@ Step 4 names.
       the packages `SearchObject` over `DEVC` names for that mask, read first with
       `livePrepare`; (a′) for a tree search (`include_subpackages: true`, e.g. the ABAP Cloud
       known-hit case in the configured build package), every hit's `devclass` is the named
-      package or one of its descendants, the tree read first with `livePrepare`
-      (`GetPackageTree`, or `GetPackageContents` with subpackages — whichever the read tools
-      offer for the package's subpackage names); (b) every hit is real — its line, read back with the
+      package or one of its descendants. The oracle is read first with
+      `livePrepare('GetPackageContents', { package_name: <the named package>,
+      include_subpackages: true })` — its walker has no depth limit and answers a flat list
+      whose package entries carry `isPackage: true` (`src/lib/strategies/packageWalk.ts`) —
+      and is the names of those package entries plus the root; not `GetPackageTree`, whose
+      default depth is 5. **Fixture prerequisite:** the ABAP Cloud known-hit case needs the
+      shared package (the hit's package) to be a descendant of the configured build package;
+      before the search the case requires the prepared oracle to contain it, and when the
+      configured packages are unrelated it **skips with that reason** (as `liveSuite`'s other
+      prerequisites skip) — it never fails falsely and never guesses another package; (b) every hit is real — its line, read back with the
       hit object's own read tool (`GetFunctionModule` for a `FUGR/FF` hit with its
       `function_group_name`, `GetFunctionInclude` / `GetInclude`, `GetClass` and the local
       includes, `GetProgram`, `GetInterface`, the CDS / BDEF / DDLX / SRVD reads — through

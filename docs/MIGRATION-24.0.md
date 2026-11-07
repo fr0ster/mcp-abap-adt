@@ -342,6 +342,13 @@ its own, logged off after SAP's answer.
   background runs: they hand out the long tools without `background`, as they hand out the run
   tools. To serve long reads in the background, register the groups on a server instance with a
   strategy and the background-run tools (`BackgroundRunHandlersGroup`), as the binaries do.
+- **The readonly exposition serves the background-run tools.** `expositionGroups` /
+  `registryForExposition` with `readonly` (and no `high`) now include `GetBackgroundRun`,
+  `ListBackgroundRuns` and `DiscardBackgroundRun`, as `high` did beside the run tools; an
+  `EmbeddableMcpServer` given `backgroundRuns` adds them to its default registry for every
+  exposition (`readonly`, `search`, `high`) that has no `system`. Its long tools then list
+  `background` and run in the background, as in the `-ro` binaries; its runs are reads alone.
+  Without a strategy the server adds none, and its long tools answer in the call.
 - **Removed from `@mcp-abap-adt/lib`'s modules:** `TIMEOUT_FIELD`, `timeoutField`,
   `TIMEOUT_DESCRIPTION`, `timedOutAnswer`, `timedOutWords`, `TimedOutAnswer`, `readTimeout`,
   `withoutTimeout`, `TIMEOUT_INVALID_WORDS`, `TIMEOUT_NOT_FOR_RUN_WORDS`, `MAX_TIMEOUT_SECONDS`,

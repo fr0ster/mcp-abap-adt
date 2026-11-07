@@ -132,12 +132,14 @@ function answerOf(raw: unknown): Answer {
 /** An MCP client on `server`. */
 export async function clientOf(server: BaseMcpServer): Promise<{
   call: Caller['call'];
+  list: () => ReturnType<Client['listTools']>;
   close: () => Promise<void>;
 }> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'background', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
   return {
+    list: () => client.listTools(),
     call: async (name, args = {}) =>
       answerOf(
         await client.callTool({ name, arguments: args }, undefined, {

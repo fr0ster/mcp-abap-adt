@@ -210,6 +210,13 @@ describe('a group registered on its own (no server instance, no strategy)', () =
   });
 });
 
+/** A connection the listing never uses: nothing is called on it. */
+const unconnected = () =>
+  createAbapConnection(
+    { url: 'http://127.0.0.1:9', client: '100', authType: 'basic' },
+    new BasicAuthProvider('LIST_USER', 'list-password'),
+  );
+
 describe('where the background-run tools are served: beside the run tools and the long reads', () => {
   const FULL = [
     'GetBackgroundRun',
@@ -225,16 +232,80 @@ describe('where the background-run tools are served: beside the run tools and th
     groups: { getHandlers(): { toolDefinition: { name: string } }[] }[],
   ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
-  it.each<[HandlerSet[], boolean]>([
-    [['readonly'], false],
+  it.each<[HandlerSet[], boolean, boolean]>([
+    [['readonly'], true, false],
+    [['readonly', 'high'], true, true],
+    [['readonly', 'debug'], true, false],
+    [['high'], true, true],
+    [['debug'], false, false],
+  ])(
+    'full %j: background-run tools served %s (beside the long reads or the run tools), RuntimeRunClass %s',
+    (exposition, served, runs) => {
+      const tools = namesOf(
+        registryForExposition(exposition).getHandlerGroups(),
+      );
+      expect(tools.includes('RuntimeRunClass')).toBe(runs);
+      for (const name of FULL) expect(tools.includes(name)).toBe(served);
+      expect(tools.filter((name) => FULL.includes(name))).toHaveLength(
+        served ? 3 : 0,
+      );
+    },
+  );
+
+  it.each<[('readonly' | 'high' | 'system' | 'search')[], boolean]>([
+    [['readonly'], true],
+    [['search'], true],
     [['readonly', 'high'], true],
-    [['readonly', 'debug'], false],
-    [['high'], true],
-    [['debug'], false],
-  ])('full %j: served %s, as RuntimeRunClass is', (exposition, served) => {
-    const tools = namesOf(registryForExposition(exposition).getHandlerGroups());
-    expect(tools.includes('RuntimeRunClass')).toBe(served);
-    for (const name of FULL) expect(tools.includes(name)).toBe(served);
+    [['system'], true],
+  ])(
+    'an EmbeddableMcpServer of exposition %j with a strategy serves the background-run tools (%s), and its long tools list background',
+    async (exposition, served) => {
+      const server = new EmbeddableMcpServer({
+        connection: unconnected(),
+        exposition,
+        systemType: 'onprem',
+        logger: silent,
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      });
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.list();
+        const names = tools.map((t) => t.name);
+        for (const name of FULL) expect(names.includes(name)).toBe(served);
+        const long = tools.filter((t) => LONG_TOOLS.includes(t.name));
+        expect(long.length).toBeGreaterThan(0);
+        for (const tool of long) {
+          expect({
+            tool: tool.name,
+            background: Object.keys(tool.inputSchema.properties ?? {}).includes(
+              'background',
+            ),
+          }).toEqual({ tool: tool.name, background: true });
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it('an EmbeddableMcpServer of exposition readonly without a strategy serves no background-run tool, and its long tools answer in the call', async () => {
+    const server = new EmbeddableMcpServer({
+      connection: unconnected(),
+      exposition: ['readonly'],
+      systemType: 'onprem',
+      logger: silent,
+    });
+    const client = await clientOf(server);
+    try {
+      const { tools } = await client.list();
+      expect(tools.filter((t) => FULL.includes(t.name))).toEqual([]);
+      const contents = tools.find((t) => t.name === 'GetTableContents');
+      expect(Object.keys(contents?.inputSchema.properties ?? {})).not.toContain(
+        'background',
+      );
+    } finally {
+      await client.close();
+    }
   });
 
   // The binary fixes its set: the four kinds of binary.

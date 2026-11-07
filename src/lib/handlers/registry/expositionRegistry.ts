@@ -33,7 +33,7 @@ export function noConnectionContext(): HandlerContext {
  * The groups for `exposition`, built against `baseContext`: the non-readonly
  * groups first, so their tool names feed the readonly dedup (a readonly
  * copy of a tool they serve under the same name is withheld), then the readonly and system groups (with the
- * background-run tools beside the run tools), the others, search, and the
+ * background-run tools beside the run tools, or beside the long reads of `readonly` alone), the others, search, and the
  * leftover-session tools — in registration order.
  */
 export function expositionGroups(
@@ -68,6 +68,10 @@ export function expositionGroups(
     // none of them; beside them, their background runs, read, listed and
     // discarded.
     handlerGroups.push(new RuntimeRunHandlersGroup(baseContext));
+    handlerGroups.push(new BackgroundRunHandlersGroup(baseContext));
+  } else if (exposition.includes('readonly')) {
+    // The long reads run in the background by default (the owner, D24):
+    // their background runs, read, listed and cancelled — reads alone.
     handlerGroups.push(new BackgroundRunHandlersGroup(baseContext));
   }
   handlerGroups.push(...overridingGroups);

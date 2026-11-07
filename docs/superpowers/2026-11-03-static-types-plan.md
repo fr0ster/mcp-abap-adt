@@ -3171,6 +3171,80 @@ Step 4 names.
   `src/__tests__/unit/batch/packageWalks.test.ts` and
   `src/__tests__/unit/packageWalkBranchRule.test.ts` (the walker's place), the helpers
   `src/__tests__/helpers/sourceReaderFake.ts` and `src/__tests__/helpers/searchSourceStand.ts`.
+- [ ] **Step 4e2: The SAP-answer strategy is the consumer's (DO22, owner).** Amends Step 4e:
+  the strategy decides only on **SAP answers**, and the consumer supplies it.
+  - **What reaches the strategy.** The server applies Step 4e's fixed rules first, and none of
+    them reaches the consumer: a credential or `failureOf` refusal always ends the call; an
+    envelope failure (not the outer `404`, which falls back) is always thrown; anything that
+    is not a SAP answer — no `response` and not `origin: 'refusal'` (no answer: host,
+    network, DNS), a library defect, our defect, a primitive — is always thrown. Only a SAP
+    answer (a `response` with an integer status, whatever its `origin`, or an `IAdtError` of
+    `origin: 'refusal'`) goes to the strategy, with its place (`'mask'`, `'package'`,
+    `'level'`, `'structure'`, `'source'`; `'envelope'` never reaches it), and the strategy
+    answers `'skip' | 'end' | 'throw'`. The shipped strategy answers `'skip'` for every SAP
+    answer.
+  - **The contract is exported.** The strategy's interface, its place union and its answer
+    union (typed, closed), and the shipped strategy, are exported from
+    `@mcp-abap-adt/lib/embeddable` (`src/embeddable/index.ts`), where `IBackgroundRuns` is
+    exported today. The line-match strategy stays internal (DO22, open).
+  - **How it reaches `SearchSource`'s handler — the `backgroundRuns` path, followed:**
+    - `EmbeddableMcpServer`'s options (`src/embeddable/EmbeddableMcpServer.ts`, beside
+      `backgroundRuns?: IBackgroundRuns`) gain the strategy; the constructor hands it to
+      `BaseMcpServer`'s options (as it hands `backgroundRuns`, `options.backgroundRuns` →
+      `this.backgroundRuns`);
+    - `BaseMcpServer` puts it into every `HandlerContext` it builds — the dispatch context
+      (`registerHandlers`' call, around the `const context: HandlerContext = {` that builds
+      `connection`, `batchAvailability`, `heldLocks`, …), the batch-mode recorded context
+      (`recordedContext`) and the run tools' context — as a new `HandlerContext` field
+      (`src/handlers/interfaces.ts`), kept in every context derived from those (a long call's
+      own connection, a background run's), as `batchAvailability` is;
+    - `handleSearchSource.ts` reads it from the context and passes it to the orchestrator.
+    - **The binaries' launchers pass the shipped one**: `server-runtime/src/stdio/launcher.ts`,
+      `server-runtime/src/http/launcher.ts` (through `StreamableHttpServer`'s options, as it
+      passes `backgroundRuns` to each per-request server) and the SSE launcher
+      (`SseServer`'s session servers).
+    - **Where no host supplies one** — found in the code: `HandlerExporter`'s entries run with
+      the context the embedder passes to `entry.call(context, args)` (`wrapEntry` passes it
+      unchanged; the exporter states `systemType`, `systemContextResolver` and
+      `systemContextRules` through `inStatedScope`, not the context, and its own context is a
+      dummy for group construction); a group registered on a plain `McpServer`
+      (`BaseHandlerGroup.registerHandlers`) runs with the group's constructor context. Neither
+      carries the strategy unless its host puts it there. The plan: such a context gets the
+      shipped one where the handler reads it (`context.<field> ?? shipped`, in
+      `handleSearchSource.ts`, the one place the default lives — the orchestrator still takes
+      it explicitly), and `HandlerExporter` takes it as an option and adds it to the context it
+      passes (`wrapEntry`) when the embedder's context has none. *This placement of the default
+      is the plan's reading, put to the owner with this step.*
+  - **`EmbeddableMcpServer` without the option:** the server supplies the shipped one in the
+    context (absent = the shipped strategy, as above); an embedder that passes its own gets
+    its own on every path.
+
+  Red tests first:
+  - `'a consumer strategy passed to EmbeddableMcpServer is asked for a SAP answer at each
+    place, and its answer obeyed'`: an `EmbeddableMcpServer` with a recording strategy and a
+    stand-in connection; a SAP `500` at a mask, a package root, a level, a structure and a
+    source — each asked once with its place; `'skip'`, `'end'` and `'throw'` each obeyed (on
+    both paths, sequential and batched);
+  - `'the consumer strategy is never asked for'` a `TypeError` (thrown), a no-response failure
+    (thrown), a credential refusal (the call ends) or an envelope failure (thrown) — the
+    recording strategy records no call;
+  - `'a launcher-built server uses the shipped one'`: a server the stdio launcher builds (and
+    the HTTP launcher's per-request server) skips a SAP `500` at a source read;
+  - `'a HandlerExporter entry and a plain-group registration use the shipped one'` when their
+    context carries none, and the exporter's option when given;
+  - `'the contract is exported'`: a type test importing the interface, the place and answer
+    unions and the shipped strategy from `@mcp-abap-adt/lib/embeddable`.
+
+  Docs: `docs/architecture/HANDLER_EXPORTER.md` and the embedding docs
+  (`src/embeddable/docs/ARCHITECTURE.md`, the embedding section of `docs/architecture/`)
+  describe the option and what reaches the strategy; MIGRATION-24.0 for embedders: the new
+  optional strategy, the shipped default, and that only SAP answers reach it; CHANGELOG
+  (24.0.0) Added — the `SearchSource` SAP-answer strategy option on `EmbeddableMcpServer` and
+  `HandlerExporter`, its exported contract and the shipped strategy.
+
+  Affected suites: Step 4e's, plus the embeddable suites that build an
+  `EmbeddableMcpServer` or a launcher server for `SearchSource`, the `HandlerExporter`
+  suites, and the type tests of `@mcp-abap-adt/lib/embeddable`'s exports.
 - [ ] **Step 4f: The caller sets how much the answer holds (DO23).** Three optional controls;
   with none given the answer is exactly Steps 4–4e's (every hit with its line number and
   snippet).
@@ -3296,10 +3370,10 @@ Step 4 names.
     `run_handle` with `GetBackgroundRun`, or end it with `DiscardBackgroundRun`; the section's
     "page it with `max_objects` … `next_start_at`" text is rewritten (24.0.0 is unreleased);
     `max_hits_per_object` limits each object only when given (it was 100 by default);
-    no embedder line: the orchestrator (`src/lib/search-source/`) is not in any entry of the
-    package's `exports` (checked: `.`, `./handlers`, `./handlers/read`, `./embeddable`, …), so
-    the line-match and read-failure strategies are internal; a caller of `SearchSource` sees
-    only that a server defect while reading is an error, not a skip (DO22).
+    the orchestrator (`src/lib/search-source/`) is not in any entry of the package's
+    `exports`, so the line-match strategy stays internal; the SAP-answer strategy is the
+    embedder's option (Step 4e2), and a caller of `SearchSource` sees that a server defect
+    while reading is an error, not a skip (DO22).
 - [ ] **Step 7: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
   live-run safety:
   - on premise: a mask with `*` (several, and one matching zero characters), a mask with `?`,
@@ -4039,6 +4113,14 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   it, before adt-clients' conversion builds the parts' answers (place `'envelope'`); an
   answered failure is normalised to a carried one (`thrownOf`, `carryingFailure`) before the
   rule, so an answered `401` ends the call.
+  **The strategy is the consumer's (owner, 2026-11-07, Step 4e2):** "SAP's error rule — the
+  consumer's strategy decides". It sees only SAP answers with their place and answers skip |
+  end | throw; defects, no-answer failures, credential / `failureOf` refusals and envelope
+  failures never reach it. The embedder passes it in `EmbeddableMcpServer`'s options, carried
+  to `SearchSource` in the handler context like `backgroundRuns`; the binaries' launchers pass
+  the shipped one (skip); its contract and the shipped strategy are exported from
+  `@mcp-abap-adt/lib/embeddable`. **Open:** whether the line-match strategy is the consumer's
+  too (it stays internal until the owner decides).
 - **DO23 (2026-11-07, D23b Step 4f):** the caller sets how much the answer holds, with three
   optional controls; with none, the answer is every hit with line and snippet. `answer`:
   `'objects'` (each object and include with hits, `function_group_name` for `FUGR/FF`, and the

@@ -523,6 +523,17 @@ on-premise system disagree, the live measurement holds.
     failure is decided in the phase, before the client builds the parts' answers from it, so
     no part of a failed envelope is skipped as its own; an answered failure is normalised to
     a carried one first, so an answered `401` ends the call.
+  - **The SAP-answer strategy is the consumer's (owner, DO22).** Only SAP answers (a
+    `response` with an integer status, or `origin: 'refusal'`) reach it, with their place
+    (mask, package, level, structure, source); it answers skip, end the call or throw. Library
+    and server defects and no-answer failures are always thrown, credential and server
+    refusals always end the call, and envelope failures are always thrown — none reaches the
+    consumer. The embedder passes it in `EmbeddableMcpServer`'s options, carried to the
+    handler in its context like `backgroundRuns`; the binaries' launchers pass the shipped one
+    (skip); a context no host fills (a `HandlerExporter` entry's, a plain group's) gets the
+    shipped one. Its contract and the shipped strategy are exported from
+    `@mcp-abap-adt/lib/embeddable`. Whether the line-match strategy is the consumer's too is
+    open.
   - **The caller sets how much the answer holds (owner, DO23).** Three optional controls; with
     none, every hit with line and snippet. `answer`: `objects` (each object and include with
     hits, `function_group_name` for a `FUGR/FF` hit, and the number of hits answered),

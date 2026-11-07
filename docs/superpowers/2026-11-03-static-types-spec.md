@@ -499,16 +499,14 @@ on-premise system disagree, the live measurement holds.
     compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`; a hit in the group's
     own includes is the group's, with `include`. The counters count the group and each module
     apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another.
-  - **What a failed read leads to is a strategy (owner, DO22).** A failed source read, mask
-    search or package / level walk is handed, with its place, to a read-failure strategy the
-    orchestrator takes explicitly (no default inside it; the handler wires the shipped one),
-    which answers skip, end the call or throw. The shipped one skips a SAP refusal (a system
-    answer: an HTTP status or ADT exception) as DO17 / DO19 say, ends the call on a credential
-    refusal, and throws anything else — a defect of our own is never swallowed (today every
-    non-credential throw is skipped). The strategy is asked once per failed read, at the place it
-    arises (a mask, a package root, a walk level, a function-group structure read, a source
-    read); its decision travels unchanged through the outer layers, and a cached or replayed
-    read reuses it. Shapes are read by structure only (owner, closed and amended:
+  - **What a failed read leads to (owner, DO22).** A failed source read, mask search or
+    package / level walk goes first through a fixed classification in our code, once per
+    failed read, at the place it arises (a mask, a package root, a walk level, a
+    function-group structure read, a source read); its outcome travels unchanged through the
+    outer layers, and a cached or replayed read reuses it. Only a SAP answer goes on to the
+    SAP-answer strategy (the consumer's or the shipped one), which answers skip, end the call
+    or throw; the shipped one skips, as DO17 / DO19 say. A defect of our own is never
+    swallowed (today every non-credential throw is skipped). Shapes are read by structure only (owner, closed and amended:
     library defects are raised, SAP's answers go to the strategy): a failure is a SAP answer
     when it carries a `response` with an integer HTTP status, whatever its `origin` (answered,
     carried, or a raw transport failure), or is an `IAdtError` of `origin: 'refusal'`; a SAP
@@ -530,8 +528,11 @@ on-premise system disagree, the live measurement holds.
     refusals always end the call, and envelope failures are always thrown — none reaches the
     consumer. The embedder passes it in `EmbeddableMcpServer`'s options, carried to the
     handler in its context like `backgroundRuns`; the binaries' launchers pass the shipped one
-    (skip); a context no host fills (a `HandlerExporter` entry's, a plain group's) gets the
-    shipped one. Its contract and the shipped strategy are exported from
+    (skip). An absent option stays absent through the server and every context; the
+    handler's `?? shipped` is the one default, so a context no host fills (a `HandlerExporter`
+    entry's without its option, a plain group's, an optionless `EmbeddableMcpServer`'s) gets
+    the shipped one there. Which wins when an embedder's context field and the
+    `HandlerExporter` option are both present is open for the owner. Its contract and the shipped strategy are exported from
     `@mcp-abap-adt/lib/embeddable`. The line-match strategy is the consumer's the same way (owner,
     DO24): the same option path, the handler's default `substringLineMatch` (today's match),
     its contract and the shipped strategy exported from `@mcp-abap-adt/lib/embeddable`.

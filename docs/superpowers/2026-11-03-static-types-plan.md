@@ -3005,12 +3005,13 @@ Step 4 names.
   passes several layers: a walker's failure reaches the enumerator's catch, and a batched
   source answer is consumed twice — in discovery (`answeredReaderDeps` over the phases'
   answers, which rethrows a recorded `found.error`) and again in the final scan
-  (`runSearchSource` over `answeredReaderDeps(sources, [])`). From DO22 a **read-failure
-  strategy**, taken explicitly by the orchestrator like the line-match strategy (a required
-  member of `OrchestratorDeps`, no default inside the orchestrator; the handler wires the
-  shipped one), decides every failed read — **once**.
-  - **Places (a closed discriminated union on `kind`, from fields the code already has; the
-    `'envelope'` place is below):**
+  (`runSearchSource` over `answeredReaderDeps(sources, [])`). From DO22 every failed read
+  goes first through a **fixed classification in our code**, and only a **SAP answer** goes on
+  to the **SAP-answer strategy** — the consumer's or the shipped one (Step 4e2) — taken
+  explicitly by the orchestrator (a required member of `OrchestratorDeps`, no default inside
+  the orchestrator). Each failed read is classified, and a SAP answer decided, **once**.
+  - **Places (a closed discriminated union on `kind`, from fields the code already has) — the
+    places a SAP answer is handed to the strategy with:**
     - `'mask'` — the mask entry (`resolveMask`'s input);
     - `'package'` — the asked package (the walk's root, `walk.root`);
     - `'level'` — the asked package and the refused level: a subpackage name, or a type node
@@ -3020,17 +3021,20 @@ Step 4 names.
       names no source;
     - `'source'` — a source read: the object whose read sent it (`devclass`, `object_type`,
       `object_name`) and the source (`name`, `uri` from `sourceUriOf`, and the read's
-      `sourceReadKey`);
-    - `'envelope'` — a failed batch envelope of a `SearchSource` phase: the phase (mask
-      search, walk level, structure and source reads) and its items.
-  - **Answers (closed):** a string-literal union `'skip' | 'end' | 'throw'`. `'skip'` drops what
-    the place names (DO17, DO19); `'end'` ends the call with the failure as it came (the
-    credential path today); `'throw'` passes the value through unchanged. Each consulting site
+      `sourceReadKey`).
+
+    A failed batch envelope is no place: the classification decides it in the phase (below)
+    and it never reaches the strategy.
+  - **Outcomes (closed):** a string-literal union `'skip' | 'end' | 'throw'` — the strategy's
+    answer for a SAP answer, and the classification's fixed outcome for everything else.
+    `'skip'` drops what the place names (DO17, DO19); `'end'` ends the call with the failure
+    as it came (the credential path today); `'throw'` passes the value through unchanged. Each consulting site
     handles the answer in a `switch` with a `never` default; a type test pins both unions.
-  - **Asked once per failed read, where it arises; the decision travels unchanged.** The
-    strategy is consulted only at the place the read failed — the resolver for a mask, the
-    walker for a root or a level, the source reader for a structure or a source — and nowhere
-    else. Its decision is carried outward as decided, never re-asked:
+  - **Decided once per failed read, where it arises; the outcome travels unchanged.** The
+    classification runs, and for a SAP answer the strategy is consulted, only at the place the
+    read failed — the resolver for a mask, the walker for a root or a level, the source reader
+    for a structure or a source — and nowhere else. The outcome is carried outward as
+    decided, never re-classified or re-asked:
     - `'skip'` is applied at the place (the mask resolves to nothing, the branch or package
       yields nothing, the structure or source yields nothing); no outer layer sees a failure;
     - `'end'` and `'throw'` leave the place as a **decided** failure — the original value,
@@ -3041,15 +3045,15 @@ Step 4 names.
       have no catch of their own for read failures and let a decided failure pass; at the
       handler a carried primitive is unwrapped and thrown as it was. A `'throw'` is never
       turned into an outer `'skip'`, an `'end'` always ends the call.
-  - **Cached and replayed reads: once per read.** The batched path records the decision with
-    the answer: `readSourcesInPhase` (and the search and walk phases) consult the strategy
-    when a phase answer fails and store the decision beside the answer, keyed by
+  - **Cached and replayed reads: once per read.** The batched path records the outcome with
+    the answer: `readSourcesInPhase` (and the search and walk phases) classify a failed phase
+    answer (and, for a SAP answer, consult the strategy) and store the outcome beside it, keyed by
     `sourceReadKey` (by mask, by walk level); discovery and the final scan read the stored
     decision and act on it, never re-asking. D23a's one-read-per-source cache does the same
     on the sequential path: a source two objects name is decided once, at its first owner,
     and the second owner reuses the decision (a skipped shared source is skipped for both).
-  - **Answered failures are normalised before the rule.** Every place turns an answered
-    failure into a carried one before it consults the strategy, as the code does today:
+  - **Answered failures are normalised before the classification.** Every place turns an
+    answered failure into a carried one before it classifies it, as the code does today:
     `thrownOf` in `sourceReader.ts` (structure and source reads), `levelOf`'s
     `carryingFailure` in `packageWalk.ts` (roots and levels), the resolver's
     `carryingFailure` (`packageResolver.ts`, the mask search). This normalisation stays when
@@ -3065,23 +3069,24 @@ Step 4 names.
     `packageResolver.ts`). So the envelope's failure is decided **in the phase, before any
     part's answer is handed on**: `runPhase` reports a failed envelope as a typed outcome of
     the phase (beside today's outer-`404` path), the `SearchSource` phase callers
-    (`searchPackagesInPhase`, the walk-level phases, `readSourcesInPhase`) consult the
-    strategy once with the place `'envelope'` (the phase — mask search, walk level, structure
-    and source reads — and its items), and the parts of a failed envelope never reach the
-    per-read rule. The other `runPhase` users keep today's behaviour (the outcome is read only
-    by the callers that ask for it). The outer `404` of `isNoBatchEndpoint` stays no failure:
-    `withSequentialFallback` reads the same parts sequentially and the strategy is not
-    consulted. The place union gains `'envelope'`.
-  - **The shipped strategy's rule (owner, DO22 — closed), read by structure only, never by
-    message words, in this precedence:**
+    (`searchPackagesInPhase`, the walk-level phases, `readSourcesInPhase`) classify it once —
+    a credential or `failureOf` refusal as the envelope's error ends the call, any other
+    envelope failure is thrown — and the parts of a failed envelope never reach the per-read
+    classification or the strategy. The other `runPhase` users keep today's behaviour (the
+    outcome is read only by the callers that ask for it). The outer `404` of
+    `isNoBatchEndpoint` stays no failure: `withSequentialFallback` reads the same parts
+    sequentially.
+  - **The fixed classification (owner, DO22 — closed), in our code, read by structure only,
+    never by message words, in this precedence:**
     1. a credential refusal (`isCredentialFailure`, after the normalisation above — an
-       answered `401` included) or the server's own refusal (`failureOf`) → `'end'`, whatever
-       the place, the envelope included;
-    2. an envelope failure (place `'envelope'`; the outer `404` never gets here) → `'throw'`:
-       it is not one object's answer, and skipping it would answer a near-empty search as if
-       nothing matched;
-    3. a **SAP answer** → the strategy decides (shipped: `'skip'`). A failure is a SAP answer
-       when either holds:
+       answered `401` included) or the server's own refusal (`failureOf`) → `'end'`, at
+       every place and as an envelope's error; never handed to the strategy;
+    2. a batch envelope failure (the outer `404` never gets here) → `'throw'`: it is not one
+       object's answer, and skipping it would answer a near-empty search as if nothing
+       matched; never handed to the strategy;
+    3. a **SAP answer** → handed to the SAP-answer strategy with its place, which answers
+       `'skip' | 'end' | 'throw'` (the shipped one: `'skip'`). A failure is a SAP answer when
+       either holds:
        - it carries a `response` with an integer HTTP status, **whatever its `origin`** —
          an answered failure (`ReadAnswer` `{ ok: false, error: IAdtError }`, an
          `IAdtResponse` not `ok`, normalised to a carried one), a carried ADT failure
@@ -3090,9 +3095,9 @@ Step 4 names.
          existing safe property reads);
        - or it is an `IAdtError` of `origin: 'refusal'`, with or without a `response` (an
          `AdtSAPError`: SAP's answer by construction);
-    4. anything else → `'throw'`, never given to the strategy as a SAP answer: no `response`
-       and not `origin: 'refusal'` (an unreachable host, a network or DNS failure), a
-       library's defect, our own defect (a `TypeError`, a `RangeError`), a thrown primitive.
+    4. anything else → `'throw'`, never handed to the strategy: no `response` and not
+       `origin: 'refusal'` (an unreachable host, a network or DNS failure), a library's
+       defect, our own defect (a `TypeError`, a `RangeError`), a thrown primitive.
 
     **Why not by `origin` alone (owner, amending DO22; measured by the implementer on the
     stand probe and in the adt-clients 43 code):** adt-clients gives `origin: 'refusal'` only
@@ -3101,61 +3106,62 @@ Step 4 names.
     `analyseException`). So `origin: 'connection'` cannot tell "SAP answered" from "no
     answer"; the `response` with its status can. Rule 2 comes before rule 3 on purpose: an
     envelope's HTTP failure carries a status and must not be taken as one part's SAP answer.
+    The classification is not replaceable; only rule 3's decision is the strategy's.
   - **Wiring:** the resolver, the walkers (the level catch and the root), the source reader
-    (structure and source reads) and the batched phases consult the strategy at the place; the
-    bare `catch {}`, every `if (isCredentialFailure(error)) throw error; continue;`, the
-    enumerator's walk catch, `credentialOf` and `endOnCredential` go (the shipped strategy's
-    `'end'` replaces them); `thrownOf`, `levelOf`'s and the resolver's `carryingFailure` stay
+    (structure and source reads) and the batched phases classify at the place, through one
+    classification module, and hand only SAP answers to the strategy; the bare `catch {}`,
+    every `if (isCredentialFailure(error)) throw error; continue;`, the enumerator's walk
+    catch, `credentialOf` and `endOnCredential` go (the classification's rule 1 replaces
+    them); `thrownOf`, `levelOf`'s and the resolver's `carryingFailure` stay
     as the normalisation; `runPhase` gains the failed-envelope outcome for the callers that
     read it. Both paths use the same strategy instance.
 
   Red tests first, on both paths (sequential and batched):
-  - **once per read:** `'a recording strategy sees exactly one call per failed read'` — a
-    refused mask, a refused root, a refused level (subpackage and type node), a refused
-    structure read and a refused source read in one scan, each recorded once with its place's
-    fields; on the batched path the same counts although discovery and the final scan both
-    replay the answers; a source two objects name, refused, recorded once;
-  - **decisions travel unchanged:** `'a custom throw for a system failure at a level is thrown
-    out of the call'` (a recording strategy answering `'throw'` for a SAP `500` on a
-    subpackage: the call rejects with that value, not a skip from the enumerator); the same
-    for a `'throw'` at a structure read and at a source read; `'a custom skip for a TypeError
-    is skipped'`; `'an end ends the call'` from each place;
-  - **the shipped strategy, per place** (mask, root, level — subpackage and type node —,
-    structure, source), each case on both paths:
+  - **once per read:** `'a recording strategy sees exactly one call per SAP answer'` — a SAP
+    `500` at a mask, a root, a level (subpackage and type node), a structure read and a source
+    read in one scan, each recorded once with its place's fields; on the batched path the same
+    counts although discovery and the final scan both replay the answers; a source two objects
+    name, refused, recorded once;
+  - **the strategy's answer travels unchanged:** `'a strategy's throw for a SAP answer at a
+    level is thrown out of the call'` (a recording strategy answering `'throw'` for a SAP `500`
+    on a subpackage: the call rejects with that value, not a skip from the enumerator); the
+    same for a `'throw'` at a structure read and at a source read; `'a strategy's end ends the
+    call'` and `'a strategy's skip skips'` from each place;
+  - **what is a SAP answer, per place** (mask, root, level — subpackage and type node —,
+    structure, source), each on both paths, with a recording strategy:
+    - handed to the strategy (and skipped by the shipped one): `'a SAP 500 with origin
+      connection and a response'` and the same for a `404` — the shape adt-clients 43 answers
+      for a SAP exception document — answered and carried; `'an origin refusal failure without
+      a response'`; `'a carried ADT failure with a response'` (`carryingFailure`); `'a raw
+      transport failure with a response and a status'`;
+  - **never handed to the strategy, per place, on both paths** — the recording strategy
+    records no call:
     - `'a TypeError is thrown'`, `'a RangeError is thrown'`, `'a thrown primitive is thrown as
       the same primitive'`;
-    - `'a SAP 500 with origin connection and a response is skipped'` and the same for a `404`
-      — the shape adt-clients 43 answers for a SAP exception document — answered and carried;
-    - `'an origin refusal failure without a response is skipped'` (an `IAdtError` of `origin:
-      'refusal'` with `adtType` and no `response`);
-    - `'a carried ADT failure with a response is skipped'` (`carryingFailure`);
-    - `'a raw transport failure with a response and a status is skipped'` (a thrown object
-      carrying `response.status`, no `IAdtError`);
-    - `'a failure with no response and origin connection is thrown'` (an unreachable host):
-      the call fails with it, the strategy not asked;
+    - `'a failure with no response and origin connection is thrown'` (an unreachable host);
     - `'a credential refusal ends the call'` (`AuthRefusedError`, a `401` SAP answered) and
       `'a failureOf refusal ends the call'`;
-  - **an answered 401 ends the call** at each place (mask, root, level, structure, source),
-    on both paths: `'an answered 401 ends the call'` — the reader's answer is a failed ADT
-    answer with `response.status` `401`, never thrown by the client — so the normalisation
-    is load-bearing (the test goes red when it is removed);
-  - **envelopes (batched path), through the real client conversion:** the phases run the
+    - `'an answered 401 ends the call'` — the reader's answer is a failed ADT answer with
+      `response.status` `401`, never thrown by the client — so the normalisation is
+      load-bearing (the test goes red when it is removed);
+  - **envelopes (batched path), through the real client conversion** — the phases run the
     installed adt-clients readers (`@mcp-abap-adt/adt-clients`, whose `answering` turns a
     rejected request into a failed answer) over a connection stand-in whose envelope request
-    rejects, so each part's answer is built as in production:
+    rejects, so each part's answer is built as in production; a recording strategy records no
+    call in any of them:
     - `'an envelope answered with the outer 404 is no failure: the sequential fallback reads
-      the same parts'`, the strategy not consulted;
+      the same parts'`;
     - `'any other envelope failure is thrown'` — a mask-search phase, a walk-level phase and a
       structure-and-source phase, each envelope failing with an HTTP `500` (a status-bearing
-      transport failure): the call rejects with the envelope's error, nothing is skipped, and
-      a recording strategy sees one `'envelope'` call and no per-read call for its parts;
-    - `'an envelope failure is not skipped as a raw transport failure'` (rule 2 before rule 3:
-      the same `500` is skipped when it is one part's own failure inside an answered envelope);
+      transport failure): the call rejects with the envelope's error, nothing is skipped;
+    - `'an envelope failure is not taken as a SAP answer'` (rule 2 before rule 3: the same
+      `500` is handed to the strategy when it is one part's own failure inside an answered
+      envelope);
     - `'a credential refusal as the envelope's error ends the call'`;
-    - `'a part's own failure inside an answered envelope follows the per-read rule'`;
+    - `'a part's own failure inside an answered envelope is classified per read'`;
   - `'the orchestrator has no failure rule of its own'`: its deps type requires the strategy
-    (leaving it out does not compile), and no module but the shipped strategy calls
-    `isCredentialFailure` / `endsTheCall` for a read failure;
+    (leaving it out does not compile); the classification lives in one module, and no other
+    module calls `isCredentialFailure` / `endsTheCall` for a read failure;
   - `'a structure read is its own place'`: its place carries the group and its URI, no source
     fields.
 
@@ -3165,22 +3171,22 @@ Step 4 names.
   `src/__tests__/lib/search-source/orchestrator.test.ts`,
   `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
   `src/__tests__/unit/failureStep.test.ts` (its `SearchSource` cases),
-  `src/__tests__/unit/authRefusedRejection.test.ts` (the credential end, through the shipped
-  strategy), `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/authRefusedRejection.test.ts` (the credential end, through the
+  classification), `src/__tests__/unit/batch/searchSource.test.ts`,
   `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`, `src/__tests__/unit/packageWalk.test.ts`,
   `src/__tests__/unit/batch/packageWalks.test.ts` and
   `src/__tests__/unit/packageWalkBranchRule.test.ts` (the walker's place), the helpers
   `src/__tests__/helpers/sourceReaderFake.ts` and `src/__tests__/helpers/searchSourceStand.ts`.
 - [ ] **Step 4e2: The SAP-answer strategy is the consumer's (DO22, owner).** Amends Step 4e:
   the strategy decides only on **SAP answers**, and the consumer supplies it.
-  - **What reaches the strategy.** The server applies Step 4e's fixed rules first, and none of
-    them reaches the consumer: a credential or `failureOf` refusal always ends the call; an
+  - **What reaches the strategy.** Step 4e's fixed classification runs first, in our code, and
+    nothing it decides reaches the consumer: a credential or `failureOf` refusal always ends the call; an
     envelope failure (not the outer `404`, which falls back) is always thrown; anything that
     is not a SAP answer — no `response` and not `origin: 'refusal'` (no answer: host,
     network, DNS), a library defect, our defect, a primitive — is always thrown. Only a SAP
     answer (a `response` with an integer status, whatever its `origin`, or an `IAdtError` of
     `origin: 'refusal'`) goes to the strategy, with its place (`'mask'`, `'package'`,
-    `'level'`, `'structure'`, `'source'`; `'envelope'` never reaches it), and the strategy
+    `'level'`, `'structure'`, `'source'`; an envelope failure never reaches it), and the strategy
     answers `'skip' | 'end' | 'throw'`. The shipped strategy answers `'skip'` for every SAP
     answer.
   - **The contract is exported.** The strategy's interface, its place union and its answer
@@ -3215,9 +3221,14 @@ Step 4 names.
       it explicitly), and `HandlerExporter` takes it as an option and adds it to the context it
       passes (`wrapEntry`) when the embedder's context has none. This placement of the default is
       approved by the owner (DO24).
-  - **`EmbeddableMcpServer` without the option:** the server supplies the shipped one in the
-    context (absent = the shipped strategy, as above); an embedder that passes its own gets
-    its own on every path.
+  - **`EmbeddableMcpServer` without the option:** the option stays absent through the server
+    and every context it builds — no server, launcher-independent constructor or context
+    builder fills it in; the handler's `?? shipped` is the one default. An embedder that
+    passes its own gets its own on every route.
+  - **Precedence when both are present** — an embedder's context field and the
+    `HandlerExporter` option: the code fixes no rule for it (the field is new); it is put to
+    the owner. Until the owner answers, the exporter adds its option only when the context has
+    none, and the case of both is a red test owed on the owner's answer.
 
   Red tests first:
   - `'a consumer strategy passed to EmbeddableMcpServer is asked for a SAP answer at each
@@ -3232,6 +3243,20 @@ Step 4 names.
     the HTTP launcher's per-request server) skips a SAP `500` at a source read;
   - `'a HandlerExporter entry and a plain-group registration use the shipped one'` when their
     context carries none, and the exporter's option when given;
+  - **every route, for the SAP-answer strategy** (a recording consumer strategy asked once
+    for a SAP `500` at a source read, its answer obeyed; on the sequential and the batched
+    path each):
+    - `BaseMcpServer`'s dispatch context (an ordinary call);
+    - the batch-mode `recordedContext` (a call recorded in batch mode and run);
+    - the run tools' context and a background run's derived context (`SearchSource` in the
+      background, read with `GetBackgroundRun`);
+    - a long call's own connection (`background: false`);
+    - launcher-built servers: stdio (`StdioServer`), HTTP (`StreamableHttpServer`'s
+      per-request server) and SSE (`SseServer`'s session server) — each uses the shipped one;
+    - `HandlerExporter` with its option, and without it (the handler's default);
+    - a plain-group registration (the handler's default);
+    - `'an optionless EmbeddableMcpServer leaves the field absent'`: no context it builds
+      carries the field, and the handler's default answers;
   - `'the contract is exported'`: a type test importing the interface, the place and answer
     unions and the shipped strategy from `@mcp-abap-adt/lib/embeddable`.
 
@@ -3253,8 +3278,9 @@ Step 4 names.
   - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the three
     `HandlerContext`s it builds (dispatch, `recordedContext`, the run tools'), kept in every
     derived context; `HandlerExporter` takes it as its own option and adds it in `wrapEntry`
-    when the embedder's context has none; the binaries' launchers (stdio, HTTP per-request,
-    SSE session) pass `substringLineMatch`; `handleSearchSource.ts` reads
+    when the embedder's context has none (precedence when both are present: the owner's, as
+    Step 4e2); an optionless `EmbeddableMcpServer` leaves the field absent; the binaries'
+    launchers (stdio, HTTP per-request, SSE session) pass `substringLineMatch`; `handleSearchSource.ts` reads
     `context.<field> ?? substringLineMatch` (the one place the default lives) and hands it to
     the orchestrator, which takes it explicitly.
   - **Exported:** `LineMatchStrategy`, `ScanInput`, `ScanHit`, `ScanResult` and
@@ -3272,6 +3298,13 @@ Step 4 names.
     server;
   - `'the HandlerExporter option is used, and the shipped one without it'`; a plain-group
     registration uses the shipped one;
+  - **every route, for the line-match strategy**, as Step 4e2 lists them (dispatch context,
+    `recordedContext`, run tools' and background-run contexts, a long call's own connection,
+    the stdio, HTTP and SSE launcher servers with `substringLineMatch`, `HandlerExporter` with
+    and without its option, a plain group, an optionless `EmbeddableMcpServer` leaving the
+    field absent), each on the sequential and the batched path;
+  - the precedence of an embedder's context field and the exporter's option — as Step 4e2,
+    owed on the owner's answer;
   - `'the line-match contract is exported'`: a type test importing the types and
     `substringLineMatch` from `@mcp-abap-adt/lib/embeddable`.
 
@@ -4134,9 +4167,10 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   refusal (a system answer: an HTTP status or ADT exception) is skipped as DO17 / DO19 say; a
   credential refusal ends the call; anything else (our own defect: a `TypeError`, a
   `RangeError`, any thrown value that is not a system answer) is thrown, never swallowed.
-  The strategy is asked once per failed read, at the place it arises (mask, package root,
-  level, function-group structure, source); its decision travels unchanged through every
-  outer layer, and a cached or replayed read reuses it. **Closed (owner, 2026-11-07; amended the same
+  Every failed read is classified once, in our code, at the place it arises (mask, package
+  root, level, function-group structure, source); only a SAP answer is handed to the
+  strategy; the outcome travels unchanged through every outer layer, and a cached or replayed
+  read reuses it. **Closed (owner, 2026-11-07; amended the same
   day — "library defects are raised, SAP's answers are handled by the strategy"):** a failure
   is a SAP answer when it carries a `response` with an integer HTTP status, whatever its
   `origin` (answered, carried, or a raw transport failure), or when it is an `IAdtError` of
@@ -4149,7 +4183,7 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   `failureOf` refusal, whatever its shape. Precedence: credential / `failureOf` end →
   envelope failure throws → a SAP answer goes to the strategy → anything else throws. A live
   check of a real SAP `404`'s shape is owed (Step 7). An envelope's failure is decided in the phase, where `runPhase` sees
-  it, before adt-clients' conversion builds the parts' answers (place `'envelope'`); an
+  it, before adt-clients' conversion builds the parts' answers, and never reaches the strategy; an
   answered failure is normalised to a carried one (`thrownOf`, `carryingFailure`) before the
   rule, so an answered `401` ends the call.
   **The strategy is the consumer's (owner, 2026-11-07, Step 4e2):** "SAP's error rule — the

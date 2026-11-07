@@ -68,7 +68,7 @@ connection's; Streamable HTTP builds one per request. Every send on the instance
 connection is inside the order; the system lookup (`systeminformation`, once per destination)
 comes with the connection, when it is created, before any tool can use it; a background run, a listed
 long read and the debugger tools that work on the debugger's own connections are
-outside it. A long call on the main connection holds the flow; `background: true` or a
+outside it. A long call on the main connection holds the flow; a background run or a
 tool on its own connection does not. Once in the flow, a queued call checks its
 connection again: when the call ahead found the session lost, it takes the replacement before its
 tool runs, so only the call that met the loss fails (it is not replayed). Taking up a

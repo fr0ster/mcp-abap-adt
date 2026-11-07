@@ -218,18 +218,17 @@ Key examples of high-value workflows and tools:
 - **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
 - **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it only while SAP answers it running, and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` at once for a run SAP does not know; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
 
-### Long reads take a `timeout`
+### Long reads run in the background
 
-The long reads on an approved list (where-used and search, package walks, data preview, the
-dump feed, profiler traces, … — the list in
-[MIGRATION-19.0](docs/MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own))
-run on an ABAP session of their own and take an optional `timeout` in seconds, with no default.
-When it passes the read is cancelled — its session logged off — and nothing was changed. Set it
-below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a tool call
-cannot be cancelled** — a client's cancel aborts nothing, the call runs to its end. No other tool takes a `timeout`: a unit test, ATC, class or program run
-goes on to its end. Since 24.0.0 `SearchSource` is off the list: it takes no `timeout` and no
-`time_budget_ms`, and a large scan is paged by `max_objects` and `start_at`
-([MIGRATION-24.0](docs/MIGRATION-24.0.md)).
+The long reads on an approved list (where-used and search, `SearchSource`, package walks, data
+preview, the dump feed, profiler traces, … — `tools/long-handlers.json`) run on an ABAP session
+of their own. Since 24.0.0 a call **without** `background` answers a `run_handle` at once, and the
+result is read with `GetBackgroundRun` (compact `HandlerBackgroundRunGet`); `background: false`
+answers the result in the call. `DiscardBackgroundRun` (compact `HandlerBackgroundRunDiscard`) on a
+running read cancels it: its session is logged off, and nothing was changed. No tool takes a
+`timeout`: a read ends when SAP answers or when you cancel it. Once Get answers a finished or cancelled read, that read is gone: a Get response lost on the way cannot be recovered, `ListBackgroundRuns` no longer shows it, and the read must be started again. A server without
+background runs (the `-ro` binaries, an embedder without a store) answers a long read in the call.
+See [MIGRATION-24.0](docs/MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).
 
 ### Batch mode
 

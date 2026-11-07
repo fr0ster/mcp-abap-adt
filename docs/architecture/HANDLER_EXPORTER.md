@@ -62,7 +62,8 @@ that would reach a system is refused `system_type_required` before anything is s
 The exporter keeps no background-run store and no debugger, so it hands out neither, on every
 path (`getHandlerEntries()`, `createRegistry()`, `registerOnServer`): no background-run tool
 (`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`), no `background` parameter on
-`RuntimeRunClass` / `RuntimeRunProgram`, and no debugger tool (its options have no
+`RuntimeRunClass` / `RuntimeRunProgram` (a listed long tool keeps its `background`, and its read
+runs in the call), and no debugger tool (its options have no
 `includeDebug`). A server instance (`EmbeddableMcpServer`) serves them.
 
 ## Connection Provider
@@ -93,9 +94,10 @@ Each call:
    each run on their own connection. The entry parses the arguments with the tool's schema
    before its handler runs.
 
-A call refused for its arguments (a `timeout` a long tool does not take there) is refused before
-the provider is asked. A listed long tool's read runs on a connection of its own, opened from the
-call's, as on a plain registration.
+A call refused for its arguments (a `background` on `HandlerGet`'s run-reading parts) is refused
+before the provider is asked. A listed long tool's read runs in the call on a connection of its
+own, opened from the call's, as on a plain registration: with no background-run store, its
+`background` changes nothing.
 
 ### Async Connection Provider
 

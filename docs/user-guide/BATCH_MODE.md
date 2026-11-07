@@ -31,8 +31,9 @@ The debugger has a batch of its own — `DebugBatchBegin` / `DebugBatchEnd`, com
    batch (`GetObjectVersionDiff` sends its two version reads together, under its one number).
    A call refused, or one whose handler refused its arguments before sending anything, takes no
    number: a call no entry of the table below admits is refused `batch_not_recordable`, and a
-   long read given a `timeout` `batch_no_timeout` ("in batch mode a read takes no timeout: the
-   batch is sent at BatchEnd, with no deadline"). A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
+   long read given `background: true` `batch_no_background` ("in batch mode a read takes no
+   background: it is recorded, and the batch is sent at BatchEnd"). A long read without
+   `background` is recorded. A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
    call decides which; a call of another kind is refused `batch_other_kind` (see Phases).
 3. **`BatchEnd`** sends every recorded call, in one envelope, with the credentials in force now, and
    leaves batch mode whatever happens. Nothing is sent twice and nothing is retried. It splits

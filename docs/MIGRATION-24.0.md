@@ -271,8 +271,75 @@ call's `version`, each once per call, and names everything it could not read.
   after `start_at + max_objects`. To keep a large scan short, page it: call with `max_objects`
   (say 100), then again with `start_at` set to the `next_start_at` answered, until no
   `next_start_at` comes back. To bound a call in time, cancel it from your client.
-  `SearchSource` is no longer a long tool: it runs on the instance's connection, as the other
-  reads do.
+  `SearchSource` runs as every long tool runs: on an ABAP session of its own, in the background
+  by default — see "Callers of the long tools" below.
+
+## Callers of the long tools: background by default, no timeout
+
+**Changed, breaking:** until 23.x a call to a long tool answered its result directly. From
+24.0.0 a call **without** `background` answers a `run_handle` at once, and the result is read with
+`GetBackgroundRun` (compact `HandlerBackgroundRunGet`). A caller that wants the result in the call
+passes `background: false`. `timeout` and `time_budget_ms` are gone. A running read is ended with
+`DiscardBackgroundRun` (compact `HandlerBackgroundRunDiscard`). The code-running tools'
+`background` (`RuntimeRunClass`, `RuntimeRunProgram`, `HandlerProfileRun`) is unchanged: no
+default, without it the call waits.
+
+The long tools: `GetWhereUsed`, `SearchObject`, `SearchSource`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `RuntimeListFeeds`, `ListTransports`, `GetSqlQuery`, `GetTableContents`, `GetObjectInfo`, `DescribeByList`, `GetATCFindings`, `ListATCResults`, `GetATCResult`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`; compact `HandlerWhereUsed`, `HandlerSearch`, `HandlerDumpList`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` (`tools/long-handlers.json`). Each runs on an ABAP session of
+its own, logged off after SAP's answer.
+
+**What changes for you:**
+- **Read the `run_handle`.** The start answers `{ run_handle, state: 'running', tool, object,
+  started_at, message }`. `GetBackgroundRun { run_handle }` answers `running`; `finished` and,
+  after its header, what the tool would have answered in the call; or `cancelled`.
+  `ListBackgroundRuns` lists your runs with that state.
+- **A read is answered once.** Once Get answers a finished or cancelled read, that read is gone:
+  a Get response lost on the way cannot be recovered, `ListBackgroundRuns` no longer shows it,
+  and the read must be started again. A second Get answers "not available". A code run's answer
+  is kept until `DiscardBackgroundRun`, as before.
+- **Cancel a running read with `DiscardBackgroundRun`.** It answers `{ run_handle, state:
+  'cancelled' }`: the read's session is logged off, SAP ends the read, nothing was changed, and
+  the run reads `cancelled` until Get answers it. On a finished run it removes the answer, as
+  before; on a running code run it is refused, as before. An unknown handle and someone else's
+  answer alike, "not available". A server's instances share the owner of the running runs, so
+  over Streamable HTTP a discard sent in a later request cancels the read.
+- **Drop `timeout`.** No long tool takes it, and nothing answers `timed_out`.
+- **`HandlerGet`'s run-reading parts** (`UNIT_TEST` / `CDS_UNIT_TEST`, `activation_status`,
+  `activation_results`) are read in the call on the instance's connection, as before; a
+  `background` on them is refused before anything is sent.
+- **Batch mode** records a long read without `background`; `background: true` there is refused
+  `batch_no_background` (the refusal was `batch_no_timeout`).
+- **The 16 runs per caller** count reads too; a read that was answered no longer counts.
+- **A server without background runs** — the `-ro` binaries, an embedder without
+  `backgroundRuns` — answers a long tool in the call, whatever its `background`.
+
+## Embedders: `IBackgroundRuns` knows `cancelled`; a long tool runs synchronously without a strategy
+
+- **`BackgroundRunAnswer.cancelled?: true`** and the state `'cancelled'`
+  (`BackgroundRunState`, in `BackgroundRunListing['state']` and `BackgroundRunRecord['state']`).
+  A custom strategy keeps the answer `finish` gives it, as before, and answers
+  `state: 'cancelled'` for a kept answer with `cancelled: true`; nothing else changes for it, and
+  no method is added. `@mcp-abap-adt/background-runs-memory` does so.
+- **`finish` is called once per run:** for a cancelled read with the cancelled answer, right after
+  its session was logged off; the read's own end that comes later is dropped.
+- **`discard` follows a read's Get:** the library calls the strategy's `discard` right after `get`
+  answered a read run's finished or cancelled answer. A code run's answer is kept until
+  `DiscardBackgroundRun`.
+- **The owner of the running runs** (`BackgroundRunOwner`, from `@mcp-abap-adt/lib/embeddable`)
+  holds each running run's control, by `run_handle`. An instance creates its own; a host that
+  serves one client through several instances (one per request, one per stream) creates one and
+  hands it to every instance (`backgroundRunOwner`), as the HTTP and SSE servers do, so a discard
+  reaching any of them cancels a running read. Without it, a discard reaching an instance that
+  did not start the read is refused while the read runs.
+- **With no strategy** (`backgroundRuns` not given), a long tool runs synchronously, as with
+  `background: false`; a code run's `background: true` is refused, as before. `HandlerExporter` and
+  a group registered on its own `McpServer` have no strategy.
+- **Removed from `@mcp-abap-adt/lib`'s modules:** `TIMEOUT_FIELD`, `timeoutField`,
+  `TIMEOUT_DESCRIPTION`, `timedOutAnswer`, `timedOutWords`, `TimedOutAnswer`, `readTimeout`,
+  `withoutTimeout`, `TIMEOUT_INVALID_WORDS`, `TIMEOUT_NOT_FOR_RUN_WORDS`, `MAX_TIMEOUT_SECONDS`,
+  `BATCH_NO_TIMEOUT_WORDS`; `runLongCall` takes no `timeoutSeconds`. `LONG_TOOL_ADVICE` has new
+  words. A tool of your own that declared `timeout: TIMEOUT_FIELD` declares
+  `background: LONG_BACKGROUND_FIELD` (compact: `COMPACT_LONG_BACKGROUND_FIELD`), if it is a listed
+  long tool.
 
 ## Callers of `CreateDomain`: `package_name` is required
 

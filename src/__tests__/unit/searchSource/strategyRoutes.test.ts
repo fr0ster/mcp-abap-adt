@@ -4,16 +4,15 @@
  * reach the handler on every route as the context's internal fields:
  * `EmbeddableMcpServer`'s options (a long call's own connection, a
  * background run), `HandlerExporter`'s options (`getHandlerEntries()`,
- * `registerOnServer`); on `createRegistry()` the hosting server's options;
- * the launchers pass the shipped ones; an optionless server leaves the
- * fields absent and the handler's default answers.
+ * `registerOnServer`); an optionless server leaves the fields absent and the
+ * handler's default answers. `createRegistry()` hosted by a server and
+ * `registerOnServer` through a long call: `strategyRoutesServed.test.ts`;
+ * the three launchers: their `searchStrategies.test.ts`.
  *
  * Here the context the handler is called in is recorded on each route; the
  * handler's use of the fields is `sourcesAndFailures.test.ts`' (the D23b
  * routes block).
  */
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -261,31 +260,7 @@ describe.each([
   );
 });
 
-describe('createRegistry() and the launchers', () => {
-  it("createRegistry() takes no strategy of the exporter's: the hosting server's options apply", () => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '../../../lib/handlers/HandlerExporter.ts'),
-      'utf8',
-    );
-    const at = source.indexOf('  createRegistry(): IHandlersRegistry {');
-    const body = source.slice(at, source.indexOf('\n  }\n', at));
-    expect(at).toBeGreaterThan(0);
-    expect(body.includes('Strateg')).toBe(false);
-  });
-
-  it.each([
-    ['stdio', 'server-runtime/src/stdio/launcher.ts'],
-    ['http', 'server-runtime/src/http/launcher.ts'],
-    ['sse', 'server-runtime/src/sse/launcher.ts'],
-  ])('the %s launcher passes the shipped strategies', (_kind, file) => {
-    const source = fs.readFileSync(
-      path.join(__dirname, '../../../..', file),
-      'utf8',
-    );
-    expect(source).toContain('sapAnswerStrategy: skipSapAnswers,');
-    expect(source).toContain('lineMatchStrategy: substringLineMatch,');
-  });
-
+describe('the shipped strategies', () => {
   it('the shipped strategies are the exported ones', () => {
     expect(
       skipSapAnswers.decide(new Error('x'), { kind: 'mask', mask: 'Z*' }),

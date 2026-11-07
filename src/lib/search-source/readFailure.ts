@@ -70,13 +70,25 @@ function isSapAnswer(failure: unknown): boolean {
 }
 
 /**
+ * A credential refusal: the chain's or a `401` SAP answered, carried
+ * (`isCredentialFailure`) or raw — a thrown value whose own `response`
+ * carries the status `401`.
+ */
+function isCredential(failure: unknown): boolean {
+  return (
+    isCredentialFailure(failure) ||
+    statusOf(readOwn(failure, 'response')) === 401
+  );
+}
+
+/**
  * The fixed classification (owner, DO22), by structure only: a credential
  * refusal or the server's own refusal ends the call; a SAP answer is the
  * strategy's; anything else is thrown. (A batch envelope's failure is
  * classified in its phase: `envelopeFailure`.)
  */
 function classify(failure: unknown): 'end' | 'sap' | 'throw' {
-  if (isCredentialFailure(failure) || failureOf(failure) !== undefined) {
+  if (isCredential(failure) || failureOf(failure) !== undefined) {
     return 'end';
   }
   return isSapAnswer(failure) ? 'sap' : 'throw';
@@ -157,7 +169,7 @@ export function failedRead(
  * part, never handed to the strategy. Always throws.
  */
 export function envelopeFailure(error: unknown): never {
-  const end = isCredentialFailure(error) || failureOf(error) !== undefined;
+  const end = isCredential(error) || failureOf(error) !== undefined;
   throw decidedFailure(error, end ? 'end' : 'throw');
 }
 

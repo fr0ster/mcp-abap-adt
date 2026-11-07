@@ -310,3 +310,41 @@ describe('a level of any size', () => {
     expect(settled?.ok && settled.value).toHaveLength(300_001);
   });
 });
+
+describe('under the branch rule, a raw 401 at the root or a level ends the walk, never a SAP answer (DO22)', () => {
+  it.each([['P|root'], ['P|2'], ['SB|root']])(
+    'walkPackage, at %s',
+    async (key) => {
+      const asked: string[] = [];
+      const raw = { response: { status: 401 } };
+      const utils: NodeStructureSource = {
+        async fetchNodeStructure(_type, name, options) {
+          const at = keyOf(name, options?.nodeId);
+          if (at === key) throw raw;
+          return answerOf(at, {});
+        },
+      };
+      await expect(
+        walkPackage(utils, 'P', {
+          includeSubpackages: true,
+          missingLevel: 'refused',
+          branchRule: {
+            walked: new Set<string>(),
+            onFailure: (failure, place) =>
+              failedRead(
+                {
+                  decide(_f, p) {
+                    asked.push(p.kind);
+                    return 'skip';
+                  },
+                },
+                failure,
+                place,
+              ),
+          },
+        }),
+      ).rejects.toBe(raw);
+      expect(asked).toEqual([]);
+    },
+  );
+});

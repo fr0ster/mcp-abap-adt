@@ -260,8 +260,7 @@ async function* readOne(
     STEP[read.reader],
     (failure, key) => failedRead(sapAnswers, failure, place, key),
     () => deps.readSource(read),
-    // A class's local include no listing names: SAP's 404 says it is not
-    // there, an absence rather than a failure (D23a).
+    // D23a, measured: a class without this local include answers 404 — an absence, never a failed read.
     (error) => read.reader === 'classInclude' && error.response?.status === 404,
   );
   if (text === undefined) return;

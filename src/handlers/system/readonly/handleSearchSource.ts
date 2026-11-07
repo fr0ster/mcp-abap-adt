@@ -141,8 +141,7 @@ export async function handleSearchSource(
     logger?.error(
       `SearchSource failed: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return return_error(
-      error instanceof Error ? error : new Error(String(error)),
-    );
+    // The value as it was thrown: `return_error` reads any value.
+    return return_error(error);
   }
 }

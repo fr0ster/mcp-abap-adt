@@ -56,6 +56,7 @@ import {
   undecided,
 } from '../../../lib/search-source/readFailure';
 import { carryingFailure } from '../../../lib/strategies/step';
+import { return_error } from '../../../lib/utils';
 import { statusError } from '../../helpers/batchEnvelope';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import {
@@ -3016,6 +3017,171 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
       );
       expect(isError(result)).toBe(false);
       expect(payloadOf(result).results.map(hitLabel)).toEqual(['ZDDL/ZDDL']);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// D23b: Codex round on 4e — a raw 401, the handler's boundary, an absence
+// ---------------------------------------------------------------------------
+
+const P_ALL = [['served'], ['absent']] as const;
+
+describe('D23b: a raw 401 ends the call, never a SAP answer (DO22)', () => {
+  /** A raw transport failure carrying SAP's 401: no ADT error, no Error. */
+  const raw401 = () => ({ response: { status: 401 } });
+  const recording = () => {
+    const asked: string[] = [];
+    const strategy: SapAnswerStrategy = {
+      decide(_failure, place) {
+        asked.push(place.kind);
+        return 'skip';
+      },
+    };
+    return { strategy, asked };
+  };
+  const PROG: PackageContentItem = {
+    name: 'ZP',
+    type: 'PROG/P',
+    packageName: 'ZPKG',
+    isPackage: false,
+  };
+  const GROUP: PackageContentItem = { ...PROG, name: 'ZG', type: 'FUGR/F' };
+
+  it.each(['source', 'structure'] as const)(
+    'at a %s read: the call rejects with it and the strategy is never asked',
+    async (at) => {
+      const { strategy, asked } = recording();
+      const thrown = raw401();
+      await expect(
+        runSearchSource(
+          {
+            lineMatch: substringLineMatch,
+            sapAnswers: strategy,
+            fetchPackageContents: async (name) =>
+              listing(name, [at === 'source' ? PROG : GROUP]),
+            sourceReader: {
+              async readSource() {
+                throw thrown;
+              },
+              async readStructure() {
+                if (at === 'source') return { ok: true, value: [] };
+                throw thrown;
+              },
+            },
+            resolvePackages: exactPackages,
+          },
+          { query: 'marker', packages: ['ZPKG'] },
+        ),
+      ).rejects.toBe(thrown);
+      expect(asked).toEqual([]);
+    },
+  );
+
+  it('at a mask search: the call rejects with it and the strategy is never asked', async () => {
+    const { strategy, asked } = recording();
+    const thrown = raw401();
+    await expect(
+      resolvePackagePatterns(
+        {
+          sapAnswers: strategy,
+          searchObjects: async () => {
+            throw thrown;
+          },
+        },
+        ['Z*'],
+      ),
+    ).rejects.toBe(thrown);
+    expect(asked).toEqual([]);
+  });
+
+  it.each(P_ALL)(
+    'at a walk level and as an envelope error (%s): the call ends, the strategy never asked',
+    async (batch) => {
+      const absent = batch === 'absent';
+      const { strategy, asked } = recording();
+      const fake = standOn(
+        ONE,
+        {},
+        {
+          envelope: (parts) => {
+            if (parts.some((p) => keyOf(p.url).startsWith('NODE '))) {
+              throw raw401();
+            }
+            return undefined as never;
+          },
+          direct: () => {
+            throw raw401();
+          },
+        },
+      );
+      await expect(
+        runSearchSourceWithContext(
+          contextOn(fake, absent ? 'absent' : 'served'),
+          { query: 'marker', packages: ['ZONE'] },
+          { lineMatch: substringLineMatch, sapAnswers: strategy },
+        ),
+      ).rejects.toBeDefined();
+      expect(asked).toEqual([]);
+    },
+  );
+});
+
+describe("D23b: the handler's boundary: a decided value leaves the handler as it was thrown", () => {
+  it.each([
+    ['a primitive', 'a primitive'],
+    ['a structured value', { code: 'Z1', detail: [1, 2] }],
+  ])(
+    '%s thrown inside the scan is answered as itself',
+    async (_name, value) => {
+      const result = await handleSearchSource(
+        {
+          ...contextOn(standOn(ONE), 'absent'),
+          lineMatchStrategy: {
+            match() {
+              throw value;
+            },
+          },
+        },
+        { query: 'marker', packages: ['ZONE'] },
+      );
+      expect(result).toEqual(return_error(value));
+    },
+  );
+});
+
+describe("D23b: a class's local include that SAP answers 404 is an absence, never a failed read (D23a)", () => {
+  it.each(P_ALL)(
+    'the SAP-answer strategy is never asked for it; the class is read (%s)',
+    async (batch) => {
+      const asked: string[] = [];
+      const result = await runSearchSourceWithContext(
+        contextOn(
+          standOn(ALL, {
+            refuseWith: {
+              'CLASSINCLUDE ZCL/MACROS': { status: 404, body: NOT_FOUND_BODY },
+            },
+          }),
+          batch === 'absent' ? 'absent' : 'served',
+        ),
+        { query: 'marker', packages: ['ZALL'], object_types: ['CLAS'] },
+        {
+          lineMatch: substringLineMatch,
+          sapAnswers: {
+            decide(_failure, place) {
+              asked.push(place.kind);
+              return 'throw';
+            },
+          },
+        },
+      );
+      expect(asked).toEqual([]);
+      expect(result.results.map(hitLabel)).toEqual([
+        'ZCL/ZCL',
+        'ZCL/definitions',
+        'ZCL/implementations',
+        'ZCL/testclasses',
+      ]);
     },
   );
 });

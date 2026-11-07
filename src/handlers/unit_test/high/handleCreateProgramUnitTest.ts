@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateProgramUnitTest — give a report ABAP Unit tests: create its test
  * include in the report's package, write the test classes into it, pull it
@@ -6,7 +9,7 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { writeProgramTests } from '../shared/writeTests';
@@ -16,27 +19,23 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Creates the ABAP Unit test classes of the report named by program_name, from test_class_source. They are written to a test include, which is included into the report, and the report is activated.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Report that gets the tests. Must already exist.',
-      },
-      test_class_source: {
-        type: 'string',
-        description:
-          'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request, not a task. Required for a transportable object.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'test_class_source'],
-  },
+  inputSchema: createArguments('CreateProgramUnitTest', {
+    program_name: z
+      .string()
+      .describe('Report that gets the tests. Must already exist.'),
+    test_class_source: z
+      .string()
+      .describe(
+        'ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request, not a task. Required for a transportable object.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateProgramUnitTestArgs {

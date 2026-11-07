@@ -28,12 +28,12 @@ import {
   getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   loadTestEnv,
   resolvePackageName,
   resolveTransportRequest,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -44,6 +44,7 @@ import {
 import {
   callTool,
   createHardModeClient,
+  type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
 import {
@@ -61,16 +62,12 @@ describe('Function High-Level Handlers Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-  let mcp: {
-    client: any;
-    toolNames: Set<string>;
-    close: () => Promise<void>;
-  } | null = null;
+  let mcp: HardModeClient | null = null;
 
   beforeAll(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -124,7 +121,7 @@ describe('Function High-Level Handlers Integration', () => {
       // Check available_in from test case config
       if (!isTestAvailableForSystem(testCase.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()} (available_in: ${testCase.available_in?.join(', ')})`,
+          `⏭️  Skipping test: not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
         );
         return;
       }
@@ -167,7 +164,7 @@ describe('Function High-Level Handlers Integration', () => {
           throw new Error('Hard mode MCP client is not initialized');
         }
         try {
-          return await callTool(mcp.client, mcp.toolNames, [toolName], args);
+          return await callTool(mcp, [toolName], args);
         } catch (error: any) {
           return {
             isError: true,

@@ -1,11 +1,13 @@
-import { type FailureEntry, isCredentialFailure, thrownEntry } from '../answer';
-import { failureOf } from '../auth/failures';
+import type { AdtCodes } from '../adtProjections';
+import { isCredentialFailure } from '../answer';
+import { appendAll } from '../appendAll';
 import { type PhaseResult, withSequentialFallback } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import {
   assembleList,
   batchReader,
+  type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
   readNode,
@@ -13,19 +15,21 @@ import {
   walkPackages,
 } from '../strategies/packageWalk';
 import { ourUtils } from '../strategies/resultSets';
-import { methodFailureOf } from '../strategies/step';
-import { scanLines } from './lineScanner';
+import type { AnswerLevel } from './answerLevel';
+import type { LineMatchStrategy } from './lineMatch';
 import {
   createPackageContentsFetcher,
   type EnumerateInput,
   enumerateScanTargets,
   type PackageContentsFetcher,
+  SCAN_OBJECT_TYPES,
   type ScanObjectType,
 } from './packageEnumerator';
 import {
   answeredSearch,
   createPackagePatternResolver,
   type PackageResolverDeps,
+  type ResolvedPackages,
   resolvePackagePatterns,
   type SearchObjectsArgs,
   searchPackagesInPhase,
@@ -33,10 +37,13 @@ import {
 import {
   answeredReaderDeps,
   createSourceReaderDeps,
+  noAnsweredReads,
+  type Read,
   type ReadSourceUnitsDeps,
+  readingOnce,
   readSourcesInPhase,
   readSourceUnits,
-  type SourceRead,
+  type SourceUnit,
   type SourceVersion,
   sourceReadKey,
 } from './sourceReader';
@@ -50,18 +57,18 @@ export interface OrchestratorInput {
   object_filter?: string;
   object_types?: readonly ScanObjectType[];
   exclude_comments?: boolean;
+  /** The most hits answered per object; absent, an object's hits are not limited. */
   max_hits_per_object?: number;
-  emit_no_hits?: boolean;
-  max_objects?: number;
-  /** Index of the first scan target to read (default 0): `next_start_at` of the previous answer. */
-  start_at?: number;
+  /** The most hits of the whole answer; reached, the scan stops. Absent, no limit. */
+  max_hits?: number;
+  /** What each hit is answered as (`snippets` when absent). */
+  answer?: AnswerLevel;
   concurrency?: number;
   version?: SourceVersion;
-  /** Internal scan deadline in ms. When exceeded, returns the hits of the objects before `next_start_at` with truncated.by_timeout=true and next_start_at. */
-  time_budget_ms?: number;
 }
 
-export interface SearchHit {
+/** A hit in a source of a scanned object: its include names the source. */
+export interface ObjectHit {
   devclass: string;
   object_type: ScanObjectType;
   object_name: string;
@@ -70,114 +77,146 @@ export interface SearchHit {
   snippet: string;
 }
 
-export interface NoHitEntry {
+/**
+ * The ADT code a function module is answered under (DO18, measured on
+ * premise: the quick search and the group's node structure name a module
+ * `FUGR/FF`).
+ */
+export const FUNCTION_MODULE_TYPE: AdtCodes<'FUGR/FF'> = 'FUGR/FF';
+
+/**
+ * A hit in a function module, its own object (DO18): the module's name and
+ * its group — what `GetFunctionModule` takes —, no include.
+ */
+export interface FunctionModuleHit {
   devclass: string;
-  object_type: ScanObjectType;
+  object_type: typeof FUNCTION_MODULE_TYPE;
   object_name: string;
+  function_group_name: string;
+  line: number;
+  snippet: string;
 }
 
-/** An object whose read failed: the failure as it is, with its step. */
-export interface FailedObject {
-  devclass: string;
-  object_type: ScanObjectType;
-  object_name: string;
-  error: FailureEntry;
+export type SearchHit = ObjectHit | FunctionModuleHit;
+
+/** A hit answered at the `lines` level: no snippet. */
+export type LineHit =
+  | Omit<ObjectHit, 'snippet'>
+  | Omit<FunctionModuleHit, 'snippet'>;
+
+/** One object and include with hits, at the `objects` level: the hits answered for it. */
+export type ObjectEntry =
+  | (Omit<ObjectHit, 'line' | 'snippet'> & { hits: number })
+  | (Omit<FunctionModuleHit, 'line' | 'snippet'> & { hits: number });
+
+/** The hits as the level asks them. */
+function answeredAs(
+  level: AnswerLevel,
+  hits: readonly SearchHit[],
+): SearchHit[] | LineHit[] | ObjectEntry[] {
+  switch (level) {
+    case 'snippets':
+      return [...hits];
+    case 'lines':
+      return hits.map((hit): LineHit => {
+        const { snippet: _snippet, ...line } = hit;
+        return line;
+      });
+    case 'objects': {
+      const entries = new Map<string, ObjectEntry>();
+      for (const hit of hits) {
+        const { line: _line, snippet: _snippet, ...object } = hit;
+        const key = JSON.stringify(object);
+        const found = entries.get(key);
+        if (found !== undefined) found.hits += 1;
+        else entries.set(key, { ...object, hits: 1 });
+      }
+      return [...entries.values()];
+    }
+    default: {
+      const unreachable: never = level;
+      return unreachable;
+    }
+  }
 }
 
+/**
+ * The answer: the hits, and counters of what was done — the packages walked
+ * (their own level read), the objects read (at least one source), the
+ * sources read and the objects with a hit. What cannot be read is skipped
+ * and not counted (DO17).
+ */
 export interface OrchestratorResult {
-  results: SearchHit[];
-  no_hits?: NoHitEntry[];
-  /** Objects whose read failed, beside the others' hits; present only when any did. */
-  failures?: FailedObject[];
-  scanned: { packages: number; objects: number; sources: number };
-  /**
-   * The scan targets of the walk, before the slice. Absent when the deadline
-   * cut the package walk: the targets were never enumerated.
-   */
-  total_targets?: number;
-  /**
-   * Present only when targets remain: after the slice, or — the deadline cut
-   * the scan — from the first target not answered. Pass it as `start_at` to go on.
-   */
-  next_start_at?: number;
+  results: SearchHit[] | LineHit[] | ObjectEntry[];
+  scanned: {
+    packages: number;
+    objects: number;
+    sources: number;
+    objects_with_hits: number;
+  };
   truncated: {
+    /** A given `max_hits_per_object` left out an object's further hits. */
     by_object_cap: boolean;
-    by_max_objects: boolean;
-    /** True when a time_budget_ms deadline cut the scan; results hold the hits of the objects before `next_start_at`. */
-    by_timeout: boolean;
+    /** Present when `max_hits` was given: the scan stopped with anything left. */
+    by_max_hits?: boolean;
   };
 }
 
 export interface OrchestratorDeps {
+  /** Which lines of a source are hits: required, the orchestrator has no match of its own. */
+  lineMatch: LineMatchStrategy;
   fetchPackageContents: PackageContentsFetcher;
   sourceReader: ReadSourceUnitsDeps;
-  resolvePackages: (entries: string[]) => Promise<string[]>;
-  /** Injectable clock for deterministic tests. Defaults to Date.now. */
-  now?: () => number;
+  resolvePackages: (entries: string[]) => Promise<ResolvedPackages>;
 }
+
+/** The version a search reads when it names none. */
+const DEFAULT_VERSION: SourceVersion = 'active';
 
 const DEFAULTS = {
   include_subpackages: true,
-  object_types: [
-    'PROG',
-    'FUGR',
-    'CLAS',
-  ] as const satisfies readonly ScanObjectType[],
+  object_types: SCAN_OBJECT_TYPES,
   exclude_comments: false,
-  max_hits_per_object: 100,
-  emit_no_hits: false,
-  max_objects: 500,
   concurrency: 8,
-  version: 'active' as SourceVersion,
+  version: DEFAULT_VERSION,
 };
 
-/**
- * The slice of the walk's sorted targets one call reads: `[start_at,
- * start_at + max_objects)`. The one place the slice end is computed.
- */
-function sliceTargets<T>(
-  all: readonly T[],
-  startAt: number,
-  maxObjects: number,
-): { targets: T[]; total: number; next: number | undefined } {
-  const end = startAt + maxObjects;
-  return {
-    targets: all.slice(startAt, end),
-    total: all.length,
-    next: end < all.length ? end : undefined,
-  };
+/** A hit's include, for the order of the answer: a module's hit has none. */
+function includeOf(hit: SearchHit): string {
+  return 'include' in hit ? hit.include : '';
 }
 
-/** One target's answer in the sequential version: what it adds to the result. */
-interface TargetAnswer {
+/** One object's answer: what it adds to the result. */
+interface ObjectAnswer {
   hits: SearchHit[];
-  /** Answered in `no_hits` (no hit, `emit_no_hits` set) instead of `results`. */
-  noHit: boolean;
   capped: boolean;
+  /** This object's sources read: none, and the object was not read. */
   sources: number;
-  failure?: FailedObject;
+  /** The hits answered so far, against `max_hits_per_object`. */
+  total: number;
 }
 
 async function runWithLimit<T>(
   items: T[],
   limit: number,
   worker: (item: T) => Promise<void>,
-  shouldStop?: () => boolean,
+  stopped: () => boolean = () => false,
 ): Promise<void> {
   let next = 0;
-  // A failure the worker does not answer as its item's (a defect, not a
-  // read) ends the run: no pump takes another item, and the failure is
-  // answered once every pump has stopped — nothing runs on after the call has
-  // answered.
+  // A failure the worker does not answer as its item's (a credential
+  // failure, a defect) ends the run: no pump takes another item, and the
+  // failure is answered once every pump has stopped — nothing runs on after
+  // the call has answered.
   let failed: { error: unknown } | undefined;
   async function pump(): Promise<void> {
     while (true) {
-      if (failed) return;
-      if (shouldStop?.()) return;
+      if (failed || stopped()) return;
       const idx = next++;
       if (idx >= items.length) return;
+      const item = items[idx];
+      if (item === undefined) return;
       try {
-        await worker(items[idx]);
+        await worker(item);
       } catch (error) {
         failed ??= { error };
         return;
@@ -189,10 +228,8 @@ async function runWithLimit<T>(
   if (failed) throw failed.error;
 }
 
-export async function runSearchSource(
-  deps: OrchestratorDeps,
-  input: OrchestratorInput,
-): Promise<OrchestratorResult> {
+/** The checks every version of the scan makes before anything is sent. */
+function checkInput(input: OrchestratorInput): void {
   if (!input.query || input.query.length === 0) {
     throw new Error('query must be a non-empty string');
   }
@@ -202,24 +239,31 @@ export async function runSearchSource(
   if (input.exclude && input.exclude.length > 3) {
     throw new Error('exclude may not contain more than 3 entries');
   }
+}
 
-  const maxHits = input.max_hits_per_object ?? DEFAULTS.max_hits_per_object;
-  const maxObjects = input.max_objects ?? DEFAULTS.max_objects;
-  const concurrency = Math.min(
-    16,
-    Math.max(1, input.concurrency ?? DEFAULTS.concurrency),
-  );
-  const emitNoHits = input.emit_no_hits ?? DEFAULTS.emit_no_hits;
+export async function runSearchSource(
+  deps: OrchestratorDeps,
+  input: OrchestratorInput,
+): Promise<OrchestratorResult> {
+  checkInput(input);
+
+  // Absent, an object's hits are not limited.
+  const maxHits = input.max_hits_per_object;
+  // Absent, the answer's hits are not limited. Given, the hits count in the
+  // scan's order, so the targets are read one after another.
+  const maxTotal = input.max_hits;
+  const concurrency =
+    maxTotal !== undefined
+      ? 1
+      : Math.min(16, Math.max(1, input.concurrency ?? DEFAULTS.concurrency));
+  // The hits answered so far, and whether the scan stopped at `max_hits`.
+  let answered = 0;
+  let stopped = false;
+  let stoppedWithMore = false;
   const version = input.version ?? DEFAULTS.version;
-  const now = deps.now ?? Date.now;
-  const timeBudgetMs =
-    input.time_budget_ms != null && input.time_budget_ms > 0
-      ? input.time_budget_ms
-      : null;
-  const deadline = timeBudgetMs != null ? now() + timeBudgetMs : null;
-  const deadlinePassed = (): boolean => deadline != null && now() >= deadline;
 
-  const resolvedPackages = await deps.resolvePackages(input.packages);
+  const resolution = await deps.resolvePackages(input.packages);
+  const resolvedPackages = resolution.packages;
   const enumerateInput: EnumerateInput = {
     packages: resolvedPackages,
     include_subpackages:
@@ -227,21 +271,19 @@ export async function runSearchSource(
     object_filter: input.object_filter,
     object_types: input.object_types ?? DEFAULTS.object_types,
   };
-  const allTargets =
+  const enumerated =
     resolvedPackages.length === 0
-      ? []
+      ? { targets: [], packages: 0 }
       : await enumerateScanTargets(deps.fetchPackageContents, enumerateInput);
-  const startAt = input.start_at ?? 0;
-  const slice = sliceTargets(allTargets, startAt, maxObjects);
-  const targets = slice.targets;
-  const truncatedByMaxObjects = slice.next !== undefined;
+  // One run reads every target.
+  const targets = enumerated.targets;
 
-  // Each target's answer, by its index in the slice; a target the deadline
-  // cut has none. The answer holds whole targets, and only those before the
-  // first one not finished: under concurrency a later target may finish
-  // before an earlier one is cut, and answering it would answer it twice
-  // once the next call goes on from `next_start_at`.
-  const answers: Array<TargetAnswer | undefined> = Array.from(
+  // Every source read, once however many objects name it (DO17: the
+  // counters count the work done).
+  const sourcesRead = new Set<string>();
+
+  // Each target's answer, by its index.
+  const answers: Array<ObjectAnswer[] | undefined> = Array.from(
     { length: targets.length },
     () => undefined,
   );
@@ -250,119 +292,127 @@ export async function runSearchSource(
     targets.map((_, index) => index),
     concurrency,
     async (index) => {
+      if (stopped) return;
       const target = targets[index];
-      let totalForTarget = 0;
-      let capHitForTarget = false;
-      let sources = 0;
-      const targetHits: SearchHit[] = [];
-
-      const units = readSourceUnits(deps.sourceReader, target, version);
-      for (;;) {
-        let next: IteratorResult<{ include: string; lines: string[] }>;
-        try {
-          next = await units.next();
-        } catch (error) {
-          // A read that failed — SAP's refusal, a chain failure — is this
-          // object's answer, with its step; the others are scanned on. The
-          // hits read before it stay.
-          // A credential failure is every item's: it ends the call as it came.
-          if (
-            isCredentialFailure(error) ||
-            (methodFailureOf(error) === undefined &&
-              failureOf(error) === undefined)
-          )
-            throw error;
-          answers[index] = {
-            hits: targetHits,
-            noHit: false,
-            capped: false,
-            sources,
-            failure: {
+      if (target === undefined) return;
+      // Each object of the target its own bookkeeping (DO18): the target
+      // itself, and every function module read under it.
+      const objects = new Map<string, ObjectAnswer>();
+      const objectOf = (unit: SourceUnit): ObjectAnswer => {
+        const key = unit.module === undefined ? '' : unit.module.name;
+        const found = objects.get(key);
+        if (found !== undefined) return found;
+        const created: ObjectAnswer = {
+          hits: [],
+          capped: false,
+          sources: 0,
+          total: 0,
+        };
+        objects.set(key, created);
+        return created;
+      };
+      const hitOf = (
+        unit: SourceUnit,
+        line: number,
+        snippet: string,
+      ): SearchHit =>
+        unit.module === undefined
+          ? {
               devclass: target.devclass,
               object_type: target.object_type,
               object_name: target.object_name,
-              error: thrownEntry(error, 'read source'),
-            },
-          };
-          return;
-        }
-        if (next.done) break;
-        const unit = next.value;
-        // The deadline cuts this target: it is not answered.
-        if (deadlinePassed()) return;
-        sources++;
-        const remaining = maxHits - totalForTarget;
-        if (remaining <= 0) {
-          const probe = scanLines(unit.lines, {
-            query: input.query,
-            query2: input.query2,
-            exclude: input.exclude,
-            exclude_comments: input.exclude_comments,
-            max_hits: 1,
-          });
-          if (probe.hits.length > 0) {
-            capHitForTarget = true;
-            break;
-          }
-          continue;
-        }
-        const scan = scanLines(unit.lines, {
+              include: unit.include,
+              line,
+              snippet,
+            }
+          : {
+              devclass: target.devclass,
+              object_type: FUNCTION_MODULE_TYPE,
+              object_name: unit.module.name,
+              function_group_name: unit.module.group,
+              line,
+              snippet,
+            };
+
+      // A source that cannot be read is skipped by the reader and its other
+      // sources are read on; a credential failure is thrown by the reader
+      // and ends the call.
+      for await (const unit of readSourceUnits(
+        deps.sourceReader,
+        target,
+        version,
+      )) {
+        const object = objectOf(unit);
+        object.sources++;
+        sourcesRead.add(unit.source);
+        const terms = {
           query: input.query,
           query2: input.query2,
           exclude: input.exclude,
           exclude_comments: input.exclude_comments,
-          max_hits: remaining,
+        };
+        // A given limit caps the hits answered, never the reads. Past it a
+        // source is only probed for a hit, which marks the cap.
+        if (maxHits !== undefined && object.total >= maxHits) {
+          if (object.capped) continue;
+          const probe = deps.lineMatch.match(unit.lines, {
+            ...terms,
+            max_hits: 1,
+          });
+          if (probe.hits.length > 0) object.capped = true;
+          continue;
+        }
+        const ownRoom =
+          maxHits === undefined ? undefined : maxHits - object.total;
+        const answerRoom =
+          maxTotal === undefined ? undefined : maxTotal - answered;
+        const room =
+          ownRoom === undefined
+            ? answerRoom
+            : answerRoom === undefined
+              ? ownRoom
+              : Math.min(ownRoom, answerRoom);
+        const scan = deps.lineMatch.match(unit.lines, {
+          ...terms,
+          max_hits: room,
         });
         for (const h of scan.hits) {
-          targetHits.push({
-            devclass: target.devclass,
-            object_type: target.object_type,
-            object_name: target.object_name,
-            include: unit.include,
-            line: h.line,
-            snippet: h.snippet,
-          });
+          object.hits.push(hitOf(unit, h.line, h.snippet));
         }
-        totalForTarget += scan.hits.length;
-        if (scan.capped) {
-          capHitForTarget = true;
+        object.total += scan.hits.length;
+        answered += scan.hits.length;
+        if (
+          scan.capped &&
+          ownRoom !== undefined &&
+          (answerRoom === undefined || ownRoom <= answerRoom)
+        ) {
+          object.capped = true;
+        }
+        // The answer holds `max_hits`: the scan stops, with anything left —
+        // a further hit of this source, a source or a target not read.
+        if (maxTotal !== undefined && answered >= maxTotal) {
+          stopped = true;
+          stoppedWithMore =
+            scan.capped || !unit.last || index < targets.length - 1;
           break;
         }
       }
 
-      answers[index] = {
-        hits: targetHits,
-        noHit: targetHits.length === 0 && emitNoHits,
-        capped: capHitForTarget,
-        sources,
-      };
+      answers[index] = [...objects.values()];
     },
-    deadlinePassed,
+    () => stopped,
   );
 
-  const firstUnfinished = answers.indexOf(undefined);
-  const finished = firstUnfinished < 0 ? targets.length : firstUnfinished;
-  const timedOut = finished < targets.length;
-
   const allHits: SearchHit[] = [];
-  const noHits: NoHitEntry[] = [];
-  const failures: FailedObject[] = [];
-  let sourcesScanned = 0;
+  let objectsRead = 0;
+  let objectsWithHits = 0;
   let truncatedByObjectCap = false;
-  for (let index = 0; index < finished; index++) {
-    const answer = answers[index] as TargetAnswer;
-    const target = targets[index];
-    sourcesScanned += answer.sources;
-    if (answer.capped) truncatedByObjectCap = true;
-    if (answer.failure !== undefined) failures.push(answer.failure);
-    if (answer.noHit) {
-      noHits.push({
-        devclass: target.devclass,
-        object_type: target.object_type,
-        object_name: target.object_name,
-      });
-    } else {
-      allHits.push(...answer.hits);
+  for (const answer of answers) {
+    for (const object of answer ?? []) {
+      if (object.sources > 0) objectsRead++;
+      if (object.hits.length > 0) objectsWithHits++;
+      if (object.capped) truncatedByObjectCap = true;
+      appendAll(allHits, object.hits);
     }
   }
 
@@ -370,45 +420,25 @@ export async function runSearchSource(
     if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
     if (a.object_name !== b.object_name)
       return a.object_name < b.object_name ? -1 : 1;
-    if (a.include !== b.include) return a.include < b.include ? -1 : 1;
+    const x = includeOf(a);
+    const y = includeOf(b);
+    if (x !== y) return x < y ? -1 : 1;
     return a.line - b.line;
   });
 
-  if (emitNoHits) {
-    noHits.sort((a, b) => {
-      if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
-      if (a.object_type !== b.object_type)
-        return a.object_type < b.object_type ? -1 : 1;
-      return a.object_name < b.object_name ? -1 : 1;
-    });
-  }
-
   const result: OrchestratorResult = {
-    results: allHits,
+    results: answeredAs(input.answer ?? 'snippets', allHits),
     scanned: {
-      packages: resolvedPackages.length,
-      objects: finished,
-      sources: sourcesScanned,
+      packages: enumerated.packages,
+      objects: objectsRead,
+      sources: sourcesRead.size,
+      objects_with_hits: objectsWithHits,
     },
-    total_targets: slice.total,
-    truncated: {
-      by_object_cap: truncatedByObjectCap,
-      by_max_objects: truncatedByMaxObjects,
-      by_timeout: timedOut,
-    },
+    truncated:
+      maxTotal === undefined
+        ? { by_object_cap: truncatedByObjectCap }
+        : { by_object_cap: truncatedByObjectCap, by_max_hits: stoppedWithMore },
   };
-  // Cut by the deadline, the call goes on from the first target not
-  // answered; otherwise from the end of the slice, when targets remain.
-  const next = timedOut ? startAt + finished : slice.next;
-  if (next !== undefined) result.next_start_at = next;
-  if (emitNoHits) result.no_hits = noHits;
-  if (failures.length > 0) {
-    failures.sort((a, b) => {
-      if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
-      return a.object_name < b.object_name ? -1 : 1;
-    });
-    result.failures = failures;
-  }
   return result;
 }
 
@@ -421,9 +451,6 @@ export const READS_PER_ENVELOPE = 300;
  */
 const TARGETS_PER_CHUNK = READS_PER_ENVELOPE;
 
-/** The passed `time_budget_ms` of the batched version, before an envelope. */
-const PAST_DEADLINE = new Error('time_budget_ms passed');
-
 /** A credential failure in a phase is every item's: it ends the call as it came. */
 function endOnCredential(answers: Iterable<PhaseResult<unknown>>): void {
   for (const answer of answers) {
@@ -434,111 +461,73 @@ function endOnCredential(answers: Iterable<PhaseResult<unknown>>): void {
 /**
  * The batched version of `SearchSource` (spec §11): its independent reads in
  * ADT batch envelopes — (1) the quickSearch of every package mask, one
- * envelope; (2) the package walk's levels (`walkPackages`: per level the root
+ * envelope per round of the masks not resolved yet; (2) the package walk's levels (`walkPackages`: per level the root
  * node structures, then their type nodes), one envelope each; (3) the source
- * reads of the slice's targets, in chunks of 300 targets, each chunk's rounds
- * (the main sources and function group structures, then the function groups'
- * includes and function modules) in envelopes of at most
- * `READS_PER_ENVELOPE`. `time_budget_ms` is checked before every envelope:
- * once it passed, nothing further is sent, and the targets read whole — the
- * chunks finished — are answered with `truncated.by_timeout` and
- * `next_start_at` at the first target not answered. The answer is assembled
- * by `runSearchSource` over the phases' answers, so the hits, the failures
- * and the limits are the sequential version's.
+ * reads of every target, in chunks of 300 targets, each chunk's rounds
+ * (the objects' own sources and function group structures, then the function
+ * groups' includes and function modules) in envelopes of at most
+ * `READS_PER_ENVELOPE`, each source once. The answer is assembled by
+ * `runSearchSource` over the phases' answers, so the hits, the counters and
+ * the limits are the sequential version's.
  */
 async function runSearchSourceInPhases(
   ctx: HandlerContext,
   input: OrchestratorInput,
+  lineMatch: LineMatchStrategy,
 ): Promise<OrchestratorResult> {
-  if (!input.query || input.query.length === 0) {
-    throw new Error('query must be a non-empty string');
-  }
-  if (!input.packages || input.packages.length === 0) {
-    throw new Error('packages must contain at least one entry');
-  }
-  if (input.exclude && input.exclude.length > 3) {
-    throw new Error('exclude may not contain more than 3 entries');
-  }
-  const maxObjects = input.max_objects ?? DEFAULTS.max_objects;
-  const startAt = input.start_at ?? 0;
-  const emitNoHits = input.emit_no_hits ?? DEFAULTS.emit_no_hits;
+  checkInput(input);
   const version = input.version ?? DEFAULTS.version;
-  const deadline =
-    input.time_budget_ms != null && input.time_budget_ms > 0
-      ? Date.now() + input.time_budget_ms
-      : null;
-  const deadlinePassed = (): boolean =>
-    deadline != null && Date.now() >= deadline;
-  // Cut before the targets are known: their count is unknown too —
-  // `total_targets` is left out — and the call goes on from where it was
-  // asked to start.
-  const cutBeforeTargets = (packages: number): OrchestratorResult => {
-    const cut: OrchestratorResult = {
-      results: [],
-      scanned: { packages, objects: 0, sources: 0 },
-      next_start_at: startAt,
-      truncated: {
-        by_object_cap: false,
-        by_max_objects: false,
-        by_timeout: true,
-      },
-    };
-    if (emitNoHits) cut.no_hits = [];
-    return cut;
-  };
-  // (1) The quickSearch of every package mask; the deadline is checked
-  // before its envelope.
+  // (1) The quickSearch of every package mask, a phase per round: each run
+  // of the resolver names the next round of every mask not resolved yet; the
+  // phases repeat until a run asks nothing — every mask resolved or refused.
   const searches = new Map<string, PhaseResult<string[]>>();
-  const askedSearches: SearchObjectsArgs[] = [];
-  const resolverDeps: PackageResolverDeps = {
-    searchObjects: answeredSearch(searches, askedSearches),
-  };
-  await resolvePackagePatterns(resolverDeps, input.packages);
-  if (askedSearches.length > 0) {
-    if (deadlinePassed()) return cutBeforeTargets(0);
+  let resolution: ResolvedPackages;
+  for (;;) {
+    const askedSearches: SearchObjectsArgs[] = [];
+    resolution = await resolvePackagePatterns(
+      { searchObjects: answeredSearch(searches, askedSearches) },
+      input.packages,
+    );
+    if (askedSearches.length === 0) break;
     const answered = await searchPackagesInPhase(ctx, askedSearches);
     endOnCredential(answered.values());
     for (const [key, answer] of answered) searches.set(key, answer);
   }
-  const resolved = await resolvePackagePatterns(resolverDeps, input.packages);
+  const resolved = resolution.packages;
 
-  // (2) The package walk's levels; the deadline is checked before each.
+  // (2) The package walk's levels.
   const names = resolved.map((name) => name.toUpperCase());
-  const levels = batchReader<NodeRequest, unknown>(ctx, (request, connection) =>
-    readNode(
-      nodeStructureOn(
-        ctx,
-        createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+  const levels = batchReader<NodeRequest, NodeAnswer>(
+    ctx,
+    (request, connection) =>
+      readNode(
+        nodeStructureOn(
+          ctx,
+          createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+        ),
+        request,
       ),
-      request,
-    ),
   );
-  let walked: PhaseResult<WalkedItem[]>[];
-  try {
-    walked =
-      names.length === 0
-        ? []
-        : await walkPackages(
-            (requests) =>
-              deadlinePassed()
-                ? Promise.reject(PAST_DEADLINE)
-                : levels(requests),
-            names,
-            {
-              includeSubpackages:
-                input.include_subpackages ?? DEFAULTS.include_subpackages,
-            },
-          );
-  } catch (error) {
-    // The walk was cut.
-    if (error === PAST_DEADLINE) return cutBeforeTargets(resolved.length);
-    throw error;
-  }
+  // Every package whose own level was read: the asked ones' walks together
+  // (a package two asked packages reach is counted once, `enumerateScanTargets`).
+  const walkedPackages = new Set<string>();
+  const walked: PhaseResult<WalkedItem[]>[] =
+    names.length === 0
+      ? []
+      : await walkPackages(levels, names, {
+          includeSubpackages:
+            input.include_subpackages ?? DEFAULTS.include_subpackages,
+          missingLevel: 'refused',
+          branchRule: { walked: walkedPackages },
+        });
   const fetchPackageContents: PackageContentsFetcher = async (packageName) => {
     const answer = walked[names.indexOf(packageName.toUpperCase())];
-    if (answer === undefined) return [];
+    if (answer === undefined) return { items: [], walked: new Set() };
     if (!answer.ok) throw answer.error;
-    return assembleList(packageName, answer.value);
+    return {
+      items: assembleList(packageName, answer.value),
+      walked: walkedPackages,
+    };
   };
   const enumerateInput: EnumerateInput = {
     packages: resolved,
@@ -547,38 +536,40 @@ async function runSearchSourceInPhases(
     object_filter: input.object_filter,
     object_types: input.object_types ?? DEFAULTS.object_types,
   };
-  const allTargets =
+  const enumerated =
     resolved.length === 0
-      ? []
+      ? { targets: [], packages: 0 }
       : await enumerateScanTargets(fetchPackageContents, enumerateInput);
-  // The slice of the final scan below (`runSearchSource`, the same start and
-  // the same sorted targets) must stay this one: the reads sent here are the
-  // reads of these targets.
-  const slice = sliceTargets(allTargets, startAt, maxObjects);
-  const targets = slice.targets;
+  // Every target: the final scan below (`runSearchSource`) reads the same
+  // ones, so the reads sent here are the reads it answers from.
+  const targets = enumerated.targets;
 
   // (3) The source reads of the targets, in chunks of TARGETS_PER_CHUNK: a
-  // chunk is read through all its rounds — the main sources and function
-  // group structures, then the function groups' includes and function
-  // modules — each round's unique reads in envelopes of at most
-  // READS_PER_ENVELOPE. The deadline is checked before every envelope; a
-  // chunk it cut answers none of its targets, so the answer holds whole
-  // targets, those of the chunks read to the end.
-  const sources = new Map<string, PhaseResult<unknown>>();
-  let passed = false;
-  let finished = 0;
-  chunks: for (let at = 0; at < targets.length; at += TARGETS_PER_CHUNK) {
+  // chunk is read through all its rounds, each round's reads not answered
+  // yet — every source once, whichever objects name it — in envelopes of at
+  // most READS_PER_ENVELOPE.
+  const sources = noAnsweredReads();
+  // The scan over the answers read so far: `runSearchSource` over the
+  // phases' answers, the sequential version's own.
+  const scanAnswered = (asked: OrchestratorInput) =>
+    runSearchSource(
+      {
+        lineMatch,
+        fetchPackageContents,
+        sourceReader: answeredReaderDeps(sources, []),
+        resolvePackages: async () => resolution,
+      },
+      { ...asked, concurrency: 1 },
+    );
+  for (let at = 0; at < targets.length; at += TARGETS_PER_CHUNK) {
     const chunk = targets.slice(at, at + TARGETS_PER_CHUNK);
     for (;;) {
-      const asked: SourceRead[] = [];
+      const asked: Read[] = [];
       const naming = answeredReaderDeps(sources, asked);
       for (const target of chunk) {
-        try {
-          for await (const _unit of readSourceUnits(naming, target, version)) {
-            // Only the reads it names are wanted here.
-          }
-        } catch {
-          // A failure answered: the scan below answers it.
+        for await (const _unit of readSourceUnits(naming, target, version)) {
+          // Only the reads it names are wanted here; the scan below answers
+          // the units.
         }
       }
       const unique = [
@@ -586,67 +577,54 @@ async function runSearchSourceInPhases(
       ];
       if (unique.length === 0) break;
       for (let i = 0; i < unique.length; i += READS_PER_ENVELOPE) {
-        if (deadlinePassed()) {
-          passed = true;
-          break chunks;
-        }
-        const answered = await readSourcesInPhase(
+        await readSourcesInPhase(
           ctx,
           unique.slice(i, i + READS_PER_ENVELOPE),
+          sources,
         );
-        endOnCredential(answered.values());
-        for (const [key, answer] of answered) sources.set(key, answer);
       }
     }
-    finished = at + chunk.length;
+    // `max_hits` (DO23): the scan stops at a chunk boundary — once the
+    // chunks read hold `max_hits` hits, no envelope of a later chunk is sent.
+    if (input.max_hits !== undefined) {
+      const sofar = await scanAnswered({ ...input, answer: 'snippets' });
+      if (sofar.results.length >= input.max_hits) break;
+    }
   }
 
-  // The scan, over the phases' answers: the sequential version's own, over
-  // the targets answered whole.
-  const { time_budget_ms: _budget, ...scanned } = input;
-  const result = await runSearchSource(
-    {
-      fetchPackageContents,
-      sourceReader: answeredReaderDeps(sources, [], ctx.logger),
-      resolvePackages: async () => resolved,
-    },
-    {
-      ...scanned,
-      start_at: startAt,
-      max_objects: passed ? finished : maxObjects,
-      concurrency: 1,
-    },
-  );
-  if (passed) {
-    // Cut by the deadline: the call goes on from the first target not
-    // answered; `max_objects` is the slice's as asked.
-    result.next_start_at = startAt + finished;
-    result.truncated.by_max_objects = slice.next !== undefined;
-    result.truncated.by_timeout = true;
-  }
-  return result;
+  // The scan, over the phases' answers: the sequential version's own. With
+  // `max_hits`, `scanned.sources` counts the sources read — those of the
+  // chunk the scan stopped in included, read but not scanned.
+  const scanned = await scanAnswered(input);
+  if (input.max_hits === undefined) return scanned;
+  const read = [...sources.sources.values()].filter(
+    (answer) => answer.ok && answer.value.ok,
+  ).length;
+  return { ...scanned, scanned: { ...scanned.scanned, sources: read } };
 }
 
 /**
  * `SearchSource` on the call's connection: the batched version
  * (`runSearchSourceInPhases`), or — where the destination has no
- * communication batch — the sequential version, today's reads one object
- * after another.
+ * communication batch — the sequential version, the reads one object after
+ * another, each source read once per call (`readingOnce`).
  */
 export function runSearchSourceWithContext(
   ctx: HandlerContext,
   input: OrchestratorInput,
+  lineMatch: LineMatchStrategy,
 ): Promise<OrchestratorResult> {
   return withSequentialFallback(
     ctx,
-    () => runSearchSourceInPhases(ctx, input),
+    () => runSearchSourceInPhases(ctx, input, lineMatch),
     () => {
       const searchObjects = createPackagePatternResolver(ctx);
       const resolverDeps: PackageResolverDeps = { searchObjects };
       return runSearchSource(
         {
+          lineMatch,
           fetchPackageContents: createPackageContentsFetcher(ctx),
-          sourceReader: createSourceReaderDeps(ctx),
+          sourceReader: readingOnce(createSourceReaderDeps(ctx)),
           resolvePackages: (entries) =>
             resolvePackagePatterns(resolverDeps, entries),
         },

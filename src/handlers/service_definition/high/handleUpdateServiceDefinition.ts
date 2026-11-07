@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateServiceDefinition Handler - Update Existing ABAP Service Definition Source
  *
@@ -26,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -41,30 +43,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_definition_name: {
-        type: 'string',
-        description: 'Service definition name. Must exist in the system.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete service definition source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate service definition after update. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['service_definition_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    service_definition_name: z
+      .string()
+      .describe('Service definition name. Must exist in the system.'),
+    source_code: z
+      .string()
+      .describe('Complete service definition source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate service definition after update. Default: true.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateServiceDefinitionArgs {
@@ -135,7 +132,7 @@ export async function handleUpdateServiceDefinition(
       );
 
       if (!written.ok) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.

@@ -26,7 +26,8 @@ describe('the slot table', () => {
     const unknown: string[] = [];
     for (const key of Object.keys(m).filter((k) => /Documents$/.test(k))) {
       for (const slot of Object.keys(m[key])) {
-        if (READING_BY_SLOT[slot] === undefined) unknown.push(`${key}.${slot}`);
+        if (!Object.hasOwn(READING_BY_SLOT, slot))
+          unknown.push(`${key}.${slot}`);
       }
     }
     // A slot adt-clients adds arrives here, not as an unshaped answer at a call site.

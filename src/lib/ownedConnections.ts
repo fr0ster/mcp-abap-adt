@@ -50,6 +50,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { isLatched } from './activeTools';
 import { ClosedInstanceRefusal } from './auth/failures';
+import { hasMethod } from './capability';
 
 /** What an owned connection is to its instance. */
 export type ConnectionRole =
@@ -241,18 +242,17 @@ export function endConnection(
   const running = ending.get(connection);
   if (running) return running;
   owned.delete(connection);
-  let complete!: (completed: boolean) => void;
+  let complete: (completed: boolean) => void = () => {};
   completions.set(
     connection,
     new Promise<boolean>((resolve) => {
       complete = resolve;
     }),
   );
-  const closable = connection as { disconnect?: () => Promise<void> };
   const closing = (async () => {
     try {
-      if (typeof closable.disconnect === 'function') {
-        await closable.disconnect();
+      if (hasMethod(connection, 'disconnect')) {
+        await connection.disconnect();
       }
     } catch {
       logoffListeners.delete(connection);
@@ -300,9 +300,7 @@ function followAnswer(
   connection: object,
   complete: (completed: boolean) => void,
 ): void {
-  const flush = (connection as { flushGoodbye?: () => Promise<void> })
-    .flushGoodbye;
-  if (typeof flush !== 'function') {
+  if (!hasMethod(connection, 'flushGoodbye')) {
     // Nothing to wait for the answer with: the logoff never completes here.
     logoffListeners.delete(connection);
     complete(false);
@@ -311,7 +309,7 @@ function followAnswer(
   const answered = (async () => {
     let completed = false;
     try {
-      await flush.call(connection);
+      await connection.flushGoodbye();
       completed = true;
     } catch {
       // The library's flush never rejects; a stand-in that does ends the

@@ -20,7 +20,6 @@
     ],
     "rootDir": "..",
     "outDir": "./dist",
-    "noImplicitAny": false,
     "paths": {
       "@mcp-abap-adt/background-runs-memory": [
         "../background-runs-memory/src/index.ts"

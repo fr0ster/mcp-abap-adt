@@ -1,7 +1,10 @@
 /**
  * Compact `HandlerUpdate` is one ADT request: the write of the type under the
- * caller's `lock_handle`, for every type — no lock, unlock, check, activation,
- * no read before the write and none after it (spec §4.6, the owner's rule:
+ * caller's `lock_handle`, for every type but a function module — no lock,
+ * unlock, check, activation, no read before the write and none after it. A
+ * function module's metadata is read first, at the group given, and the
+ * write is sent only when that group holds it (#2: SAP ignores the group of
+ * a module's address) (spec §4.6, the owner's rule:
  * compact is one request per tool call, the consumer chains HandlerLock →
  * HandlerUpdate → HandlerUnlock → HandlerActivate). There is no flag and no mode.
  *
@@ -25,6 +28,13 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
+import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
+import { holding } from '../../../src/__tests__/helpers/heldLocks';
+import {
+  declaredRequired,
+  jsonAt,
+  listedJson,
+} from '../../../src/__tests__/helpers/listedJson';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
   resetSystemContextCache,
@@ -87,17 +97,32 @@ function recording(mode: Mode) {
         headers: {},
         data: String(options.url).includes('_action=LOCK')
           ? LOCK_SUCCESS_XML
-          : '',
+          : String(options.url) === MODULE_METADATA
+            ? moduleMetadataDocument('Z_FM_A', 'ZFG_A')
+            : '',
       };
     },
   };
   return { connection, sent };
 }
 
+/** The function module's metadata read, at its group (#2). */
+const MODULE_METADATA =
+  '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea';
+
+/** Every type but the function module, whose group is checked first (#2). */
+const notModule = ([type]: readonly [string, unknown]) =>
+  type !== 'FUNCTION_MODULE';
+
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
+// The instance locked what the cases write under: its owner holds the handle.
 const contextOver = (connection: unknown) =>
-  ({ connection, logger: silent }) as unknown as HandlerContext;
+  ({
+    connection,
+    logger: silent,
+    heldLocks: holding(LOCK),
+  }) as unknown as HandlerContext;
 
 /** Lets every queued callback and immediate run, so a held handler sends all it can. */
 async function settle(): Promise<void> {
@@ -256,7 +281,7 @@ describe('HandlerUpdate is one write under lock_handle', () => {
     expect(withUpdate).toEqual([...new Set(TYPES.map(([t]) => t))].sort());
   });
 
-  it.each(TYPES)(
+  it.each(TYPES.filter(notModule))(
     '%s: exactly one request, under the given lock_handle, the same held, answered or 404',
     async (objectType, fields) => {
       const call = update(objectType, underLock(fields));
@@ -299,7 +324,28 @@ describe('HandlerUpdate is one write under lock_handle', () => {
     },
   );
 
-  it.each(SOURCES)(
+  it('FUNCTION_MODULE: the metadata read at its group, then the one write under the given lock_handle, its body the source byte for byte (#2)', async () => {
+    const [, fields] = SOURCES.find(([type]) => !notModule([type, 0])) ?? [];
+    const call = update('FUNCTION_MODULE', underLock(fields ?? {}));
+    const held = await run('pending', call);
+    const answered = await run('answered', call);
+    const notFound = await run('not-found', call);
+
+    expect(held.sent.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      `GET ${MODULE_METADATA}`,
+    ]);
+    expect(answered.sent.map(({ method }) => method)).toEqual(['GET', 'PUT']);
+    const write = answered.sent[1];
+    expect(write?.url).toContain(`lockHandle=${LOCK}`);
+    expect(write?.url).toContain(`corrNr=${TRANSPORT}`);
+    expect(write?.data).toBe('source text');
+    expect(answered.answer?.isError).not.toBe(true);
+    // SAP refused the metadata read: nothing is written.
+    expect(notFound.sent).toEqual(held.sent);
+    expect(notFound.answer?.isError).toBe(true);
+  });
+
+  it.each(SOURCES.filter(notModule))(
     '%s: the body is the given source, byte for byte',
     async (objectType, fields) => {
       const held = await run('pending', update(objectType, underLock(fields)));
@@ -338,16 +384,25 @@ describe('HandlerUpdate is one write under lock_handle', () => {
     async (objectType, fields) => {
       // A service binding's publication runs under the empty handle its
       // lock may answer; every other type needs one.
-      const absent =
-        objectType === 'SERVICE_BINDING' ? [undefined] : [undefined, ''];
-      for (const lock_handle of absent) {
+      // Absent, the schema refuses it (it requires the key); empty, the
+      // handler does.
+      const absent: Array<[string | undefined, string]> = [
+        [
+          undefined,
+          'Input validation error: Invalid arguments for tool HandlerUpdate: Invalid input: expected string, received undefined at lock_handle',
+        ],
+      ];
+      if (objectType !== 'SERVICE_BINDING') {
+        absent.push(['', 'lock_handle is required']);
+      }
+      for (const [lock_handle, words] of absent) {
         const answered = await run(
           'answered',
           update(objectType, { ...fields, lock_handle }),
         );
         expect(answered.sent).toEqual([]);
         expect(answered.answer?.isError).toBe(true);
-        expect(textOf(answered.answer)).toContain('lock_handle is required');
+        expect(textOf(answered.answer)).toContain(words);
       }
     },
   );
@@ -361,6 +416,36 @@ describe('HandlerUpdate is one write under lock_handle', () => {
       );
       expect(answered.sent).toEqual([]);
       expect(textOf(answered.answer)).toContain('source_code is required');
+    },
+  );
+
+  // A type whose write is a target tool's is parsed with that tool's
+  // schema: a name it requires, absent, is refused in its words, naming the
+  // target, before any request (spec §3).
+  it.each([
+    ['TABLE', 'table_name', 'UpdateTableLow'],
+    ['STRUCTURE', 'structure_name', 'UpdateStructureLow'],
+    ['DDL', 'ddl_name', 'UpdateDdlLow'],
+    ['CLASS', 'class_name', 'UpdateClassLow'],
+    ['PROGRAM', 'program_name', 'UpdateProgramLow'],
+    ['INTERFACE', 'interface_name', 'UpdateInterfaceLow'],
+    ['FUNCTION_MODULE', 'function_module_name', 'UpdateFunctionModuleLow'],
+    ['BEHAVIOR_DEFINITION', 'name', 'UpdateBehaviorDefinitionLow'],
+    ['METADATA_EXTENSION', 'name', 'UpdateMetadataExtensionLow'],
+  ])(
+    "%s without %s: refused by %s's schema, before any request",
+    async (objectType, name, target) => {
+      const fields = TYPES.find(([type]) => type === objectType)?.[1] ?? {};
+      const answered = await run(
+        'answered',
+        update(objectType, underLock({ ...fields, [name]: undefined })),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        `Input validation error: Invalid arguments for tool ${target}: `,
+      );
+      expect(textOf(answered.answer)).toContain(` at ${name}`);
     },
   );
 
@@ -419,6 +504,7 @@ describe('HandlerUpdate part: the include’s source or its metadata', () => {
     expect(held.sent[0].data).toBe(document);
   });
 
+  // A part the schema does not list is refused by the parse, in its words.
   it('INCLUDE with a part of no such name: refused before any request', async () => {
     const answered = await run(
       'answered',
@@ -427,7 +513,7 @@ describe('HandlerUpdate part: the include’s source or its metadata', () => {
     expect(answered.sent).toEqual([]);
     expect(answered.answer?.isError).toBe(true);
     expect(textOf(answered.answer)).toContain(
-      'part is source or metadata for INCLUDE',
+      'Input validation error: Invalid arguments for tool HandlerUpdate: Invalid option: expected one of "source"|"metadata" at part',
     );
   });
 
@@ -459,14 +545,11 @@ describe('HandlerUpdate part: the include’s source or its metadata', () => {
   });
 });
 
-const schemaProperties = compactUpdateSchema.properties as Record<
-  string,
-  unknown
->;
+const schemaProperties = listedJson(compactUpdateSchema).properties ?? {};
 
 describe('the HandlerUpdate schema and description', () => {
   it('requires object_type and lock_handle', () => {
-    expect([...compactUpdateSchema.required].sort()).toEqual([
+    expect([...declaredRequired(compactUpdateSchema)].sort()).toEqual([
       'lock_handle',
       'object_type',
     ]);
@@ -553,7 +636,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
 
   it('their schemas name the service types', () => {
     for (const schema of [compactLockSchema, compactUnlockSchema]) {
-      expect(schema.properties.object_type.enum).toEqual(
+      expect(jsonAt(listedJson(schema), 'object_type').enum).toEqual(
         expect.arrayContaining(['SERVICE_DEFINITION', 'SERVICE_BINDING']),
       );
     }
@@ -594,10 +677,12 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   ])(
     '%s locks a table type on both variants, an include on premise only',
     (_tool, variants) => {
-      const onprem: readonly string[] =
-        variants.onprem.inputSchema.properties.object_type.enum;
-      const cloud: readonly string[] =
-        variants.cloud.inputSchema.properties.object_type.enum;
+      const onprem =
+        jsonAt(listedJson(variants.onprem.inputSchema), 'object_type').enum ??
+        [];
+      const cloud =
+        jsonAt(listedJson(variants.cloud.inputSchema), 'object_type').enum ??
+        [];
       expect(onprem).toEqual(expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']));
       expect(cloud).toContain('TABLE_TYPE');
       expect(cloud).not.toContain('INCLUDE');
@@ -605,9 +690,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   );
 
   it('HandlerUpdate’s schema names every type it writes', () => {
-    const named = (
-      compactUpdateSchema.properties.object_type as { enum?: readonly string[] }
-    ).enum;
+    const named = jsonAt(listedJson(compactUpdateSchema), 'object_type').enum;
     expect(named).toEqual(
       expect.arrayContaining([...new Set(TYPES.map(([t]) => t))]),
     );
@@ -670,7 +753,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   });
 
   it.each([
-    ['without held locks', undefined],
+    ['holding the lock of the other cases', undefined],
     ['with held locks (Streamable HTTP)', new HeldLocks()],
   ])(
     'unlocking a service binding with an empty lock_handle, %s: nothing to unlock, nothing sent',

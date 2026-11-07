@@ -32,9 +32,9 @@ import { handleUpdateLocalTestClass } from '../../../../handlers/class/high/hand
 import { handleUpdateLocalTypes } from '../../../../handlers/class/high/handleUpdateLocalTypes';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
 import {
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -309,7 +309,7 @@ ENDCLASS.`;
         // happen at all.
         if (!isTestAvailableForSystem(['onprem', 'legacy'])) {
           logger?.info(
-            `   • skipping LocalMacros handlers: macros are not part of the ${getSystemType()} ABAP language version`,
+            `   • skipping LocalMacros handlers: macros are not part of the ${statedKindWords()} ABAP language version`,
           );
         } else {
           logger?.info(`   • testing LocalMacros handlers`);

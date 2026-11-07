@@ -275,9 +275,12 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
       },
     });
     const fetcher = createPackageContentsFetcher(context as any);
-    const items = await fetcher('ZMCP_SHR_PKG', { includeSubpackages: false });
+    const contents = await fetcher('ZMCP_SHR_PKG', {
+      includeSubpackages: false,
+    });
     expect(walked).toContain('ZMCP_SHR_PKG');
-    expect(items).toEqual([]);
+    expect(contents.items).toEqual([]);
+    expect([...contents.walked]).toEqual(['ZMCP_SHR_PKG']);
   });
 });
 

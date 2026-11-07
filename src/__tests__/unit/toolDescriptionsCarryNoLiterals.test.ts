@@ -39,7 +39,9 @@ import { BackgroundRunHandlersGroup } from '../../lib/handlers/groups/Background
 import { DebugHandlersGroup } from '../../lib/handlers/groups/DebugHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
+import type { ToolDefinition } from '../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
+import { listedJson } from '../helpers/listedJson';
 
 /**
  * Classes of literal, not a list of known offenders: a new example of the same
@@ -117,12 +119,10 @@ const parameterDescriptions = (node: unknown): string[] => {
 };
 
 /** A tool's parameter text, whichever shape its schema is written in. */
-const parametersOf = (definition: {
-  inputSchema?: { properties?: unknown };
-}): string[] =>
-  parameterDescriptions(
-    definition.inputSchema?.properties ?? definition.inputSchema,
-  );
+const parametersOf = (definition: ToolDefinition): string[] => {
+  const listed = listedJson(definition.inputSchema);
+  return parameterDescriptions(listed.properties ?? listed);
+};
 
 /**
  * The tools that take no parameter at all — a fixed, tiny list, so a schema

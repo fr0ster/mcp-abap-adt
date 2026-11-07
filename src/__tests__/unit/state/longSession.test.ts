@@ -17,6 +17,8 @@ jest.mock('../../../lib/connectionFactory', () => ({
     throw new Error('no connection may be built here');
   }),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
@@ -46,6 +48,7 @@ import {
   type ServedTransport,
   type ToolSet,
 } from '../../../lib/toolSet';
+import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
@@ -171,12 +174,10 @@ describe('where the session tools are served', () => {
     const tool = namesOf(set as ToolSet, 'http').find(
       (d) => d.name === 'HandlerSession',
     );
-    const schema = tool?.inputSchema as {
-      properties: Record<string, { enum?: string[] }>;
-      required?: string[];
-    };
-    expect(schema.properties.action?.enum).toEqual(['open', 'close']);
-    expect(schema.required).toEqual(['action']);
+    if (tool === undefined) throw new Error('no HandlerSession');
+    const schema = listedJson(tool.inputSchema);
+    expect(jsonAt(schema, 'action').enum).toEqual(['open', 'close']);
+    expect(declaredRequired(tool.inputSchema)).toEqual(['action']);
   });
 });
 
@@ -277,7 +278,7 @@ describe('the host declaration of state_handle', () => {
           description: 'answers its arguments',
           inputSchema: z.object({ state_handle: z.string() }),
         } as never,
-        handler: (async (_context: unknown, args: unknown) => ({
+        call: (async (_context: unknown, args: unknown) => ({
           content: [{ type: 'text', text: JSON.stringify(args) }],
         })) as never,
         connectionless: true,
@@ -334,9 +335,9 @@ describe('close on an instance', () => {
         toolDefinition: {
           name: 'TakeDebugger',
           description: 'takes the debugger',
-          inputSchema: { type: 'object', properties: {}, required: [] },
+          inputSchema: z.object({}),
         } as never,
-        handler: (async (
+        call: (async (
           context: { debugger?: () => unknown },
           _args: unknown,
         ) => {

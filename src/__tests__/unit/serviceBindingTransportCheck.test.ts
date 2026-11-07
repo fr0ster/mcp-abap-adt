@@ -26,6 +26,7 @@ import {
 } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import { compactValidateDescription } from '../../lib/compact/compactDescriptions';
 import { declareSystemKind } from '../../lib/systemKind';
+import { declaredRequired } from '../helpers/listedJson';
 import {
   type RecordingConnection,
   recordingConnection,
@@ -216,9 +217,9 @@ describe("HandlerServiceBindingValidate states package_name, the binding's packa
   });
 
   it('marks package_name required in the schema', () => {
-    expect(HandlerServiceBindingValidate_Tool.inputSchema.required).toContain(
-      'package_name',
-    );
+    expect(
+      declaredRequired(HandlerServiceBindingValidate_Tool.inputSchema),
+    ).toContain('package_name');
   });
 
   it('refuses a call without package_name before anything is sent', async () => {

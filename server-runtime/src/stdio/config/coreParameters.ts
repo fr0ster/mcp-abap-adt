@@ -9,11 +9,13 @@
 import {
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
+  flagValue,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
   MESSAGE_SERVER_ENV,
   MESSAGE_SERVER_FIELDS,
   type MessageServerField,
+  numberValue,
   type Parameter,
   ParameterRefusal,
   type ParameterTable,
@@ -26,14 +28,22 @@ import {
   STATE_IDLE_CLI,
   STATE_IDLE_YAML,
   TLS_OPTIONS_REMOVED,
+  textValue,
   transportRemoved,
+  wordValue,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
+import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 import { resolveEnvFilePath } from './envResolver';
 
 const DESTINATION = 'DESTINATION AND LOGIN';
+
+/** How an expired session is renewed (`--renewal`). */
+const RENEWALS = ['refresh-then-login', 'refresh-only'] as const;
+
+/** The connection types (`--connection-type`). */
+const CONNECTION_TYPES = ['http', 'rfc'] as const;
 
 /** The destination, browser and login rows: core's own. */
 export const CORE_ROWS: readonly Parameter[] = [
@@ -104,7 +114,7 @@ export const CORE_ROWS: readonly Parameter[] = [
     env: 'MCP_RENEWAL',
     yaml: 'renewal',
     kind: 'enum',
-    values: ['refresh-then-login', 'refresh-only'],
+    values: RENEWALS,
     section: DESTINATION,
     help: 'How an expired session is renewed: refresh, then log in (default); or refresh only, never a login',
   },
@@ -123,7 +133,7 @@ export const CORE_ROWS: readonly Parameter[] = [
     env: 'SAP_CONNECTION_TYPE',
     yaml: 'connection-type',
     kind: 'enum',
-    values: ['http', 'rfc'],
+    values: CONNECTION_TYPES,
     section: DESTINATION,
     help: 'SAP connection type, required for a destination. rfc needs the SAP NW RFC SDK',
   },
@@ -347,7 +357,7 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** The program that opens the login URL (`--browser-program`); excludes `browser`. */
   browserProgram?: string;
   /** How an expired session is renewed (`--renewal`); default `refresh-then-login`. */
-  renewal?: 'refresh-then-login' | 'refresh-only';
+  renewal?: (typeof RENEWALS)[number];
   /** Port for the login's callback (`--browser-auth-port`) */
   browserAuthPort?: number;
   /** `--login-timeout` in seconds: the bound on each login; absent: none. */
@@ -360,7 +370,7 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** `--auth-debug`: the providers' debug lines on stderr, secrets in their prepared form. */
   authDebug?: boolean;
   /** SAP connection type: http or rfc; required for a destination, no default */
-  connectionType?: 'http' | 'rfc';
+  connectionType?: (typeof CONNECTION_TYPES)[number];
   /**
    * The form `connectionType` came from: `--connection-type`,
    * `SAP_CONNECTION_TYPE`, or `connection-type (config file)`. Only the CLI
@@ -384,8 +394,7 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   messageServerSource?: Partial<Record<MessageServerField, string>>;
 }
 
-const str = (v: ParameterValue | undefined): string | undefined =>
-  typeof v === 'string' ? v : undefined;
+const str = textValue;
 
 /**
  * core's configuration from the arguments (without the program's own two),
@@ -418,13 +427,13 @@ export function readCoreConfig(
 
   return {
     configFile: str(values.configFile),
-    systemType: values.systemType as CoreConfig['systemType'],
+    systemType: wordValue(values.systemType, SYSTEM_TYPES),
     // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins
     // the environment later, and the launcher resolves the precedence then
     // (effectiveSystemType), as for the connection type.
     systemTypeSource: source('systemType'),
     batchKeepRawParts: values.batchKeepRawParts === true,
-    shutdownTimeout: values.shutdownTimeout as number | undefined,
+    shutdownTimeout: numberValue(values.shutdownTimeout),
     mcpDestination: str(values.mcpDestination),
     envDestination,
     envPath,
@@ -438,16 +447,16 @@ export function readCoreConfig(
           ? source('envPath')
           : source('envDestination'),
     authBrokerPath,
-    unsafe: (values.unsafe as boolean | undefined) ?? false,
+    unsafe: flagValue(values.unsafe) ?? false,
     browser: str(values.browser),
     browserProgram: str(values.browserProgram),
-    renewal: values.renewal as CoreConfig['renewal'],
-    browserAuthPort: values.browserAuthPort as number | undefined,
-    loginTimeout: values.loginTimeout as number | undefined,
+    renewal: wordValue(values.renewal, RENEWALS),
+    browserAuthPort: numberValue(values.browserAuthPort),
+    loginTimeout: numberValue(values.loginTimeout),
     authDebug: values.authDebug === true,
     loginTimeoutSource:
       values.loginTimeout === undefined ? undefined : source('loginTimeout'),
-    connectionType: values.connectionType as CoreConfig['connectionType'],
+    connectionType: wordValue(values.connectionType, CONNECTION_TYPES),
     connectionTypeSource: source('connectionType'),
     ...messageServerOf(values, source),
   };

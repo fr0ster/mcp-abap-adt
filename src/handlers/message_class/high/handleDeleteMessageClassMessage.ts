@@ -1,4 +1,5 @@
 import { messageDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * DeleteMessageClassMessage Handler - Delete a single message from a Message
  * Class (MSAG) via AdtClient.
@@ -31,69 +32,35 @@ import { messageDocuments } from '@mcp-abap-adt/adt-clients';
  * against it — the default `messageDocuments` answers the raw PUT body as a
  * plain string, with no `status` alongside it.
  *
- * **One cast, for the same reason `cdsUnitTestWrites.ts` used to need one.**
- * `IMessageClassMessageContract` (what `getMessageClassMessage()` is declared
- * to return) is `IAdtCreatable & IAdtReadable & IAdtUpdatable` only — no
- * `delete` — but `AdtMessageClassMessage` implements it for real (confirmed
- * against the shipped `.js`: `delete(config, options) { return
- * this.writeClass(config, true, options); }`, genuinely different from
- * `update`'s call to the same private method with the deletion flag off).
- * `MessageClassMessageWrites` names exactly that one extra method, the same
- * way `CdsUnitTestWrites` did for `AdtCdsUnitTest` before this task removed
- * it (`getCdsUnitTest()`'s declared type turned out to omit `delete`
- * entirely, so calling `getClass()` directly replaced the cast instead of
- * needing one — see `handleDeleteCdsUnitTest.ts`). No such alternate route
- * exists here: deleting a message is `writeClass` with the flag on, and nothing
- * else reaches it.
+ * **No cast.** adt-clients declares `delete` on `AdtMessageClassMessage`
+ * (`delete(config, options) { return this.writeClass(config, true, options);
+ * }`, different from `update`'s call with the deletion flag off); the
+ * server's own contract for `getMessageClassMessage()`'s answer
+ * (`MessageClassMessageApi`) states it beside create, read and update.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type {
-  IAdtError,
-  IAdtHeaders,
-  IAdtOperationOptions,
-  IAdtResponse,
-  IMessageClassMessageConfig,
-} from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
 
-/** The one method `IMessageClassMessageContract` omits. See the file doc
- * comment above. */
-interface MessageClassMessageWrites {
-  delete<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassMessageConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<string, E>>;
-}
-
 export const TOOL_DEFINITION = {
   name: 'DeleteMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Parent message class name.',
-      },
-      msgno: {
-        type: 'string',
-        description: 'Message number to delete (e.g., "001").',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects, optional for local ones.',
-      },
-    },
-    required: ['message_class_name', 'msgno'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Parent message class name.'),
+    msgno: z.string().describe('Message number to delete (e.g., "001").'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects, optional for local ones.',
+      ),
+  }),
 } as const;
 
 interface DeleteMessageClassMessageArgs {
@@ -121,18 +88,16 @@ export async function handleDeleteMessageClassMessage(
     { tool: 'DeleteMessageClassMessage', detail: 'terse' },
     () =>
       withAdtHeaders(context, 'messageClassMessage.delete', (headers) =>
-        (
-          createAdtClient(connection, logger).getMessageClassMessage(
-            messageDocuments,
-          ) as unknown as MessageClassMessageWrites
-        ).delete(
-          {
-            className,
-            msgno: args.msgno,
-            transportRequest: args.transport_request,
-          },
-          { headers, analyse: analyseException },
-        ),
+        createAdtClient(connection, logger)
+          .getMessageClassMessage(messageDocuments)
+          .delete(
+            {
+              className,
+              msgno: args.msgno,
+              transportRequest: args.transport_request,
+            },
+            { headers, analyse: analyseException },
+          ),
       ),
     // A constant success, reading nothing from the answer — safe here, and
     // only here, because `answer()` never reaches this projection unless the

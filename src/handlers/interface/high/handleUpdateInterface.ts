@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateInterface Handler - Update existing ABAP Interface source code
  *
@@ -27,7 +29,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -42,31 +44,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      interface_name: {
-        type: 'string',
-        description: 'Interface name. Must exist in the system.',
-      },
-      source_code: {
-        type: 'string',
-        description:
-          'Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate interface after update. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['interface_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    interface_name: z
+      .string()
+      .describe('Interface name. Must exist in the system.'),
+    source_code: z
+      .string()
+      .describe(
+        'Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate interface after update. Default: true.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateInterfaceArgs {
@@ -141,7 +139,7 @@ export async function handleUpdateInterface(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

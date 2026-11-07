@@ -46,6 +46,7 @@ import {
   listenUrl,
   shutdownTools,
 } from '../../helpers/shutdownTools';
+import { toolAnswer } from '../../helpers/toolAnswer';
 
 jest.setTimeout(30_000);
 
@@ -74,23 +75,20 @@ interface Runs {
 function countedRegistry(runs: Runs): CompositeHandlersRegistry {
   const tools = shutdownTools().map((entry): HandlerEntry => {
     if (entry.toolDefinition.name !== 'LockedUpdate') return entry;
-    const inner = entry.handler as (c: unknown, a: unknown) => Promise<unknown>;
+    const inner = entry.call;
     return {
       ...entry,
-      // (context, args): the server hands a two-parameter handler its context.
-      handler: (async (context: unknown, args: { id: string }) => {
-        runs.started.push(args.id);
-        const result = (await inner(context, args)) as {
-          content: Array<{ text: string }>;
-          isError?: boolean;
-        };
+      call: async (context, args) => {
+        const id = String(args.id);
+        runs.started.push(id);
+        const result = toolAnswer(await inner(context, args));
         runs.answered.push({
-          id: args.id,
+          id,
           text: result.content[0]?.text ?? '',
           isError: result.isError === true,
         });
         return result;
-      }) as never,
+      },
     };
   });
   return new CompositeHandlersRegistry([probeGroup(tools)]);

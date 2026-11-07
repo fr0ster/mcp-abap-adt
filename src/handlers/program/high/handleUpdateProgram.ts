@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateProgram Handler - Update Existing ABAP Program Source Code
  *
@@ -25,7 +27,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -33,38 +35,32 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem'] as const,
   description:
     'Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name. Program must already exist.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP program source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    program_name: z
+      .string()
+      .describe('Program name. Program must already exist.'),
+    source_code: z.string().describe('Complete ABAP program source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateProgramArgs {
@@ -84,14 +80,6 @@ export async function handleUpdateProgram(
   if (!args.program_name || !args.source_code) {
     return return_error(
       new Error('Missing required parameters: program_name and source_code'),
-    );
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
     );
   }
 
@@ -147,7 +135,7 @@ export async function handleUpdateProgram(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

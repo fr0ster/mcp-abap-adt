@@ -1,0 +1,64 @@
+{
+  "GetObjectOutline#CLAS/OC": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#FUGR/F": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#INTF/OI": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#PROG/P": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerGet#-#activation_status": {
+    "unit": "src/__tests__/unit/pins/activate.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activate.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activate.live.test.ts"
+    }
+  },
+  "HandlerUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "RunAbapUnit": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "RunUnitTest": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  }
+}

@@ -1,3 +1,5 @@
+import { child, isList } from './xml/tree';
+
 /**
  * Shape a handler returns. `content` items may carry a custom `json` type that
  * the MCP SDK does not know about.
@@ -24,14 +26,25 @@ export interface ToolResultLike {
 export function normalizeToolContent(
   result: unknown,
 ): { type: 'text'; text: string }[] {
-  const items = (result as ToolResultLike | undefined)?.content || [];
+  const content = child(result, 'content');
+  const items = isList(content) ? content : [];
   return items.map((item) => {
-    if (item?.type === 'json' && item.json !== undefined) {
-      return { type: 'text' as const, text: JSON.stringify(item.json) };
+    const json = child(item, 'json');
+    if (child(item, 'type') === 'json' && json !== undefined) {
+      return { type: 'text' as const, text: JSON.stringify(json) };
     }
+    const text = child(item, 'text');
     return {
       type: 'text' as const,
-      text: item?.text !== undefined ? String(item.text) : String(item || ''),
+      text: text !== undefined ? String(text) : String(item || ''),
     };
   });
+}
+
+/**
+ * Whether a handler's answer says it failed: its `isError`, read as a
+ * condition reads it (any truthy value).
+ */
+export function isErrorResult(result: unknown): boolean {
+  return Boolean(child(result, 'isError'));
 }

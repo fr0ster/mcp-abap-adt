@@ -25,12 +25,18 @@ import {
   analyseUnsupportedStatus,
   type IObjectVersion,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAdtVersionable,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import {
   VERSIONED_KINDS,
   type VersionedKind,
 } from '../../../lib/adtProjections';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
@@ -43,19 +49,32 @@ import { carryingFailure } from '../../../lib/strategies/step';
 // those types ARE lockable, just not versioned.
 export const VERSIONED_OBJECT_TYPES = VERSIONED_KINDS.onprem;
 
+/**
+ * The version members of one object, its identity bound: the history read
+ * names the object the resolver was given, and a version's source is read by
+ * the content URI the history answered. The values are what the version
+ * result set makes of them (`resultsFor`: `objectVersions`, `asItCame`).
+ */
 export interface ResolvedVersionedObject {
-  /**
-   * The versions atom to call getVersions/getVersionSource on.
-   *
-   * `IAdtObject` — a per-type bundle interface — is gone from adt-clients 19
-   * (decision 19: member by member). `IAdtVersionable` is the one atom every
-   * caller here actually uses, and `getVersionSource`'s source is hardcoded to
-   * `string` by `VersionsCapability` regardless of which result set the
-   * factory below was given — see `VersionsCapability.d.ts`.
-   */
-  obj: IAdtVersionable<any, any, string>;
-  /** Identity config to pass to getVersions(config). */
-  config: Record<string, unknown>;
+  getVersions(options: {
+    analyse: IAnalyse;
+  }): Promise<IAdtResponse<IObjectVersion[]>>;
+  getVersionSource(
+    contentUri: string,
+    options: { analyse: IAnalyse },
+  ): Promise<IAdtResponse<string>>;
+}
+
+/** `obj`'s version members with `config` bound to the history read. */
+function bound<C>(
+  obj: IAdtVersionable<C, IObjectVersion[], string>,
+  config: Partial<C>,
+): ResolvedVersionedObject {
+  return {
+    getVersions: (options) => obj.getVersions(config, options),
+    getVersionSource: (contentUri, options) =>
+      obj.getVersionSource(contentUri, options),
+  };
 }
 
 /**
@@ -74,20 +93,17 @@ export function resolveVersionedObject(
   const name = objectName.toUpperCase();
   switch (objectType) {
     case 'class':
-      return {
-        obj: client.getClass(resultsFor(classDocuments)),
-        config: { className: name },
-      };
+      return bound(client.getClass(resultsFor(classDocuments)), {
+        className: name,
+      });
     case 'program':
-      return {
-        obj: client.getProgram(resultsFor(programDocuments)),
-        config: { programName: name },
-      };
+      return bound(client.getProgram(resultsFor(programDocuments)), {
+        programName: name,
+      });
     case 'interface':
-      return {
-        obj: client.getInterface(resultsFor(interfaceDocuments)),
-        config: { interfaceName: name },
-      };
+      return bound(client.getInterface(resultsFor(interfaceDocuments)), {
+        interfaceName: name,
+      });
     case 'function_module': {
       // Identity is the FM name + its owning function group. The group can be
       // passed explicitly (function_group_name) or via GROUP|FM_NAME, as the
@@ -104,45 +120,46 @@ export function resolveVersionedObject(
           'function_group_name is required for function_module (or use GROUP|FM_NAME).',
         );
       }
+      const group = groupName;
+      const module = fmName;
+      const versions = bound(
+        client.getFunctionModule(resultsFor(functionModuleDocuments)),
+        { functionGroupName: group, functionModuleName: module },
+      );
+      // SAP ignores the group of the address (#2): the history is read only
+      // after the module's metadata names the group given.
       return {
-        obj: client.getFunctionModule(resultsFor(functionModuleDocuments)),
-        config: { functionGroupName: groupName, functionModuleName: fmName },
+        getVersions: (options) =>
+          inCheckedGroupOn(client, group, module, () =>
+            versions.getVersions(options),
+          ),
+        getVersionSource: versions.getVersionSource,
       };
     }
     case 'table':
-      return {
-        obj: client.getTable(resultsFor(tableDocuments)),
-        config: { tableName: name },
-      };
+      return bound(client.getTable(resultsFor(tableDocuments)), {
+        tableName: name,
+      });
     case 'structure':
-      return {
-        obj: client.getStructure(resultsFor(structureDocuments)),
-        config: { structureName: name },
-      };
+      return bound(client.getStructure(resultsFor(structureDocuments)), {
+        structureName: name,
+      });
     case 'ddl':
-      return {
-        obj: client.getDdl(resultsFor(ddlDocuments)),
-        config: { ddlName: name },
-      };
+      return bound(client.getDdl(resultsFor(ddlDocuments)), { ddlName: name });
     case 'behavior_definition':
-      return {
-        obj: client.getBehaviorDefinition(
-          resultsFor(behaviorDefinitionDocuments),
-        ),
-        config: { name },
-      };
+      return bound(
+        client.getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments)),
+        { name },
+      );
     case 'metadata_extension':
-      return {
-        obj: client.getMetadataExtension(
-          resultsFor(metadataExtensionDocuments),
-        ),
-        config: { name },
-      };
+      return bound(
+        client.getMetadataExtension(resultsFor(metadataExtensionDocuments)),
+        { name },
+      );
     case 'table_type':
-      return {
-        obj: client.getTableType(resultsFor(tableTypeDocuments)),
-        config: { tableTypeName: name },
-      };
+      return bound(client.getTableType(resultsFor(tableTypeDocuments)), {
+        tableTypeName: name,
+      });
   }
 }
 
@@ -154,8 +171,10 @@ export function resolveVersionedObject(
  * every version listing answered that and nothing else (on premise, 2026-09-26).
  */
 function thrown(error: IAdtError, step: string): Error {
-  const failure = new Error(error.message) as Error & { code?: string };
-  if (error.code !== undefined) failure.code = error.code;
+  const failure = Object.assign(
+    new Error(error.message),
+    error.code !== undefined ? { code: error.code } : {},
+  );
   // The method's error rides on the throw, as it is, with the step: the
   // consumer gets it, not this message (`return_error`).
   return carryingFailure(failure, error, step);
@@ -169,11 +188,11 @@ function thrown(error: IAdtError, step: string): Error {
 export async function readVersions(
   resolved: ResolvedVersionedObject,
 ): Promise<IObjectVersion[]> {
-  const answered = await resolved.obj.getVersions(resolved.config, {
+  const answered = await resolved.getVersions({
     analyse: analyseUnsupportedStatus([404, 406], 'version history'),
   });
   if (!answered.ok) throw thrown(answered.getError(), 'read versions');
-  return answered.getResult().value as IObjectVersion[];
+  return answered.getResult().value;
 }
 
 /** One version's source, as the text it came as. */
@@ -181,9 +200,9 @@ export async function readVersionSource(
   resolved: ResolvedVersionedObject,
   contentUri: string,
 ): Promise<string> {
-  const answered = await resolved.obj.getVersionSource(contentUri, {
+  const answered = await resolved.getVersionSource(contentUri, {
     analyse: analyseUnsupportedStatus([404, 406], 'version source'),
   });
   if (!answered.ok) throw thrown(answered.getError(), 'read version source');
-  return String(answered.getResult().value);
+  return answered.getResult().value;
 }

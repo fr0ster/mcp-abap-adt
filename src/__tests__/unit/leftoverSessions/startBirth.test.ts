@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A stdio instance's connection is born at its start, before any tool call
  * (`bornAtStart`): the one leftover session of its destination — a dead
@@ -68,9 +69,9 @@ const needsResponsible = {
   toolDefinition: {
     name: 'NeedsResponsible',
     description: 'NeedsResponsible',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: z.object({}),
   },
-  handler: (async (
+  call: (async (
     context: { connection: { makeAdtRequest(o: object): Promise<unknown> } },
     _args: unknown,
   ) => {

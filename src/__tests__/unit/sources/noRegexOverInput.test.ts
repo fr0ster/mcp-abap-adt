@@ -1,92 +1,61 @@
 /**
- * No regular expression over untrusted input in the touched files —
- * `errorClassOf` (errors.ts), `return_error` (utils.ts), the destination name
- * (destinationName.ts) and the parameter parsers (authParameters.ts, the
- * config file reader, and each binary's table) are
- * plain code. A scan with the TypeScript parser: no regex literal, no
- * `RegExp` in each file, or — for utils.ts — in `return_error` and the
- * helpers it calls.
+ * No regular expression in production code. The scan
+ * (`helpers/regexScan.ts`) reads the syntax tree of every git-tracked
+ * production source of every package — `src`, `scripts`, `tools` and each
+ * package's sources, `.ts`, `.js`, `.mjs` and `.cjs` outside tests, fixtures
+ * and docs — for a regular-expression literal, any reference to `RegExp`
+ * (by name or by a string key), and a `match` / `matchAll` / `search` call
+ * on a receiver the type checker reads as a string, or given a string. There is no
+ * allowlist: input is read with plain string code, `URL` /
+ * `URLSearchParams`, character tests and the XML parser.
+ *
+ * Each fixture under `__fixtures__/regex/refused` is one regular expression
+ * and must be reported; the one under `clean` must not be.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as ts from 'typescript';
+import { productionSources, regexSitesIn } from './helpers/regexScan';
 
-const REPO = path.resolve(__dirname, '../../../..');
+// One program over every production source: the type checker reads each
+// receiver of `match` / `matchAll` / `search`.
+jest.setTimeout(300_000);
 
-/** A file, and the functions scanned in it (`undefined`: the whole file). */
-const SCANNED: ReadonlyArray<[string, readonly string[] | undefined]> = [
-  ['src/lib/auth/errors.ts', undefined],
-  ['src/lib/auth/destinationName.ts', undefined],
-  ['src/lib/config/authParameters.ts', undefined],
-  ['src/lib/config/yamlConfig.ts', undefined],
-  ['src/lib/config/binaries.ts', undefined],
-  ['src/lib/config/startup.ts', undefined],
-  ['server-runtime/src/stdio/config/coreParameters.ts', undefined],
-  ['server-runtime/src/http/config/httpParameters.ts', undefined],
-  ['server-runtime/src/sse/config/sseParameters.ts', undefined],
-  [
-    'src/lib/utils.ts',
-    [
-      'return_error',
-      'hostAfterNotFound',
-      'mcpErrorPrefixAt',
-      'withoutMcpErrorPrefixes',
-      'isSpace',
-    ],
-  ],
-];
-
-function parse(file: string): ts.SourceFile {
-  return ts.createSourceFile(
-    file,
-    fs.readFileSync(path.join(REPO, file), 'utf8'),
-    ts.ScriptTarget.ES2022,
-    true,
-  );
-}
-
-function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
-  visit(node);
-  node.forEachChild((child) => walk(child, visit));
-}
-
-function regexesIn(root: ts.Node, source: ts.SourceFile): string[] {
-  const found: string[] = [];
-  walk(root, (node) => {
-    const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
-    if (node.kind === ts.SyntaxKind.RegularExpressionLiteral) {
-      found.push(`${source.fileName}:${line} ${node.getText()}`);
+describe('no regular expression in production code', () => {
+  it('scans src, scripts, tools and every package, outside tests and fixtures', () => {
+    const files = productionSources();
+    const roots = new Set(files.map((file) => file.split('/')[0]));
+    for (const root of ['src', 'scripts', 'tools', 'server-runtime']) {
+      expect(roots.has(root)).toBe(true);
     }
-    if (ts.isIdentifier(node) && node.text === 'RegExp') {
-      found.push(`${source.fileName}:${line} RegExp`);
+    expect(files.some((file) => file.endsWith('.cjs'))).toBe(true);
+    expect(files.some((file) => file.endsWith('.mjs'))).toBe(true);
+    expect(files.some((file) => file.endsWith('.js'))).toBe(true);
+    for (const excluded of ['__tests__', '__fixtures__', 'docs']) {
+      expect(files.some((file) => file.split('/').includes(excluded))).toBe(
+        false,
+      );
     }
   });
-  return found;
-}
 
-describe('no regular expression over input in the touched files', () => {
-  it.each(SCANNED.map(([file, fns]) => [file, fns] as const))(
-    '%s',
-    (file, functions) => {
-      const source = parse(file);
-      if (functions === undefined) {
-        expect(regexesIn(source, source)).toEqual([]);
-        return;
-      }
-      const seen = new Set<string>();
-      for (const statement of source.statements) {
-        if (
-          ts.isFunctionDeclaration(statement) &&
-          statement.name &&
-          functions.includes(statement.name.text)
-        ) {
-          seen.add(statement.name.text);
-          expect(regexesIn(statement, source)).toEqual([]);
-        }
-      }
-      // Every named function is still there: a rename cannot empty the scan.
-      expect([...seen].sort()).toEqual([...functions].sort());
-    },
-  );
+  it('finds none', () => {
+    const found = regexSitesIn(productionSources()).map(
+      (site) => `${site.where} ${site.text}`,
+    );
+    expect(found).toEqual([]);
+  });
+
+  describe('fixtures', () => {
+    const root = path.join(__dirname, '__fixtures__/regex');
+    const listed = (dir: string) =>
+      fs.readdirSync(path.join(root, dir)).map((name) => `${dir}/${name}`);
+
+    it.each(listed('refused'))('refuses %s', (file) => {
+      expect(regexSitesIn([file], root)).toHaveLength(1);
+    });
+
+    it.each(listed('clean'))('accepts %s', (file) => {
+      expect(regexSitesIn([file], root)).toEqual([]);
+    });
+  });
 });

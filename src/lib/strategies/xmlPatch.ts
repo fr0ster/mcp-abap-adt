@@ -1,3 +1,19 @@
+import {
+  buildOrdered,
+  escapeOrderedText,
+  isWellFormed,
+  ORDERED_ATTRIBUTES,
+  ORDERED_CDATA,
+  ORDERED_TEXT,
+  type OrderedElement,
+  orderedElement,
+  orderedElements,
+  orderedHoldsMarkup,
+  parseOrdered,
+  replaceOrderedMember,
+} from '../xml/ordered';
+import { child, type Element, isElement, isList } from '../xml/tree';
+
 /**
  * Patching an XML document in place, for the read-modify-write an update is.
  *
@@ -7,9 +23,14 @@
  * write are the consumer's, and this is the patch half — ported from the
  * implementation at the `18.0.2` tag rather than reinvented.
  *
- * **Why patch the text and not rebuild it.** The document carries fields nobody
- * here knows about — `abapLanguageVersion`, links, SAP-managed state — and
- * building one from the fields a caller named would drop every one of them.
+ * **Why patch the document and not build one.** The document carries fields
+ * nobody here knows about — `abapLanguageVersion`, links, SAP-managed state —
+ * and building one from the fields a caller named would drop every one of
+ * them. So the document is read with the XML parser in its order
+ * (`xml/ordered`), the one value is changed in that structure, and the
+ * document is built back with the same options: everything else comes back
+ * as it came (what the round trip does not keep is listed there — an
+ * apostrophe in an attribute value is written `&apos;`).
  *
  * **Every patch fails loudly when it cannot find its target**, and that is the
  * point rather than a detail. It was learned from a live failure: a domain
@@ -35,72 +56,98 @@ const NOT_PRESENT =
   'ADT answers a read of a not-yet-ready object with HTTP 200 and no content ' +
   'rather than an error.';
 
-function escapeXmlAttr(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+/** No patch finds what it was asked to change: there is no case where quietly passing the XML through is right. */
+function notPresent(target: string): XmlPatchError {
+  return new XmlPatchError(
+    `Cannot patch ${target}: it is not present in the XML being updated. ${NOT_PRESENT}`,
+  );
 }
 
-function escapeXmlText(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+/** `value` written as XML text: `&`, `<` and `>` as entities. */
+const escapeXml = escapeOrderedText;
+
+/**
+ * The document in its order. A body that is not well-formed — a read cut
+ * short among them, which the parser alone would close and read — is refused:
+ * patched, it would go back to SAP without what the read did not carry.
+ */
+function membersOf(xml: string): readonly unknown[] {
+  if (xml.trim() !== '' && !isWellFormed(xml)) {
+    throw new XmlPatchError(
+      `Cannot patch: the XML being updated is not a complete XML document. ${NOT_PRESENT}`,
+    );
+  }
+  const parsed = parseOrdered(xml);
+  return isList(parsed) ? parsed : [];
+}
+
+const element = orderedElement;
+
+/** An element's attributes, `undefined` when it has none. */
+function attributesOf(target: OrderedElement): Element | undefined {
+  const attributes = child(target.member, ORDERED_ATTRIBUTES);
+  return isElement(attributes) ? attributes : undefined;
+}
+
+/** The document built back with `target` replaced by `replacement`. */
+function rebuilt(
+  members: readonly unknown[],
+  target: OrderedElement,
+  replacement: readonly unknown[],
+): string {
+  return buildOrdered(
+    replaceOrderedMember(members, target.member, replacement),
+  );
 }
 
 /**
- * Apply a replacement, refusing to pass the XML through untouched.
- *
- * A caller reaches a patch only when it intends the change — `patchIf` skips
- * the call for an absent value — so "no match" always means the PUT would not
- * carry what the caller asked for. There is no case where quietly returning the
- * input is right.
+ * `adtcore:description="old"` becomes `adtcore:description="new"`: the
+ * attribute on the first element, in document order, that carries it.
  */
-function replaceOrThrow(
-  xml: string,
-  regex: RegExp,
-  replacement: string,
-  target: string,
-): string {
-  if (!regex.test(xml)) {
-    throw new XmlPatchError(
-      `Cannot patch ${target}: it is not present in the XML being updated. ${NOT_PRESENT}`,
-    );
-  }
-  // a function, so no `$` pattern in the value is read as one
-  return xml.replace(regex, () => replacement);
-}
-
-/** `adtcore:description="old"` becomes `adtcore:description="new"`. */
 export function patchXmlAttribute(
   xml: string,
   attrName: string,
   newValue: string,
 ): string {
-  return replaceOrThrow(
-    xml,
-    new RegExp(`${attrName}="[^"]*"`),
-    `${attrName}="${escapeXmlAttr(newValue)}"`,
-    `attribute ${attrName}`,
+  const members = membersOf(xml);
+  const target = orderedElements(members).find(
+    (each) => attributesOf(each)?.[attrName] !== undefined,
   );
+  if (!target) throw notPresent(`attribute ${attrName}`);
+  return rebuilt(members, target, [
+    element(target.name, target.content, {
+      ...attributesOf(target),
+      [attrName]: escapeXml(newValue),
+    }),
+  ]);
 }
 
-/** Element text. Handles `<tag>x</tag>` and the self-closing `<tag/>`. */
+/**
+ * Element text: the first element so named that holds text alone — text,
+ * CDATA, or nothing, as the self-closing `<tag/>` — gets `newValue` as its
+ * text, or nothing when `newValue` is empty.
+ */
 export function patchXmlElement(
   xml: string,
   tagName: string,
   newValue: string,
 ): string {
-  const regex = new RegExp(
-    `<${tagName}>([^<]*)</${tagName}>|<${tagName}\\s*/>`,
+  const members = membersOf(xml);
+  const target = orderedElements(members).find(
+    (each) =>
+      each.name === tagName &&
+      !orderedHoldsMarkup(
+        each.content.filter(
+          (member) => child(member, ORDERED_CDATA) === undefined,
+        ),
+      ),
   );
-  const replacement =
-    newValue === '' || newValue === undefined
-      ? `<${tagName}/>`
-      : `<${tagName}>${escapeXmlText(newValue)}</${tagName}>`;
-  return replaceOrThrow(xml, regex, replacement, `element <${tagName}>`);
+  if (!target) throw notPresent(`element <${tagName}>`);
+  const content =
+    newValue === '' ? [] : [{ [ORDERED_TEXT]: escapeXml(newValue) }];
+  return rebuilt(members, target, [
+    element(tagName, content, attributesOf(target)),
+  ]);
 }
 
 /**
@@ -118,39 +165,50 @@ export function patchXmlElementAttribute(
   attrName: string,
   newValue: string,
 ): string {
-  const value = escapeXmlAttr(newValue);
-  const withAttribute = new RegExp(`(<${elementTag}[^>]*?)${attrName}="[^"]*"`);
-  if (withAttribute.test(xml)) {
-    return xml.replace(
-      withAttribute,
-      (_match, head) => `${head}${attrName}="${value}"`,
-    );
-  }
-  const element = new RegExp(`<${elementTag}(\\s[^>]*?)?(/?)>`);
-  if (element.test(xml)) {
-    return xml.replace(
-      element,
-      (_match, attrs, selfClosing) =>
-        `<${elementTag}${attrs ?? ''} ${attrName}="${value}"${selfClosing}>`,
-    );
-  }
-  throw new XmlPatchError(
-    `Cannot patch attribute ${attrName}: element <${elementTag}> is not present in the XML being updated. ${NOT_PRESENT}`,
+  const members = membersOf(xml);
+  const named = orderedElements(members).filter(
+    (each) => each.name === elementTag,
   );
+  const target =
+    named.find((each) => attributesOf(each)?.[attrName] !== undefined) ??
+    named[0];
+  if (!target) {
+    throw new XmlPatchError(
+      `Cannot patch attribute ${attrName}: element <${elementTag}> is not present in the XML being updated. ${NOT_PRESENT}`,
+    );
+  }
+  return rebuilt(members, target, [
+    element(elementTag, target.content, {
+      ...attributesOf(target),
+      [attrName]: escapeXml(newValue),
+    }),
+  ]);
 }
 
-/** A whole block, opening tag to closing tag, nesting and all. */
+/**
+ * A whole block, opening tag to closing tag, nesting and all: the first
+ * element so named is replaced by `newContent`, the caller's markup, read with
+ * the same parser.
+ */
 export function patchXmlBlock(
   xml: string,
   tagName: string,
   newContent: string,
 ): string {
-  return replaceOrThrow(
-    xml,
-    new RegExp(`<${tagName}[\\s\\S]*?</${tagName}>|<${tagName}\\s*/>`),
-    newContent,
-    `block <${tagName}>`,
-  );
+  const members = membersOf(xml);
+  const target = orderedElements(members).find((each) => each.name === tagName);
+  if (!target) throw notPresent(`block <${tagName}>`);
+  // The content is the caller's markup: well-formed, and an element at least —
+  // text alone, or nothing, would delete the block.
+  const replacement = isWellFormed(newContent)
+    ? parseOrdered(newContent)
+    : null;
+  if (!isList(replacement) || orderedElements(replacement).length === 0) {
+    throw new XmlPatchError(
+      `Cannot patch block <${tagName}>: the content to write is not a well-formed XML element.`,
+    );
+  }
+  return rebuilt(members, target, replacement);
 }
 
 /** Apply a patch only when the caller named a value. */

@@ -7,20 +7,24 @@ import { rfcParamsFrom, type SapConfig } from '@mcp-abap-adt/connection';
  * connection's), no check (connection refuses `mshost` with neither
  * `msserv` nor `sysid`, naming both).
  */
+/** The five fields, in a fixed order. */
+export const MESSAGE_SERVER_FIELDS = [
+  'mshost',
+  'msserv',
+  'sysid',
+  'group',
+  'saprouter',
+] as const;
+
+export type MessageServerField = (typeof MESSAGE_SERVER_FIELDS)[number];
+
 export const MESSAGE_SERVER_ENV = {
   mshost: 'SAP_MSHOST',
   msserv: 'SAP_MSSERV',
   sysid: 'SAP_SYSID',
   group: 'SAP_GROUP',
   saprouter: 'SAP_SAPROUTER',
-} as const;
-
-export type MessageServerField = keyof typeof MESSAGE_SERVER_ENV;
-
-/** The five fields, in a fixed order. */
-export const MESSAGE_SERVER_FIELDS = Object.keys(
-  MESSAGE_SERVER_ENV,
-) as readonly MessageServerField[];
+} as const satisfies Record<MessageServerField, string>;
 
 /**
  * Sets each field `env` states on `config`, trimmed as `SAP_CLIENT` is; a
@@ -37,37 +41,40 @@ export function applyMessageServerFields(
 }
 
 /**
- * connection's own refusals of an RFC address it cannot dial — a message
+ * connection's own refusal of an RFC address it cannot dial — a message
  * server with neither `msserv` nor `sysid`, an address with neither `url` nor
- * `mshost` — read once from connection itself (`rfcParamsFrom`). Each is a
- * fixed sentence that quotes no value of the config.
+ * `mshost` — carrying connection's own words: a fixed sentence that quotes no
+ * value of the config.
  */
-const RFC_ADDRESS_REFUSALS: readonly string[] = (() => {
-  const words: string[] = [];
-  for (const probe of [{ mshost: 'probe' }, {}] as SapConfig[]) {
-    try {
-      rfcParamsFrom(probe);
-    } catch (error) {
-      if (error instanceof Error && error.message) words.push(error.message);
-    }
-  }
-  return words;
-})();
+export class RfcAddressRefusal extends Error {}
 
 /**
- * The words of `error` when it is one of connection's refusals of an RFC
- * address, as connection gave them; `undefined` for anything else, whose
- * message is never read out.
+ * connection's refusal of `config`'s RFC address, asked of connection
+ * itself (`rfcParamsFrom`): its plain `Error`, as an `RfcAddressRefusal`;
+ * `undefined` when connection can dial it (or refuses with an error of
+ * another class, never read out).
+ */
+export function rfcAddressRefusalFor(
+  config: SapConfig,
+): RfcAddressRefusal | undefined {
+  try {
+    rfcParamsFrom(config);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      Object.getPrototypeOf(error) === Error.prototype
+    ) {
+      return new RfcAddressRefusal(error.message);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The words of `error` when it is connection's refusal of an RFC address
+ * (`RfcAddressRefusal`), as connection gave them; `undefined` for anything
+ * else, whose message is never read out.
  */
 export function rfcAddressRefusalOf(error: unknown): string | undefined {
-  if (!(error instanceof Error)) return undefined;
-  let message: unknown;
-  try {
-    message = error.message;
-  } catch {
-    return undefined;
-  }
-  return typeof message === 'string' && RFC_ADDRESS_REFUSALS.includes(message)
-    ? message
-    : undefined;
+  return error instanceof RfcAddressRefusal ? error.message : undefined;
 }

@@ -18,8 +18,8 @@ Each `object_type` enum, and each tool's description, is the declared system typ
 members are those the system type's ADT type table serves (22.0.0) — on cloud the writes offer
 no `PROGRAM` and no `INCLUDE` — and a member outside them is refused naming the list, before
 anything is sent. On cloud a write handler's schema offers only the properties its cloud members
-take (23.0.0): `HandlerCreate` has no `program_name`, `program_type`, `application` or
-`include_name` there, for example.
+take (23.0.0): `HandlerCreate` has no `program_name`, `application` or `include_name` there,
+for example.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP
@@ -84,8 +84,8 @@ mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothin
 is what a local server gives), the four debugger tools, the debugger batch (`HandlerDebugBatch`),
 the leftover-session list and logoff, the background-run tools and `HandlerBatch` — 40. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
 where-used, checks and validations, the unit-test status and result reads, the profiler list and
-view, the dump list and view, the service-binding type list — with `HandlerBatch` and the
-leftover-session list and logoff — 20; its tool list is exactly these, so a client calls only them. `--exposition`
+view, the dump list and view, the service-binding type list — with the background-run tools, `HandlerBatch` and the
+leftover-session list and logoff — 23; its tool list is exactly these, so a client calls only them. `--exposition`
 (`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence
 naming the binary to install instead, e.g. *--exposition is gone (19.0.0): the binary fixes its tool
 set, so remove it; the compact tools that change nothing are served by `mcp-abap-adt-compact-ro`

@@ -15,6 +15,7 @@ import {
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
+import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import {
   handleHandlerDumpList,
   TOOL_DEFINITION,
@@ -140,8 +141,10 @@ describe('HandlerDumpList reads one page', () => {
       "The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.",
     );
     expect(TOOL_DEFINITION.description).toMatch(/\b100\b/);
-    const props = TOOL_DEFINITION.inputSchema.properties;
-    expect(props.top.description).toContain('100');
-    expect(props.to.description).toContain('boundary second, inclusive');
+    const schema = listedJson(TOOL_DEFINITION.inputSchema);
+    expect(jsonAt(schema, 'top').description).toContain('100');
+    expect(jsonAt(schema, 'to').description).toContain(
+      'boundary second, inclusive',
+    );
   });
 });

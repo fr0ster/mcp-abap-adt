@@ -202,6 +202,13 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
  * compact's class read (`HandlerGet`) is listed and full's (`GetClass`) is
  * not, so those two no longer share a failure path.
  */
+/**
+ * The sample read, in the call (`background: false`). Every set keeps
+ * background runs, so by default all four would answer a `run_handle`
+ * alike; the read is asked in the call so each observation counts its
+ * requests — and their credentials — when the call answers, not when a
+ * background run gets to them.
+ */
 const readCall = (
   set: SetName,
   className = 'ZCL_PARITY',
@@ -209,11 +216,19 @@ const readCall = (
   familyOf(set) === 'full'
     ? {
         name: 'GetWhereUsed',
-        arguments: { object_name: className, object_type: 'class' },
+        arguments: {
+          object_name: className,
+          object_type: 'class',
+          background: false,
+        },
       }
     : {
         name: 'HandlerWhereUsed',
-        arguments: { object_type: 'CLASS', object_name: className },
+        arguments: {
+          object_type: 'CLASS',
+          object_name: className,
+          background: false,
+        },
       };
 const READ_CALL: Record<SetName, ReturnType<typeof readCall>> = {
   full: readCall('full'),
@@ -889,7 +904,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // core: the debugger, high, background runs, the three batch tools
       // and the two debugger batch tools, always; on http SessionOpen and
       // SessionClose.
-      expect(full.tools).toHaveLength(onStdio ? 272 : onHttp ? 272 : 270);
+      expect(full.tools).toHaveLength(onStdio ? 270 : onHttp ? 270 : 268);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -904,10 +919,17 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ]),
       );
       // core-ro: the readonly tools with system and search, the three batch
-      // tools (and, on stdio, the leftover-session list; on http SessionOpen
-      // and SessionClose); no write, run, debugger, background run, logoff
-      // or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 74 : onHttp ? 75 : 73);
+      // tools, the three background-run tools of the long reads (and, on
+      // stdio, the leftover-session list; on http SessionOpen and
+      // SessionClose); no write, run, debugger, logoff or resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 75 : onHttp ? 76 : 74);
+      for (const name of [
+        'GetBackgroundRun',
+        'ListBackgroundRuns',
+        'DiscardBackgroundRun',
+      ]) {
+        expect(fullRo.tools).toContain(name);
+      }
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'GetClass',
@@ -933,7 +955,6 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       for (const name of [
         'CreateClass',
         'DebugStartListener',
-        'GetBackgroundRun',
         'ResumeLeftoverSession',
         'DebugBatchBegin',
         'DebugBatchEnd',
@@ -961,11 +982,13 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'HandlerBatch',
         ]),
       );
-      // compact-ro: the 17 that change nothing, HandlerBatch, and on stdio
-      // the leftover-session list.
+      // compact-ro: the 17 that change nothing, the three background-run
+      // tools of the long reads, HandlerBatch, and on stdio the
+      // leftover-session list.
       expect(compactRo.tools).toHaveLength(
-        17 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
+        17 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
       );
+      expect(compactRo.tools).toContain('HandlerBackgroundRunGet');
       expect(compactRo.tools).toContain('HandlerGet');
       expect(compactRo.tools).toContain('HandlerDeletionCheck');
       expect(compactRo.tools).toContain('HandlerBatch');
@@ -978,7 +1001,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       for (const name of [
         ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),
         ...COMPACT_DEBUG,
-        'HandlerBackgroundRunGet',
+        'HandlerProfileRun',
         'HandlerLeftoverSessionResume',
         'HandlerLeftoverSessionLogoff',
         'HandlerDebugBatch',
@@ -1442,6 +1465,29 @@ const writeCall = (
       };
 };
 
+/** The lock_handle a `HandlerLock` answer's text carries. */
+function lockHandleOf(text: string): string {
+  const read: unknown = JSON.parse(text);
+  if (
+    typeof read !== 'object' ||
+    read === null ||
+    !('lock_handle' in read) ||
+    typeof read.lock_handle !== 'string'
+  ) {
+    throw new Error(`no lock_handle in ${text}`);
+  }
+  return read.lock_handle;
+}
+
+/** The write under `lockHandle`: compact's write runs under a lock its instance holds. */
+const underLock = (
+  write: { name: string; arguments: Record<string, unknown> },
+  lockHandle: string,
+) => ({
+  name: write.name,
+  arguments: { ...write.arguments, lock_handle: lockHandle },
+});
+
 /** A `tools/call` written in two halves on a raw socket: accepted before `finish()`. */
 function halfPost(
   port: number,
@@ -1531,8 +1577,29 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
       serverSide,
     );
     await client.connect(clientSide);
+    // Compact's write runs under a lock the instance holds: the lock first.
+    let write = writeCall(set, className);
+    if (set === 'compact') {
+      const locked = await client.callTool({
+        name: 'HandlerLock',
+        arguments: { object_type: 'CLASS', object_name: className },
+      });
+      const content = locked.content;
+      const first = Array.isArray(content) ? content[0] : undefined;
+      write = underLock(
+        write,
+        lockHandleOf(
+          typeof first === 'object' &&
+            first !== null &&
+            'text' in first &&
+            typeof first.text === 'string'
+            ? first.text
+            : '',
+        ),
+      );
+    }
     void client
-      .callTool(writeCall(set, className), undefined, { timeout: 600_000 })
+      .callTool(write, undefined, { timeout: 600_000 })
       .catch(() => undefined);
     await hold.arrived;
     started.processLike.stdin.emit('end');
@@ -1620,6 +1687,45 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
     });
     const next = eventReader(stream.body as ReadableStream<Uint8Array>);
     const postPath = await next('endpoint');
+    // Compact's write runs under a lock the connection's instance holds:
+    // the lock first, its answer the stream's first message.
+    let write = writeCall(set, className);
+    if (set === 'compact') {
+      await fetch(new URL(postPath, `http://127.0.0.1:${port}`), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 0,
+          method: 'tools/call',
+          params: {
+            name: 'HandlerLock',
+            arguments: { object_type: 'CLASS', object_name: className },
+          },
+        }),
+      });
+      const message: unknown = JSON.parse(await next('message'));
+      const result =
+        typeof message === 'object' && message !== null && 'result' in message
+          ? message.result
+          : undefined;
+      const content =
+        typeof result === 'object' && result !== null && 'content' in result
+          ? result.content
+          : undefined;
+      const first = Array.isArray(content) ? content[0] : undefined;
+      write = underLock(
+        write,
+        lockHandleOf(
+          typeof first === 'object' &&
+            first !== null &&
+            'text' in first &&
+            typeof first.text === 'string'
+            ? first.text
+            : '',
+        ),
+      );
+    }
     await fetch(new URL(postPath, `http://127.0.0.1:${port}`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -1627,7 +1733,7 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
         jsonrpc: '2.0',
         id: 1,
         method: 'tools/call',
-        params: writeCall(set, className),
+        params: write,
       }),
     });
     await hold.arrived;

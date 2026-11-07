@@ -23,12 +23,13 @@ import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteC
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import {
+  configuredSystemKind,
   getOperationDelay,
-  getSystemType,
   getTimeout,
   loadTestConfig,
   loadTestEnv,
 } from '../../helpers/configHelpers';
+import { NO_KIND_STATED } from '../../helpers/configuredSystemKind';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
   createTestConnectionAndSession,
@@ -53,7 +54,11 @@ describe('Transported Object CRUD (GitHub #11)', () => {
   beforeAll(async () => {
     await loadTestEnv();
 
-    const systemType = getSystemType();
+    const systemType = configuredSystemKind();
+    if (systemType === undefined) {
+      logger?.warn(`Skipping: ${NO_KIND_STATED}`);
+      return;
+    }
     logger?.info(`System type: ${systemType}`);
 
     const config = loadTestConfig();

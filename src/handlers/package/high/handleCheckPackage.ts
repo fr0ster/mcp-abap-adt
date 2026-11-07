@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,21 +27,15 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP package named by package_name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      super_package: {
-        type: 'string',
-        description:
-          'Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.',
-      },
-    },
-    required: ['package_name'],
-  },
+  inputSchema: z.object({
+    package_name: z.string().describe('Package name.'),
+    super_package: z
+      .string()
+      .optional()
+      .describe(
+        'Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckPackage(

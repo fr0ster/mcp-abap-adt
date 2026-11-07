@@ -1,3 +1,7 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateDataElement Handler - ABAP Data Element Creation via ADT API
  *
@@ -7,7 +11,7 @@
  * A lifecycle, not one call: validate the name, create the bare object, lock
  * it, read-patch-write the properties the caller gave (through `withLock`,
  * released on every path out), wait for the write to be visible, check the
- * inactive version, and optionally activate — the order the pre-migration
+ * inactive version, and activate — the order the pre-migration
  * handler ran them in: `unlock` then the wait then `check`, because `check`
  * is the first call after the write that reads it back and so the one the
  * wait has to sit ahead of. `create` itself never reaches
@@ -39,7 +43,7 @@ import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { patchDataElementXml } from '../../../lib/strategies/dataElementPatch';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -56,105 +60,103 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP data element in SAP system. Creates the data element object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      data_element_name: {
-        type: 'string',
-        description: 'Data element name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Data element description. If not provided, data_element_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      data_type: {
-        type: 'string',
-        description:
-          "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.",
-        default: 'CHAR',
-      },
-      length: {
-        type: 'number',
-        description: 'Data type length. Usually inherited from domain.',
-        default: 100,
-      },
-      decimals: {
-        type: 'number',
-        description: 'Decimal places. Usually inherited from domain.',
-        default: 0,
-      },
-      short_label: {
-        type: 'string',
-        description:
-          'Short field label (max 10 chars). Applied during update step after creation.',
-      },
-      medium_label: {
-        type: 'string',
-        description:
-          'Medium field label (max 20 chars). Applied during update step after creation.',
-      },
-      long_label: {
-        type: 'string',
-        description:
-          'Long field label (max 40 chars). Applied during update step after creation.',
-      },
-      heading_label: {
-        type: 'string',
-        description:
-          'Heading field label (max 55 chars). Applied during update step after creation.',
-      },
-      type_kind: {
-        type: 'string',
-        description:
-          "Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.",
-        enum: [
-          'domain',
-          'predefinedAbapType',
-          'refToPredefinedAbapType',
-          'refToDictionaryType',
-          'refToClifType',
-        ],
-        default: 'domain',
-      },
-      type_name: {
-        type: 'string',
-        description:
-          "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')",
-      },
-      search_help: {
-        type: 'string',
-        description:
-          'Search help name. Applied during update step after creation.',
-      },
-      search_help_parameter: {
-        type: 'string',
-        description:
-          'Search help parameter. Applied during update step after creation.',
-      },
-      set_get_parameter: {
-        type: 'string',
-        description:
-          'Set/Get parameter ID. Applied during update step after creation.',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['data_element_name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateDataElement', {
+    data_element_name: z.string().describe('Data element name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Data element description. If not provided, data_element_name will be used.',
+      ),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    data_type: z
+      .string()
+      .default('CHAR')
+      .optional()
+      .describe(
+        "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.",
+      ),
+    length: z
+      .number()
+      .default(100)
+      .optional()
+      .describe('Data type length. Usually inherited from domain.'),
+    decimals: z
+      .number()
+      .default(0)
+      .optional()
+      .describe('Decimal places. Usually inherited from domain.'),
+    short_label: z
+      .string()
+      .optional()
+      .describe(
+        'Short field label (max 10 chars). Applied during update step after creation.',
+      ),
+    medium_label: z
+      .string()
+      .optional()
+      .describe(
+        'Medium field label (max 20 chars). Applied during update step after creation.',
+      ),
+    long_label: z
+      .string()
+      .optional()
+      .describe(
+        'Long field label (max 40 chars). Applied during update step after creation.',
+      ),
+    heading_label: z
+      .string()
+      .optional()
+      .describe(
+        'Heading field label (max 55 chars). Applied during update step after creation.',
+      ),
+    type_kind: z
+      .enum([
+        'domain',
+        'predefinedAbapType',
+        'refToPredefinedAbapType',
+        'refToDictionaryType',
+        'refToClifType',
+      ])
+      .default('domain')
+      .optional()
+      .describe(
+        "Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.",
+      ),
+    type_name: z
+      .string()
+      .optional()
+      .describe(
+        "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')",
+      ),
+    search_help: z
+      .string()
+      .optional()
+      .describe('Search help name. Applied during update step after creation.'),
+    search_help_parameter: z
+      .string()
+      .optional()
+      .describe(
+        'Search help parameter. Applied during update step after creation.',
+      ),
+    set_get_parameter: z
+      .string()
+      .optional()
+      .describe(
+        'Set/Get parameter ID. Applied during update step after creation.',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DataElementArgs {
@@ -179,7 +181,6 @@ interface DataElementArgs {
   search_help?: string;
   search_help_parameter?: string;
   set_get_parameter?: string;
-  activate?: boolean;
   master_language?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -200,7 +201,6 @@ export async function handleCreateDataElement(
   validateTransportRequest(args.package_name, args.transport_request);
 
   const dataElementName = args.data_element_name.toUpperCase();
-  const shouldActivate = args.activate !== false;
   const typeKind = args.type_kind || 'domain';
   const detail = detailOf(args);
 
@@ -318,8 +318,8 @@ export async function handleCreateDataElement(
         }),
       );
 
-      if (!checked.ok || !shouldActivate) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      if (!checked.ok) {
+        return checked;
       }
 
       return carryCleanup(

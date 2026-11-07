@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type * as z from 'zod';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import type { AbapSystemKind } from '../systemKind.js';
-import type { ArgsOf } from './argsOf.js';
 
 // Re-export HandlerContext for consumers
 export type { HandlerContext };
@@ -11,7 +11,7 @@ export type { HandlerContext };
  */
 /**
  * SAP environment types for tool availability filtering.
- * - 'cloud'  — BTP ABAP Environment (jwt auth)
+ * - 'cloud'  — BTP ABAP Environment, whatever the credential
  * - 'onprem' — Modern on-premise (BASIS >= 7.50)
  * - 'legacy' — Legacy on-premise (BASIS < 7.50). Accepted by the type and
  *   declared by no tool: that support is parked on `parked/legacy-support`
@@ -19,10 +19,11 @@ export type { HandlerContext };
  */
 export type SapEnvironment = 'cloud' | 'onprem' | 'legacy';
 
-export interface ToolDefinition {
+export interface ToolDefinition<S extends z.ZodObject = z.ZodObject> {
   name: string;
   description: string;
-  inputSchema: any; // JSON Schema or Zod schema object
+  /** The tool's arguments: their type and the one check of a call's arguments. */
+  inputSchema: S;
   /**
    * SAP environments where this tool is available.
    * If omitted, the tool is available in all environments.
@@ -42,7 +43,7 @@ export interface ToolDefinition {
 /** A tool's description and input schema on one variant. */
 export interface VariantToolDefinition {
   readonly description: string;
-  readonly inputSchema: any;
+  readonly inputSchema: z.ZodObject;
   /**
    * The members its `object_type` (or `target_type`) offers there, for a
    * tool whose member picks the object: its search texts name only these.
@@ -50,32 +51,22 @@ export interface VariantToolDefinition {
   readonly members?: readonly string[];
 }
 
-/** A handler that takes the call's context and its arguments. */
-export type ContextHandler = (
-  context: HandlerContext,
-  args: any,
-) => Promise<any>;
+/** A tool call's arguments as they reach the server, before its own schema reads them. */
+export type ToolArgs = Readonly<Record<string, unknown>>;
 
 /**
- * A handler that takes its arguments alone and reads its group's context
- * (`(args) => handleX(this.context, args)`).
+ * Handler registration entry: the tool's definition and how one of its calls
+ * runs, given the call's context and its arguments. Every registration path
+ * passes the call's context at the call.
  */
-export type ArgsOnlyHandler = (args: any) => Promise<any>;
-
-/**
- * Tool handler function type, in either form: every registration path calls
- * it in the form it takes (`callInItsForm`), decided by its parameter count
- * (`isArgsOnly`). Context (containing connection and logger) is not part of
- * the MCP tool signature.
- */
-export type ToolHandler = ContextHandler | ArgsOnlyHandler;
-
-/**
- * Handler registration entry
- */
-export interface HandlerEntry {
-  toolDefinition: ToolDefinition;
-  handler: ToolHandler;
+export interface HandlerEntry<R = unknown> {
+  readonly toolDefinition: ToolDefinition;
+  /**
+   * Runs one call: the arguments parsed with the definition's schema, the
+   * handler called with the call's context and their typed output; refused,
+   * naming each issue, when they do not parse.
+   */
+  readonly call: (context: HandlerContext, args: ToolArgs) => Promise<R>;
   /**
    * The tool works on no connection of the instance: the server calls it
    * without building or connecting one first (the leftover-session tools,
@@ -83,24 +74,52 @@ export interface HandlerEntry {
    * A function decides per call, on the arguments as the SDK parsed them,
    * before any connection is taken (`HandlerBatch`: every action but `end`).
    */
-  connectionless?: true | ((args: unknown) => boolean);
+  readonly connectionless?: true | ((args: ToolArgs) => boolean);
+  /**
+   * The lock handle the call would be sent under, read from its arguments
+   * as the SDK parsed them; `undefined` when it is sent under none. The
+   * server refuses a handle its instance does not hold before it takes a
+   * connection, so the refusal sends nothing, no logon included (#4).
+   */
+  readonly heldLockOf?: (args: ToolArgs) => string | undefined;
 }
 
 /**
  * Pairs a tool definition with its handler, checked by the compiler: the
- * handler must take the arguments the definition's schema declares
- * (`ArgsOf`). The entry it answers is the ordinary, erased `HandlerEntry`, so
- * registration is unchanged; the handler takes `(context, args)`, and every
- * registration path passes the call's context to such a handler.
+ * handler takes the output of the definition's schema. The entry's call
+ * parses a call's arguments with that schema and hands the handler the
+ * result; arguments that do not parse are refused, naming each issue, and
+ * the handler does not run. The call answers what the handler answers.
  */
-export function defineTool<const D extends ToolDefinition>(
-  toolDefinition: D,
-  handler: (
-    context: HandlerContext,
-    args: ArgsOf<D['inputSchema']>,
-  ) => Promise<unknown>,
-): HandlerEntry {
-  return { toolDefinition, handler };
+export function defineTool<S extends z.ZodObject, R>(
+  toolDefinition: ToolDefinition<S>,
+  handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
+): HandlerEntry<R> {
+  return {
+    toolDefinition,
+    call: async (context, args) => {
+      const parsed = toolDefinition.inputSchema.safeParse(args);
+      if (!parsed.success) {
+        throw new Error(
+          invalidArgumentsWords(toolDefinition.name, parsed.error.issues),
+        );
+      }
+      return handler(context, parsed.data);
+    },
+  };
+}
+
+/** The refusal of arguments a tool's schema does not parse: each issue, at its path. */
+export function invalidArgumentsWords(
+  tool: string,
+  issues: readonly z.core.$ZodIssue[],
+): string {
+  const each = issues.map((issue) =>
+    issue.path.length === 0
+      ? issue.message
+      : `${issue.message} at ${issue.path.map(String).join('.')}`,
+  );
+  return `Input validation error: Invalid arguments for tool ${tool}: ${each.join('\n')}`;
 }
 
 /**
@@ -140,16 +159,9 @@ export interface IHandlersRegistry {
   /**
    * Registers a single tool on server
    * @param server - McpServer instance
-   * @param toolName - tool name
-   * @param toolDefinition - tool definition (name, description, inputSchema)
-   * @param handler - handler function
+   * @param entry - the tool's definition and its call
    */
-  registerTool(
-    server: McpServer,
-    toolName: string,
-    toolDefinition: ToolDefinition,
-    handler: ToolHandler,
-  ): void;
+  registerTool(server: McpServer, entry: HandlerEntry): void;
 
   /**
    * Gets list of registered tools

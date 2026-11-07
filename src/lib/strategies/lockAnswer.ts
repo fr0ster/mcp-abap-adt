@@ -25,9 +25,11 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { attr, child, childAt, isList, text } from '../xml/tree';
+import { parseStructure } from './reading';
 
 function headerValue(value: unknown): string {
-  if (Array.isArray(value)) return String(value[0] ?? '').trim();
+  if (isList(value)) return String(value[0] ?? '').trim();
   return typeof value === 'string' ? value.trim() : '';
 }
 
@@ -35,27 +37,32 @@ function headerValue(value: unknown): string {
 export function carriesLockHandle(
   answer: IAdtWireResponse | undefined,
 ): boolean {
-  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
-  if (headerValue(headers['sap-adt-lm-handle'])) return true;
-  const body = typeof answer?.data === 'string' ? answer.data : '';
-  return /<LOCK_HANDLE>\s*[^<\s][^<]*<\/LOCK_HANDLE>/.test(body);
+  // The answer is optional (`IAnalyse`); a wire answer's `headers` are not.
+  if (headerValue(answer?.headers['sap-adt-lm-handle'])) return true;
+  const handle = childAt(
+    parseStructure(answer?.data),
+    'asx:abap',
+    'asx:values',
+    'DATA',
+    'LOCK_HANDLE',
+  );
+  return (text(handle) ?? '').trim() !== '';
 }
 
 export const analyseLock: IAnalyse<IAdtError> = (verdict, answer) => {
   const judged = analyseException(verdict, answer);
   if (judged !== ADT_NO_FAILURE) return judged;
   if (carriesLockHandle(answer)) return ADT_NO_FAILURE;
-  const request = (answer as { request?: { method?: string; url?: string } })
-    ?.request;
+  // The wire answer's `request` is the transport's, typed `unknown`: read.
+  const request = child(answer, 'request');
+  const url = attr(request, 'url');
   return {
     origin: 'refusal',
     message:
       'SAP answered the lock request without a lock handle; the object is not locked',
     response: answer,
-    ...(request?.url
-      ? { request: { method: request.method, url: request.url } }
-      : {}),
-  } as unknown as IAdtError;
+    ...(url ? { request: { method: attr(request, 'method'), url } } : {}),
+  };
 };
 
 /**
@@ -88,8 +95,6 @@ export const analysePublicationLockAnswer: IAnalyse<IAdtError> = (
   // the answer because a `403` arrives thrown: adt-clients hands the analyse a
   // verdict whose `response` carries it, and `answer.status` can be undefined —
   // which is why `analysePublicationLock` reads it in that order too.
-  const status =
-    (judged as { response?: { status?: number } }).response?.status ??
-    answer?.status;
+  const status = judged.response?.status ?? answer?.status;
   return status === 403 ? ADT_NO_FAILURE : judged;
 };

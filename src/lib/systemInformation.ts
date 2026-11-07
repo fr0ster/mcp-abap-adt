@@ -25,6 +25,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { childAt, isElement } from './xml/tree';
 
 const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
 const SYSTEM_INFORMATION_ACCEPT =
@@ -47,10 +48,7 @@ function objectOf(data: unknown): Record<string, unknown> | undefined {
       return undefined;
     }
   }
-  if (value === null || typeof value !== 'object') {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
+  return isElement(value) ? value : undefined;
 }
 
 function fieldOf(
@@ -108,8 +106,7 @@ export class SystemInformationStatusError extends Error {
 /** The HTTP status a failed request carries, if any (read guarded). */
 function statusOf(error: unknown): unknown {
   try {
-    return (error as { response?: { status?: unknown } } | null)?.response
-      ?.status;
+    return childAt(error, 'response', 'status');
   } catch {
     return undefined;
   }

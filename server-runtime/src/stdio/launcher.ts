@@ -68,10 +68,10 @@ import {
 } from './shutdown.js';
 
 const stderrLogger: ILogger = {
-  info: (...args: any[]) => console.error(...args),
-  warn: (...args: any[]) => console.error(...args),
-  error: (...args: any[]) => console.error(...args),
-  debug: (...args: any[]) => console.error(...args),
+  info: (...args: unknown[]) => console.error(...args),
+  warn: (...args: unknown[]) => console.error(...args),
+  error: (...args: unknown[]) => console.error(...args),
+  debug: (...args: unknown[]) => console.error(...args),
 };
 
 const silentLogger: ILogger = {
@@ -356,15 +356,12 @@ export interface LauncherDeps {
 function envFileOf(
   config: CoreConfig,
 ): Pick<IAuthBrokerFactoryConfig, 'envFile'> {
-  const field = config.envFile
-    ? 'envFile'
-    : config.envFilePath
-      ? 'envFilePath'
-      : undefined;
-  if (!field) return {};
+  const field = config.envFile ? 'envFile' : 'envFilePath';
+  const path = config.envFile || config.envFilePath;
+  if (!path) return {};
   return {
     envFile: {
-      path: config[field] as string,
+      path,
       source: config.envFileSource ?? `CoreConfig.${field}`,
     },
   };
@@ -402,7 +399,8 @@ function effectiveFromEnvironment<T extends string>(
   if (!overridable) return value;
   const raw = env[key]?.trim().toLowerCase();
   if (!raw) return value;
-  if (!(values as readonly string[]).includes(raw)) {
+  const word = values.find((each) => each === raw);
+  if (word === undefined) {
     const words =
       values.length === 2
         ? values.join(' or ')
@@ -411,7 +409,7 @@ function effectiveFromEnvironment<T extends string>(
       `${key} (environment or env file) must be ${words}`,
     );
   }
-  return raw as T;
+  return word;
 }
 
 /** `config` without its message-server fields: they are read again after the env file. */
@@ -916,9 +914,9 @@ async function launchStdio(
       leftoverSessions: new LeftoverSessions({
         directory: runtimeDirectory(getPlatformPaths(config.authBrokerPath)[0]),
       }),
-      // Background runs of the run tools, kept in this process's memory;
-      // they end with the process. Only where the set serves them: a -ro
-      // command has none, so a run's `background: true` is refused.
+      // Background runs of the long reads (and, in the write sets, of the
+      // run tools), kept in this process's memory; they end with the
+      // process. Every set serves them.
       ...(options.toolSet.backgroundRuns && {
         backgroundRuns: new InMemoryBackgroundRuns(),
       }),

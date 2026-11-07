@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateClass Handler - Update existing ABAP class source code (optional activation)
  *
@@ -33,7 +35,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -48,30 +50,21 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Class name.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP class source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after update. Default: false.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Class name.'),
+    source_code: z.string().describe('Complete ABAP class source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after update. Default: false.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateClassArgs {
@@ -160,7 +153,7 @@ export async function handleUpdateClass(
         { type: 'CLASS', name: className },
       );
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

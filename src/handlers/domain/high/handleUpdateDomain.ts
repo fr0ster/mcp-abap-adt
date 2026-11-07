@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateDomain Handler - Update Existing ABAP Domain
  *
@@ -43,7 +45,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -61,83 +63,61 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      domain_name: {
-        type: 'string',
-        description: 'Domain name to update',
-      },
-      description: {
-        type: 'string',
-        description: 'New domain description (optional)',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      datatype: {
-        type: 'string',
-        description:
-          'Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
-      },
-      length: {
-        type: 'number',
-        description: 'Field length (max depends on datatype)',
-      },
-      decimals: {
-        type: 'number',
-        description: 'Decimal places (for DEC, CURR, QUAN types)',
-      },
-      conversion_exit: {
-        type: 'string',
-        description:
-          'Conversion exit routine name (without CONVERSION_EXIT_ prefix)',
-      },
-      lowercase: {
-        type: 'boolean',
-        description: 'Allow lowercase input',
-      },
-      sign_exists: {
-        type: 'boolean',
-        description: 'Field has sign (+/-)',
-      },
-      value_table: {
-        type: 'string',
-        description: 'Value table name for foreign key relationship',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate domain after update (default: true)',
-        default: true,
-      },
-      fixed_values: {
-        type: 'array',
-        description: 'Array of fixed values for domain value range',
-        items: {
-          type: 'object',
-          properties: {
-            low: {
-              type: 'string',
-              description: "Fixed value (e.g., '001', 'A')",
-            },
-            text: {
-              type: 'string',
-              description: 'Description text for the fixed value',
-            },
-          },
-          required: ['low', 'text'],
-        },
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['domain_name', 'package_name'],
-  },
+  inputSchema: z.object({
+    domain_name: z.string().describe('Domain name to update'),
+    description: z
+      .string()
+      .optional()
+      .describe('New domain description (optional)'),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    datatype: z
+      .string()
+      .optional()
+      .describe(
+        'Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
+      ),
+    length: z
+      .number()
+      .optional()
+      .describe('Field length (max depends on datatype)'),
+    decimals: z
+      .number()
+      .optional()
+      .describe('Decimal places (for DEC, CURR, QUAN types)'),
+    conversion_exit: z
+      .string()
+      .optional()
+      .describe(
+        'Conversion exit routine name (without CONVERSION_EXIT_ prefix)',
+      ),
+    lowercase: z.boolean().optional().describe('Allow lowercase input'),
+    sign_exists: z.boolean().optional().describe('Field has sign (+/-)'),
+    value_table: z
+      .string()
+      .optional()
+      .describe('Value table name for foreign key relationship'),
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Activate domain after update (default: true)'),
+    fixed_values: z
+      .array(
+        z.object({
+          low: z.string().describe("Fixed value (e.g., '001', 'A')"),
+          text: z.string().describe('Description text for the fixed value'),
+        }),
+      )
+      .optional()
+      .describe('Array of fixed values for domain value range'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DomainArgs {
@@ -237,7 +217,7 @@ export async function handleUpdateDomain(
       );
 
       if (!written.ok) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.

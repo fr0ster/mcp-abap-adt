@@ -20,6 +20,7 @@ import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomai
 import { handleUpdateFunctionModule } from '../../handlers/function/high/handleUpdateFunctionModule';
 import { handleUpdateServiceDefinition } from '../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 let fakeClient: unknown;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -347,9 +348,14 @@ describe('the restored long-polling wait: call order, per handler', () => {
     ]);
   });
 
-  it('FunctionModule update: lock, update, check, unlock, wait, activate', async () => {
+  it('FunctionModule update: group check, lock, update, check, unlock, wait, activate', async () => {
     const order: string[] = [];
+    const metadata = readsModuleIn('ZFG_X', 'Z_FM_X');
     fakeClient = fakeClientOf({
+      readMetadata: async () => {
+        order.push('metadata');
+        return metadata();
+      },
       lock: async () => {
         order.push('lock');
         return okResponse('L1');
@@ -383,6 +389,7 @@ describe('the restored long-polling wait: call order, per handler', () => {
     });
     expect(result.isError).toBe(false);
     expect(order).toEqual([
+      'metadata',
       'lock',
       'update',
       'check',

@@ -20,8 +20,16 @@ import {
 } from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
-// that reads `seen.last`/`seen.calls` needs this wiring.
-const seen = recordAnalyse();
+// that reads `seen.last`/`seen.calls` needs this wiring. A group activation
+// reads its run until SAP states it ended, so the run reads `finished`.
+const seen = recordAnalyse({
+  getActivationRun: () =>
+    reading(
+      { 'runs:run': { '@': { 'runs:status': 'finished' } } },
+      '<runs:run runs:status="finished"/>',
+      200,
+    ),
+});
 let fakeClient: unknown = seen.client;
 jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
@@ -366,8 +374,8 @@ describe('ActivateObjectLow', () => {
     });
     // Three requests, not one: the POST answers `202` with the id in
     // `Location` and an empty body, so the verdict is in the run's results.
-    // `getActivationRun` repeats while the run has not settled, which the
-    // recording double never reports — only the sequence is pinned here.
+    // `getActivationRun` repeats while the run has not ended; the recording
+    // double answers it finished — only the sequence is pinned here.
     const members = seen.calls.map((c) => c.member);
     expect(members[0]).toBe('activateObjectsGroup');
     expect(members).toContain('getActivationRun');

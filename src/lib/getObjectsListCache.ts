@@ -1,15 +1,17 @@
 // In-memory cache for GetObjectsList
 
-type ObjectsListCacheType = any | null;
-
+/**
+ * The last list a listing tool answered, as it answered it: each listing
+ * caches its own shape, so a reader reads it as a value of no known type.
+ */
 class ObjectsListCache {
-  private cache: ObjectsListCacheType = null;
+  private cache: unknown = null;
 
-  setCache(data: any) {
+  setCache(data: unknown) {
     this.cache = data;
   }
 
-  getCache(): ObjectsListCacheType {
+  getCache(): unknown {
     return this.cache;
   }
 

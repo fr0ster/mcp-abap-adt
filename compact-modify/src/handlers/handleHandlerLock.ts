@@ -6,10 +6,13 @@ import {
   COMPACT_LOCK_KINDS,
   compactLockDescription,
   compactLockSchemaFor,
+  isElement,
+  jsonOf,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { lockObject } from '@mcp-abap-adt/lib/handlers/write';
+import { return_error } from '@mcp-abap-adt/lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',
@@ -20,6 +23,10 @@ export const TOOL_DEFINITION = {
     members: COMPACT_LOCK[variant],
   })),
 } as const;
+
+/** The words of a lock asked of an instance whose host keeps no held locks. */
+export const LOCKS_NOT_KEPT_WORDS =
+  'locks are not kept by this server instance: its host gave it no held locks, so a lock taken here could not be written under or released';
 
 type HandlerLockArgs = {
   object_type: string;
@@ -41,11 +48,17 @@ export async function handleHandlerLock(
     );
   }
 
-  const answered = (await lockObject(context, {
+  // A lock this instance cannot keep could not be written or released
+  // under its handle here (`lockHeldHere`): none is taken.
+  if (context.heldLocks === undefined) {
+    return return_error(new Error(LOCKS_NOT_KEPT_WORDS));
+  }
+
+  const answered = await lockObject(context, {
     object_name: args.object_name,
     object_type: COMPACT_LOCK_KINDS[member],
     super_package: args.super_package,
-  })) as LockAnswer;
+  });
   // A package lock over RFC lives in a session of its own.
   return keptLock(context, answered, member === 'PACKAGE' ? 'own' : 'main');
 }
@@ -56,10 +69,10 @@ type LockAnswer = {
 };
 
 /**
- * Where the host keeps locks (Streamable HTTP), the handle a lock answered
- * is kept as the instance's state and the answer names the instance's
- * `state_handle`. An empty handle (a service binding open in an editing
- * session) holds nothing.
+ * The handle a lock answered is kept as the instance's state (every
+ * transport's instance has its held locks), and the answer names the
+ * instance's `state_handle`. An empty handle (a service binding open in an
+ * editing session) holds nothing.
  */
 function keptLock(
   context: HandlerContext,
@@ -71,16 +84,15 @@ function keptLock(
   if (locks === undefined || answered?.isError || text === undefined) {
     return answered;
   }
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    return answered;
-  }
-  const handle = body.lock_handle;
+  const read = jsonOf(text);
+  if (!isElement(read)) return answered;
+  const handle = read.lock_handle;
   if (typeof handle !== 'string' || handle === '') return answered;
   locks.hold(handle, session);
-  if (context.state !== undefined) body.state_handle = context.state.handle;
+  const body =
+    context.state === undefined
+      ? read
+      : { ...read, state_handle: context.state.handle };
   return {
     ...answered,
     content: [

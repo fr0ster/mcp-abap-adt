@@ -1,7 +1,15 @@
+import * as z from 'zod';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readEnhancementSpotMetadata } from '../../../lib/strategies/metadataReads';
+import {
+  attributeOf,
+  firstAttribute,
+  firstAttributeOn,
+  membersNamed,
+  parseStructure,
+} from '../../../lib/strategies/reading';
 import { carryingFailure } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
 import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
@@ -11,16 +19,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve metadata and list of implementations for a specific enhancement spot, at its active version.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      enhancement_spot: {
-        type: 'string',
-        description: 'Name of the enhancement spot',
-      },
-    },
-    required: ['enhancement_spot'],
-  },
+  inputSchema: z.object({
+    enhancement_spot: z.string().describe('Name of the enhancement spot'),
+  }),
 } as const;
 
 /**
@@ -28,11 +29,28 @@ export const TOOL_DEFINITION = {
  */
 export interface EnhancementSpotResponse {
   enhancement_spot: string;
-  metadata: {
-    description?: string;
-    type?: string;
-    status?: string;
-  };
+  metadata: EnhancementSpotMetadata;
+}
+
+/** What the spot's document names: each member only when the document has it. */
+export interface EnhancementSpotMetadata {
+  name?: string;
+  description?: string;
+  type?: string;
+  status?: string;
+  package?: string;
+  interface?: string;
+  badi_definitions?: Array<{
+    name: string | undefined;
+    shorttext: string | undefined;
+    interface: string | undefined;
+  }>;
+  links?: Array<{
+    href: string | undefined;
+    rel: string | undefined;
+    type: string | undefined;
+    title: string | undefined;
+  }>;
 }
 
 /**
@@ -40,64 +58,48 @@ export interface EnhancementSpotResponse {
  * @param xmlData - Raw XML response from ADT
  * @returns Metadata object with description, type, status, and functions (implementations)
  */
-function parseEnhancementSpotMetadata(xmlData: string): any {
-  const metadata: any = {};
+function parseEnhancementSpotMetadata(
+  xmlData: string,
+): EnhancementSpotMetadata {
+  const metadata: EnhancementSpotMetadata = {};
   try {
-    // Spot name, description, type, package
-    const nameMatch = xmlData.match(/adtcore:name="([^"]*)"/);
-    if (nameMatch?.[1]) metadata.name = nameMatch[1];
-    const descMatch = xmlData.match(/adtcore:description="([^"]*)"/);
-    if (descMatch?.[1]) metadata.description = descMatch[1];
-    const typeMatch = xmlData.match(/adtcore:type="([^"]*)"/);
-    if (typeMatch?.[1]) metadata.type = typeMatch[1];
-    const pkgMatch = xmlData.match(
-      /adtcore:packageRef[^>]+adtcore:name="([^"]*)"/,
+    const document = parseStructure(xmlData);
+    // Spot name, description, type: the first element that states each — the
+    // spot's own root; its package off its package reference.
+    const name = firstAttribute(document, 'adtcore:name');
+    if (name) metadata.name = name;
+    const description = firstAttribute(document, 'adtcore:description');
+    if (description) metadata.description = description;
+    const type = firstAttribute(document, 'adtcore:type');
+    if (type) metadata.type = type;
+    const pkg = firstAttributeOn(
+      document,
+      'adtcore:packageRef',
+      'adtcore:name',
     );
-    if (pkgMatch?.[1]) metadata.package = pkgMatch[1];
+    if (pkg) metadata.package = pkg;
 
     // Interface reference
-    const ifaceMatch = xmlData.match(
-      /<enhs:interface[^>]*adtcore:name="([^"]*)"/,
-    );
-    if (ifaceMatch?.[1]) metadata.interface = ifaceMatch[1];
+    const iface = firstAttributeOn(document, 'enhs:interface', 'adtcore:name');
+    if (iface) metadata.interface = iface;
 
     // BAdI definitions
-    const badiDefs: Array<{
-      name: string;
-      shorttext: string;
-      interface: string;
-    }> = [];
-    const badiDefRegex = /<enhs:badiDefinition[\s\S]*?<\/enhs:badiDefinition>/g;
-    let badiMatch: RegExpExecArray | null = badiDefRegex.exec(xmlData);
-    while (badiMatch !== null) {
-      const block = badiMatch[0];
-      const badiName = (block.match(/enhs:name="([^"]*)"/) || [])[1];
-      const badiShort = (block.match(/enhs:shorttext="([^"]*)"/) || [])[1];
-      const badiIface = (block.match(
-        /<enhs:interface[^>]*adtcore:name="([^"]*)"/,
-      ) || [])[1];
-      badiDefs.push({
-        name: badiName,
-        shorttext: badiShort,
-        interface: badiIface,
-      });
-      badiMatch = badiDefRegex.exec(xmlData);
-    }
+    const badiDefs = membersNamed(document, 'enhs:badiDefinition').map(
+      ({ node }) => ({
+        name: attributeOf(node, 'enhs:name'),
+        shorttext: attributeOf(node, 'enhs:shorttext'),
+        interface: firstAttributeOn(node, 'enhs:interface', 'adtcore:name'),
+      }),
+    );
     if (badiDefs.length > 0) metadata.badi_definitions = badiDefs;
 
     // All atom:link rels
-    const links: Array<any> = [];
-    const linkRegex = /<atom:link ([^>]+)\/>/g;
-    let linkMatch: RegExpExecArray | null = linkRegex.exec(xmlData);
-    while (linkMatch !== null) {
-      const attrs = linkMatch[1];
-      const href = (attrs.match(/href="([^"]*)"/) || [])[1];
-      const rel = (attrs.match(/rel="([^"]*)"/) || [])[1];
-      const type = (attrs.match(/type="([^"]*)"/) || [])[1];
-      const title = (attrs.match(/title="([^"]*)"/) || [])[1];
-      links.push({ href, rel, type, title });
-      linkMatch = linkRegex.exec(xmlData);
-    }
+    const links = membersNamed(document, 'atom:link').map(({ node }) => ({
+      href: attributeOf(node, 'href'),
+      rel: attributeOf(node, 'rel'),
+      type: attributeOf(node, 'type'),
+      title: attributeOf(node, 'title'),
+    }));
     if (links.length > 0) metadata.links = links;
 
     logger?.info(`Parsed structured metadata for enhancement spot:`, metadata);
@@ -124,7 +126,7 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
  */
 export async function handleGetEnhancementSpot(
   context: HandlerContext,
-  args: any,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   try {

@@ -15,6 +15,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { AdtHeaderPairs } from '../../../lib/adtHeaders/AdtHeaderPairs';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
@@ -44,9 +45,9 @@ const probe: HandlerEntry = {
   toolDefinition: {
     name: TOOL,
     description: 'reads a where-used list',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: z.object({}),
   } as never,
-  handler: (async (context: HandlerContext, _args: unknown) => {
+  call: (async (context: HandlerContext, _args: unknown) => {
     const answer = await withAdtHeaders(context, OP, (headers) =>
       createAdtClient(context.connection)
         .getUtils(utilDocuments)

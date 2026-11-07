@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetTypeInfo: every DDIC kind a type name is (#321).
  *
@@ -20,6 +21,7 @@ import { XMLParser } from 'fast-xml-parser';
 import {
   answerCaught,
   answerFailure,
+  type JsonAnswer,
   type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -34,28 +36,23 @@ import {
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { child, childAt, listOf } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] Retrieve ABAP type information for a DDIC type name: data elements (DTEL), domains (DOMA), structures and table types. One name can be more than one type (MANDT is a data element and a domain): the answer lists every type the name is, in alphabetical order of type, each with its definition — data type, length and decimals, field labels, a domain's output format, value table and fixed values, a table type's row type and key. Each type is read from the working area: its inactive version where one exists.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      type_name: {
-        type: 'string',
-        description: 'Name of the ABAP type',
-      },
-      include_structure_fallback: {
-        type: 'boolean',
-        description:
-          'When true (default), the name is also read as a DDIC structure; false leaves the structure read out.',
-        default: true,
-      },
-    },
-    required: ['type_name'],
-  },
+  inputSchema: z.object({
+    type_name: z.string().describe('Name of the ABAP type'),
+    include_structure_fallback: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'When true (default), the name is also read as a DDIC structure; false leaves the structure read out.',
+      ),
+  }),
 } as const;
 
 /** The kinds a name is read as, in the order they are answered. */
@@ -95,97 +92,102 @@ function boundOf(value: unknown): string | undefined {
 }
 
 /** The attributes every ADT object document carries. */
-function objectFacts(root: Record<string, any>) {
+function objectFacts(root: unknown) {
   return {
-    name: textOf(root['adtcore:name']),
-    description: textOf(root['adtcore:description']),
-    package: textOf(root['adtcore:packageRef']?.['adtcore:name']),
+    name: textOf(child(root, 'adtcore:name')),
+    description: textOf(child(root, 'adtcore:description')),
+    package: textOf(childAt(root, 'adtcore:packageRef', 'adtcore:name')),
   };
 }
 
+/** The document `xml` parses to, read from outside the type system. */
+function documentOf(xml: string): unknown {
+  return parser.parse(xml);
+}
+
 function parseDataElement(xml: string) {
-  const root = parser.parse(xml)['blue:wbobj'];
-  const dtel = root?.['dtel:dataElement'];
+  const root = child(documentOf(xml), 'blue:wbobj');
+  const dtel = child(root, 'dtel:dataElement');
   if (!dtel) return undefined;
   return {
     objectType: 'data_element' as const,
     ...objectFacts(root),
-    typeKind: textOf(dtel['dtel:typeKind']),
-    domain: textOf(dtel['dtel:typeName']),
-    dataType: textOf(dtel['dtel:dataType']),
-    length: numberOf(dtel['dtel:dataTypeLength']),
-    decimals: numberOf(dtel['dtel:dataTypeDecimals']),
+    typeKind: textOf(child(dtel, 'dtel:typeKind')),
+    domain: textOf(child(dtel, 'dtel:typeName')),
+    dataType: textOf(child(dtel, 'dtel:dataType')),
+    length: numberOf(child(dtel, 'dtel:dataTypeLength')),
+    decimals: numberOf(child(dtel, 'dtel:dataTypeDecimals')),
     labels: {
-      short: textOf(dtel['dtel:shortFieldLabel']),
-      medium: textOf(dtel['dtel:mediumFieldLabel']),
-      long: textOf(dtel['dtel:longFieldLabel']),
-      heading: textOf(dtel['dtel:headingFieldLabel']),
+      short: textOf(child(dtel, 'dtel:shortFieldLabel')),
+      medium: textOf(child(dtel, 'dtel:mediumFieldLabel')),
+      long: textOf(child(dtel, 'dtel:longFieldLabel')),
+      heading: textOf(child(dtel, 'dtel:headingFieldLabel')),
     },
   };
 }
 
 function parseDomain(xml: string) {
-  const root = parser.parse(xml)['doma:domain'];
-  const content = root?.['doma:content'];
+  const root = child(documentOf(xml), 'doma:domain');
+  const content = child(root, 'doma:content');
   if (!content) return undefined;
-  const type = content['doma:typeInformation'] ?? {};
-  const output = content['doma:outputInformation'] ?? {};
-  const values = content['doma:valueInformation'] ?? {};
-  const fixed: any[] = values['doma:fixValues']?.['doma:fixValue'] ?? [];
+  const type = child(content, 'doma:typeInformation');
+  const output = child(content, 'doma:outputInformation');
+  const values = child(content, 'doma:valueInformation');
+  const fixed = listOf(childAt(values, 'doma:fixValues', 'doma:fixValue'));
   return {
     objectType: 'domain' as const,
     ...objectFacts(root),
-    dataType: textOf(type['doma:datatype']),
-    length: numberOf(type['doma:length']),
-    decimals: numberOf(type['doma:decimals']),
+    dataType: textOf(child(type, 'doma:datatype')),
+    length: numberOf(child(type, 'doma:length')),
+    decimals: numberOf(child(type, 'doma:decimals')),
     output: {
-      length: numberOf(output['doma:length']),
-      conversionExit: textOf(output['doma:conversionExit']),
-      lowercase: output['doma:lowercase'] === 'true',
-      signExists: output['doma:signExists'] === 'true',
+      length: numberOf(child(output, 'doma:length')),
+      conversionExit: textOf(child(output, 'doma:conversionExit')),
+      lowercase: child(output, 'doma:lowercase') === 'true',
+      signExists: child(output, 'doma:signExists') === 'true',
     },
-    valueTable: textOf(values['doma:valueTableRef']?.['adtcore:name']),
+    valueTable: textOf(childAt(values, 'doma:valueTableRef', 'adtcore:name')),
     fixedValues: fixed.map((entry) => ({
-      low: boundOf(entry['doma:low']),
-      high: boundOf(entry['doma:high']),
-      text: textOf(entry['doma:text']),
+      low: boundOf(child(entry, 'doma:low')),
+      high: boundOf(child(entry, 'doma:high')),
+      text: textOf(child(entry, 'doma:text')),
     })),
   };
 }
 
 function parseStructure(xml: string) {
-  const root = parser.parse(xml)['blue:blueSource'];
+  const root = child(documentOf(xml), 'blue:blueSource');
   if (!root) return undefined;
   return { objectType: 'structure' as const, ...objectFacts(root) };
 }
 
 function parseTableType(xml: string) {
-  const root = parser.parse(xml)['ttyp:tableType'];
+  const root = child(documentOf(xml), 'ttyp:tableType');
   if (!root) return undefined;
-  const row = root['ttyp:rowType'] ?? {};
-  const builtIn = row['ttyp:builtInType'] ?? {};
-  const key = root['ttyp:primaryKey'] ?? {};
+  const row = child(root, 'ttyp:rowType');
+  const builtIn = child(row, 'ttyp:builtInType');
+  const key = child(root, 'ttyp:primaryKey');
   return {
     objectType: 'table_type' as const,
     ...objectFacts(root),
     rowType: {
-      typeKind: textOf(row['ttyp:typeKind']),
-      typeName: textOf(row['ttyp:typeName']),
-      dataType: textOf(builtIn['ttyp:dataType']),
-      length: numberOf(builtIn['ttyp:length']),
-      decimals: numberOf(builtIn['ttyp:decimals']),
+      typeKind: textOf(child(row, 'ttyp:typeKind')),
+      typeName: textOf(child(row, 'ttyp:typeName')),
+      dataType: textOf(child(builtIn, 'ttyp:dataType')),
+      length: numberOf(child(builtIn, 'ttyp:length')),
+      decimals: numberOf(child(builtIn, 'ttyp:decimals')),
     },
-    accessType: textOf(root['ttyp:accessType']),
+    accessType: textOf(child(root, 'ttyp:accessType')),
     primaryKey: {
-      definition: textOf(key['ttyp:definition']),
-      kind: textOf(key['ttyp:kind']),
+      definition: textOf(child(key, 'ttyp:definition')),
+      kind: textOf(child(key, 'ttyp:kind')),
     },
   };
 }
 
 /** Whether a refusal is SAP's `404`: the name is not of this kind. */
 function isNotFound(error: IAdtError): boolean {
-  return (error.response as { status?: unknown } | undefined)?.status === 404;
+  return error.response?.status === 404;
 }
 
 type Lookup = {
@@ -193,7 +195,7 @@ type Lookup = {
   step: string;
   /** The root element of the kind's document, named in a refusal to read one. */
   document: string;
-  read: () => Promise<IAdtResponse<unknown, IAdtError>>;
+  read: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   parse: (xml: string) => object | undefined;
 };
 
@@ -217,7 +219,7 @@ async function lookUp(lookup: Lookup): Promise<LookupResult> {
       answer: answerFailure(withStep(failed, lookup.step)),
     };
   }
-  const raw = (answered.getResult().value as AdtReading<unknown>).raw;
+  const raw = answered.getResult().value.raw;
   if (typeof raw !== 'string' || raw.trim() === '') return { status: 'absent' };
   // A document we cannot read is our failure, not SAP's answer, and never the
   // kind's absence: the call ends naming the read.
@@ -230,7 +232,10 @@ async function lookUp(lookup: Lookup): Promise<LookupResult> {
   return { status: 'found', payload };
 }
 
-export async function handleGetTypeInfo(context: HandlerContext, args: any) {
+export async function handleGetTypeInfo(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
   const { connection, logger } = context;
   if (!args?.type_name) {
     return return_error('Type name is required');
@@ -314,17 +319,14 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       };
     }
 
-    const mcpResult = {
+    const mcpResult: JsonAnswer = {
       isError: false,
       content: [{ type: 'json', json: { name: typeName, types } }],
     };
     objectsListCache.setCache(mcpResult);
     return mcpResult;
   } catch (error) {
-    logger?.error(
-      `Failed to resolve type info for ${args.type_name}`,
-      error as any,
-    );
+    logger?.error(`Failed to resolve type info for ${args.type_name}`, error);
     // Not a read's refusal (each answers its own): ours.
     return answerCaught(error, { tool: 'GetTypeInfo', detail: 'terse' });
   }

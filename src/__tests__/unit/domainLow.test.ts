@@ -161,6 +161,30 @@ describe('UpdateDomainLow', () => {
     expect(updateCall?.config?.transportRequest).toBe('SIDK900123');
   });
 
+  // The bag is the model's own object: a flag given as null is no flag, and
+  // was written into the document as the text "null".
+  it('leaves out a flag given as null instead of writing "null" into the document', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"><doma:signExists>false</doma:signExists></doma:domain>';
+    let source = '';
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (_config: unknown, options: { source: string }) => {
+        source = options.source;
+        return okResponse(undefined);
+      },
+    });
+
+    const result = await handleUpdateDomain(context, {
+      domain_name: 'zd',
+      properties: { description: 'after', sign_exists: null },
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(source).toContain('<doma:signExists>false</doma:signExists>');
+  });
+
   it('accepts the camelCase alias too, the same fallback UpdateDataElementLow reads', async () => {
     const currentXml =
       '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';

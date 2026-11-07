@@ -58,6 +58,7 @@ import {
   SINGLE_ACTIVATION_ROUTES,
   TYPE_NAMES,
 } from '../../lib/adtProjections';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 
 /**
  * Which ADT type code reaches which family's own `activate()`.
@@ -144,8 +145,8 @@ describe('ActivateObject: each type code and where it goes', () => {
 
   it('ActivateObjects names the codes a table type and a structure are activated by', () => {
     const typeText =
-      ActivateObjects.inputSchema.properties.objects.items.properties.type
-        .description;
+      jsonAt(listedJson(ActivateObjects.inputSchema), 'objects', '[]', 'type')
+        .description ?? '';
     // Each code, with the names that stand for it (`ACTIVATION_NAMES`).
     expect(typeText).toContain('TABL/DS (structure, stru)');
     // A main type is no name: `TTYP` reads as `TTYP/DA` through the
@@ -179,11 +180,13 @@ describe('the preaudit text names exactly the codes the map routes to a family',
   it.each([
     [
       'ActivateObjects',
-      ActivateObjects.inputSchema.properties.preaudit.description,
+      jsonAt(listedJson(ActivateObjects.inputSchema), 'preaudit').description ??
+        '',
     ],
     [
       'ActivateObjectLow',
-      ActivateObjectLow.inputSchema.properties.preaudit.description,
+      jsonAt(listedJson(ActivateObjectLow.inputSchema), 'preaudit')
+        .description ?? '',
     ],
   ])('%s', (_tool, text) => {
     // The projection of the variant (`SINGLE_ACTIVATION`), every value of

@@ -22,6 +22,7 @@ import type {
   HandlerContext,
   HandlerEntry,
 } from '../../../lib/handlers/interfaces';
+import { listedJson } from '../../helpers/listedJson';
 
 const REPO = path.resolve(__dirname, '../../../..');
 const NAMES = ['session_id', 'session_state'];
@@ -103,7 +104,7 @@ describe('no tool takes session_id or session_state', () => {
 
   it('no shipped tool declares either in its input schema, nor GetSession exists', () => {
     const offending = tools.flatMap((t) =>
-      declared(t.toolDefinition.inputSchema)
+      declared(listedJson(t.toolDefinition.inputSchema))
         .filter((name) => NAMES.includes(name))
         .map((name) => `${t.toolDefinition.name}.${name}`),
     );

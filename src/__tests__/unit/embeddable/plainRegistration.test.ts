@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A plain registration (`registry.registerAllTools(mcpServer)` on an SDK
  * `McpServer`, the `./handlers` export) lists the variant its groups state
@@ -17,6 +18,10 @@ import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
+import {
+  isBackgroundRunTool,
+  longToolInTheCall,
+} from '../../../lib/backgroundRuns/tools';
 import { variantOf } from '../../../lib/clients';
 import {
   createAbapConnection,
@@ -43,7 +48,6 @@ import {
   REGISTER_TOOL_UNHELD_WORDS,
 } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
-import { callInItsForm } from '../../../lib/handlers/utils/handlerCall';
 import { isLongTool } from '../../../lib/longTools';
 
 import { adtStandIn } from '../../helpers/adtStandIn';
@@ -160,15 +164,21 @@ describe.each(Object.entries(REGISTRIES))(
       const { registry, definitions } = registeredFor();
       const plain = await plainListing(registry);
       expect(plain).toEqual(await listedOn(new StatedServer(registryFor())));
+      // A plain registration keeps no background runs: no background-run tool.
       expect(plain.map((tool) => tool.name)).toEqual(
         definitions
           .map((definition) => definition.name)
+          .filter((name) => !isBackgroundRunTool(name))
           .sort((a, b) => a.localeCompare(b)),
       );
+      // A listed long tool as a plain registration hands it out: without
+      // background runs, it answers in the call (`longToolInTheCall`).
       const described = new Map(
         definitions.map((definition) => [
           definition.name,
-          definition.description,
+          isLongTool(definition.name)
+            ? longToolInTheCall(definition).description
+            : definition.description,
         ]),
       );
       for (const tool of plain) {
@@ -183,14 +193,10 @@ describe.each(Object.entries(REGISTRIES))(
         const all = await plainListing(registry);
         const server = new McpServer({ name: 'single', version: '1.0.0' });
         for (const definition of definitions) {
-          registry.registerTool(
-            server,
-            definition.name,
-            definition,
-            async () => ({
-              content: [],
-            }),
-          );
+          registry.registerTool(server, {
+            toolDefinition: definition,
+            call: async () => ({ content: [] }),
+          });
         }
         const single = await listedOn(server);
         const shown = (tools: Listed) =>
@@ -318,14 +324,10 @@ describe('a plain registration of groups that state different variants', () => {
       const definition = someDefinition();
       const server = withSentinel();
       expect(() =>
-        registry.registerTool(
-          server,
-          definition.name,
-          definition,
-          async () => ({
-            content: [],
-          }),
-        ),
+        registry.registerTool(server, {
+          toolDefinition: definition,
+          call: async () => ({ content: [] }),
+        }),
       ).toThrow(words);
       expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
         'Sentinel',
@@ -343,12 +345,10 @@ describe('a plain registration of groups that state different variants', () => {
     ]);
     const definition = someDefinition();
     expect(() =>
-      registry.registerTool(
-        withSentinel(),
-        definition.name,
-        definition,
-        async () => ({ content: [] }),
-      ),
+      registry.registerTool(withSentinel(), {
+        toolDefinition: definition,
+        call: async () => ({ content: [] }),
+      }),
     ).not.toThrow();
   });
 });
@@ -374,7 +374,7 @@ describe('a call on the plain path', () => {
           {
             name: 'VariantProbe',
             description: 'Answers the variant of the call.',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           },
           // Both parameters declared: the form decides how it is called.
           async (context, _args) => ({
@@ -434,14 +434,11 @@ describe('a call on the plain path', () => {
 });
 
 /**
- * The plain path calls each handler in the form it takes, as a server
- * instance does (`callInItsForm`): a handler declaring `(context, args)` gets
- * both, an args-only one (`(args) => handleX(this.context, args)`, every
- * compact and readonly tool) gets its arguments with its group's context set
- * for the call. Each tool answers on a plain `McpServer` as it answers
+ * The plain path calls each entry with the call's context, as a server
+ * instance does. Each tool answers on a plain `McpServer` as it answers
  * through a `BaseMcpServer` (`EmbeddableMcpServer`) on the same groups.
  */
-describe('a plain registration calls each handler in the form it takes', () => {
+describe('a plain registration calls each entry with the call’s context', () => {
   const groupsOn = (context: HandlerContext): IHandlerGroup[] => [
     ...compactToolSet.groups(context, 'stdio'),
     new ReadOnlyHandlersGroup(context),
@@ -495,16 +492,12 @@ describe('a plain registration calls each handler in the form it takes', () => {
 
   it.each<[string, string, Record<string, unknown>]>([
     [
-      'a compact tool (args-only)',
+      'a compact tool',
       'HandlerCheckRun',
       { object_type: 'CLASS', object_name: 'ZCL_PLACEHOLDER' },
     ],
-    [
-      'a readonly tool (args-only)',
-      'GetProgram',
-      { program_name: 'ZPLACEHOLDER' },
-    ],
-    ['a context-taking tool', 'ListBackgroundRuns', {}],
+    ['a readonly tool', 'GetProgram', { program_name: 'ZPLACEHOLDER' }],
+    ['a background-run tool', 'ListBackgroundRuns', {}],
   ])('%s answers as through a BaseMcpServer', async (_label, name, args) => {
     const plain = await onPlain(name, args);
     const served = await onServer(name, args);
@@ -517,9 +510,7 @@ describe('a plain registration calls each handler in the form it takes', () => {
  * A handler `HandlerExporter.getHandlerEntries()` hands out runs on the
  * system kind the exporter states (`systemType`), stated on the call's
  * connection before it runs; with none stated, none — `SAP_SYSTEM_TYPE` is
- * not read on this path. The embedder calls each handler in its form
- * (`callInItsForm`), setting an args-only handler's group context for the
- * call, as a server instance does.
+ * not read on this path. The embedder calls each entry with its context.
  */
 describe('a handler getHandlerEntries hands out', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
@@ -537,17 +528,10 @@ describe('a handler getHandlerEntries hands out', () => {
     const exporter = new HandlerExporter({
       ...(systemType !== undefined && { systemType }),
     });
-    const registry = exporter.createRegistry();
-    if (!(registry instanceof CompositeHandlersRegistry)) {
-      throw new Error('the exporter builds a CompositeHandlersRegistry');
-    }
-    const group = registry
-      .getHandlerGroups()
-      .find((g) => g.getHandlers().some((e) => e.toolDefinition.name === name));
     const entry = exporter
       .getHandlerEntries()
       .find((e) => e.toolDefinition.name === name);
-    if (group === undefined || entry === undefined) {
+    if (entry === undefined) {
       throw new Error(`the exporter hands out ${name}`);
     }
     const counting = countingConnection('document', undefined);
@@ -556,15 +540,7 @@ describe('a handler getHandlerEntries hands out', () => {
       logger: silentLogger,
     };
     // A handed-out handler answers its result, or throws its refusal.
-    const answer = await callInItsForm(
-      entry.handler,
-      context,
-      args,
-      (callContext, call) => {
-        Object.assign(group, { context: callContext });
-        return call();
-      },
-    ).then(
+    const answer = await entry.call(context, args).then(
       (result) => JSON.stringify(result),
       (error) => String(error),
     );
@@ -575,7 +551,7 @@ describe('a handler getHandlerEntries hands out', () => {
     };
   }
 
-  it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, an args-only handler is refused system_type_required, nothing sent', async () => {
+  it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, a handler is refused system_type_required, nothing sent', async () => {
     process.env.SAP_SYSTEM_TYPE = 'cloud';
     const { answer, sent } = await embedderCall(undefined, 'GetProgram', {
       program_name: 'ZPLACEHOLDER',
@@ -605,9 +581,9 @@ describe('a handler getHandlerEntries hands out', () => {
 
 /**
  * A listed long tool's read on the plain path runs on a connection of its
- * own (`runLongCall`), and its handler is called in the form it takes there
- * too (`callInItsForm`): an args-only handler answers as through a
- * `BaseMcpServer` on the same group, on a connection the factory built.
+ * own (`runLongCall`), and its entry is called with that connection's
+ * context there: it answers as through a `BaseMcpServer` on the same group,
+ * on a connection the factory built.
  */
 describe('a long read on the plain path', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
@@ -616,7 +592,7 @@ describe('a long read on the plain path', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  /** `SearchObject` (args-only, listed long) on `register`'s server. */
+  /** `SearchObject` (listed long) on `register`'s server. */
   async function searched(
     register: (context: HandlerContext) => McpServer,
   ): Promise<{ answer: string; requests: string[] }> {
@@ -660,7 +636,7 @@ describe('a long read on the plain path', () => {
     }
   }
 
-  it('an args-only handler answers as through a BaseMcpServer', async () => {
+  it('a listed long read answers as through a BaseMcpServer', async () => {
     expect(isLongTool('SearchObject')).toBe(true);
     const plain = await searched((context) => {
       const server = new McpServer({ name: 'plain-long', version: '1.0.0' });
@@ -688,8 +664,8 @@ describe('a long read on the plain path', () => {
 
 /**
  * `registerTool` calls a tool as `registerAllTools` does: through the path
- * of the group that holds it — its call form (`callInItsForm`), the group's
- * context for an args-only handler, the stated kind (`inStatedScope`) — so
+ * of the group that holds it — the entry's call with the call's context,
+ * the stated kind (`inStatedScope`) — so
  * groups stating cloud run the call as cloud whatever `SAP_SYSTEM_TYPE`
  * says. A tool no group of the registry holds has no context to run on and
  * is refused.
@@ -701,27 +677,19 @@ describe('registerTool calls a tool as registerAllTools does', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  /** Two probes answering the variant of their call: one in each form. */
+  /** A probe answering the variant of its call. */
   class FormProbeGroup extends BaseHandlerGroup {
     protected groupName = 'FormProbe';
     getHandlers(): HandlerEntry[] {
       const definition = (name: string): ToolDefinition => ({
         name,
         description: 'Answers the variant of the call.',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: z.object({}),
       });
       return [
         defineTool(definition('ContextProbe'), async (context, _args) => ({
           content: [{ type: 'text', text: variantOf(context.connection) }],
         })),
-        {
-          toolDefinition: definition('ArgsProbe'),
-          handler: async (_args: unknown) => ({
-            content: [
-              { type: 'text', text: variantOf(this.context.connection) },
-            ],
-          }),
-        },
       ];
     }
   }
@@ -739,7 +707,7 @@ describe('registerTool calls a tool as registerAllTools does', () => {
       .flatMap((group) => group.getHandlers())
       .find((e) => e.toolDefinition.name === name);
     if (entry === undefined) throw new Error(`a group holds ${name}`);
-    registry.registerTool(server, name, entry.toolDefinition, entry.handler);
+    registry.registerTool(server, entry);
   };
 
   async function answered(
@@ -773,7 +741,7 @@ describe('registerTool calls a tool as registerAllTools does', () => {
 
   const probes = (context: HandlerContext) => [new FormProbeGroup(context)];
 
-  it.each(['ContextProbe', 'ArgsProbe'])(
+  it.each(['ContextProbe'])(
     'groups stating cloud, SAP_SYSTEM_TYPE=onprem: %s runs as cloud, as registerAllTools runs it',
     async (name) => {
       process.env.SAP_SYSTEM_TYPE = 'onprem';
@@ -785,7 +753,7 @@ describe('registerTool calls a tool as registerAllTools does', () => {
     },
   );
 
-  it('a shipped args-only tool answers and sends as registerAllTools', async () => {
+  it('a shipped readonly tool answers and sends as registerAllTools', async () => {
     const readonly = (context: HandlerContext) => [
       new ReadOnlyHandlersGroup(context),
     ];
@@ -804,13 +772,14 @@ describe('registerTool calls a tool as registerAllTools does', () => {
     expect(() =>
       registry.registerTool(
         new McpServer({ name: 'register-tool', version: '1.0.0' }),
-        'Elsewhere',
         {
-          name: 'Elsewhere',
-          description: 'Held by no group.',
-          inputSchema: { type: 'object', properties: {} },
+          toolDefinition: {
+            name: 'Elsewhere',
+            description: 'Held by no group.',
+            inputSchema: z.object({}),
+          },
+          call: async () => ({ content: [] }),
         },
-        async () => ({ content: [] }),
       ),
     ).toThrow(REGISTER_TOOL_UNHELD_WORDS('Elsewhere'));
   });

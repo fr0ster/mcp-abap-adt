@@ -2,6 +2,8 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { failedWith } from '../../../lib/strategies/sequence';
 import { atStep, withStep } from '../../../lib/strategies/step';
+import { succeeded } from '../../../lib/strategies/stepResponse';
+import { childAt } from '../../../lib/xml/tree';
 
 /**
  * Reconstructing what the v18 convenience read did.
@@ -26,27 +28,41 @@ import { atStep, withStep } from '../../../lib/strategies/step';
  * result.
  */
 
+/**
+ * The statuses an ABAP Unit run's `aunit:progress` was measured to answer
+ * (on premise and on the cloud, 2026-11-05), and what each means here:
+ * - `RUNNING`: the run is in progress, from right after its start: read
+ *   again by long polling;
+ * - `FINISHED`: the run ended: its result is read;
+ * - `NOT_STARTED`: what SAP answers for a run id it does not know, at once
+ *   without long polling (and only after about 300 s with it): answered as
+ *   it is.
+ */
+const RUNNING = 'RUNNING';
+const FINISHED = 'FINISHED';
+const NOT_STARTED = 'NOT_STARTED';
+
 /** The run's own verdict on itself, read off `<aunit:progress status="..."/>`. */
 export function runProgressStatus(statusValue: unknown): string | undefined {
-  const run = (statusValue as Record<string, unknown> | null | undefined)?.[
-    'aunit:run'
-  ] as Record<string, unknown> | undefined;
-  const progress = run?.['aunit:progress'] as
-    | { '@'?: { status?: unknown } }
-    | undefined;
-  const status = progress?.['@']?.status;
+  const status = childAt(
+    statusValue,
+    'aunit:run',
+    'aunit:progress',
+    '@',
+    'status',
+  );
   return typeof status === 'string' ? status : undefined;
 }
 
 /** `true` only once ADT itself says the run is `FINISHED` — never guessed. */
 export function runIsFinished(statusValue: unknown): boolean {
-  return runProgressStatus(statusValue) === 'FINISHED';
+  return runProgressStatus(statusValue) === FINISHED;
 }
 
 /**
- * What one long-polled status read found: a run SAP answered `FINISHED`, with
- * its status and its result; or a run SAP answered with another status, with
- * that status as SAP named it and no result.
+ * What reading a run found: a run SAP answered `FINISHED`, with its status
+ * and its result; or a run SAP answered `NOT_STARTED`, with that status and
+ * no result.
  */
 export type RunOutcome<TResult> =
   | {
@@ -61,33 +77,28 @@ export type RunOutcome<TResult> =
     };
 
 function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('readRunOnce: asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  return succeeded(value, 'readRunOnce');
 }
 
 /** The step a status read is named by. */
 export const READ_STATUS = 'read status';
 
 /**
- * Read a run's status once, by long polling, and fetch the result via
- * `fetchResult` when SAP answers the run `FINISHED`.
+ * Read a run's status, waiting only for a run SAP says is running, and fetch
+ * the result via `fetchResult` when SAP answers the run `FINISHED`.
  *
- * The status read asks for long polling (`withLongPolling`), and ADT holds
- * that request open until the run has finished (measured on premise,
- * 2026-10-31: one poll held 97 s for a 90 s test and 207 s for a 200 s one,
- * and returned on no progress step), so the call lasts as long as the run.
- * SAP's answer ends the call, whatever it is:
+ * The first read asks for no long polling, so SAP answers at once. Only a
+ * `RUNNING` answer is followed by a long-polled read (`withLongPolling`),
+ * which ADT holds until the run has finished or about 300 s passed
+ * (measured on premise, 2026-10-31: one poll held 97 s for a 90 s test and
+ * 207 s for a 200 s one), and every further `RUNNING` answer by another,
+ * with no limit and no timer of this package's. The read ends on:
  *
  * - `FINISHED`: the result is fetched and answered with the status.
- * - another status: answered as SAP named it (`finished: false`), and the
- *   result is not fetched; the caller reads on by the run's id.
- * - no `aunit:progress` status at all: a failure at the status step, whose
- *   message carries the status document as SAP sent it.
+ * - `NOT_STARTED`: answered as SAP named it (`finished: false`), and the
+ *   result is not fetched. An unknown run id answers it, at once.
+ * - no `aunit:progress` status, or a status other than the three measured:
+ *   a failure at the status step, whose message states what SAP sent.
  *
  * A failing `getStatus` call is returned exactly as it came (the caller's
  * `answer()` reports it as the refusal it is). A failing `getResult` call,
@@ -97,55 +108,60 @@ export const READ_STATUS = 'read status';
 export async function readRunOnce<TResult>(
   getStatus: (
     runId: string,
-    withLongPolling?: boolean,
+    withLongPolling: boolean,
   ) => Promise<IAdtResponse<AdtReading<unknown>>>,
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
-  const statusResponse = await atStep(READ_STATUS, getStatus)(runId, true);
-  if (!statusResponse.ok) {
-    return statusResponse as unknown as IAdtResponse<
-      RunOutcome<TResult>,
-      IAdtError
-    >;
-  }
-  const status = statusResponse.getResult().value;
-  const runStatus = runProgressStatus(status.value);
-  if (runStatus === undefined) {
-    return failedWith<RunOutcome<TResult>>(
-      withStep(
-        {
-          origin: 'refusal',
-          message: `SAP answered the status of run ${runId} with no aunit:progress status; the status document as SAP sent it: ${status.raw}`,
-        },
-        READ_STATUS,
-      ),
-    );
-  }
-  if (runStatus !== 'FINISHED') {
+  const readStatus = atStep(READ_STATUS, getStatus);
+  let statusResponse = await readStatus(runId, false);
+  for (;;) {
+    if (!statusResponse.ok) {
+      return statusResponse;
+    }
+    const status = statusResponse.getResult().value;
+    const runStatus = runProgressStatus(status.value);
+    if (runStatus === RUNNING) {
+      statusResponse = await readStatus(runId, true);
+      continue;
+    }
+    if (runStatus === NOT_STARTED) {
+      return okOutcome<RunOutcome<TResult>>({
+        finished: false,
+        status,
+        runStatus,
+      });
+    }
+    if (runStatus !== FINISHED) {
+      const named =
+        runStatus === undefined
+          ? 'no aunit:progress status'
+          : `the status ${JSON.stringify(runStatus)}`;
+      return failedWith<RunOutcome<TResult>>(
+        withStep(
+          {
+            origin: 'refusal',
+            message: `SAP answered the status of run ${runId} with ${named}, which is neither ${RUNNING} (read again), ${FINISHED} (the result is read) nor ${NOT_STARTED} (answered as it is): the read stops here, and the run's result is not read; the status document as SAP sent it: ${status.raw}`,
+          },
+          READ_STATUS,
+        ),
+      );
+    }
+    const resultResponse = await atStep('read result', fetchResult)();
+    if (!resultResponse.ok) {
+      return resultResponse;
+    }
     return okOutcome<RunOutcome<TResult>>({
-      finished: false,
+      finished: true,
       status,
-      runStatus,
+      result: resultResponse.getResult().value,
     });
   }
-  const resultResponse = await atStep('read result', fetchResult)();
-  if (!resultResponse.ok) {
-    return resultResponse as unknown as IAdtResponse<
-      RunOutcome<TResult>,
-      IAdtError
-    >;
-  }
-  return okOutcome<RunOutcome<TResult>>({
-    finished: true,
-    status,
-    result: resultResponse.getResult().value,
-  });
 }
 
 /**
- * What a reader answers for a run SAP answered with a status other than
- * `FINISHED`: the run id and that status, to read on by the id.
+ * What a reader answers for a run SAP answered `NOT_STARTED`: the run id and
+ * that status.
  */
 export function unfinishedRun(runId: string, runStatus: string) {
   return { success: true, run_id: runId, status: runStatus };

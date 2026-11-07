@@ -49,24 +49,30 @@ This organization improves code navigation, reduces merge conflicts, and makes t
 
 ### 2. Handlers with definitions
 
-Each handler (for example, `src/handlers/program/handleGetProgram.ts`) contains:
+Each handler (for example, `src/handlers/program/high/handleGetProgram.ts`) contains its
+definition and its function. The `inputSchema` is a zod object: it is the arguments' type and the
+one check of a call's arguments; the JSON Schema a client lists is derived from it
+(`z.toJSONSchema`).
 
 ```typescript
+import * as z from "zod";
+
 export const TOOL_DEFINITION = {
   name: "GetProgram",
-  description: "Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.",
-  available_in: ['onprem', 'legacy'] as const,
-  inputSchema: {
-    type: "object",
-    properties: {
-      program_name: { type: "string", description: "Name of the ABAP program" }
-    },
-    required: ["program_name"]
-  }
+  description: "Reads the ABAP program named by program_name …",
+  available_in: ['onprem', 'cloud'] as const,
+  inputSchema: z.object({
+    program_name: z.string().describe("Program name."),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
-export async function handleGetProgram(args: any) {
-  // Handler logic
+export async function handleGetProgram(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  // Handler logic: context.connection, context.logger
 }
 ```
 
@@ -79,7 +85,7 @@ export const TOOL_DEFINITION = {
   name: "CreateClass",
   description: "Create a new ABAP class",
   available_in: ['onprem', 'cloud', 'legacy'] as const,
-  inputSchema: { ... }
+  inputSchema: z.object({ /* … */ }),
 } as const;
 ```
 
@@ -124,98 +130,49 @@ if (availableIn?.length > 0 && currentEnv !== undefined && !availableIn.includes
 See generated documentation:
 - [All Tools](../user-guide/AVAILABLE_TOOLS.md)
 
-### 4. Central registry
+### 4. Handler groups and entries
 
-The `src/lib/toolsRegistry.ts` file:
-- Defines the `ToolDefinition` interface for type safety
-- Imports every handler `TOOL_DEFINITION`
-- Aggregates them into a single `ALL_TOOLS` array
-- Exports helper functions to work with the tools
+There is no central list of definitions. Each handler group (`src/lib/handlers/groups/`, an
+`IHandlerGroup`) answers its entries, each built by `defineTool(definition, handler)`
+(`@mcp-abap-adt/lib/handlers`), which the compiler checks: the handler takes the call's context
+and the output of the definition's schema.
+
+```typescript
+import {
+  TOOL_DEFINITION as GetTypeInfo_Tool,
+  handleGetTypeInfo,
+} from '../../../handlers/system/readonly/handleGetTypeInfo';
+
+getHandlers(): HandlerEntry[] {
+  return [
+    defineTool(GetTypeInfo_Tool, handleGetTypeInfo),
+    // ... the group's other tools
+  ];
+}
+```
+
+A `HandlerEntry` is `{ toolDefinition, call(context, args), connectionless? }`. Its `call` parses
+the arguments with the definition's schema and runs the handler on the result; arguments that do
+not parse are refused, naming each issue, and the handler does not run.
 
 **ToolDefinition Interface:**
 ```typescript
-export interface ToolDefinition {
+export interface ToolDefinition<S extends z.ZodObject = z.ZodObject> {
   name: string;
   description: string;
-  inputSchema: {
-    type: string;
-    properties: Record<string, any>;
-    required: readonly string[];
-  };
+  inputSchema: S;
+  available_in?: readonly SapEnvironment[];
+  variants?: { readonly [V in AbapSystemKind]: VariantToolDefinition };
 }
 ```
 
-```typescript
-import { TOOL_DEFINITION as GetProgram_Tool } from '../handlers/program/handleGetProgram';
-import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/class/handleGetClass';
-// ... other imports
+### 5. Registration
 
-// Static descriptors for tools that rely on dynamic import
-const DYNAMIC_IMPORT_TOOLS: ToolDefinition[] = [
-  GetObjectsByType_Tool,
-  GetObjectsList_Tool,
-  GetObjectNodeFromCache_Tool,
-  DescribeByList_Tool
-];
-
-// Aggregate every tool definition into a single list
-export const ALL_TOOLS: ToolDefinition[] = [
-  // Programs, classes, functions
-  GetClass_Tool,
-  GetFunction_Tool,
-  // ... other tools
-  
-  // Dynamically imported tools
-  ...DYNAMIC_IMPORT_TOOLS
-];
-
-export function getAllTools(): ToolDefinition[] {
-  return ALL_TOOLS;
-}
-
-// Finds a tool definition by name
-export function getToolByName(name: string): ToolDefinition | undefined {
-  return ALL_TOOLS.find(tool => tool.name === name);
-}
-```
-
-**Important Notes:**
-- All `TOOL_DEFINITION` exports are **statically imported** in the registry (even for tools with dynamic handler imports)
-- The `DYNAMIC_IMPORT_TOOLS` array is just for organizational purposes - it groups tools whose handlers use dynamic imports
-- Some tools (like `GetAdtTypes`, `GetObjectStructure`) use dynamic imports in `index.ts` but are placed in the main `ALL_TOOLS` array, not in `DYNAMIC_IMPORT_TOOLS`
-- The `getToolByName()` helper function allows finding tools by name programmatically
-
-### 5. Usage in index.ts
-
-`index.ts` now relies on the dynamic registry instead of a hard-coded list:
-
-```typescript
-import { getAllTools } from "./lib/toolsRegistry";
-
-// Handler for ListToolsRequest - relies on the dynamic tool registry
-this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: getAllTools()
-}));
-
-// Handler for CallToolRequest
-this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  switch (request.params.name) {
-    case "GetProgram":
-      return await handleGetProgram(request.params.arguments);
-    // ... other cases
-    
-    // Some tools use dynamic import for performance
-    case "GetObjectsList":
-      return await (await import("./handlers/search/low/handleGetObjectsList.js"))
-        .handleGetObjectsList(request.params.arguments);
-    // ...
-  }
-});
-```
-
-**Note:** Most handlers are statically imported, but some use dynamic imports to avoid circular dependencies or improve startup performance:
-- `GetObjectsList`, `GetObjectsByType`, `GetObjectNodeFromCache`, `DescribeByList` (marked in `DYNAMIC_IMPORT_TOOLS`)
-- `GetAdtTypes`, `GetObjectStructure` (also use dynamic import but are in main `ALL_TOOLS` array)
+A server instance (`BaseMcpServer`) or a plain registration (`CompositeHandlersRegistry`,
+`registerAllTools(server)` or `registerTool(server, entry)`) registers each entry on the MCP SDK
+with the variant's description and zod schema (`listedTool`), and runs each call as
+`entry.call(context, args)` with the call's context. Which groups a binary serves is its tool set
+(`@mcp-abap-adt/lib/tool-set`).
 
 ## Benefits
 
@@ -229,25 +186,21 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 1. **Create a new handler** under the appropriate subdirectory in `src/handlers/` (e.g., `src/handlers/system/handleYourTool.ts` for system tools, `src/handlers/class/handleYourTool.ts` for class tools)
    
-2. **Add a `TOOL_DEFINITION` constant** to the handler:
+2. **Add a `TOOL_DEFINITION` constant** to the handler, its schema in zod:
    ```typescript
    export const TOOL_DEFINITION = {
      name: "YourToolName",
      description: "Description of what your tool does",
      available_in: ['onprem', 'cloud'] as const,  // specify supported environments
-     inputSchema: {
-       type: "object",
-       properties: {
-         param_name: {
-           type: "string",
-           description: "Description of the parameter"
-         }
-       },
-       required: ["param_name"]
-     }
+     inputSchema: z.object({
+       param_name: z.string().describe("Description of the parameter"),
+     }),
    } as const;
 
-   export async function handleYourTool(args: any) {
+   export async function handleYourTool(
+     context: HandlerContext,
+     args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+   ) {
      try {
        // Handler implementation — return a success result here.
      } catch (error) {
@@ -259,35 +212,14 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
    }
    ```
 
-3. **Import and register the tool** in `src/lib/toolsRegistry.ts`:
+3. **Add its entry** to the group that serves it (`src/lib/handlers/groups/`):
    ```typescript
-   import { TOOL_DEFINITION as YourTool_Tool } from '../handlers/system/handleYourTool';
-   
-   export const ALL_TOOLS: ToolDefinition[] = [
-     // ... existing tools
-     YourTool_Tool,
-   ];
+   defineTool(YourTool_Tool, handleYourTool),
    ```
-   
-   **Note:** If your tool needs dynamic import (for performance), add it to `DYNAMIC_IMPORT_TOOLS` array instead.
 
-4. **Add a case** to the `CallToolRequestSchema` handler in `index.ts`:
-   
-   **For static import:**
-   ```typescript
-   import { handleYourTool } from "./handlers/system/handleYourTool";
-   
-   // In setupHandlers():
-   case "YourToolName":
-     return await handleYourTool(request.params.arguments);
-   ```
-   
-   **For dynamic import:**
-   ```typescript
-   case "YourToolName":
-     return await (await import("./handlers/system/handleYourTool.js"))
-       .handleYourTool(request.params.arguments);
-   ```
+4. **Update the fixtures** that record what is listed — the listed schemas
+   (`WRITE_LISTED_SCHEMAS=1`), the transport and variant surfaces — and the tool search table
+   (`tools/tool-search.json`), as their tests say.
 
 5. **Regenerate documentation:**
    ```bash
@@ -295,24 +227,6 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
    ```
 
 ## Automation
-
-### Updating Handlers
-
-The `tools/update-handlers-with-tool-definitions.js` script helps add `TOOL_DEFINITION` blocks to handlers that don't have them yet.
-
-```bash
-node tools/update-handlers-with-tool-definitions.js [--help]
-```
-
-**What it does:**
-- Checks all handler files for `TOOL_DEFINITION`
-- Suggests basic definitions for missing ones
-- ⚠️ **Important:** Auto-generated definitions are incomplete! Always review and update.
-
-**When to use:**
-- Creating new handlers
-- Migrating existing handlers
-- Verifying all handlers have `TOOL_DEFINITION`
 
 ### Generating Documentation
 
@@ -325,7 +239,7 @@ node tools/generate-tools-docs.js [--help]
 ```
 
 **What it does:**
-- Reads the built tool sets (`fullToolSet`, `fullReadOnlyToolSet` in `dist`): every tool a binary serves, with the description and input schema it registers (a Zod shape converted as the MCP SDK lists it)
+- Reads the built tool sets (`fullToolSet`, `fullReadOnlyToolSet` in `dist`): every tool a binary serves, with the description and input schema it registers (the zod schema converted as the MCP SDK lists it)
 - Files each tool under the object and level of the built handler module that holds its definition (`dist/handlers/<object>/<level>/…`), a `low` module under its handler group's level
 - Reads no source text, so a spread-in or shared property is listed as the server registers it
 - Generates the markdown pages

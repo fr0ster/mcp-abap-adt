@@ -20,7 +20,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 it('SIGTERM with a call in the flow and one queued: the logoff at once, the queued call never sends, exit 0', async () => {
-  const s = await stand({ shutdown: {} });
+  const s = await stand({ kind: 'onprem', shutdown: {} });
   try {
     const held = s.adt.hold((r) => isLockOf('A')(r.url));
     void s.callTool('LockedUpdate', { id: 'A' });

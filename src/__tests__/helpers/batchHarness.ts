@@ -28,12 +28,14 @@ import type {
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
 import type { BatchEntryCase } from './batchEntryCases';
+import { holdingLockOf } from './heldLocks';
 import { LOCK_SUCCESS_XML } from './recordingConnection';
+import { toolAnswer } from './toolAnswer';
 
 /** A captured metadata document per ADT address prefix (not a source or include read). */
 const METADATA_DOCUMENTS: Array<[string, string]> = [
   [
-    '/sap/bc/adt/functions/groups/fugr_a/fmodules/',
+    '/sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/',
     'read-metadata-function-module--01-fmodules-zmcpshrfm',
   ],
   [
@@ -71,6 +73,13 @@ const METADATA_DOCUMENTS: Array<[string, string]> = [
 
 /** How the fake answers: a document, a `404`, or never. */
 export type Mode = 'document' | 'not-found' | 'pending';
+
+/** Where a started activation run is read. */
+const ACTIVATION_RUNS = '/sap/bc/adt/activation/runs/';
+
+/** An activation run's status once it ended. */
+const RUN_ENDED =
+  '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>';
 
 /**
  * A run's address, as SAP answers a started activation or unit test run in
@@ -124,6 +133,9 @@ export function countingConnection(
   const documentFor = (method: string, url: string): string => {
     if (url.includes('_action=LOCK')) return LOCK_SUCCESS_XML;
     if (body !== undefined) return body;
+    // A started activation run's status: ended, as SAP answers a long poll
+    // once the run is over — a group activation reads its run until then.
+    if (method === 'GET' && url.startsWith(ACTIVATION_RUNS)) return RUN_ENDED;
     const lower = url.toLowerCase();
     if (
       method !== 'GET' ||
@@ -238,9 +250,13 @@ export async function runCase(
   if (!entry) throw new Error(`no served tool ${c.tool}`);
   const counting = countingConnection(mode, c.body, c.headers);
   (context as { connection: IAbapConnection }).connection = counting.connection;
-  const call = (entry.handler as unknown as (a: unknown) => Promise<Answer>)(
-    structuredClone(c.args),
-  );
+  // The instance locked what the case writes under (`holdingLockOf`).
+  const call = entry
+    .call(
+      { heldLocks: holdingLockOf(c.args), ...context },
+      structuredClone(c.args),
+    )
+    .then(toolAnswer);
   if (mode === 'pending') {
     call.catch(() => undefined);
     await settle();

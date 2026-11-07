@@ -1,11 +1,13 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  *
  * Uses AdtClient.getBehaviorDefinition().{lock,update,unlock,read,activate}
- * from @mcp-abap-adt/adt-clients 19, through `withLock` when this handler
- * owns the lock — held for the whole write, released on every path out. A
- * caller who passes `lock_handle` already holds it, so `withLock` is
- * skipped and the update runs as the one request it is.
+ * from @mcp-abap-adt/adt-clients 19, through `withLock`: the handler locks,
+ * writes and unlocks itself, the lock held for the whole write and released
+ * on every path out. It takes no `lock_handle`: on the full set no tool
+ * issues one (compact `HandlerUpdate` writes under a held lock).
  *
  * The wait between the write and `activate` is the pre-migration handler's
  * long-polling `read({withLongPolling: true})`, discarded for its result
@@ -27,7 +29,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -41,42 +43,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Behavior Definition name',
-      },
-      source_code: {
-        type: 'string',
-        description: 'New source code',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after update. Default: true',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name', 'source_code'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('Behavior Definition name'),
+    source_code: z.string().describe('New source code'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after update. Default: true'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateBehaviorDefinitionArgs {
   name: string;
   source_code: string;
   transport_request?: string;
-  lock_handle?: string;
   activate?: boolean;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -115,18 +102,16 @@ export async function handleUpdateBehaviorDefinition(
           ),
         );
 
-      const written = args.lock_handle
-        ? await update(args.lock_handle)
-        : await withLock(
-            () => obj.lock({ name }, { analyse: analyseLock }),
-            atStep('update', update),
-            (lockHandle) =>
-              obj.unlock({ name }, lockHandle, { analyse: analyseException }),
-            { type: 'BEHAVIOR_DEFINITION', name: name },
-          );
+      const written = await withLock(
+        () => obj.lock({ name }, { analyse: analyseLock }),
+        atStep('update', update),
+        (lockHandle) =>
+          obj.unlock({ name }, lockHandle, { analyse: analyseException }),
+        { type: 'BEHAVIOR_DEFINITION', name: name },
+      );
 
       if (!written.ok) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.

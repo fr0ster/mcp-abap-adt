@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * `HandlerBatch`: batch mode in the compact sets, one tool for the three
  * actions — `begin`, `end`, `answers` — each as the full set's tool of the
@@ -12,7 +13,8 @@
  */
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
-import type { ArgsOf, HandlerContext } from '../../handlers/index';
+import type { HandlerContext } from '../../handlers/index';
+import { child } from '../../xml/tree';
 
 /**
  * `HandlerBatch`'s description: the same sentences, one per action, naming
@@ -27,38 +29,35 @@ export const HANDLER_BATCH_DESCRIPTION = `[read-only] ${[
 export const TOOL_DEFINITION = {
   name: 'HandlerBatch',
   description: HANDLER_BATCH_DESCRIPTION,
-  inputSchema: {
-    type: 'object',
-    properties: {
-      action: {
-        type: 'string',
-        enum: ['begin', 'end', 'answers'],
-        description:
-          "begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).",
-      },
-      number: {
-        type: 'integer',
-        minimum: 1,
-        description:
-          'answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.',
-      },
-      numbers: {
-        type: 'array',
-        items: { type: 'integer', minimum: 1 },
-        minItems: 1,
-        description:
-          'answers only: several batch numbers to read, answered in the order given; give this or number, not both.',
-      },
-    },
-    required: ['action'],
-  },
+  inputSchema: z.object({
+    action: z
+      .enum(['begin', 'end', 'answers'])
+      .describe(
+        "begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).",
+      ),
+    number: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        'answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.',
+      ),
+    numbers: z
+      .array(z.number().int().min(1))
+      .min(1)
+      .optional()
+      .describe(
+        'answers only: several batch numbers to read, answered in the order given; give this or number, not both.',
+      ),
+  }),
 } as const;
 
 /** `number` or `numbers` beside an action other than `answers`. */
 export const NUMBER_WITHOUT_ANSWERS_WORDS =
   "number and numbers are given only with action 'answers'";
 
-type BatchArgs = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
+type BatchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * Whether a `HandlerBatch` call works on no connection: every call but a
@@ -66,10 +65,7 @@ type BatchArgs = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
  * refused for its arguments is refused before any is taken.
  */
 export function batchActionIsConnectionless(args: unknown): boolean {
-  const action =
-    args !== null && typeof args === 'object'
-      ? (args as { action?: unknown }).action
-      : undefined;
+  const action = child(args, 'action');
   return action !== 'end' || asksNumbers(args);
 }
 

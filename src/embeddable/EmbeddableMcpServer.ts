@@ -21,12 +21,14 @@ import type {
   IHandlersRegistry,
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
+import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { registerFreshConnectionFactory } from '../lib/packageSessions.js';
 import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution.js';
+import type { HeldLocks } from '../lib/state/heldLocks.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
 import { setSystemContext } from '../lib/systemContext.js';
@@ -69,8 +71,11 @@ export interface EmbeddableMcpServerOptions {
    * keeps them in this process's memory).
    * A run tool called with `background: true` runs on a connection of its
    * own — from `freshConnection` on an injected connection — and its answer
-   * is handed to the strategy. Without it, `background: true` and the
-   * background-run tools are refused (`background_runs_unavailable`).
+   * is handed to the strategy; a listed long tool runs in the background by
+   * default, and the server serves the background-run tools beside any long
+   * tool its registry carries. Without it, a code run's `background: true` and the
+   * background-run tools are refused (`background_runs_unavailable`), and a
+   * long tool answers in the call.
    */
   backgroundRuns?: IBackgroundRuns;
 
@@ -90,6 +95,17 @@ export interface EmbeddableMcpServerOptions {
    * `batch_mode_unavailable`.
    */
   batch?: InstanceBatch;
+
+  /**
+   * The locks this instance takes, created by the embedder for this instance
+   * alone — `new HeldLocks()` — never shared with another instance: compact
+   * `HandlerLock` keeps the handle it answered there, and a write, a delete
+   * or an unlock under a `lock_handle` is sent only under one it keeps.
+   * Absent: the instance makes its own, as it is constructed. A host that
+   * makes an instance per request and keeps a lock across requests hands
+   * each request's instance the owner it keeps for that caller.
+   */
+  heldLocks?: HeldLocks;
 
   /**
    * Logger instance
@@ -244,6 +260,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
         backgroundRuns: options.backgroundRuns,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
+      ...(options.heldLocks !== undefined && {
+        heldLocks: options.heldLocks,
+      }),
       ...(options.adtHeaderPairs !== undefined && {
         adtHeaderPairs: options.adtHeaderPairs,
       }),
@@ -283,10 +302,11 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     logger?: Logger,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
-    // Dummy context - not actually used because BaseMcpServer.registerHandlers()
-    // creates wrapper lambdas that call getConnection() for fresh context
+    // A registration-only context: BaseMcpServer.registerHandlers() gives
+    // every call a context of its own (getConnection()); this connection
+    // refuses any use in words.
     const dummyContext: HandlerContext = {
-      connection: null as unknown as AbapConnection,
+      connection: noConnection,
       logger: logger ?? noopLogger,
     };
 

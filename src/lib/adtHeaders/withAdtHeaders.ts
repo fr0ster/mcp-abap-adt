@@ -20,11 +20,14 @@
  * - Inside a call recorded in batch mode (`BatchBegin` … `BatchEnd`) the call
  *   is made once: a `406`/`415` part is that call's answer.
  */
+
 import {
   extractSupportedAccept,
   extractSupportedContentType,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import { hasMethod } from '../capability';
+import { child } from '../xml/tree';
 import type { AdtHeaderPort } from './AdtHeaderPairs';
 import { type AdtOperation, DEFAULT_ADT_HEADERS } from './defaultPairs';
 import { adtCallScope, type HeaderInvocation } from './scope';
@@ -46,7 +49,8 @@ function readSafely(value: unknown, key: string): unknown {
     return undefined;
   }
   try {
-    return (value as Record<string, unknown>)[key];
+    const read: unknown = Reflect.get(value, key);
+    return read;
   } catch {
     return undefined;
   }
@@ -139,7 +143,7 @@ export async function withAdtHeaders<T>(
   const scope = adtCallScope.getStore();
   if (scope?.recorded === true) return call(headers);
   if (scope?.phase !== undefined) {
-    const invocation: HeaderInvocation = {
+    const invocation: HeaderInvocation<T> = {
       operation,
       sent: headers,
       port,
@@ -153,7 +157,7 @@ export async function withAdtHeaders<T>(
     // The phase recorded it again with the corrected pair: that is the
     // call's answer.
     if (invocation.redone !== undefined) {
-      return (await invocation.redone) as T;
+      return await invocation.redone;
     }
     // Recorded nothing in the phase (sent on another connection): corrected
     // here, as outside a phase.
@@ -183,6 +187,25 @@ async function correctOnce<T>(
  * safely: what a debug session bound to a call's context sends with.
  */
 export function adtHeadersOf(origin: unknown): AdtHeadersContext {
-  const port = readSafely(origin, 'adtHeaders') as AdtHeaderPort | undefined;
-  return port === undefined ? {} : { adtHeaders: port };
+  const port = readSafely(origin, 'adtHeaders');
+  if (!hasMethod(port, 'pairFor') || !hasMethod(port, 'remember')) return {};
+  // Read through its two members: what it answers is checked, not assumed.
+  const adtHeaders: AdtHeaderPort = {
+    pairFor: (operation) => {
+      const pair = port.pairFor(operation);
+      return isAdtHeaders(pair) ? pair : DEFAULT_ADT_HEADERS[operation];
+    },
+    remember: (operation, pair) => {
+      port.remember(operation, pair);
+    },
+  };
+  return { adtHeaders };
+}
+
+/** Whether `value` is a header pair: `accept` and `contentType`, both text. */
+function isAdtHeaders(value: unknown): value is IAdtHeaders {
+  return (
+    typeof child(value, 'accept') === 'string' &&
+    typeof child(value, 'contentType') === 'string'
+  );
 }

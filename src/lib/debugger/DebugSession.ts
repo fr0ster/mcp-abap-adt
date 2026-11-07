@@ -10,6 +10,7 @@
  * timer of ours. Every change goes through one Serial; the long poll runs
  * outside it and its answer is dropped when the generation moved on.
  */
+
 import {
   type AbapDebugger,
   AdtBatchConnection,
@@ -42,7 +43,6 @@ import {
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
 import {
-  type FailureEntry,
   isCredentialFailure,
   isCredentialPayload,
   unlessCredentialFailure,
@@ -53,6 +53,7 @@ import {
   noteLeftBehind,
   payloadCarriedBy,
 } from '../strategies/step';
+import { child } from '../xml/tree';
 import {
   type BreakpointNotPlaced,
   mergeDefinitions,
@@ -356,7 +357,8 @@ export function refuseConditionOffLine(
   list: readonly IDebuggerBreakpoint[],
 ): void {
   list.forEach((b, i) => {
-    if (b.kind !== 'line' && (b as { condition?: string }).condition)
+    // The breakpoints come from the model's arguments: a condition is read.
+    if (b.kind !== 'line' && child(b, 'condition'))
       throw new DebugRefusedError(
         `breakpoints[${i}] (${b.kind}): a condition applies to a line breakpoint only`,
       );
@@ -403,7 +405,7 @@ function describePlaced(b: BreakpointReading): string {
  */
 function credentialEntryOf(error: unknown): DebugFailure | undefined {
   if (isCredentialFailure(error)) return thrownFailure(error, 'start');
-  const carried = payloadCarriedBy(error) as FailureEntry | undefined;
+  const carried = payloadCarriedBy(error);
   return carried !== undefined && isCredentialPayload(carried)
     ? carried
     : undefined;
@@ -514,9 +516,21 @@ export class DebugSession<O = unknown> {
   private tags = 0;
   protected listener?: Listener;
   protected current?: Stop;
-  protected failure?: string;
-  /** The failed listen behind `failure`, carrying the method's error. */
+  private failureWords?: string;
+  /**
+   * The failed listen behind `failure`, carrying the method's error. Set
+   * right after `failure`, whose every write drops it: it is never one
+   * recorded for an earlier failure.
+   */
   private failedListen?: DebugListenerError;
+  /** The failure the next report throws. */
+  protected get failure(): string | undefined {
+    return this.failureWords;
+  }
+  protected set failure(value: string | undefined) {
+    this.failureWords = value;
+    this.failedListen = undefined;
+  }
   protected generation = 0;
   protected readonly notices: DebugState[] = [];
   private readonly waiters = new Set<() => void>();
@@ -660,6 +674,10 @@ export class DebugSession<O = unknown> {
     this.closedConnections.add(connection);
   }
   protected async controlDebugger(): Promise<Debugger> {
+    return (await this.controlListener()).debugger;
+  }
+  /** The control connection and its debugger, opened at the first need. */
+  private async controlListener(): Promise<Listener> {
     if (!this.control) {
       const connection = await this.open();
       this.control = {
@@ -667,7 +685,7 @@ export class DebugSession<O = unknown> {
         debugger: this.ports.abapDebugger(connection, this.mode),
       };
     }
-    return this.control.debugger;
+    return this.control;
   }
   private observer?: () => void;
   observe(onChange: () => void): void {
@@ -753,7 +771,7 @@ export class DebugSession<O = unknown> {
     const raw = bodyOf(answer);
     const pairing = pairRows(sent, earlier, readBreakpoints(raw));
     this.armed.clear();
-    for (const row of pairing.placed) this.armed.set(row.id!, row);
+    for (const row of pairing.placed) this.armed.set(row.id, row);
     this.requested = pairing.requested;
     this.pairedWith.clear();
     for (const [id, tag] of pairing.paired) this.pairedWith.set(id, tag);
@@ -1270,9 +1288,7 @@ export class DebugSession<O = unknown> {
       this.failure = undefined;
       this.failedListen = undefined;
       this.observer?.(); // consuming it may leave nothing held
-      throw carried !== undefined && carried.message === message
-        ? carried
-        : new DebugListenerError(message);
+      throw carried ?? new DebugListenerError(message);
     }
     const notice = this.notices.shift();
     if (notice) {
@@ -1691,8 +1707,7 @@ export class DebugSession<O = unknown> {
 
   /** The control connection's debugger, under the conflict behaviour asked for. */
   private async onceControl(conflict: IDebuggerListenerConflict) {
-    await this.controlDebugger();
-    const control = this.control as Listener;
+    const control = await this.controlListener();
     return this.ports.abapDebugger(control.connection, conflict);
   }
 

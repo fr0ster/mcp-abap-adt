@@ -121,8 +121,10 @@ const url = {
     `/sap/bc/adt/ddic/tabletypes/${n}?version=workingArea`,
 };
 
-const run = (connection: IAbapConnection, args: Record<string, unknown>) =>
-  handleGetTypeInfo({ connection, logger: undefined } as any, args) as any;
+const run = (
+  connection: IAbapConnection,
+  args: Parameters<typeof handleGetTypeInfo>[1],
+) => handleGetTypeInfo({ connection, logger: undefined } as any, args) as any;
 
 describe('GetTypeInfo', () => {
   it('reads the name as every kind, in alphabetical order, and answers every kind it is', async () => {

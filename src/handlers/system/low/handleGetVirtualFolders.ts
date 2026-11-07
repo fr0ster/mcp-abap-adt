@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * GetVirtualFolders Handler - Low-level handler for virtual folders
  *
@@ -21,7 +23,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 
@@ -30,56 +32,48 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_search_pattern: {
-        type: 'string',
-        description:
-          'Object search pattern: "*" matches any name, and a trailing "*" matches a prefix. Default: "*"',
-        default: '*',
-      },
-      preselection: {
-        type: 'array',
-        description:
-          'Optional preselection filters (facet-value pairs for filtering)',
-        items: {
-          type: 'object',
-          properties: {
-            facet: {
-              type: 'string',
-              description: 'Facet name (e.g., "package", "group", "type")',
-            },
-            values: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Array of facet values to filter by',
-            },
-          },
-          required: ['facet', 'values'],
-        },
-      },
-      facet_order: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Order of facets in response (e.g., ["package", "group", "type"]). Default: ["package", "group", "type"]',
-        default: ['package', 'group', 'type'],
-      },
-      with_versions: {
-        type: 'boolean',
-        description: 'Include version information in response',
-        default: false,
-      },
-      ignore_short_descriptions: {
-        type: 'boolean',
-        description: 'Ignore short descriptions in response',
-        default: false,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    object_search_pattern: z
+      .string()
+      .default('*')
+      .optional()
+      .describe(
+        'Object search pattern: "*" matches any name, and a trailing "*" matches a prefix. Default: "*"',
+      ),
+    preselection: z
+      .array(
+        z.object({
+          facet: z
+            .string()
+            .describe('Facet name (e.g., "package", "group", "type")'),
+          values: z
+            .array(z.string())
+            .describe('Array of facet values to filter by'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Optional preselection filters (facet-value pairs for filtering)',
+      ),
+    facet_order: z
+      .array(z.string())
+      .default(['package', 'group', 'type'])
+      .optional()
+      .describe(
+        'Order of facets in response (e.g., ["package", "group", "type"]). Default: ["package", "group", "type"]',
+      ),
+    with_versions: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('Include version information in response'),
+    ignore_short_descriptions: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('Ignore short descriptions in response'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface GetVirtualFoldersArgs {

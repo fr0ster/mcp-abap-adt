@@ -33,7 +33,7 @@ export type ServerRefusalCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout'
+  | 'batch_no_background'
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
@@ -88,7 +88,7 @@ export const BACKGROUND_RUN_NOT_AVAILABLE_WORDS =
 
 /** A discard of a run still running: it cannot be stopped. */
 export const BACKGROUND_RUN_RUNNING_WORDS =
-  'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
+  'this background run is still running and cannot be discarded here: a started code run runs to its end; discard it once it has finished';
 
 /**
  * A call whose system gave no information where it must (ABAP Cloud, which
@@ -196,9 +196,9 @@ export const BATCH_MODE_OTHER_WORDS =
 export const BATCH_MODE_OFF_WORDS =
   'no batch of this kind is open on this server: begin one first';
 
-/** A long read given `timeout` in batch mode: refused before anything is recorded. */
-export const BATCH_NO_TIMEOUT_WORDS =
-  'in batch mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline';
+/** A long read given `background: true` in batch mode: refused before anything is recorded. */
+export const BATCH_NO_BACKGROUND_WORDS =
+  'in batch mode a read takes no background: it is recorded, and the batch is sent at BatchEnd';
 
 /**
  * A request of a recorded call after its batch ended: a handler resumed when
@@ -298,7 +298,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_mode_on: BATCH_MODE_ON_WORDS,
   batch_mode_other: BATCH_MODE_OTHER_WORDS,
   batch_mode_off: BATCH_MODE_OFF_WORDS,
-  batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
+  batch_no_background: BATCH_NO_BACKGROUND_WORDS,
   batch_ended: BATCH_ENDED_WORDS,
   batch_unsplit: BATCH_UNSPLIT_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,

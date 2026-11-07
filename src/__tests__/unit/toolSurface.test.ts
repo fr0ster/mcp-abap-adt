@@ -4,11 +4,10 @@ import { join } from 'node:path';
 import { tsxCommand } from '../helpers/platform';
 
 /**
- * **The long tools on the approved list gain `timeout` (19.0.0).** The
- * user approved them tool by tool (`tools/long-handlers.json`); each may
- * gain `timeout` and nothing else for it. `GetIncludesList` and
- * `GetStructuresList` already declared one (per request, in ms) — the name
- * stays, its meaning is now the call's (seconds, on the wait only).
+ * **The long tools on the approved list** (`tools/long-handlers.json`,
+ * approved tool by tool): 19.0.0 gave them `timeout`; 24.0.0 (D24, the
+ * owner) removes it and gives each `background` (default true) instead —
+ * nothing else for it.
  */
 const LONG_TOOLS = new Set(
   (
@@ -220,17 +219,48 @@ describe('the MCP tool surface', () => {
       // refused (before, adt-clients failed on it with a TypeError). The
       // schema now says what the handler already required: `package_name`
       // leaves and `package_name*` arrives, this one pair and nothing else.
+      // **A third, decided by the owner (24.0.0).** `CreateDomain` requires
+      // `package_name`: SAP creates no domain without one, and the handler
+      // refused every call without it while the schema said optional.
       const MAY_TIGHTEN_REQUIRED: Record<string, string> = {
         'debug/DebugStartListener': 'breakpoints',
         'debug/DebugTakeOverListener': 'breakpoints',
         'high/ValidateServiceBinding': 'package_name',
+        'high/CreateDomain': 'package_name',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
       // **19.0.0, internal batches (spec §11).** A parallelism knob the
       // batched version makes meaningless is removed: `SearchSource`'s
       // `concurrency`, and nothing else.
+      //
+      // **24.0.0, decided by the owner (D2).** SAP ignores both on create
+      // (measured on premise): `CreateClass`'s `abstract` and
+      // `CreateProgram`'s `program_type` are removed, and nothing else.
+      //
+      // **24.0.0, decided by the owner (D9, #4).** No tool of the full set
+      // issues a lock handle, and a handle the instance did not issue is
+      // refused: `UpdateBehaviorDefinition`'s and `UpdateMetadataExtension`'s
+      // `lock_handle` are removed — each locks, writes and unlocks itself.
+      //
+      // **24.0.0, decided by the owner (DO11).** No deadline of the server's
+      // ends a scan: `SearchSource`'s `time_budget_ms` and `timeout` are
+      // removed.
+      //
+      // **24.0.0, decided by the owner (DO15, DO20).** `SearchSource` answers
+      // hits only and reads every target in one run: `emit_no_hits` and
+      // `max_objects` are removed (and `start_at`, never in this fixture).
       const REMOVED: Record<string, string[]> = {
-        'search/SearchSource': ['concurrency'],
+        'search/SearchSource': [
+          'concurrency',
+          'time_budget_ms',
+          'timeout',
+          'emit_no_hits',
+          'max_objects',
+        ],
+        'high/CreateClass': ['abstract'],
+        'high/CreateProgram': ['program_type'],
+        'high/UpdateBehaviorDefinition': ['lock_handle'],
+        'high/UpdateMetadataExtension': ['lock_handle'],
       };
       const removed = REMOVED[tool] ?? [];
       expect({
@@ -241,7 +271,12 @@ describe('the MCP tool surface', () => {
             !removed.includes(p) &&
             p !== `${relaxed ?? '\u0000'}*` &&
             p !== tightened &&
-            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))),
+            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))) &&
+            // 24.0.0 (D24, the owner): no long tool takes `timeout`.
+            !(
+              LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1)) &&
+              p === 'timeout'
+            ),
         ),
       }).toEqual({
         tool,
@@ -290,25 +325,26 @@ describe('the MCP tool surface', () => {
         // the caller's choice, `include_descriptions` (default false), as in
         // GetPackageContents and GetPackageTree.
         'system/GetObjectInfo': ['include_descriptions'],
-        // 19.0.0: SearchSource's cursor, `start_at` (from `next_start_at`), optional.
-        'search/SearchSource': ['start_at'],
+        // 24.0.0 (DO23): SearchSource's answer level and its hit limit,
+        // both optional — without them the answer is as before.
+        'search/SearchSource': ['answer', 'max_hits'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
         // part per call, `part` (source | metadata, default source), optional.
-        'high/GetClass': ['part'],
-        'high/GetInterface': ['part'],
-        'high/GetProgram': ['part'],
-        'high/GetTable': ['part'],
-        'high/GetStructure': ['part'],
-        'high/GetDdl': ['part'],
-        'high/GetServiceDefinition': ['part'],
+        'high/GetClass': ['part', 'start_line', 'end_line'],
+        'high/GetInterface': ['part', 'start_line', 'end_line'],
+        'high/GetProgram': ['part', 'start_line', 'end_line'],
+        'high/GetTable': ['part', 'start_line', 'end_line'],
+        'high/GetStructure': ['part', 'start_line', 'end_line'],
+        'high/GetDdl': ['part', 'start_line', 'end_line'],
+        'high/GetServiceDefinition': ['part', 'start_line', 'end_line'],
         'high/GetServiceBinding': ['part'],
-        'high/GetBehaviorDefinition': ['part'],
-        'high/GetBehaviorImplementation': ['part'],
-        'high/GetMetadataExtension': ['part'],
-        'high/GetFunctionModule': ['part'],
+        'high/GetBehaviorDefinition': ['part', 'start_line', 'end_line'],
+        'high/GetBehaviorImplementation': ['part', 'start_line', 'end_line'],
+        'high/GetMetadataExtension': ['part', 'start_line', 'end_line'],
+        'high/GetFunctionModule': ['part', 'start_line', 'end_line'],
         // The ninth deliberate move (below): GetInclude reads the include's
         // metadata too, `part` and `version` optional.
-        'readonly/GetInclude': ['part', 'version'],
+        'readonly/GetInclude': ['part', 'version', 'start_line', 'end_line'],
         // The ninth deliberate move too: GetTableType reads at the version
         // asked, `version` optional (active by default).
         'readonly/GetTableType': ['version'],
@@ -351,6 +387,43 @@ describe('the MCP tool surface', () => {
           'debugging_mode',
           'settings',
         ],
+        // 24.0.0 (plan Appendix B): the result read took them and its schema
+        // dropped them; declared now, both optional.
+        'readonly/GetUnitTestResult': ['format', 'with_navigation_uris'],
+        'high/GetUnitTestResult': ['format', 'with_navigation_uris'],
+        // 24.0.0 (static types): GetEnhancements read them and its schema
+        // dropped them; declared now, each optional.
+        'readonly/GetEnhancements': [
+          'detailed',
+          'include_nested',
+          'max_includes',
+          'program',
+        ],
+        // 24.0.0 (D5, the owner's DO1): the source reads take a line range,
+        // `start_line` and `end_line`, each optional; the server cuts the
+        // source its one GET answered (ADT serves no part of a source).
+        'readonly/GetClass': ['start_line', 'end_line'],
+        'readonly/GetInterface': ['start_line', 'end_line'],
+        'readonly/GetProgram': ['start_line', 'end_line'],
+        'readonly/GetTable': ['start_line', 'end_line'],
+        'readonly/GetStructure': ['start_line', 'end_line'],
+        'readonly/GetDdl': ['start_line', 'end_line'],
+        'readonly/GetServiceDefinition': ['start_line', 'end_line'],
+        'readonly/GetBehaviorDefinition': ['start_line', 'end_line'],
+        'readonly/GetBehaviorImplementation': ['start_line', 'end_line'],
+        'readonly/GetMetadataExtension': ['start_line', 'end_line'],
+        'readonly/GetFunctionModule': ['start_line', 'end_line'],
+        'readonly/GetFunctionInclude': ['start_line', 'end_line'],
+        'high/GetLocalDefinitions': ['start_line', 'end_line'],
+        'high/GetLocalTypes': ['start_line', 'end_line'],
+        'high/GetLocalMacros': ['start_line', 'end_line'],
+        'high/GetLocalTestClass': ['start_line', 'end_line'],
+        // 24.0.0 (D2): each lost one argument (`REMOVED`) and gained none.
+        'high/CreateClass': [],
+        'high/CreateProgram': [],
+        // 24.0.0 (D9): each lost `lock_handle` (`REMOVED`) and gained none.
+        'high/UpdateBehaviorDefinition': [],
+        'high/UpdateMetadataExtension': [],
       };
       const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
       const gainsTimeout = isLong && !had.includes('timeout');
@@ -360,7 +433,10 @@ describe('the MCP tool surface', () => {
           p !== relaxed &&
           p !== `${tightened}*` &&
           !(listRelaxed(p) && had.includes(`${p}*`)) &&
-          !(gainsTimeout && p === 'timeout'),
+          !(gainsTimeout && p === 'timeout') &&
+          // 24.0.0 (D24, the owner): every long tool gains `background`
+          // (default true) and loses `timeout`.
+          !(isLong && p === 'background'),
       );
       // A long tool whose only change is its `timeout` (gained, or moved
       // first in the list) gained nothing else.

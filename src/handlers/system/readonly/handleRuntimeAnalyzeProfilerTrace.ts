@@ -1,10 +1,15 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { child, entries, isElement, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeProfilerTrace',
@@ -12,30 +17,24 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      trace_id_or_uri: {
-        type: 'string',
-        description: 'Profiler trace ID or full trace URI.',
-      },
-      view: {
-        type: 'string',
-        enum: ['hitlist', 'statements', 'db_accesses'],
-        default: 'hitlist',
-      },
-      top: {
-        type: 'number',
-        description: 'Number of top rows for summary. Default: 10.',
-      },
-      with_system_events: {
-        type: 'boolean',
-        description: 'Include system events.',
-      },
-    },
-    required: ['trace_id_or_uri'],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    trace_id_or_uri: z
+      .string()
+      .describe('Profiler trace ID or full trace URI.'),
+    view: z
+      .enum(['hitlist', 'statements', 'db_accesses'])
+      .default('hitlist')
+      .optional(),
+    top: z
+      .number()
+      .optional()
+      .describe('Number of top rows for summary. Default: 10.'),
+    with_system_events: z
+      .boolean()
+      .optional()
+      .describe('Include system events.'),
+  }),
 } as const;
 
 interface RuntimeAnalyzeProfilerTraceArgs {
@@ -70,10 +69,8 @@ function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
       out[key] = value;
       continue;
     }
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      for (const [nestedKey, nestedValue] of Object.entries(
-        value as Record<string, unknown>,
-      )) {
+    if (isElement(value)) {
+      for (const [nestedKey, nestedValue] of entries(value)) {
         if (
           typeof nestedValue === 'string' ||
           typeof nestedValue === 'number' ||
@@ -90,7 +87,7 @@ function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
 function rankBy(row: Record<string, unknown>, path: [string, string]): number {
   const outer = row[path[0]];
   if (!outer || typeof outer !== 'object') return 0;
-  const value = (outer as Record<string, unknown>)[path[1]];
+  const value = child(outer, path[1]);
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
@@ -131,10 +128,8 @@ function summarizeView(
   const rankPath: [string, string] =
     view === 'db_accesses' ? ['accessTime', 'total'] : ['grossTime', 'time'];
 
-  const collection = (payload as Record<string, unknown> | undefined)?.[
-    collectionKey
-  ];
-  const rows: Record<string, unknown>[] = Array.isArray(collection)
+  const collection = child(payload, collectionKey);
+  const rows: Record<string, unknown>[] = isList(collection)
     ? collection.filter(
         (row): row is Record<string, unknown> =>
           !!row && typeof row === 'object',

@@ -1,4 +1,11 @@
 import {
+  buildOrdered,
+  ORDERED_TEXT,
+  orderedElement,
+  orderedTextMember,
+} from '../xml/ordered';
+import type { Element } from '../xml/tree';
+import {
   patchIf,
   patchXmlAttribute,
   patchXmlBlock,
@@ -21,8 +28,10 @@ export interface DomainChanges {
   length?: number | string;
   decimals?: number | string;
   conversion_exit?: string;
-  sign_exists?: boolean;
-  lowercase?: boolean;
+  /** Written out as given: a flag, or its text. */
+  sign_exists?: boolean | string;
+  /** Written out as given: a flag, or its text. */
+  lowercase?: boolean | string;
   value_table?: string;
   fixed_values?: Array<{ low: string; text: string }>;
 }
@@ -36,6 +45,31 @@ export interface DomainChanges {
  * unread, which is the whole reason this patches text rather than building a
  * document from the caller's fields.
  */
+/**
+ * `doma:fixValues` in the ordered form, built by the XML builder: each value
+ * written as XML text (`&` and `<` as entities), laid out as before — one
+ * `doma:fixValue` per line, indented; `<doma:fixValues/>` for none.
+ */
+function fixValuesBlock(
+  fixedValues: ReadonlyArray<{ low: string; text: string }>,
+): Element {
+  const line = (indent: string) => ({ [ORDERED_TEXT]: `\n${indent}` });
+  const values = fixedValues.flatMap((fv) => [
+    line('      '),
+    orderedElement('doma:fixValue', [
+      line('        '),
+      orderedElement('doma:low', [orderedTextMember(fv.low)]),
+      line('        '),
+      orderedElement('doma:text', [orderedTextMember(fv.text)]),
+      line('      '),
+    ]),
+  ]);
+  return orderedElement(
+    'doma:fixValues',
+    values.length === 0 ? [] : [...values, line('    ')],
+  );
+}
+
 export function patchDomainXml(
   currentXml: string,
   changes: DomainChanges,
@@ -88,15 +122,7 @@ export function patchDomainXml(
   // Fixed values are replaced whole: they are a list, and patching one entry of
   // a list the caller supplied in full would merge two intentions.
   if (changes.fixed_values !== undefined) {
-    const block =
-      changes.fixed_values && changes.fixed_values.length > 0
-        ? `<doma:fixValues>\n${changes.fixed_values
-            .map(
-              (fv) =>
-                `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`,
-            )
-            .join('\n')}\n    </doma:fixValues>`
-        : '<doma:fixValues/>';
+    const block = buildOrdered([fixValuesBlock(changes.fixed_values)]);
     xml = patchXmlBlock(xml, 'doma:fixValues', block);
   }
 

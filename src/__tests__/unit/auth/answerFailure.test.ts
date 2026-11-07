@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * What the MCP client sees of a failure: the JSON answer, row by
  * row, and what never reaches it. The stderr line is `logFields`.
@@ -252,9 +253,9 @@ describe('the answer sites read the failure first', () => {
             toolDefinition: {
               name: 'StubThrowsRefusal',
               description: 'a tool whose call is refused',
-              inputSchema: { type: 'object', properties: {} },
+              inputSchema: z.object({}),
             },
-            handler: async () => {
+            call: async () => {
               throw new AuthProviderFailure(error);
             },
           },

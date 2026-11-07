@@ -22,6 +22,7 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
+import { toolAnswer } from '../helpers/toolAnswer';
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -175,7 +176,7 @@ describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
       { query: 'Z*', object_type: 'NOPE' },
     );
     expect(refusedConnection.requests).toEqual([]);
-    expect(textOf(refused)).toContain(refusal('NOPE'));
+    expect(textOf(toolAnswer(refused))).toContain(refusal('NOPE'));
   });
 
   it('DescribeByList searches an object whose type is no search name without one', async () => {

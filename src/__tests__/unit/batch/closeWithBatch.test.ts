@@ -17,6 +17,8 @@
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import { BATCH_MODE_OFF_WORDS } from '../../../lib/auth/serverRefusal';

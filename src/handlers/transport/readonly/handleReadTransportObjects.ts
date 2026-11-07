@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ReadTransportObjects — what a transport request or task holds.
  *
@@ -29,28 +31,32 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import {
+  attr,
+  child,
+  type Element,
+  entries,
+  isElement,
+  isList,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description:
-          'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe(
+        'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ReadTransportObjectsArgs {
@@ -83,31 +89,28 @@ interface Entry {
  */
 function collect(
   node: unknown,
-  found: { attributes: Record<string, string>; task?: string }[],
+  found: { attributes: Element; task?: string }[],
   task?: string,
   inRequest = false,
 ): void {
-  if (Array.isArray(node)) {
-    for (const child of node) collect(child, found, task, inRequest);
+  if (isList(node)) {
+    for (const member of node) collect(member, found, task, inRequest);
     return;
   }
-  if (!node || typeof node !== 'object') return;
-  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+  for (const [key, value] of entries(node)) {
     if (key === '@' || key === 'tm:all_objects') continue;
     if (key === 'tm:abap_object') {
-      for (const entry of Array.isArray(value) ? value : [value]) {
-        const attributes = (entry as { '@'?: Record<string, string> })?.['@'];
-        if (attributes) found.push({ attributes, task });
+      for (const entry of isList(value) ? value : [value]) {
+        const attributes = child(entry, '@');
+        if (isElement(attributes)) found.push({ attributes, task });
       }
       continue;
     }
     if (key === 'tm:task' && inRequest) {
       // A task of the request: its entries carry its number.
-      for (const child of Array.isArray(value) ? value : [value]) {
-        const number = (child as { '@'?: Record<string, string> })?.['@']?.[
-          'tm:number'
-        ];
-        collect(child, found, text(number), false);
+      for (const member of isList(value) ? value : [value]) {
+        const number = attr(child(member, '@'), 'tm:number');
+        collect(member, found, text(number), false);
       }
       continue;
     }
@@ -119,26 +122,26 @@ const text = (value: string | undefined): string | undefined =>
   value === undefined || value === '' ? undefined : value;
 
 function entriesOf(value: unknown): Entry[] {
-  const found: { attributes: Record<string, string>; task?: string }[] = [];
+  const found: { attributes: Element; task?: string }[] = [];
   collect(value, found);
-  const entries: Entry[] = [];
+  const read: Entry[] = [];
   for (const { attributes, task } of found) {
-    const name = text(attributes['tm:name']);
-    const type = text(attributes['tm:type']);
+    const name = text(attr(attributes, 'tm:name'));
+    const type = text(attr(attributes, 'tm:type'));
     // Nothing can be done with a nameless entry, and a caller counting
     // objects should not count a hole.
     if (name === undefined || type === undefined) continue;
-    entries.push({
+    read.push({
       name,
       type,
-      pgmid: text(attributes['tm:pgmid']),
-      description: text(attributes['tm:obj_desc']),
-      position: text(attributes['tm:position']),
-      lockStatus: text(attributes['tm:lock_status']),
+      pgmid: text(attr(attributes, 'tm:pgmid')),
+      description: text(attr(attributes, 'tm:obj_desc')),
+      position: text(attr(attributes, 'tm:position')),
+      lockStatus: text(attr(attributes, 'tm:lock_status')),
       task,
     });
   }
-  return entries;
+  return read;
 }
 
 export async function handleReadTransportObjects(

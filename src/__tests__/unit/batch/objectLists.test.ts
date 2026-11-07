@@ -1,6 +1,6 @@
 /**
  * The object lists on internal batches (spec §11, rows `ListTransports`,
- * `DescribeByList`, `GetAbapSystemSymbols`): each phase's independent reads
+ * `DescribeByList`): each phase's independent reads
  * go in one envelope; the answer is the sequential version's; a part's
  * failure is its item's; a credential refusal ends the call as it came; a
  * destination with no communication batch runs the sequential reads.
@@ -17,7 +17,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapSystemSymbols } from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import {
@@ -63,6 +62,11 @@ function labelOf(method: string, url: string, params?: unknown): string {
   }
   if (path === '/sap/bc/adt/repository/informationsystem/search') {
     return `qs:${query.get('query')}:${query.get('objectType') ?? ''}`;
+  }
+  const groups = '/sap/bc/adt/functions/groups/';
+  if (path.startsWith(groups)) {
+    const [group = '', , name = ''] = path.slice(groups.length).split('/');
+    return `src:func:${group.toUpperCase()}/${name.toUpperCase()}`;
   }
   const kinds: Array<[string, string]> = [
     ['/sap/bc/adt/oo/classes/', 'class'],
@@ -172,7 +176,14 @@ const REPOSITORY: Record<string, PartAnswer> = {
   ),
   'qs:ZNONE:': ok(hitsXml([])),
 
+  // A function module's search: its address names its group (measured on
+  // premise and on ABAP cloud: `…/functions/groups/{group}/fmodules/{name}`).
+  'qs:Z_FUNC:FUNC': ok(
+    '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/zfg_a/fmodules/z_func" adtcore:type="FUGR/FF" adtcore:name="Z_FUNC" adtcore:packageName="ZPKG" adtcore:description="Function Z"/></adtcore:objectReferences>',
+  ),
+
   // Sources of the symbols.
+  'src:func:ZFG_A/Z_FUNC': ok('FUNCTION z_func.\nENDFUNCTION.', text),
   'src:class:ZCL_A': ok('CLASS zcl_a DEFINITION PUBLIC.\nENDCLASS.', text),
   'src:class:ZCL_B': ok('CLASS zcl_b DEFINITION PUBLIC.\nENDCLASS.', text),
   'src:intf:ZIF_A': ok('INTERFACE zif_a PUBLIC.\nENDINTERFACE.', text),
@@ -722,148 +733,5 @@ describe('DescribeByList', () => {
     ).rejects.toThrow('objects (array) is required');
     expect(fake.envelopes).toHaveLength(0);
     expect(fake.directs).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GetAbapSystemSymbols
-// ---------------------------------------------------------------------------
-
-const CODE = [
-  'CLASS zcl_a DEFINITION PUBLIC.',
-  '  PUBLIC SECTION.',
-  '    METHODS run IMPORTING iv TYPE i.',
-  'ENDCLASS.',
-  'INTERFACE zif_a PUBLIC.',
-  'ENDINTERFACE.',
-  'CLASS zcl_b DEFINITION.',
-  'ENDCLASS.',
-  'CLASS zcl_gone DEFINITION.',
-  'ENDCLASS.',
-  'FUNCTION z_func.',
-  'ENDFUNCTION.',
-  'DATA lv_count TYPE i.',
-].join('\n');
-
-describe('GetAbapSystemSymbols', () => {
-  it.each([[{ code: CODE }], [{ code: 'DATA lv TYPE i.' }]])(
-    'same answer as the sequential version: %j',
-    async (args) => {
-      const { a, b, batched, sequential } = await bothWays(
-        handleGetAbapSystemSymbols,
-        args,
-      );
-      expect(contentOf(a)).toBe(contentOf(b));
-      expect(batched.directs).toHaveLength(0);
-      expect(sequential.envelopes).toHaveLength(0);
-    },
-  );
-
-  it('one phase: every symbol’s read, each independent of the others, in one envelope', async () => {
-    const fake = system();
-    await withinTurns(
-      handleGetAbapSystemSymbols(contextOn(fake), { code: CODE }),
-      TURNS,
-    );
-    expect(phasesOf(fake)).toEqual([
-      [
-        'src:class:ZCL_A',
-        'src:intf:ZIF_A',
-        'src:class:ZCL_B',
-        'src:class:ZCL_GONE',
-      ],
-    ]);
-    expect(fake.directs).toHaveLength(0);
-  });
-
-  it('nothing to read in the system: no envelope', async () => {
-    const fake = system();
-    await withinTurns(
-      handleGetAbapSystemSymbols(contextOn(fake), { code: 'DATA lv TYPE i.' }),
-      TURNS,
-    );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(0);
-  });
-
-  it("a part's failure is that symbol's; the rest resolve", async () => {
-    const model = { answers: { 'src:class:ZCL_B': FORBIDDEN } };
-    const { a, b } = await bothWays(
-      handleGetAbapSystemSymbols,
-      { code: CODE },
-      model,
-    );
-    expect(contentOf(a)).toBe(contentOf(b));
-    const symbols = (a as any).content[0].json.symbols;
-    const named = (name: string) =>
-      symbols.find((s: { name: string }) => s.name === name);
-    expect(named('ZCL_B').error).toMatchObject({
-      status: 403,
-      step: 'read class',
-    });
-    expect(named('ZCL_A').systemInfo.exists).toBe(true);
-    expect(named('ZCL_GONE').error).toMatchObject({ status: 404 });
-  });
-
-  it('a 401 SAP answered to a symbol ends the call as it came', async () => {
-    const model = { answers: { 'src:intf:ZIF_A': UNAUTHORIZED } };
-    const { a, b, batched } = await bothWays(
-      handleGetAbapSystemSymbols,
-      { code: CODE },
-      model,
-    );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
-    expect(batched.envelopes).toHaveLength(1);
-  });
-
-  it("the connection's credential refusal ends the call as it came", async () => {
-    const fake = system({}, () => {
-      throw credential();
-    });
-    const result = await withinTurns(
-      handleGetAbapSystemSymbols(contextOn(fake), { code: CODE }),
-      TURNS,
-    );
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
-  });
-
-  it('a failed envelope: every read symbol answers the error; nothing is retried', async () => {
-    const fake = failingEnvelope(1);
-    const result = await withinTurns(
-      handleGetAbapSystemSymbols(contextOn(fake), { code: CODE }),
-      TURNS,
-    );
-    const expected = await sequentialWithFailed(
-      handleGetAbapSystemSymbols,
-      { code: CODE },
-      phasesOf(fake)[0] as string[],
-    );
-    expectEnvelopeFailure(result, expected, 4);
-    const symbols = (result as any).content[0].json.symbols;
-    expect(
-      symbols
-        .filter((s: { error?: unknown }) => s.error !== undefined)
-        .map((s: { name: string }) => s.name),
-    ).toEqual(['ZCL_A', 'ZIF_A', 'ZCL_B', 'ZCL_GONE']);
-    expect(fake.envelopes).toHaveLength(1);
-    expect(fake.directs).toHaveLength(0);
-  });
-
-  it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
-    const { fake, context, result, expected } = await noCommunicationBatch(
-      handleGetAbapSystemSymbols,
-      { code: CODE },
-    );
-    expect(contentOf(result)).toBe(contentOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(directsOf(fake)).toEqual([
-      'src:class:ZCL_A',
-      'src:intf:ZIF_A',
-      'src:class:ZCL_B',
-      'src:class:ZCL_GONE',
-    ]);
-    expect(context.batchAvailability?.available()).toBe(false);
   });
 });

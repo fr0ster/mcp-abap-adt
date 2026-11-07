@@ -211,19 +211,29 @@ function moduleIndex() {
     byName.get(definition.name);
 }
 
-/**
- * A definition's input as JSON Schema: a plain object schema as it is, a Zod
- * shape converted as the MCP SDK lists it (input side).
- */
+/** A definition's input as JSON Schema, as the MCP SDK lists it (input side). */
 function jsonSchemaOf(inputSchema) {
-  if (
-    inputSchema &&
-    inputSchema.type === 'object' &&
-    typeof inputSchema.properties === 'object'
-  )
-    return inputSchema;
   const { z } = require('zod');
-  return z.toJSONSchema(z.object(inputSchema), { io: 'input' });
+  return z.toJSONSchema(inputSchema, { io: 'input' });
+}
+
+/**
+ * The arguments a definition requires: its zod schema's fields that are
+ * neither optional nor a default over an optional field, as its JSON Schema
+ * stated them before it moved to zod.
+ */
+function requiredOf(inputSchema) {
+  const { z } = require('zod');
+  return Object.entries(inputSchema.shape)
+    .filter(
+      ([, field]) =>
+        !(
+          field instanceof z.ZodOptional ||
+          (field instanceof z.ZodDefault &&
+            field.unwrap() instanceof z.ZodOptional)
+        ),
+    )
+    .map(([name]) => name);
 }
 
 /** A built JSON-Schema property as the page lists it: type, default, enum, words. */
@@ -269,7 +279,7 @@ function documentedTool(definition, groupName, moduleOf) {
       typeof definition.description === 'string' ? definition.description : '',
     inputSchema: {
       properties,
-      required: Array.isArray(schema.required) ? [...schema.required] : [],
+      required: requiredOf(definition.inputSchema),
     },
     availableIn: Array.isArray(definition.available_in)
       ? [...definition.available_in]
@@ -385,11 +395,20 @@ function groupByLevelAndObject(tools) {
 }
 
 function renderParams(tool) {
-  const props = tool.inputSchema?.properties || {};
+  const { z } = require('zod');
+  const schema =
+    tool.inputSchema instanceof z.ZodObject
+      ? jsonSchemaOf(tool.inputSchema)
+      : tool.inputSchema;
+  const props = schema?.properties || {};
   const keys = Object.keys(props);
   if (keys.length === 0) return '- None\n';
 
-  const required = new Set(tool.inputSchema?.required || []);
+  const required = new Set(
+    tool.inputSchema instanceof z.ZodObject
+      ? requiredOf(tool.inputSchema)
+      : schema?.required || [],
+  );
   let out = '';
   for (const key of keys.sort((a, b) => a.localeCompare(b))) {
     const p = props[key];
@@ -488,7 +507,7 @@ function generateMarkdown(tools, surface) {
 
   md += `## Handler Sets\n\n`;
   md += `The binary fixes its tool set (19.0.0); there is no \`--exposition\`.\n\n`;
-  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group, the system and search tools, and on stdio the leftover-session list — none of the run tools (\`RuntimeRunClass\`, \`RuntimeRunProgram\`, \`RuntimeCreateProfilerTraceParameters\`), the background-run tools or the leftover-session logoff, which change the system\n`;
+  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group, the system and search tools, the background-run tools of the long reads, and on stdio the leftover-session list — none of the run tools (\`RuntimeRunClass\`, \`RuntimeRunProgram\`, \`RuntimeCreateProfilerTraceParameters\`) or the leftover-session logoff, which change the system\n`;
   md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
   md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
@@ -689,7 +708,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
 
 /** What the read-only page lists, said on the page. */
 const READ_ONLY_PAGE_INTRO =
-  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, background-run, leftover-session logoff or resume tool. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
+  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
 
 /** What the high-level page says beside its tools. */
 const HIGH_PAGE_INTRO =

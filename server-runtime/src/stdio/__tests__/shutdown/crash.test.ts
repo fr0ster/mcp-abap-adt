@@ -50,7 +50,7 @@ it.each([
 ])(
   '%s: the orderly shutdown logs off the connection, one line, exit 1',
   async (_name, crash) => {
-    s = await stand({ shutdown: {} });
+    s = await stand({ kind: 'onprem', shutdown: {} });
     expect(await s.callTool('ProbeAdt', { id: 'p1' })).toMatchObject({
       isError: false,
     });
@@ -63,7 +63,7 @@ it.each([
 );
 
 it('a crash during a running shutdown lets it finish and exits 1; a second crash adds nothing', async () => {
-  s = await stand({ shutdown: {} });
+  s = await stand({ kind: 'onprem', shutdown: {} });
   // The session writes are held: the orderly shutdown is still running.
   const written = deferred<void>();
   const broker = await s.factory.getBroker('default');

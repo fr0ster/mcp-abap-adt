@@ -8,9 +8,14 @@
  * request ends with the request; the HTTP session, and a stateful context
  * inside it, do not.
  *
- * Kept free of other imports so the setup file that closes them loads nothing
- * else.
+ * After a credential refusal (the run's marker) nothing is sent: a logoff
+ * included, so a test connection is then left as it is.
+ *
+ * Kept free of other imports (but the run's files, Node's own modules only)
+ * so the setup file that closes them loads nothing else.
  */
+import { markerExists } from '../coverageReport/reportFormat';
+
 type Closable = {
   disconnect?: () => Promise<void>;
   flushGoodbye?: () => Promise<void>;
@@ -28,6 +33,8 @@ type Closable = {
 export async function endTestConnection(connection: unknown): Promise<void> {
   const closable = connection as Closable | null | undefined;
   if (!closable || typeof closable.disconnect !== 'function') return;
+  // After a credential refusal nothing is sent, a logoff included.
+  if (markerExists()) return;
   await closable.disconnect();
   await closable.flushGoodbye?.();
 }

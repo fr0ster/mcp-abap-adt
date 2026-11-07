@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ValidateObject Handler - Validate ABAP object name via ADT API
  *
@@ -45,7 +47,7 @@ import {
   variantOf,
 } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -55,70 +57,68 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description: 'Object name to validate',
-      },
-      object_type: {
-        type: 'string',
-        description:
-          "Object type: 'class', 'program', 'interface', 'function_group', 'function_module' (object_name GROUP|MODULE), 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'behavior_implementation',
-          'metadata_extension',
-        ],
-      },
-      super_package: {
-        type: 'string',
-        description: 'Super package (package validation).',
-      },
-      superclass: {
-        type: 'string',
-        description: 'Superclass name (class validation).',
-      },
-      behavior_definition: {
-        type: 'string',
-        description:
-          'Optional behavior definition name (required for behavior_implementation validation)',
-      },
-      root_entity: {
-        type: 'string',
-        description:
-          'Root entity name (required for behavior_definition validation)',
-      },
-      implementation_type: {
-        type: 'string',
-        description:
-          "Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)",
-      },
-      package_name: {
-        type: 'string',
-        description:
-          'Package of the object. Required for program, include, behavior_implementation and metadata_extension (and for behavior_definition with its other fields); elsewhere optional, used for a name in a namespace (/NS/…).',
-      },
-      description: {
-        type: 'string',
-        description: 'Optional description for validation',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['object_name', 'object_type'],
-  },
+  inputSchema: z.object({
+    object_name: z.string().describe('Object name to validate'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'behavior_implementation',
+        'metadata_extension',
+      ])
+      .describe(
+        "Object type: 'class', 'program', 'interface', 'function_group', 'function_module' (object_name GROUP|MODULE), 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
+      ),
+    super_package: z
+      .string()
+      .optional()
+      .describe('Super package (package validation).'),
+    superclass: z
+      .string()
+      .optional()
+      .describe('Superclass name (class validation).'),
+    behavior_definition: z
+      .string()
+      .optional()
+      .describe(
+        'Optional behavior definition name (required for behavior_implementation validation)',
+      ),
+    root_entity: z
+      .string()
+      .optional()
+      .describe(
+        'Root entity name (required for behavior_definition validation)',
+      ),
+    implementation_type: z
+      .string()
+      .optional()
+      .describe(
+        "Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)",
+      ),
+    package_name: z
+      .string()
+      .optional()
+      .describe(
+        'Package of the object. Required for program, include, behavior_implementation and metadata_extension (and for behavior_definition with its other fields); elsewhere optional, used for a name in a namespace (/NS/…).',
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Description sent with the validation. Required for function_module, metadata_extension and behavior_definition; elsewhere optional.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ValidateObjectArgs {
@@ -219,11 +219,13 @@ export async function validateObject(
         ),
       );
     }
-    normalizedImplementationType = (implementation_type
-      .charAt(0)
-      .toUpperCase() +
-      implementation_type.slice(1).toLowerCase()) as ImplementationType;
-    if (!VALID_IMPLEMENTATION_TYPES.includes(normalizedImplementationType)) {
+    const spelled =
+      implementation_type.charAt(0).toUpperCase() +
+      implementation_type.slice(1).toLowerCase();
+    normalizedImplementationType = VALID_IMPLEMENTATION_TYPES.find(
+      (known) => known === spelled,
+    );
+    if (normalizedImplementationType === undefined) {
       return return_error(
         new Error(
           `Invalid implementationType. Must be one of: ${VALID_IMPLEMENTATION_TYPES.join(', ')}`,
@@ -262,10 +264,22 @@ export async function validateObject(
   }
 
   // A function module is addressed under its group: GROUP|MODULE, as the
-  // lock takes it.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // lock takes it, and its validation states a description: SAP answers
+  // `400` without one (measured), so a call without it is refused before
+  // anything is sent.
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
+  let functionModuleDescription = '';
   if (normalizedType === 'function_module') {
+    if (!description) {
+      return return_error(
+        new Error(
+          'Function module validation requires description; missing: description',
+        ),
+      );
+    }
+    functionModuleDescription = description;
     const [group, module] = object_name.toUpperCase().split('|');
     if (!group || !module) {
       return return_error(
@@ -358,9 +372,9 @@ export async function validateObject(
             .getFunctionModule(resultsFor(functionModuleDocuments))
             .validate(
               {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
-                description: normalizedDescription,
+                functionGroupName,
+                functionModuleName,
+                description: functionModuleDescription,
               },
               { analyse: analyseException },
             );
@@ -445,7 +459,8 @@ export async function validateObject(
             .validate(
               {
                 className: objectName,
-                packageName: packageName as string,
+                // Required for a behavior implementation, refused above when absent.
+                packageName: packageName ?? '',
                 behaviorDefinition: behavior_definition || '',
                 ...(normalizedDescription
                   ? { description: normalizedDescription }

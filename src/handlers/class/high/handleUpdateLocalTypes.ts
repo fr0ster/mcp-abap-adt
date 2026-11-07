@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateLocalTypes Handler - Write a class's local types include
  *
@@ -24,7 +26,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -38,32 +40,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Parent class name.',
-      },
-      local_types_code: {
-        type: 'string',
-        description: 'Updated source code for local types.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable objects), not a task.',
-      },
-      activate_on_update: {
-        type: 'boolean',
-        description:
-          'Activate parent class after updating local types. Default: false',
-        default: false,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'local_types_code'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Parent class name.'),
+    local_types_code: z
+      .string()
+      .describe('Updated source code for local types.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable objects), not a task.',
+      ),
+    activate_on_update: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Activate parent class after updating local types. Default: false',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateLocalTypesArgs {
@@ -119,7 +115,7 @@ export async function handleUpdateLocalTypes(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

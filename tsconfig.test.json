@@ -84,5 +84,11 @@
     "src/lib/servers/v2/__tests__/**/*",
     "scripts/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    // The coverage guard's refusal fixtures: source the guard reads as text
+    // with the compiler API, each wrong on purpose — never compiled.
+    "src/__tests__/unit/coverage/__fixtures__/coverage"
+  ]
 }

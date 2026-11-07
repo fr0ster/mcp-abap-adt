@@ -9,6 +9,7 @@
  * alone.
  */
 
+import { DEFAULT_STATE_IDLE_MINUTES } from '../state/idleBound.js';
 import {
   type ParameterTable,
   readParameters,
@@ -32,6 +33,12 @@ export function readStateIdleMinutes(
   env: NodeJS.ProcessEnv,
   yaml?: Record<string, unknown> | null,
 ): number {
-  return readParameters(STATE_IDLE_ONLY, argv, env, yaml)
-    .stateIdleMinutes as number;
+  const minutes = readParameters(
+    STATE_IDLE_ONLY,
+    argv,
+    env,
+    yaml,
+  ).stateIdleMinutes;
+  // The row parses a whole number and defaults to it; nothing else is read.
+  return typeof minutes === 'number' ? minutes : DEFAULT_STATE_IDLE_MINUTES;
 }

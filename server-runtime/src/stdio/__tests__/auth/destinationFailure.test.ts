@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * core's failure reader: a `DestinationConfigError` is read
  * first — `destination_refused`, `Destination "<name>" cannot be used:
@@ -271,9 +272,9 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
           toolDefinition: {
             name: 'StubTool',
             description: 'a tool that would read the system',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           },
-          handler: async () => {
+          call: async () => {
             reached();
             return { content: [{ type: 'text', text: 'read' }] };
           },

@@ -3,6 +3,7 @@
  * description (with the sentence appended at registration), parameter
  * names and the search texts of `_meta`, per set, from a `BaseMcpServer` with a batch owner.
  */
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -68,6 +69,8 @@ class CatalogServer extends BaseMcpServer {
       logger: silent as never,
       systemType,
       batch: new InstanceBatch({ keepRawParts: false }),
+      // As the launchers: every set keeps background runs.
+      backgroundRuns: new InMemoryBackgroundRuns(),
     });
     this.registerHandlers(registry);
   }

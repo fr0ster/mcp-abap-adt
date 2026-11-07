@@ -14,6 +14,7 @@
  * one bounded wait is a sync's confirmation, inside its own call, at
  * WAIT_MAX_SECONDS.
  */
+
 import { randomUUID } from 'node:crypto';
 import {
   AdtBatchConnection,
@@ -31,6 +32,7 @@ import {
   carryingPayload,
   noteLeftBehind,
 } from '../strategies/step';
+import { child, isElement } from '../xml/tree';
 import {
   type AmdpBreakpointState,
   type AmdpEvent,
@@ -147,8 +149,15 @@ const failedAt = <E extends Error>(
     ? error
     : carryingFailure(error, a.getError(), step);
 type Wire = { headers?: Record<string, unknown>; data?: unknown };
-const wireOf = (a: IAdtResponse<unknown>): Wire =>
-  (a.ok ? (a.getResult().value ?? {}) : {}) as Wire;
+const wireOf = (a: IAdtResponse<unknown>): Wire => {
+  const value = a.ok ? a.getResult().value : undefined;
+  const headers = child(value, 'headers');
+  const data = child(value, 'data');
+  return {
+    ...(isElement(headers) ? { headers } : {}),
+    ...(data !== undefined ? { data } : {}),
+  };
+};
 
 export class AmdpSession<O = unknown> {
   private readonly serial = new Serial();
@@ -1372,7 +1381,7 @@ export class AmdpSession<O = unknown> {
       }
       try {
         await this.close(connection);
-        this.unclosed.delete(connection as IAbapConnection);
+        if (connection) this.unclosed.delete(connection);
       } catch {
         if (connection) this.unclosed.add(connection); // the next stop closes it
       }

@@ -26,6 +26,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { holding } from '../helpers/heldLocks';
 
 let fakeClient: unknown;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -223,8 +224,8 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
       update: async () => saveRefused([ALREADY_LOCKED]),
     });
     const result: any = await handleUpdateUnderLock(
-      // No held-lock port: the handle is taken as held here.
-      context as any,
+      // The instance locked first: its owner holds the handle.
+      { ...context, heldLocks: holding('handle-1') } as any,
       {
         object_type: 'LOCAL_TEST_CLASS',
         lock_handle: 'handle-1',

@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A reader the answer site does not own — a `BaseMcpServer` override — may
  * throw. The call is then answered in auth-errors'
@@ -37,9 +38,9 @@ const group = {
       toolDefinition: {
         name: 'StubTool',
         description: 'a tool',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: z.object({}),
       },
-      handler: async () => ({ content: [{ type: 'text', text: 'read' }] }),
+      call: async () => ({ content: [{ type: 'text', text: 'read' }] }),
     },
   ],
   registerHandlers: () => {},

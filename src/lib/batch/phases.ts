@@ -48,6 +48,7 @@
  * takes; the long call's own `timeout`, when given, cuts it by logging its
  * connection off.
  */
+
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -59,7 +60,9 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
+import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
+import { sessionOf } from './sessionOf';
 
 /** One item's settlement in a phase. */
 export type PhaseResult<R> =
@@ -111,17 +114,15 @@ function outerStatusWatch(connection: IAbapConnection): {
   let outer: number | undefined;
   let sent = 0;
   let refused: Error | undefined;
-  const typed = connection as {
-    getSessionType?: () => Session;
-    getSessionMode?: () => Session;
-  };
   const forwarding = {
     connect: () => connection.connect(),
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
     setSessionType: (type: Session) => connection.setSessionType(type),
     getSessionType: (): Session =>
-      typed.getSessionType?.() ?? typed.getSessionMode?.() ?? 'stateless',
+      sessionOf(connection, 'getSessionType') ??
+      sessionOf(connection, 'getSessionMode') ??
+      'stateless',
     makeAdtRequest<T = unknown, D = unknown>(
       request: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
@@ -142,7 +143,11 @@ function outerStatusWatch(connection: IAbapConnection): {
       );
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  return { forwarding, outer: () => outer, refused: () => refused };
+  return {
+    forwarding: withSystemKindOf(forwarding, connection),
+    outer: () => outer,
+    refused: () => refused,
+  };
 }
 
 /**
@@ -178,7 +183,7 @@ function itemView(
       return answer;
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  return view;
+  return withSystemKindOf(view, batch);
 }
 
 /** A part's answer: SAP's response, or the failure it was rejected with. */
@@ -227,13 +232,16 @@ async function correctPhaseParts(
   });
   if (corrected.length === 0) return;
   const watch = outerStatusWatch(context.connection);
-  const batch = new AdtBatchConnection(watch.forwarding, {
-    endpoint: 'communication',
-    ...(context.logger !== undefined ? { logger: context.logger } : {}),
-  });
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
   const waits = corrected.map(({ invocation, pair }) => {
     invocation.port?.remember(invocation.operation, pair);
-    let signal!: () => void;
+    let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });
@@ -285,10 +293,13 @@ export async function runPhase<I, R>(
   read: (item: I, batch: IAbapConnection) => Promise<R>,
 ): Promise<PhaseResult<R>[]> {
   const watch = outerStatusWatch(context.connection);
-  const batch = new AdtBatchConnection(watch.forwarding, {
-    endpoint: 'communication',
-    ...(context.logger !== undefined ? { logger: context.logger } : {}),
-  });
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
   let sealed = false;
   const parts: RecordedPart[] = [];
   // A part's answer reaches its read once the correction is made.
@@ -296,7 +307,7 @@ export async function runPhase<I, R>(
     const invocation = adtCallScope.getStore()?.invocation;
     if (invocation !== undefined) invocation.parts += 1;
     const first = settledOf(batch.makeAdtRequest(request));
-    let answer!: (final: PartAnswer) => void;
+    let answer: (final: PartAnswer) => void = () => {};
     const final = new Promise<PartAnswer>((resolve) => {
       answer = resolve;
     });
@@ -306,7 +317,7 @@ export async function runPhase<I, R>(
     );
   };
   const entries = items.map((item) => {
-    let signal!: () => void;
+    let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });

@@ -3,8 +3,12 @@ import type { Logger } from '@mcp-abap-adt/logger';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import { ServerRefusal } from '../auth/serverRefusal.js';
-import { withoutBackgroundParameter } from '../backgroundRuns/tools.js';
+import {
+  longToolInTheCall,
+  withoutBackgroundParameter,
+} from '../backgroundRuns/tools.js';
 import { noopLogger } from '../handlerLogger.js';
+import { isLongTool } from '../longTools.js';
 import {
   isCredentialFailure,
   type SystemContextResolver,
@@ -21,14 +25,10 @@ import type {
   HandlerEntry,
   IHandlersRegistry,
   SapEnvironment,
-  ToolHandler,
 } from './interfaces.js';
+import { noConnection } from './noConnection.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
-import {
-  type CallContext,
-  inStatedScope,
-  isArgsOnly,
-} from './utils/handlerCall.js';
+import { type CallContext, inStatedScope } from './utils/handlerCall.js';
 
 /**
  * The run tools as the exporter hands them out: without `background`, since
@@ -166,7 +166,7 @@ export class HandlerExporter {
     // getConnection()) or made per call by registerOnServer (its provider's
     // connection).
     const dummyContext: HandlerContext = {
-      connection: null as any,
+      connection: noConnection,
       logger: this.logger,
       ...(options?.systemType !== undefined && {
         systemType: options.systemType,
@@ -225,16 +225,25 @@ export class HandlerExporter {
    * and with a resolver the responsible person and master system are filled
    * from the connection's parameters (see `systemContextResolver`,
    * `systemContextRules`) before it runs — a credential failure or a
-   * refusal of the rules is thrown, and the handler does not run. The
-   * wrapper keeps the original's `length`,
-   * because embedders choose between `handler(context, args)` and
-   * `handler(args)` by it.
+   * refusal of the rules is thrown, and the handler does not run. An
+   * embedder calls an entry as `entry.call(context, args)`.
    */
   getHandlerEntries(): HandlerEntry[] {
     const entries: HandlerEntry[] = [];
     for (const group of this.handlerGroups) {
       for (const entry of group.getHandlers()) {
-        entries.push(this.wrapEntry(group, entry));
+        // The exporter keeps no background runs: a listed long tool is
+        // handed out without `background`, as the run tools are.
+        entries.push(
+          this.wrapEntry(
+            isLongTool(entry.toolDefinition.name)
+              ? {
+                  ...entry,
+                  toolDefinition: longToolInTheCall(entry.toolDefinition),
+                }
+              : entry,
+          ),
+        );
       }
     }
     return entries;
@@ -250,28 +259,17 @@ export class HandlerExporter {
    * failure renderer's transport hint), and with the system lookup when a
    * resolver is given.
    */
-  private wrapEntry(
-    group: BaseHandlerGroup,
-    entry: HandlerEntry,
-  ): HandlerEntry {
-    // The scope a plain registration gives a call (`inStatedScope`), on the
-    // call's connection and this exporter's options.
-    const inScope = <T>(
-      connection: HandlerContext['connection'] | undefined,
-      args: unknown,
-      fn: () => Promise<T>,
-    ): Promise<T> => inStatedScope({ ...this.stated(), connection }, args, fn);
-
-    const original = entry.handler;
-    const wrapped: ToolHandler = isArgsOnly(original)
-      ? // Args-only handlers close over their group's context, which the
-        // embedder swaps before calling — so read it at call time.
-        (args: unknown) =>
-          inScope(group.currentContext().connection, args, () => original(args))
-      : (context: HandlerContext, args: unknown) =>
-          inScope(context?.connection, args, () => original(context, args));
-    Object.defineProperty(wrapped, 'length', { value: original.length });
-    return { ...entry, handler: wrapped };
+  private wrapEntry(entry: HandlerEntry): HandlerEntry {
+    const original = entry.call;
+    return {
+      ...entry,
+      call: (context, args) =>
+        inStatedScope(
+          { ...this.stated(), connection: context?.connection },
+          args,
+          () => original(context, args),
+        ),
+    };
   }
 
   /**
@@ -300,9 +298,7 @@ export class HandlerExporter {
    * The listing is a plain registration's (`createRegistry().registerAllTools`)
    * for the stated `systemType`: that variant's tools, descriptions, schemas
    * and search members; none stated, the definitions as they are. Each call
-   * awaits the provider, then runs the handler on what it returned — in the
-   * form the handler takes (an args-only one reads that context as its
-   * group's for exactly its call, so calls at once each get their own), on
+   * awaits the provider, then runs the entry's call on what it returned, on
    * the stated kind (none stated: refused `system_type_required` before
    * anything is sent; `SAP_SYSTEM_TYPE` is not read), and with the
    * `systemContextResolver` / `systemContextRules` when given, as

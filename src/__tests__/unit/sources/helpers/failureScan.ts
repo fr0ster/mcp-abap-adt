@@ -69,7 +69,7 @@ export function tsFiles(dir: string, out: string[] = []): string[] {
 }
 
 /** `@mcp-abap-adt/<pkg>[/sub]` → its source, from each package's `exports` (types → src). */
-function sourcePaths(): Record<string, string[]> {
+export function sourcePaths(): Record<string, string[]> {
   const paths: Record<string, string[]> = {};
   for (const dir of ['.', 'server-runtime', 'server', 'http', 'sse']) {
     const pkg = JSON.parse(

@@ -29,6 +29,8 @@ import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,
 } from '../../../lib/toolSet';
+import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
+import { toolAnswer } from '../../helpers/toolAnswer';
 
 type Mode = 'pending' | 'document' | 'not-found';
 const MODES: Mode[] = ['pending', 'document', 'not-found'];
@@ -160,11 +162,11 @@ function install(
     debugger: () => instance,
     logger: { debug() {}, info() {}, warn() {}, error() {} },
   } as never;
-  const call = (name: string, args: Record<string, unknown>) =>
-    (
-      compactDebugEntries().find((e) => e.toolDefinition.name === name)!
-        .handler as unknown as (c: unknown, a: unknown) => Promise<Answer>
-    )(context, structuredClone(args));
+  const call = (name: string, args: Record<string, unknown>): Promise<Answer> =>
+    compactDebugEntries()
+      .find((e) => e.toolDefinition.name === name)!
+      .call(context, structuredClone(args))
+      .then(toolAnswer);
   return { wire, state, instance, call };
 }
 
@@ -551,8 +553,7 @@ describe('the compact debugger is four tools', () => {
     for (const e of entries) {
       // end sends logoffs, no ADT request: its own tests below.
       const ops = (
-        (e.toolDefinition.inputSchema as any).properties.operation
-          .enum as string[]
+        jsonAt(listedJson(e.toolDefinition.inputSchema), 'operation').enum ?? []
       ).filter((op) => op !== 'end');
       const covered = new Set(
         CASES.filter((c) => c.tool === e.toolDefinition.name).map(
@@ -568,14 +569,17 @@ describe('the compact debugger is four tools', () => {
 
   it('every parameter is described and every tool takes kind, operation and detail', () => {
     for (const e of entries) {
-      const schema = e.toolDefinition.inputSchema as any;
-      expect(schema.required).toEqual(
+      const schema = listedJson(e.toolDefinition.inputSchema);
+      expect(declaredRequired(e.toolDefinition.inputSchema)).toEqual(
         expect.arrayContaining(['kind', 'operation']),
       );
-      expect(schema.properties.detail).toBeDefined();
-      for (const [name, p] of Object.entries<any>(schema.properties))
+      expect(schema.properties?.detail).toBeDefined();
+      for (const [name, p] of Object.entries(schema.properties ?? {}))
         if (name !== 'detail')
-          expect({ name, described: !!p.description }).toEqual({
+          expect({
+            name,
+            described: typeof p === 'object' && !!p.description,
+          }).toEqual({
             name,
             described: true,
           });
@@ -625,8 +629,8 @@ describe('descriptions, positive', () => {
     for (const [name, tool] of byName) {
       const texts = [
         tool.description as string,
-        ...Object.values<any>((tool.inputSchema as any).properties).map(
-          (p) => p.description as string,
+        ...Object.values(listedJson(tool.inputSchema).properties ?? {}).map(
+          (p) => (typeof p === 'object' ? (p.description ?? '') : ''),
         ),
       ];
       for (const text of texts) {

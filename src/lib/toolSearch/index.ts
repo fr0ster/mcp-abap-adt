@@ -21,6 +21,7 @@
  * ({@link toolSearchText}); without, every word stays.
  */
 
+import { isList, entries as membersOf } from '../xml/tree';
 import '../instance.js';
 
 /** The search texts of one tool. */
@@ -63,7 +64,7 @@ function malformed(where: string): Error {
 
 /** `value` as a list of strings, or the refusal. */
 function strings(value: unknown, where: string): readonly string[] {
-  if (!Array.isArray(value)) throw malformed(where);
+  if (!isList(value)) throw malformed(where);
   return value.map((item) => {
     if (typeof item !== 'string') throw malformed(where);
     return item;
@@ -82,7 +83,7 @@ function semanticList(value: object, where: string): SemanticList {
   const join = stringAt(value, 'join', where);
   if (join !== 'and' && join !== 'or') throw malformed(`${where}.join`);
   const items: unknown = Reflect.get(value, 'items');
-  if (!Array.isArray(items)) throw malformed(`${where}.items`);
+  if (!isList(items)) throw malformed(`${where}.items`);
   return {
     before: stringAt(value, 'before', where),
     items: items.map((item: unknown, index) => {
@@ -117,7 +118,7 @@ function entryOf(name: string, value: unknown): SearchEntry {
     keywords: strings(Reflect.get(value, 'keywords'), `${name}.keywords`),
     semantic: semanticOf(Reflect.get(value, 'semantic'), `${name}.semantic`),
     members: new Map(
-      Object.entries(groups ?? {}).map(([member, words]) => [
+      membersOf(groups).map(([member, words]) => [
         member,
         strings(words, `${name}.members.${member}`),
       ]),
@@ -175,7 +176,7 @@ function searchEntries(): ReadonlyMap<string, SearchEntry> {
       throw malformed('the table');
     }
     entries = new Map(
-      Object.entries(file).map(([name, value]) => [name, entryOf(name, value)]),
+      membersOf(file).map(([name, value]) => [name, entryOf(name, value)]),
     );
   }
   return entries;

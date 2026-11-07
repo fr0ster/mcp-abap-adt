@@ -18,12 +18,13 @@ import { RuntimeRunHandlersGroup } from '../groups/RuntimeRunHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
 import type { HandlerContext, IHandlerGroup } from '../interfaces.js';
+import { noConnection } from '../noConnection.js';
 import { CompositeHandlersRegistry } from './CompositeHandlersRegistry.js';
 
 /** The context a registry is built against before any connection exists. */
 export function noConnectionContext(): HandlerContext {
   return {
-    connection: undefined as never,
+    connection: noConnection,
     logger: undefined,
   } satisfies HandlerContext;
 }
@@ -32,7 +33,7 @@ export function noConnectionContext(): HandlerContext {
  * The groups for `exposition`, built against `baseContext`: the non-readonly
  * groups first, so their tool names feed the readonly dedup (a readonly
  * copy of a tool they serve under the same name is withheld), then the readonly and system groups (with the
- * background-run tools beside the run tools), the others, search, and the
+ * background-run tools beside the run tools; a server instance with a strategy adds them beside any long read), the others, search, and the
  * leftover-session tools — in registration order.
  */
 export function expositionGroups(

@@ -11,9 +11,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type * as z from 'zod';
 import { TOOL_DEFINITION as CreateTableType } from '../../../handlers/table_type/high/handleCreateTableType';
 import { TOOL_DEFINITION as UpdateTableType } from '../../../handlers/table_type/high/handleUpdateTableType';
-import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 
 const TOOLS = [
   {
@@ -46,14 +47,14 @@ const CASES = TOOLS.flatMap(({ tool, args }) =>
 
 /** What the handler receives for a client call, and whether the SDK refused it. */
 async function call(
-  tool: { name: string; inputSchema: object },
+  tool: { name: string; inputSchema: z.ZodObject },
   args: Record<string, unknown>,
 ): Promise<{ seen: Record<string, unknown> | undefined; refused: boolean }> {
   let seen: Record<string, unknown> | undefined;
   const server = new McpServer({ name: 'probe', version: '1.0.0' });
   server.registerTool(
     tool.name,
-    { inputSchema: jsonSchemaToZod(tool.inputSchema) },
+    { inputSchema: tool.inputSchema },
     async (given: Record<string, unknown>): Promise<CallToolResult> => {
       seen = given;
       return { content: [{ type: 'text', text: 'ok' }] };
@@ -113,7 +114,7 @@ describe.each(TOOLS)('$tool.name', ({ tool, args }) => {
   });
 
   it('declares no default for a definition property', () => {
-    const { properties } = tool.inputSchema;
+    const properties = listedJson(tool.inputSchema).properties ?? {};
     expect(properties.row_type_kind).not.toHaveProperty('default');
     expect(properties.row_type_name).not.toHaveProperty('default');
     expect(properties.data_type).not.toHaveProperty('default');
@@ -125,18 +126,17 @@ describe.each(TOOLS)('$tool.name', ({ tool, args }) => {
   });
 
   it('lists exactly the measured values', () => {
-    const { properties } = tool.inputSchema;
-    expect([...properties.row_type_kind.enum].sort()).toEqual(
+    const schema = listedJson(tool.inputSchema);
+    const values = (name: string) => [...(jsonAt(schema, name).enum ?? [])];
+    expect(values('row_type_kind').sort()).toEqual(
       [...MEASURED.row_type_kind].sort(),
     );
-    expect([...properties.access_type.enum].sort()).toEqual(
+    expect(values('access_type').sort()).toEqual(
       [...MEASURED.access_type].sort(),
     );
-    expect([...properties.key_definition.enum].sort()).toEqual(
+    expect(values('key_definition').sort()).toEqual(
       [...MEASURED.key_definition].sort(),
     );
-    expect([...properties.key_kind.enum].sort()).toEqual(
-      [...MEASURED.key_kind].sort(),
-    );
+    expect(values('key_kind').sort()).toEqual([...MEASURED.key_kind].sort());
   });
 });

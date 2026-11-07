@@ -1,7 +1,7 @@
 import type { McpResult } from '../answer';
 import { detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
-import type { DebugState, DebugView, OnceStep, StopView } from './DebugSession';
+import type { DebugState, DebugView, OnceStep } from './DebugSession';
 import { terseSettings, terseStop } from './readings';
 
 const asText = (value: unknown) => ({
@@ -39,11 +39,11 @@ export async function debugAnswer<T>(
     const merged = !hasExtra
       ? projected
       : projected && typeof projected === 'object' && !Array.isArray(projected)
-        ? { ...(projected as Record<string, unknown>), ...extra }
+        ? { ...projected, ...extra }
         : { value: projected, ...extra };
     return { isError: false, content: [asText(merged)] };
   } catch (error) {
-    const failed = return_error(error) as McpResult;
+    const failed = return_error(error);
     const extra = failureExtraOf();
     return Object.keys(extra).length > 0
       ? { ...failed, content: [...failed.content, asText(extra)] }
@@ -54,8 +54,6 @@ export async function debugAnswer<T>(
 /** A step of the one-request and batch paths, terse: SAP's step result, or the end it reports. */
 export const terseOnceStep = (v: OnceStep) =>
   'ended' in v ? { state: 'ended', reason: v.ended } : v.step;
-
-type Stopped = Extract<DebugState, { state: 'stopped' }>;
 
 /** A debug state: under terse a stop is its place and the top frames; raw is SAP's documents of the stop. */
 export async function debugStateAnswer(
@@ -81,10 +79,7 @@ export async function debugStateAnswer(
     (s) => {
       if (s.state !== 'stopped') return s;
       // Everything a start added beside the stop (breakpoints placed and refused, reconciliation) stays.
-      const { stop, ...rest } = s as Stopped & { stop: StopView } & Record<
-          string,
-          unknown
-        >;
+      const { stop, ...rest } = s;
       return {
         ...rest,
         ...terseStop(stop.debuggee, stop.stack, stop.attach),

@@ -1,29 +1,24 @@
 import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { child, entries, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the properties of the ABAP transaction (t-code) named by transaction_name in one request. Answers the transaction under `object` (name, text, type, package) and its facets under `properties`, in the order the system gives them — the application component chain, the package chain, type, owner, language, creation and the others the system names — each entry with its facet, name, displayName and text.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transaction_name: {
-        type: 'string',
-        description: 'Name of the ABAP transaction',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transaction_name'],
-  },
+  inputSchema: z.object({
+    transaction_name: z.string().describe('Name of the ABAP transaction'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** The workbench uri ADT knows a transaction by. */
@@ -31,29 +26,18 @@ export function transactionUri(name: string): string {
   return `/sap/bc/adt/vit/wb/object_type/trant/object_name/${encodeURIComponent(name)}`;
 }
 
-const asArray = (value: unknown): unknown[] =>
-  Array.isArray(value) ? value : value === undefined ? [] : [value];
+const asArray = (value: unknown): readonly unknown[] =>
+  isList(value) ? value : value === undefined ? [] : [value];
 
 /** The child whose local name (the part after any prefix) is `name`. */
-const byLocalName = (node: unknown, name: string): unknown => {
-  if (node === null || typeof node !== 'object') return undefined;
-  const key = Object.keys(node).find(
-    (k) => k.slice(k.indexOf(':') + 1) === name,
-  );
-  return key === undefined ? undefined : (node as Record<string, unknown>)[key];
-};
+const byLocalName = (node: unknown, name: string): unknown =>
+  entries(node).find(([k]) => k.slice(k.indexOf(':') + 1) === name)?.[1];
 
 /** An element's attributes as SAP sent them, values as text. */
-const attributesOf = (element: unknown): Record<string, string> => {
-  const group = (element as { '@'?: unknown } | null | undefined)?.['@'];
-  if (group === null || typeof group !== 'object') return {};
-  return Object.fromEntries(
-    Object.entries(group as Record<string, unknown>).map(([k, v]) => [
-      k,
-      String(v),
-    ]),
+const attributesOf = (element: unknown): Record<string, string> =>
+  Object.fromEntries(
+    entries(child(element, '@')).map(([k, v]) => [k, String(v)]),
   );
-};
 
 /**
  * `opr:objectProperties` (measured on premise, BASIS 816, 2026-10-21):

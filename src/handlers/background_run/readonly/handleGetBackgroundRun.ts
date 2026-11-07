@@ -1,27 +1,21 @@
+import * as z from 'zod';
 import { answerBackgroundGet } from '../../../lib/backgroundRuns/answers';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'GetBackgroundRun',
   description:
-    '[read-only] [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). A read keeps the run; a finished run is kept until you discard it.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      run_handle: {
-        type: 'string',
-        description:
-          'The run_handle a run started with background=true answered.',
-      },
-    },
-    required: ['run_handle'],
-  },
+    "[read-only] [runtime] Reads one of your background runs by its run_handle: running; finished with what the run tool answered (the system answer as it is, an error included); or cancelled. A read run's finished or cancelled answer is answered once and then deleted, so a lost answer is read again by starting the read again; a code run's answer is kept until it is discarded.",
+  inputSchema: z.object({
+    run_handle: z
+      .string()
+      .describe('The run_handle a background run answered at its start.'),
+  }),
 } as const;
 
 export async function handleGetBackgroundRun(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return answerBackgroundGet(context, args.run_handle);
 }

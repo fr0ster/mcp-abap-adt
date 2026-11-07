@@ -1,3 +1,7 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
  *
@@ -8,8 +12,12 @@
  * the status for `terse` while `full`/`raw` answer the document ADT sent
  * instead of discarding it. The pre-migration handler's own `validate()`
  * call is dropped — this is a bare create, matching `CreateProgramLow`.
- * `description`, `programType` and `application` all reach the wire; no
- * source — that is `UpdateProgram`'s job, after `LockProgram`.
+ * `description` and `application` reach the wire; no source — that is
+ * `UpdateProgram`'s job, after `LockProgram`.
+ *
+ * **No program type.** SAP ignores `program:programType` on create (measured
+ * on premise: module pool, subroutine pool, `M` and `F` each gave an
+ * executable program), so the tool takes none.
  */
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
@@ -18,10 +26,10 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -29,53 +37,33 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Program description. If not provided, program_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      program_type: {
-        type: 'string',
-        description:
-          "Program type: 'executable' (Report), 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
-        enum: [
-          'executable',
-          'module_pool',
-          'function_group',
-          'class_pool',
-          'interface_pool',
-        ],
-      },
-      application: {
-        type: 'string',
-        description:
-          "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'",
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateProgram', {
+    program_name: z.string().describe('Program name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Program description. If not provided, program_name will be used.',
+      ),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    application: z
+      .string()
+      .optional()
+      .describe(
+        "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'",
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateProgramArgs {
@@ -83,7 +71,6 @@ interface CreateProgramArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  program_type?: string;
   application?: string;
   master_language?: string;
   detail?: 'terse' | 'full' | 'raw';
@@ -98,14 +85,6 @@ export async function handleCreateProgram(
   if (!args.program_name || !args.package_name) {
     return return_error(
       new Error('Missing required parameters: program_name and package_name'),
-    );
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
     );
   }
 
@@ -126,7 +105,6 @@ export async function handleCreateProgram(
               description: args.description || programName,
               packageName: args.package_name,
               transportRequest: args.transport_request,
-              programType: args.program_type,
               application: args.application,
               masterLanguage: args.master_language,
             },

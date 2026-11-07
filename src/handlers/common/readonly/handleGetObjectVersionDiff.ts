@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetObjectVersionDiff Handler - read-only unified diff between two versions.
  *
@@ -26,7 +27,10 @@ import { both } from '../../../lib/strategies/sequence';
 import { atStep, carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
-import { resolveVersionedObject } from './resolveVersionedObject';
+import {
+  type ResolvedVersionedObject,
+  resolveVersionedObject,
+} from './resolveVersionedObject';
 
 export interface VersionDiffResult {
   diff: string;
@@ -94,10 +98,10 @@ function unwrapVersionSource(
 ): string | undefined {
   if (response.ok) return response.getResult().value;
   const error = response.getError();
-  const failure = new Error(error.message) as Error & {
-    code?: string;
-  };
-  if (error.code !== undefined) failure.code = error.code;
+  const failure = Object.assign(
+    new Error(error.message),
+    error.code !== undefined ? { code: error.code } : {},
+  );
   // The method's error rides on the throw, as it is, with the step.
   throw carryingFailure(failure, error, step);
 }
@@ -109,7 +113,7 @@ function unwrapVersionSource(
  * own comment for why.
  */
 export async function buildVersionDiff(
-  obj: IAdtVersionable<any, any, string>,
+  obj: ResolvedVersionedObject,
   contentUriFrom: string,
   contentUriTo: string,
 ): Promise<VersionDiffResult> {
@@ -136,28 +140,23 @@ export const TOOL_DEFINITION = {
 
 /** GetObjectVersionDiff's input on `variant`. */
 function objectVersionDiffSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      object_type: {
-        type: 'string',
-        description:
-          'Object type (the same value the version history was read with).',
-        enum: VERSION_SOURCE_KINDS[variant],
-      },
-      content_uri_from: {
-        type: 'string',
-        description:
-          "Opaque content_uri of the OLD/base version (from the object's version history).",
-      },
-      content_uri_to: {
-        type: 'string',
-        description:
-          "Opaque content_uri of the NEW/compare version (from the object's version history).",
-      },
-    },
-    required: ['object_type', 'content_uri_from', 'content_uri_to'],
-  } as const;
+  return z.object({
+    object_type: z
+      .enum(VERSION_SOURCE_KINDS[variant])
+      .describe(
+        'Object type (the same value the version history was read with).',
+      ),
+    content_uri_from: z
+      .string()
+      .describe(
+        "Opaque content_uri of the OLD/base version (from the object's version history).",
+      ),
+    content_uri_to: z
+      .string()
+      .describe(
+        "Opaque content_uri of the NEW/compare version (from the object's version history).",
+      ),
+  });
 }
 
 interface GetObjectVersionDiffArgs {
@@ -213,12 +212,12 @@ export async function handleGetObjectVersionDiff(
       () =>
         both(
           atStep('read version source (from)', () =>
-            resolved.obj.getVersionSource(content_uri_from, {
+            resolved.getVersionSource(content_uri_from, {
               analyse: analyseException,
             }),
           ),
           atStep('read version source (to)', () =>
-            resolved.obj.getVersionSource(content_uri_to, {
+            resolved.getVersionSource(content_uri_to, {
               analyse: analyseException,
             }),
           ),
@@ -241,7 +240,7 @@ export async function handleGetObjectVersionDiff(
         };
       },
     );
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

@@ -80,12 +80,26 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: unknown;
+
+/**
+ * A function module's metadata read, naming the group the call gives (#2):
+ * for the arguments of a function module only.
+ */
+function moduleGroupRead(
+  args: Record<string, unknown>,
+): Record<string, ReturnType<typeof readsModuleIn>> {
+  const group = args.function_group_name;
+  return typeof group === 'string' && 'function_module_name' in args
+    ? { readMetadata: readsModuleIn(group) }
+    : {};
+}
 jest.mock('../../lib/clients', () => ({
   createAdtClient: () => fakeClient,
   createOnPremAdtClient: () => fakeClient,
@@ -195,6 +209,7 @@ describe('the nineteen deletion-service deletes: analyseDeletion, and terseDelet
       const seen: unknown[] = [];
       const lock = jest.fn();
       fakeClient = fakeClientOf({
+        ...moduleGroupRead(args),
         delete: async (_c: unknown, o: any) => {
           seen.push(o.analyse);
           return okResponse(reading(parseStructure(document), document, 200));
@@ -332,6 +347,7 @@ describe('the thirteen checks: analyseException, and terseCheck fields', () => {
       const document = corpusBody('check-success-verdict--01-checkrun');
       const seen: unknown[] = [];
       fakeClient = fakeClientOf({
+        ...moduleGroupRead(args),
         check: async (_c: unknown, _status: unknown, o: any) => {
           seen.push(o.analyse);
           return okResponse(reading(parseStructure(document), document, 200));

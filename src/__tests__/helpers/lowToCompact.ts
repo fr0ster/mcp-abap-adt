@@ -11,6 +11,7 @@
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody } from '../../lib/adtCorpus';
+import { moduleMetadataDocument } from './functionModuleMetadata';
 import {
   type RecordedRequest,
   type RecordingConnection,
@@ -25,8 +26,8 @@ export interface LowToCompactRow {
   compact: Array<{ tool: string; args: Record<string, unknown> }>;
   /**
    * A difference the owner accepted. `since` names the release that accepted
-   * it after MIGRATION-19.0 was released: that note is history, so such a
-   * difference is not rendered into it.
+   * it after MIGRATION-19.0 was released (that note is history and keeps its
+   * table as released); the current mapping, in MIGRATION-24.0, shows it.
    */
   accepted?: { kind: string; reason: string; since?: string };
   note?: string;
@@ -53,6 +54,9 @@ const METADATA_DOCUMENTS: Array<[string, string]> = [
   ],
 ];
 
+/** The address of the rows' function module (`FUGR_A|FM_A`). */
+const MODULE_ADDRESS = '/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a';
+
 /** The stand-in: a recording connection with the answers above. */
 export function parityConnection(): RecordingConnection {
   const inner = recordingConnection();
@@ -63,6 +67,14 @@ export function parityConnection(): RecordingConnection {
       const answered = await inner.makeAdtRequest(options);
       if (options.method === 'GET') {
         const url = String(options.url).toLowerCase();
+        // The rows' function module, FM_A in FUGR_A: its metadata names that
+        // group, so a call that checks it goes on (#2).
+        if (url.startsWith(`${MODULE_ADDRESS}?`)) {
+          return {
+            ...answered,
+            data: moduleMetadataDocument('FM_A', 'FUGR_A'),
+          } as IAdtWireResponse<never, never>;
+        }
         const hit = METADATA_DOCUMENTS.find(([prefix]) =>
           url.startsWith(prefix),
         );
@@ -100,7 +112,7 @@ export const silentLogger = {
   debug: () => {},
 };
 
-/** The markers around the table in docs/MIGRATION-19.0.md. */
+/** The markers around the table in docs/MIGRATION-24.0.md. */
 export const TABLE_START =
   '<!-- low-to-compact table: rendered from tools/low-to-compact.json -->';
 export const TABLE_END = '<!-- end of the low-to-compact table -->';
@@ -117,7 +129,7 @@ function callCell(call: {
   return `\`${call.tool}\` (${words.join(', ')})`;
 }
 
-/** The mapping table of docs/MIGRATION-19.0.md, rendered from the rows. */
+/** The mapping table of docs/MIGRATION-24.0.md, rendered from the rows. */
 export function renderLowToCompactTable(rows: LowToCompactRow[]): string {
   const lines = [
     '| Low tool | Compact call | Difference / note |',
@@ -127,9 +139,7 @@ export function renderLowToCompactTable(rows: LowToCompactRow[]): string {
   for (const row of ordered) {
     const calls = row.compact.map(callCell).join(', then ');
     const notes = [
-      row.accepted && row.accepted.since === undefined
-        ? `**accepted:** ${row.accepted.reason}`
-        : '',
+      row.accepted ? `**accepted:** ${row.accepted.reason}` : '',
       row.note ?? '',
     ]
       .filter((n) => n !== '')

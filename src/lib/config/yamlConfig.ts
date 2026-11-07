@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
+import { childAt, isElement } from '../xml/tree';
 import {
   CONF_ROW,
   ParameterRefusal,
@@ -83,23 +84,23 @@ export function loadYamlConfig(
     parsed = parseYaml(text);
   } catch (error) {
     // js-yaml's message quotes the file; only the position is passed on.
-    const mark = (error as { mark?: { line?: unknown; column?: unknown } })
-      ?.mark;
+    const line = childAt(error, 'mark', 'line');
+    const column = childAt(error, 'mark', 'column');
     const at =
-      typeof mark?.line === 'number' && typeof mark?.column === 'number'
-        ? ` (line ${mark.line + 1}, column ${mark.column + 1})`
+      typeof line === 'number' && typeof column === 'number'
+        ? ` (line ${line + 1}, column ${column + 1})`
         : '';
     throw new ParameterRefusal(
       `The config file ${configPath} is not valid YAML${at}`,
     );
   }
   if (parsed === undefined || parsed === null) return {};
-  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!isElement(parsed)) {
     throw new ParameterRefusal(
       `The config file ${configPath} must be a mapping of parameter keys`,
     );
   }
-  const config = parsed as YamlConfig;
+  const config: YamlConfig = parsed;
   const { errors } = validateYamlConfig(table, config);
   if (errors.length > 0) {
     throw new ParameterRefusal(

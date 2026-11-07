@@ -2,10 +2,11 @@ import {
   compactGetDataSchema,
   withLongToolAdvice,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetSqlQuery,
   handleGetTableContents,
+  READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 
@@ -17,6 +18,16 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: compactGetDataSchema,
 } as const;
+
+/** The two reads' entries: each one's schema parses its call. */
+const sqlQuery = defineTool(
+  READ_DEFINITIONS.GetSqlQuery,
+  handleGetSqlQuery,
+).call;
+const tableContents = defineTool(
+  READ_DEFINITIONS.GetTableContents,
+  handleGetTableContents,
+).call;
 
 type HandlerGetDataArgs = {
   object_name?: string;
@@ -30,16 +41,16 @@ export async function handleHandlerGetData(
 ) {
   const maxRows = args?.max_rows ?? 100;
   if (args?.sql_query) {
-    return handleGetSqlQuery(context, {
+    return sqlQuery(context, {
       sql_query: args.sql_query,
       row_number: maxRows,
-    } as never);
+    });
   }
   if (args?.object_name) {
-    return handleGetTableContents(context, {
+    return tableContents(context, {
       table_name: args.object_name,
       max_rows: maxRows,
-    } as never);
+    });
   }
   return return_error(new Error('object_name or sql_query is required'));
 }

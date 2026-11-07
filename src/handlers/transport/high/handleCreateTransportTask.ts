@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransportTask — a task of your own under a shared request.
  *
@@ -40,11 +43,13 @@ import {
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
+import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
+import { child, childAt } from '../../../lib/xml/tree';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 const TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -55,30 +60,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Creates a task under the existing transport request named by transport_number, owned by the user named by target_user, of the type task_type. The task is itself a request resource — it reads, writes and releases like one — and is what adding and removing an object entry address, since a request's objects live on its tasks. `target_user` is required: it names the task's owner, and an empty owner is refused with SCTS_ADT_MSG 009. The task is typed Development/Correction (S) by default, because an Unclassified task refuses an added object on premise with SCTS_ADT_MSG 009 / TK127.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description:
-          'The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.',
-      },
-      target_user: {
-        type: 'string',
-        description:
-          'The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
-      },
-      task_type: {
-        type: 'string',
-        enum: TASK_TYPES,
-        default: 'S',
-        description:
-          'S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number', 'target_user'],
-  },
+  inputSchema: createArguments('CreateTransportTask', {
+    transport_number: z
+      .string()
+      .describe(
+        'The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.',
+      ),
+    target_user: z
+      .string()
+      .describe(
+        'The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
+      ),
+    task_type: z
+      .enum(TASK_TYPES)
+      .default('S')
+      .optional()
+      .describe(
+        'S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CreateTransportTaskArgs {
@@ -94,11 +95,8 @@ interface CreateTransportTaskArgs {
  * the shape `parseCreatedTransport` learned in adt-clients 20.0.0.
  */
 const taskNumberOf = (value: unknown): string => {
-  const root =
-    (value as Record<string, any>)?.['tm:root'] ??
-    (value as Record<string, any>);
-  const attributes = (root as Record<string, any>)?.['@'] ?? {};
-  return String(attributes['tm:number'] ?? '');
+  const root = child(value, 'tm:root') ?? value;
+  return String(childAt(root, '@', 'tm:number') ?? '');
 };
 
 export async function handleCreateTransportTask(
@@ -112,7 +110,8 @@ export async function handleCreateTransportTask(
   }
 
   const taskType = args.task_type ?? 'S';
-  if (!(TASK_TYPES as readonly string[]).includes(taskType)) {
+  const known: readonly string[] = TASK_TYPES;
+  if (!known.includes(taskType)) {
     return return_error(
       new Error(
         `task_type must be one of ${TASK_TYPES.join(', ')} — got ${taskType}`,
@@ -168,10 +167,7 @@ export async function handleCreateTransportTask(
       )();
       // A reading, as `project` receives it: the parsed document is its value.
       const number = created.ok
-        ? taskNumberOf(
-            (created.getResult().value as { value?: unknown } | undefined)
-              ?.value,
-          )
+        ? taskNumberOf(child(created.getResult().value, 'value'))
         : '';
       if (number && taskType !== 'X') {
         const changed = await withAdtHeaders(
@@ -205,25 +201,18 @@ export async function handleCreateTransportTask(
           // A credential failure (a `401`) is the call's failure, as it came
           // with its step — not a cleanup note beside a creation.
           if (isCredentialPayload(failureEntry(failure, 'change task type'))) {
-            const stepped = withStep(failure, 'change task type');
-            return {
-              ok: false,
-              getResult: () => {
-                throw new Error('asked for the result of a failure');
-              },
-              getError: () => stepped,
-            } as unknown as typeof created;
+            return failed(
+              withStep(failure, 'change task type'),
+              'CreateTransportTask',
+            );
           }
-          const result = created.ok ? created.getResult() : undefined;
-          return {
-            ok: created.ok,
-            getResult: () => result,
-            getError: () => failure,
-            cleanup: {
+          // A task number was read, so the creation answered a success.
+          if (created.ok) {
+            return succeeded(created.getResult().value, 'CreateTransportTask', {
               message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127)`,
               failures: [failureEntry(failure, 'change task type')],
-            },
-          } as unknown as typeof created;
+            });
+          }
         }
       }
       return created;

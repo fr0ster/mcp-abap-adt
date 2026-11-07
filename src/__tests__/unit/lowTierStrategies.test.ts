@@ -36,6 +36,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
@@ -65,9 +66,15 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
-import { handleActivateProgram } from '../../handlers/program/low/handleActivateProgram';
+import {
+  TOOL_DEFINITION as ActivateProgramLowTool,
+  handleActivateProgram,
+} from '../../handlers/program/low/handleActivateProgram';
 import { handleCheckProgram } from '../../handlers/program/low/handleCheckProgram';
-import { handleUpdateProgram } from '../../handlers/program/low/handleUpdateProgram';
+import {
+  handleUpdateProgram,
+  TOOL_DEFINITION as UpdateProgramLowTool,
+} from '../../handlers/program/low/handleUpdateProgram';
 import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
 import { handleActivateServiceDefinition } from '../../handlers/service_definition/low/handleActivateServiceDefinition';
 import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
@@ -80,6 +87,7 @@ import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { corpusBody } from '../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { listedTool } from '../../lib/listedTool';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
@@ -92,9 +100,14 @@ import {
   fakeClientOf,
   fakeClientOfWithFactory,
   okResponse,
+  reading as readingOf,
   recordAnalyse,
   refusedResponse,
 } from '../helpers/fakeClient';
+import {
+  moduleMetadataDocument,
+  readsModuleIn,
+} from '../helpers/functionModuleMetadata';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -104,7 +117,13 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.calls` needs this wiring; tests that need a real document
 // swap `fakeClient` to `fakeClientOf(...)` for their own call and restore it.
-const seen = recordAnalyse();
+const seen = recordAnalyse({
+  // A function module's metadata names the group the calls give (#2).
+  'getFunctionModule.readMetadata': () => {
+    const document = moduleMetadataDocument('ZFM_X', 'ZFG_X');
+    return readingOf(document, document);
+  },
+});
 let fakeClient: unknown = seen.client;
 jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
@@ -591,7 +610,7 @@ describe('structure', () => {
 });
 
 describe('table', () => {
-  it("CheckTableLow defaults the check member's status to 'active' when version is omitted, and forwards no source — runTableCheckRun's source argument is hardcoded undefined", async () => {
+  it("CheckTableLow defaults the check member's status to 'active' when version is omitted, and forwards ddl_code as the source checked", async () => {
     await handleCheckTable(context as any, {
       table_name: 'ZT_X',
       ddl_code: 'define table zt_x { client : abap.clnt; }',
@@ -600,9 +619,12 @@ describe('table', () => {
     expect(call?.factory).toBe('getTable');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
-    // ddl_code is accepted by the tool but never reaches config — unlike
-    // structure's sibling handler, table's check has nothing to forward it to.
-    expect(call?.args[0]).toEqual({ tableName: 'ZT_X' });
+    // adt-clients 43 sends `config.source` with the check run (#9), as the
+    // structure check does: ddl_code reaches it.
+    expect(call?.args[0]).toEqual({
+      tableName: 'ZT_X',
+      source: 'define table zt_x { client : abap.clnt; }',
+    });
     expect(call?.args[1]).toBe('active');
   });
 
@@ -701,20 +723,21 @@ describe('program', () => {
     });
   });
 
-  // `ProgramLow` tools declare `available_in: ['onprem', 'legacy']` —
-  // cloud excluded. That field is a registration-time hint only:
-  // `BaseHandlerGroup.registerHandlers` (the path `LowLevelHandlersGroup`
-  // uses) forwards just the name, description and schema to
-  // `server.registerTool`, never `available_in` — so on that path every
-  // one of these tools stays registered and callable on a cloud system
-  // regardless of what it declares. The runtime refusal below is the only
-  // thing standing between a cloud caller and a real ADT request; drop it
-  // and nothing in the tool surface itself notices. Driven through
-  // `sessionContext` — the same store `isCloudConnection()` reads first —
-  // rather than stubbing the handler's own guard call, so that removing
-  // the guard makes the cloud row fail for the right reason.
-  describe('the cloud guard — declared in available_in, enforced here', () => {
-    const cloudStore = { sapConfig: { authType: 'jwt' } } as any;
+  // The credential is not the system kind (the owner's rule): what a
+  // variant offers is decided where it is listed — `listedTool`, which both
+  // registration paths apply (`BaseHandlerGroup.registerOneTool`,
+  // `CompositeHandlersRegistry`) — on the declared kind: the variant's ADT
+  // type table and the tool's `available_in`. Nothing in a handler reads the
+  // credential to refuse. Driven with a JWT credential in `sessionContext`
+  // (the store the removed `isCloudConnection()` read first).
+  describe('the declared kind, not the credential, decides what is offered', () => {
+    const jwtStore: { sapConfig: SapConfig } = {
+      sapConfig: {
+        url: 'https://example.com',
+        authType: 'jwt',
+        jwtToken: 'pin-token',
+      },
+    };
 
     const rows: Array<
       [string, (...args: any[]) => unknown, string, Record<string, unknown>]
@@ -734,37 +757,31 @@ describe('program', () => {
     ];
 
     it.each(rows)(
-      '%s refuses on a cloud connection and never reaches the client',
+      '%s with a JWT credential reaches its member',
       async (_name, handler, member, args) => {
-        const result: any = await sessionContext.run(cloudStore, () =>
-          handler(context as any, args),
-        );
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain(
-          'Programs are not available on cloud systems',
-        );
-        // The half that matters: a handler that explains and calls anyway
-        // is the same bug wearing a message.
-        expect(callTo(member)).toBeUndefined();
-      },
-    );
-
-    it.each(rows)(
-      '%s proceeds on a non-cloud connection and reaches its member',
-      async (_name, handler, member, args) => {
-        await handler(context as any, args);
+        await sessionContext.run(jwtStore, () => handler(context, args));
         expect(callTo(member)).toBeDefined();
       },
     );
 
+    it('the program writes are listed where onprem is declared, not where cloud is', () => {
+      for (const definition of [ActivateProgramLowTool, UpdateProgramLowTool]) {
+        expect({
+          tool: definition.name,
+          onprem: listedTool(definition, 'onprem').listed,
+          cloud: listedTool(definition, 'cloud').listed,
+        }).toEqual({ tool: definition.name, onprem: true, cloud: false });
+      }
+    });
+
     // A program's check is served on cloud (`ADT_TYPES_CLOUD` lists it), and
-    // `CheckProgram` delegates here: no refusal stands in its way.
-    it('CheckProgramLow reaches its member on a cloud connection', async () => {
+    // `CheckProgram` delegates here.
+    it('CheckProgramLow reaches its member with a JWT credential', async () => {
       const typedContext: HandlerContext = {
         connection: recordingConnection(),
         logger: undefined,
       };
-      await sessionContext.run(cloudStore, () =>
+      await sessionContext.run(jwtStore, () =>
         handleCheckProgram(typedContext, { program_name: 'Z_X' }),
       );
       expect(callTo('check')).toBeDefined();
@@ -859,7 +876,10 @@ describe('function (function module)', () => {
       data: corpusBody('activation-success-verdict--01-activation'),
       status: 200,
     } as any);
-    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+    fakeClient = fakeClientOf({
+      readMetadata: readsModuleIn('ZFG_X', 'ZFM_X'),
+      activate: async () => okResponse(reading),
+    });
 
     const result: any = await handleActivateFunctionModule(context as any, {
       function_module_name: 'ZFM_X',
@@ -1023,6 +1043,30 @@ describe('data_element', () => {
 
     expect(patched).toContain('<dtel:typeKind>domain</dtel:typeKind>');
     expect(patched).toContain('<dtel:typeName>ZD_DOMAIN</dtel:typeName>');
+  });
+
+  // The bag is the model's own object: a type name given as a number failed
+  // the call (`toUpperCase` of a number); it is written out as text.
+  it('UpdateDataElementLow writes a type name given as a number', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="x"><dtel:typeKind>predefinedAbapType</dtel:typeKind><dtel:typeName></dtel:typeName><dtel:dataType>CHAR</dtel:dataType></blue:wbobj>';
+    let patched = '';
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (_config: unknown, options: { source: string }) => {
+        patched = options.source;
+        return okResponse(undefined);
+      },
+    });
+
+    const result = await handleUpdateDataElement(context, {
+      data_element_name: 'zdt_x',
+      properties: { type_name: 5 },
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(patched).toContain('<dtel:typeName>5</dtel:typeName>');
   });
 });
 

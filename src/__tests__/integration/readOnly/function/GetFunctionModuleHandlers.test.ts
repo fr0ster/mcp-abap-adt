@@ -10,10 +10,10 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleGetFunctionModule } from '../../../../handlers/function_module/high/handleGetFunctionModule';
 import {
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   resolveSharedDependency,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -23,6 +23,7 @@ import {
 import {
   callTool,
   createHardModeClient,
+  type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
 import {
@@ -36,16 +37,12 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-  let mcp: {
-    client: any;
-    toolNames: Set<string>;
-    close: () => Promise<void>;
-  } | null = null;
+  let mcp: HardModeClient | null = null;
 
   beforeAll(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -92,7 +89,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
 
       if (!isTestAvailableForSystem(sharedFM.available_in)) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()}`,
+          `⏭️  Skipping test: not available on ${statedKindWords()}`,
         );
         return;
       }
@@ -116,7 +113,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
           throw new Error('Hard mode MCP client is not initialized');
         }
         try {
-          return await callTool(mcp.client, mcp.toolNames, [toolName], args);
+          return await callTool(mcp, [toolName], args);
         } catch (error: any) {
           return {
             isError: true,

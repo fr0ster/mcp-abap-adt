@@ -14,9 +14,9 @@
  * | Set | Binaries | Tools |
  * |---|---|---|
  * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
- * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
+ * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), background runs of the long reads, batch mode; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
  * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`, `HandlerDebugBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
- * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, `HandlerBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
+ * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, background runs of the long reads, `HandlerBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
  *
  * **The leftover-session tools are stdio's**: the
  * runtime session files exist for stdio, where the process serves one user.
@@ -30,7 +30,9 @@
  * between calls, and none of their binaries lists a session tool. Every kind
  * serves it, the `-ro` ones included: it changes nothing in the system.
  *
- * No `-ro` set serves the debugger or a background run. No set serves a
+ * No `-ro` set serves the debugger or a run of code; each serves the
+ * background runs of its long reads (the owner, D24: every long tool only
+ * reads), so its runs are reads alone. No set serves a
  * resume of a leftover session: a stdio process is born on the one leftover
  * of its destination at its start. There is
  * no `--exposition`: each set refuses it (and its YAML key) as a removed
@@ -61,6 +63,7 @@ import {
   type ServedTransport,
   type ToolSetKind,
 } from './config/binaries';
+import { BackgroundRunHandlersGroup } from './handlers/groups/BackgroundRunHandlersGroup.js';
 import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
 import {
@@ -181,9 +184,7 @@ export function streamableHttpSurface(toolSet: ToolSet): StreamableHttpSurface {
       .filter((entry) => !stdio.has(entry.toolDefinition.name))
       .map((entry) => ({
         ...entry.toolDefinition,
-        inputSchema: withStateHandle(
-          entry.toolDefinition.inputSchema,
-        ) as HandlerEntry['toolDefinition']['inputSchema'],
+        inputSchema: withStateHandle(entry.toolDefinition.inputSchema),
       })),
     stdioOnly: [...stdio].filter((name) => !httpNames.has(name)),
     stateHandleWords: STATE_HANDLE_ARGUMENT_WORDS,
@@ -278,7 +279,7 @@ export const fullToolSet: ToolSet = {
           transport,
           'the leftover SAP sessions of an ended process: list, log off',
         ),
-        'background runs of RuntimeRunClass and RuntimeRunProgram: read, list, discard',
+        'background runs of the long reads, RuntimeRunClass and RuntimeRunProgram: read, list, cancel or discard',
         BATCH_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
@@ -313,13 +314,14 @@ export const fullToolSet: ToolSet = {
 /**
  * The read-only object-oriented tool set of `mcp-abap-adt-ro`,
  * `mcp-abap-adt-http-ro` and `mcp-abap-adt-sse-ro`: readonly (with system and
- * search); on stdio the leftover-session list. Nothing in it changes the
- * system (the owner's decision): no high, no debugger, no run of a class or
- * a program, no trace schedule, no leftover-session logoff, no background run.
+ * search) and the background runs of its long reads; on stdio the
+ * leftover-session list. Nothing in it changes the system (the owner's
+ * decision): no high, no debugger, no run of a class or a program, no trace
+ * schedule, no leftover-session logoff.
  */
 export const fullReadOnlyToolSet: ToolSet = {
   kind: 'core-ro',
-  backgroundRuns: false,
+  backgroundRuns: true,
   toolsHelp: (transport) =>
     toolsSection(
       transport,
@@ -330,12 +332,13 @@ export const fullReadOnlyToolSet: ToolSet = {
           transport,
           'the leftover SAP sessions of an ended process: list',
         ),
+        'background runs of the long reads: read, list, cancel',
         BATCH_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
         [
-          'The tools that change the system (write, run, debugger, a session logoff) and background runs',
+          'The tools that change the system (write, run, debugger, a session logoff)',
           'core',
         ],
         ['The compact tools that change nothing', 'compact-ro'],
@@ -346,6 +349,8 @@ export const fullReadOnlyToolSet: ToolSet = {
     new ReadOnlyHandlersGroup(context),
     new SystemHandlersGroup(context),
     new SearchHandlersGroup(context),
+    // The background runs of the long reads: read, listed and cancelled.
+    new BackgroundRunHandlersGroup(context),
     ...(servesLeftoverSessions(transport)
       ? [new LeftoverSessionListHandlersGroup(context)]
       : []),
@@ -394,7 +399,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
             transport,
             'the leftover SAP sessions of an ended process: list, log off',
           ),
-          'background runs of HandlerProfileRun: read, list, discard',
+          'background runs of the long reads and HandlerProfileRun: read, list, cancel or discard',
           COMPACT_BATCH_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
@@ -426,15 +431,15 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
  * The read-only compact tool set of `mcp-abap-adt-compact-ro`,
  * `-compact-http-ro` and `-compact-sse-ro`: the half that changes nothing
  * (`compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly-entries`); on
- * stdio the leftover-session list. No modify half, no debugger, no
- * leftover-session logoff, no background run.
+ * stdio the leftover-session list; the background runs of its long reads.
+ * No modify half, no debugger, no leftover-session logoff, no run of code.
  */
 export function compactReadOnlyToolSetOf(
   readOnly: CompactEntryBuilder,
 ): ToolSet {
   return {
     kind: 'compact-ro',
-    backgroundRuns: false,
+    backgroundRuns: true,
     toolsHelp: (transport) =>
       toolsSection(
         transport,
@@ -445,17 +450,20 @@ export function compactReadOnlyToolSetOf(
             transport,
             'the leftover SAP sessions of an ended process: list',
           ),
+          'background runs of the long reads: read, list, cancel',
           COMPACT_BATCH_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [
-          ['All compact tools, the debugger and background runs', 'compact'],
+          ['All compact tools, the debugger and the profiler run', 'compact'],
           ['The object-oriented readonly tools', 'core-ro'],
         ],
       ),
     expositionRemoved: (transport) => expositionRemoved('compact', transport),
     groups: (context, transport) => [
       new CompactHandlersGroup(context, [readOnly], 'CompactReadOnlyHandlers'),
+      // The background runs of the long reads: read, listed and cancelled.
+      new CompactBackgroundRunHandlersGroup(context),
       ...(servesLeftoverSessions(transport)
         ? [new CompactLeftoverSessionListHandlersGroup(context)]
         : []),

@@ -9,11 +9,11 @@ HTTP and SSE, each `-ro` binary a package of its own:
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
 | core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff |
-| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), batch mode; on stdio the leftover-session list. Nothing that changes the system: no run, trace schedule or logoff |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the background runs of the long reads, batch mode; on stdio the leftover-session list. Nothing that changes the system: no run, trace schedule or logoff |
 | compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger and its batch (`HandlerDebugBatch`), background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
-| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, `HandlerBatch`; on stdio the leftover-session list |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, the background runs of the long reads, `HandlerBatch`; on stdio the leftover-session list |
 
-No `-ro` binary carries a debugger or a background run, no binary a resume of a leftover session
+No `-ro` binary carries a debugger or a run of code (each serves the background runs of its long reads, which only read), no binary a resume of a leftover session
 (a stdio server takes up the one leftover session of its destination at its start), and no http or
 sse binary any leftover-session tool: one such server holds the sessions of many users,
 so it writes no runtime session file. A
@@ -29,10 +29,10 @@ run outside batch mode — see
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
 on premise, stdio / Streamable HTTP / SSE: core 269 / 269 / 267 (with the 3 batch tools and the
-debugger batch's 2); core-ro 71 / 72 / 70 (each with the 3 batch tools); compact 40 / 39 / 38 (29 +
-4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 19 / 19 / 18
-(17 + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
-premise only), core-ro 70, compact 40, compact-ro 19. stdio adds the leftover-session tools — list and logoff in the full sets, the
+debugger batch's 2); core-ro 74 / 75 / 73 (each with the 3 batch tools and the 3 background-run tools); compact 40 / 39 / 38 (29 +
+4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 22 / 22 / 21
+(17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
+premise only), core-ro 73, compact 40, compact-ro 22. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`
 in the compact ones — and declares an optional `state_handle` argument on every tool
@@ -361,23 +361,30 @@ To add handlers to a specific set:
    - `src/handlers/<domain>/readonly/` for read operations
    - `src/handlers/<domain>/high/` for safe writes
 
-2. Export `TOOL_DEFINITION`:
+2. Export `TOOL_DEFINITION`, its `inputSchema` a zod object (the arguments' type and their check):
    ```typescript
+   import * as z from 'zod';
+
    export const TOOL_DEFINITION = {
-     name: 'my_handler',
+     name: 'MyOperation',
      description: 'Handler description',
-     inputSchema: { /* zod schema */ }
+     inputSchema: z.object({
+       object_name: z.string().describe('The object to read.'),
+     }),
    } as const;
    ```
 
-3. Export handler function:
+3. Export handler function, taking the call's context and the schema's output:
    ```typescript
-   export async function handleMyOperation(args: any, context: HandlerContext) {
+   export async function handleMyOperation(
+     context: HandlerContext,
+     args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+   ) {
      // implementation
    }
    ```
 
-4. Register in appropriate group:
+4. Add its entry, `defineTool(TOOL_DEFINITION, handleMyOperation)`, to the appropriate group:
    - `src/lib/handlers/groups/ReadOnlyHandlersGroup.ts`
    - `src/lib/handlers/groups/HighLevelHandlersGroup.ts`
 

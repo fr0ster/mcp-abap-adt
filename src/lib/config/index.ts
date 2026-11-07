@@ -7,7 +7,10 @@
 import '../instance.js';
 
 export { type LibInstance, libInstances } from '../instance.js';
-
+export {
+  type PackageManifest,
+  packageManifestOf,
+} from '../packageManifest.js';
 export {
   BATCH_KEEP_RAW_PARTS_CLI,
   BATCH_KEEP_RAW_PARTS_ENV,
@@ -65,6 +68,13 @@ export {
   type MessageServerField,
   rfcAddressRefusalOf,
 } from './messageServer.js';
+export {
+  flagValue,
+  listValue,
+  numberValue,
+  textValue,
+  wordValue,
+} from './parameterValues.js';
 export {
   answerVersionOrHelp,
   type LauncherEdges,

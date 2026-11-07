@@ -38,8 +38,11 @@ export interface Repository {
   nodes: Record<string, NodeDoc>;
   /** Sources, keyed `PROGRAM <name>`, `CLASS <name>`, `INCLUDE <name>`, `FM <name>`. */
   sources: Record<string, string>;
-  /** A function group's children: `[objecttype, objectname]`. */
-  fugrChildren: Record<string, Array<[string, string]>>;
+  /** A function group's children: `[objecttype, objectname, objecturi?]`. */
+  fugrChildren: Record<
+    string,
+    Array<[string, string] | [string, string, string]>
+  >;
   /** The packages each quickSearch mask finds. */
   masks: Record<string, string[]>;
 }
@@ -70,8 +73,8 @@ const structureXml = (repo: Repository, name: string) =>
     repo.fugrChildren[name] ?? []
   )
     .map(
-      ([type, child]) =>
-        `<projectexplorer:node objecttype="${type}" objectname="${child}"/>`,
+      ([type, child, uri]) =>
+        `<projectexplorer:node objecttype="${type}" objectname="${child}"${uri === undefined ? '' : ` objecturi="${uri}"`}/>`,
     )
     .join('')}</projectexplorer:objectstructure>`;
 
@@ -91,8 +94,8 @@ const segmentAfter = (path: string, marker: string): string => {
   return decodeURIComponent(end < 0 ? rest : rest.slice(0, end)).toUpperCase();
 };
 
-/** The key of any request the scan makes. */
-export function keyOf(url: string, params?: unknown): string {
+/** A request's query parameters: its URL's, then `params`. */
+function searchParamsOf(url: string, params?: unknown): URLSearchParams {
   const parsed = new URL(url, 'https://system.invalid');
   const query = new URLSearchParams(parsed.search);
   for (const [k, v] of Object.entries(
@@ -100,7 +103,34 @@ export function keyOf(url: string, params?: unknown): string {
   )) {
     query.set(k, String(v));
   }
-  const path = parsed.pathname;
+  return query;
+}
+
+/** Every quick search a fake received, as `[query, maxResults]`, in order (envelopes first). */
+export function searchesOf(fake: {
+  envelopes: SeenEnvelope[];
+  directs: IAbapRequestOptions[];
+}): Array<[string, number]> {
+  const urls: Array<{ url: string; params?: unknown }> = [
+    ...fake.envelopes.flatMap((e) => e.parts.map((p) => ({ url: p.url }))),
+    ...fake.directs.map((r) => ({ url: r.url, params: r.params })),
+  ];
+  return urls
+    .filter(({ url }) =>
+      new URL(url, 'https://system.invalid').pathname.endsWith(
+        '/informationsystem/search',
+      ),
+    )
+    .map(({ url, params }) => {
+      const query = searchParamsOf(url, params);
+      return [query.get('query') ?? '', Number(query.get('maxResults'))];
+    });
+}
+
+/** The key of any request the scan makes. */
+export function keyOf(url: string, params?: unknown): string {
+  const query = searchParamsOf(url, params);
+  const path = new URL(url, 'https://system.invalid').pathname;
   if (path.endsWith('/repository/nodestructure')) {
     return nodeKey(query.get('parent_name') ?? '', query.get('node_id'));
   }
@@ -112,6 +142,27 @@ export function keyOf(url: string, params?: unknown): string {
   }
   if (path.includes('/fmodules/')) {
     return `FM ${segmentAfter(path, '/fmodules/')}`;
+  }
+  if (path.includes('/functions/groups/') && path.includes('/includes/')) {
+    return `FINCLUDE ${segmentAfter(path, '/functions/groups/')}/${segmentAfter(path, '/includes/')}`;
+  }
+  if (path.includes('/oo/classes/') && path.includes('/includes/')) {
+    return `CLASSINCLUDE ${segmentAfter(path, '/oo/classes/')}/${segmentAfter(path, '/includes/')}`;
+  }
+  if (path.includes('/oo/interfaces/')) {
+    return `INTERFACE ${segmentAfter(path, '/oo/interfaces/')}`;
+  }
+  if (path.includes('/ddic/ddl/sources/')) {
+    return `DDL ${segmentAfter(path, '/ddic/ddl/sources/')}`;
+  }
+  if (path.includes('/bo/behaviordefinitions/')) {
+    return `BDEF ${segmentAfter(path, '/bo/behaviordefinitions/')}`;
+  }
+  if (path.includes('/ddic/ddlx/sources/')) {
+    return `DDLX ${segmentAfter(path, '/ddic/ddlx/sources/')}`;
+  }
+  if (path.includes('/ddic/srvd/sources/')) {
+    return `SRVD ${segmentAfter(path, '/ddic/srvd/sources/')}`;
   }
   if (path.includes('/programs/includes/')) {
     return `INCLUDE ${segmentAfter(path, '/programs/includes/')}`;
@@ -126,9 +177,18 @@ export function keyOf(url: string, params?: unknown): string {
 }
 
 export interface Model {
-  /** Requests answered with this status instead (a key of `keyOf`). */
+  /** Requests answered with this status instead (a key of `keyOf`; a quick search's round also as `SEARCH <mask>@<maxResults>`). */
   refuse?: Record<string, number>;
+  /** Requests answered with this status and body instead (a key of `keyOf`). */
+  refuseWith?: Record<string, { status: number; body: string }>;
+  /** Direct requests that throw this plain error, no answer (a key of `keyOf`). */
+  throwOn?: Record<string, string>;
+  /** The first request of a key answered with this status; later ones as usual. */
+  refuseOnce?: Record<string, number>;
 }
+
+/** The keys of `refuseOnce` already answered with their status, per model. */
+const refusedOnce = new WeakMap<Model, Set<string>>();
 
 function answerOf(
   repo: Repository,
@@ -137,19 +197,47 @@ function answerOf(
   params?: unknown,
 ): PartAnswer {
   const key = keyOf(url, params);
-  const refused = model.refuse?.[key];
+  // A quick search is also refused by its round: `SEARCH <mask>@<maxResults>`.
+  const round = key.startsWith('SEARCH ')
+    ? `${key}@${searchParamsOf(url, params).get('maxResults')}`
+    : key;
+  const once = model.refuseOnce?.[key];
+  if (once !== undefined) {
+    const used = refusedOnce.get(model) ?? new Set<string>();
+    refusedOnce.set(model, used);
+    if (!used.has(key)) {
+      used.add(key);
+      return { status: once, statusText: 'Refused', body: '' };
+    }
+  }
+  const refused = model.refuse?.[round] ?? model.refuse?.[key];
   if (refused !== undefined) {
     return { status: refused, statusText: 'Refused', body: '' };
+  }
+  const refusedWith = model.refuseWith?.[key];
+  if (refusedWith !== undefined) {
+    return {
+      status: refusedWith.status,
+      statusText: 'Refused',
+      headers: { 'content-type': 'application/xml' },
+      body: refusedWith.body,
+    };
   }
   const xml = { 'content-type': 'application/xml' };
   const text = { 'content-type': 'text/plain' };
   if (key.startsWith('SEARCH ')) {
     const mask = key.slice('SEARCH '.length);
+    // The quick search answers the first `maxResults` packages by name, with
+    // no "more" marker (measured).
+    const limit = Number(searchParamsOf(url, params).get('maxResults'));
+    const found = repo.masks[mask] ?? [];
     return {
       status: 200,
       statusText: 'OK',
       headers: xml,
-      body: searchXml(repo.masks[mask] ?? []),
+      body: searchXml(
+        Number.isInteger(limit) && limit > 0 ? found.slice(0, limit) : found,
+      ),
     };
   }
   if (key.startsWith('STRUCTURE ')) {
@@ -200,6 +288,8 @@ export function standOn(
     },
     async (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
       if (options.direct !== undefined) options.direct();
+      const thrown = model.throwOn?.[keyOf(request.url, request.params)];
+      if (thrown !== undefined) throw new Error(thrown);
       const a = answerOf(repo, model, request.url, request.params);
       if (a.status >= 400) {
         throw statusError(a.status, a.statusText ?? '', a.body ?? '');
@@ -238,6 +328,19 @@ export const isError = (result: unknown) =>
 export const partKeys = (envelope: SeenEnvelope) =>
   envelope.parts.map((p) => keyOf(p.url));
 
+/** Every request the fake received, envelope parts and direct requests, by URL as sent. */
+export const sentUrls = (fake: Fake): string[] => [
+  ...fake.envelopes.flatMap((envelope) => envelope.parts.map((p) => p.url)),
+  ...fake.directs.map((request) => {
+    const query = new URLSearchParams();
+    for (const [k, v] of Object.entries(request.params ?? {})) {
+      query.set(k, String(v));
+    }
+    const text = query.toString();
+    return text === '' ? request.url : `${request.url}?${text}`;
+  }),
+];
+
 /** `SearchSource` through the handler on the fake, bounded by event-loop turns. */
 export const searchOn = (
   fake: Fake,
@@ -253,8 +356,15 @@ export const searchOn = (
     turns,
   );
 
+/** A hit as one label: `object/include`, or `module@group` for a function module's hit (DO18). */
+export const hitLabel = (h: {
+  object_name: string;
+  include?: string;
+  function_group_name?: string;
+}) =>
+  h.include === undefined
+    ? `${h.object_name}@${h.function_group_name}`
+    : `${h.object_name}/${h.include}`;
+
 export const hitNames = (result: unknown) =>
-  payloadOf(result).results.map(
-    (h: { object_name: string; include: string }) =>
-      `${h.object_name}/${h.include}`,
-  );
+  payloadOf(result).results.map(hitLabel);

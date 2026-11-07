@@ -8,6 +8,7 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /**
@@ -18,13 +19,19 @@ import { recordingConnection } from '../helpers/recordingConnection';
  */
 describe("ActivateObject's preaudit, as described", () => {
   it('says what the single-object path sends', () => {
-    const text = TOOL_DEFINITION.inputSchema.properties.preaudit.description;
+    const text = jsonAt(
+      listedJson(TOOL_DEFINITION.inputSchema),
+      'preaudit',
+    ).description;
     expect(text).toContain('preauditRequested=true');
     expect(text).not.toContain('no preaudit parameter at all');
   });
 
   it('ActivateObjects, which serves that handler, says the same', () => {
-    const text = ActivateObjects.inputSchema.properties.preaudit.description;
+    const text = jsonAt(
+      listedJson(ActivateObjects.inputSchema),
+      'preaudit',
+    ).description;
     expect(text).toContain('always sends preauditRequested=true');
   });
 });

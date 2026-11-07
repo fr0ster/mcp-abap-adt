@@ -10,11 +10,11 @@
  * Only errors are written to stderr, all other methods are no-ops
  */
 export class StdioLogger {
-  info(_message: string, ..._args: any[]): void {
+  info(_message: string, ..._args: unknown[]): void {
     // No-op for stdio - MCP protocol requires only JSON-RPC messages on stdout
   }
 
-  error(message: string, ...args: any[]): void {
+  error(message: string, ...args: unknown[]): void {
     // Write errors to stderr for stdio transport
     const errorMsg =
       args.length > 0
@@ -23,11 +23,11 @@ export class StdioLogger {
     process.stderr.write(`[ERROR] ${errorMsg}\n`);
   }
 
-  warn(_message: string, ..._args: any[]): void {
+  warn(_message: string, ..._args: unknown[]): void {
     // No-op for stdio
   }
 
-  debug(_message: string, ..._args: any[]): void {
+  debug(_message: string, ..._args: unknown[]): void {
     // No-op for stdio
   }
 }

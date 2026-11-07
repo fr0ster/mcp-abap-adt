@@ -156,10 +156,7 @@ describe('Class High-Level Handlers Integration', () => {
           let detailedError = errorMsg;
           if (createResponse.content && createResponse.content.length > 0) {
             const firstContent = createResponse.content[0];
-            if (firstContent.type === 'json') {
-              detailedError = JSON.stringify(firstContent.text, null, 2);
-              createLogger?.error(`Create error details: ${detailedError}`);
-            } else if (firstContent.text) {
+            if (firstContent.text) {
               detailedError = firstContent.text;
               createLogger?.error(`Create error: ${detailedError}`);
             }
@@ -236,10 +233,7 @@ describe('Class High-Level Handlers Integration', () => {
           let detailedError = errorMsg;
           if (updateResponse.content && updateResponse.content.length > 0) {
             const firstContent = updateResponse.content[0];
-            if (firstContent.type === 'json') {
-              detailedError = JSON.stringify(firstContent.text, null, 2);
-              updateLogger?.error(`Update error details: ${detailedError}`);
-            } else if (firstContent.text) {
+            if (firstContent.text) {
               detailedError = firstContent.text;
               updateLogger?.error(`Update error: ${detailedError}`);
             }

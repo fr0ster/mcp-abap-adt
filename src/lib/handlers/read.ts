@@ -92,3 +92,5 @@ export {
   handleGetUnitTestResultOnce,
 } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
 export { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';
+// The read tools' definitions, for the compact routes' entries.
+export { READ_DEFINITIONS } from './readDefinitions.js';

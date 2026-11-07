@@ -1,5 +1,10 @@
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtHeaders,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import type { AdtReading } from '../../../lib/strategies/reading';
 /**
  * The compact update: one write under the lock the caller holds (spec §4.6).
  *
@@ -38,6 +43,7 @@ import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import type * as z from 'zod';
 import {
   type AdtObjectWith,
   adtOperation,
@@ -45,24 +51,53 @@ import {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
+import type { compactUpdateSchema } from '../../../lib/compact/compactSchemas';
 import {
-  LOCK_NOT_HELD_WORDS,
-  lockHeldHere,
-} from '../../../lib/state/heldLocks';
+  defineTool,
+  type HandlerContext,
+  type ToolArgs,
+} from '../../../lib/handlers/interfaces';
+import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
+import { lockHeldHere, lockNotHeldWords } from '../../../lib/state/heldLocks';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { handleUpdateBehaviorDefinition } from '../../behavior_definition/low/handleUpdateBehaviorDefinition';
-import { handleUpdateClass } from '../../class/low/handleUpdateClass';
-import { handleUpdateDdl } from '../../ddl/low/handleUpdateDdl';
-import { handleUpdateMetadataExtension } from '../../ddlx/low/handleUpdateMetadataExtension';
-import { handleUpdateFunctionModule } from '../../function/low/handleUpdateFunctionModule';
-import { handleUpdateInterface } from '../../interface/low/handleUpdateInterface';
-import { handleUpdateProgram } from '../../program/low/handleUpdateProgram';
-import { handleUpdateStructure } from '../../structure/low/handleUpdateStructure';
-import { handleUpdateTable } from '../../table/low/handleUpdateTable';
+import {
+  handleUpdateBehaviorDefinition,
+  TOOL_DEFINITION as UpdateBehaviorDefinition_Tool,
+} from '../../behavior_definition/low/handleUpdateBehaviorDefinition';
+import {
+  handleUpdateClass,
+  TOOL_DEFINITION as UpdateClass_Tool,
+} from '../../class/low/handleUpdateClass';
+import {
+  handleUpdateDdl,
+  TOOL_DEFINITION as UpdateDdl_Tool,
+} from '../../ddl/low/handleUpdateDdl';
+import {
+  handleUpdateMetadataExtension,
+  TOOL_DEFINITION as UpdateMetadataExtension_Tool,
+} from '../../ddlx/low/handleUpdateMetadataExtension';
+import {
+  handleUpdateFunctionModule,
+  TOOL_DEFINITION as UpdateFunctionModule_Tool,
+} from '../../function/low/handleUpdateFunctionModule';
+import {
+  handleUpdateInterface,
+  TOOL_DEFINITION as UpdateInterface_Tool,
+} from '../../interface/low/handleUpdateInterface';
+import {
+  handleUpdateProgram,
+  TOOL_DEFINITION as UpdateProgram_Tool,
+} from '../../program/low/handleUpdateProgram';
+import {
+  handleUpdateStructure,
+  TOOL_DEFINITION as UpdateStructure_Tool,
+} from '../../structure/low/handleUpdateStructure';
+import {
+  handleUpdateTable,
+  TOOL_DEFINITION as UpdateTable_Tool,
+} from '../../table/low/handleUpdateTable';
 
 /** The object types the compact update writes, each one request under `lock_handle`. */
 export const UNDER_LOCK_TYPES = [
@@ -118,32 +153,60 @@ function partRefusal(args: Args): Error | undefined {
   return undefined;
 }
 
-type Args = Record<string, unknown> & {
-  object_type?: string;
-  lock_handle?: string;
-};
+/** HandlerUpdate's arguments, as its schema parses them. */
+type Args = z.output<typeof compactUpdateSchema>;
+
+/**
+ * The writes a type delegates to: each the target tool's entry, so the
+ * arguments are parsed with the target's own schema.
+ */
+const update = {
+  BEHAVIOR_DEFINITION: defineTool(
+    UpdateBehaviorDefinition_Tool,
+    handleUpdateBehaviorDefinition,
+  ).call,
+  CLASS: defineTool(UpdateClass_Tool, handleUpdateClass).call,
+  DDL: defineTool(UpdateDdl_Tool, handleUpdateDdl).call,
+  METADATA_EXTENSION: defineTool(
+    UpdateMetadataExtension_Tool,
+    handleUpdateMetadataExtension,
+  ).call,
+  FUNCTION_MODULE: defineTool(
+    UpdateFunctionModule_Tool,
+    handleUpdateFunctionModule,
+  ).call,
+  INTERFACE: defineTool(UpdateInterface_Tool, handleUpdateInterface).call,
+  PROGRAM: defineTool(UpdateProgram_Tool, handleUpdateProgram).call,
+  STRUCTURE: defineTool(UpdateStructure_Tool, handleUpdateStructure).call,
+  TABLE: defineTool(UpdateTable_Tool, handleUpdateTable).call,
+} as const;
 
 /** `source_code` and the source fields some types name otherwise. */
-const source = (args: Args, field: string): unknown =>
+const source = (args: ToolArgs, field: string): unknown =>
   args[field] ?? args.source_code;
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined;
+
+/** `value` when it is a non-empty string; else the error naming `field`. */
+const requiredText = (field: string, value: unknown): string | Error =>
+  text(value) ?? new Error(`${field} is required`);
 
 const upper = (value: unknown): string => String(value ?? '').toUpperCase();
 
 const ANSWER = { tool: 'HandlerUpdate', detail: 'terse' } as const;
 
 /** The one write's answer, as every compact write answers it. */
-const written = (call: () => Promise<never>) =>
-  answer(ANSWER, call, project('terse', terseWrite));
+const written = (
+  call: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>,
+) => answer(ANSWER, call, project('terse', terseWrite));
 
 type AdtClient = IServerAdtClient;
 export type IncludeWriter = {
   update(
     config: object,
     options: { headers: IAdtHeaders } & Record<string, unknown>,
-  ): Promise<unknown>;
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 };
 
 /**
@@ -211,7 +274,7 @@ export async function handleUpdateUnderLock(
     );
   }
   if (!emptyBindingHandle && !lockHeldHere(context.heldLocks, lockHandle)) {
-    return return_error(new Error(LOCK_NOT_HELD_WORDS));
+    return return_error(new Error(lockNotHeldWords(context.heldLocks)));
   }
   const { connection, logger } = context;
   const transportRequest = text(args.transport_request);
@@ -226,102 +289,98 @@ export async function handleUpdateUnderLock(
 
   switch (args.object_type) {
     case 'PACKAGE': {
-      const missing =
-        required('package_name', args.package_name) ??
-        required('source_code', args.source_code);
+      const missing = required('package_name', args.package_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
       // The package lock lives in a session of its own over RFC; the write
       // runs in that session, where the handle is valid.
-      return written(
-        () =>
-          withAdtHeaders(context, 'package.updateMetadata', (headers) =>
-            createAdtClient(
-              connectionHoldingPackageLock(connection, lockHandle),
-              logger,
-            )
-              .getPackage(resultsFor(packageDocuments))
-              .updateMetadata(
-                { packageName: upper(args.package_name), ...transport },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'package.updateMetadata', (headers) =>
+          createAdtClient(
+            connectionHoldingPackageLock(connection, lockHandle),
+            logger,
+          )
+            .getPackage(resultsFor(packageDocuments))
+            .updateMetadata(
+              { packageName: upper(args.package_name), ...transport },
+              {
+                headers,
+                source: sourceCode,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'DOMAIN': {
-      const missing =
-        required('domain_name', args.domain_name) ??
-        required('source_code', args.source_code);
+      const missing = required('domain_name', args.domain_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
-            client()
-              .getDomain(resultsFor(domainDocuments))
-              .updateMetadata(
-                { domainName: upper(args.domain_name), ...transport },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
+      return written(() =>
+        withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
+          client()
+            .getDomain(resultsFor(domainDocuments))
+            .updateMetadata(
+              { domainName: upper(args.domain_name), ...transport },
+              {
+                headers,
+                source: sourceCode,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'DATA_ELEMENT': {
-      const missing =
-        required('data_element_name', args.data_element_name) ??
-        required('source_code', args.source_code);
+      const missing = required('data_element_name', args.data_element_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
-            client()
-              .getDataElement(resultsFor(dataElementDocuments))
-              .updateMetadata(
-                {
-                  dataElementName: upper(args.data_element_name),
-                  ...transport,
-                },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
+      return written(() =>
+        withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
+          client()
+            .getDataElement(resultsFor(dataElementDocuments))
+            .updateMetadata(
+              {
+                dataElementName: upper(args.data_element_name),
+                ...transport,
+              },
+              {
+                headers,
+                source: sourceCode,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'FUNCTION_GROUP': {
-      const missing =
-        required('function_group_name', args.function_group_name) ??
-        required('source_code', args.source_code);
+      const missing = required('function_group_name', args.function_group_name);
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'functionGroup.updateMetadata', (headers) =>
-            client()
-              .getFunctionGroup(resultsFor(functionGroupDocuments))
-              .updateMetadata(
-                {
-                  functionGroupName: upper(args.function_group_name),
-                  ...transport,
-                },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
+      return written(() =>
+        withAdtHeaders(context, 'functionGroup.updateMetadata', (headers) =>
+          client()
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
+            .updateMetadata(
+              {
+                functionGroupName: upper(args.function_group_name),
+                ...transport,
+              },
+              {
+                headers,
+                source: sourceCode,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'TABLE_TYPE': {
@@ -391,28 +450,30 @@ export async function handleUpdateUnderLock(
       );
     }
     case 'SERVICE_DEFINITION': {
-      const missing =
-        required('service_definition_name', args.service_definition_name) ??
-        required('source_code', args.source_code);
+      const missing = required(
+        'service_definition_name',
+        args.service_definition_name,
+      );
+      const sourceCode = requiredText('source_code', args.source_code);
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
-            client()
-              .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
-              .update(
-                {
-                  serviceDefinitionName: upper(args.service_definition_name),
-                  ...transport,
-                },
-                {
-                  headers,
-                  source: args.source_code as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      if (typeof sourceCode !== 'string') return return_error(sourceCode);
+      return written(() =>
+        withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
+          client()
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .update(
+              {
+                serviceDefinitionName: upper(args.service_definition_name),
+                ...transport,
+              },
+              {
+                headers,
+                source: sourceCode,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'SERVICE_BINDING': {
@@ -427,12 +488,10 @@ export async function handleUpdateUnderLock(
           new Error('desired_publication_state is published or unpublished'),
         );
       }
-      const variant = (
-        SERVICE_BINDING_VARIANT_MAP as Record<
-          string,
-          { serviceType: 'odatav2' | 'odatav4' } | undefined
-        >
-      )[String(args.binding_variant)];
+      const variants: Readonly<
+        Record<string, { serviceType: 'odatav2' | 'odatav4' } | undefined>
+      > = SERVICE_BINDING_VARIANT_MAP;
+      const variant = variants[String(args.binding_variant)];
       if (variant === undefined) {
         return return_error(
           new Error(
@@ -448,37 +507,34 @@ export async function handleUpdateUnderLock(
       const bindingName = String(args.service_binding_name)
         .trim()
         .toUpperCase();
-      return written(
-        () =>
-          withAdtHeaders(context, 'serviceBinding.update', (headers) =>
-            client()
-              .getServiceBinding(resultsFor(serviceDocuments))
-              .update(
-                serviceType === 'odatav2'
-                  ? {
-                      bindingName,
-                      desiredPublicationState: state,
-                      serviceType,
-                      serviceName: String(args.service_name)
-                        .trim()
-                        .toUpperCase(),
-                      serviceVersion: String(
-                        args.service_version ?? '0001',
-                      ).trim(),
-                    }
-                  : {
-                      bindingName,
-                      desiredPublicationState: state,
-                      serviceType,
-                    },
-                {
-                  headers,
-                  lockHandle,
-                  timeout: 0,
-                  analyse: analysePublication,
-                },
-              ),
-          ) as Promise<never>,
+      return written(() =>
+        withAdtHeaders(context, 'serviceBinding.update', (headers) =>
+          client()
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .update(
+              serviceType === 'odatav2'
+                ? {
+                    bindingName,
+                    desiredPublicationState: state,
+                    serviceType,
+                    serviceName: String(args.service_name).trim().toUpperCase(),
+                    serviceVersion: String(
+                      args.service_version ?? '0001',
+                    ).trim(),
+                  }
+                : {
+                    bindingName,
+                    desiredPublicationState: state,
+                    serviceType,
+                  },
+              {
+                headers,
+                lockHandle,
+                timeout: 0,
+                analyse: analysePublication,
+              },
+            ),
+        ),
       );
     }
     case 'LOCAL_TEST_CLASS':
@@ -489,83 +545,82 @@ export async function handleUpdateUnderLock(
     case 'CDS_UNIT_TEST':
     case 'BEHAVIOR_IMPLEMENTATION': {
       const [field, includeType, include] = CLASS_INCLUDES[args.object_type];
-      const body = source(args, field);
-      const missing =
-        required('class_name', args.class_name) ?? required(field, body);
+      const missing = required('class_name', args.class_name);
+      const body = requiredText(field, source(args, field));
       if (missing) return return_error(missing);
-      return written(
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(includeType, 'update'),
-            (headers) =>
-              include(client()).update(
-                { className: upper(args.class_name), ...transport },
-                {
-                  headers,
-                  source: body as string,
-                  lockHandle,
-                  analyse: analyseException,
-                },
-              ),
-          ) as Promise<never>,
+      if (typeof body !== 'string') return return_error(body);
+      return written(() =>
+        withAdtHeaders(
+          context,
+          adtOperation(includeType, 'update'),
+          (headers) =>
+            include(client()).update(
+              { className: upper(args.class_name), ...transport },
+              {
+                headers,
+                source: body,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+        ),
       );
     }
     case 'TABLE':
-      return handleUpdateTable(context, {
+      return update.TABLE(context, {
         ...common,
         table_name: args.table_name,
         ddl_code: source(args, 'ddl_code'),
-      } as never);
+      });
     case 'STRUCTURE':
-      return handleUpdateStructure(context, {
+      return update.STRUCTURE(context, {
         ...common,
         structure_name: args.structure_name,
         ddl_code: source(args, 'ddl_code'),
-      } as never);
+      });
     case 'DDL':
-      return handleUpdateDdl(context, {
+      return update.DDL(context, {
         ...common,
         ddl_name: args.ddl_name,
         ddl_source: source(args, 'ddl_source'),
-      } as never);
+      });
     case 'CLASS':
-      return handleUpdateClass(context, {
+      return update.CLASS(context, {
         ...common,
         class_name: args.class_name,
         source_code: args.source_code,
-      } as never);
+      });
     case 'PROGRAM':
-      return handleUpdateProgram(context, {
+      return update.PROGRAM(context, {
         ...common,
         program_name: args.program_name,
         source_code: args.source_code,
-      } as never);
+      });
     case 'INTERFACE':
-      return handleUpdateInterface(context, {
+      return update.INTERFACE(context, {
         ...common,
         interface_name: args.interface_name,
         source_code: args.source_code,
-      } as never);
+      });
     case 'FUNCTION_MODULE':
-      return handleUpdateFunctionModule(context, {
+      return update.FUNCTION_MODULE(context, {
         ...common,
         function_module_name: args.function_module_name,
         function_group_name: args.function_group_name,
         source_code: args.source_code,
-      } as never);
+      });
     case 'BEHAVIOR_DEFINITION':
-      return handleUpdateBehaviorDefinition(context, {
+      return update.BEHAVIOR_DEFINITION(context, {
         ...common,
         name: args.name,
         source_code: args.source_code,
-      } as never);
+      });
     case 'METADATA_EXTENSION':
-      return handleUpdateMetadataExtension(context, {
+      return update.METADATA_EXTENSION(context, {
         ...common,
         name: args.name,
         source_code: args.source_code,
-      } as never);
+      });
     default:
       return return_error(
         new Error(

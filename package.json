@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "23.1.0",
+  "version": "24.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -145,19 +145,26 @@
   "scripts": {
     "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
+    "pretest": "npm run build:test-reporter",
     "test": "jest --passWithNoTests",
-    "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
+    "pretest:integration": "npm run build:test-reporter",
+    "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit --reporters=default --reporters=./build/test-reporter/coverageReporter.js",
+    "pretest:coverage-family": "npm run build:test-reporter",
+    "test:coverage-family": "jest --reporters=default --reporters=./build/test-reporter/coverageReporter.js --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit",
+    "test:live-connection": "jest --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit src/__tests__/integration/live/liveConnection.test.ts",
     "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
+    "build:test-reporter": "tsc -p tsconfig.reporter.json",
+    "check:test-reporter": "node --eval \"require('./build/test-reporter/coverageReporter.js')\"",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
-    "shared:check": "jest --testPathPatterns='admin/shared-deps/check' --testPathIgnorePatterns='[]' --passWithNoTests",
+    "shared:check": "jest --testPathPatterns='admin/shared-deps/check' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "polygon:backup": "adt-backup backup --package ZMCP_SHR_PKG --env-path trial.env --output tests/fixtures/polygon.backup.yaml",
-    "lint": "biome check --write src",
-    "lint:check": "biome check src",
+    "lint": "biome check --write src scripts background-runs-memory/src responsible-rules/src compact-readonly-entries/src compact-modify/src server-runtime/src server/src http/src sse/src compact/src compact-http/src compact-sse/src core-ro/src http-ro/src sse-ro/src compact-ro/src compact-http-ro/src compact-sse-ro/src",
+    "lint:check": "biome check src scripts background-runs-memory/src responsible-rules/src compact-readonly-entries/src compact-modify/src server-runtime/src server/src http/src sse/src compact/src compact-http/src compact-sse/src core-ro/src http-ro/src sse-ro/src compact-ro/src compact-http-ro/src compact-sse-ro/src",
     "format": "biome format --write src",
     "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','background-runs-memory/dist','responsible-rules/dist','server-runtime/dist','http/dist','sse/dist','server/dist','compact-readonly-entries/dist','compact-modify/dist','compact/dist','compact-http/dist','compact-sse/dist','core-ro/dist','http-ro/dist','sse-ro/dist','compact-ro/dist','compact-http-ro/dist','compact-sse-ro/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
-    "build": "biome check --write --diagnostic-level=error src && tsc -p tsconfig.json && tsc -p background-runs-memory/tsconfig.json && tsc -p responsible-rules/tsconfig.json && tsc -p compact-readonly-entries/tsconfig.json && tsc -p compact-modify/tsconfig.json && tsc -p server-runtime/tsconfig.json && tsc -p server/tsconfig.json && tsc -p http/tsconfig.json && tsc -p sse/tsconfig.json && tsc -p compact/tsconfig.json && tsc -p compact-http/tsconfig.json && tsc -p compact-sse/tsconfig.json && tsc -p core-ro/tsconfig.json && tsc -p http-ro/tsconfig.json && tsc -p sse-ro/tsconfig.json && tsc -p compact-ro/tsconfig.json && tsc -p compact-http-ro/tsconfig.json && tsc -p compact-sse-ro/tsconfig.json",
+    "build": "biome check --write --diagnostic-level=error src scripts background-runs-memory/src responsible-rules/src compact-readonly-entries/src compact-modify/src server-runtime/src server/src http/src sse/src compact/src compact-http/src compact-sse/src core-ro/src http-ro/src sse-ro/src compact-ro/src compact-http-ro/src compact-sse-ro/src && tsc -p tsconfig.json && tsc -p background-runs-memory/tsconfig.json && tsc -p responsible-rules/tsconfig.json && tsc -p compact-readonly-entries/tsconfig.json && tsc -p compact-modify/tsconfig.json && tsc -p server-runtime/tsconfig.json && tsc -p server/tsconfig.json && tsc -p http/tsconfig.json && tsc -p sse/tsconfig.json && tsc -p compact/tsconfig.json && tsc -p compact-http/tsconfig.json && tsc -p compact-sse/tsconfig.json && tsc -p core-ro/tsconfig.json && tsc -p http-ro/tsconfig.json && tsc -p sse-ro/tsconfig.json && tsc -p compact-ro/tsconfig.json && tsc -p compact-http-ro/tsconfig.json && tsc -p compact-sse-ro/tsconfig.json",
     "build:fast": "tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
     "clean": "make clean",
@@ -205,7 +212,7 @@
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
+    "@biomejs/biome": "2.5.15",
     "@mcp-abap-adt/auth-broker": "^5.0.6",
     "@mcp-abap-adt/auth-stores": "^5.0.1",
     "@mcp-abap-adt/interfaces-auth-broker": "^1.3.0",
@@ -224,18 +231,19 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^42.1.0",
-    "@mcp-abap-adt/adt-strategies": "^0.18.2",
+    "@mcp-abap-adt/adt-clients": "^43.0.1",
+    "@mcp-abap-adt/adt-strategies": "^0.19.1",
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
     "@mcp-abap-adt/connection": "^19.1.0",
-    "@mcp-abap-adt/interfaces-adt": "^25.1.0",
+    "@mcp-abap-adt/interfaces-adt": "^26.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^3.0.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^3.4.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
+    "@types/express": "^5.0.6",
     "axios": "^1.20.0",
     "diff": "^9.0.0",
     "express": "^5.2.1",
@@ -364,12 +372,13 @@
     "maxWorkers": 1,
     "testTimeout": 600000,
     "globalSetup": "<rootDir>/src/__tests__/integration/globalSetup.ts",
+    "globalTeardown": "<rootDir>/src/__tests__/integration/globalTeardown.ts",
     "setupFilesAfterEnv": [
       "<rootDir>/src/__tests__/integration/helpers/closeConnectionsAfterAll.ts"
     ]
   },
   "lint-staged": {
-    "src/**/*.{ts,js}": [
+    "{src,scripts,*/src}/**/*.{ts,js,mjs,cjs}": [
       "biome check --write"
     ]
   },

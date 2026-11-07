@@ -41,6 +41,7 @@ it.each([
   '%s: every owned connection logged off once, exit 1 naming the request and the step',
   async (_name, timeoutMs) => {
     s = await stand({
+      kind: 'onprem',
       shutdown: timeoutMs === undefined ? {} : { timeoutMs },
     });
     expect(await s.callTool('HoldState', { id: 'S' })).toMatchObject({

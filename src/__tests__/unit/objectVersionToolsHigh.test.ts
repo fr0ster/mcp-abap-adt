@@ -31,6 +31,7 @@ jest.mock('../../lib/clients', () => ({
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
 import { okResponse } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -61,7 +62,11 @@ beforeEach(() => {
     getVersions: mockTableGetVersions,
     getVersionSource: mockTableGetVersionSource,
   });
-  mockGetFunctionModule.mockReturnValue({ getVersions: mockFmGetVersions });
+  // A function module's metadata names the group the cases give (#2).
+  mockGetFunctionModule.mockReturnValue({
+    getVersions: mockFmGetVersions,
+    readMetadata: readsModuleIn('Z_MY_GRP', 'Z_MY_FM'),
+  });
 });
 
 describe('per-object high-level version tools (#30)', () => {

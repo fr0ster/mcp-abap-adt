@@ -106,7 +106,7 @@ export function createCustomServer(
   const handlerGroups: IHandlerGroup[] = [];
 
   if (includeReadOnly) {
-    handlerGroups.push(new ReadOnlyHandlersGroup(context) as IHandlerGroup);
+    handlerGroups.push(new ReadOnlyHandlersGroup(context));
   }
 
   // Add other groups based on configuration
@@ -121,9 +121,9 @@ export function createCustomServer(
   // }
 
   // Example: Add high-level, system, and search groups
-  handlerGroups.push(new HighLevelHandlersGroup(context) as IHandlerGroup);
-  handlerGroups.push(new SystemHandlersGroup(context) as IHandlerGroup);
-  handlerGroups.push(new SearchHandlersGroup(context) as IHandlerGroup);
+  handlerGroups.push(new HighLevelHandlersGroup(context));
+  handlerGroups.push(new SystemHandlersGroup(context));
+  handlerGroups.push(new SearchHandlersGroup(context));
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
   handlersRegistry.registerAllTools(mcpServer);

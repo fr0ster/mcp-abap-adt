@@ -16,6 +16,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
@@ -98,7 +99,10 @@ async function surfaceOf(
   kind: ToolSetKind,
 ): Promise<KindSurface> {
   process.env.SAP_SYSTEM_TYPE = environment;
-  const server = new StdioServer(registryOf(SETS[kind], 'stdio'), undefined);
+  // As the launcher builds it: every set keeps background runs.
+  const server = new StdioServer(registryOf(SETS[kind], 'stdio'), undefined, {
+    backgroundRuns: new InMemoryBackgroundRuns(),
+  });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-surface', version: '1' });

@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * UnlockObject Handler - Unlock ABAP object after modification via ADT API
  *
@@ -44,6 +45,7 @@ import {
   connectionHoldingPackageLock,
   releasePackageLockSession,
 } from '../../../lib/packageSessions';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -53,43 +55,32 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Unlock an ABAP object after modification, with the lock_handle the LockObject operation answered (the lock stays in the instance’s own session until then).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description:
-          'Object name. For function modules, use format GROUP|FM_NAME',
-      },
-      object_type: {
-        type: 'string',
-        description: 'Object type',
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'behavior_implementation',
-          'metadata_extension',
-          'service_definition',
-          'service_binding',
-        ],
-      },
-      lock_handle: {
-        type: 'string',
-        description: 'Lock handle from LockObject operation',
-      },
-    },
-    required: ['object_name', 'object_type', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .describe('Object name. For function modules, use format GROUP|FM_NAME'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'behavior_implementation',
+        'metadata_extension',
+        'service_definition',
+        'service_binding',
+      ])
+      .describe('Object type'),
+    lock_handle: z.string().describe('Lock handle from LockObject operation'),
+  }),
 } as const;
 
 interface UnlockObjectArgs {
@@ -143,8 +134,9 @@ export async function unlockObject(
   // Request-shape check that stays ahead of the client call, exactly where it
   // lived before this migration: `unlock()`'s config does not itself enforce
   // it.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (objectType === 'function_module') {
     if (!object_name.toUpperCase().includes('|')) {
       return return_error(
@@ -202,16 +194,24 @@ export async function unlockObject(
               analyse: analyseException,
             });
         case 'function_module':
-          return client
-            .getFunctionModule(resultsFor(functionModuleDocuments))
-            .unlock(
-              {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
-              },
-              lock_handle,
-              { analyse: analyseException },
-            );
+          // SAP ignores the group of the address (#2): the unlock is sent
+          // after the module's metadata names the group given.
+          return inCheckedGroupOn(
+            client,
+            functionGroupName,
+            functionModuleName,
+            () =>
+              client
+                .getFunctionModule(resultsFor(functionModuleDocuments))
+                .unlock(
+                  {
+                    functionGroupName,
+                    functionModuleName,
+                  },
+                  lock_handle,
+                  { analyse: analyseException },
+                ),
+          );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))

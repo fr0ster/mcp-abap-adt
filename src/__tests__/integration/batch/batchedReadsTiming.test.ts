@@ -29,9 +29,7 @@
  * (`shared_dependencies`, those served on the system): GetIncludesList (two
  * function groups), GetStructuresList (two structures), GetEnhancements (two
  * classes), ListTransports (modifiable), DescribeByList (a class, a table and
- * a structure), GetAbapSystemSymbols (a source naming a shared class and
- * interface), GetWhereUsed (two
- * tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
+ * a structure), GetWhereUsed (two tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
  *
  * Run (HTTP): npm test -- --testPathPatterns='batchedReadsTiming' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
@@ -48,7 +46,6 @@ import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGe
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapSystemSymbols } from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeListFeeds } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
@@ -60,13 +57,14 @@ import {
 } from '../../../lib/batch/availability';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import {
+  configuredSystemKind,
   getSharedDependenciesConfig,
-  getSystemType,
   getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
   resolvePackageName,
 } from '../helpers/configHelpers';
+import { NO_KIND_STATED } from '../helpers/configuredSystemKind';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
@@ -328,23 +326,6 @@ const SHARED_CASES: SharedCase[] = [
     },
   },
   {
-    tool: 'GetAbapSystemSymbols',
-    prepare: () => {
-      // A class and an interface: the symbols the tool reads one request each.
-      const [cls] = sharedNames('classes');
-      const [intf] = sharedNames('interfaces');
-      if (!cls || !intf) {
-        return 'the config names no shared class or interface served here';
-      }
-      return (context) =>
-        handleGetAbapSystemSymbols(context, {
-          // The handler reads a class or an interface it finds defined in the
-          // source: one definition of each, named after the shared objects.
-          code: `CLASS ${cls.toLowerCase()} DEFINITION.\nENDCLASS.\nINTERFACE ${intf.toLowerCase()}.\nENDINTERFACE.`,
-        });
-    },
-  },
-  {
     tool: 'GetWhereUsed',
     prepare: () => {
       const tables = two('tables');
@@ -473,8 +454,10 @@ async function timeBothPaths(
 describe('batched reads timed against the sequential path on the system the test config names', () => {
   let connection: IAbapConnection | null = null;
   let packages: Array<{ label: string; name: string }> = [];
-  // Legacy support is parked: a legacy config skips before any logon.
-  const served = getSystemType() !== 'legacy';
+  // Legacy support is parked: a legacy config skips before any logon, and
+  // so does a run whose kind nothing states (never on-premise by default).
+  const stated = configuredSystemKind();
+  const served = stated !== undefined && stated !== 'legacy';
 
   beforeAll(async () => {
     if (!served) return;
@@ -493,7 +476,9 @@ describe('batched reads timed against the sequential path on the system the test
         async () => {
           if (!served) {
             testLogger?.info(
-              '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+              stated === undefined
+                ? `⏭️  Skipping: ${NO_KIND_STATED}`
+                : '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
             );
             return;
           }

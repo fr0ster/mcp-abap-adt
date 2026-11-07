@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * `BatchEnd` (spec §5): the open communication batch executed on the
  * connection `BatchEnd` took, every recorded call's answer the one its
@@ -11,6 +13,8 @@
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import { authError } from '@mcp-abap-adt/auth-errors';
@@ -40,6 +44,7 @@ import {
   LOCK_SUCCESS_XML,
   payloadOf,
 } from '../../helpers/batchStand';
+import { holding } from '../../helpers/heldLocks';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -120,15 +125,12 @@ function own(
         toolDefinition: {
           name,
           description: name,
-          inputSchema: {
-            type: 'object',
-            properties: {
-              program_name: { type: 'string' },
-              class_name: { type: 'string' },
-            },
-          },
+          inputSchema: z.object({
+            program_name: z.string().optional(),
+            class_name: z.string().optional(),
+          }),
         },
-        handler: async (context: HandlerContext, _args: unknown) =>
+        call: async (context: HandlerContext, _args: unknown) =>
           handler(context),
       },
     ],
@@ -502,6 +504,8 @@ describe('BatchEnd', () => {
       tools: TOOLS,
       part: sap,
       keepRawParts: true,
+      // The instance locked what it unlocks.
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
     });
     on.begin();
     await on.call('GetObjectVersionDiff', DIFF_ARGS);
@@ -623,13 +627,10 @@ describe('BatchEnd', () => {
           toolDefinition: {
             name: 'GetProgram',
             description: 'GetProgram',
-            inputSchema: {
-              type: 'object',
-              properties: { program_name: { type: 'string' } },
-            },
+            inputSchema: z.object({ program_name: z.string().optional() }),
           },
           // Two parameters: the server hands `(context, args)` by the arity.
-          handler: async (context: HandlerContext, _args: unknown) => {
+          call: async (context: HandlerContext, _args: unknown) => {
             await context.connection.makeAdtRequest({
               url: '/sap/bc/adt/programs/programs/prog_a/source/main',
               method: 'GET',

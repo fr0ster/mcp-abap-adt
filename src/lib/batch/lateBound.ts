@@ -21,20 +21,15 @@
  * What SAP answers to an envelope reaches `execute()` as it came; the
  * connection's own handling (credential, CSRF, session) stays.
  */
+
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { sessionOf } from './sessionOf';
 
 type Session = 'stateful' | 'stateless';
-
-/** What an optional session member of a connection may answer. */
-interface SessionAware {
-  getSessionType?: () => Session | undefined;
-  getSessionMode?: () => Session | undefined;
-}
-
 /** A member reached while the target points at no connection. */
 export const LATE_BOUND_UNPOINTED_WORDS =
   'the batch connection points at no connection now: nothing was sent';
@@ -86,11 +81,11 @@ export class LateBoundConnection implements IAbapConnection {
   }
 
   getSessionType(): Session | undefined {
-    return (this.current as SessionAware | undefined)?.getSessionType?.();
+    return sessionOf(this.current, 'getSessionType');
   }
 
   getSessionMode(): Session | undefined {
-    return (this.current as SessionAware | undefined)?.getSessionMode?.();
+    return sessionOf(this.current, 'getSessionMode');
   }
 
   async makeAdtRequest<T = unknown, D = unknown>(

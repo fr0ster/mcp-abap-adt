@@ -19,6 +19,7 @@ import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonl
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
+import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
 import {
@@ -27,6 +28,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { listing } from '../helpers/sourceReaderFake';
 
 let fakeClient: unknown;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -138,10 +140,11 @@ describe('SearchSource: a source read through adt-clients rejects with AuthRefus
     });
     const run = runSearchSource(
       {
-        fetchPackageContents: async () =>
-          [target('ZA'), target('ZB'), target('ZC')] as never,
+        fetchPackageContents: async (name) =>
+          listing(name, [target('ZA'), target('ZB'), target('ZC')]),
         sourceReader: createSourceReaderDeps(context as any),
-        resolvePackages: async (entries) => entries,
+        lineMatch: substringLineMatch,
+        resolvePackages: async (entries) => ({ packages: entries }),
       },
       {
         query: 'marker',

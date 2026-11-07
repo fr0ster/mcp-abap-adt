@@ -1,11 +1,11 @@
+import * as z from 'zod';
 import {
   debugBatchRecorder,
   requireDebugger,
 } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -13,25 +13,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      action: {
-        type: 'string',
-        enum: ['over', 'continue'],
-        description:
-          'over runs the current statement, continue runs to the next stop.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'action'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    action: z
+      .enum(['over', 'continue'])
+      .describe(
+        'over runs the current statement, continue runs to the next stop.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleAmdpDebugStep(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   // Recorded in the debugger batch: the step's own request.
   const recorder = debugBatchRecorder(context);

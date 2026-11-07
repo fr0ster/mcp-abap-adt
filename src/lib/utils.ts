@@ -2,12 +2,24 @@ import './instance.js';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  type AdtRefusal,
+  readExceptionRefusal,
+} from '@mcp-abap-adt/adt-strategies';
 import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
-import { answerFailure } from './answer';
-import { answerRead } from './auth/answerFailure';
+import { XMLParser } from 'fast-xml-parser';
+import { answerFailure, type McpResult } from './answer';
+import { answerRead, type FailureAnswer } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
+import { hasMethod } from './capability';
 import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
@@ -16,9 +28,24 @@ import { createAbapConnection } from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
+import {
+  ALREADY_EXISTS_TYPE,
+  hasT100Key,
+  NAME_TAKEN_KEYS,
+} from './messageKeys';
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
+import { child, childAt, listOf } from './xml/tree';
+
+/** The readers of a value from outside the type system (`xml/tree`), for the packages. */
+export {
+  child,
+  childAt,
+  type Element,
+  isElement,
+  isList,
+} from './xml/tree';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -66,7 +93,13 @@ export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }
 
-export function return_response(response: AxiosResponse) {
+/** What {@link return_response} reads of an answer: its text. */
+export interface ResponseText {
+  readonly data: string;
+}
+
+/** An answer's text as the tool's answer. */
+export function return_response(response: ResponseText): McpResult {
   return {
     isError: false,
     content: [
@@ -80,10 +113,10 @@ export function return_response(response: AxiosResponse) {
 /**
  * Safely serializes an error object, avoiding circular references
  */
-function _safeStringifyError(error: any): string {
+function _safeStringifyError(error: unknown): string {
   if (error instanceof AxiosError) {
     // For Axios errors, extract safe information
-    const safeError: any = {
+    const safeError: Record<string, unknown> = {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -126,16 +159,16 @@ function _safeStringifyError(error: any): string {
  * Safely logs an error without circular reference issues
  */
 export function logErrorSafely(
-  logger: any,
+  logger: { error?: (message: string, data?: unknown) => void } | undefined,
   operationName: string,
-  error: any,
+  error: unknown,
 ): void {
   if (!logger?.error) {
     return;
   }
 
   let errorMessage = `[ERROR] ${operationName} failed`;
-  const errorDetails: any = {};
+  const errorDetails: Record<string, unknown> = {};
 
   if (error instanceof AxiosError && error.response) {
     errorMessage += ` - Status: ${error.response.status}`;
@@ -177,132 +210,93 @@ export function logErrorSafely(
 
 /**
  * Extracts a user-facing ADT/SAP error message from Axios/ADT errors.
- * Prioritizes XML exception payloads (<exc:exception>) for detailed messages.
+ * Prioritizes XML exception payloads (<exc:exception>), read by the parser,
+ * for detailed messages; any other body is relayed as it came.
  */
 export function extractAdtErrorMessage(
-  error: any,
+  error: unknown,
   fallback = 'Operation failed',
 ): string {
   if (!error) {
     return fallback;
   }
 
-  const response = error?.response;
-  const responseData = response?.data;
+  const response = child(error, 'response');
+  const responseData = child(response, 'data');
 
   if (typeof responseData === 'string') {
     const raw = responseData.trim();
 
-    // Try to parse ADT XML exception payloads first.
-    if (raw.includes('<exc:exception') || raw.includes('<message')) {
-      try {
-        const { XMLParser } = require('fast-xml-parser');
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const parsed = parser.parse(raw);
-        const xmlMessage =
-          parsed?.['exc:exception']?.message?.['#text'] ||
-          parsed?.['exc:exception']?.localizedMessage?.['#text'] ||
-          parsed?.['exc:exception']?.message ||
-          parsed?.['exc:exception']?.localizedMessage;
-
-        if (xmlMessage && String(xmlMessage).trim().length > 0) {
-          return `SAP Error: ${String(xmlMessage).trim()}`;
-        }
-      } catch {
-        // Fall through to plain text.
-      }
-    }
+    // An ADT exception document: its message, read by the parser.
+    const said = readExceptionRefusal(raw)?.message.trim();
+    if (said) return `SAP Error: ${said}`;
 
     if (raw.length > 0) {
       return raw.slice(0, 2000);
     }
   } else if (responseData && typeof responseData === 'object') {
     const dataMessage =
-      (responseData as any).message ||
-      (responseData as any).error?.message ||
-      (responseData as any).error_description;
+      child(responseData, 'message') ||
+      childAt(responseData, 'error', 'message') ||
+      child(responseData, 'error_description');
     if (typeof dataMessage === 'string' && dataMessage.trim().length > 0) {
       return dataMessage.trim();
     }
   }
 
-  if (typeof error?.message === 'string' && error.message.trim().length > 0) {
-    return error.message.trim();
+  const message = child(error, 'message');
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message.trim();
   }
 
-  if (response?.status) {
-    return `HTTP ${response.status}: ${response.statusText || 'Error'}`;
+  const status = child(response, 'status');
+  if (status) {
+    return `HTTP ${String(status)}: ${String(child(response, 'statusText') || 'Error')}`;
   }
 
   return fallback;
 }
 
-/** Whether `c` is a whitespace code unit (space, tab, line feed, CR, VT, FF). */
-function isSpace(c: number): boolean {
-  return c === 32 || (c >= 9 && c <= 13);
-}
-
 /**
- * The host after the first `ENOTFOUND` followed by whitespace, up to the
- * next whitespace; `undefined` without one. Plain code.
+ * The host a DNS lookup could not resolve: the `hostname` Node's resolver
+ * error carries — on the error itself, or on the error axios wraps it in
+ * (`cause`); `undefined` without one.
  */
-function hostAfterNotFound(text: string): string | undefined {
-  const marker = 'ENOTFOUND';
-  for (
-    let at = text.indexOf(marker);
-    at >= 0;
-    at = text.indexOf(marker, at + 1)
-  ) {
-    const afterMarker = at + marker.length;
-    let start = afterMarker;
-    while (start < text.length && isSpace(text.charCodeAt(start))) start += 1;
-    if (start === afterMarker || start === text.length) continue;
-    let end = start;
-    while (end < text.length && !isSpace(text.charCodeAt(end))) end += 1;
-    return text.slice(start, end);
+function unresolvedHostOf(error: Error): string | undefined {
+  for (const from of [error, child(error, 'cause')]) {
+    const hostname = child(from, 'hostname');
+    if (typeof hostname === 'string' && hostname !== '') return hostname;
   }
   return undefined;
 }
 
-/** `MCP error -<n>: ` at `at`: its length, else 0. */
-function mcpErrorPrefixAt(text: string, at: number): number {
-  const head = 'MCP error ';
-  if (!text.startsWith(head, at)) return 0;
-  let i = at + head.length;
-  if (text[i] === '-') i += 1;
-  const digits = i;
-  while (
-    i < text.length &&
-    text.charCodeAt(i) >= 48 &&
-    text.charCodeAt(i) <= 57
-  )
-    i += 1;
-  if (i === digits || !text.startsWith(': ', i)) return 0;
-  return i + 2 - at;
+/** The words of a DNS failure for `hostname`, with the error's own line. */
+function dnsFailureWords(hostname: string, errorMessage: string): string {
+  return (
+    `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
+    `Please check:\n` +
+    `1. Your network connection\n` +
+    `2. DNS settings (try: nslookup ${hostname})\n` +
+    `3. VPN connection (if required)\n` +
+    `4. Firewall settings\n` +
+    `5. The SAP_URL in your .env file is correct\n` +
+    `\nOriginal error: ${errorMessage}`
+  );
 }
 
 /**
- * `text` without the SDK's leading `McpError: ` / `MCP error -<n>: `
- * prefixes, however many are stacked. Plain code.
+ * An SDK `McpError`'s own words: its message without the `MCP error <code>: `
+ * its constructor puts in front (`McpError` in @modelcontextprotocol/sdk),
+ * cut by its length — recognised by the error's name and numeric code,
+ * never by its words. `undefined` for any other error.
  */
-function withoutMcpErrorPrefixes(text: string): string {
-  let at = 0;
-  for (;;) {
-    if (text.startsWith('McpError: ', at)) {
-      at += 'McpError: '.length;
-      continue;
-    }
-    const length = mcpErrorPrefixAt(text, at);
-    if (length === 0) break;
-    at += length;
-  }
-  return text.slice(at);
+function mcpErrorWords(error: Error): string | undefined {
+  const code = child(error, 'code');
+  if (error.name !== 'McpError' || typeof code !== 'number') return undefined;
+  return error.message.slice(`MCP error ${code}: `.length);
 }
 
-export function return_error(error: any) {
+export function return_error(error: unknown): FailureAnswer {
   // The failure reader first: a chain failure or the server's own
   // refusal is answered as the failure answer — never its message.
   const read = failureOf(error);
@@ -329,38 +323,22 @@ export function return_error(error: any) {
       // Validation sites pass a ready message; this is the shortest path.
       errorText = error;
     } else if (error instanceof AxiosError) {
-      // Check for DNS/network errors first
-      const errorCode = (error as any).code;
+      // DNS and network errors first, by the error's code
+      const errorCode = error.code;
       const errorMessage = error.message || '';
 
       // Handle DNS resolution errors (common on Windows)
-      if (
-        errorCode === 'ENOTFOUND' ||
-        errorMessage.includes('getaddrinfo ENOTFOUND')
-      ) {
-        const hostname = hostAfterNotFound(errorMessage) ?? 'unknown host';
-
-        errorText =
-          `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
-          `Please check:\n` +
-          `1. Your network connection\n` +
-          `2. DNS settings (try: nslookup ${hostname})\n` +
-          `3. VPN connection (if required)\n` +
-          `4. Firewall settings\n` +
-          `5. The SAP_URL in your .env file is correct\n` +
-          `\nOriginal error: ${errorMessage}`;
-      } else if (
-        errorCode === 'ECONNREFUSED' ||
-        errorMessage.includes('ECONNREFUSED')
-      ) {
+      if (errorCode === 'ENOTFOUND') {
+        errorText = dnsFailureWords(
+          unresolvedHostOf(error) ?? 'unknown host',
+          errorMessage,
+        );
+      } else if (errorCode === 'ECONNREFUSED') {
         errorText =
           `Connection refused: The server is not accepting connections. ` +
           `Please check if the SAP system is accessible and the URL is correct.\n` +
           `\nOriginal error: ${errorMessage}`;
-      } else if (
-        errorCode === 'ETIMEDOUT' ||
-        errorMessage.includes('ETIMEDOUT')
-      ) {
+      } else if (errorCode === 'ETIMEDOUT') {
         errorText =
           `Connection timeout: The request took too long to complete. ` +
           `Please check your network connection and try again.\n` +
@@ -400,25 +378,16 @@ export function return_error(error: any) {
           errorMessage || `HTTP ${error.response?.status || 'Unknown error'}`;
       }
     } else if (error instanceof Error) {
-      // Check for DNS errors in regular Error objects too
+      // DNS errors in regular Error objects too, by the error's code
       const errorMessage = error.message || '';
-      if (
-        errorMessage.includes('getaddrinfo ENOTFOUND') ||
-        errorMessage.includes('ENOTFOUND')
-      ) {
-        const hostname = hostAfterNotFound(errorMessage) ?? 'unknown host';
-
-        errorText =
-          `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
-          `Please check:\n` +
-          `1. Your network connection\n` +
-          `2. DNS settings (try: nslookup ${hostname})\n` +
-          `3. VPN connection (if required)\n` +
-          `4. Firewall settings\n` +
-          `5. The SAP_URL in your .env file is correct\n` +
-          `\nOriginal error: ${errorMessage}`;
+      if (child(error, 'code') === 'ENOTFOUND') {
+        errorText = dnsFailureWords(
+          unresolvedHostOf(error) ?? 'unknown host',
+          errorMessage,
+        );
       } else {
-        errorText = errorMessage;
+        // An SDK McpError's own words, without its code prefix.
+        errorText = mcpErrorWords(error) ?? errorMessage;
       }
     } else {
       // For other types, try safe stringify
@@ -450,14 +419,12 @@ export function return_error(error: any) {
     errorText = 'An error occurred (failed to serialize error details)';
   }
 
-  // Strip SDK McpError prefixes that a custom/external handler group may have
-  // baked into a thrown error's message (e.g. `MCP error -32602: bad`, or the
-  // stacked `McpError: MCP error -32602: bad`). Our own handlers no longer throw
-  // McpError, but the package accepts external handler groups, and both
-  // registration paths route any thrown error through here. Schema-validation
-  // errors are unaffected: the SDK raises those before our code runs and never
-  // reaches return_error.
-  errorText = withoutMcpErrorPrefixes(errorText);
+  // An SDK McpError thrown by a custom/external handler group answers its own
+  // words, without the `MCP error <code>: ` prefix (`mcpErrorWords` above).
+  // Our own handlers no longer throw McpError, but the package accepts
+  // external handler groups, and both registration paths route any thrown
+  // error through here. Schema-validation errors are unaffected: the SDK
+  // raises those before our code runs and never reaches return_error.
 
   return {
     isError: true,
@@ -507,10 +474,8 @@ export function getManagedConnection(): IAbapConnection {
     // Also try to write to a debug file on Windows
     if (process.platform === 'win32') {
       try {
-        const fs = require('node:fs');
-        const path = require('node:path');
-        const debugFile = path.join(process.cwd(), 'mcp-debug.log');
-        fs.appendFileSync(
+        const debugFile = join(process.cwd(), 'mcp-debug.log');
+        appendFileSync(
           debugFile,
           `${new Date().toISOString()} ${message}`,
           'utf8',
@@ -548,24 +513,6 @@ export function getManagedConnection(): IAbapConnection {
       );
     }
 
-    // Log refresh token availability for debugging
-    const hasRefreshToken = !!config.refreshToken?.trim();
-    const hasUaaUrl = !!config.uaaUrl;
-    const hasUaaClientId = !!config.uaaClientId;
-    const hasUaaClientSecret = !!config.uaaClientSecret;
-    connectionManagerLogger?.debug(
-      `[DEBUG] getManagedConnection - Refresh token config:`,
-      {
-        hasRefreshToken,
-        hasUaaUrl,
-        hasUaaClientId,
-        hasUaaClientSecret,
-        canRefresh:
-          hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret,
-        configObjectId: (config as any).__debugId || 'no-id',
-      },
-    );
-
     // The connection it replaces was built here: it ends with its logoff.
     endManaged(cachedConnection, true);
 
@@ -584,27 +531,6 @@ export function getManagedConnection(): IAbapConnection {
       fallbackSessionId,
     );
 
-    // Verify connection has access to refresh token
-    const connectionWithRefresh = cachedConnection as any;
-    if (
-      connectionWithRefresh.getConfig &&
-      connectionWithRefresh.canRefreshToken
-    ) {
-      const connectionConfig = connectionWithRefresh.getConfig();
-      const canRefresh = connectionWithRefresh.canRefreshToken();
-      connectionManagerLogger?.debug(
-        `[DEBUG] getManagedConnection - Connection created, refresh check:`,
-        {
-          canRefresh,
-          connectionHasRefreshToken: !!connectionConfig?.refreshToken,
-          connectionHasUaaUrl: !!connectionConfig?.uaaUrl,
-          configMatches:
-            connectionConfig === config
-              ? 'same object ✓'
-              : 'different object ✗',
-        },
-      );
-    }
     cachedConfigSignature = signature;
 
     // Don't call connect() here - it will be called lazily on first request
@@ -731,10 +657,10 @@ export async function makeAdtRequest(
   url: string,
   method: string,
   timeout: number,
-  data?: any,
-  params?: any,
+  data?: unknown,
+  params?: IAbapRequestOptions['params'],
   headers?: Record<string, string>,
-): Promise<AxiosResponse> {
+): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url,
     method,
@@ -742,7 +668,7 @@ export async function makeAdtRequest(
     data,
     params,
     headers,
-  }) as Promise<AxiosResponse>;
+  });
 }
 
 /**
@@ -760,245 +686,128 @@ export async function getSystemInformation(): Promise<{
   return { systemID: ctx.masterSystem, userName: ctx.responsible };
 }
 
-/**
- * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
- * In v2 architecture, config must come from connection provider/broker, not from getConfig()
- */
-export function isCloudConnection(config?: SapConfig): boolean {
-  try {
-    // If config provided as parameter, use it
-    if (config) {
-      return config.authType === 'jwt';
-    }
-
-    // Try to get config from session context (v2 architecture)
-    const context = sessionContext.getStore();
-    if (context?.sapConfig) {
-      return context.sapConfig.authType === 'jwt';
-    }
-
-    // Try to get config from overrideConfig (set by connection provider)
-    if (overrideConfig) {
-      return overrideConfig.authType === 'jwt';
-    }
-
-    // Try to get config from cached connection
-    if (cachedConnection) {
-      const connectionConfig = (cachedConnection as any).getConfig?.();
-      if (connectionConfig) {
-        return connectionConfig.authType === 'jwt';
-      }
-    }
-
-    // If no config available, cannot determine - return false for safety
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Parse validation response from ADT
- * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
- * @param response - AxiosResponse from validation endpoint
- * @returns Parsed validation result with valid, severity, message, exists fields
- */
-export function parseValidationResponse(response: AxiosResponse): {
+/** What `parseValidationResponse` answers. */
+interface ValidationReading {
   valid: boolean;
   severity?: string;
   message?: string;
   longText?: string;
   exists?: boolean;
-} {
+}
+
+/**
+ * A validation answer read from its status and its text alone: what
+ * `parseValidationResponse` answers when the document cannot be read. A
+ * short body is SAP's text, relayed as it came.
+ */
+function validationFromStatus(response: {
+  data: unknown;
+  status: number;
+}): ValidationReading {
+  if (response.status === 200) {
+    return { valid: true };
+  }
+  let errorMessage = `Validation failed with status ${response.status}`;
+  if (typeof response.data === 'string') {
+    const text = response.data.trim();
+    if (text.length > 0 && text.length < 1000) errorMessage = text;
+  }
+  return {
+    valid: false,
+    severity: 'ERROR',
+    message: errorMessage,
+  };
+}
+
+/**
+ * Parse validation response from ADT, judged by key, never by words:
+ * - an `exc:exception` (a name refused with `400`): not valid, SAP's message
+ *   relayed; `exists` when a message carries a name-taken T100 key
+ *   (`NAME_TAKEN_KEYS`), or, with no key, the type is
+ *   `ExceptionResourceAlreadyExists`;
+ * - `asx:abap` `DATA`: `CHECK_RESULT` `X` is valid; else `SEVERITY` decides,
+ *   `SHORT_TEXT` and `LONG_TEXT` relayed — that form carries no key, so
+ *   `exists` is not stated.
+ * @param response - the validation's answer: status and body
+ */
+export function parseValidationResponse(response: {
+  data: unknown;
+  status: number;
+}): ValidationReading {
+  const exception = readExceptionRefusal(response.data);
+  if (exception) {
+    const exists = namesTakenName(exception);
+    return {
+      valid: false,
+      severity: 'ERROR',
+      message: exception.message,
+      exists: exists || undefined,
+    };
+  }
+
+  // A document this reading cannot take apart — not XML, or a field that is
+  // not text where text is read — is answered from the status and the text.
+  let result: unknown;
   try {
-    const { XMLParser } = require('fast-xml-parser');
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@_',
     });
-    const result = parser.parse(response.data);
-
-    // Check for exception format (<exc:exception>)
-    const exception = result['exc:exception'];
-    if (exception) {
-      const message = exception.message || '';
-      const localizedMessage = exception.localizedMessage || message;
-      const msgText = localizedMessage || message;
-      const msgLower = msgText.toLowerCase();
-
-      // Check exception type - ExceptionResourceAlreadyExists means object exists
-      const exceptionType = exception.type || '';
-      const isResourceAlreadyExists =
-        exceptionType === 'ExceptionResourceAlreadyExists' ||
-        exceptionType.includes('ResourceAlreadyExists') ||
-        exceptionType.includes('AlreadyExists');
-
-      // InvalidClifName with "already exists" message also means object exists
-      const isInvalidClifName = exceptionType === 'InvalidClifName';
-
-      // Check if message indicates object already exists
-      const exists =
-        isResourceAlreadyExists ||
-        (isInvalidClifName && msgLower.includes('already exists')) ||
-        msgLower.includes('already exists') ||
-        (msgLower.includes('exist') &&
-          (msgLower.includes('table') ||
-            msgLower.includes('database') ||
-            msgLower.includes('resource') ||
-            msgLower.includes('interface') ||
-            msgLower.includes('class')));
-
-      return {
-        valid: false,
-        severity: 'ERROR',
-        message: msgText,
-        exists: exists ? true : undefined,
-      };
-    }
-
-    // Check for standard format (<asx:abap><asx:values><DATA>)
-    const data = result['asx:abap']?.['asx:values']?.DATA;
-    if (!data) {
-      // No data means validation passed
-      return { valid: true };
-    }
-
-    // Check for CHECK_RESULT=X (success)
-    if (data.CHECK_RESULT === 'X') {
-      return { valid: true };
-    }
-
-    // Check for SEVERITY (error/warning)
-    const severity = data.SEVERITY;
-    const shortText = data.SHORT_TEXT || '';
-    const longText = data.LONG_TEXT || '';
-
-    // Check if message indicates object already exists
-    const msgLower = shortText.toLowerCase();
-    const exists =
-      msgLower.includes('already exists') ||
-      msgLower.includes('does already exist') ||
-      (msgLower.includes('exist') &&
-        (msgLower.includes('resource') ||
-          msgLower.includes('definition') ||
-          msgLower.includes('object')));
-
-    return {
-      valid: severity !== 'ERROR',
-      severity: severity,
-      message: shortText,
-      longText: longText,
-      exists: exists || undefined,
-    };
+    result = parser.parse(xmlTextOf(response.data));
   } catch (_error) {
-    // If parsing fails, check HTTP status
-    if (response.status === 200) {
-      return { valid: true };
-    }
-    // If parsing fails and status is not 200, try to extract error message from response.data
-    let errorMessage = `Validation failed with status ${response.status}`;
-
-    // Try to extract error details from response data (plain text or XML)
-    if (response.data) {
-      const dataStr =
-        typeof response.data === 'string'
-          ? response.data
-          : String(response.data);
-      // Try to extract meaningful error from plain text or unparsed XML
-      if (dataStr.length > 0 && dataStr.length < 1000) {
-        // If it's short text, use it directly (might be plain error message)
-        errorMessage = dataStr.trim();
-      } else if (dataStr.includes('<message>')) {
-        // Try simple regex extraction for <message> tag
-        const match = dataStr.match(/<message[^>]*>([^<]+)<\/message>/i);
-        if (match?.[1]) {
-          errorMessage = match[1].trim();
-        }
-      }
-    }
-
-    return {
-      valid: false,
-      severity: 'ERROR',
-      message: errorMessage,
-    };
+    return validationFromStatus(response);
   }
-}
 
-/**
- * Check if error message indicates object was already checked
- * Used to handle "has been checked" / "was checked" messages as non-critical
- * @param error - Error object or error message string
- * @returns true if error indicates object was already checked
- */
-export function isAlreadyCheckedError(error: any): boolean {
-  const errorMessage = error?.message || error?.text || String(error || '');
-  const msgLower = errorMessage.toLowerCase();
-  return (
-    msgLower.includes('has been checked') ||
-    msgLower.includes('was checked') ||
-    msgLower.includes('already checked')
-  );
-}
-
-/**
- * Check if error message indicates object already exists
- * Used to handle validation errors for existing objects
- * @param error - Error object or error message string
- * @returns true if error indicates object already exists
- */
-export function isAlreadyExistsError(error: any): boolean {
-  const errorMessage = error?.message || error?.text || String(error || '');
-  const responseData =
-    typeof error?.response?.data === 'string'
-      ? error.response.data
-      : error?.response?.data
-        ? JSON.stringify(error.response.data)
-        : '';
-  const msgLower = `${errorMessage} ${responseData}`.toLowerCase();
-  return (
-    msgLower.includes('already exists') ||
-    msgLower.includes('does already exist') ||
-    msgLower.includes('resource already exists') ||
-    msgLower.includes('object already exists')
-  );
-}
-
-/**
- * Safely handle check operation - ignores "already checked" errors
- * Wraps check operation and handles "has been checked" as non-critical
- * @param checkOperation - Promise that performs check operation
- * @param objectName - Name of object being checked (for logging)
- * @param logger - Optional logger function for debug messages
- * @returns Result of check operation or throws if real error
- */
-export async function safeCheckOperation<T>(
-  checkOperation: () => Promise<T>,
-  objectName: string,
-  logger?: { debug?: (message: string, data?: any) => void },
-): Promise<T> {
-  try {
-    return await checkOperation();
-  } catch (checkError: any) {
-    if (isAlreadyCheckedError(checkError)) {
-      // Object was already checked - this is OK, continue
-      if (logger?.debug) {
-        logger?.debug(
-          `${objectName} was already checked - this is OK, continuing`,
-        );
-      }
-      // Return a mock success response or rethrow with handled flag
-      // For now, we'll rethrow but mark it as handled
-      const handledError = new Error(
-        `Object ${objectName} was already checked`,
-      );
-      (handledError as any).isAlreadyChecked = true;
-      throw handledError;
-    }
-    // Real check error - rethrow
-    throw checkError;
+  // Check for standard format (<asx:abap><asx:values><DATA>)
+  const data = childAt(result, 'asx:abap', 'asx:values', 'DATA');
+  if (!data) {
+    // No data means validation passed
+    return { valid: true };
   }
+
+  // Check for CHECK_RESULT=X (success)
+  if (child(data, 'CHECK_RESULT') === 'X') {
+    return { valid: true };
+  }
+
+  // SEVERITY (error/warning) decides; the texts are relayed.
+  const severity = child(data, 'SEVERITY');
+  const shortText = child(data, 'SHORT_TEXT') || '';
+  const longText = child(data, 'LONG_TEXT') || '';
+  if (typeof shortText !== 'string') return validationFromStatus(response);
+
+  return {
+    valid: severity !== 'ERROR',
+    severity: severity === undefined ? undefined : String(severity),
+    message: shortText,
+    longText: String(longText),
+  };
 }
+
+/**
+ * Whether an `exc:exception` refuses a name that is taken: a message
+ * carries a name-taken T100 key (`NAME_TAKEN_KEYS`), or — SAP giving no key —
+ * the exception type is `ExceptionResourceAlreadyExists`.
+ */
+function namesTakenName(refusal: AdtRefusal): boolean {
+  const keyed = refusal.messages.some((message) => message.t100 !== undefined);
+  return keyed
+    ? refusal.messages.some((message) => hasT100Key(message, NAME_TAKEN_KEYS))
+    : refusal.adtType === ALREADY_EXISTS_TYPE;
+}
+
+/**
+ * Whether an error is SAP's refusal of a name that is taken: its body is an
+ * `exc:exception` carrying a name-taken T100 key (`NAME_TAKEN_KEYS`), or —
+ * where SAP gives no key — of type `ExceptionResourceAlreadyExists`; read by
+ * key or type, whatever the logon language words it.
+ * @param error - an error carrying SAP's answer (`response.data`)
+ */
+export function isAlreadyExistsError(error: unknown): boolean {
+  const refusal = readExceptionRefusal(childAt(error, 'response', 'data'));
+  return refusal !== null && namesTakenName(refusal);
+}
+
 export interface ServerOptions {
   sapConfig?: SapConfig;
   connection?: IAbapConnection;
@@ -1036,10 +845,8 @@ function debugLog(message: string): void {
   // Also try to write to a debug file on Windows
   if (process.platform === 'win32') {
     try {
-      const fs = require('node:fs');
-      const path = require('node:path');
-      const debugFile = path.join(process.cwd(), 'mcp-debug.log');
-      fs.appendFileSync(
+      const debugFile = join(process.cwd(), 'mcp-debug.log');
+      appendFileSync(
         debugFile,
         `${new Date().toISOString()} ${message}`,
         'utf8',
@@ -1166,8 +973,21 @@ export function formatAuthConfigForDisplay(
   return lines.join('\n');
 }
 
-export function parseActivationResponse(responseData: any) {
-  const { XMLParser } = require('fast-xml-parser');
+/** What fast-xml-parser reads of `value`: its text, as `parse` reads it. */
+function xmlTextOf(value: unknown): string | Uint8Array {
+  if (typeof value === 'string' || value instanceof Uint8Array) return value;
+  if (value === undefined || value === null) {
+    throw new TypeError('XML data is accepted in String or Bytes[] form.');
+  }
+  return String(value);
+}
+
+/** An attribute that reads `true`, as text or as a parsed boolean. */
+function isTrue(value: unknown): boolean {
+  return value === 'true' || value === true;
+}
+
+export function parseActivationResponse(responseData: unknown) {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
@@ -1178,35 +998,33 @@ export function parseActivationResponse(responseData: any) {
     const data =
       typeof responseData === 'string'
         ? responseData
-        : responseData?.data || JSON.stringify(responseData);
-    const result = parser.parse(data);
-    const properties = result['chkl:messages']?.['chkl:properties'];
-    const activated =
-      properties?.['@_activationExecuted'] === 'true' ||
-      properties?.['@_activationExecuted'] === true;
-    const checked =
-      properties?.['@_checkExecuted'] === 'true' ||
-      properties?.['@_checkExecuted'] === true;
-    const generated =
-      properties?.['@_generationExecuted'] === 'true' ||
-      properties?.['@_generationExecuted'] === true;
+        : child(responseData, 'data') || JSON.stringify(responseData);
+    const result: unknown = parser.parse(xmlTextOf(data));
+    const properties = childAt(result, 'chkl:messages', 'chkl:properties');
+    const activated = isTrue(child(properties, '@_activationExecuted'));
+    const checked = isTrue(child(properties, '@_checkExecuted'));
+    const generated = isTrue(child(properties, '@_generationExecuted'));
     const messages: Array<{
       type: string;
       text: string;
       line?: number;
       column?: number;
     }> = [];
-    const msgData = result['chkl:messages']?.msg;
+    const numberOrNone = (value: unknown) =>
+      typeof value === 'number' ? value : undefined;
+    const msgData = childAt(result, 'chkl:messages', 'msg');
     if (msgData) {
-      const msgArray = Array.isArray(msgData) ? msgData : [msgData];
-      msgArray.forEach((msg: any) => {
+      for (const msg of listOf(msgData)) {
+        const shortText = child(msg, 'shortText');
         messages.push({
-          type: msg['@_type'] || 'info',
-          text: msg.shortText?.txt || msg.shortText || 'Unknown message',
-          line: msg['@_line'],
-          column: msg['@_column'],
+          type: String(child(msg, '@_type') || 'info'),
+          text: String(
+            child(shortText, 'txt') || shortText || 'Unknown message',
+          ),
+          line: numberOrNone(child(msg, '@_line')),
+          column: numberOrNone(child(msg, '@_column')),
         });
-      });
+      }
     }
     return {
       activated,

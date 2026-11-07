@@ -50,16 +50,11 @@ const AUTH_TYPE_REASON =
 const GRANT_REASON = 'grantType is missing or not a known grant.';
 
 function isAuthType(value: unknown): value is AuthType {
-  return (
-    typeof value === 'string' &&
-    (AUTH_TYPES as readonly string[]).includes(value)
-  );
+  return AUTH_TYPES.some((type) => type === value);
 }
 
 function isGrant(value: unknown): value is DestinationGrant {
-  return (
-    typeof value === 'string' && (GRANTS as readonly string[]).includes(value)
-  );
+  return GRANTS.some((grant) => grant === value);
 }
 
 export interface VettedAuthentication {

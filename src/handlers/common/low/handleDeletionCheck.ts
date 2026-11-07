@@ -9,8 +9,6 @@
  * deletion request removes (`deletionTargets.ts`). Nothing is changed.
  */
 
-import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
-import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { COMPACT_DELETION_CHECK, supported } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
@@ -68,21 +66,14 @@ export async function handleDeletionCheck(
   return answer(
     ANSWER,
     () =>
-      atStep(
-        'delete check',
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(target.objectType, 'checkDeletion'),
-            (headers) =>
-              target
-                .checked(createAdtClient(connection, logger))
-                .checkDeletion(
-                  target.config({ name, ...(group ? { group } : {}) }),
-                  { headers, analyse: analyseDeletion },
-                ),
-          ) as Promise<never>,
-      )() as Promise<never>,
+      atStep('delete check', () =>
+        target.checkDeletion(
+          context,
+          createAdtClient(connection, logger),
+          { name, ...(group ? { group } : {}) },
+          analyseDeletion,
+        ),
+      )(),
     project('terse', terseDeletionCheck),
   );
 }

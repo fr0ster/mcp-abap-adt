@@ -76,13 +76,21 @@ export function wireOf(r: RequestedBreakpoint): IDebuggerBreakpoint {
   return { ...r.definition, clientId: r.clientId };
 }
 
+/** A row the system placed: it names its id. */
+export type PlacedBreakpoint = BreakpointReading & { id: string };
+
+/** Whether `row` was placed: it names a non-empty id. */
+function isPlaced(row: BreakpointReading): row is PlacedBreakpoint {
+  return typeof row.id === 'string' && row.id !== '';
+}
+
 export interface Pairing {
   /** The definitions placed, with their tags: what the next change sends again. */
   requested: RequestedBreakpoint[];
   /** A paired placed row's id → its definition's tag. */
   paired: Map<string, string>;
   /** Every placed row of the answer, an unexpected one included: the system holds it. */
-  placed: BreakpointReading[];
+  placed: PlacedBreakpoint[];
   /** New definitions not placed. */
   refused: BreakpointNotPlaced[];
   /** Earlier definitions not placed any more. */
@@ -108,7 +116,7 @@ export function pairRows(
   const result: Pairing = {
     requested: [],
     paired: new Map(),
-    placed: rows.filter((r) => r.id),
+    placed: rows.filter(isPlaced),
     refused: [],
     lost: [],
     unexpected: [],

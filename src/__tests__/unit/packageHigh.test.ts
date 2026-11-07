@@ -24,7 +24,9 @@ import { corpusBody } from '../../lib/adtCorpus';
 import type {
   HandlerContext,
   HandlerEntry,
+  ToolArgs,
 } from '../../lib/handlers/interfaces';
+import { holdingLockOf } from '../helpers/heldLocks';
 import {
   parityConnection,
   parityRequests,
@@ -74,12 +76,13 @@ const shape = (requests: { method: string; url: string }[]) =>
 function compactTool(connection: unknown, name: string) {
   const context = ctx(connection);
   const entries: HandlerEntry[] = [
-    ...compactModifyEntries(() => context),
-    ...compactReadOnlyEntries(() => context),
+    ...compactModifyEntries(),
+    ...compactReadOnlyEntries(),
   ];
   const entry = entries.find((e) => e.toolDefinition.name === name);
   if (!entry) throw new Error(name);
-  return entry.handler as unknown as (args: unknown) => Promise<unknown>;
+  return (args: ToolArgs) =>
+    entry.call({ ...context, heldLocks: holdingLockOf(args) }, args);
 }
 
 describe('UpdatePackage (high)', () => {
@@ -219,16 +222,19 @@ describe('DeletePackage (high)', () => {
     ]);
   });
 
-  it('a package the check reports absent gets no delete', async () => {
-    const absent =
+  // A permitted check is followed by the delete, whatever its W says: on
+  // premise the check words existing objects "does not exist" (#1, #11).
+  it('a package the check permits gets the delete, though its W says "does not exist"', async () => {
+    const permitted =
       '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">' +
       '<del:object adtcore:uri="/sap/bc/adt/packages/pkg_a" del:isDeletable="true">' +
       '<del:message del:type="W"><del:text>Object PKG_A does not exist</del:text></del:message>' +
       '</del:object></del:checkResponse>';
-    const connection = recordingConnection([{ data: absent }]);
+    const connection = recordingConnection([{ data: permitted }]);
     await handleDeletePackage(ctx(connection), { package_name: 'PKG_A' });
     expect(shape(connection.requests)).toEqual([
       'POST /sap/bc/adt/deletion/check',
+      'POST /sap/bc/adt/deletion/delete',
     ]);
   });
 

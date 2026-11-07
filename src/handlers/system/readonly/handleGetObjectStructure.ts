@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
  */
@@ -7,44 +9,36 @@ import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { attr, child, childAt, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Returns the ADT structure of the repository object named by objecttype and objectname as a compact JSON tree.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      objecttype: {
-        type: 'string',
-        description: 'ADT object type (e.g. DDLS/DF)',
-      },
-      objectname: {
-        type: 'string',
-        description: 'ADT object name (e.g. /CBY/ACQ_DDL)',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['objecttype', 'objectname'],
-  },
+  inputSchema: z.object({
+    objecttype: z.string().describe('ADT object type (e.g. DDLS/DF)'),
+    objectname: z.string().describe('ADT object name (e.g. /CBY/ACQ_DDL)'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
+/** A node as the document lists it: each attribute as given, or absent. */
 interface FlatObjectStructureNode {
-  nodeid: string;
+  nodeid?: string;
   parentid?: string;
-  objecttype: string;
+  objecttype?: string;
   objectname?: string;
   description?: string;
   isfolder: boolean;
 }
 
 interface ObjectStructureTreeNode {
-  objecttype: string;
+  objecttype?: string;
   objectname?: string;
   description?: string;
   isfolder: boolean;
@@ -60,19 +54,21 @@ interface ObjectStructureTreeNode {
  * forced-array elements, so this holds for a single node too.
  */
 function flatNodesOf(value: unknown): FlatObjectStructureNode[] {
-  const nodesRaw = (value as any)?.['projectexplorer:objectstructure']?.[
-    'projectexplorer:node'
-  ];
-  const nodes = Array.isArray(nodesRaw) ? nodesRaw : nodesRaw ? [nodesRaw] : [];
-  return nodes.map((n: any) => {
-    const a = n?.['@'] ?? {};
+  const nodesRaw = childAt(
+    value,
+    'projectexplorer:objectstructure',
+    'projectexplorer:node',
+  );
+  const nodes = isList(nodesRaw) ? nodesRaw : nodesRaw ? [nodesRaw] : [];
+  return nodes.map((n) => {
+    const a = child(n, '@');
     return {
-      nodeid: a.nodeid,
-      parentid: a.parentid,
-      objecttype: a.objecttype,
-      objectname: a.objectname,
-      description: a.description,
-      isfolder: a.isfolder === 'true',
+      nodeid: attr(a, 'nodeid'),
+      parentid: attr(a, 'parentid'),
+      objecttype: attr(a, 'objecttype'),
+      objectname: attr(a, 'objectname'),
+      description: attr(a, 'description'),
+      isfolder: attr(a, 'isfolder') === 'true',
     };
   });
 }
@@ -90,7 +86,7 @@ function buildNestedTree(
 ): ObjectStructureTreeNode[] {
   const nodeMap: Record<string, ObjectStructureTreeNode> = {};
   flatNodes.forEach((node) => {
-    nodeMap[node.nodeid] = {
+    nodeMap[String(node.nodeid)] = {
       objecttype: node.objecttype,
       objectname: node.objectname,
       description: node.description,
@@ -104,11 +100,11 @@ function buildNestedTree(
     : undefined;
   flatNodes.forEach((node) => {
     if (node.parentid && nodeMap[node.parentid]) {
-      nodeMap[node.parentid].children.push(nodeMap[node.nodeid]);
+      nodeMap[node.parentid].children.push(nodeMap[String(node.nodeid)]);
     } else if (node.parentid && synthetic) {
-      synthetic.children.push(nodeMap[node.nodeid]);
+      synthetic.children.push(nodeMap[String(node.nodeid)]);
     } else {
-      roots.push(nodeMap[node.nodeid]);
+      roots.push(nodeMap[String(node.nodeid)]);
     }
   });
   if (synthetic && synthetic.children.length > 0) roots.unshift(synthetic);
@@ -169,9 +165,7 @@ function serializeTree(
  * through `call()` first — cheap, since the check is synchronous and idempotent.
  */
 export function assertObjectStructurePresent(value: unknown): void {
-  const root = (
-    value as { 'projectexplorer:objectstructure'?: unknown } | null | undefined
-  )?.['projectexplorer:objectstructure'];
+  const root = child(value, 'projectexplorer:objectstructure');
   if (root === undefined || root === null) {
     throw new Error(
       'No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',

@@ -19,12 +19,30 @@ export interface LibInstance {
 
 const REGISTRY = Symbol.for('@mcp-abap-adt/lib/instances');
 
+/**
+ * Whether `value` is the registry another copy of this module left on the
+ * global: a list of entries, each naming its file.
+ */
+function isRegistry(value: unknown): value is LibInstance[] {
+  // Read here, not through the tree module: this module imports nothing, so
+  // it runs on its own, even where there is no `require`.
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry: unknown) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        'file' in entry &&
+        typeof entry.file === 'string',
+    )
+  );
+}
+
 function registry(): LibInstance[] {
-  const holder = globalThis as Record<symbol, unknown>;
-  const found = holder[REGISTRY];
-  if (Array.isArray(found)) return found as LibInstance[];
+  const found: unknown = Reflect.get(globalThis, REGISTRY);
+  if (isRegistry(found)) return found;
   const created: LibInstance[] = [];
-  holder[REGISTRY] = created;
+  Reflect.set(globalThis, REGISTRY, created);
   return created;
 }
 

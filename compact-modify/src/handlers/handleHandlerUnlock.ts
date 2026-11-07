@@ -6,8 +6,8 @@ import {
   COMPACT_UNLOCK,
   compactUnlockDescription,
   compactUnlockSchemaFor,
-  LOCK_NOT_HELD_WORDS,
   lockHeldHere,
+  lockNotHeldWords,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
@@ -69,13 +69,13 @@ export async function handleHandlerUnlock(
     };
   }
   if (!lockHeldHere(context.heldLocks, args.lock_handle)) {
-    return return_error(new Error(LOCK_NOT_HELD_WORDS));
+    return return_error(new Error(lockNotHeldWords(context.heldLocks)));
   }
-  const answered = (await unlockObject(context, {
+  const answered = await unlockObject(context, {
     object_name: args.object_name,
     object_type: COMPACT_LOCK_KINDS[member],
     lock_handle: args.lock_handle,
-  })) as { isError?: boolean };
+  });
   // The UNLOCK answered: the lock is held no more.
   if (!answered?.isError) context.heldLocks?.release(args.lock_handle);
   return answered;

@@ -1,4 +1,6 @@
 import { messageDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
 /**
  * CreateMessageClassMessage Handler - Add (upsert) a single message to a
  * Message Class (MSAG)
@@ -40,40 +42,30 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Adds the message numbered msgno, with the text msgtext, to the existing ABAP message class (T100) named by message_class_name.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Parent message class name.',
-      },
-      msgno: {
-        type: 'string',
-        description: 'Message number (e.g., "001").',
-      },
-      msgtext: {
-        type: 'string',
-        description:
-          'Message text. May contain placeholders &1 &2 &3 &4 (or &).',
-      },
-      self_explanatory: {
-        type: 'boolean',
-        description:
-          '(optional) Mark the message as self-explanatory (no long text needed). Default: false.',
-        default: false,
-      },
-      description: {
-        type: 'string',
-        description: '(optional) Long description for the message.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          '(optional) Transport request number, not a task. Required for transportable objects.',
-      },
-    },
-    required: ['message_class_name', 'msgno', 'msgtext'],
-  },
+  inputSchema: createArguments('CreateMessageClassMessage', {
+    message_class_name: z.string().describe('Parent message class name.'),
+    msgno: z.string().describe('Message number (e.g., "001").'),
+    msgtext: z
+      .string()
+      .describe('Message text. May contain placeholders &1 &2 &3 &4 (or &).'),
+    self_explanatory: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        '(optional) Mark the message as self-explanatory (no long text needed). Default: false.',
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe('(optional) Long description for the message.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Transport request number, not a task. Required for transportable objects.',
+      ),
+  }),
 } as const;
 
 interface CreateMessageClassMessageArgs {

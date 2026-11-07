@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 /**
  * RuntimeRunClass Handler - Execute an ABAP class, optionally profiled
  *
@@ -41,7 +43,6 @@ import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
@@ -59,58 +60,55 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Runs the ABAP class named by class_name, which implements if_oo_adt_classrun, and returns its console output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace appears only after that bound, the run still answers success with output and profiler_id, trace_id absent — the trace is then found later in the list of profiler trace files.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'ABAP class name to execute.',
-      },
-      background: BACKGROUND_PROPERTY,
-      profile: {
-        type: 'boolean',
-        description:
-          'When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Profiler trace description (only used when profile=true).',
-      },
-      all_procedural_units: { type: 'boolean' },
-      all_misc_abap_statements: { type: 'boolean' },
-      all_internal_table_events: { type: 'boolean' },
-      all_dynpro_events: { type: 'boolean' },
-      aggregate: { type: 'boolean' },
-      explicit_on_off: { type: 'boolean' },
-      with_rfc_tracing: { type: 'boolean' },
-      all_system_kernel_events: { type: 'boolean' },
-      sql_trace: { type: 'boolean' },
-      all_db_events: { type: 'boolean' },
-      max_size_for_trace_file: { type: 'number' },
-      amdp_trace: { type: 'boolean' },
-      max_time_for_tracing: { type: 'number' },
-      max_trace_attempts: {
-        type: 'integer',
-        minimum: 1,
-        description:
-          'Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.',
-      },
-      trace_retry_delay_ms: {
-        type: 'integer',
-        minimum: 0,
-        description:
-          'Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.',
-      },
-      trace_lookup_uris: {
-        type: 'array',
-        items: { type: 'string', minLength: 1 },
-        description:
-          'Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.',
-      },
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('ABAP class name to execute.'),
+    background: BACKGROUND_FIELD,
+    profile: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.',
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe('Profiler trace description (only used when profile=true).'),
+    all_procedural_units: z.boolean().optional(),
+    all_misc_abap_statements: z.boolean().optional(),
+    all_internal_table_events: z.boolean().optional(),
+    all_dynpro_events: z.boolean().optional(),
+    aggregate: z.boolean().optional(),
+    explicit_on_off: z.boolean().optional(),
+    with_rfc_tracing: z.boolean().optional(),
+    all_system_kernel_events: z.boolean().optional(),
+    sql_trace: z.boolean().optional(),
+    all_db_events: z.boolean().optional(),
+    max_size_for_trace_file: z.number().optional(),
+    amdp_trace: z.boolean().optional(),
+    max_time_for_tracing: z.number().optional(),
+    max_trace_attempts: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        'Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.',
+      ),
+    trace_retry_delay_ms: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.',
+      ),
+    trace_lookup_uris: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.',
+      ),
+  }),
 } as const;
 
 interface RuntimeRunClassArgs {

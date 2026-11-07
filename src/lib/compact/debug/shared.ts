@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import type { McpResult } from '../../answer';
 import {
   type DebuggerInstance,
@@ -15,38 +16,39 @@ import type { HandlerContext } from '../../handlers/index';
 export type DebugKind = 'abap' | 'amdp';
 
 export const KIND_PROPERTY = {
-  kind: {
-    type: 'string',
-    enum: ['abap', 'amdp'],
-    description:
+  kind: z
+    .enum(['abap', 'amdp'])
+    .describe(
       'abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.',
-  },
-} as const;
+    ),
+};
 
 /** The handle on a tool some of whose operations open the debug state: `opening` names them. */
-export function openingStateHandleProperty<const W extends string>(opening: W) {
+export function openingStateHandleProperty(opening: string) {
   return {
-    state_handle: {
-      type: 'string',
-      description:
-        `The handle of this server's debug state. ${opening} open the debug state when it is omitted and answer its handle; every other operation takes it.` as `The handle of this server's debug state. ${W} open the debug state when it is omitted and answer its handle; every other operation takes it.`,
-    },
-  } as const;
+    state_handle: z
+      .string()
+      .optional()
+      .describe(
+        `The handle of this server's debug state. ${opening} open the debug state when it is omitted and answer its handle; every other operation takes it.`,
+      ),
+  };
 }
 
 export const IDENTITY_PROPERTIES = {
-  request_user: {
-    type: 'string',
-    description:
+  request_user: z
+    .string()
+    .optional()
+    .describe(
       'abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.',
-  },
-  debugging_mode: {
-    type: 'string',
-    enum: ['user', 'terminal'],
-    description:
+    ),
+  debugging_mode: z
+    .enum(['user', 'terminal'])
+    .optional()
+    .describe(
       "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
-  },
-} as const;
+    ),
+};
 
 /** A call of one kind is refused while the instance holds the other. */
 export function refuseOtherKind(

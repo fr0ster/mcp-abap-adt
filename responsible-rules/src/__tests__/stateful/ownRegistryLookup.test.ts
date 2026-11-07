@@ -49,7 +49,7 @@ function ownRegistry(seen: Seen): IHandlersRegistry {
         'OwnProbe',
         {
           description: 'registered by its own registry',
-          inputSchema: { id: z.string() },
+          inputSchema: z.object({ id: z.string() }),
         },
         async (args: { id: string }, extra: { signal: AbortSignal }) => {
           seen.push(getStatedSystemContext().responsible);

@@ -1,4 +1,5 @@
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * ListFunctionModules Handler
  *
@@ -39,16 +40,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] List the function modules of an ABAP function group, read at its active version.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name.',
-      },
-    },
-    required: ['function_group_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z.string().describe('Function group name.'),
+  }),
 } as const;
 
 export async function handleListFunctionModules(

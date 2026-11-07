@@ -125,6 +125,19 @@ The bodies are the answers byte for byte, except that every SAP user id
 (`author`, `processor`, `lastChangedBy`) was set to `SAPUSER01`. They were
 taken by a direct GET; the response headers were not recorded.
 
+| Case | What provoked it | What came back |
+|---|---|---|
+| `read-outline-class` | `GET /sap/bc/adt/oo/classes/{name}/objectstructure`, Accept `application/vnd.sap.adt.objectstructure.v2+xml`, a class the measurement created (types, attributes, an event, public, protected and private methods, an implemented interface), 2026-11-04 | 200, nested `abapsource:objectStructureElement`s with `visibility`, `level`, `clif_name`, and `atom:link`s positioned `./source/main#start=l,c;end=l,c` |
+| `read-outline-local-class` | the same read of a class with a local class and a local type | 200, `CLAS/OCL`, `CLAS/OLD` and `CLAS/OLT` elements pointing into `./includes/definitions` and `./includes/implementations` |
+| `read-outline-interface` | `GET /sap/bc/adt/oo/interfaces/{name}/objectstructure`, the same Accept | 200, `INTF/IT`, `INTF/IA`, `INTF/IE`, `INTF/IO` with positions |
+| `read-outline-program` | `GET /sap/bc/adt/programs/programs/{name}/objectstructure`, the same Accept, on premise | 200, `PROG/PL`, `PROG/PLM`, `PROG/PY`, `PROG/PD`, `PROG/PE`, `PROG/PU`, `PROG/I`, `PROG/PX`; links name their target (`#type=…;name=…`), no positions |
+| `read-outline-function-group` | `GET /sap/bc/adt/functions/groups/{name}/objectstructure`, the same Accept | 200, `FUGR/I`, `FUGR/PX` and `FUGR/FF` elements, each link a source URI |
+
+The bodies are the answers byte for byte (plan D1's measurement, on premise and on ABAP cloud: the
+same apart from object names), copied from adt-clients' corpus (`corpus/adt/answers/`); the
+sidecars hold the request and the status, and no response header but the content type.
+`GetObjectOutline` reads them.
+
 ## Refusals
 
 | Case | What provoked it | How SAP refused |

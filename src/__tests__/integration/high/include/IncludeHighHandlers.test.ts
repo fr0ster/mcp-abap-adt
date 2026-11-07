@@ -35,7 +35,6 @@
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
@@ -64,6 +63,7 @@ import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/Com
 import { patchXmlAttribute } from '../../../../lib/strategies/xmlPatch';
 import { getSystemType, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext, delay } from '../../helpers/testHelpers';
@@ -556,10 +556,11 @@ async function listedTools(
   server: EmbeddableMcpServer,
 ): Promise<Array<{ name: string; inputSchema: unknown }>> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'incl-cloud', version: '1.0.0' });
-  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+  // Timer-free JSON-RPC over the in-memory transport (no SDK client).
+  const client = new McpSession(clientSide);
+  await Promise.all([server.connect(serverSide), client.initialize()]);
   try {
-    const { tools } = await client.listTools();
+    const tools = await client.listTools();
     return tools.map((tool) => ({
       name: tool.name,
       inputSchema: tool.inputSchema,

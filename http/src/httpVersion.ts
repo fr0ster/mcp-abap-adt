@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { packageManifestOf } from '@mcp-abap-adt/lib/config';
 
 /**
  * `@mcp-abap-adt/http`'s own version, read from its own manifest: the version
@@ -10,8 +11,8 @@ import { join } from 'node:path';
  * `dist/` when built) and the package root when installed — in every layout it
  * is this package's `package.json`.
  */
-const manifest: { name: string; version: string } = JSON.parse(
-  readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+const manifest = packageManifestOf(
+  JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')),
 );
 
 export const HTTP_VERSION: string = manifest.version;

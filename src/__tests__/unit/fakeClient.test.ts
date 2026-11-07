@@ -103,7 +103,7 @@ describe('fakeClient helpers', () => {
     expect(result.getResult()).toEqual({ value: { name: 'ZD' } });
   });
 
-  it('fakeClientOf falls back to undefined for unnamed members', async () => {
+  it('fakeClientOf falls back to an empty reading for unnamed members', async () => {
     const members = {
       getDomain: async () => okResponse({ name: 'ZD' }),
     };
@@ -112,7 +112,9 @@ describe('fakeClient helpers', () => {
     const member = factory();
     const result = await member.getTable();
     expect(result.ok).toBe(true);
-    expect(result.getResult()).toEqual({ value: undefined });
+    expect(result.getResult()).toEqual({
+      value: reading(undefined, '', 200),
+    });
   });
 
   it('refusingClient refuses whatever it is asked', async () => {

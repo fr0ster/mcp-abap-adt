@@ -1717,12 +1717,13 @@ describe('Admin: Setup shared dependencies', () => {
                 status: 'created',
               });
             }
-            const readKind = {
+            const readKinds: Partial<Record<string, string>> = {
               'INTF/OI': 'interface',
               'PROG/P': 'program',
               'DDLX/EX': 'ddlx',
               'TABL/DS': 'append',
-            }[kind.typeCode];
+            };
+            const readKind = readKinds[kind.typeCode];
             if (
               kind.update &&
               item.source &&

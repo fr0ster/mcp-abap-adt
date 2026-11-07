@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckDdlLow Handler - Syntax check for ABAP DDL Source
  *
@@ -16,7 +18,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -26,28 +28,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ddl_name: {
-        type: 'string',
-        description: 'DDL source name.',
-      },
-      ddl_source: {
-        type: 'string',
-        description:
-          'Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Without `version` the active version is checked.",
-        enum: ['active', 'inactive'],
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['ddl_name'],
-  },
+  inputSchema: z.object({
+    ddl_name: z.string().describe('DDL source name.'),
+    ddl_source: z
+      .string()
+      .optional()
+      .describe(
+        'Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.',
+      ),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Without `version` the active version is checked.",
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CheckDdlArgs {

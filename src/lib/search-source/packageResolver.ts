@@ -2,6 +2,8 @@ import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes, TableMainOf } from '../adtProjections';
+import { isCredentialFailure } from '../answer';
+import { appendAll } from '../appendAll';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -26,34 +28,82 @@ export interface SearchObjectsArgs {
 export const PACKAGE_SEARCH_NAME =
   ADT_TYPES_ONPREM.package.codes[PACKAGE_CODE].main;
 
-export type SearchObjectsFn = (args: SearchObjectsArgs) => Promise<string[]>;
+/**
+ * One quick search: the package names it answers, or `undefined` for a
+ * search not answered yet (the batched version names its searches first,
+ * `answeredSearch`); a search over a connection always answers.
+ */
+export type SearchObjectsFn = (
+  args: SearchObjectsArgs,
+) => Promise<string[] | undefined>;
+
+/** A quick search over a connection: every search answered. */
+export type AnsweringSearch = (args: SearchObjectsArgs) => Promise<string[]>;
 
 export interface PackageResolverDeps {
   searchObjects: SearchObjectsFn;
 }
 
-const WILDCARD_RE = /[*+]/;
-
+/**
+ * A package entry is a mask when it holds a wildcard of the quick search:
+ * `*` (zero or more characters) or `?` (one character). `+`, `_`, `%` and
+ * `#` are characters of a package name, so an entry holding neither `*` nor
+ * `?` is an exact name.
+ */
 function isPattern(entry: string): boolean {
-  return WILDCARD_RE.test(entry);
+  return entry.includes('*') || entry.includes('?');
 }
 
+/** The first round's `maxResults` of a mask search; each next round doubles it. */
+const FIRST_ROUND = 1000;
+
+/** The packages the entries name. */
+export interface ResolvedPackages {
+  packages: string[];
+}
+
+/**
+ * Every package `mask` names: the quick search asked with `maxResults`
+ * doubled until its answer holds fewer packages than `maxResults` (the
+ * quick search has no window to page around and answers no "more" marker,
+ * measured). `undefined` while a round is not answered yet. A round needs
+ * the previous round's answer, so the rounds are sequential.
+ */
+async function resolveMask(
+  deps: PackageResolverDeps,
+  mask: string,
+): Promise<string[] | undefined> {
+  for (let maxResults = FIRST_ROUND; ; maxResults *= 2) {
+    const names = await deps.searchObjects({
+      query: mask,
+      objectType: PACKAGE_SEARCH_NAME,
+      maxResults,
+    });
+    if (names === undefined) return undefined;
+    if (names.length < maxResults) return names;
+  }
+}
+
+/**
+ * The packages `entries` name: the exact names as given, then every
+ * package each mask resolves to, each package once. A mask SAP refuses is
+ * skipped; a credential failure ends the call, thrown as it came.
+ */
 export async function resolvePackagePatterns(
   deps: PackageResolverDeps,
   entries: string[],
-): Promise<string[]> {
+): Promise<ResolvedPackages> {
   const exact: string[] = [];
   const resolved: string[] = [];
   for (const entry of entries) {
-    if (isPattern(entry)) {
-      const names = await deps.searchObjects({
-        query: entry,
-        objectType: PACKAGE_SEARCH_NAME,
-        maxResults: 1000,
-      });
-      resolved.push(...names);
-    } else {
+    if (!isPattern(entry)) {
       exact.push(entry);
+      continue;
+    }
+    try {
+      appendAll(resolved, (await resolveMask(deps, entry)) ?? []);
+    } catch (error) {
+      if (isCredentialFailure(error)) throw error;
     }
   }
   const seen = new Set<string>();
@@ -64,7 +114,7 @@ export async function resolvePackagePatterns(
     seen.add(key);
     out.push(name);
   }
-  return out;
+  return { packages: out };
 }
 
 /**
@@ -91,7 +141,7 @@ export async function resolvePackagePatterns(
  */
 export function createPackagePatternResolver(
   ctx: HandlerContext,
-): SearchObjectsFn {
+): AnsweringSearch {
   const client = createAdtClient(ctx.connection, ctx.logger);
   // adt-clients 23 ships the search document as it came; the parsed hits
   // are `utilSearchHits` from adt-strategies (MIGRATION-23 §4).
@@ -121,9 +171,11 @@ function searchKey(args: SearchObjectsArgs): string {
  * A `SearchObjectsFn` answering from `answers`, for the batched version of
  * `SearchSource` (spec §11): a search answered there gives its package names
  * (or throws its failure, as it came); a search with no answer yet is
- * recorded in `asked` and gives no names. `resolvePackagePatterns` run over it
- * once names the searches of a phase; run again once the phase answered, it
- * resolves the packages exactly as over the connection.
+ * recorded in `asked` and answers `undefined` — not answered, never a short
+ * answer. `resolvePackagePatterns` run over it names the searches of the next
+ * phase (each mask's next round); run again once every phase answered (a run
+ * that asks nothing), it resolves the packages exactly as over the
+ * connection.
  */
 export function answeredSearch(
   answers: ReadonlyMap<string, PhaseResult<string[]>>,
@@ -133,7 +185,7 @@ export function answeredSearch(
     const answer = answers.get(searchKey(args));
     if (answer === undefined) {
       asked.push(args);
-      return [];
+      return undefined;
     }
     if (!answer.ok) throw answer.error;
     return answer.value;
@@ -149,13 +201,14 @@ export async function searchPackagesInPhase(
   ctx: HandlerContext,
   asked: readonly SearchObjectsArgs[],
 ): Promise<Map<string, PhaseResult<string[]>>> {
-  const results = await runPhase(ctx, asked, (args, connection) =>
+  // One request per distinct search: a mask named twice is one search, so
+  // no answer of it can stand in for another's (a later success hiding a
+  // credential refusal).
+  const distinct = [
+    ...new Map(asked.map((args) => [searchKey(args), args])).values(),
+  ];
+  const results = await runPhase(ctx, distinct, (args, connection) =>
     createPackagePatternResolver({ ...ctx, connection })(args),
   );
-  return new Map(
-    asked.map((args, i) => [
-      searchKey(args),
-      results[i] as PhaseResult<string[]>,
-    ]),
-  );
+  return new Map(distinct.map((args, i) => [searchKey(args), results[i]]));
 }

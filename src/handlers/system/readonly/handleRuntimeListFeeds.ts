@@ -9,6 +9,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import {
   answer,
   answerThrown,
@@ -22,8 +23,13 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
+import { withSystemKindOf } from '../../../lib/connectionFactory';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { afterLast, isBlank } from '../../../lib/plainText';
 import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
@@ -43,82 +49,79 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      feed_type: {
-        type: 'string',
-        enum: [
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    feed_type: z
+      .enum([
+        'descriptors',
+        'variants',
+        'dumps',
+        'system_messages',
+        'gateway_errors',
+      ])
+      .optional()
+      .describe(
+        'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
+      ),
+    feed_types: z
+      .array(
+        z.enum([
           'descriptors',
           'variants',
           'dumps',
           'system_messages',
           'gateway_errors',
-        ],
-        description:
-          'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
-      },
-      feed_types: {
-        type: 'array',
-        items: {
-          type: 'string',
-          enum: [
-            'descriptors',
-            'variants',
-            'dumps',
-            'system_messages',
-            'gateway_errors',
-          ],
-        },
-        description:
-          'Several feeds, read together with the same filters (give this or feed_type).',
-      },
-      user: {
-        type: 'string',
-        description: 'Entries of this SAP user (exact match).',
-      },
-      runtime_error: {
-        type: 'string',
-        description:
-          'Dumps whose runtime error contains this text, in any case.',
-      },
-      exception: {
-        type: 'string',
-        description:
-          'Dumps whose exception class contains this text, in any case.',
-      },
-      object_name: {
-        type: 'string',
-        description:
-          'Dumps whose terminated object name contains this text, in any case.',
-      },
-      package: {
-        type: 'string',
-        description:
-          'Dumps whose object package contains this text, in any case.',
-      },
-      component: {
-        type: 'string',
-        description:
-          'Dumps whose application component contains this text, in any case.',
-      },
-      max_results: {
-        type: 'number',
-        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
-      },
-      from: {
-        type: 'string',
-        description: 'Start of time range in YYYYMMDDHHMMSS format.',
-      },
-      to: {
-        type: 'string',
-        description:
-          'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
-      },
-    },
-    required: [],
-  },
+        ]),
+      )
+      .optional()
+      .describe(
+        'Several feeds, read together with the same filters (give this or feed_type).',
+      ),
+    user: z
+      .string()
+      .optional()
+      .describe('Entries of this SAP user (exact match).'),
+    runtime_error: z
+      .string()
+      .optional()
+      .describe('Dumps whose runtime error contains this text, in any case.'),
+    exception: z
+      .string()
+      .optional()
+      .describe('Dumps whose exception class contains this text, in any case.'),
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        'Dumps whose terminated object name contains this text, in any case.',
+      ),
+    package: z
+      .string()
+      .optional()
+      .describe('Dumps whose object package contains this text, in any case.'),
+    component: z
+      .string()
+      .optional()
+      .describe(
+        'Dumps whose application component contains this text, in any case.',
+      ),
+    max_results: z
+      .number()
+      .optional()
+      .describe(
+        `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
+      ),
+    from: z
+      .string()
+      .optional()
+      .describe('Start of time range in YYYYMMDDHHMMSS format.'),
+    to: z
+      .string()
+      .optional()
+      .describe(
+        'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
+      ),
+  }),
 } as const;
 
 interface RuntimeListFeedsArgs {
@@ -159,7 +162,13 @@ const DUMP_FILTERS = [
  * A value is written into the expression as it stands, so what would end an
  * operand — a blank, a comma, a parenthesis — is refused rather than sent.
  */
-const OPERAND = /^[^\s,()]+$/;
+function isOperand(value: string): boolean {
+  if (value.length === 0) return false;
+  for (const character of value) {
+    if (isBlank(character) || ',()'.includes(character)) return false;
+  }
+  return true;
+}
 
 /**
  * The dumps feed's `$query` for the filters given — `and ( … )` of one
@@ -170,7 +179,7 @@ export function dumpQueryOf(args: RuntimeListFeedsArgs): string | undefined {
   for (const [param, attribute, operator] of DUMP_FILTERS) {
     const value = args[param]?.trim();
     if (!value) continue;
-    if (!OPERAND.test(value)) {
+    if (!isOperand(value)) {
       throw new Error(
         `${param} must not contain blanks, commas or parentheses: "${value}"`,
       );
@@ -187,7 +196,7 @@ export function dumpQueryOf(args: RuntimeListFeedsArgs): string | undefined {
  * (`/sap/bc/adt/vit/runtime/dumps/<id>`), as it stands in that URI.
  */
 export function dumpIdOf(uri: string): string {
-  return uri.replace(/^.*\/runtime\/dumps\//, '');
+  return afterLast(uri, '/runtime/dumps/');
 }
 
 /**
@@ -200,13 +209,16 @@ function pagedFeeds(
 ) {
   return new AdtRuntimeClient(connection, logger).getFeeds({
     ...ourFeeds,
-    entries: feedPage(feedEntries as never),
-    systemMessages: feedPage(feedSystemMessages as never),
-    gatewayErrors: feedPage(feedGatewayErrors as never),
-  } as never);
+    entries: feedPage(feedEntries),
+    systemMessages: feedPage(feedSystemMessages),
+    gatewayErrors: feedPage(feedGatewayErrors),
+  });
 }
 
-async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
+async function feedsOf(
+  context: HandlerContext,
+  args: RuntimeListFeedsArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
   const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const feedType = args?.feed_type ?? 'descriptors';
@@ -228,7 +240,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
   } catch (thrown) {
-    return return_error(thrown as Error);
+    return return_error(thrown);
   }
 
   // The request's own filters, the same on every page; `feedPages` supplies
@@ -305,7 +317,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             { keyOf: (entry) => entry.id, stampOf: (entry) => entry.updated },
           ),
@@ -330,7 +342,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             {
               keyOf: (entry) => entry.id,
@@ -351,7 +363,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             {
               keyOf: (entry) => `${entry.transactionId}|${entry.dateTime}`,
@@ -427,7 +439,7 @@ export async function handleRuntimeListFeedPage(
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
   } catch (thrown) {
-    return return_error(thrown as Error);
+    return return_error(thrown);
   }
   const base = { user: args?.user, query, from: args?.from };
   const page = { maxResults: top, to: args?.to };
@@ -450,7 +462,7 @@ export async function handleRuntimeListFeedPage(
         () =>
           atStep(step, () =>
             feeds.dumps({ ...base, ...page, analyse: analyseException }),
-          )() as never,
+          )(),
         (read: FeedPage<{ id: string }>) =>
           shown({
             ...read,
@@ -470,7 +482,7 @@ export async function handleRuntimeListFeedPage(
               ...page,
               analyse: analyseException,
             }),
-          )() as never,
+          )(),
         shown,
       );
     default:
@@ -483,7 +495,7 @@ export async function handleRuntimeListFeedPage(
               ...page,
               analyse: analyseException,
             }),
-          )() as never,
+          )(),
         shown,
       );
   }
@@ -496,6 +508,13 @@ interface Asked {
   reject: (error: unknown) => void;
 }
 
+/** One feed's read in the rounds: its request waiting, and the signal it was made. */
+interface RoundState {
+  asked: Promise<void>;
+  signal: () => void;
+  pending: Asked | undefined;
+}
+
 /** The fixed words of a request made once the rounds have ended. */
 const ROUNDS_ENDED_WORDS =
   'the feeds read in envelopes have ended: no further request is sent';
@@ -503,13 +522,18 @@ const ROUNDS_ENDED_WORDS =
 /**
  * A connection for one feed's read whose requests wait for their round:
  * `ask` holds each one until the round sends it, and settles it with the
- * part's answer.
+ * part's answer. It has `connection`'s system kind, as every view over a
+ * connection has (`withSystemKindOf`).
  */
-function roundConnection(
+export function roundConnection(
   connection: HandlerContext['connection'],
   ask: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): HandlerContext['connection'] {
-  const view = {
+  // `getSessionType` beside the contract: a connection the server builds
+  // has it, and a reader asks for it (`hasMethod`).
+  const view: HandlerContext['connection'] & {
+    getSessionType(): 'stateful' | 'stateless';
+  } = {
     connect: () => connection.connect(),
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
@@ -523,7 +547,7 @@ function roundConnection(
       return ask(request) as Promise<IAdtWireResponse<T, D>>;
     },
   };
-  return view as HandlerContext['connection'];
+  return withSystemKindOf(view, connection);
 }
 
 /** What the rounds answer: every feed's answer, or the one that ends the call. */
@@ -549,12 +573,13 @@ async function feedsInRounds(
   ) => Promise<McpResult>,
 ): Promise<RoundsOutcome> {
   let ended = false;
-  const states = Array.from({ length: count }, () => {
-    let signal!: () => void;
+  const states = Array.from({ length: count }, (): RoundState => {
+    // Replaced by the promise's resolver, which its executor hands over at once.
+    let signal: () => void = () => {};
     const asked = new Promise<void>((resolve) => {
       signal = resolve;
     });
-    return { asked, signal, pending: undefined as Asked | undefined };
+    return { asked, signal, pending: undefined };
   });
   const settled = states.map((state, i) =>
     (async () =>
@@ -600,16 +625,17 @@ async function feedsInRounds(
         return { ended: result.value };
       }
     }
-    const asking = states.filter((state) => state.pending !== undefined);
-    if (asking.length === 0) break;
-    const round = asking.map((state) => {
-      const asked = state.pending as Asked;
+    const round: Asked[] = [];
+    for (const state of states) {
+      const asked = state.pending;
+      if (asked === undefined) continue;
       state.pending = undefined;
       state.asked = new Promise<void>((resolve) => {
         state.signal = resolve;
       });
-      return asked;
-    });
+      round.push(asked);
+    }
+    if (round.length === 0) break;
     let answers: PhaseResult<IAdtWireResponse>[];
     try {
       answers = await runPhase(context, round, (asked, batch) =>
@@ -692,15 +718,10 @@ export async function handleRuntimeListFeeds(
       context,
       async () => {
         try {
-          const outcome = await feedsInRounds(
-            context,
-            1,
-            (_i, connection) =>
-              feedsOf({ ...context, connection }, args) as Promise<McpResult>,
+          const outcome = await feedsInRounds(context, 1, (_i, connection) =>
+            feedsOf({ ...context, connection }, args),
           );
-          return 'ended' in outcome
-            ? outcome.ended
-            : (outcome.answers[0] as McpResult);
+          return 'ended' in outcome ? outcome.ended : outcome.answers[0];
         } catch (error) {
           // A refusal the connection threw: as `answer()` renders a throw of
           // the sequential version's call.
@@ -708,7 +729,7 @@ export async function handleRuntimeListFeeds(
           return answerThrown(error, ctx);
         }
       },
-      () => feedsOf(context, args) as Promise<McpResult>,
+      () => feedsOf(context, args),
     );
   }
   if (
@@ -723,9 +744,11 @@ export async function handleRuntimeListFeeds(
     );
   }
   const { feed_types: _list, ...rest } = args;
-  const single = (feedType: unknown): RuntimeListFeedsArgs => ({
+  const single = (
+    feedType: RuntimeListFeedsArgs['feed_type'],
+  ): RuntimeListFeedsArgs => ({
     ...rest,
-    feed_type: feedType as RuntimeListFeedsArgs['feed_type'],
+    feed_type: feedType,
   });
   return withSequentialFallback<McpResult>(
     context,
@@ -735,10 +758,7 @@ export async function handleRuntimeListFeeds(
           context,
           listed.length,
           (i, connection) =>
-            feedsOf(
-              { ...context, connection },
-              single(listed[i]),
-            ) as Promise<McpResult>,
+            feedsOf({ ...context, connection }, single(listed[i])),
         );
         return 'ended' in outcome
           ? outcome.ended
@@ -753,7 +773,7 @@ export async function handleRuntimeListFeeds(
       // credential failure ends the call, and nothing after it is read.
       const results: McpResult[] = [];
       for (const feedType of listed) {
-        const result = (await feedsOf(context, single(feedType))) as McpResult;
+        const result = await feedsOf(context, single(feedType));
         if (endsList(result)) return result;
         results.push(result);
       }

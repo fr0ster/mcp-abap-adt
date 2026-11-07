@@ -359,13 +359,18 @@ function fromLibraryLevel(value: unknown): NodeLevel {
 }
 
 /** `fetchNodeStructure` answers an IAdtResponse; this is the level inside it. */
-function levelOf(answer: NodeAnswer): NodeLevel {
+function levelOf(
+  answer: NodeAnswer,
+  missingLevel: MissingLevel = 'empty',
+): NodeLevel {
   if (!answer.ok) {
     const error = answer.getError();
-    // A level that is not there stays what it was: empty. Any other refusal
-    // is the method's error as it is, with the step — not an empty level that
-    // reads as "nothing here".
-    if (error.response?.status === 404) return { objects: [], childNodes: [] };
+    // A level that is not there stays what it was: empty, unless the caller
+    // asked for it as a refusal. Any other refusal is the method's error as
+    // it is, with the step — not an empty level that reads as "nothing here".
+    if (error.response?.status === 404 && missingLevel === 'empty') {
+      return { objects: [], childNodes: [] };
+    }
     throw carryingFailure(
       new Error(error.message),
       error,
@@ -566,7 +571,16 @@ export interface WalkOptions {
   includeSubpackages?: boolean;
   maxDepth?: number;
   includeDescriptions?: boolean;
+  /**
+   * What a `404` on a level answers: `'empty'` (the default) reads the level
+   * as empty; `'refused'` makes it the walk's failure, SAP's answer with its
+   * step — for a caller that must name every scope it did not read.
+   */
+  missingLevel?: MissingLevel;
 }
+
+/** What a `404` on a level of a walk answers. */
+export type MissingLevel = 'empty' | 'refused';
 
 /** A package of a walk: what was found in it, and the subpackages walked from it. */
 interface PackageWalk {
@@ -646,7 +660,7 @@ export async function walkPackages(
     if (failures.has(walk.root)) return undefined;
     try {
       if (!result.ok) throw result.error;
-      return levelOf(result.value);
+      return levelOf(result.value, options.missingLevel);
     } catch (error) {
       // A credential failure is every root's: it ends the walk as it came.
       if (endsTheCall(error)) throw error;
@@ -747,6 +761,7 @@ export async function walkPackage(
   const withShortDescriptions = options.includeDescriptions === true;
   const root = levelOf(
     await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
+    options.missingLevel,
   );
 
   // A description only when asked for: SAP sends some without it.
@@ -763,6 +778,7 @@ export async function walkPackage(
         nodeId: child.nodeId,
         withShortDescriptions,
       }),
+      options.missingLevel,
     );
     found.push(...level.objects.map(owned));
   }

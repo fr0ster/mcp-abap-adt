@@ -183,6 +183,9 @@ export function createPackageContentsFetcher(
       packageName,
       await walkPackage(utils, packageName, {
         includeSubpackages: options.includeSubpackages,
+        // A level SAP answers 404 is scope the scan did not read: the walk's
+        // failure, never an empty level.
+        missingLevel: 'refused',
       }),
     );
 }

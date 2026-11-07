@@ -434,6 +434,142 @@ describe('SearchSource: the failure contract', () => {
   );
 });
 
+describe('SearchSource: every scope it did not read is named (review round 1)', () => {
+  /** SAP's 404 with its T100 key, as the stand answers a request. */
+  const keyed404 = { status: 404, body: NOT_FOUND_BODY };
+
+  it.each(PATHS)(
+    "a package's root SAP answers 404 is a walk failure with SAP's key, not an empty package (%s)",
+    async (batch) => {
+      const { result } = searchOne(
+        { refuseWith: { [nodeKey('ZONE')]: keyed404 } },
+        batch === 'absent',
+        { packages: ['ZONE', 'ZTWO'], object_types: ['PROG'] },
+      );
+      const payload = payloadOf(await result);
+      expect(
+        payload.results.map((h: { object_name: string }) => h.object_name),
+      ).toEqual(['ZTWOP']);
+      expect(payload.failures).toHaveLength(1);
+      expect(payload.failures[0]).toMatchObject({
+        kind: 'operation',
+        step: 'walk package',
+        package: 'ZONE',
+        t100: { id: 'SADT_RESOURCE', no: '002' },
+      });
+      expect(payload.failures[0].error.status).toBe(404);
+    },
+  );
+
+  it.each(PATHS)(
+    "a type node the root listed that SAP answers 404 is a walk failure with SAP's key (%s)",
+    async (batch) => {
+      const { result } = searchOne(
+        { refuseWith: { [nodeKey('ZONE', '1')]: keyed404 } },
+        batch === 'absent',
+        { packages: ['ZONE', 'ZTWO'], object_types: ['PROG'] },
+      );
+      const payload = payloadOf(await result);
+      expect(
+        payload.results.map((h: { object_name: string }) => h.object_name),
+      ).toEqual(['ZTWOP']);
+      expect(payload.failures).toHaveLength(1);
+      expect(payload.failures[0]).toMatchObject({
+        kind: 'operation',
+        step: 'walk package',
+        package: 'ZONE',
+        t100: { id: 'SADT_RESOURCE', no: '002' },
+      });
+    },
+  );
+
+  it.each(PATHS)(
+    "a package mask SAP refuses carries SAP's key (%s)",
+    async (batch) => {
+      const { result } = searchOne(
+        { refuseWith: { 'SEARCH ZO*': keyed404 } },
+        batch === 'absent',
+        { packages: ['ZO*', 'ZTWO'], object_types: ['PROG'] },
+      );
+      const payload = payloadOf(await result);
+      expect(payload.failures).toHaveLength(1);
+      expect(payload.failures[0]).toMatchObject({
+        kind: 'operation',
+        step: 'resolve package mask',
+        mask: 'ZO*',
+        t100: { id: 'SADT_RESOURCE', no: '002' },
+      });
+    },
+  );
+
+  it.each(PATHS)(
+    'an early source fills the hit cap, a later child fails: the child is read and its failure named (%s)',
+    async (batch) => {
+      const fake = standOn(
+        {
+          ...ONE,
+          sources: { 'FM Z_FM_A': 'marker one\nmarker two' },
+        },
+        { refuse: { 'FM Z_FM_B': 500 } },
+      );
+      const payload = payloadOf(
+        await searchOn(
+          fake,
+          {
+            query: 'marker',
+            packages: ['ZONE'],
+            object_types: ['FUGR'],
+            max_hits_per_object: 1,
+          },
+          batch === 'absent',
+        ),
+      );
+      expect(sourceReads(fake)).toEqual([
+        '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm_a/source/main?version=active',
+        '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm_b/source/main?version=active',
+        '/sap/bc/adt/repository/objectstructure?objecttype=FUGR%2FF&objectname=ZFG',
+      ]);
+      expect(
+        payload.results.map(
+          (h: { include: string; line: number }) => `${h.include}:${h.line}`,
+        ),
+      ).toEqual(['Z_FM_A:1']);
+      expect(payload.truncated.by_object_cap).toBe(true);
+      expect(payload.failures).toHaveLength(1);
+      expect(payload.failures[0]).toMatchObject({
+        kind: 'source',
+        object_name: 'ZFG',
+        source: { name: 'Z_FM_B' },
+        step: 'read function module',
+      });
+    },
+  );
+
+  it.each(PATHS)(
+    'a credential refusal after the hit cap still ends the call (%s)',
+    async (batch) => {
+      const fake = standOn(
+        {
+          ...ONE,
+          sources: { 'FM Z_FM_A': 'marker one\nmarker two' },
+        },
+        { refuse: { 'FM Z_FM_B': 401 } },
+      );
+      const result = await searchOn(
+        fake,
+        {
+          query: 'marker',
+          packages: ['ZONE'],
+          object_types: ['FUGR'],
+          max_hits_per_object: 1,
+        },
+        batch === 'absent',
+      );
+      expect(isError(result)).toBe(true);
+    },
+  );
+});
+
 // ---------------------------------------------------------------------------
 // One read per source
 // ---------------------------------------------------------------------------

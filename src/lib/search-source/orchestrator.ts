@@ -255,8 +255,12 @@ export async function runSearchSource(
         }
         const unit = outcome.unit;
         sources++;
+        // The cap limits the hits answered, never the reads: every source is
+        // read on, so a later source's failure is still named. Past the cap
+        // a source is only probed for a hit, which marks the cap.
         const remaining = maxHits - totalForTarget;
         if (remaining <= 0) {
+          if (capHitForTarget) continue;
           const probe = scanLines(unit.lines, {
             query: input.query,
             query2: input.query2,
@@ -264,10 +268,7 @@ export async function runSearchSource(
             exclude_comments: input.exclude_comments,
             max_hits: 1,
           });
-          if (probe.hits.length > 0) {
-            capHitForTarget = true;
-            break;
-          }
+          if (probe.hits.length > 0) capHitForTarget = true;
           continue;
         }
         const scan = scanLines(unit.lines, {
@@ -288,10 +289,7 @@ export async function runSearchSource(
           });
         }
         totalForTarget += scan.hits.length;
-        if (scan.capped) {
-          capHitForTarget = true;
-          break;
-        }
+        if (scan.capped) capHitForTarget = true;
       }
 
       answers[index] = {
@@ -436,6 +434,7 @@ async function runSearchSourceInPhases(
       : await walkPackages(levels, names, {
           includeSubpackages:
             input.include_subpackages ?? DEFAULTS.include_subpackages,
+          missingLevel: 'refused',
         });
   const fetchPackageContents: PackageContentsFetcher = async (packageName) => {
     const answer = walked[names.indexOf(packageName.toUpperCase())];

@@ -258,9 +258,11 @@ call's `version`, each once per call, and names everything it could not read.
   `kind: 'operation'` names no object: `step` is `resolve package mask` (with `mask`) or
   `walk package` (with `package`), with `t100` where there is one and `error`. A mask SAP refused
   or a package whose walk SAP refused is such an entry, and the other packages are scanned; it
-  ended the call before. A `404` on a listed source is an entry (it was skipped as absent), and
+  ended the call before; a package level SAP answers `404` (root, type node, subpackage) is a
+  `walk package` entry too (it was read as empty). A `404` on a listed source is an entry (it was skipped as absent), and
   so is a read that threw without SAP's answer (it was dropped). A credential failure still ends
-  the call. An object with a failure is not listed in `no_hits`.
+  the call. An object with a failure is not listed in `no_hits`. Past `max_hits_per_object` an
+  object's sources are still read, so their failures are named; only the hits are capped.
 - **`time_budget_ms` and `timeout` are removed.** No deadline of the server's ends a scan: a
   call answers when every target of its page is read. `truncated.by_timeout` is gone,
   `total_targets` is always present, and `next_start_at` is present only while targets remain

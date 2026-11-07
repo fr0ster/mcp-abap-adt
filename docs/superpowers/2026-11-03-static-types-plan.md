@@ -2545,7 +2545,7 @@ skipped without an entry or a count; the search is about the objects that can be
 
 **The task is in two parts.** **D23a** needs no SAP and starts now. **D23b** holds the masks, the
 line-match strategy, the hits-only answer, the skipped unreadable objects and the function
-module as its own object; the owner decided it on 2026-11-07 (DO12–DO19), its red-first steps
+module as its own object; the owner decided it on 2026-11-07 (DO12–DO20), its red-first steps
 need no SAP, and its live cases wait for the owner's go.
 
 #### D23a. Sources, versions, failures, dedup, description (no SAP; starts now)
@@ -2754,8 +2754,8 @@ Step 4 names.
   only what was done — `scanned.packages` the packages actually walked, `scanned.objects` the
   objects actually read (at least one source read), `scanned.sources` the sources read, and
   the new `scanned.objects_with_hits` (the objects with at least one hit in `results`).
-  `total_targets`, `next_start_at` and `truncated` stay as they are. Red tests first, on both
-  paths (sequential and batched):
+  `truncated.by_object_cap` stays (the paging fields go in Step 4d, DO20). Red tests first,
+  on both paths (sequential and batched):
   - **object reads:**
     - `'a source SAP refuses is skipped: no entry, no count'`: no `failures` field; the source
       is not in `scanned.sources`;
@@ -2840,10 +2840,8 @@ Step 4 names.
     `object_name` and `include` (the include kind the compact `LOCAL_*` reads name by the
     class), an interface, CDS, BDEF, DDLX and SRVD by `object_name`.
   - **Counters count them apart:** `scanned.objects` and `scanned.objects_with_hits` count
-    the group and each of its modules as separate objects. The page (`start_at`,
-    `max_objects`, `total_targets`, `next_start_at`) stays over the walk's targets as today —
-    the modules are known only after the group's structure read — so a group's modules come
-    with the group's page.
+    the group and each of its modules as separate objects. (The paging over the walk's
+    targets goes in Step 4d, DO20: every target is read in one run.)
   - **`object_types`:** `FUGR` keeps scanning the group and its modules (the modules come only
     from the group's structure); no new filter value.
   - **One read per source** (D23a's cache) and the skip rule (Step 4a) apply to a module as to
@@ -2860,7 +2858,6 @@ Step 4 names.
     fields fill the read tool's required arguments (`GetFunctionModule`, `GetFunctionInclude`,
     `GetInclude`, `GetProgram`, `GetClass` and the local includes, `GetInterface`, the CDS,
     BDEF, DDLX and SRVD reads), checked against their schemas;
-  - `'the page stays over the walk's targets'` (cursor unchanged with modules split out);
   - `'each object has its own max_hits_per_object'`: a group with two modules and an include
     of its own, the first module holding more hits than `max_hits_per_object` — the second
     module and the group's include still answer their hits, each up to the limit; only the
@@ -2943,11 +2940,64 @@ Step 4 names.
   (`src/__tests__/unit/readonlySingleCall.test.ts`, `src/__tests__/unit/batch/metadataReads.test.ts`,
   `src/__tests__/unit/runtimeReadersFixRound1.test.ts`, `src/__tests__/unit/detailSurface.test.ts`)
   stay green unchanged.
+- [ ] **Step 4d: No paging; one run reads every target; the hit limit optional (DO20).**
+  Today the schema takes `max_objects` (default 500) and `start_at` (default 0); the
+  orchestrator slices the walk's sorted targets (`sliceTargets`, `[start_at, start_at +
+  max_objects)`) on both paths, and the answer carries `total_targets`, `next_start_at` and
+  `truncated.by_max_objects`. `max_hits_per_object` defaults to 100 (`DEFAULTS` in
+  `orchestrator.ts`, and the schema's words). From DO20:
+  - **No user-facing package or object limit.** The mask quick search's `maxResults` is
+    internal (the doubling of DO12 answers every package); nothing else limits packages or
+    objects.
+  - **One run reads every target.** `max_objects`, `start_at`, `next_start_at`,
+    `total_targets` and `truncated.by_max_objects` go from the schema and the answer.
+    `SearchSource` runs in the background by default (D24), so a long scan is a background
+    run read with `GetBackgroundRun`, ended with `DiscardBackgroundRun`; it keeps only the
+    hits.
+  - **`max_hits_per_object` stays, optional, with no default:** absent, an object's hits are
+    not limited; given, each object (every function module and the group apart, DO18) is
+    limited to it. `truncated.by_object_cap` stays, set only when a given limit cut an object.
+  - `scanned.*` (packages walked, objects read, sources read, objects with hits) stays.
+
+  Red tests first, on both paths (sequential and batched):
+  - `'every target is read in one call'`: a walk of more than 500 targets — every target's
+    sources are requested and its hits answered, with no slicing;
+  - `'the answer has no cursor fields'`: no `total_targets`, `next_start_at` or
+    `truncated.by_max_objects`;
+  - `'SearchSource does not declare max_objects or start_at'`: the listed-schema fixture;
+  - `'a call that still sends max_objects or start_at has them dropped'`: it answers as without
+    them (every target read, no slice), nothing refused — the non-strict rule of Step 4;
+  - `'max_hits_per_object absent means no limit'`: an object with more than 100 hits answers
+    all of them; `truncated.by_object_cap` false;
+  - `'max_hits_per_object given limits each object'`: as DO18's per-object case, the flag set
+    by the object that passed it;
+  - `'the mask search's maxResults is not an argument'`: no schema field names a package or
+    object limit.
+
+  Then: `sliceTargets`, the slice in `runSearchSource` and `runSearchSourceInPhases` (the
+  phases' "the same start and the same sorted targets" comment with it), `max_objects`,
+  `start_at`, `next_start_at`, `total_targets` and `by_max_objects` go from
+  `OrchestratorInput`, `OrchestratorResult`, `DEFAULTS` and the handler's schema;
+  `max_hits_per_object`'s default goes from `DEFAULTS`, and the orchestrator treats an absent
+  value as no limit (no probe past a cap that does not exist).
+
+  Affected suites: `src/__tests__/lib/search-source/cursor.test.ts` goes (it tests only the
+  slice and the cursor; any case that is not about paging moves to `orchestrator.test.ts`),
+  `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`,
+  `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`, the live assertion in
+  `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`, the listed-schema
+  and surface fixtures, and any D24 background-run test that passes `max_objects` to
+  `SearchSource`.
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
   1000 packages"; `emit_no_hits`, `no_hits` and `failures` leave it, and it states
   that an object that cannot be read is skipped, names the counters, and says a hit in a
-  function module names the module and its group (DO18). Functional only; a description test
+  function module names the module and its group (DO18). It drops `start_at`, `max_objects`,
+  `total_targets`, `next_start_at` and `truncated.by_max_objects`, says every target is read
+  in one run, and says `max_hits_per_object` limits each object only when given (DO20); the
+  argument's own words lose "default 100". Functional only; a description test
   under the functional-descriptions guard. `time_budget_ms` and `timeout` are not
   reintroduced (DO11; D24's regression check).
 - [ ] **Step 6: Pins, docs, CHANGELOG, MIGRATION-24.0.**
@@ -2964,6 +3014,10 @@ Step 4 names.
     Changed — a hit in a function module names the module (its type, its name and
     `function_group_name`), not the group with the module as `include` (DO18).
     Changed — the line match is a strategy (an embedder of the orchestrator passes it).
+    Removed — `max_objects`, `start_at`, `next_start_at`, `total_targets` and
+    `truncated.by_max_objects`: one run reads every target (DO20); the 24.0.0 entry's
+    "Migrating: page a large scan with `max_objects` and `start_at`" is rewritten (24.0.0 is
+    unreleased). Changed — `max_hits_per_object` has no default: absent, no limit.
   - MIGRATION-24.0, in the `SearchSource` section: a mask is `*` / `?`, and an entry with `+`
     is an exact name now (write `*` where `+` was meant as a wildcard); a mask answers every
     matching package; drop `emit_no_hits` (a call that still sends it has it dropped) and read
@@ -2980,6 +3034,12 @@ Step 4 names.
     module's own object — read it with `GetFunctionModule` (`function_module_name` =
     `object_name`, `function_group_name`) — where 23.x answered it as the group's hit with
     the module in `include`; the group and its modules are counted apart (DO18);
+    no paging (DO20): drop `max_objects` and `start_at` (a call that still sends them has
+    them dropped); `total_targets`, `next_start_at` and `truncated.by_max_objects` are gone;
+    every target is read in one run — run it in the background (the default) and read the
+    `run_handle` with `GetBackgroundRun`, or end it with `DiscardBackgroundRun`; the section's
+    "page it with `max_objects` … `next_start_at`" text is rewritten (24.0.0 is unreleased);
+    `max_hits_per_object` limits each object only when given (it was 100 by default);
     embedders of `runSearchSource` pass the line-match strategy (the shipped one keeps
     today's match).
 - [ ] **Step 7: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
@@ -3280,8 +3340,8 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   (`404`), a refused walk of a package, type node or subpackage are skipped with no entry (a
   type node or subpackage excludes only its branch, DO19); the answer has no `failures` list. The counters count only what was done: `scanned.packages`
   the packages walked, `scanned.objects` the objects read (at least one source),
-  `scanned.sources` the sources read, `scanned.objects_with_hits`; `total_targets`,
-  `next_start_at` and `truncated` stay.
+  `scanned.sources` the sources read, `scanned.objects_with_hits`; `truncated.by_object_cap`
+  stays (the paging fields go, DO20).
 - **DO18 (2026-11-07, D23b Step 4b):** a function group and each of its function modules are
   separate scan objects: a hit in a module names the module (its type, name, package and
   `function_group_name`, what `GetFunctionModule` requires), not the group; a hit in the
@@ -3292,6 +3352,12 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   it; the rest of the asked package is walked and searched. A refused root of the asked
   package excludes that package. No entry, not counted. For `SearchSource` only; the other
   walking tools keep their answer.
+- **DO20 (2026-11-07, D23b Step 4d):** no user-facing package or object limit: the mask quick
+  search's `maxResults` is internal (the doubling answers every package). `max_objects` and
+  the paging (`start_at`, `next_start_at`, `total_targets`, `truncated.by_max_objects`) go:
+  one run reads every target (in the background by default, D24) and keeps only the hits.
+  `max_hits_per_object` stays, optional, no default (absent = no limit; given = per object,
+  DO18); `truncated.by_object_cap` stays.
 
 ## Test coverage — the families
 
@@ -4022,7 +4088,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO19 as decided);
+      argument now refused, and the owner's decisions DO1–DO20 as decided);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
       activation waits on long polling with no attempt limit or interval) and C2d's added

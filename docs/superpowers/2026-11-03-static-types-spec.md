@@ -488,8 +488,8 @@ on-premise system disagree, the live measurement holds.
     walked and searched (owner, DO19; today it ends the package's whole walk). The other
     walking tools keep their answer. The counters count only what was done: `scanned.packages` the
     packages walked, `scanned.objects` the objects read (at least one source read),
-    `scanned.sources` the sources read, and `scanned.objects_with_hits`; `total_targets`,
-    `next_start_at` and `truncated` stay. A credential refusal still ends the call. This
+    `scanned.sources` the sources read, and `scanned.objects_with_hits`;
+    `truncated.by_object_cap` stays. A credential refusal still ends the call. This
     supersedes D23a's failure contract; MIGRATION-24.0 (unreleased) says `failures` is
     removed.
   - **A function module is its own object (owner, DO18).** A function group and each of its
@@ -497,8 +497,15 @@ on-premise system disagree, the live measurement holds.
     type, its name, its package and `function_group_name` (which `GetFunctionModule` and
     compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`; a hit in the group's
     own includes is the group's, with `include`. The counters count the group and each module
-    apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another. The
-    page stays over the walk's targets.
+    apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another.
+  - **No paging; no user-facing limit (owner, DO20).** The mask quick search's `maxResults` is
+    internal — the doubling answers every package — and no argument limits packages or
+    objects. `max_objects`, `start_at`, `next_start_at`, `total_targets` and
+    `truncated.by_max_objects` are removed: one run reads every target (in the background by
+    default, D24) and keeps only the hits; a call that still sends `max_objects` or
+    `start_at` has them dropped. `max_hits_per_object` stays, optional, with no default
+    (today 100): absent, no limit; given, per object. `truncated.by_object_cap` and
+    `scanned.*` stay.
     `SearchSource` is not a strict tool (only the create tools are, MIGRATION-24.0), so a call
     that still sends `emit_no_hits` has it dropped, as D24's removed `timeout` is; MIGRATION
     says to drop it.

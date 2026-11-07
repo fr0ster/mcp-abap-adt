@@ -14,6 +14,8 @@ import {
   closeInstance,
   type IBackgroundRuns,
   InstanceBatch,
+  type LineMatchStrategy,
+  type SapAnswerStrategy,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -120,6 +122,16 @@ export interface StreamableHttpServerOptions {
    * `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to every instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy, handed to every instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 }
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
@@ -188,6 +200,8 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
+  private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
+  private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
 
   constructor(
@@ -209,6 +223,8 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
+    this.sapAnswerStrategy = opts?.sapAnswerStrategy;
+    this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -528,6 +544,8 @@ export class StreamableHttpServer extends BaseMcpServer {
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
           backgroundRunOwner?: BackgroundRunOwner;
+          sapAnswerStrategy?: SapAnswerStrategy;
+          lineMatchStrategy?: LineMatchStrategy;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
           longSession?: LongSession;
@@ -584,6 +602,12 @@ export class StreamableHttpServer extends BaseMcpServer {
         stateLogger: this.stateLogger,
         // A handle the pool already files is drawn again.
         isStateHandleTaken: this.pool.isHandleTaken,
+        ...(this.sapAnswerStrategy !== undefined && {
+          sapAnswerStrategy: this.sapAnswerStrategy,
+        }),
+        ...(this.lineMatchStrategy !== undefined && {
+          lineMatchStrategy: this.lineMatchStrategy,
+        }),
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
           // The running runs' owner is this server's, shared by every

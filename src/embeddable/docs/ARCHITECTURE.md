@@ -367,6 +367,16 @@ A run of ABAP code cannot be cut (a running request dies with its socket or its 
 the call answers at once with a handle and the run goes on (background-runs spec). Where runs and
 their answers are kept is the host's: a strategy.
 
+- **`SearchSource`'s strategies** (DO22, DO24): `sapAnswerStrategy` (what a SAP
+  answer to a failed read leads to; only SAP answers reach it — a credential
+  refusal ends the call, a failed envelope and anything else are thrown) and
+  `lineMatchStrategy` (which lines are hits), options of `EmbeddableMcpServer`
+  (and `StdioServer`, `StreamableHttpServer`, `SseServer`, whose launchers pass
+  the shipped `skipSapAnswers` and `substringLineMatch`), put by `BaseMcpServer`
+  into every context it builds and kept in every derived one (a long call's
+  own connection, a background run's). The context fields are internal;
+  absent, the handler's default is the shipped one. Contracts and shipped
+  strategies: `@mcp-abap-adt/lib/embeddable`.
 - **The contract** (`IBackgroundRuns`, `src/lib/backgroundRuns/contract.ts`, exported from
   `@mcp-abap-adt/lib/embeddable`): `start(caller, { tool, object, started_at })` → `{ handle }`
   (opaque, at least 128 random bits) or `{ refused: 'limit', limit }`; `finish(handle, answer,

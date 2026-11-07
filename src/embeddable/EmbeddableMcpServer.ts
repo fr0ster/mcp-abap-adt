@@ -28,6 +28,8 @@ import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution.js';
+import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
+import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
 import type { HeldLocks } from '../lib/state/heldLocks.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
@@ -78,6 +80,21 @@ export interface EmbeddableMcpServerOptions {
    * long tool answers in the call.
    */
   backgroundRuns?: IBackgroundRuns;
+
+  /**
+   * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
+   * failed read leads to (`'skip' | 'end' | 'throw'`), asked once per SAP
+   * answer with its place. Only SAP answers reach it: a credential refusal
+   * ends the call, a failed batch envelope and anything that is no SAP
+   * answer are thrown, before any strategy. Absent: the shipped one,
+   * `skipSapAnswers`.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy (DO24): which lines of a source are
+   * hits. Absent: the shipped one, `substringLineMatch`.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -258,6 +275,12 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       }),
       ...(options.backgroundRuns !== undefined && {
         backgroundRuns: options.backgroundRuns,
+      }),
+      ...(options.sapAnswerStrategy !== undefined && {
+        sapAnswerStrategy: options.sapAnswerStrategy,
+      }),
+      ...(options.lineMatchStrategy !== undefined && {
+        lineMatchStrategy: options.lineMatchStrategy,
       }),
       ...(options.batch !== undefined && { batch: options.batch }),
       ...(options.heldLocks !== undefined && {

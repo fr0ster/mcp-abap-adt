@@ -152,6 +152,8 @@ import {
   withDestinationSystemContext,
   withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
+import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
+import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
 import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
@@ -329,6 +331,11 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly backgroundRuns: IBackgroundRuns | undefined;
 
+  /** `SearchSource`'s SAP-answer strategy, from the options; absent, none set. */
+  private readonly searchSapAnswers: SapAnswerStrategy | undefined;
+  /** `SearchSource`'s line-match strategy, from the options; absent, none set. */
+  private readonly searchLineMatch: LineMatchStrategy | undefined;
+
   /**
    * The running runs, by `run_handle`: each one's control over its one
    * execution connection (`backgroundRunOwner` option, else this
@@ -415,6 +422,20 @@ export abstract class BaseMcpServer extends McpServer {
      */
     backgroundRuns?: IBackgroundRuns;
     /**
+     * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
+     * failed read leads to (`'skip' | 'end' | 'throw'`), asked once per SAP
+     * answer with its place. Only SAP answers reach it: a credential refusal
+     * ends the call, a failed batch envelope and anything that is no SAP
+     * answer are thrown, before any strategy. Absent: the shipped one,
+     * `skipSapAnswers`.
+     */
+    sapAnswerStrategy?: SapAnswerStrategy;
+    /**
+     * `SearchSource`'s line-match strategy (DO24): which lines of a source are
+     * hits. Absent: the shipped one, `substringLineMatch`.
+     */
+    lineMatchStrategy?: LineMatchStrategy;
+    /**
      * The owner of the running background runs (their controls, by
      * `run_handle`): handed by a host that serves one client through several
      * instances (Streamable HTTP's per-request instances, SSE's per-stream
@@ -483,6 +504,8 @@ export abstract class BaseMcpServer extends McpServer {
     this.logger = options.logger ?? getDefaultLogger();
     this.leftoverSessions = options.leftoverSessions;
     this.backgroundRuns = options.backgroundRuns;
+    this.searchSapAnswers = options.sapAnswerStrategy;
+    this.searchLineMatch = options.lineMatchStrategy;
     this.runOwner = options.backgroundRunOwner ?? new BackgroundRunOwner();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
@@ -846,6 +869,25 @@ export abstract class BaseMcpServer extends McpServer {
    * (`buildConnection`); `undefined` for a connection with no destination
    * (a host's injected one).
    */
+  /**
+   * The `SearchSource` strategies this server was given, for every context
+   * it builds: a field per strategy given, none for one absent (the
+   * handler's default then answers).
+   */
+  private searchStrategies(): Pick<
+    HandlerContext,
+    'sapAnswerStrategy' | 'lineMatchStrategy'
+  > {
+    return {
+      ...(this.searchSapAnswers !== undefined && {
+        sapAnswerStrategy: this.searchSapAnswers,
+      }),
+      ...(this.searchLineMatch !== undefined && {
+        lineMatchStrategy: this.searchLineMatch,
+      }),
+    };
+  }
+
   private batchAvailabilityOf(
     connection: object,
   ): BatchAvailability | undefined {
@@ -1613,6 +1655,7 @@ export abstract class BaseMcpServer extends McpServer {
                 ...(batchAvailability !== undefined
                   ? { batchAvailability }
                   : {}),
+                ...this.searchStrategies(),
                 heldLocks: this.heldLocks,
                 ...(this.longSessionPort !== undefined
                   ? { longSession: this.longSessionPort }
@@ -2009,6 +2052,8 @@ export abstract class BaseMcpServer extends McpServer {
     );
     const recordedContext: HandlerContext = {
       ...call.context,
+      // The server's own, whatever the recorded call's context carried.
+      ...this.searchStrategies(),
       // The call's connection's kind, as the server declared it for it.
       connection: withSystemKindOf(recorder, connection),
       // The debug sessions are bound to the call's own context, whose
@@ -2116,6 +2161,7 @@ export abstract class BaseMcpServer extends McpServer {
         state: this.state,
         debugger: () => this.takeDebugger(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
+        ...this.searchStrategies(),
         heldLocks: this.heldLocks,
         ...(this.longSessionPort !== undefined
           ? { longSession: this.longSessionPort }

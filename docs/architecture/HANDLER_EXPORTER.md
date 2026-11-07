@@ -245,6 +245,29 @@ const server = new EmbeddableMcpServer({
 });
 ```
 
+## SearchSource's strategies
+
+`SearchSource` takes two strategies, both the consumer's, both optional, given
+only as options — `HandlerExporter`'s, or the hosting server's:
+
+- **`sapAnswerStrategy`** (`SapAnswerStrategy`): what a SAP answer to a failed
+  read leads to — `'skip'`, `'end'` (the call ends with the failure) or
+  `'throw'` — asked once per SAP answer with its place (`'mask'`, `'package'`,
+  `'level'`, `'structure'`, `'source'`). Only SAP answers reach it: a failure
+  carrying a response with an HTTP status, whatever its `origin`, or an ADT
+  refusal. A credential refusal always ends the call; a failed batch envelope
+  and anything else are always thrown. Absent: `skipSapAnswers`.
+- **`lineMatchStrategy`** (`LineMatchStrategy`): which lines of a source are
+  hits (`ScanInput` in, `ScanResult` out). Absent: `substringLineMatch`.
+
+Both contracts and both shipped strategies are exported from
+`@mcp-abap-adt/lib/embeddable`. On `getHandlerEntries()` and
+`registerOnServer` the exporter's options apply, and an embedder's own
+context is not a way to pass them (the exporter sets the context's fields
+from its options). On `createRegistry()` the tools run in the contexts of the
+server the registry is handed to: there the server's own
+`sapAnswerStrategy` / `lineMatchStrategy` options apply.
+
 ## Logging
 
 Pass a logger (`Logger` from `@mcp-abap-adt/logger`):

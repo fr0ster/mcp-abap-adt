@@ -14,6 +14,8 @@ import {
   type SystemContextResolver,
   type SystemContextRules,
 } from '../requestSystemResolution.js';
+import type { LineMatchStrategy } from '../search-source/lineMatch.js';
+import type { SapAnswerStrategy } from '../search-source/readFailure.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
@@ -61,6 +63,26 @@ export interface HandlerExporterOptions {
    * @default defaultLogger
    */
   logger?: Logger;
+
+  /**
+   * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
+   * failed read leads to (`'skip' | 'end' | 'throw'`). Only SAP answers
+   * reach it: a credential refusal ends the call, a failed batch envelope
+   * and anything that is no SAP answer are thrown. It applies to the entries
+   * of `getHandlerEntries()` and to `registerOnServer`; on `createRegistry()`
+   * the tools run in the contexts of the server the registry is handed to,
+   * with that server's own `sapAnswerStrategy` option. Absent: the shipped
+   * one, `skipSapAnswers`.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+
+  /**
+   * `SearchSource`'s line-match strategy (DO24): which lines of a source are
+   * hits. As `sapAnswerStrategy`, on `getHandlerEntries()` and
+   * `registerOnServer`; on `createRegistry()` the hosting server's option
+   * applies. Absent: the shipped one, `substringLineMatch`.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 
   /**
    * Include readonly handlers (getProgram, getClass, etc.)
@@ -154,9 +176,13 @@ export class HandlerExporter {
   private readonly systemContextResolver: SystemContextResolver | null;
   private readonly systemContextRules: SystemContextRules | null;
   private readonly systemType: string | undefined;
+  private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
+  private readonly lineMatchStrategy: LineMatchStrategy | undefined;
 
   constructor(options?: HandlerExporterOptions) {
     this.logger = options?.logger ?? noopLogger;
+    this.sapAnswerStrategy = options?.sapAnswerStrategy;
+    this.lineMatchStrategy = options?.lineMatchStrategy;
     this.systemType = options?.systemType;
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
@@ -267,8 +293,37 @@ export class HandlerExporter {
         inStatedScope(
           { ...this.stated(), connection: context?.connection },
           args,
-          () => original(context, args),
+          () => original(this.withStrategies(context), args),
         ),
+    };
+  }
+
+  /**
+   * `context` with this exporter's `SearchSource` strategies: the field of
+   * each is the option when given and absent when not, whatever the
+   * embedder's context held — a context is no way to pass a strategy.
+   */
+  private withStrategies(context: HandlerContext): HandlerContext {
+    const {
+      sapAnswerStrategy: _sap,
+      lineMatchStrategy: _lines,
+      ...rest
+    } = context;
+    return { ...rest, ...this.strategies() };
+  }
+
+  /** This exporter's `SearchSource` strategies: a field per option given. */
+  private strategies(): Pick<
+    HandlerContext,
+    'sapAnswerStrategy' | 'lineMatchStrategy'
+  > {
+    return {
+      ...(this.sapAnswerStrategy !== undefined && {
+        sapAnswerStrategy: this.sapAnswerStrategy,
+      }),
+      ...(this.lineMatchStrategy !== undefined && {
+        lineMatchStrategy: this.lineMatchStrategy,
+      }),
     };
   }
 
@@ -323,7 +378,12 @@ export class HandlerExporter {
         if (isCredentialFailure(error)) throw error;
         throw new ServerRefusal('connection_provider_failed');
       }
-      return { connection, logger: this.logger, ...this.stated() };
+      return {
+        connection,
+        logger: this.logger,
+        ...this.stated(),
+        ...this.strategies(),
+      };
     };
     new CompositeHandlersRegistry(this.handlerGroups).registerAllToolsOnCall(
       server,
@@ -339,7 +399,10 @@ export class HandlerExporter {
   }
 
   /**
-   * Create handlers registry for use with EmbeddableMcpServer or BaseMcpServer
+   * Create handlers registry for use with EmbeddableMcpServer or BaseMcpServer.
+   * Its tools run in the contexts that server builds: `SearchSource`'s
+   * strategies are that server's options (`sapAnswerStrategy`,
+   * `lineMatchStrategy`), and this exporter's do not apply.
    */
   createRegistry(): IHandlersRegistry {
     return new CompositeHandlersRegistry(this.handlerGroups);

@@ -392,10 +392,12 @@ export async function runSearchSource(
         }
         object.total += scan.hits.length;
         answered += scan.hits.length;
+        // A capped match is the object's cap, unless the answer's
+        // `max_hits` was the tighter room (then `by_max_hits` tells it).
         if (
           scan.capped &&
-          ownRoom !== undefined &&
-          (answerRoom === undefined || ownRoom <= answerRoom)
+          (answerRoom === undefined ||
+            (ownRoom !== undefined && ownRoom <= answerRoom))
         ) {
           object.capped = true;
         }

@@ -25,6 +25,8 @@ import {
   LeftoverSessions,
   runtimeDirectory,
   sapAnswerOf,
+  skipSapAnswers,
+  substringLineMatch,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   logOffAtOnce,
@@ -920,6 +922,9 @@ async function launchStdio(
       ...(options.toolSet.backgroundRuns && {
         backgroundRuns: new InMemoryBackgroundRuns(),
       }),
+      // SearchSource's strategies: the shipped ones (DO22, DO24).
+      sapAnswerStrategy: skipSapAnswers,
+      lineMatchStrategy: substringLineMatch,
       // Batch mode: the one instance's batch state, owned here.
       batch: new InstanceBatch({
         keepRawParts: config.batchKeepRawParts === true,

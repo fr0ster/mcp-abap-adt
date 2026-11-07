@@ -119,7 +119,12 @@ export async function handleSearchSource(
     const result = await runSearchSourceWithContext(
       context,
       isRfcConnection(context.connection) ? { ...args, concurrency: 1 } : args,
-      { lineMatch: substringLineMatch, sapAnswers: skipSapAnswers },
+      // The server's strategies, set from its options; absent, the shipped
+      // ones — the one place their default lives (DO24).
+      {
+        lineMatch: context.lineMatchStrategy ?? substringLineMatch,
+        sapAnswers: context.sapAnswerStrategy ?? skipSapAnswers,
+      },
     );
     return {
       isError: false,

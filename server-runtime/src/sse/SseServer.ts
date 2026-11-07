@@ -6,7 +6,9 @@ import type {
   ConnectionContext,
   IBackgroundRuns,
   IHttpApplication,
+  LineMatchStrategy,
   RouteRegistrationOptions,
+  SapAnswerStrategy,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   AdtHeaderPairs,
@@ -110,6 +112,16 @@ export interface SseServerOptions {
    * `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to every instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy, handed to every instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 }
 
 type SessionEntry = {
@@ -163,6 +175,8 @@ export class SseServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
+  private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
+  private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   /** The running background runs' owner: this server's, shared by every stream's instance. */
   private readonly runOwner = new BackgroundRunOwner();
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
@@ -192,6 +206,8 @@ export class SseServer {
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
+    this.sapAnswerStrategy = opts?.sapAnswerStrategy;
+    this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -373,6 +389,8 @@ export class SseServer {
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           backgroundRunOwner?: BackgroundRunOwner;
+          sapAnswerStrategy?: SapAnswerStrategy;
+          lineMatchStrategy?: LineMatchStrategy;
           batch?: InstanceBatch;
           heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
@@ -403,6 +421,12 @@ export class SseServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        ...(this.sapAnswerStrategy !== undefined && {
+          sapAnswerStrategy: this.sapAnswerStrategy,
+        }),
+        ...(this.lineMatchStrategy !== undefined && {
+          lineMatchStrategy: this.lineMatchStrategy,
+        }),
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,
           // The running runs' owner is this server's, shared by every

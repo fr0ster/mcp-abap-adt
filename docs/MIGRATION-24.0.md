@@ -297,9 +297,19 @@ in one run, answers only the hits with counters of what it did, and skips what i
   session. `SearchSource` runs as every long
   tool runs: on an ABAP session of its own, in the background by default — see "Callers of the
   long tools" below.
-- **Embedders of `runSearchSource` / `runSearchSourceWithContext` pass the line-match
-  strategy:** `OrchestratorDeps.lineMatch`, and the third argument of
-  `runSearchSourceWithContext`. The shipped `substringLineMatch` keeps the match as it was. A
+- **Embedders of the server: `SearchSource`'s strategies are options.**
+  `EmbeddableMcpServer` and `HandlerExporter` take `sapAnswerStrategy` and
+  `lineMatchStrategy`, optional; without them the search behaves as shipped
+  (`skipSapAnswers`, `substringLineMatch`, exported from
+  `@mcp-abap-adt/lib/embeddable` with the contracts). Only SAP answers reach the
+  SAP-answer strategy; a credential refusal ends the call and a failure with no
+  SAP answer is an error, whatever the strategy. Pass them as options — a
+  context you build is no way in. On `createRegistry()` the hosting server's
+  options apply.
+- **Embedders of `runSearchSource` / `runSearchSourceWithContext` pass both strategies:**
+  `OrchestratorDeps.lineMatch` and `OrchestratorDeps.sapAnswers`, and the third argument of
+  `runSearchSourceWithContext`, `{ lineMatch, sapAnswers }`. The shipped `substringLineMatch`
+  keeps the match as it was; the shipped `skipSapAnswers` skips every SAP answer. A
   `PackageContentsFetcher` answers `{ items, walked }` (the packages whose own level was read)
   where it answered the items alone.
 

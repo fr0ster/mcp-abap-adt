@@ -34,6 +34,8 @@ import type {
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { LONG_TOOLS } from '../../../lib/longTools';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
+import type { LineMatchStrategy } from '../../../lib/search-source/lineMatch';
+import type { SapAnswerStrategy } from '../../../lib/search-source/readFailure';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -122,8 +124,23 @@ function shippedEntry(tool: string): {
 }
 
 /** A group offering `tool` alone, its handler reading its own group's context. */
-function oneToolGroup(tool: string): IHandlerGroup {
-  const { group, entry } = shippedEntry(tool);
+function oneToolGroup(
+  tool: string,
+  recordContext?: (context: HandlerContext) => void,
+): IHandlerGroup {
+  const { group, entry: shipped } = shippedEntry(tool);
+  // With a recorder: the tool's own schema, its call recording the context
+  // it runs in and answering at once.
+  const entry: HandlerEntry =
+    recordContext === undefined
+      ? shipped
+      : {
+          ...shipped,
+          call: async (context) => {
+            recordContext(context);
+            return { content: [{ type: 'text', text: 'recorded' }] };
+          },
+        };
   return {
     getName: () => `long-${tool}`,
     getHandlers: () => [entry],
@@ -169,6 +186,11 @@ export async function longStand(
     backgroundRuns?: IBackgroundRuns;
     /** With a strategy: serve the background-run tools (default true). */
     runTools?: boolean;
+    /** The server's `SearchSource` strategies (its options). */
+    sapAnswerStrategy?: SapAnswerStrategy;
+    lineMatchStrategy?: LineMatchStrategy;
+    /** Records the context the tool's call runs in, in place of the call. */
+    recordContext?: (context: HandlerContext) => void;
   } = {},
 ): Promise<LongStand> {
   if (!LONG_TOOLS.includes(tool)) throw new Error(`${tool} is not listed`);
@@ -187,7 +209,7 @@ export async function longStand(
   const server = new EmbeddableMcpServer({
     connection: connection as never,
     handlersRegistry: new CompositeHandlersRegistry([
-      oneToolGroup(tool),
+      oneToolGroup(tool, options.recordContext),
       probeGroup(),
       ...(options.backgroundRuns !== undefined && options.runTools !== false
         ? [
@@ -199,6 +221,12 @@ export async function longStand(
     systemType: 'onprem',
     ...(options.backgroundRuns !== undefined
       ? { backgroundRuns: options.backgroundRuns }
+      : {}),
+    ...(options.sapAnswerStrategy !== undefined
+      ? { sapAnswerStrategy: options.sapAnswerStrategy }
+      : {}),
+    ...(options.lineMatchStrategy !== undefined
+      ? { lineMatchStrategy: options.lineMatchStrategy }
       : {}),
     logger: silent,
     systemContextResolver: defaultSystemContextResolver,

@@ -14,6 +14,10 @@ import {
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
+import {
+  skipSapAnswers,
+  substringLineMatch,
+} from '@mcp-abap-adt/lib/embeddable';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
@@ -186,6 +190,9 @@ export async function launch(
     ...(options.toolSet.backgroundRuns && {
       backgroundRuns: new InMemoryBackgroundRuns(),
     }),
+    // SearchSource's strategies: the shipped ones (DO22, DO24).
+    sapAnswerStrategy: skipSapAnswers,
+    lineMatchStrategy: substringLineMatch,
   });
   installTransportShutdown({
     begin: () => server.beginShutdown(),

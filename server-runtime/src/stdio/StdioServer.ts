@@ -6,7 +6,9 @@ import {
   type IBackgroundRuns,
   type InstanceBatch,
   type LeftoverSessions,
+  type LineMatchStrategy,
   type ResolvedConnection,
+  type SapAnswerStrategy,
   type StartedConnection,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
@@ -47,6 +49,16 @@ export interface StdioServerOptions {
    * `@mcp-abap-adt/background-runs-memory`). Absent: `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to the instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy, handed to the instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
   /**
    * The owner of this instance's batch state (the launcher's, one for the
    * process's one instance). Absent: the batch tools answer
@@ -93,6 +105,12 @@ export class StdioServer extends BaseMcpServer {
       }),
       ...(opts?.backgroundRuns !== undefined && {
         backgroundRuns: opts.backgroundRuns,
+      }),
+      ...(opts?.sapAnswerStrategy !== undefined && {
+        sapAnswerStrategy: opts.sapAnswerStrategy,
+      }),
+      ...(opts?.lineMatchStrategy !== undefined && {
+        lineMatchStrategy: opts.lineMatchStrategy,
       }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
       // The locks the instance took: a write, a delete or an unlock under a

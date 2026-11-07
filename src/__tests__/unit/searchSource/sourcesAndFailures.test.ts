@@ -28,7 +28,11 @@ import { TOOL_DEFINITION as INTFT } from '../../../handlers/interface/high/handl
 import { TOOL_DEFINITION as DDLXT } from '../../../handlers/metadata_extension/high/handleGetMetadataExtension';
 import { TOOL_DEFINITION as PROGT } from '../../../handlers/program/high/handleGetProgram';
 import { TOOL_DEFINITION as SRVDT } from '../../../handlers/service_definition/high/handleGetServiceDefinition';
-import { TOOL_DEFINITION } from '../../../handlers/system/readonly/handleSearchSource';
+import {
+  handleSearchSource,
+  TOOL_DEFINITION,
+} from '../../../handlers/system/readonly/handleSearchSource';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type {
   LineMatchStrategy,
   ScanInput,
@@ -2903,4 +2907,115 @@ describe('D23b: the fixed classification and the SAP-answer strategy (DO22)', ()
       }).toEqual({ file, reads: false });
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: the handler takes the server's strategies (DO22, DO24)
+// ---------------------------------------------------------------------------
+
+describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
+  const P = [['served'], ['absent']] as const;
+  /** The context of a call on `fake`, with the server's strategies set. */
+  const withStrategies = (
+    fake: Fake,
+    absent: boolean,
+    fields: Pick<HandlerContext, 'sapAnswerStrategy' | 'lineMatchStrategy'>,
+  ): HandlerContext => ({
+    ...contextOn(fake, absent ? 'absent' : 'served'),
+    ...fields,
+  });
+
+  it.each(P)(
+    "the context's SAP-answer strategy is asked for a SAP answer and obeyed (%s)",
+    async (batch) => {
+      const absent = batch === 'absent';
+      for (const [decision, failed] of [
+        ['skip', false],
+        ['end', true],
+        ['throw', true],
+      ] as const) {
+        const asked: string[] = [];
+        const result = await handleSearchSource(
+          withStrategies(
+            standOn(ALL, { refuse: { 'PROGRAM ZPROG': 500 } }),
+            absent,
+            {
+              sapAnswerStrategy: {
+                decide(_failure, place) {
+                  asked.push(place.kind);
+                  return decision;
+                },
+              },
+            },
+          ),
+          { query: 'marker', packages: ['ZALL'] },
+        );
+        expect({ decision, asked }).toEqual({ decision, asked: ['source'] });
+        expect(isError(result)).toBe(failed);
+      }
+    },
+  );
+
+  it.each(P)(
+    "the context's line match is used for every source, with all its lines and the call's terms; its capped sets by_object_cap (%s)",
+    async (batch) => {
+      const seen: Array<{ lines: readonly string[]; input: ScanInput }> = [];
+      const result = await handleSearchSource(
+        withStrategies(standOn(ALL), batch === 'absent', {
+          lineMatchStrategy: {
+            match(lines, input) {
+              seen.push({ lines, input });
+              return {
+                hits: [{ line: 1, snippet: 'chosen' }],
+                capped: lines[0] === 'marker program',
+              };
+            },
+          },
+        }),
+        {
+          query: 'marker',
+          query2: 'second',
+          exclude: ['dropped'],
+          exclude_comments: true,
+          packages: ['ZALL'],
+        },
+      );
+      // Program, include, class main and four local includes, interface,
+      // two modules, a function include and an include, CDS, BDEF, DDLX, SRVD.
+      expect(seen.map((s) => s.lines[0]).sort()).toEqual(
+        Object.values(ALL.sources).sort(),
+      );
+      for (const { input } of seen) {
+        expect(input).toMatchObject({
+          query: 'marker',
+          query2: 'second',
+          exclude: ['dropped'],
+          exclude_comments: true,
+        });
+      }
+      const payload = payloadOf(result);
+      expect(payload.results).toHaveLength(seen.length);
+      expect(
+        payload.results.every(
+          (h: { snippet: string }) => h.snippet === 'chosen',
+        ),
+      ).toBe(true);
+      expect(payload.truncated.by_object_cap).toBe(true);
+    },
+  );
+
+  it.each(P)(
+    'without the fields the shipped strategies answer: a SAP answer skipped, the substring match (%s)',
+    async (batch) => {
+      const result = await handleSearchSource(
+        contextOn(
+          standOn(ALL, { refuse: { 'PROGRAM ZPROG': 500 } }),
+          batch === 'absent' ? 'absent' : 'served',
+        ),
+        { query: 'MARKER CDS', packages: ['ZALL'] },
+      );
+      expect(isError(result)).toBe(false);
+      expect(payloadOf(result).results.map(hitLabel)).toEqual(['ZDDL/ZDDL']);
+    },
+  );
 });

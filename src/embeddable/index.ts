@@ -93,6 +93,32 @@ export {
   runWithRequestSignal,
   throwIfRequestAborted,
 } from '../lib/requestSignal.js';
+/**
+ * `SearchSource`'s strategies, the consumer's: passed as
+ * `EmbeddableMcpServer`'s (or `HandlerExporter`'s) `sapAnswerStrategy` and
+ * `lineMatchStrategy` options; absent, the shipped ones answer.
+ *
+ * - The SAP-answer strategy (DO22): what a SAP answer to a failed read leads
+ *   to, at its place. Only SAP answers reach it — a credential refusal ends
+ *   the call, a failed batch envelope and anything that is no SAP answer are
+ *   thrown, before any strategy. The shipped one, `skipSapAnswers`, skips
+ *   every SAP answer.
+ * - The line-match strategy (DO24): which lines of a source are hits. The
+ *   shipped one, `substringLineMatch`, matches a case-insensitive substring.
+ */
+export type {
+  LineMatchStrategy,
+  ScanHit,
+  ScanInput,
+  ScanResult,
+} from '../lib/search-source/lineMatch.js';
+export { substringLineMatch } from '../lib/search-source/lineScanner.js';
+export {
+  type SapAnswerDecision,
+  type SapAnswerPlace,
+  type SapAnswerStrategy,
+  skipSapAnswers,
+} from '../lib/search-source/readFailure.js';
 export * from './BaseMcpServer.js';
 export * from './ConnectionContext.js';
 export * from './EmbeddableMcpServer.js';

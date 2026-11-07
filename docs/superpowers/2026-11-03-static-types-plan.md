@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D24 (spec §9), then C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D25 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -3287,6 +3287,367 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   answered).
 - [ ] **Step 9:** Commit.
 
+### D25. Compact `HandlerSystem`: the system-wide reads in one tool (owner, 2026-11-07, DO21)
+
+**Order.** D25 is implemented after D23b: its `search_source` action is `SearchSource` as
+D23b leaves it (masks `*` / `?`, hits only, no paging, the counters). It also builds on D24
+(the long-tool list, `background`, the run's own session, the cancel by discard).
+
+**The owner's decisions (DO21).**
+1. **A new compact tool `HandlerSystem` with a required `action`.** Each action calls exactly
+   one full-set tool's entry (its `call`, so its schema parses the arguments):
+
+   | `action` | Full-set tool |
+   | --- | --- |
+   | `search_source` | `SearchSource` (after D23b); compact has no source search today |
+   | `search_object` | `SearchObject` (today `HandlerSearch`) |
+   | `where_used` | `GetWhereUsed` (today `HandlerWhereUsed`) |
+   | `package_tree` | `GetPackageTree` |
+   | `transports` | `ListTransports` |
+   | `atc_findings` | `GetATCFindings` |
+   | `atc_results` | `ListATCResults` |
+   | `atc_result` | `GetATCResult` |
+
+   Eight actions, one full tool each: the `action` value alone picks the tool, as the other
+   compact tools' constants (`object_type`, `operation`, `action`) pick theirs; nothing is
+   inferred from which arguments a call carries (owner, D25-Q1).
+
+2. **`HandlerSearch` and `HandlerWhereUsed` are removed**, with no duplicate left beside
+   `HandlerSystem`. MIGRATION-24.0 and CHANGELOG map each of their calls to a `HandlerSystem`
+   action.
+3. **`HandlerSystem` is a long tool** (D24 for every long tool): on `LONG_TOOLS` and
+   `tools/long-handlers.json`; `background` defaults to `true` (a call answers a `run_handle`
+   at once; `background: false` answers the result in the call); its own ABAP session; its run
+   read with `HandlerBackgroundRunGet` and cancelled with `HandlerBackgroundRunDiscard`.
+   Without a background-run strategy it answers in the call and is listed without
+   `background`. Every action is a read, so no action is a run mode (`isLongRead` holds for
+   every call; no `NOT_A_READ` rule).
+4. **Each action takes exactly its full-set tool's arguments**, named and typed as there;
+   validation is per action, and a missing required argument is refused before anything is
+   sent. An argument of another action is no argument of this one: it is dropped, like any
+   undeclared key on a non-strict tool (owner, D25-Q2; D23b Step 4, MIGRATION-24.0). *What the
+   flat schema lets hold of this is below ("Validation, as the code runs it").* **D25-Q3
+   (owner, 2026-11-07, option A):** a well-typed argument of another action and an undeclared
+   key are dropped; a wrong-typed argument of another action is refused before dispatch in
+   `HandlerSystem`'s name, like any malformed argument; the listing keeps its types.
+5. **Read-only:** `HandlerSystem` belongs to `compact-readonly-entries`, so it is served by
+   every compact binary, the `-ro` ones included (`compact`, `compact-ro`, `compact-http`,
+   `compact-http-ro`, `compact-sse`, `compact-sse-ro`). The exporter (`HandlerExporter`,
+   `src/lib/handlers/HandlerExporter.ts`) builds only full-tool groups (`ReadOnlyHandlersGroup`,
+   `HighLevelHandlersGroup`, `SystemHandlersGroup`, `SearchHandlersGroup`, its runtime-run
+   group) and serves no compact tool (Measured by code), so D25 leaves it unaffected: it keeps
+   serving the full counterparts. Adding compact tools to it is not part of D25. **Owner
+   (2026-11-07):** `HandlerExporter` stays full-only; an embedder reaches compact through the
+   groups the compact packages export — `CompactReadOnlyHandlersGroup`
+   (`@mcp-abap-adt/compact-readonly-entries`) and `CompactModifyHandlersGroup`
+   (`@mcp-abap-adt/compact-modify`; both names checked in the packages' `src/index.ts`) —
+   registered on `EmbeddableMcpServer` (background runs, given a strategy) or on a plain
+   `McpServer` (answered in the call). There is no second path to the compact groups.
+6. **Not included, unchanged:** `HandlerDumpList`, `HandlerProfileView`, `HandlerGetData`.
+7. **`HandlerGet` and five full reads: reported, not added.** See "Finding" below; adding them
+   to `HandlerSystem` is the owner's later call.
+
+**Finding — what `HandlerGet` covers of `GetObjectsList`, `GetStructuresList`,
+`GetIncludesList`, `GetObjectInfo`, `DescribeByList` (Measured by code, 2026-11-07, the
+worktree's `HEAD` plus the D23b work in progress, which touches none of these files).**
+- No compact tool routes a call to any of the five. Their handlers
+  (`handleGetObjectsList`, `handleGetStructuresList`, `handleGetIncludesList`,
+  `handleGetObjectInfo`, `handleDescribeByList`) are imported only by the full groups
+  (`SearchHandlersGroup`, `ReadOnlyHandlersGroup`, `SystemHandlersGroup`); nothing in
+  `compact-readonly-entries/src`, `compact-modify/src` or `src/lib/compact` names them.
+- What `HandlerGet` serves nearby (`compactReadRoutes.ts`, `compactPartRoutes.ts`,
+  `handleHandlerGet.ts`), and how it differs:
+  - part `node_structure` calls `GetNodeStructureLow` (`handleGetNodeStructureOnce`): **one**
+    node level; `GetObjectsList` walks every child node recursively, by levels, in batch
+    envelopes. Not equivalent;
+  - part `object_structure` calls `GetObjectStructure`: one object's structure; none of the
+    five;
+  - part `contents` (`PACKAGE`) calls `GetPackageContents`: none of the five;
+  - part `main_programs` (`INCLUDE`) calls `GetMainPrograms`: an include's main programs, the
+    reverse direction of `GetIncludesList` (a program's include tree). Not equivalent;
+  - `GetStructuresList` (a structure's include tree with element info), `GetObjectInfo` (a
+    node tree with optional quick-search enrichment) and `DescribeByList` (a quick search per
+    listed object): no part of `HandlerGet` reads anything like them.
+- So compact serves none of the five today. They are not added to `HandlerSystem` in D25; the
+  finding goes into the PR description for the owner's later decision.
+
+**How the per-action arguments are declared** (the compact pattern, followed, not invented).
+
+*Which pattern gives each action exactly its own arguments (Measured by code, 2026-11-07):*
+- **A discriminated union on `action` cannot be registered.** `ToolDefinition<S extends
+  z.ZodObject>` and `VariantToolDefinition.inputSchema: z.ZodObject`
+  (`src/lib/handlers/interfaces.ts`) type every tool's schema as a `z.ZodObject`, and
+  `defineTool`'s `call` parses with it; a `z.discriminatedUnion` is no `z.ZodObject`, so the
+  definition does not compile. No compact tool uses one (`grep` over `src/lib`,
+  `compact*/src`: none). The MCP tool listing also carries an object schema as a tool's
+  `inputSchema`, where a union would serialise to `anyOf` (from the protocol's schema; not
+  measured here).
+- **The takes table plus the target's parse gives each action exactly its own arguments to
+  its handler.** The listed schema is one flat object (the union of the actions' properties);
+  the takes table states, at compile time, exactly which properties each action takes; and
+  the target entry's own schema keeps exactly that tool's arguments and drops every other key
+  (a `z.object` drops an undeclared key), so the target's handler receives exactly its tool's
+  arguments. In the listing each property's words name the action(s) that take it. This is
+  the pattern planned.
+
+*Validation, as the code runs it (Measured by code, 2026-11-07):* a call is parsed three
+times before the target's handler runs —
+1. the MCP SDK validates the arguments against the listed schema before dispatch
+   (`validateToolInput`, `node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js`),
+   on every transport, refusing with its own "Invalid arguments for tool HandlerSystem" words;
+2. `defineTool`'s `call` parses them with `HandlerSystem`'s own schema
+   (`src/lib/handlers/interfaces.ts`, `invalidArgumentsWords('HandlerSystem', …)`);
+3. the action's target entry parses them with the full tool's schema, in the target's words.
+
+So with the flat schema every action's properties are declared and typed for every call:
+- **a malformed argument of the action itself** (a wrong type, or a value rule the listed
+  property states) is refused at 1 in `HandlerSystem`'s name, not the target's; only what
+  the flat schema cannot state per action — a missing required argument — reaches 3 and is
+  refused in the target's words, naming the target and the argument; nothing is sent either
+  way;
+- **a well-typed argument of another action, or a key no action declares,** passes 1 and 2
+  and is dropped at 3: the target's handler never sees it, nothing is refused — DO21's
+  "dropped" holds;
+- **a wrong-typed argument of another action** (e.g. `search_object` with `worklist_id: 123`)
+  is refused at 1, before dispatch, in `HandlerSystem`'s name, like any malformed argument —
+  as the owner decided (D25-Q3, option A): within the `z.ZodObject` contract no listed schema
+  both types each property and drops another action's wrong-typed property, and the listing
+  keeps its types.
+
+The compact tools with a mode argument declare one flat `z.object` whose properties are the
+union of what the modes take, each property's words naming the modes that take it, and a
+compile-time takes table (`takesOf<Property, Member>()({ every, members })`,
+`compactSchemas.ts`) that names, per mode, the properties it reads — a property no list names
+does not compile; per variant through `byVariant` where a full tool differs by variant
+(`GetWhereUsed`'s `object_type`). The required properties of a mode are not `required` in the
+listed schema (another mode does not take them); each mode's call goes to the target entry's
+`call`, which parses with the target's own schema, so a missing required argument is refused
+in the target's words, naming the target and the argument, before any request (the rule of
+steps 8–9 and MIGRATION-24.0 "compact callers: refusals in the target tool's words"); a
+wrong-typed one is refused earlier, by the listed schema (above).
+`HandlerSystem` follows this:
+- `action`: a required enum of the eight values; each value is its own coverage key (O11,
+  `HandlerSystem#<action>`);
+- the takes table keyed by action, with `every: ['background', 'action']`;
+- a property two actions share is listed once, with words naming each action's meaning;
+  measured overlaps: `object_name` and `object_type` (`search_object`: a name or mask and a
+  search name; `where_used`: the object and its where-used code or name, per variant),
+  `include_subpackages` (`search_source`, `package_tree`), `detail` (`search_object`,
+  `transports`, `atc_findings`, `atc_result`: `SearchObject`, `ListTransports`,
+  `GetATCFindings` and `GetATCResult` each spread the shared `DETAIL_SHAPE`). The listed type accepts what every
+  action takes (all are strings or booleans today, so no widening is needed — the red test
+  pins it); a full tool's `default` is applied by that tool's parse, not stated by the listed
+  schema;
+- `background` is `HandlerSystem`'s own (`COMPACT_LONG_BACKGROUND_FIELD`), decided at the
+  dispatch; the action's call into the full entry runs inside that run or that synchronous
+  call, never a second background run and never a second connection (D24 Step 3);
+- the handler hands the target entry the call's arguments without `action`; the target's
+  parse keeps its own and drops the rest (D25-Q2), and nothing reads a dropped key;
+- the ATC and transport actions: `atc_findings` takes `GetATCFindings`' `worklist_id` and
+  `detail`; `atc_results` `ListATCResults`' `created_by`, `central_only`, `age_min`,
+  `age_max`; `atc_result` `GetATCResult`'s `display_id` and `detail`; `transports`
+  `ListTransports`' `user`, `modifiable_only` and `detail`.
+
+**What each action changes for a caller of the removed tools** (from the code, for
+MIGRATION):
+- `HandlerSearch(query, object_type, max_results)` → `HandlerSystem(action: "search_object",
+  object_name: <query>, object_type, maxResults: <max_results>)`. Both default the count to
+  100 (`HandlerSearch` `max_results`, `SearchObject` `maxResults`), so an absent count is
+  unchanged; `search_object` also takes `SearchObject`'s `detail`.
+- `HandlerWhereUsed(object_type: <compact type>, object_name, function_group_name,
+  max_results)` → `HandlerSystem(action: "where_used", object_name, object_type, …)` with
+  `GetWhereUsed`'s arguments: `object_type` a where-used code or name (not the compact
+  member names), a function module named as `GetWhereUsed` takes it (`GROUP|MODULE` in
+  `object_name`), `objects` for several, the type filters (`enable_all_types`,
+  `enable_only_types`, `disable_types`). `HandlerWhereUsed` cut the list at `max_results`
+  (default 100) and added `returned_references`; `GetWhereUsed` answers every reference. The
+  compact where-used tables (`COMPACT_WHERE_USED`, `COMPACT_WHERE_USED_ROUTES`,
+  `COMPACT_WHERE_USED_TAKES`, `compactWhereUsedSchemaFor`, `compactWhereUsedDescription`) go
+  when nothing uses them.
+
+**Files:** `compact-readonly-entries/src/handlers/handleHandlerSystem.ts` (new) and
+`compact-readonly-entries/src/group.ts`; `handleHandlerSearch.ts` and `handleHandlerWhereUsed.ts`
+(removed); `src/lib/compact/compactSchemas.ts`, `compactDescriptions.ts` and
+`src/lib/compact/index.ts` (the new schema and takes table; the search and where-used ones
+removed); `src/lib/adtProjections.ts` (the compact where-used projection, where nothing else
+uses it); `src/lib/longTools.ts` and `tools/long-handlers.json`; `src/lib/backgroundRuns/tools.ts`
+(`COMPACT_LONG_READS`); `tools/batch-handlers.json` and `docs/user-guide/BATCH_MODE.md`;
+`src/lib/toolSet.ts` (the compact read-only set's words); `scripts/ci/check-images.mjs` (its
+`HandlerSearch` probe); the listed-schema and surface fixtures (`tests/fixtures/tools/*.json`,
+`compact/tests/fixtures/surface.json`); `tools/tool-search.json` (generated);
+`compact/docs/AVAILABLE_TOOLS.md` and the other tool pages (`npm run docs:tools`); `README.md`,
+the compact packages' READMEs (`compact-ro`, `compact-sse-ro`, `compact-http-ro`, …),
+`docs/user-guide/HANDLERS_MANAGEMENT.md`; `src/__tests__/unit/coverage/coverage-debt.json`
+and the coverage ledger; CHANGELOG, MIGRATION-24.0.
+
+**Steps (red first):**
+- [x] **Step 0: The owner's answers to D25-Q1 and D25-Q2** are recorded under DO21 (closed,
+  2026-11-07): one action per full tool (the ATC entry split into three), and an argument of
+  another action dropped.
+- [x] **Step 0a: The owner's answer to D25-Q3** is recorded under DO21 (closed, 2026-11-07,
+  option A): a wrong-typed argument of another action is refused before dispatch in
+  `HandlerSystem`'s name, like any malformed argument; the listing keeps its types.
+- [ ] **Step 1: Red tests per action** (`compact-readonly-entries/src/__tests__/handlerSystem.test.ts`
+  and a new `src/__tests__/unit/handlerSystem/` suite, on `recordingConnection` /
+  `adtStandIn` over corpus answers), table-driven over the eight actions:
+  - `'each action calls exactly its full tool's path'`: for each action, the requests a
+    `HandlerSystem` call sends equal, literal for literal, the requests the full tool sends for
+    the same arguments (`SearchSource`, `SearchObject`, `GetWhereUsed`, `GetPackageTree`,
+    `ListTransports`, `GetATCFindings`, `ListATCResults`, `GetATCResult`), and the answer is the full tool's answer — on both variants where the
+    full tool differs by variant (`where_used`);
+  - `'each action goes through its target's entry'`: a recording double of the target entry
+    sees the call, and no other target is called;
+  - **argument errors, nothing sent:**
+    - `'action is required'`, and `'an action outside the eight is refused, naming the
+      eight'`;
+    - per action, each argument its full tool requires, missing, is refused in the target's
+      words naming the target and the argument (`search_source` `query` and `packages`, `search_object`
+      `object_name`, `where_used` `object_name` / `object_type` or `objects`, `package_tree`
+      `package_name` or `package_names`, `atc_findings` `worklist_id`, `atc_result`
+      `display_id`; `transports` and `atc_results` as their full tools state), with no request
+      recorded;
+    - `'a malformed argument of the action itself is refused before dispatch'`, per action:
+      a wrong-typed argument (e.g. `search_object` `maxResults: "x"`, `package_tree`
+      `include_subpackages: "yes"`, `atc_results` `age_min: "1"`) and a value the listed
+      property's rule refuses (e.g. `search_source` `query: ""`) are refused by the SDK's
+      validation of the listed schema in `HandlerSystem`'s name, on every registration path
+      (stdio, HTTP, SSE; full and `-ro`), and again by `defineTool`'s parse when the entry is
+      called directly; the words pinned as they come; no request recorded, the target entry
+      not called;
+  - `'a well-typed argument of another action is dropped'` (D25-Q2), per action: the call
+    carries an argument only another action takes, with that action's type (e.g.
+    `search_object` with `worklist_id: "W1"`, `atc_result` with `packages: ["Z*"]`,
+    `where_used` with `display_id: "D1"`); its requests and answer equal those of the same
+    call without it, nothing is refused, and the target's handler receives no such key — on
+    every registration path; and `'a key no action declares is dropped'`, the same;
+  - `'a wrong-typed argument of another action is refused before dispatch'` (D25-Q3, option
+    A), per action (e.g. `search_object` with `worklist_id: 123`, `atc_result` with
+    `packages: "Z*"`, `where_used` with `display_id: 1`): refused by the SDK's validation of
+    the listed schema in `HandlerSystem`'s name, the words pinned as they come, on every
+    registration path (stdio, HTTP, SSE; full and `-ro`), and by `defineTool`'s parse when the
+    entry is called directly; no request recorded, the target entry not called;
+  - `'detail is each detail-taking action's own'`: `search_object`, `transports`,
+    `atc_findings` and `atc_result` pass `detail` (`terse`, `full`, `raw`) to their target
+    and answer as the full tool does for it; the other four actions drop it;
+  - `'the action alone picks the tool'` (D25-Q1): `atc_results` with a `worklist_id` still
+    calls `ListATCResults` (the `worklist_id` dropped); `atc_findings` with a `display_id` and
+    no `worklist_id` is refused for the missing `worklist_id`, nothing sent;
+  - `'the listed schema declares each action's arguments once'`: the takes table names every
+    listed property; each action's properties are exactly its full tool's (minus its
+    `background`, which is `HandlerSystem`'s); a shared property's listed type accepts every
+    action's values;
+  - **the removed tools:** `'HandlerSearch and HandlerWhereUsed are in no compact set'`: on
+    every compact binary (stdio, HTTP, SSE; full and `-ro`) and every system type,
+    `tools/list` names neither (the exporter serves no compact tool and is unchanged: the
+    full counterparts it serves stay as its existing tests pin them); `'a call to HandlerSearch or HandlerWhereUsed answers
+    as an unknown tool'`, on each binary: the answer the server gives any unknown tool name
+    (pinned as it is today, for a made-up name), and nothing sent.
+- [ ] **Step 2: Red tests — the long tool and the background, on every registration path.**
+  Extend the D24 table-driven suites (`src/__tests__/unit/longTools/harness.ts`,
+  `background.test.ts`, `ownConnection.test.ts`) with `HandlerSystem` (removing `HandlerSearch` and `HandlerWhereUsed`), on each path
+  that registers it: the compact stdio binary, `compact-ro`, `compact-http` / `compact-http-ro`,
+  `compact-sse` / `compact-sse-ro`, with and without a background-run strategy (the exporter
+  serves no compact tool, so it is no path of `HandlerSystem`'s):
+  - `'HandlerSystem is a long tool'`: in `LONG_TOOLS` and `tools/long-handlers.json` (the
+    source test keeping them equal), in `COMPACT_LONG_READS`, and its run tools are compact's;
+  - per action: `'a call without background answers a run_handle'`, the read on a session
+    other than the instance's main one, logged off after; `'background: false answers in the
+    call'`, on its own session; `'HandlerBackgroundRunGet answers the result once'`;
+    `'HandlerBackgroundRunDiscard cancels a running read'` (the session's logoff sent; the run
+    `cancelled`);
+  - `'one connection per background run'`: the action's call into the full entry opens no
+    second connection and starts no second run;
+  - `'without a strategy, HandlerSystem is listed without background and answers in the
+    call'`; a plain registration of the compact read-only group lists it so;
+  - `'no HandlerSystem call is a run mode'`: `isLongRead` holds for every action;
+  - **batch mode:** each action's batch row matches its full tool's (`tools/batch-handlers.json`
+    `when` rows on `action`): an action whose full tool is recorded is recorded with the same
+    `sends`, an action whose full tool runs outside batch mode runs outside it, and
+    `background: true` in batch mode is refused `batch_no_background` as for every long tool.
+- [ ] **Step 3: Implement.** The schema and takes table (`compactSchemas.ts`, per variant via
+  `byVariant`), the description (`compactDescriptions.ts`), `handleHandlerSystem.ts` routing
+  each action to its target entry's `call` by the `action` value alone, the arguments without
+  `action`, registered in
+  `compact-readonly-entries/src/group.ts`; `HandlerSystem` added to `LONG_TOOLS`,
+  `tools/long-handlers.json` (a row per action's `sends`, as `HandlerGet`'s row states its
+  modes) and `COMPACT_LONG_READS`; the batch rows. Remove `HandlerSearch` and
+  `HandlerWhereUsed`: their files, group entries, long-tool and batch rows, schemas,
+  descriptions, and the where-used projections nothing else uses. No `as`, no `any`, no regex
+  (the static-types gate).
+- [ ] **Step 4: Tool-set parity and surface fixtures.** `src/__tests__/parity/toolSetParity.test.ts`
+  (its `HandlerWhereUsed` row becomes `HandlerSystem`'s), `variantProperties.test.ts`,
+  `searchObjectTypes.test.ts`, `functionModuleGroup.test.ts` and the other suites naming the
+  removed tools (`grep` at the step's start, each named in the commit) move to `HandlerSystem`
+  or drop the removed tool's case where the full tool's own case already covers it; the
+  listed-schema fixture, `http-surface.json`, `stdio-sse-surface.json`, `variant-surface.json`
+  and `compact/tests/fixtures/surface.json` change only by the two removals and the one
+  addition, visible in the diff; `tools/tool-search.json` regenerated; `src/lib/toolSet.ts`'s
+  compact read-only words name `HandlerSystem`; `scripts/ci/check-images.mjs`'s probe calls
+  `HandlerSystem` `search_object` with `background: false`.
+- [ ] **Step 5: The description, functional only,** under the functional-descriptions guard
+  (`src/__tests__/unit/sources/descriptionsFunctional.test.ts`, every set, transport and
+  system type): `[read-only]`; what each action reads and its required arguments, in the
+  compact form (`search_source(query*, packages*, …)`); the answer per action; the long-tool words (`LONG_TOOL_ADVICE`, or the in-call words without a
+  strategy). It names no other tool of its set and carries none of the guard's forbidden
+  words. A description test pins its first sentence and each action's required arguments.
+- [ ] **Step 6: Generated tool pages, README and docs.** `npm run docs:tools` (it builds,
+  then writes `compact/docs/AVAILABLE_TOOLS.md` and the full pages; the compact count goes
+  from 40 to 39); `README.md`, the compact packages' READMEs, `docs/user-guide/HANDLERS_MANAGEMENT.md`,
+  `docs/user-guide/BATCH_MODE.md` (its table from `tools/batch-handlers.json`) and any `docs/`
+  page naming `HandlerSearch` or `HandlerWhereUsed` (`grep` over `README.md`, `docs/` and the
+  packages' READMEs; the released `MIGRATION-19.0`–`23.0` stay as released).
+  `docs/architecture/HANDLER_EXPORTER.md` gets one sentence (owner, DO21): the exporter
+  serves the full tools only; compact tools are registered from `CompactReadOnlyHandlersGroup`
+  and `CompactModifyHandlersGroup` on `EmbeddableMcpServer` (background runs given a
+  strategy) or on a plain `McpServer` (in the call).
+- [ ] **Step 7: MIGRATION-24.0 and CHANGELOG.**
+  - MIGRATION-24.0, a new section "compact callers: `HandlerSystem` replaces `HandlerSearch`
+    and `HandlerWhereUsed`": the call mapping above, argument for argument (`query` →
+    `object_name`, `max_results` → `maxResults`; the where-used `object_type` values and the
+    function-module form; no `max_results` cut and no `returned_references` on `where_used`);
+    the six new reads compact did not have (`search_source`, `package_tree`, `transports`,
+    `atc_findings`, `atc_results`, `atc_result`); a well-typed argument of another action, or an undeclared key, is
+    dropped, while a wrong-typed one, like a malformed argument of the action itself, is
+    refused before dispatch in `HandlerSystem`'s name (D25-Q3); the listing keeps each
+    argument's type; `HandlerSystem` is a long tool (a call without `background` answers a
+    `run_handle`). The sections that list the compact long tools or the compact routes
+    (`HandlerSearch`, `HandlerWhereUsed`; the long-tools section, "compact callers: refusals
+    in the target tool's words", the function-module section) are rewritten to `HandlerSystem`
+    (24.0.0 is unreleased).
+  - CHANGELOG (24.0.0): Added — compact `HandlerSystem` (its eight actions and their full
+    tools); Removed — `HandlerSearch` and `HandlerWhereUsed` (with the mapping, pointing at
+    MIGRATION-24.0). The 24.0.0 entry's lines naming the two tools (the long-tool list, the
+    compact routes, #2's tool list, the `object_type` search-names lines) name `HandlerSystem`
+    (`search_object`, `where_used`) instead. Entries of released versions stay as they are.
+- [ ] **Step 8: Coverage ledger.** The keys `HandlerSearch` and `HandlerWhereUsed#<type>`
+  leave `coverage-debt.json` and the ledger (no longer served); the keys
+  `HandlerSystem#search_source`, `#search_object`, `#where_used`, `#package_tree`,
+  `#transports`, `#atc_findings`, `#atc_results`, `#atc_result` (O11, per `action` value) are added to `coverage-debt.json`
+  and owed by their families: C10 (`search_source`, `search_object`, `where_used`), C8
+  (`package_tree`, beside `GetPackageTree`), C11 (`atc_findings`, `atc_results`,
+  `atc_result`, beside the ATC reads), C13
+  (`transports`, beside `ListTransports`). Each key's pin carries a background case and a
+  `background: false` case (D24 Step 7). `coverageLedger.test.ts` green, the ratchet naming
+  exactly the new keys.
+- [ ] **Step 9: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
+  live-run safety, with `background: false` and with the default background (read back with
+  `HandlerBackgroundRunGet`), on premise and on ABAP Cloud, each action:
+  - `search_source` in a configured package with a known hit (on the cloud, the configured
+    build package): the hit as `SearchSource` answers it;
+  - `search_object` for a shared object's name: it is listed;
+  - `where_used` for a shared object: the references `GetWhereUsed` answers;
+  - `package_tree` for the configured package: the tree holds a shared object;
+  - `transports` for the test user's modifiable requests: the configured request is listed
+    (C13's `coverage_transport.request`);
+  - `atc_findings` on the worklist the C11 ATC run produced, `atc_result` on its stored
+    result, `atc_results` listing the test user's results: each answer as its full tool's;
+  - one background run cancelled by `HandlerBackgroundRunDiscard` mid-run (`search_source`):
+    `cancelled`, its session logged off.
+  An action whose endpoint the trial's discovery does not offer is reported to the owner
+  before its cloud case is written (O7 / O8).
+- [ ] **Step 10:** Commit as `feat(compact): D25 — HandlerSystem; HandlerSearch and
+  HandlerWhereUsed removed`.
+
 ### Defect-stage owner decisions (decided 2026-11-04)
 
 - **DO1:** a line range on the source reads, cut by the server after its one GET (ADT serves
@@ -3358,6 +3719,39 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   one run reads every target (in the background by default, D24) and keeps only the hits.
   `max_hits_per_object` stays, optional, no default (absent = no limit; given = per object,
   DO18); `truncated.by_object_cap` stays.
+- **DO21 (2026-11-07, D25):** a new compact tool `HandlerSystem` with a required `action`,
+  each action calling exactly its full-set tool's entry: `search_source` = `SearchSource` (as
+  D23b leaves it), `search_object` = `SearchObject`, `where_used` = `GetWhereUsed`,
+  `package_tree` = `GetPackageTree`, `transports` = `ListTransports`, `atc_findings` =
+  `GetATCFindings`, `atc_results` = `ListATCResults`, `atc_result` = `GetATCResult` — eight
+  actions, one full tool each. `HandlerSearch` and `HandlerWhereUsed`
+  are removed (no duplicates); MIGRATION-24.0 and CHANGELOG map their calls to the actions.
+  `HandlerSystem` is a long tool (D24: `LONG_TOOLS`, `tools/long-handlers.json`, `background`
+  default `true`, its own ABAP session, read with `HandlerBackgroundRunGet`, cancelled with
+  `HandlerBackgroundRunDiscard`; without a strategy it answers in the call and lists no
+  `background`). Each action takes exactly its full tool's arguments, validated per action, a
+  missing required one refused before anything is sent. Read-only: in every compact set, the `-ro`
+  ones included; the exporter serves no compact tool and is unaffected. **Exporter (owner,
+  2026-11-07):** `HandlerExporter` stays full-only; compact is reached by embedders through
+  `CompactReadOnlyHandlersGroup` and `CompactModifyHandlersGroup` on `EmbeddableMcpServer`
+  (background runs, given a strategy) or on a plain `McpServer` (in the call), with no second
+  path; `HANDLER_EXPORTER.md` says so (D25 Step 6). `HandlerDumpList`, `HandlerProfileView` and `HandlerGetData` stay as they
+  are. `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `GetObjectInfo` and
+  `DescribeByList` are not added (D25's finding: compact serves none of them today); that is
+  the owner's later call. D25 is implemented after D23b. **D25-Q1 (owner, 2026-11-07):** the
+  tool is picked by a constant, as the other compact operations are: one `action` per full
+  tool, the ATC entry split into `atc_findings`, `atc_results` and `atc_result`; nothing is
+  inferred from which arguments are present. **D25-Q2 (owner, 2026-11-07):** since the action
+  names the tool, each action declares exactly its tool's arguments; an argument of another
+  action is no part of it and is dropped like any undeclared key on a non-strict tool. The
+  pattern that gives this (Measured by code): the flat schema with the per-action takes table,
+  the target entry's parse keeping exactly its tool's arguments — a discriminated union on
+  `action` is no `z.ZodObject`, which every tool definition's schema must be. **D25-Q3 (owner,
+  2026-11-07, option A; DO21 amended):** a well-typed argument of another action and an
+  undeclared key are dropped (by the target's parse); a wrong-typed argument of another action
+  is refused before dispatch in `HandlerSystem`'s name (the SDK's validation of the listed
+  schema), like any malformed argument of the action itself; the listing keeps its types;
+  MIGRATION-24.0 says so.
 
 ## Test coverage — the families
 
@@ -3606,7 +4000,8 @@ are pinned again here by literal (O2, decided).
 - **Compact:** `HandlerGet#<type>#<part>`, every pair the route tables serve, except the
   unit-test pairs (C12); and the typeless address parts `HandlerGet#-#object_structure`,
   `HandlerGet#-#node_structure`, `HandlerGet#-#virtual_folders`, which `handleHandlerGet`
-  routes before any type. The typeless run parts are C3's.
+  routes before any type. The typeless run parts are C3's. `HandlerSystem#package_tree` (D25),
+  beside `GetPackageTree`, its live case on the same package.
 - **The behaviour implementations (D17):** `GetBehaviorImplementation#implementations` and
   `HandlerGet#BEHAVIOR_IMPLEMENTATION#implementations`.
 - **The outline tool (D5):** `GetObjectOutline#<object_type>`, one key per value of its
@@ -3688,8 +4083,9 @@ answers are corpus documents.
   `GetInactiveObjects`, `GetObjectInfo`, `GetObjectStructure`,
   `GetObjectsByType`, `GetTransaction`, `SearchObject`, `SearchSource`, `GetWhereUsed`,
   `DescribeByList`, `GetSqlQuery`, `GetTableContents`.
-- Compact: `HandlerSearch`, `HandlerGetData`, `HandlerWhereUsed#<type>` (its listed schema has
-  an `object_type` enum, so one key per type).
+- Compact: `HandlerGetData`, `HandlerSystem#search_source`, `HandlerSystem#search_object`,
+  `HandlerSystem#where_used` (D25, O11: one key per `action` value; `HandlerSearch` and
+  `HandlerWhereUsed#<type>` are removed in D25).
 
 **Owner's decision applied:** O8 — the cloud cases of `GetSqlQuery` and `GetTableContents` are
 written only after the trial's ADT discovery is read for their endpoints; an endpoint it does
@@ -3717,7 +4113,10 @@ not offer is reported to the owner.
   `RuntimeAnalyzeProfilerTrace`, `RuntimeListFeeds`, `RuntimeGetDumpById`,
   `RuntimeGetGatewayErrorLog`, `RuntimeListSystemMessages`.
 - Compact: `HandlerDumpList`, `HandlerDumpView`, `HandlerProfileList`, `HandlerProfileRun`,
-  `HandlerProfileSchedule`, `HandlerProfileView`.
+  `HandlerProfileSchedule`, `HandlerProfileView`, `HandlerSystem#atc_findings`,
+  `HandlerSystem#atc_results`, `HandlerSystem#atc_result` (D25; their live cases read the
+  worklist and the stored result this family's ATC run produces, and the test user's result
+  list).
 
 **Owner's decision applied:** O6 — the trace files and parameters a run leaves are accepted
 as the test user's own and listed in the run report.
@@ -3774,7 +4173,8 @@ C16's (server-dispatched).
   `MoveTransportObjects`, `SortAndCompressTransportTask`, `ReadTransportObjects`,
   `ReadTransportActionLog`, `GetTransport`, `ListTransports`.
 - Compact: `HandlerTransportCreate`, `HandlerTransportMoveObjects`,
-  `HandlerTransportSortAndCompress`.
+  `HandlerTransportSortAndCompress`, `HandlerSystem#transports` (D25; read-only, it lists the
+  configured `coverage_transport.request`).
 
 **Owner's decision applied:** O4 / O5.
 
@@ -4088,7 +4488,8 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO20 as decided);
+      argument now refused, and the owner's decisions DO1–DO21 as decided, D25's removal of `HandlerSearch` and
+      `HandlerWhereUsed` with their `HandlerSystem` actions included);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group
       activation waits on long polling with no attempt limit or interval) and C2d's added
@@ -4100,7 +4501,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
 20. Delete the goal, spec and plan before the release commit. Put anything they owe into the
     PR description: the owner's decisions (O1–O12), the exceptions the owner granted (none so
     far), D19's later work (the XML wrapper in adt-clients and adt-strategies; a possible
-    switch to `@xmldom/xmldom`), D23b's later work (SAP's text search, DO13), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
+    switch to `@xmldom/xmldom`), D23b's later work (SAP's text search, DO13), D25's finding for the owner's later call (compact serves none of `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `GetObjectInfo`, `DescribeByList`), the best-effort limit of request-create reconciliation (C1's `live.ts`: an
     unidentifiable leftover fails its case and is named by its description), the accepted
     residual of launched servers (C2 Step 4a: one follow-up request a child
     server may still send inside a refused call), the measured transport delete path, the per-system run counts and the config

@@ -532,6 +532,37 @@ on-premise system disagree, the live measurement holds.
   results) stay synchronous and take no `background`. `time_budget_ms` / `timeout` were removed in D23a (`91ee9d14`); D24 only runs the
   regression check. Once Get answers a finished or cancelled read, that read is gone: a lost
   Get response cannot be recovered, List no longer shows it, and the read is started again.
+- **Compact `HandlerSystem` (owner, 2026-11-07, plan D25, DO21):** one compact tool with a
+  required `action`, each action calling exactly one full-set tool's entry, so that tool's
+  schema parses its arguments: `search_source` (`SearchSource` as D23b leaves it — compact has
+  no source search today), `search_object` (`SearchObject`), `where_used` (`GetWhereUsed`),
+  `package_tree` (`GetPackageTree`), `transports` (`ListTransports`), `atc_findings`
+  (`GetATCFindings`), `atc_results` (`ListATCResults`) and `atc_result` (`GetATCResult`):
+  eight actions, one full tool each, picked by the `action` constant alone — nothing is
+  inferred from which arguments a call carries (owner). Each action takes exactly its full
+  tool's arguments, named and typed as there: one flat schema with a per-action takes table
+  (the compact pattern; a discriminated union on `action` is no `z.ZodObject`, which every
+  tool definition's schema is — measured by code), the call parsed by the target entry's own
+  schema. A missing required argument is refused per action in the target's words before
+  anything is sent; a wrong-typed or ill-valued argument is refused before dispatch by the
+  SDK's validation of the listed schema, in `HandlerSystem`'s name. An argument of another
+  action is dropped like any undeclared key on a non-strict tool when it has that action's
+  type; a wrong-typed one is refused by the same listed-schema validation, in
+  `HandlerSystem`'s name, like any malformed argument, and the listing keeps its types (owner,
+  plan D25-Q3, option A); MIGRATION-24.0 says so. `HandlerSearch` and `HandlerWhereUsed` are removed,
+  with no duplicate; MIGRATION-24.0 and CHANGELOG map their calls to `search_object` and
+  `where_used` (`where_used` takes `GetWhereUsed`'s arguments and answers every reference: the
+  compact `max_results` cut goes). `HandlerSystem` is a long tool under D24's rules (on
+  `LONG_TOOLS` and `tools/long-handlers.json`, `background` default `true`, its own ABAP
+  session, read by `HandlerBackgroundRunGet`, cancelled by `HandlerBackgroundRunDiscard`; with
+  no strategy it answers in the call and lists no `background`). It is read-only and served by
+  every compact binary, the `-ro` ones included; the exporter serves no compact tool and is
+  unaffected (it keeps the full counterparts). `HandlerDumpList`,
+  `HandlerProfileView` and `HandlerGetData` stay as they are. D25 follows D23b. Measured by
+  code: no compact tool serves `GetObjectsList`, `GetStructuresList`, `GetIncludesList`,
+  `GetObjectInfo` or `DescribeByList` (`HandlerGet`'s `node_structure` reads one node level,
+  `main_programs` an include's main programs; neither is one of them); adding them is the
+  owner's later call, not D25's.
 - **Verified doubts (owner-approved):** `GetIncludesList` fails for an unknown root
   program (nested includes stay absent); `MemorySnapshotList` always answers
   `{ snapshots }` (a contract change); `GetBehaviorImplementation` and `HandlerGet`
@@ -587,6 +618,8 @@ These are SAP's answers, relayed as they are:
 - The listed-schema and surface fixtures change only by the removals, the additions and the
   contract fixes this section names, each visible in the diff.
 - CHANGELOG (24.0.0) records each fix. MIGRATION-24.0 records each contract change: the
-  three removed tools with their replacements, the outline tool, and any argument that is
-  now refused.
-- The ledger (§8) drops the removed tools' keys and adds the outline tool's.
+  three removed tools with their replacements, the outline tool, `HandlerSearch` and
+  `HandlerWhereUsed` with the `HandlerSystem` action that replaces each call (D25), and any
+  argument that is now refused.
+- The ledger (§8) drops the removed tools' keys and adds the outline tool's and
+  `HandlerSystem`'s, one per `action` value.

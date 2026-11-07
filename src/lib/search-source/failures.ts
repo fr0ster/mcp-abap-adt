@@ -20,6 +20,7 @@ import {
   thrownEntry,
 } from '../answer';
 import type { T100Key } from '../messageKeys';
+import type { FailedLevel } from '../strategies/packageWalk';
 import { methodFailureOf } from '../strategies/step';
 import type { ScanObjectType } from './packageEnumerator';
 
@@ -52,8 +53,10 @@ export interface OperationFailure {
   step: OperationStep;
   /** The package mask whose resolution failed. */
   mask?: string;
-  /** The package whose walk failed. */
+  /** The package whose walk failed: the one the call asked for. */
   package?: string;
+  /** The level of that walk SAP refused: its package (a subpackage, or the package itself) and, for a type node, the node. */
+  failed_level?: FailedLevel;
   /** SAP's T100 key (message class and number), where SAP gave one. */
   t100?: T100Key;
   error: FailureEntry;

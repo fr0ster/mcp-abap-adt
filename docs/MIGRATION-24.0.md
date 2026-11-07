@@ -256,7 +256,9 @@ call's `version`, each once per call, and names everything it could not read.
   `object_name` and `error`, and adds `source` (`name`, `uri`), `step` (the read) and `t100`
   (`id`, `no`) where SAP gave a T100 key; an object may have several, one per source.
   `kind: 'operation'` names no object: `step` is `resolve package mask` (with `mask`) or
-  `walk package` (with `package`), with `t100` where there is one and `error`. A mask SAP refused
+  `walk package` (with `package`, the package the call asked for, and `failed_level`: the level
+  SAP refused — its `package`, that package or a subpackage, and for a type node `node`
+  `{ id, type }`), with `t100` where there is one and `error`. A mask SAP refused
   or a package whose walk SAP refused is such an entry, and the other packages are scanned; it
   ended the call before; a package level SAP answers `404` (root, type node, subpackage) is a
   `walk package` entry too (it was read as empty). A `404` on a listed source is an entry (it was skipped as absent), and

@@ -582,6 +582,27 @@ export interface WalkOptions {
 /** What a `404` on a level of a walk answers. */
 export type MissingLevel = 'empty' | 'refused';
 
+/** The level of a walk whose read failed: its package and, for a type node, the node. */
+export interface FailedLevel {
+  package: string;
+  node?: { id: string; type: string };
+}
+
+/** The level each failure of a walk arose at, by the thrown value. */
+const FAILED_LEVEL = new WeakMap<object, FailedLevel>();
+
+/** Records the level `thrown` arose at, unless a deeper level was recorded already. */
+function markLevel(thrown: unknown, level: FailedLevel): void {
+  if (thrown === null || typeof thrown !== 'object') return;
+  if (!FAILED_LEVEL.has(thrown)) FAILED_LEVEL.set(thrown, level);
+}
+
+/** The level of a walk a failure arose at; `undefined` when it is none of a walk's. */
+export function failedLevelOf(thrown: unknown): FailedLevel | undefined {
+  if (thrown === null || typeof thrown !== 'object') return undefined;
+  return FAILED_LEVEL.get(thrown);
+}
+
 /** A package of a walk: what was found in it, and the subpackages walked from it. */
 interface PackageWalk {
   root: number;
@@ -656,6 +677,7 @@ export async function walkPackages(
   const settle = (
     walk: PackageWalk,
     result: PhaseResult<NodeAnswer>,
+    node?: { id: string; type: string },
   ): NodeLevel | undefined => {
     if (failures.has(walk.root)) return undefined;
     try {
@@ -664,6 +686,12 @@ export async function walkPackages(
     } catch (error) {
       // A credential failure is every root's: it ends the walk as it came.
       if (endsTheCall(error)) throw error;
+      markLevel(
+        error,
+        node === undefined
+          ? { package: walk.name }
+          : { package: walk.name, node },
+      );
       failures.set(walk.root, error);
       return undefined;
     }
@@ -683,13 +711,17 @@ export async function walkPackages(
         })),
       ));
     first = undefined;
-    const typeNodes: Array<{ walk: PackageWalk; nodeId: string }> = [];
+    const typeNodes: Array<{
+      walk: PackageWalk;
+      nodeId: string;
+      type: string;
+    }> = [];
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
       walk.found.push(...root.objects.map((o) => objectOf(o, walk.name)));
       for (const child of root.childNodes) {
-        typeNodes.push({ walk, nodeId: child.nodeId });
+        typeNodes.push({ walk, nodeId: child.nodeId, type: child.type });
       }
     });
 
@@ -702,8 +734,8 @@ export async function walkPackages(
           withShortDescriptions,
         })),
       );
-      typeNodes.forEach(({ walk }, i) => {
-        const typed = settle(walk, typeAnswers[i]);
+      typeNodes.forEach(({ walk, nodeId, type }, i) => {
+        const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
         walk.found.push(...typed.objects.map((o) => objectOf(o, walk.name)));
       });
@@ -759,10 +791,16 @@ export async function walkPackage(
   seen.add(pkg);
 
   const withShortDescriptions = options.includeDescriptions === true;
-  const root = levelOf(
-    await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
-    options.missingLevel,
-  );
+  let root: NodeLevel;
+  try {
+    root = levelOf(
+      await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
+      options.missingLevel,
+    );
+  } catch (error) {
+    markLevel(error, { package: pkg });
+    throw error;
+  }
 
   // A description only when asked for: SAP sends some without it.
   const owned = (o: WalkedItem): WalkedItem => {
@@ -773,13 +811,22 @@ export async function walkPackage(
   };
   const found: WalkedItem[] = root.objects.map(owned);
   for (const child of root.childNodes) {
-    const level = levelOf(
-      await utils.fetchNodeStructure('DEVC/K', pkg, {
-        nodeId: child.nodeId,
-        withShortDescriptions,
-      }),
-      options.missingLevel,
-    );
+    let level: NodeLevel;
+    try {
+      level = levelOf(
+        await utils.fetchNodeStructure('DEVC/K', pkg, {
+          nodeId: child.nodeId,
+          withShortDescriptions,
+        }),
+        options.missingLevel,
+      );
+    } catch (error) {
+      markLevel(error, {
+        package: pkg,
+        node: { id: child.nodeId, type: child.type },
+      });
+      throw error;
+    }
     found.push(...level.objects.map(owned));
   }
 

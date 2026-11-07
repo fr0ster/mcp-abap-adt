@@ -455,8 +455,10 @@ describe('SearchSource: every scope it did not read is named (review round 1)', 
         kind: 'operation',
         step: 'walk package',
         package: 'ZONE',
+        failed_level: { package: 'ZONE' },
         t100: { id: 'SADT_RESOURCE', no: '002' },
       });
+      expect(payload.failures[0].failed_level.node).toBeUndefined();
       expect(payload.failures[0].error.status).toBe(404);
     },
   );
@@ -478,6 +480,53 @@ describe('SearchSource: every scope it did not read is named (review round 1)', 
         kind: 'operation',
         step: 'walk package',
         package: 'ZONE',
+        failed_level: {
+          package: 'ZONE',
+          node: { id: '1', type: 'PROG/P' },
+        },
+        t100: { id: 'SADT_RESOURCE', no: '002' },
+      });
+    },
+  );
+
+  it.each(PATHS)(
+    'a subpackage SAP answers 404 is named as the level that failed, beside the package asked for (%s)',
+    async (batch) => {
+      const fake = standOn(
+        {
+          ...ONE,
+          nodes: {
+            ...ONE.nodes,
+            [nodeKey('ZPAR')]: {
+              types: [{ type: 'DEVC/K', nodeId: '000001' }],
+            },
+            [nodeKey('ZPAR', '1')]: {
+              objects: [{ type: 'DEVC/K', name: 'ZKID' }],
+            },
+          },
+        },
+        { refuseWith: { [nodeKey('ZKID')]: keyed404 } },
+      );
+      const payload = payloadOf(
+        await searchOn(
+          fake,
+          {
+            query: 'marker',
+            packages: ['ZPAR', 'ZTWO'],
+            object_types: ['PROG'],
+          },
+          batch === 'absent',
+        ),
+      );
+      expect(
+        payload.results.map((h: { object_name: string }) => h.object_name),
+      ).toEqual(['ZTWOP']);
+      expect(payload.failures).toHaveLength(1);
+      expect(payload.failures[0]).toMatchObject({
+        kind: 'operation',
+        step: 'walk package',
+        package: 'ZPAR',
+        failed_level: { package: 'ZKID' },
         t100: { id: 'SADT_RESOURCE', no: '002' },
       });
     },

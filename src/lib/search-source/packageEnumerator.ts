@@ -6,6 +6,7 @@ import type { HandlerContext } from '../handlers/interfaces';
 import { globMatches } from '../plainText';
 import {
   assembleList,
+  failedLevelOf,
   nodeStructureOn,
   type PackageItem,
   walkPackage,
@@ -130,10 +131,12 @@ export async function enumerateScanTargets(
     } catch (error) {
       // The walk SAP refused is this package's answer; the other packages
       // are walked on. A credential failure ends the call (`thrownFacts`).
+      const level = failedLevelOf(error);
       failures.push({
         kind: 'operation',
         step: 'walk package',
         package: pkg.toUpperCase(),
+        ...(level !== undefined ? { failed_level: level } : {}),
         ...thrownFacts(error, 'walk package'),
       });
       continue;

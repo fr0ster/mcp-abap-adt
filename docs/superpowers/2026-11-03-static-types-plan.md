@@ -2760,7 +2760,7 @@ Step 4 names.
     - `'a source SAP refuses is skipped: no entry, no count'`: no `failures` field; the source
       is not in `scanned.sources`;
     - `'a listed source that answers 404 is skipped'`, and `'a read that throws without SAP's
-      answer is skipped'` (the two paths D23a Step 3 turned into entries);
+      answer is skipped'` (superseded by Step 4e, DO22: only a system answer is skipped; a throw that is not one is thrown) (the two paths D23a Step 3 turned into entries);
     - `'an object none of whose sources can be read is not in the answer and not in
       scanned.objects'`;
     - `'a readable source of an object is searched and its hits kept when another source of
@@ -2823,9 +2823,11 @@ Step 4 names.
   (`functionInclude` or `include`) — all as sources of the group, so a hit in a module is
   answered as `object_type: 'FUGR'`, `object_name: <group>`, `include: <module>`, and
   `scanned.objects` counts the group once. What changes:
-  - **A hit in a function module names the module:** its own `object_type` (a function
-    module's, distinct from the group's — the value the type tables give for `FUGR/FF`,
-    never a name made up here; the first red test pins it), `object_name` the module's name,
+  - **A hit in a function module names the module:** `object_type` is the ADT code
+    **`FUGR/FF`** (owner, DO18 — measured on premise, 2026-11-07: the repository quick search
+    answers `adtcore:type="FUGR/FF"` for a function module, and the group's node structure
+    lists its modules as `OBJECT_TYPE` `FUGR/FF`, beside `FUGR/I` and `FUGR/PX`), so the hit's
+    type widens from `ScanObjectType` to it plus `'FUGR/FF'`; `object_name` the module's name,
     `devclass` the group's package, and **`function_group_name`**, the group — because
     `GetFunctionModule` requires `function_module_name` and `function_group_name`, and compact
     `HandlerGet` `FUNCTION_MODULE` takes the same two. The module's hit has no `include` (its
@@ -2841,7 +2843,7 @@ Step 4 names.
     class), an interface, CDS, BDEF, DDLX and SRVD by `object_name`.
   - **Counters count them apart:** `scanned.objects` and `scanned.objects_with_hits` count
     the group and each of its modules as separate objects. (The paging over the walk's
-    targets goes in Step 4d, DO20: every target is read in one run.)
+    targets goes in Step 4d, DO20: every target is read in one run, unless the caller gives `max_hits` and it is reached (DO23).)
   - **`object_types`:** `FUGR` keeps scanning the group and its modules (the modules come only
     from the group's structure); no new filter value.
   - **One read per source** (D23a's cache) and the skip rule (Step 4a) apply to a module as to
@@ -2849,8 +2851,11 @@ Step 4 names.
     still searched.
 
   Red tests first, on both paths:
-  - `'a hit in a function module is the module's object, with function_group_name'`: its type,
-    name, package and group; no `include`; not listed under the group;
+  - `'a hit in a function module is the module's object, with function_group_name'`:
+    `object_type: 'FUGR/FF'`, the module's name, the group's package and
+    `function_group_name`; no `include`; not listed under the group;
+  - `'a hit in a group include stays FUGR'`: `object_type: 'FUGR'`, the group's name,
+    `include` the include's name;
   - `'a hit in a group include is the group's, with include'`;
   - `'a group and its modules are counted as separate objects'` (`scanned.objects`,
     `scanned.objects_with_hits` over a group with a hit in one module and in one include);
@@ -2940,7 +2945,7 @@ Step 4 names.
   (`src/__tests__/unit/readonlySingleCall.test.ts`, `src/__tests__/unit/batch/metadataReads.test.ts`,
   `src/__tests__/unit/runtimeReadersFixRound1.test.ts`, `src/__tests__/unit/detailSurface.test.ts`)
   stay green unchanged.
-- [ ] **Step 4d: No paging; one run reads every target; the hit limit optional (DO20).**
+- [ ] **Step 4d: No paging; one run reads every target (unless the caller gives `max_hits` and it is reached, DO23); the hit limit optional (DO20).**
   Today the schema takes `max_objects` (default 500) and `start_at` (default 0); the
   orchestrator slices the walk's sorted targets (`sliceTargets`, `[start_at, start_at +
   max_objects)`) on both paths, and the answer carries `total_targets`, `next_start_at` and
@@ -2949,7 +2954,7 @@ Step 4 names.
   - **No user-facing package or object limit.** The mask quick search's `maxResults` is
     internal (the doubling of DO12 answers every package); nothing else limits packages or
     objects.
-  - **One run reads every target.** `max_objects`, `start_at`, `next_start_at`,
+  - **One run reads every target, unless the caller gives `max_hits` and it is reached (DO23).** `max_objects`, `start_at`, `next_start_at`,
     `total_targets` and `truncated.by_max_objects` go from the schema and the answer.
     `SearchSource` runs in the background by default (D24), so a long scan is a background
     run read with `GetBackgroundRun`, ended with `DiscardBackgroundRun`; it keeps only the
@@ -2990,12 +2995,254 @@ Step 4 names.
   `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`, the listed-schema
   and surface fixtures, and any D24 background-run test that passes `max_objects` to
   `SearchSource`.
+- [ ] **Step 4e: What a failed read leads to is a strategy (DO22).** Today each catch decides
+  by itself and swallows anything that is not a credential failure:
+  `packageEnumerator.ts`' walk catch (`if (isCredentialFailure(error)) throw error; continue;`),
+  `packageResolver.ts`' mask catch, `sourceReader.ts`' read catches (one of them a bare
+  `catch {}`), the walkers' level catch (`packageWalk.ts`, `endsTheCall` then the branch rule
+  or the root's failure), and the batched path's settlements (`credentialOf`,
+  `endOnCredential`). So a `TypeError` of our own is skipped like a SAP refusal. And a failure
+  passes several layers: a walker's failure reaches the enumerator's catch, and a batched
+  source answer is consumed twice — in discovery (`answeredReaderDeps` over the phases'
+  answers, which rethrows a recorded `found.error`) and again in the final scan
+  (`runSearchSource` over `answeredReaderDeps(sources, [])`). From DO22 a **read-failure
+  strategy**, taken explicitly by the orchestrator like the line-match strategy (a required
+  member of `OrchestratorDeps`, no default inside the orchestrator; the handler wires the
+  shipped one), decides every failed read — **once**.
+  - **Places (a closed discriminated union on `kind`, from fields the code already has; the
+    `'envelope'` place is below):**
+    - `'mask'` — the mask entry (`resolveMask`'s input);
+    - `'package'` — the asked package (the walk's root, `walk.root`);
+    - `'level'` — the asked package and the refused level: a subpackage name, or a type node
+      `{ id, type }` (the walker's `node` and `walk.name`);
+    - `'structure'` — a function group's structure read: the group (`StructureRead`
+      `{ reader: 'functionGroupStructure', name }`) and its URI (`functionGroupUri`); it
+      names no source;
+    - `'source'` — a source read: the object whose read sent it (`devclass`, `object_type`,
+      `object_name`) and the source (`name`, `uri` from `sourceUriOf`, and the read's
+      `sourceReadKey`);
+    - `'envelope'` — a failed batch envelope of a `SearchSource` phase: the phase (mask
+      search, walk level, structure and source reads) and its items.
+  - **Answers (closed):** a string-literal union `'skip' | 'end' | 'throw'`. `'skip'` drops what
+    the place names (DO17, DO19); `'end'` ends the call with the failure as it came (the
+    credential path today); `'throw'` passes the value through unchanged. Each consulting site
+    handles the answer in a `switch` with a `never` default; a type test pins both unions.
+  - **Asked once per failed read, where it arises; the decision travels unchanged.** The
+    strategy is consulted only at the place the read failed — the resolver for a mask, the
+    walker for a root or a level, the source reader for a structure or a source — and nowhere
+    else. Its decision is carried outward as decided, never re-asked:
+    - `'skip'` is applied at the place (the mask resolves to nothing, the branch or package
+      yields nothing, the structure or source yields nothing); no outer layer sees a failure;
+    - `'end'` and `'throw'` leave the place as a **decided** failure — the original value,
+      marked as decided in a module-private registry keyed by the thrown object (as
+      `carryingFailure` keeps a method failure in a `WeakMap`), and, for a primitive thrown
+      value, wrapped in a module-private carrier holding it and the decision; the outer
+      layers (the enumerator, `walkPackages`' settlements, the orchestrator, the handler)
+      have no catch of their own for read failures and let a decided failure pass; at the
+      handler a carried primitive is unwrapped and thrown as it was. A `'throw'` is never
+      turned into an outer `'skip'`, an `'end'` always ends the call.
+  - **Cached and replayed reads: once per read.** The batched path records the decision with
+    the answer: `readSourcesInPhase` (and the search and walk phases) consult the strategy
+    when a phase answer fails and store the decision beside the answer, keyed by
+    `sourceReadKey` (by mask, by walk level); discovery and the final scan read the stored
+    decision and act on it, never re-asking. D23a's one-read-per-source cache does the same
+    on the sequential path: a source two objects name is decided once, at its first owner,
+    and the second owner reuses the decision (a skipped shared source is skipped for both).
+  - **Answered failures are normalised before the rule.** Every place turns an answered
+    failure into a carried one before it consults the strategy, as the code does today:
+    `thrownOf` in `sourceReader.ts` (structure and source reads), `levelOf`'s
+    `carryingFailure` in `packageWalk.ts` (roots and levels), the resolver's
+    `carryingFailure` (`packageResolver.ts`, the mask search). This normalisation stays when
+    `credentialOf` and `endOnCredential` go: `isCredentialFailure` (`answer.ts`) recognises a
+    `401` SAP answered only through `methodFailureOf`, so without it an answered `401` would
+    fall to the skip.
+  - **Envelope provenance is decided where `runPhase` sees it.** A failed envelope loses its
+    identity on the way to the parts: `runPhase` knows the envelope failed (`batch.execute()`
+    rejected, `failed`), but each part's answer is then built by adt-clients' conversion
+    (`dist/utils/adtResponse.js`, `answering`: a rejection becomes a failed ADT answer with a
+    new `IAdtError` from `recogniseFailure`, its `response` the rejection's), and our readers
+    extract that new error (`answerOf` in `sourceReader.ts`) or wrap it (`carryingFailure` in
+    `packageResolver.ts`). So the envelope's failure is decided **in the phase, before any
+    part's answer is handed on**: `runPhase` reports a failed envelope as a typed outcome of
+    the phase (beside today's outer-`404` path), the `SearchSource` phase callers
+    (`searchPackagesInPhase`, the walk-level phases, `readSourcesInPhase`) consult the
+    strategy once with the place `'envelope'` (the phase — mask search, walk level, structure
+    and source reads — and its items), and the parts of a failed envelope never reach the
+    per-read rule. The other `runPhase` users keep today's behaviour (the outcome is read only
+    by the callers that ask for it). The outer `404` of `isNoBatchEndpoint` stays no failure:
+    `withSequentialFallback` reads the same parts sequentially and the strategy is not
+    consulted. The place union gains `'envelope'`.
+  - **The shipped strategy's rule (owner, DO22 — closed), read by structure only, never by
+    message words, in this precedence:**
+    1. a credential refusal (`isCredentialFailure`, after the normalisation above — an
+       answered `401` included) or the server's own refusal (`failureOf`) → `'end'`, whatever
+       the place, the envelope included;
+    2. an envelope failure (place `'envelope'`; the outer `404` never gets here) → `'throw'`:
+       it is not one object's answer, and skipping it would answer a near-empty search as if
+       nothing matched;
+    3. an `IAdtError` with `origin: 'connection'` (no usable answer: unreachable host, expired
+       session), answered or carried → `'throw'`: the call fails as an error;
+    4. a **system answer** → `'skip'`:
+       - an answered failure (`ReadAnswer` `{ ok: false, error: IAdtError }`, an
+         `IAdtResponse` not `ok`, normalised to a carried one) or a carried ADT failure
+         (`methodFailureOf(thrown) !== undefined`), of `origin: 'refusal'`, with or without a
+         `response`;
+       - a raw transport failure: a thrown object that is not an `IAdtError` but carries a
+         `response` with an integer `status` (read through the existing safe property reads);
+    5. anything else — a `TypeError`, a `RangeError`, a thrown primitive, any other value →
+       `'throw'`.
+
+    Rule 2 comes before rule 4 on purpose: an envelope's HTTP failure carries a status, as a
+    raw transport failure does, and must not be skipped as one.
+  - **Wiring:** the resolver, the walkers (the level catch and the root), the source reader
+    (structure and source reads) and the batched phases consult the strategy at the place; the
+    bare `catch {}`, every `if (isCredentialFailure(error)) throw error; continue;`, the
+    enumerator's walk catch, `credentialOf` and `endOnCredential` go (the shipped strategy's
+    `'end'` replaces them); `thrownOf`, `levelOf`'s and the resolver's `carryingFailure` stay
+    as the normalisation; `runPhase` gains the failed-envelope outcome for the callers that
+    read it. Both paths use the same strategy instance.
+
+  Red tests first, on both paths (sequential and batched):
+  - **once per read:** `'a recording strategy sees exactly one call per failed read'` — a
+    refused mask, a refused root, a refused level (subpackage and type node), a refused
+    structure read and a refused source read in one scan, each recorded once with its place's
+    fields; on the batched path the same counts although discovery and the final scan both
+    replay the answers; a source two objects name, refused, recorded once;
+  - **decisions travel unchanged:** `'a custom throw for a system failure at a level is thrown
+    out of the call'` (a recording strategy answering `'throw'` for a SAP `500` on a
+    subpackage: the call rejects with that value, not a skip from the enumerator); the same
+    for a `'throw'` at a structure read and at a source read; `'a custom skip for a TypeError
+    is skipped'`; `'an end ends the call'` from each place;
+  - **the shipped strategy, per place** (mask, root, level — subpackage and type node —,
+    structure, source), each case on both paths:
+    - `'a TypeError is thrown'`, `'a RangeError is thrown'`, `'a thrown primitive is thrown as
+      the same primitive'`;
+    - `'an answered refusal with a response is skipped'` (`500`, `404`);
+    - `'an answered refusal without a response is skipped'` (an `IAdtError` of `origin:
+      'refusal'` with `adtType` and no `response`);
+    - `'a carried ADT failure is skipped'` (`carryingFailure`);
+    - `'a raw transport failure with a response and a status is skipped'` (a thrown object
+      carrying `response.status`, no `IAdtError`);
+    - `'an IAdtError of origin connection is thrown'`, answered and carried: the call fails
+      with it;
+    - `'a credential refusal ends the call'` (`AuthRefusedError`, a `401` SAP answered) and
+      `'a failureOf refusal ends the call'`;
+  - **an answered 401 ends the call** at each place (mask, root, level, structure, source),
+    on both paths: `'an answered 401 ends the call'` — the reader's answer is a failed ADT
+    answer with `response.status` `401`, never thrown by the client — so the normalisation
+    is load-bearing (the test goes red when it is removed);
+  - **envelopes (batched path), through the real client conversion:** the phases run the
+    installed adt-clients readers (`@mcp-abap-adt/adt-clients`, whose `answering` turns a
+    rejected request into a failed answer) over a connection stand-in whose envelope request
+    rejects, so each part's answer is built as in production:
+    - `'an envelope answered with the outer 404 is no failure: the sequential fallback reads
+      the same parts'`, the strategy not consulted;
+    - `'any other envelope failure is thrown'` — a mask-search phase, a walk-level phase and a
+      structure-and-source phase, each envelope failing with an HTTP `500` (a status-bearing
+      transport failure): the call rejects with the envelope's error, nothing is skipped, and
+      a recording strategy sees one `'envelope'` call and no per-read call for its parts;
+    - `'an envelope failure is not skipped as a raw transport failure'` (rule 2 before rule 4:
+      the same `500` is skipped when it is one part's own failure inside an answered envelope);
+    - `'a credential refusal as the envelope's error ends the call'`;
+    - `'a part's own failure inside an answered envelope follows the per-read rule'`;
+  - `'the orchestrator has no failure rule of its own'`: its deps type requires the strategy
+    (leaving it out does not compile), and no module but the shipped strategy calls
+    `isCredentialFailure` / `endsTheCall` for a read failure;
+  - `'a structure read is its own place'`: its place carries the group and its URI, no source
+    fields.
+
+  Affected suites: `src/__tests__/lib/search-source/sourceReader.test.ts`,
+  `src/__tests__/lib/search-source/packageResolver.test.ts`,
+  `src/__tests__/lib/search-source/packageEnumerator.test.ts`,
+  `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
+  `src/__tests__/unit/failureStep.test.ts` (its `SearchSource` cases),
+  `src/__tests__/unit/authRefusedRejection.test.ts` (the credential end, through the shipped
+  strategy), `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`, `src/__tests__/unit/packageWalk.test.ts`,
+  `src/__tests__/unit/batch/packageWalks.test.ts` and
+  `src/__tests__/unit/packageWalkBranchRule.test.ts` (the walker's place), the helpers
+  `src/__tests__/helpers/sourceReaderFake.ts` and `src/__tests__/helpers/searchSourceStand.ts`.
+- [ ] **Step 4f: The caller sets how much the answer holds (DO23).** Three optional controls;
+  with none given the answer is exactly Steps 4–4e's (every hit with its line number and
+  snippet).
+  - **`answer`: `'objects' | 'lines' | 'snippets'`, default `'snippets'`.**
+    - `'objects'`: one entry per object and include with hits — `devclass`, `object_type`,
+      `object_name`, `include` where the hits are an include's, `function_group_name` for a
+      `FUGR/FF` hit — and `hits`, the number of hits answered for it (after
+      `max_hits_per_object` and `max_hits`; hits cut by either are not counted); no lines;
+    - `'lines'`: each hit as today, with `line`, without `snippet`;
+    - `'snippets'`: each hit with `line` and `snippet` (up to 255 characters) — today's.
+    The scan and the limits are the same at every level; only the answer's shape differs.
+  - **`max_hits_per_object`:** as Steps 4b and 4d plan it (per object, absent = no limit,
+    `truncated.by_object_cap`).
+  - **`max_hits`: a limit on the hits of the whole answer, absent = no limit.** What counts:
+    the hits answered, in the scan's order (targets by package, type and name; an object's
+    sources in reading order; lines in order), each after `max_hits_per_object` — a hit cut by
+    the per-object limit does not count. When the answer holds `max_hits` hits the scan stops:
+    the current source's further hits are cut, and no further source or target is read.
+    `truncated.by_max_hits: true` is set when the scan stopped with anything left — a further
+    hit of the current source, a source or a target not read; reaching exactly `max_hits` at
+    the end of the scan leaves it false. `scanned.*` report what was done until the stop
+    (packages walked, objects read, sources read, objects with hits).
+    - **The batched path:** its sources are read in chunks (`TARGETS_PER_CHUNK`) before they
+      are scanned, so the stop takes effect at a chunk boundary: each chunk is scanned once its
+      reads are answered, and no envelope of a later chunk is sent once the limit is reached.
+      The answer is the same as the sequential path's (the same hits, the same
+      `truncated.by_max_hits`); `scanned.sources` counts the sources read, the stopped chunk's
+      read but unscanned ones included — stated in the description.
+  - **Types, no casts:** the schema's `answer` is a `z.enum` of the three levels; the answer
+    type is a discriminated union keyed by the level (an `'objects'` entry type, a `'lines'`
+    hit type, a `'snippets'` hit type), built from the scan's hits by a `switch` on the level
+    with a `never` default; `max_hits` and `max_hits_per_object` are optional positive
+    integers.
+
+  Red tests first, on both paths (sequential and batched):
+  - `'with no control the answer is the snippets level'` (the Steps 4–4e answer unchanged);
+  - `'answer objects names each object and include with its hit count'`: no `line`, no
+    `snippet`; a `FUGR/FF` entry carries `function_group_name`; a class's local include is its
+    own entry with `include`; `hits` is the number answered;
+  - `'answer lines carries line numbers and no snippets'`;
+  - `'answer snippets carries line and snippet'`;
+  - `'max_hits stops reading'`: a scan whose first targets reach the limit — the requests
+    recorded stop after the target (sequential) or the chunk (batched) that reached it; fewer
+    source requests than without the limit; `truncated.by_max_hits` true;
+  - `'max_hits exactly at the end leaves by_max_hits false'`;
+  - `'max_hits counts hits after max_hits_per_object'`: with both, an object's hits past its
+    own limit do not count toward `max_hits`; `by_object_cap` and `by_max_hits` each set by
+    its own cause;
+  - `'objects counts only the hits answered'`: with `answer: 'objects'` and either limit, an
+    entry's `hits` excludes cut hits;
+  - `'the counters report what was done until the stop'`: `scanned.packages`,
+    `scanned.objects`, `scanned.sources`, `scanned.objects_with_hits` pinned at a stop;
+  - `'the schema offers answer, max_hits and max_hits_per_object'`: the listed-schema
+    fixture; a wrong `answer` value is refused by the schema.
+
+  Then: the schema fields in `handleSearchSource.ts`, `max_hits` and the level in
+  `OrchestratorInput`, the stop in both paths (the sequential target loop; the batched chunk
+  loop scanning each chunk before reading the next), the level-shaped answer, the
+  description (functional: the three levels, the two limits, `truncated.by_max_hits`, what
+  the counters report at a stop).
+
+  Affected suites: `src/__tests__/lib/search-source/orchestrator.test.ts`,
+  `src/__tests__/unit/batch/searchSource.test.ts`,
+  `src/__tests__/unit/batch/searchSourceEnvelopes.test.ts`,
+  `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`, the helper
+  `src/__tests__/helpers/searchSourceStand.ts`, the listed-schema and surface fixtures, the
+  description tests, `tools/tool-search.json` (generated) and the tool pages
+  (`npm run docs:tools`).
+
+  CHANGELOG (24.0.0): Added — `SearchSource`'s `answer` (`objects`, `lines`, `snippets`, the
+  default), `max_hits` and `truncated.by_max_hits`. MIGRATION-24.0, in the `SearchSource`
+  section: nothing to do — without the new arguments the answer is the hits with lines and
+  snippets; to keep a large answer small, pass `answer: 'objects'` or `'lines'`, `max_hits`,
+  or `max_hits_per_object`.
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
   1000 packages"; `emit_no_hits`, `no_hits` and `failures` leave it, and it states
   that an object that cannot be read is skipped, names the counters, and says a hit in a
   function module names the module and its group (DO18). It drops `start_at`, `max_objects`,
-  `total_targets`, `next_start_at` and `truncated.by_max_objects`, says every target is read
+  `total_targets`, `next_start_at` and `truncated.by_max_objects`, says every target is read, unless the caller gives `max_hits` and it is reached (DO23),
   in one run, and says `max_hits_per_object` limits each object only when given (DO20); the
   argument's own words lose "default 100". Functional only; a description test
   under the functional-descriptions guard. `time_budget_ms` and `timeout` are not
@@ -3013,9 +3260,10 @@ Step 4 names.
     searched (it ended the package's whole walk; DO19). Added — `scanned.objects_with_hits`.
     Changed — a hit in a function module names the module (its type, its name and
     `function_group_name`), not the group with the module as `include` (DO18).
-    Changed — the line match is a strategy (an embedder of the orchestrator passes it).
+    Changed — a defect of the server while reading (a thrown value that is not a system
+    answer) ends the call as an error instead of being skipped (DO22).
     Removed — `max_objects`, `start_at`, `next_start_at`, `total_targets` and
-    `truncated.by_max_objects`: one run reads every target (DO20); the 24.0.0 entry's
+    `truncated.by_max_objects`: one run reads every target (DO20), unless the caller gives `max_hits` and it is reached (DO23); the 24.0.0 entry's
     "Migrating: page a large scan with `max_objects` and `start_at`" is rewritten (24.0.0 is
     unreleased). Changed — `max_hits_per_object` has no default: absent, no limit.
   - MIGRATION-24.0, in the `SearchSource` section: a mask is `*` / `?`, and an entry with `+`
@@ -3036,12 +3284,14 @@ Step 4 names.
     the module in `include`; the group and its modules are counted apart (DO18);
     no paging (DO20): drop `max_objects` and `start_at` (a call that still sends them has
     them dropped); `total_targets`, `next_start_at` and `truncated.by_max_objects` are gone;
-    every target is read in one run — run it in the background (the default) and read the
+    every target is read in one run, unless the caller gives `max_hits` and it is reached (DO23) — run it in the background (the default) and read the
     `run_handle` with `GetBackgroundRun`, or end it with `DiscardBackgroundRun`; the section's
     "page it with `max_objects` … `next_start_at`" text is rewritten (24.0.0 is unreleased);
     `max_hits_per_object` limits each object only when given (it was 100 by default);
-    embedders of `runSearchSource` pass the line-match strategy (the shipped one keeps
-    today's match).
+    no embedder line: the orchestrator (`src/lib/search-source/`) is not in any entry of the
+    package's `exports` (checked: `.`, `./handlers`, `./handlers/read`, `./embeddable`, …), so
+    the line-match and read-failure strategies are internal; a caller of `SearchSource` sees
+    only that a server defect while reading is an error, not a skip (DO22).
 - [ ] **Step 7: Live cases (owed; each runs only on the owner's go),** read-only, under C2's
   live-run safety:
   - on premise: a mask with `*` (several, and one matching zero characters), a mask with `?`,
@@ -3704,7 +3954,9 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   `scanned.sources` the sources read, `scanned.objects_with_hits`; `truncated.by_object_cap`
   stays (the paging fields go, DO20).
 - **DO18 (2026-11-07, D23b Step 4b):** a function group and each of its function modules are
-  separate scan objects: a hit in a module names the module (its type, name, package and
+  separate scan objects: a hit in a module names the module (`object_type` the ADT code
+  `FUGR/FF` — measured on premise 2026-11-07 in the quick search's `adtcore:type` and the
+  group's node structure —, name, package and
   `function_group_name`, what `GetFunctionModule` requires), not the group; a hit in the
   group's own includes is the group's (with `include`); the counters count them apart; every
   hit carries what its read tool needs, with no object nested under another.
@@ -3716,7 +3968,7 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
 - **DO20 (2026-11-07, D23b Step 4d):** no user-facing package or object limit: the mask quick
   search's `maxResults` is internal (the doubling answers every package). `max_objects` and
   the paging (`start_at`, `next_start_at`, `total_targets`, `truncated.by_max_objects`) go:
-  one run reads every target (in the background by default, D24) and keeps only the hits.
+  one run reads every target, unless the caller gives `max_hits` and it is reached (DO23) (in the background by default, D24) and keeps only the hits.
   `max_hits_per_object` stays, optional, no default (absent = no limit; given = per object,
   DO18); `truncated.by_object_cap` stays.
 - **DO21 (2026-11-07, D25):** a new compact tool `HandlerSystem` with a required `action`,
@@ -3752,6 +4004,34 @@ and the coverage ledger; CHANGELOG, MIGRATION-24.0.
   is refused before dispatch in `HandlerSystem`'s name (the SDK's validation of the listed
   schema), like any malformed argument of the action itself; the listing keeps its types;
   MIGRATION-24.0 says so.
+- **DO22 (2026-11-07, D23b Step 4e):** what a failed read (a source read, a mask search, a
+  package or level walk) leads to is decided by a read-failure strategy the orchestrator
+  takes explicitly, with no default inside it; the handler wires the shipped one: a SAP
+  refusal (a system answer: an HTTP status or ADT exception) is skipped as DO17 / DO19 say; a
+  credential refusal ends the call; anything else (our own defect: a `TypeError`, a
+  `RangeError`, any thrown value that is not a system answer) is thrown, never swallowed.
+  The strategy is asked once per failed read, at the place it arises (mask, package root,
+  level, function-group structure, source); its decision travels unchanged through every
+  outer layer, and a cached or replayed read reuses it. **Closed (owner, 2026-11-07):** skipped —
+  an answered failure (`ReadAnswer` `ok: false`, an `IAdtResponse` not `ok`) and a carried ADT
+  failure (`methodFailureOf`), each of `origin: 'refusal'`, with or without a `response`, and a
+  raw transport failure carrying a `response` with a status; thrown — an `IAdtError` of
+  `origin: 'connection'` and any batch envelope failure but the outer `404` of
+  `isNoBatchEndpoint`, which is no failure (the sequential fallback runs); the call ends on a
+  credential or `failureOf` refusal, whatever its shape. Precedence: credential / `failureOf`
+  end → envelope failure throws → `origin: 'connection'` throws → system answers skip →
+  anything else throws. An envelope's failure is decided in the phase, where `runPhase` sees
+  it, before adt-clients' conversion builds the parts' answers (place `'envelope'`); an
+  answered failure is normalised to a carried one (`thrownOf`, `carryingFailure`) before the
+  rule, so an answered `401` ends the call.
+- **DO23 (2026-11-07, D23b Step 4f):** the caller sets how much the answer holds, with three
+  optional controls; with none, the answer is every hit with line and snippet. `answer`:
+  `'objects'` (each object and include with hits, `function_group_name` for `FUGR/FF`, and the
+  number of hits answered), `'lines'` (plus line numbers), `'snippets'` (plus the line text;
+  the default). `max_hits_per_object` as DO18 / DO20. `max_hits` limits the hits of the whole
+  answer (counted after `max_hits_per_object`): when reached, the scan stops reading and
+  `truncated.by_max_hits` is set when something remains; absent, no limit; `scanned.*` report what was done until the
+  stop.
 
 ## Test coverage — the families
 
@@ -4488,7 +4768,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO21 as decided, D25's removal of `HandlerSearch` and
+      argument now refused, and the owner's decisions DO1–DO23 as decided, D25's removal of `HandlerSearch` and
       `HandlerWhereUsed` with their `HandlerSystem` actions included);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group

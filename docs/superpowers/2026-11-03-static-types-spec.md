@@ -493,15 +493,43 @@ on-premise system disagree, the live measurement holds.
     supersedes D23a's failure contract; MIGRATION-24.0 (unreleased) says `failures` is
     removed.
   - **A function module is its own object (owner, DO18).** A function group and each of its
-    function modules are separate scan objects. A hit in a module names the module: its own
-    type, its name, its package and `function_group_name` (which `GetFunctionModule` and
+    function modules are separate scan objects. A hit in a module names the module: its type
+    is the ADT code `FUGR/FF` (measured on premise: the quick search's `adtcore:type` and the
+    group's node structure name a module so), its name, its package and `function_group_name` (which `GetFunctionModule` and
     compact `HandlerGet` `FUNCTION_MODULE` require), with no `include`; a hit in the group's
     own includes is the group's, with `include`. The counters count the group and each module
     apart, and each has its own `max_hits_per_object` allowance and capped flag. Every hit carries what its read tool needs; no object is nested under another.
+  - **What a failed read leads to is a strategy (owner, DO22).** A failed source read, mask
+    search or package / level walk is handed, with its place, to a read-failure strategy the
+    orchestrator takes explicitly (no default inside it; the handler wires the shipped one),
+    which answers skip, end the call or throw. The shipped one skips a SAP refusal (a system
+    answer: an HTTP status or ADT exception) as DO17 / DO19 say, ends the call on a credential
+    refusal, and throws anything else — a defect of our own is never swallowed (today every
+    non-credential throw is skipped). The strategy is asked once per failed read, at the place it
+    arises (a mask, a package root, a walk level, a function-group structure read, a source
+    read); its decision travels unchanged through the outer layers, and a cached or replayed
+    read reuses it. Shapes are read by structure only (owner, closed): an answered
+    or carried ADT failure of `origin: 'refusal'` (with or without a `response`) and a raw
+    transport failure carrying a `response` status are skipped; an `IAdtError` of `origin:
+    'connection'` is thrown; a batch envelope failure is thrown, except the outer `404` of
+    `isNoBatchEndpoint`, which is no failure (the sequential fallback); a credential refusal
+    ends the call. Precedence: credential / server refusal end → envelope failure throws →
+    `origin: 'connection'` throws → system answers skip → anything else throws. An envelope's
+    failure is decided in the phase, before the client builds the parts' answers from it, so
+    no part of a failed envelope is skipped as its own; an answered failure is normalised to
+    a carried one first, so an answered `401` ends the call.
+  - **The caller sets how much the answer holds (owner, DO23).** Three optional controls; with
+    none, every hit with line and snippet. `answer`: `objects` (each object and include with
+    hits, `function_group_name` for a `FUGR/FF` hit, and the number of hits answered),
+    `lines` (plus line numbers) or `snippets` (plus the line text; the default).
+    `max_hits_per_object` limits each object. `max_hits` limits the whole answer's hits,
+    counted after the per-object limit: when reached, the scan stops reading further sources
+    and targets (on the batched path at the next chunk) and `truncated.by_max_hits` is set when something remains;
+    `scanned.*` report what was done until the stop.
   - **No paging; no user-facing limit (owner, DO20).** The mask quick search's `maxResults` is
     internal — the doubling answers every package — and no argument limits packages or
     objects. `max_objects`, `start_at`, `next_start_at`, `total_targets` and
-    `truncated.by_max_objects` are removed: one run reads every target (in the background by
+    `truncated.by_max_objects` are removed: one run reads every target, unless the caller gives `max_hits` and it is reached (in the background by
     default, D24) and keeps only the hits; a call that still sends `max_objects` or
     `start_at` has them dropped. `max_hits_per_object` stays, optional, with no default
     (today 100): absent, no limit; given, per object. `truncated.by_object_cap` and

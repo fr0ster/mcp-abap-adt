@@ -2895,6 +2895,83 @@ Step 4 names.
   `src/__tests__/helpers/sourceReaderFake.ts`, the live assertion in
   `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`, and the
   listed-schema and surface fixtures (the answer's shape).
+- [ ] **Step 4b2: A program include hit is `PROG/I` (DO27, owner).** Measured live and read in
+  the code: a program include is walked as `PROG/I`, but `packageEnumerator.ts`' `FAMILY_OF`
+  maps it to its main type `PROG`, so its hit is answered `object_type: 'PROG'`, like a
+  program's — the answer does not tell `GetProgram` from `GetInclude`, and the live suite reads
+  a `PROG` hit with `GetProgram` and falls back to `GetInclude`. DO18 says a hit carries exactly
+  what its read tool needs. From DO27 a program include hit's `object_type` is the ADT code
+  **`PROG/I`** (as `FUGR/FF` for a module); a program's stays `PROG`.
+  - **Every scan type checked for the same ambiguity** (one answered shape read by two tools),
+    from `sourceReader.ts` (`readOne`'s unit names) and the 14-tool test in
+    `sourcesAndFailures.test.ts`:
+    - `PROG` — a program (`GetProgram`) and a program include (`GetInclude`): **ambiguous**,
+      fixed here;
+    - `FUGR` with `include` — a group include addressed under the group
+      (`…/functions/groups/<g>/includes/<i>`, read through the function include reader:
+      `GetFunctionInclude`) and one addressed under `/programs/includes/` or with no address
+      (read through the include reader: `GetInclude`) answer the same shape; the live suite
+      falls back from `GetFunctionInclude` to `GetInclude` for it: **ambiguous — fixed here by
+      the owner's answer (DO27, "from the ADT code")**:
+      - an include addressed under the function group → `object_type: 'FUGR/I'` (the code the
+        type tables hold for it: interfaces-adt `AdtTypeTables`, `functionInclude.codes['FUGR/I']`,
+        main `FUGR`, parent `functionGroup`; `src/lib/adtProjections.ts` knows it too), read with
+        `GetFunctionInclude` — the hit carries `function_group_name` (the group) and the include's
+        name as `object_name`, as a `FUGR/FF` hit carries its group;
+      - an include addressed under `/programs/includes/` → `object_type: 'PROG/I'`, read with
+        `GetInclude` (`include_name` = `object_name`);
+      - **a node with no `objecturi` and type `FUGR/I`** (`fugrSourceOf` reads it through the
+        include reader today) is read through the **function include reader** (the group and
+        the include's name) and answered `FUGR/I` — type and tool follow the ADT code (owner);
+      - **a group include hit is its own object, like a module** (owner, amending DO18 for
+        includes): counted apart from its group in `scanned.objects` and `objects_with_hits`,
+        with its own `max_hits_per_object` allowance and capped flag;
+    - `CLAS` — the main source (`include` = the class name, `GetClass`) and the four local
+      includes (`include` = `definitions` / `implementations` / `macros` / `testclasses`, the
+      `GetLocal*` tools) are told apart by `include`: one tool per shape;
+    - `FUGR/FF`, `INTF`, `DDLS`, `BDEF`, `DDLX`, `SRVD` — one tool each.
+  - **`object_types` keeps its family values:** `PROG` still selects programs and program
+    includes; `FUGR` still selects function groups, their modules and their includes (both the
+    `FUGR/I` ones and the `/programs/includes/` ones a group lists, which answer `PROG/I`). A
+    hit's `object_type` is its ADT code wherever the main type would be ambiguous: `PROG`,
+    `PROG/I`, `FUGR/FF`, `FUGR/I`. The filter takes no code value (`PROG/I`, `FUGR/I`,
+    `FUGR/FF` are the families').
+  - Red tests first, on both paths:
+    - `'a program include hit is PROG/I'`, `'a program hit stays PROG'`;
+    - the hit's type per scan type (a table over every scan type: program, program include,
+      class main and each local include, function module, group include, interface, CDS,
+      BDEF, DDLX, SRVD);
+    - the 14-tool test in `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`
+      (`'each hit carries the arguments its read tool requires'`) extended: every hit's fields
+      pass **exactly one** read tool's schema chosen by `object_type` (and `include` for a
+      class) alone — the `hit.object_name === 'ZINCL'` choice goes; `PROG/I` →
+      `GetInclude { include_name }`, `PROG` → `GetProgram { program_name }`, `FUGR/I` →
+      `GetFunctionInclude { function_group_name, include_name }`;
+    - `'a group include addressed under the group is FUGR/I, with function_group_name'` and
+      `'a group include addressed under /programs/includes/ is PROG/I'`;
+    - `'a FUGR/I node without objecturi is read by the function include reader'`: the request
+      is the function include's (`…/functions/groups/<g>/includes/<i>/source/main`), and its hit
+      is `FUGR/I` with `function_group_name`;
+    - `'a group include is counted apart from its group with its own allowance'`: a group with
+      a hit in its own source path (a module) and in an include — the include counts as its own
+      object in `scanned.objects` and `objects_with_hits`; with `max_hits_per_object` the
+      include's hits are limited on their own, and its capped flag sets
+      `truncated.by_object_cap` alone; on the sequential and the batched path.
+  - Then the hit type gains `'PROG/I'` and `'FUGR/I'` (typed from the scan codes, as
+    `FUGR/FF`), the orchestrator answers each from the read that produced the hit (the target's
+    code, or the group child's address), and the description names the hit types and the read
+    tool of each.
+  - **The live suite's reader fallbacks go**
+    (`src/__tests__/integration/coverage/searchSource.live.test.ts`): `PROG` → `GetProgram`,
+    `PROG/I` → `GetInclude`, `FUGR/I` → `GetFunctionInclude`, `FUGR/FF` → `GetFunctionModule`,
+    each hit read by its one tool, no fallback.
+  - MIGRATION-24.0 (unreleased, the `SearchSource` section): a program include's hit is
+    `object_type: 'PROG/I'` — read it with `GetInclude` (`include_name` = `object_name`); a
+    program's stays `PROG`; a function-group include's hit is `FUGR/I` (read it with
+    `GetFunctionInclude`, `function_group_name` and `include_name` = `object_name`) or, when
+    the group lists a `/programs/includes/` include, `PROG/I`; `object_types: ['PROG']` and
+    `['FUGR']` select as before. CHANGELOG (24.0.0): Changed — a hit's type is its ADT code
+    where the main type was ambiguous (`PROG/I`, `FUGR/I`).
 - [ ] **Step 4c: A refused level excludes only its branch (DO19).** Today a refused level of
   a walk ends the asked package's whole walk: `levelOf` (`src/lib/strategies/packageWalk.ts`)
   throws for a refused level — and, under `missingLevel: 'refused'`, which `SearchSource` passes
@@ -4732,6 +4809,18 @@ stand-in.
   `SearchSource` is a handler, a batch an adt-client-level entity: `SearchSource` may be built
   of batched calls, but is not put into a batch — `batch_not_recordable` stays, and the
   strategies' route tests pin that refusal instead of a batch-mode route.
+- **DO27 (2026-11-08, D23b Step 4b2):** a program include hit's `object_type` is the ADT code
+  `PROG/I` (as `FUGR/FF` for a module), so a hit names exactly one read tool (`GetInclude`, not
+  `GetProgram`); `object_types` keeps its family values (`PROG` selects programs and their
+  includes). **Closed (owner, "from the ADT code"):** a function-group include addressed under
+  the group is `FUGR/I` (read with `GetFunctionInclude`, `function_group_name` and the include
+  name), one addressed under `/programs/includes/` is `PROG/I` (`GetInclude`); every hit type is
+  its ADT code where the main type would be ambiguous; the live suite's fallbacks go; `FUGR`
+  still selects groups, modules and group includes. **Closed (owner, "1 ok, 2 ok"):** an
+  unaddressed `FUGR/I` node is read through the function include reader and answered `FUGR/I`;
+  a group include hit is its own object, like a module — counted apart in `scanned.objects` /
+  `objects_with_hits`, with its own `max_hits_per_object` allowance and capped flag (amending
+  DO18 for includes).
 
 ## Test coverage — the families
 
@@ -5468,7 +5557,7 @@ measurement), then C2c and C2d, before C3. The other decisions apply as named ab
     - guides and examples that show a test or a config;
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defect stage's fixes and contract changes
       (spec §9: the three removed tools with their replacements, the outline tool, every
-      argument now refused, and the owner's decisions DO1–DO25 as decided, D25's removal of `HandlerSearch` and
+      argument now refused, and the owner's decisions DO1–DO27 as decided, D25's removal of `HandlerSearch` and
       `HandlerWhereUsed` with their `HandlerSystem` actions included);
     - `CHANGELOG.md` / `MIGRATION-24.0.md`: the defects fixed in the stage (spec §8,
       acceptance 4) and the two owner-approved changes — C2c's behaviour fix (a group

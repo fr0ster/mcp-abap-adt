@@ -493,6 +493,16 @@ on-premise system disagree, the live measurement holds.
     `truncated.by_object_cap` stays. A credential refusal still ends the call. This
     supersedes D23a's failure contract; MIGRATION-24.0 (unreleased) says `failures` is
     removed.
+  - **A program include hit is `PROG/I` (owner, DO27).** As a function module's hit is
+    `FUGR/FF`, a program include's is `PROG/I`, a program's stays `PROG`, so each hit names
+    exactly one read tool; `object_types: ['PROG']` still selects both. A function-group
+    include's type is its ADT code (owner): addressed under the group, `FUGR/I`, read with
+    `GetFunctionInclude` (the hit carries `function_group_name`); addressed under
+    `/programs/includes/`, `PROG/I`, read with `GetInclude`; `FUGR` still selects groups,
+    modules and their includes. An unaddressed `FUGR/I` node is read through the function
+    include reader and answered `FUGR/I`; a group include hit is its own object, like a module —
+    counted apart, with its own `max_hits_per_object` allowance and capped flag (owner,
+    amending DO18 for includes).
   - **No package counter (owner, DO26).** SAP answers the node structure of a package that
     does not exist `200` with an empty body, like an empty package (measured on premise), so
     the two cannot be told apart without an extra read, which is not made: a named package

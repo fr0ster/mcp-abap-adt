@@ -1,15 +1,31 @@
 /**
  * `SearchSource` (D23a): every source-bearing object SAP lists is read through
- * its reader at the asked version; no source is lost silently; failures are
- * typed (`SourceFailure`, `OperationFailure`); one read per source per call;
- * no deadline of the server's. Each case runs on both paths — ADT batch
+ * its reader at the asked version; what cannot be read is skipped and the
+ * reads go on (DO17); one read per source per call; no deadline of the
+ * server's; and D23b's masks, line-match strategy, hits
+ * and counters, branch rule and single run (kept in this one file so the
+ * suite loads the handler once). Each case runs on both paths — ADT batch
  * envelopes (`served`) and the sequential reads (`absent`) — with the real
  * handler and real clients over the stand's fake connection.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { TOOL_DEFINITION } from '../../../handlers/system/readonly/handleSearchSource';
+import type {
+  LineMatchStrategy,
+  ScanInput,
+} from '../../../lib/search-source/lineMatch';
 import {
+  runSearchSource,
+  runSearchSourceWithContext,
+} from '../../../lib/search-source/orchestrator';
+import {
+  createPackagePatternResolver,
+  resolvePackagePatterns,
+} from '../../../lib/search-source/packageResolver';
+import { recordingConnection } from '../../helpers/recordingConnection';
+import {
+  contextOn,
   type Fake,
   isError,
   type Model,
@@ -17,10 +33,16 @@ import {
   nodeKey,
   payloadOf,
   type Repository,
+  searchesOf,
   searchOn,
   sentUrls,
   standOn,
 } from '../../helpers/searchSourceStand';
+import {
+  exactPackages,
+  listing,
+  sourcesFrom,
+} from '../../helpers/sourceReaderFake';
 
 // The process declares its system type, as every launcher requires.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
@@ -713,5 +735,1036 @@ describe('SearchSource: the description is functional', () => {
     const field = TOOL_DEFINITION.inputSchema.shape.max_hits_per_object;
     expect(field.description).not.toContain('default');
     expect(field.description).toContain('absent, no limit');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: package masks (DO12)
+// ---------------------------------------------------------------------------
+
+/**
+ * `SearchSource`'s package masks (DO12): a mask is resolved by the quick
+ * search, its `maxResults` doubled until the answer holds fewer packages than
+ * `maxResults`. On the batched path every round of every unresolved mask is a
+ * search phase of its own, repeated until every mask is resolved; a search not
+ * answered yet never counts as a short answer. The sequential path answers
+ * alike.
+ *
+ * Real handler, real clients, real `AdtBatchConnection`; only the connection
+ * is a fake. The quick search answers the first `maxResults` packages, as SAP
+ * does (measured: no cap, no "more" marker).
+ */
+describe('D23b: package masks (DO12)', () => {
+  /** `count` package names: `<prefix>000001`, … */
+  const names = (prefix: string, count: number): string[] =>
+    Array.from(
+      { length: count },
+      (_, i) => `${prefix}${String(i + 1).padStart(6, '0')}`,
+    );
+
+  /**
+   * The repository: the masks' packages; the last package of each mask holds
+   * one program with a hit, every other package is empty.
+   */
+  function repositoryOf(masks: Record<string, string[]>): Repository {
+    const nodes: Record<string, NodeDoc> = {};
+    const sources: Record<string, string> = {};
+    for (const packages of Object.values(masks)) {
+      for (const name of packages) nodes[nodeKey(name)] = {};
+      const last = packages[packages.length - 1];
+      if (last === undefined) continue;
+      const program = `P${last}`;
+      nodes[nodeKey(last)] = { types: [{ type: 'PROG/P', nodeId: '000020' }] };
+      nodes[nodeKey(last, '20')] = {
+        objects: [{ type: 'PROG/P', name: program }],
+      };
+      sources[`PROGRAM ${program}`] = "WRITE 'marker'.";
+    }
+    return { nodes, sources, fugrChildren: {}, masks };
+  }
+
+  const run = (fake: Fake, packages: string[], sequential: boolean) =>
+    searchOn(
+      fake,
+      { query: 'marker', packages, include_subpackages: false },
+      sequential,
+      100_000,
+    );
+
+  /** The package roots a fake was asked for, in order. */
+  const walkedRoots = (fake: Fake, sequential = false): string[] =>
+    (sequential
+      ? fake.directs.map((r) => {
+          const u = new URL(r.url, 'https://system.invalid');
+          for (const [k, v] of Object.entries(r.params ?? {})) {
+            u.searchParams.set(k, String(v));
+          }
+          return u;
+        })
+      : fake.envelopes.flatMap((e) =>
+          e.parts.map((p) => new URL(p.url, 'https://system.invalid')),
+        )
+    )
+      .filter(
+        (u) =>
+          u.pathname.endsWith('/repository/nodestructure') &&
+          !u.searchParams.has('node_id'),
+      )
+      .map((u) => u.searchParams.get('parent_name') ?? '');
+
+  describe.each([
+    ['batched', false],
+    ['sequential', true],
+  ])('SearchSource masks on the %s path', (_path, sequential) => {
+    it('a mask whose first answer is full is resolved', async () => {
+      const all = names('ZA', 1001);
+      const fake = standOn(repositoryOf({ 'ZA*': all }));
+      const result = await run(fake, ['ZA*'], sequential);
+      expect(isError(result)).toBe(false);
+      expect(searchesOf(fake)).toEqual([
+        ['ZA*', 1000],
+        ['ZA*', 2000],
+      ]);
+      const answer = payloadOf(result);
+      expect(answer.scanned.packages).toBe(1001);
+      expect(
+        answer.results.map((h: { devclass: string }) => h.devclass),
+      ).toEqual([all[1000]]);
+      if (!sequential) {
+        // Each round is a phase of its own: one envelope per round.
+        expect(fake.envelopes[0]?.parts).toHaveLength(1);
+        expect(fake.envelopes[1]?.parts).toHaveLength(1);
+        expect(new Set(walkedRoots(fake)).size).toBe(1001);
+      } else {
+        expect(new Set(walkedRoots(fake, true)).size).toBe(1001);
+      }
+    });
+
+    it('a mask that fills maxResults twice is resolved', async () => {
+      const all = names('ZB', 2001);
+      const fake = standOn(repositoryOf({ 'ZB*': all }));
+      const result = await run(fake, ['ZB*'], sequential);
+      expect(searchesOf(fake)).toEqual([
+        ['ZB*', 1000],
+        ['ZB*', 2000],
+        ['ZB*', 4000],
+      ]);
+      const answer = payloadOf(result);
+      expect(answer.scanned.packages).toBe(2001);
+      expect(
+        answer.results.map((h: { devclass: string }) => h.devclass),
+      ).toEqual([all[2000]]);
+    });
+
+    it('a search not answered yet is not taken as a short answer: the mask is cut nowhere', async () => {
+      const all = names('ZC', 1000);
+      const fake = standOn(repositoryOf({ 'ZC*': all }));
+      const result = await run(fake, ['ZC*'], sequential);
+      // 1000 fills the first round; the second answers the same 1000, short.
+      expect(searchesOf(fake)).toEqual([
+        ['ZC*', 1000],
+        ['ZC*', 2000],
+      ]);
+      expect(payloadOf(result).scanned.packages).toBe(1000);
+    });
+
+    it('masks of different depths resolve together, no search sent twice', async () => {
+      const shallow = names('ZD', 5);
+      const deep = names('ZE', 2001);
+      const fake = standOn(repositoryOf({ 'ZD*': shallow, 'ZE*': deep }));
+      const result = await run(fake, ['ZD*', 'ZE*'], sequential);
+      const searches = searchesOf(fake);
+      expect(searches).toHaveLength(new Set(searches.map(String)).size);
+      if (sequential) {
+        expect(searches).toEqual([
+          ['ZD*', 1000],
+          ['ZE*', 1000],
+          ['ZE*', 2000],
+          ['ZE*', 4000],
+        ]);
+      } else {
+        // Round by round, every unresolved mask's search in one phase.
+        expect(fake.envelopes.slice(0, 3).map((e) => e.parts.length)).toEqual([
+          2, 1, 1,
+        ]);
+        expect(searches).toEqual([
+          ['ZD*', 1000],
+          ['ZE*', 1000],
+          ['ZE*', 2000],
+          ['ZE*', 4000],
+        ]);
+      }
+      const answer = payloadOf(result);
+      expect(answer.scanned.packages).toBe(2006);
+      expect(
+        answer.results.map((h: { devclass: string }) => h.devclass).sort(),
+      ).toEqual([shallow[4], deep[2000]]);
+    });
+
+    it('a mask SAP refuses at a later round is skipped with no entry; the other entries are scanned', async () => {
+      const fake = standOn(
+        repositoryOf({ 'ZF*': names('ZF', 1000), 'ZG*': names('ZG', 1) }),
+        { refuse: { 'SEARCH ZF*@2000': 500 } },
+      );
+      const result = await run(fake, ['ZF*', 'ZG*'], sequential);
+      expect(isError(result)).toBe(false);
+      expect(searchesOf(fake)).toEqual(
+        sequential
+          ? [
+              ['ZF*', 1000],
+              ['ZF*', 2000],
+              ['ZG*', 1000],
+            ]
+          : [
+              ['ZF*', 1000],
+              ['ZG*', 1000],
+              ['ZF*', 2000],
+            ],
+      );
+      const answer = payloadOf(result);
+      expect(answer.failures).toBeUndefined();
+      expect(answer.scanned.packages).toBe(1);
+      expect(walkedRoots(fake, sequential)).toEqual(['ZG000001']);
+      expect(
+        answer.results.map((h: { devclass: string }) => h.devclass),
+      ).toEqual(['ZG000001']);
+    });
+
+    it('a credential failure of a mask search ends the call', async () => {
+      const fake = standOn(repositoryOf({ 'ZH*': names('ZH', 3) }), {
+        refuse: { 'SEARCH ZH*': 401 },
+      });
+      const result = await run(fake, ['ZH*'], sequential);
+      expect(isError(result)).toBe(true);
+      expect(payloadOf(result).status).toBe(401);
+      expect(walkedRoots(fake, sequential)).toEqual([]);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: the line match is a strategy (DO14)
+// ---------------------------------------------------------------------------
+
+/**
+ * The line match is a strategy the orchestrator is given (DO14): it receives
+ * each source's lines and the call's terms, its hits are the answer's, on the
+ * sequential path and on the batched path alike; the orchestrator has no
+ * match of its own.
+ */
+describe('D23b: the line match is a strategy (DO14)', () => {
+  interface Seen {
+    lines: readonly string[];
+    input: ScanInput;
+  }
+
+  /** A strategy answering one hit on each source's second line, its own words. */
+  function recording(): { strategy: LineMatchStrategy; seen: Seen[] } {
+    const seen: Seen[] = [];
+    return {
+      seen,
+      strategy: {
+        match(lines, input) {
+          seen.push({ lines, input });
+          return {
+            hits: [{ line: 2, snippet: 'chosen by the strategy' }],
+            capped: false,
+          };
+        },
+      },
+    };
+  }
+
+  const ASKED = {
+    query: 'never-in-the-source',
+    query2: 'second',
+    exclude: ['dropped'],
+    exclude_comments: true,
+    packages: ['ZPKG'],
+    max_hits_per_object: 7,
+  };
+
+  describe('the orchestrator matches lines through the strategy it is given', () => {
+    it('on the sequential path', async () => {
+      const { strategy, seen } = recording();
+      const result = await runSearchSource(
+        {
+          lineMatch: strategy,
+          fetchPackageContents: async (name) =>
+            listing(name, [
+              {
+                name: 'ZPROG',
+                type: 'PROG/P',
+                packageName: 'ZPKG',
+                isPackage: false,
+              },
+            ]),
+          sourceReader: sourcesFrom({ 'PROG:ZPROG': 'first\nsecond' }),
+          resolvePackages: exactPackages,
+        },
+        ASKED,
+      );
+      expect(seen).toEqual([
+        {
+          lines: ['first', 'second'],
+          input: {
+            query: 'never-in-the-source',
+            query2: 'second',
+            exclude: ['dropped'],
+            exclude_comments: true,
+            max_hits: 7,
+          },
+        },
+      ]);
+      expect(result.results).toEqual([
+        expect.objectContaining({
+          object_name: 'ZPROG',
+          line: 2,
+          snippet: 'chosen by the strategy',
+        }),
+      ]);
+    });
+
+    it('on the batched path', async () => {
+      const repository: Repository = {
+        nodes: {
+          [nodeKey('ZPKG')]: { types: [{ type: 'PROG/P', nodeId: '000020' }] },
+          [nodeKey('ZPKG', '20')]: {
+            objects: [{ type: 'PROG/P', name: 'ZPROG' }],
+          },
+        },
+        sources: { 'PROGRAM ZPROG': 'first\nsecond' },
+        fugrChildren: {},
+        masks: {},
+      };
+      const fake = standOn(repository);
+      const { strategy, seen } = recording();
+      const result = await runSearchSourceWithContext(
+        contextOn(fake),
+        ASKED,
+        strategy,
+      );
+      expect(fake.envelopes.length).toBeGreaterThan(0);
+      expect(fake.directs).toHaveLength(0);
+      expect(seen.map((s) => s.lines)).toEqual([['first', 'second']]);
+      expect(seen[0]?.input).toEqual({
+        query: 'never-in-the-source',
+        query2: 'second',
+        exclude: ['dropped'],
+        exclude_comments: true,
+        max_hits: 7,
+      });
+      expect(result.results.map((h) => h.snippet)).toEqual([
+        'chosen by the strategy',
+      ]);
+    });
+  });
+
+  describe('the orchestrator has no line match of its own', () => {
+    it('imports no matcher', () => {
+      const source = fs.readFileSync(
+        path.join(__dirname, '../../../lib/search-source/orchestrator.ts'),
+        'utf8',
+      );
+      expect(source.includes("from './lineScanner'")).toBe(false);
+      expect(source.includes('scanLines')).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: hits and counters only (DO15, DO17, DO19)
+// ---------------------------------------------------------------------------
+
+/**
+ * `SearchSource` answers hits and counters only (DO15, DO17, DO19): an object
+ * without a hit is not listed; what cannot be read — a source, an object, a
+ * package whose root is refused or missing, a refused type node or
+ * subpackage (only its branch) — is skipped with no entry and not counted; a
+ * credential refusal still ends the call. Each case runs on both paths — ADT
+ * batch envelopes (`served`) and the sequential reads (`absent`) — with the
+ * real handler and real clients over the stand's fake connection.
+ */
+describe('D23b: hits and counters only (DO15, DO17, DO19)', () => {
+  const PATHS = [['served'], ['absent']] as const;
+
+  /**
+   * `ZPKG` holds a program with a hit, one without, one whose source is not
+   * there and one SAP refuses; a class whose main source hits and whose first
+   * local include SAP refuses; a function group whose first module SAP refuses
+   * and whose second hits. `ZTWO` holds one program with a hit.
+   */
+  const REPO: Repository = {
+    nodes: {
+      [nodeKey('ZPKG')]: {
+        types: [
+          { type: 'PROG/P', nodeId: '000001' },
+          { type: 'CLAS/OC', nodeId: '000002' },
+          { type: 'FUGR/F', nodeId: '000003' },
+        ],
+      },
+      [nodeKey('ZPKG', '1')]: {
+        objects: [
+          { type: 'PROG/P', name: 'ZHIT' },
+          { type: 'PROG/P', name: 'ZMISS' },
+          { type: 'PROG/P', name: 'ZGONE' },
+          { type: 'PROG/P', name: 'ZBAD' },
+        ],
+      },
+      [nodeKey('ZPKG', '2')]: { objects: [{ type: 'CLAS/OC', name: 'ZCL' }] },
+      [nodeKey('ZPKG', '3')]: { objects: [{ type: 'FUGR/F', name: 'ZFG' }] },
+      [nodeKey('ZTWO')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+      [nodeKey('ZTWO', '1')]: { objects: [{ type: 'PROG/P', name: 'ZTWOP' }] },
+    },
+    sources: {
+      'PROGRAM ZHIT': 'marker here',
+      'PROGRAM ZMISS': 'nothing here',
+      'PROGRAM ZBAD': 'marker never read',
+      'PROGRAM ZTWOP': 'marker two',
+      'CLASS ZCL': 'marker main',
+      'CLASSINCLUDE ZCL/DEFINITIONS': 'marker never read',
+      'FM Z_FM_A': 'marker never read',
+      'FM Z_FM_B': 'marker in b',
+    },
+    fugrChildren: {
+      ZFG: [
+        ['FUGR/FF', 'Z_FM_A'],
+        ['FUGR/FF', 'Z_FM_B'],
+      ],
+    },
+    masks: {},
+  };
+
+  const REFUSED: Model = {
+    refuse: {
+      'PROGRAM ZBAD': 500,
+      'CLASSINCLUDE ZCL/DEFINITIONS': 500,
+      'FM Z_FM_A': 500,
+    },
+  };
+
+  const search = (
+    fake: Fake,
+    absent: boolean,
+    args: Record<string, unknown> = {},
+  ) => searchOn(fake, { query: 'marker', packages: ['ZPKG'], ...args }, absent);
+
+  const hits = (payload: {
+    results: Array<{ object_name: string; include: string; line: number }>;
+  }) => payload.results.map((h) => `${h.object_name}/${h.include}:${h.line}`);
+
+  describe('SearchSource: only hits are answered (DO15)', () => {
+    it('SearchSource does not declare emit_no_hits', () => {
+      expect(Object.keys(TOOL_DEFINITION.inputSchema.shape)).not.toContain(
+        'emit_no_hits',
+      );
+    });
+
+    it.each(PATHS)(
+      'an object without a hit is not in the answer; a call that still sends emit_no_hits has it dropped (%s)',
+      async (batch) => {
+        const absent = batch === 'absent';
+        const plain = payloadOf(await search(standOn(REPO), absent));
+        const sent = await search(standOn(REPO), absent, {
+          emit_no_hits: true,
+        });
+        expect(isError(sent)).toBe(false);
+        const payload = payloadOf(sent);
+        expect(payload.no_hits).toBeUndefined();
+        expect(payload).toEqual(plain);
+        expect(
+          payload.results.some(
+            (h: { object_name: string }) => h.object_name === 'ZMISS',
+          ),
+        ).toBe(false);
+      },
+    );
+  });
+
+  describe('SearchSource: what cannot be read is skipped (DO17)', () => {
+    it.each(PATHS)(
+      'a source SAP refuses, a listed source that answers 404: skipped, no entry, no count (%s)',
+      async (batch) => {
+        const fake = standOn(REPO, REFUSED);
+        const payload = payloadOf(await search(fake, batch === 'absent'));
+        expect(payload.failures).toBeUndefined();
+        expect(hits(payload)).toEqual([
+          'ZCL/ZCL:1',
+          'ZFG/Z_FM_B:1',
+          'ZHIT/ZHIT:1',
+        ]);
+        // A readable source beside a refused one of the same object is searched:
+        // the function group's second module after its first was refused, the
+        // class's main source beside its refused local include.
+        const reads = sentUrls(fake);
+        expect(reads).toContain(
+          '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm_a/source/main?version=active',
+        );
+        expect(reads).toContain(
+          '/sap/bc/adt/functions/groups/zfg/fmodules/z_fm_b/source/main?version=active',
+        );
+      },
+    );
+
+    it("a read that throws without SAP's answer is skipped (absent)", async () => {
+      const fake = standOn(REPO, {
+        ...REFUSED,
+        throwOn: { 'PROGRAM ZHIT': 'socket hang up' },
+      });
+      const payload = payloadOf(await search(fake, true));
+      expect(payload.failures).toBeUndefined();
+      expect(hits(payload)).toEqual(['ZCL/ZCL:1', 'ZFG/Z_FM_B:1']);
+    });
+
+    it.each(PATHS)(
+      'the counters count only what was done (%s)',
+      async (batch) => {
+        const fake = standOn(REPO, {
+          refuse: { ...REFUSED.refuse, [nodeKey('ZNONE')]: 404 },
+        });
+        const payload = payloadOf(
+          await search(fake, batch === 'absent', {
+            packages: ['ZPKG', 'ZNONE'],
+          }),
+        );
+        // ZPKG walked, ZNONE (its root 404) not; read: ZHIT, ZMISS, ZCL (its
+        // main source), ZFG (its second module) — not ZGONE nor ZBAD; one
+        // source each; with hits: ZHIT, ZCL, ZFG.
+        expect(payload.scanned).toEqual({
+          packages: 1,
+          objects: 4,
+          sources: 4,
+          objects_with_hits: 3,
+        });
+        expect(payload.failures).toBeUndefined();
+      },
+    );
+
+    it.each(PATHS)(
+      'an object none of whose sources can be read is not in scanned.objects (%s)',
+      async (batch) => {
+        const fake = standOn(REPO, REFUSED);
+        const payload = payloadOf(
+          await search(fake, batch === 'absent', { object_filter: 'ZBAD' }),
+        );
+        expect(payload.results).toEqual([]);
+        expect(payload.scanned).toEqual({
+          packages: 1,
+          objects: 0,
+          sources: 0,
+          objects_with_hits: 0,
+        });
+      },
+    );
+
+    it.each(PATHS)(
+      'a named package that does not exist (its root answers 404) is skipped: no entry, not in scanned.packages (%s)',
+      async (batch) => {
+        const fake = standOn(REPO, { refuse: { [nodeKey('ZNONE')]: 404 } });
+        const payload = payloadOf(
+          await search(fake, batch === 'absent', {
+            packages: ['ZNONE', 'ZTWO'],
+          }),
+        );
+        expect(payload.failures).toBeUndefined();
+        expect(hits(payload)).toEqual(['ZTWOP/ZTWOP:1']);
+        expect(payload.scanned.packages).toBe(1);
+      },
+    );
+
+    it.each(PATHS)(
+      'a refused root is skipped: no entry, not in scanned.packages (%s)',
+      async (batch) => {
+        const fake = standOn(REPO, { refuse: { [nodeKey('ZPKG')]: 500 } });
+        const payload = payloadOf(
+          await search(fake, batch === 'absent', {
+            packages: ['ZPKG', 'ZTWO'],
+          }),
+        );
+        expect(payload.failures).toBeUndefined();
+        expect(hits(payload)).toEqual(['ZTWOP/ZTWOP:1']);
+        expect(payload.scanned.packages).toBe(1);
+      },
+    );
+
+    it.each(PATHS)(
+      'a mask that matches no package answers no packages (%s)',
+      async (batch) => {
+        const payload = payloadOf(
+          await search(standOn(REPO), batch === 'absent', {
+            packages: ['ZNOTHING*'],
+          }),
+        );
+        expect(payload.results).toEqual([]);
+        expect(payload.scanned).toEqual({
+          packages: 0,
+          objects: 0,
+          sources: 0,
+          objects_with_hits: 0,
+        });
+      },
+    );
+
+    it.each(PATHS)(
+      'a credential refusal still ends the call: a walk, a source read (%s)',
+      async (batch) => {
+        const absent = batch === 'absent';
+        const walk = await search(
+          standOn(REPO, { refuse: { [nodeKey('ZPKG')]: 401 } }),
+          absent,
+        );
+        expect(isError(walk)).toBe(true);
+        const source = await search(
+          standOn(REPO, { refuse: { 'PROGRAM ZHIT': 401 } }),
+          absent,
+        );
+        expect(isError(source)).toBe(true);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // A shared source that fails
+  // ---------------------------------------------------------------------------
+
+  /** Two function groups name the same include; each has a module of its own. */
+  const SHARED: Repository = {
+    nodes: {
+      [nodeKey('ZSHR')]: { types: [{ type: 'FUGR/F', nodeId: '000001' }] },
+      [nodeKey('ZSHR', '1')]: {
+        objects: [
+          { type: 'FUGR/F', name: 'ZFG1' },
+          { type: 'FUGR/F', name: 'ZFG2' },
+        ],
+      },
+    },
+    sources: {
+      'INCLUDE LSHARED': 'marker shared',
+      'FM Z_ONE': 'marker one',
+      'FM Z_TWO': 'marker two',
+    },
+    fugrChildren: {
+      ZFG1: [
+        ['FUGR/I', 'LSHARED'],
+        ['FUGR/FF', 'Z_ONE'],
+      ],
+      ZFG2: [
+        ['FUGR/I', 'LSHARED'],
+        ['FUGR/FF', 'Z_TWO'],
+      ],
+    },
+    masks: {},
+  };
+
+  describe('SearchSource: a shared source that fails', () => {
+    it.each(PATHS)(
+      'is skipped for both owners: one request, no entry, the other sources still read (%s)',
+      async (batch) => {
+        const fake = standOn(SHARED, { refuse: { 'INCLUDE LSHARED': 500 } });
+        const payload = payloadOf(
+          await searchOn(
+            fake,
+            { query: 'marker', packages: ['ZSHR'] },
+            batch === 'absent',
+          ),
+        );
+        expect(
+          sentUrls(fake).filter((url) => url.includes('/programs/includes/')),
+        ).toEqual([
+          '/sap/bc/adt/programs/includes/lshared/source/main?version=active',
+        ]);
+        expect(payload.failures).toBeUndefined();
+        expect(hits(payload)).toEqual(['ZFG1/Z_ONE:1', 'ZFG2/Z_TWO:1']);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // A refused level excludes only its branch (DO19)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * `ZTYP` lists two type nodes: programs (node 1) and classes (node 2).
+   * `ZPAR` holds a program of its own and two subpackages, `ZKA` (one program)
+   * and `ZKB` (one program).
+   */
+  const BRANCHES: Repository = {
+    nodes: {
+      [nodeKey('ZTYP')]: {
+        types: [
+          { type: 'PROG/P', nodeId: '000001' },
+          { type: 'CLAS/OC', nodeId: '000002' },
+        ],
+      },
+      [nodeKey('ZTYP', '1')]: { objects: [{ type: 'PROG/P', name: 'ZTPROG' }] },
+      [nodeKey('ZTYP', '2')]: { objects: [{ type: 'CLAS/OC', name: 'ZTCL' }] },
+      [nodeKey('ZPAR')]: {
+        types: [
+          { type: 'DEVC/K', nodeId: '000001' },
+          { type: 'PROG/P', nodeId: '000002' },
+        ],
+      },
+      [nodeKey('ZPAR', '1')]: {
+        objects: [
+          { type: 'DEVC/K', name: 'ZKA' },
+          { type: 'DEVC/K', name: 'ZKB' },
+        ],
+      },
+      [nodeKey('ZPAR', '2')]: { objects: [{ type: 'PROG/P', name: 'ZPARP' }] },
+      [nodeKey('ZKA')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+      [nodeKey('ZKA', '1')]: { objects: [{ type: 'PROG/P', name: 'ZKAP' }] },
+      [nodeKey('ZKB')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+      [nodeKey('ZKB', '1')]: { objects: [{ type: 'PROG/P', name: 'ZKBP' }] },
+    },
+    sources: {
+      'PROGRAM ZTPROG': 'marker never read',
+      'CLASS ZTCL': 'marker class',
+      'PROGRAM ZPARP': 'marker parent',
+      'PROGRAM ZKAP': 'marker sibling',
+      'PROGRAM ZKBP': 'marker never read',
+    },
+    fugrChildren: {},
+    masks: {},
+  };
+
+  const searchBranches = (
+    model: Model,
+    absent: boolean,
+    packages: string[],
+  ) => {
+    const fake = standOn(BRANCHES, model);
+    return {
+      fake,
+      result: searchOn(fake, { query: 'marker', packages }, absent),
+    };
+  };
+
+  describe('SearchSource: a refused level excludes only its branch (DO19)', () => {
+    it.each([
+      ['served', 500],
+      ['absent', 500],
+      ['served', 404],
+      ['absent', 404],
+    ] as const)(
+      'a type node refused (%s, %d) excludes only that node',
+      async (batch, status) => {
+        const { fake, result } = searchBranches(
+          { refuse: { [nodeKey('ZTYP', '1')]: status } },
+          batch === 'absent',
+          ['ZTYP'],
+        );
+        const payload = payloadOf(await result);
+        expect(isError(result)).toBe(false);
+        expect(hits(payload)).toEqual(['ZTCL/ZTCL:1']);
+        expect(sentUrls(fake).some((url) => url.includes('ztprog'))).toBe(
+          false,
+        );
+        expect(payload.scanned.packages).toBe(1);
+        expect(payload.failures).toBeUndefined();
+      },
+    );
+
+    it.each([
+      ['served', 500],
+      ['absent', 500],
+      ['served', 404],
+      ['absent', 404],
+    ] as const)(
+      'a subpackage refused (%s, %d) excludes only its branch',
+      async (batch, status) => {
+        const { fake, result } = searchBranches(
+          { refuse: { [nodeKey('ZKB')]: status } },
+          batch === 'absent',
+          ['ZPAR'],
+        );
+        const payload = payloadOf(await result);
+        expect(hits(payload)).toEqual(['ZKAP/ZKAP:1', 'ZPARP/ZPARP:1']);
+        expect(
+          sentUrls(fake).some((url) => url.includes('parent_name=ZKB&node_id')),
+        ).toBe(false);
+        // ZPAR and ZKA walked; ZKB not.
+        expect(payload.scanned.packages).toBe(2);
+        expect(payload.failures).toBeUndefined();
+      },
+    );
+
+    it.each(PATHS)(
+      'a credential refusal at any level ends the call (%s)',
+      async (batch) => {
+        const absent = batch === 'absent';
+        const node = await searchBranches(
+          { refuse: { [nodeKey('ZTYP', '1')]: 401 } },
+          absent,
+          ['ZTYP'],
+        ).result;
+        expect(isError(node)).toBe(true);
+        const sub = await searchBranches(
+          { refuse: { [nodeKey('ZKB')]: 401 } },
+          absent,
+          ['ZPAR'],
+        ).result;
+        expect(isError(sub)).toBe(true);
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: no paging (DO20)
+// ---------------------------------------------------------------------------
+
+/**
+ * `SearchSource` reads every target in one run (DO20): no `max_objects`, no
+ * `start_at`, no cursor in the answer; `max_hits_per_object` limits each
+ * object only when given. Each case runs on both paths — ADT batch envelopes
+ * (`served`) and the sequential reads (`absent`) — with the real handler and
+ * real clients over the stand's fake connection.
+ */
+describe('D23b: no paging (DO20)', () => {
+  const PATHS = [['served'], ['absent']] as const;
+
+  /** `ZBIG` holds `count` programs, each with one hit. */
+  function big(count: number): Repository {
+    const programs = Array.from(
+      { length: count },
+      (_, i) => `ZP${String(i + 1).padStart(4, '0')}`,
+    );
+    return {
+      nodes: {
+        [nodeKey('ZBIG')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+        [nodeKey('ZBIG', '1')]: {
+          objects: programs.map((name) => ({ type: 'PROG/P', name })),
+        },
+      },
+      sources: Object.fromEntries(
+        programs.map((name) => [`PROGRAM ${name}`, "WRITE 'marker'."]),
+      ),
+      fugrChildren: {},
+      masks: {},
+    };
+  }
+
+  /** `ZHITS` holds `ZMANY` (150 hits) and `ZFEW` (2 hits). */
+  const HITS: Repository = {
+    nodes: {
+      [nodeKey('ZHITS')]: { types: [{ type: 'PROG/P', nodeId: '000001' }] },
+      [nodeKey('ZHITS', '1')]: {
+        objects: [
+          { type: 'PROG/P', name: 'ZMANY' },
+          { type: 'PROG/P', name: 'ZFEW' },
+        ],
+      },
+    },
+    sources: {
+      'PROGRAM ZMANY': Array.from({ length: 150 }, () => 'marker').join('\n'),
+      'PROGRAM ZFEW': 'marker\nmarker',
+    },
+    fugrChildren: {},
+    masks: {},
+  };
+
+  const count = (payload: { results: Array<{ object_name: string }> }) => {
+    const out: Record<string, number> = {};
+    for (const h of payload.results) {
+      out[h.object_name] = (out[h.object_name] ?? 0) + 1;
+    }
+    return out;
+  };
+
+  describe('SearchSource: no paging (DO20)', () => {
+    it('SearchSource does not declare max_objects or start_at; no field names a package or object limit', () => {
+      const keys = Object.keys(TOOL_DEFINITION.inputSchema.shape);
+      expect(keys).not.toContain('max_objects');
+      expect(keys).not.toContain('start_at');
+      expect(keys).not.toContain('maxResults');
+      expect(keys.filter((k) => k.startsWith('max_'))).toEqual([
+        'max_hits_per_object',
+      ]);
+    });
+
+    it.each(PATHS)(
+      'every target is read in one call; the answer has no cursor fields (%s)',
+      async (batch) => {
+        const result = await searchOn(
+          standOn(big(501)),
+          { query: 'marker', packages: ['ZBIG'] },
+          batch === 'absent',
+          4000,
+        );
+        expect(isError(result)).toBe(false);
+        const payload = payloadOf(result);
+        expect(payload.results).toHaveLength(501);
+        expect(payload.scanned.objects).toBe(501);
+        expect(payload.total_targets).toBeUndefined();
+        expect(payload.next_start_at).toBeUndefined();
+        expect(payload.truncated).toEqual({ by_object_cap: false });
+      },
+    );
+
+    it.each(PATHS)(
+      'a call that still sends max_objects or start_at has them dropped (%s)',
+      async (batch) => {
+        const absent = batch === 'absent';
+        const plain = payloadOf(
+          await searchOn(
+            standOn(big(5)),
+            { query: 'marker', packages: ['ZBIG'] },
+            absent,
+          ),
+        );
+        const sent = await searchOn(
+          standOn(big(5)),
+          { query: 'marker', packages: ['ZBIG'], max_objects: 2, start_at: 3 },
+          absent,
+        );
+        expect(isError(sent)).toBe(false);
+        expect(payloadOf(sent)).toEqual(plain);
+        expect(plain.results).toHaveLength(5);
+      },
+    );
+
+    it.each(PATHS)(
+      'max_hits_per_object absent means no limit (%s)',
+      async (batch) => {
+        const payload = payloadOf(
+          await searchOn(
+            standOn(HITS),
+            { query: 'marker', packages: ['ZHITS'] },
+            batch === 'absent',
+          ),
+        );
+        expect(count(payload)).toEqual({ ZMANY: 150, ZFEW: 2 });
+        expect(payload.truncated.by_object_cap).toBe(false);
+      },
+    );
+
+    it.each(PATHS)(
+      'max_hits_per_object given limits each object; the flag is set by the object that passed it (%s)',
+      async (batch) => {
+        const payload = payloadOf(
+          await searchOn(
+            standOn(HITS),
+            { query: 'marker', packages: ['ZHITS'], max_hits_per_object: 3 },
+            batch === 'absent',
+          ),
+        );
+        expect(count(payload)).toEqual({ ZMANY: 3, ZFEW: 2 });
+        expect(payload.truncated.by_object_cap).toBe(true);
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: the package masks on the wire
+// ---------------------------------------------------------------------------
+
+/**
+ * Pins of the package masks on the wire (D23b Step 6): the quick searches the
+ * real client sends for a mask — the doubling sequence of `maxResults`, a `?`
+ * mask sent as given — and none for an exact name with a literal `_`.
+ *
+ * The corpus records no quick-search exchange, so the answers are documents
+ * of the shape the quick search answers (`adtcore:objectReferences`); a live
+ * capture is owed (D23b Step 7).
+ */
+describe('D23b: the package masks on the wire', () => {
+  /** A quick-search answer naming `count` packages. */
+  const answerOf = (count: number) => ({
+    status: 200,
+    data: `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">${Array.from(
+      { length: count },
+      (_, i) => {
+        const name = `ZP${String(i + 1).padStart(6, '0')}`;
+        return `<adtcore:objectReference adtcore:uri="/sap/bc/adt/packages/${name.toLowerCase()}" adtcore:type="DEVC/K" adtcore:name="${name}" adtcore:packageName="${name}"/>`;
+      },
+    ).join('')}</adtcore:objectReferences>`,
+  });
+
+  /** The query parameters of a recorded request: its URL's, then its params. */
+  function paramsOf(request: { url: string; params?: unknown }) {
+    const url = new URL(request.url, 'https://system.invalid');
+    const out: Record<string, string> = {};
+    url.searchParams.forEach((value, key) => {
+      out[key] = value;
+    });
+    for (const [key, value] of Object.entries(
+      (request.params ?? {}) as Record<string, unknown>,
+    )) {
+      out[key] = String(value);
+    }
+    return { path: url.pathname, query: out.query, maxResults: out.maxResults };
+  }
+
+  describe('the package masks on the wire', () => {
+    it('a mask fills 1000, then 2000: three quick searches, maxResults doubled, the last answer used', async () => {
+      const connection = recordingConnection([
+        answerOf(1000),
+        answerOf(2000),
+        answerOf(2500),
+      ]);
+      const { packages } = await resolvePackagePatterns(
+        {
+          searchObjects: createPackagePatternResolver({
+            connection,
+            logger: undefined,
+          }),
+        },
+        ['Z*'],
+      );
+      expect(connection.requests.map(paramsOf)).toEqual([
+        {
+          path: '/sap/bc/adt/repository/informationsystem/search',
+          query: 'Z*',
+          maxResults: '1000',
+        },
+        {
+          path: '/sap/bc/adt/repository/informationsystem/search',
+          query: 'Z*',
+          maxResults: '2000',
+        },
+        {
+          path: '/sap/bc/adt/repository/informationsystem/search',
+          query: 'Z*',
+          maxResults: '4000',
+        },
+      ]);
+      expect(packages).toHaveLength(2500);
+    });
+
+    it('a ? mask is sent as given', async () => {
+      const connection = recordingConnection([answerOf(3)]);
+      await resolvePackagePatterns(
+        {
+          searchObjects: createPackagePatternResolver({
+            connection,
+            logger: undefined,
+          }),
+        },
+        ['Z?TEST'],
+      );
+      expect(connection.requests.map(paramsOf)).toEqual([
+        {
+          path: '/sap/bc/adt/repository/informationsystem/search',
+          query: 'Z?TEST',
+          maxResults: '1000',
+        },
+      ]);
+    });
+
+    it('an exact name with a literal _ sends no quick search', async () => {
+      const connection = recordingConnection([]);
+      const { packages } = await resolvePackagePatterns(
+        {
+          searchObjects: createPackagePatternResolver({
+            connection,
+            logger: undefined,
+          }),
+        },
+        ['Z_PKG'],
+      );
+      expect(connection.requests).toEqual([]);
+      expect(packages).toEqual(['Z_PKG']);
+    });
   });
 });

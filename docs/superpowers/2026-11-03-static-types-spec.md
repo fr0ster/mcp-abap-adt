@@ -462,7 +462,7 @@ on-premise system disagree, the live measurement holds.
     search, its `maxResults` doubled until the answer holds fewer packages than `maxResults`.
     Measured on both systems: the quick search has no cap up to `maxResults` 100 000 and
     answers no "more" marker; `*` alone answers every package in seconds. A mask SAP refuses
-    stays an `OperationFailure` (`resolve package mask`), as in D23a. The sequential and the
+    is skipped with no entry (DO17). The sequential and the
     batched paths resolve alike: the batched path repeats its search phase until every mask
     is resolved, and a search not yet answered never counts as a short answer. (This replaces the
     earlier idea of splitting a mask into disjoint parts.)
@@ -478,16 +478,17 @@ on-premise system disagree, the live measurement holds.
   - **Only hits are answered.** A hit names the object (type, name, package, include), the
     line number and the line's text (`snippet`, up to 255 characters). An object without a
     hit is left out of the answer: `emit_no_hits` and the `no_hits` field are removed.
-  - **Unreadable objects are skipped (owner, DO17).** The answer is `results` plus counters:
-    packages walked, objects scanned and objects with hits (`scanned.objects_with_hits`); the
-    cursor fields (`scanned`, `total_targets`, `next_start_at`, `truncated`) stay. A source or
-    object that cannot be read is skipped — no entry, no count; a readable source of the same
-    object is still searched and its hits kept. The source `failures` entries go (this
-    supersedes D23a's failure contract for object reads; MIGRATION-24.0, unreleased, says
-    they are removed). A credential refusal still ends the call. The package-level outcomes
-    (a mask search SAP refused, a package walk SAP refused or answered `404`) stay as the
-    current contract answers them — `kind: 'operation'` entries in `failures` — until the
-    owner decides.
+  - **What cannot be read is skipped (owner, DO17).** The answer is `results` plus counters,
+    with no `failures` list. A source or object that cannot be read is skipped — no entry, no
+    count; a readable source of the same object is still searched and its hits kept. The
+    package-level outcomes follow the same rule: a mask search SAP refuses, a named package
+    that does not exist (`404`) and a refused walk of a package, type node or subpackage are
+    skipped with no entry. The counters count only what was done: `scanned.packages` the
+    packages walked, `scanned.objects` the objects read (at least one source read),
+    `scanned.sources` the sources read, and `scanned.objects_with_hits`; `total_targets`,
+    `next_start_at` and `truncated` stay. A credential refusal still ends the call. This
+    supersedes D23a's failure contract; MIGRATION-24.0 (unreleased) says `failures` is
+    removed.
   - **A function module is its own object (owner, DO18).** A function group and each of its
     function modules are separate scan objects. A hit in a module names the module: its own
     type, its name, its package and `function_group_name` (which `GetFunctionModule` and

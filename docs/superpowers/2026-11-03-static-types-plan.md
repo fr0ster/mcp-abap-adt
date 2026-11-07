@@ -2677,8 +2677,8 @@ Step 4 names.
     the last answer's packages used;
   - `'the packages of the last answer are walked, each once'` (the dedup with exact entries
     stays);
-  - `'a mask SAP refuses at any round is an OperationFailure resolve package mask, and the
-    other entries are scanned'` (the D23a shape, unchanged);
+  - `'a mask SAP refuses at any round is skipped with no entry, and the other entries are
+    scanned'` (DO17, Step 4a);
   - `'a credential failure at any round ends the call'`.
 
   Then the resolver loops: send with `maxResults`, keep the answer when it holds fewer than
@@ -2748,53 +2748,56 @@ Step 4 names.
   `src/__tests__/lib/search-source/cursor.test.ts` (its assertions counting zero-hit
   objects), `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`, and the live
   assertion in `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`.
-- [ ] **Step 4a: Unreadable objects are skipped; the answer is hits and counters (DO17).**
+- [ ] **Step 4a: What cannot be read is skipped; the answer is hits and counters (DO17).**
   Supersedes D23a Step 4 (the failure contract) and the failure parts of D23a Steps 3 and 5.
-  The answer is `results` plus counters; the cursor fields stay as they are (`scanned`
-  `{ packages, objects, sources }`, `total_targets`, `next_start_at`, `truncated`), and
-  `scanned` gains `objects_with_hits` (the objects with at least one hit in `results`). Red
-  tests first, on both paths (sequential and batched):
-  - `'a source SAP refuses is skipped: no entry, no count'`: no `failures` field; the source is
-    not in `scanned.sources`;
-  - `'a listed source that answers 404 is skipped'`, and `'a read that throws without SAP's
-    answer is skipped'` (the two paths D23a Step 3 turned into entries);
-  - `'an object none of whose sources can be read is not in the answer'`;
-  - `'a readable source of an object is searched and its hits kept when another source of the
-    same object failed'`: a function group whose first child fails and a later one hits —
-    both requests pinned, the later one's hits in `results`, no entry for the first; the same
-    for a class whose local include fails beside a hitting main source;
-  - `'a shared source that fails is skipped for both owners'`: one request (the D23a cache),
-    no entry, the other sources of both owners still read;
-  - `'objects_with_hits counts the objects with hits'`, on a page with hit, no-hit and
-    unreadable objects;
+  The answer has **no `failures` list at all**: `results` plus counters. The counters count
+  only what was done — `scanned.packages` the packages actually walked, `scanned.objects` the
+  objects actually read (at least one source read), `scanned.sources` the sources read, and
+  the new `scanned.objects_with_hits` (the objects with at least one hit in `results`).
+  `total_targets`, `next_start_at` and `truncated` stay as they are. Red tests first, on both
+  paths (sequential and batched):
+  - **object reads:**
+    - `'a source SAP refuses is skipped: no entry, no count'`: no `failures` field; the source
+      is not in `scanned.sources`;
+    - `'a listed source that answers 404 is skipped'`, and `'a read that throws without SAP's
+      answer is skipped'` (the two paths D23a Step 3 turned into entries);
+    - `'an object none of whose sources can be read is not in the answer and not in
+      scanned.objects'`;
+    - `'a readable source of an object is searched and its hits kept when another source of
+      the same object failed'`: a function group whose first child fails and a later one hits
+      — both requests pinned, the later one's hits in `results`, no entry for the first; the
+      same for a class whose local include fails beside a hitting main source; the object
+      counts in `scanned.objects`;
+    - `'a shared source that fails is skipped for both owners'`: one request (the D23a cache),
+      no entry, the other sources of both owners still read;
+  - **package-level outcomes (today `kind: 'operation'` entries):**
+    - `'a mask whose quick search SAP refuses is skipped: no entry'`, the other entries
+      scanned;
+    - `'a named package that does not exist (its root answers 404) is skipped: no entry, not
+      in scanned.packages'`;
+    - `'a refused walk is skipped: no entry, not in scanned.packages'`, for the package itself,
+      a type node and a subpackage. Today a refused level ends that package's walk
+      (`walkPackage` throws, `failed_level` names the level), so the asked package is skipped
+      whole; the test pins that, and the other packages are walked;
+    - `'a mask that matches no package answers no packages'` (unchanged);
+  - **counters:** `'the counters count only what was done'`, on a page with hit, no-hit and
+    unreadable objects and a skipped package: `scanned.packages`, `scanned.objects`,
+    `scanned.sources` and `scanned.objects_with_hits` each pinned;
   - `'a credential refusal still ends the call'` (unchanged: it is no broken object), on a
-    source read and on a walk, through `AuthRefusedError` as today.
+    mask search, a walk and a source read, through `AuthRefusedError` as today.
 
-  Then `SourceFailure`, the per-object failure bookkeeping (`targetFailures`, the answer's
-  `failures` from sources) and `orderedFailures` for sources go; `sourceReader.ts` skips a
-  failed read and goes on to the object's next source; `src/lib/search-source/failures.ts`
-  keeps only what the package-level outcomes below need, or goes if they go.
-
-  **Package-level outcomes — not object reads, kept as the current contract answers them
-  until the owner decides (open, DO17):** today they are entries of `kind: 'operation'` in the
-  same `failures` list:
-  - a mask whose quick search SAP refused: `step: 'resolve package mask'`, `mask`, `t100`
-    where SAP gave one, `error`; the other entries are scanned;
-  - a named package whose walk SAP refused, a package that does not exist (its root answers
-    `404`), or a type node or subpackage SAP refused or answered `404`: `step: 'walk package'`,
-    `package` (the one the call asked for), `failed_level` (`package`, and `node` `{ id, type
-    }` for a type node), `t100`, `error`; the other packages are walked;
-  - a mask that matches no package answers no packages and no entry;
-  - a credential refusal ends the call.
-
-  Such a package also counts in `scanned.packages` today (the count is of the resolved
-  packages, before the walk), and `scanned.objects` counts the page's targets, an unreadable
-  one included. These stay unchanged here; whether the operation entries stay in a
-  `failures` list of their own, and whether the counts leave out what was not read, is the
-  owner's to decide before this step is implemented.
+  Then the `failures` field goes from `OrchestratorResult` and the handler's answer;
+  `SourceFailure`, `OperationFailure`, `ScanFailure`, the per-object bookkeeping
+  (`targetFailures`), `orderedFailures` and the resolver's and enumerator's `failures` go,
+  and `src/lib/search-source/failures.ts` goes with them (its credential check moves to where
+  the skip is decided, so a credential refusal still ends the call). `sourceReader.ts` skips a
+  failed read and goes on to the object's next source; the resolver skips a refused mask; the
+  enumerator skips a refused or missing package; the counters are taken from what was read.
 
   Affected suites (each rewritten to skip-and-count, red first):
   `src/__tests__/unit/searchSource/sourcesAndFailures.test.ts`,
+  `src/__tests__/lib/search-source/packageResolver.test.ts` (a refused mask),
+  `src/__tests__/lib/search-source/packageEnumerator.test.ts` (a refused or missing walk),
   `src/__tests__/unit/failureStep.test.ts` (its `SearchSource` cases: a refused source read, a
   listed source not there, "a refused object is its own answer"),
   `src/__tests__/lib/search-source/orchestrator.test.ts`,
@@ -2867,7 +2870,7 @@ Step 4 names.
   listed-schema and surface fixtures (the answer's shape).
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
-  1000 packages"; `emit_no_hits`, `no_hits` and the source `failures` leave it, and it states
+  1000 packages"; `emit_no_hits`, `no_hits` and `failures` leave it, and it states
   that an object that cannot be read is skipped, names the counters, and says a hit in a
   function module names the module and its group (DO18). Functional only; a description test
   under the functional-descriptions guard. `time_budget_ms` and `timeout` are not
@@ -2878,8 +2881,9 @@ Step 4 names.
     that describes `SearchSource`'s masks or `no_hits`.
   - CHANGELOG (24.0.0): Fixed — a package mask is resolved completely (it was cut at 1000
     packages without a word); `?` is a wildcard and `+` a literal character. Removed —
-    `SearchSource`'s `emit_no_hits`, its `no_hits` answer and its source `failures` entries (an
-    object that cannot be read is skipped; DO17). Added — `scanned.objects_with_hits`.
+    `SearchSource`'s `emit_no_hits`, its `no_hits` answer and its `failures` list (what cannot
+    be read — a source, an object, a refused mask search, a missing or refused package walk —
+    is skipped; the counters count only what was done; DO17). Added — `scanned.objects_with_hits`.
     Changed — a hit in a function module names the module (its type, its name and
     `function_group_name`), not the group with the module as `include` (DO18).
     Changed — the line match is a strategy (an embedder of the orchestrator passes it).
@@ -2887,11 +2891,13 @@ Step 4 names.
     is an exact name now (write `*` where `+` was meant as a wildcard); a mask answers every
     matching package; drop `emit_no_hits` (a call that still sends it has it dropped) and read
     the objects with hits from `results` — an object without a hit is no longer listed;
-    `failures` entries of `kind: 'source'` are gone (24.0.0 is unreleased, so the section's
-    D23a text about them is rewritten, not kept beside): a source or object that cannot be
-    read is skipped with no entry and no count, and a readable source of the same object is
-    still searched; `scanned.objects_with_hits` counts the objects with hits; the
-    package-level entries as the owner decides (Step 4a); a hit in a function module is the
+    the `failures` list is gone, both kinds (24.0.0 is unreleased, so the section's D23a text
+    about it is rewritten, not kept beside): a source or object that cannot be read, a mask
+    search SAP refuses, a package that does not exist and a refused walk are skipped with no
+    entry, and a readable source of the same object is still searched; `scanned.packages`,
+    `scanned.objects` and `scanned.sources` count only what was walked and read, and
+    `scanned.objects_with_hits` counts the objects with hits; a credential refusal still ends
+    the call; a hit in a function module is the
     module's own object — read it with `GetFunctionModule` (`function_module_name` =
     `object_name`, `function_group_name`) — where 23.x answered it as the group's hit with
     the module in `include`; the group and its modules are counted apart (DO18);
@@ -2904,7 +2910,7 @@ Step 4 names.
     the `*` mask past 1000 packages through the doubling;
   - a `SearchSource` on premise, and one on ABAP Cloud in the cloud's configured build
     package, each with a known hit: the hit's object, line and snippet; no `no_hits`, no
-    source `failures`; `scanned.objects_with_hits` matches the objects in `results`; a hit
+    `failures`; a named package that does not exist is skipped and not counted; `scanned.objects_with_hits` matches the objects in `results`; a hit
     in a function module names the module and its group, and `GetFunctionModule` reads it
     with exactly those fields;
   - the `VIEW*` measurement owed by D23a Step 2.
@@ -3187,12 +3193,16 @@ the compact run tools' schemas and descriptions (`HandlerBackgroundRunGet`,
   packages about 130 s; envelopes of about 1 000 parts and more an outer `500` after about
   600 s) is a known limit, no change.
 - **DO17 (2026-11-07, D23b Step 4a):** the answer is `results` (the hits) plus counters
-  (packages walked, objects scanned, objects with hits); the cursor fields stay. A source or
+  (packages walked, objects read, sources read, objects with hits). A source or
   object that cannot be read is skipped: no entry, no count; a readable source of the same
   object is still searched and its hits kept. A credential refusal still ends the call.
-  Supersedes D23a's failure contract for object reads. **Open:** the package-level outcomes
-  (a refused mask search, a refused or missing package walk) — today `kind: 'operation'`
-  entries in `failures` — are kept as they are until the owner decides.
+  Supersedes D23a's failure contract. **Closed (owner, 2026-11-07):** the package-level
+  outcomes follow the same rule — a refused mask search, a package that does not exist
+  (`404`), a refused walk of a package, type node or subpackage are skipped with no entry; the
+  answer has no `failures` list. The counters count only what was done: `scanned.packages`
+  the packages walked, `scanned.objects` the objects read (at least one source),
+  `scanned.sources` the sources read, `scanned.objects_with_hits`; `total_targets`,
+  `next_start_at` and `truncated` stay.
 - **DO18 (2026-11-07, D23b Step 4b):** a function group and each of its function modules are
   separate scan objects: a hit in a module names the module (its type, name, package and
   `function_group_name`, what `GetFunctionModule` requires), not the group; a hit in the

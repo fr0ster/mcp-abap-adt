@@ -219,7 +219,8 @@ Streamable HTTP instance did in 23.x — and sends a write, a delete or an unloc
   again with the module's group and the same handle.
 - **`lock_handle` is removed from `UpdateBehaviorDefinition` and `UpdateMetadataExtension`.** No
   tool of the full set issues a lock handle. Both lock, write and unlock themselves; drop the
-  argument (a call that sends it is refused as undeclared). To write under a lock you hold, use
+  argument (a call that still sends it has it dropped: these tools are not strict, so the update
+  takes its own lock and the handle is not used). To write under a lock you hold, use
   compact `HandlerLock` and `HandlerUpdate` (`BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`) with
   the handle it answered.
 - **SSE: the idle bound logs a lock's session off.** When the idle bound (`stateIdleMinutes`)

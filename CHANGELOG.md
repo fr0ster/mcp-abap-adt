@@ -47,7 +47,7 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 
 ### Removed — breaking for a caller of `UpdateBehaviorDefinition` and `UpdateMetadataExtension`
 
-- **`lock_handle` is removed from `UpdateBehaviorDefinition` and `UpdateMetadataExtension`** (#4): no tool of the full set issues a lock handle, and a handle the instance did not issue is refused, so the argument could only be refused. Both lock, write and unlock themselves, as the other full updates do; a call that still sends `lock_handle` is refused as an argument the schema does not declare. A write under a held lock is compact `HandlerUpdate`'s. Migrating: `docs/MIGRATION-24.0.md`, "Callers of the lock tools".
+- **`lock_handle` is removed from `UpdateBehaviorDefinition` and `UpdateMetadataExtension`** (#4): no tool of the full set issues a lock handle, and a handle the instance did not issue is refused, so the argument could only be refused. Both lock, write and unlock themselves, as the other full updates do; a call that still sends `lock_handle` has it dropped by the parse (only the create tools are strict), so the update takes its own lock and the handle is not used. A write under a held lock is compact `HandlerUpdate`'s. Migrating: `docs/MIGRATION-24.0.md`, "Callers of the lock tools".
 
 ### Removed — breaking for a caller of `GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols`
 

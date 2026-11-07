@@ -3225,10 +3225,22 @@ Step 4 names.
     passes the strategies as explicit parameters only: `EmbeddableMcpServer`'s options, and
     `HandlerExporter`'s options (the exporter's one public path); the launchers pass the
     shipped ones. The `HandlerContext` field is internal plumbing from the server to the
-    handler, never filled by a consumer: `HandlerExporter.wrapEntry` sets the field of the
-    context it passes from its own option — the option's value when given, the field removed
-    when not, whatever the embedder's context held — so an absent option means an absent
-    field and the handler's `?? shipped`. An embedder's own context is not a way to pass a
+    handler, never filled by a consumer. The exporter has three paths
+    (`src/lib/handlers/HandlerExporter.ts`), and the rule is the same on each — the field of
+    the context a handler runs in is the exporter's option when given and absent when not,
+    so an absent option means an absent field and the handler's `?? shipped`:
+    - **`getHandlerEntries()`**: each entry is wrapped by `wrapEntry`, which sets the field of
+      the context it passes to the original `call` from the option (the field removed when the
+      option is absent), whatever the embedder's context held;
+    - **`registerOnServer(server, connectionProvider)`**: it does not go through `wrapEntry`
+      — its `callContext` builds the context itself (`{ connection, logger, ...this.stated() }`)
+      and registers the groups through `CompositeHandlersRegistry.registerAllToolsOnCall`; the
+      fields are added to that context from the options (absent option → no field);
+    - **`createRegistry()`**: it hands a `CompositeHandlersRegistry` to a server
+      (`EmbeddableMcpServer` / `BaseMcpServer`), whose tools run in the contexts **that
+      server** builds; there the strategies are the server's own options, and the exporter's
+      options do not apply (the exporter builds no context on this path). The exporter's doc
+      says so, and the embedding docs name the server's options for this route. An embedder's own context is not a way to pass a
     strategy, and no doc says it is. `HandlerContext` is exported to embedders
     (`@mcp-abap-adt/lib/handlers`: `src/lib/handlers/index.ts` re-exports
     `src/lib/handlers/interfaces.ts`, which re-exports it, and `HandlerEntry.call` takes it),
@@ -3264,8 +3276,15 @@ Step 4 names.
     - launcher-built servers: stdio (`StdioServer`), HTTP (`StreamableHttpServer`'s
       per-request server) and SSE (`SseServer`'s session server) — each uses the shipped one;
     - `'the HandlerExporter option reaches the handler; without it the shipped strategy is
-      used'` — also when the embedder's context passed to `entry.call` carries a value in the
-      field: the exporter's option (or its absence) decides;
+      used'`, through `getHandlerEntries()` — also when the embedder's context passed to
+      `entry.call` carries a value in the field: the exporter's option (or its absence)
+      decides;
+    - the same through `registerOnServer` on an `McpServer`, with a stand-in connection
+      provider: a recording strategy given as the exporter's option is asked for a SAP `500`
+      at a source read and obeyed; without the option the shipped one skips it — on the
+      sequential and the batched path each;
+    - through `createRegistry()` handed to an `EmbeddableMcpServer`: the server's option is
+      used, and the exporter's option is not;
     - a plain-group registration (the handler's default);
     - `'an optionless EmbeddableMcpServer leaves the field absent'`: no context it builds
       carries the field, and the handler's default answers;
@@ -3290,7 +3309,9 @@ Step 4 names.
   - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the three
     `HandlerContext`s it builds (dispatch, `recordedContext`, the run tools'), kept in every
     derived context; `HandlerExporter` takes it as its own option, its one public path, and
-    `wrapEntry` sets the field from it (absent option → field absent); the field is internal,
+    sets the field from it on `getHandlerEntries()` (`wrapEntry`) and `registerOnServer` (its
+    `callContext`), absent option → field absent; on `createRegistry()` the hosting server's
+    option applies (Step 4e2); the field is internal,
     marked so, never a consumer's way in (Step 4e2); an optionless `EmbeddableMcpServer`
     leaves the field absent; the binaries'
     launchers (stdio, HTTP per-request, SSE session) pass `substringLineMatch`; `handleSearchSource.ts` reads
@@ -3317,8 +3338,9 @@ Step 4 names.
     and without its option, a plain group, an optionless `EmbeddableMcpServer` leaving the
     field absent), each on the sequential and the batched path;
   - `'the HandlerExporter line-match option reaches the handler; without it
-    substringLineMatch is used'`, also when the embedder's context carries a value in the
-    field;
+    substringLineMatch is used'`, through `getHandlerEntries()` (also when the embedder's
+    context carries a value in the field) and through `registerOnServer`, each on the
+    sequential and the batched path; through `createRegistry()` the server's option is used;
   - `'the line-match contract is exported'`: a type test importing the types and
     `substringLineMatch` from `@mcp-abap-adt/lib/embeddable`.
 

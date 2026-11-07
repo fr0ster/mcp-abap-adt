@@ -534,7 +534,9 @@ on-premise system disagree, the live measurement holds.
     the shipped one there. The consumer is any server built on the library; it passes the
     strategies only as explicit parameters — `EmbeddableMcpServer`'s options and
     `HandlerExporter`'s options. The context field is internal plumbing from the server to the
-    handler: the exporter sets it from its option (absent option, absent field), an embedder's
+    handler: the exporter sets it from its option (absent option, absent field) on both paths
+    that build a context — `getHandlerEntries()` and `registerOnServer` — while a registry from
+    `createRegistry()` runs in its hosting server's contexts, with that server's options; an embedder's
     own context is no way to pass a strategy, and because `HandlerContext` is exported the
     field is marked internal in its doc comment. Its contract and the shipped strategy are exported from
     `@mcp-abap-adt/lib/embeddable`. The line-match strategy is the consumer's the same way (owner,

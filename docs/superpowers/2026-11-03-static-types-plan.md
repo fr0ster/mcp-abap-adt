@@ -2751,11 +2751,11 @@ Step 4 names.
 - [ ] **Step 4a: What cannot be read is skipped; the answer is hits and counters (DO17).**
   Supersedes D23a Step 4 (the failure contract) and the failure parts of D23a Steps 3 and 5.
   The answer has **no `failures` list at all**: `results` plus counters. The counters count
-  only what was done — `scanned.packages` the packages actually walked, `scanned.objects` the
-  objects actually read (at least one source read), `scanned.sources` the sources read, and
+  only what was done — `scanned.objects` the objects actually read (at least one source read), `scanned.sources` the sources read, and
   the new `scanned.objects_with_hits` (the objects with at least one hit in `results`).
-  `truncated.by_object_cap` stays (the paging fields go in Step 4d, DO20). Red tests first,
-  on both paths (sequential and batched):
+  `truncated.by_object_cap` stays (the paging fields go in Step 4d, DO20). There is no
+  package counter (DO26): `scanned.packages` is removed. Red tests first, on both paths
+  (sequential and batched):
   - **object reads:**
     - `'a source SAP refuses is skipped: no entry, no count'`: no `failures` field; the source
       is not in `scanned.sources`;
@@ -2773,16 +2773,17 @@ Step 4 names.
   - **package-level outcomes (today `kind: 'operation'` entries):**
     - `'a mask whose quick search SAP refuses is skipped: no entry'`, the other entries
       scanned;
-    - `'a named package that does not exist (its root answers 404) is skipped: no entry, not
-      in scanned.packages'`;
-    - `'a refused root is skipped: no entry, not in scanned.packages'`: the asked package's
+    - `'a named package that does not exist yields no hit'` (DO26: SAP answers its node
+      structure `200` with an empty body, as for an empty package — measured on premise — so
+      no existence read is made and nothing tells the two apart);
+    - `'a refused root is skipped: no entry'`: the asked package's
       own root refused (or `404`) excludes that package, nothing under it is reachable; the
       other packages are walked;
     - the refused levels below the root are Step 4c's (DO19): only that branch is excluded;
     - `'a mask that matches no package answers no packages'` (unchanged);
   - **counters:** `'the counters count only what was done'`, on a page with hit, no-hit and
-    unreadable objects and a skipped package: `scanned.packages`, `scanned.objects`,
-    `scanned.sources` and `scanned.objects_with_hits` each pinned;
+    unreadable objects and a skipped package: `scanned.objects`, `scanned.sources` and
+    `scanned.objects_with_hits` each pinned, and no `scanned.packages` in the answer;
   - `'a credential refusal still ends the call'` (unchanged: it is no broken object), on a
     mask search, a walk and a source read, through `AuthRefusedError` as today.
 
@@ -2913,12 +2914,11 @@ Step 4 names.
   `runSearchSourceInPhases`), on `recordingConnection` with node-structure answers:
   - `'a refused type node excludes only that node'`: a package with two type nodes, the first
     refused — the second node's objects are read and their hits answered; no request under the
-    refused node; `scanned.packages` counts the package;
+    refused node;
   - `'a type node answering 404 excludes only that node'` (the same, with `404`);
   - `'a refused subpackage excludes only its branch'`: a parent with its own objects and two
     subpackages, one refused (and a case with its `404`) — the parent's objects and the
-    sibling's are searched; the refused subpackage's descendants are not requested; it is not
-    in `scanned.packages`, its sibling and the parent are;
+    sibling's are searched; the refused subpackage's descendants are not requested;
   - `'a refused root excludes the package'` (Step 4a's case, on both paths);
   - `'a credential refusal at any level ends the call'`;
   - `'the other walking tools are unchanged'`: `GetPackageContents`, `GetPackageTree` and the
@@ -2930,8 +2930,8 @@ Step 4 names.
   with it, a refused or missing level below the root yields nothing for that branch and the
   walk goes on with the next node or subpackage; a refused root still settles the package as
   refused, which the enumerator skips; a credential refusal still ends the walk.
-  `packageEnumerator.ts`' fetcher and the batched orchestration pass it; the enumerator counts
-  a package in `scanned.packages` only when its own level was read. `failed_level` and the
+  `packageEnumerator.ts`' fetcher and the batched orchestration pass it (no package is
+  counted, DO26). `failed_level` and the
   `walk package` failure go with Step 4a's `failures`.
 
   Affected suites: `src/__tests__/unit/packageWalk.test.ts`,
@@ -2962,7 +2962,8 @@ Step 4 names.
   - **`max_hits_per_object` stays, optional, with no default:** absent, an object's hits are
     not limited; given, each object (every function module and the group apart, DO18) is
     limited to it. `truncated.by_object_cap` stays, set only when a given limit cut an object.
-  - `scanned.*` (packages walked, objects read, sources read, objects with hits) stays.
+  - `scanned.*` (objects read, sources read, objects with hits) stays; there is no package
+    counter (DO26).
 
   Red tests first, on both paths (sequential and batched):
   - `'every target is read in one call'`: a walk of more than 500 targets — every target's
@@ -3200,8 +3201,9 @@ Step 4 names.
       `this.backgroundRuns`);
     - `BaseMcpServer` puts it into every `HandlerContext` it builds — the dispatch context
       (`registerHandlers`' call, around the `const context: HandlerContext = {` that builds
-      `connection`, `batchAvailability`, `heldLocks`, …), the batch-mode recorded context
-      (`recordedContext`) and the run tools' context — as a new `HandlerContext` field
+      `connection`, `batchAvailability`, `heldLocks`, …) and the run tools' context — as a new
+      `HandlerContext` field (not the batch-mode `recordedContext`: `SearchSource` is not
+      recordable in batch mode, below)
       (`src/handlers/interfaces.ts`), kept in every context derived from those (a long call's
       own connection, a background run's), as `batchAvailability` is;
     - `handleSearchSource.ts` reads it from the context and passes it to the orchestrator.
@@ -3269,7 +3271,11 @@ Step 4 names.
     for a SAP `500` at a source read, its answer obeyed; on the sequential and the batched
     path each):
     - `BaseMcpServer`'s dispatch context (an ordinary call);
-    - the batch-mode `recordedContext` (a call recorded in batch mode and run);
+    - **batch mode: the pinned refusal.** `SearchSource` is a handler and a batch is an
+      adt-client-level entity: `SearchSource` may itself be built of batched calls, but cannot
+      be put into a batch (owner, DO26). So there is no batch-mode route; the test pins that
+      `SearchSource` in batch mode is refused `batch_not_recordable`, as today, with either
+      strategy given;
     - the run tools' context and a background run's derived context (`SearchSource` in the
       background, read with `GetBackgroundRun`);
     - a long call's own connection (`background: false`);
@@ -3307,7 +3313,8 @@ Step 4 names.
   `exclude_comments`, `max_hits` — in, `ScanResult` — the `ScanHit`s and `capped` — out);
   the shipped one is `substringLineMatch` (`lineScanner.ts`, today's match).
   - **Same option path:** `EmbeddableMcpServer`'s options → `BaseMcpServer` → the three
-    `HandlerContext`s it builds (dispatch, `recordedContext`, the run tools'), kept in every
+    `HandlerContext`s it builds for `SearchSource` (dispatch, the run tools'; batch mode refuses
+    it, `batch_not_recordable`), kept in every
     derived context; `HandlerExporter` takes it as its own option, its one public path, and
     sets the field from it on `getHandlerEntries()` (`wrapEntry`) and `registerOnServer` (its
     `callContext`), absent option → field absent; on `createRegistry()` the hosting server's
@@ -3333,7 +3340,8 @@ Step 4 names.
   - `'the HandlerExporter option is used, and the shipped one without it'`; a plain-group
     registration uses the shipped one;
   - **every route, for the line-match strategy**, as Step 4e2 lists them (dispatch context,
-    `recordedContext`, run tools' and background-run contexts, a long call's own connection,
+    the pinned `batch_not_recordable` refusal in batch mode, run tools' and background-run
+    contexts, a long call's own connection,
     the stdio, HTTP and SSE launcher servers with `substringLineMatch`, `HandlerExporter` with
     and without its option, a plain group, an optionless `EmbeddableMcpServer` leaving the
     field absent), each on the sequential and the batched path;
@@ -3373,7 +3381,7 @@ Step 4 names.
     `truncated.by_max_hits: true` is set when the scan stopped with anything left — a further
     hit of the current source, a source or a target not read; reaching exactly `max_hits` at
     the end of the scan leaves it false. `scanned.*` report what was done until the stop
-    (packages walked, objects read, sources read, objects with hits).
+    (objects read, sources read, objects with hits).
     - **The batched path:** its sources are read in chunks (`TARGETS_PER_CHUNK`) before they
       are scanned, so the stop takes effect at a chunk boundary: each chunk is scanned once its
       reads are answered, and no envelope of a later chunk is sent once the limit is reached.
@@ -3402,7 +3410,7 @@ Step 4 names.
     its own cause;
   - `'objects counts only the hits answered'`: with `answer: 'objects'` and either limit, an
     entry's `hits` excludes cut hits;
-  - `'the counters report what was done until the stop'`: `scanned.packages`,
+  - `'the counters report what was done until the stop'`:
     `scanned.objects`, `scanned.sources`, `scanned.objects_with_hits` pinned at a stop;
   - `'the schema offers answer, max_hits and max_hits_per_object'`: the listed-schema
     fixture; a wrong `answer` value is refused by the schema.
@@ -3429,7 +3437,8 @@ Step 4 names.
 - [ ] **Step 5: Description.** The mask sentence states DO12 (`*` and `?` the wildcards; `+`,
   `_`, `%`, `#` literal; a mask resolved completely by the quick search) and loses "of up to
   1000 packages"; `emit_no_hits`, `no_hits` and `failures` leave it, and it states
-  that an object that cannot be read is skipped, names the counters, and says a hit in a
+  that an object that cannot be read is skipped, names the counters (objects read, sources
+  read, objects with hits — no package counter, DO26), and says a hit in a
   function module names the module and its group (DO18). It drops `start_at`, `max_objects`,
   `total_targets`, `next_start_at` and `truncated.by_max_objects`, says every target is read, unless the caller gives `max_hits` and it is reached (DO23),
   in one run, and says `max_hits_per_object` limits each object only when given (DO20); the
@@ -3447,6 +3456,7 @@ Step 4 names.
     is skipped; the counters count only what was done; DO17). Fixed — a refused or missing
     type node or subpackage excludes only its branch; the rest of the package is walked and
     searched (it ended the package's whole walk; DO19). Added — `scanned.objects_with_hits`.
+    Removed — `scanned.packages` (a missing package is answered by SAP as an empty one; DO26).
     Changed — a hit in a function module names the module (its type, its name and
     `function_group_name`), not the group with the module as `include` (DO18).
     Changed — a defect of the server while reading (a thrown value that is not a system
@@ -3464,8 +3474,10 @@ Step 4 names.
     search SAP refuses, a package that does not exist (its root refused or `404`) are
     skipped with no entry; a refused or missing type node or subpackage excludes only its
     branch — the package's other nodes, subpackages and objects are walked and searched
-    (DO19); a readable source of an object is still searched when another failed; `scanned.packages`,
-    `scanned.objects` and `scanned.sources` count only what was walked and read, and
+    (DO19); a readable source of an object is still searched when another failed; a named
+    package that does not exist yields no hit; `scanned.packages` is removed (DO26: no package
+    is counted — SAP answers a missing package as an empty one); `scanned.objects` and
+    `scanned.sources` count only what was read, and
     `scanned.objects_with_hits` counts the objects with hits; a credential refusal still ends
     the call; a hit in a function module is the
     module's own object — read it with `GetFunctionModule` (`function_module_name` =
@@ -3489,7 +3501,7 @@ Step 4 names.
     the `*` mask past 1000 packages through the doubling;
   - a `SearchSource` on premise, and one on ABAP Cloud in the cloud's configured build
     package, each with a known hit: the hit's object, line and snippet; no `no_hits`, no
-    `failures`; a named package that does not exist is skipped and not counted; `scanned.objects_with_hits` matches the objects in `results`; a hit
+    `failures`; a named package that does not exist yields no hit (no `scanned.packages`); `scanned.objects_with_hits` matches the objects in `results`; a hit
     in a function module names the module and its group, and `GetFunctionModule` reads it
     with exactly those fields;
   - the `VIEW*` measurement owed by D23a Step 2;
@@ -4525,14 +4537,14 @@ stand-in.
   packages about 130 s; envelopes of about 1 000 parts and more an outer `500` after about
   600 s) is a known limit, no change.
 - **DO17 (2026-11-07, D23b Step 4a):** the answer is `results` (the hits) plus counters
-  (packages walked, objects read, sources read, objects with hits). A source or
+  (objects read, sources read, objects with hits; the package counter removed by DO26). A source or
   object that cannot be read is skipped: no entry, no count; a readable source of the same
   object is still searched and its hits kept. A credential refusal still ends the call.
   Supersedes D23a's failure contract. **Closed (owner, 2026-11-07):** the package-level
   outcomes follow the same rule — a refused mask search, a package that does not exist
   (`404`), a refused walk of a package, type node or subpackage are skipped with no entry (a
-  type node or subpackage excludes only its branch, DO19); the answer has no `failures` list. The counters count only what was done: `scanned.packages`
-  the packages walked, `scanned.objects` the objects read (at least one source),
+  type node or subpackage excludes only its branch, DO19); the answer has no `failures` list. The counters count only what was done: `scanned.objects`
+  the objects read (at least one source),
   `scanned.sources` the sources read, `scanned.objects_with_hits`; `truncated.by_object_cap`
   stays (the paging fields go, DO20).
 - **DO18 (2026-11-07, D23b Step 4b):** a function group and each of its function modules are
@@ -4658,6 +4670,16 @@ stand-in.
   server's options, the doc corrected, a contradicting recorded kind refused; Q11 if the
   measurement confirms it, the exported run tools get `background` on a server with background
   runs. **Open:** Q12 `--tls-ca`, decided after its measurement.
+- **DO26 (2026-11-07, D23b):** "a missing or empty package does not matter; the problem is a
+  search returning an object that holds nothing of what was searched. Reading packages'
+  metadata would add many reads and no use; better count no packages, only the results."
+  Measured on premise: SAP answers the node structure of a package that does not exist `200`
+  with an empty body, exactly like an empty package. So no existence read is made;
+  `scanned.packages` is removed (`scanned.objects`, `scanned.sources`,
+  `scanned.objects_with_hits` stay); a named package that does not exist yields no hit. And
+  `SearchSource` is a handler, a batch an adt-client-level entity: `SearchSource` may be built
+  of batched calls, but is not put into a batch — `batch_not_recordable` stays, and the
+  strategies' route tests pin that refusal instead of a batch-mode route.
 
 ## Test coverage — the families
 

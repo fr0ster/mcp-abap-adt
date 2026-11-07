@@ -486,12 +486,18 @@ on-premise system disagree, the live measurement holds.
     of a walk (a type node or a subpackage, its `404` included) excludes only that branch —
     the node and everything under it; the package's other nodes, subpackages and objects are
     walked and searched (owner, DO19; today it ends the package's whole walk). The other
-    walking tools keep their answer. The counters count only what was done: `scanned.packages` the
-    packages walked, `scanned.objects` the objects read (at least one source read),
+    walking tools keep their answer. The counters count only what was done: `scanned.objects` the
+    objects read (at least one source read),
     `scanned.sources` the sources read, and `scanned.objects_with_hits`;
     `truncated.by_object_cap` stays. A credential refusal still ends the call. This
     supersedes D23a's failure contract; MIGRATION-24.0 (unreleased) says `failures` is
     removed.
+  - **No package counter (owner, DO26).** SAP answers the node structure of a package that
+    does not exist `200` with an empty body, like an empty package (measured on premise), so
+    the two cannot be told apart without an extra read, which is not made: a named package
+    that does not exist yields no hit, and `scanned.packages` is removed. `SearchSource` is not
+    recordable in a batch (`batch_not_recordable` stays): a batch is an adt-client-level entity
+    `SearchSource` may use, not one it can be put into.
   - **A function module is its own object (owner, DO18).** A function group and each of its
     function modules are separate scan objects. A hit in a module names the module: its type
     is the ADT code `FUGR/FF` (measured on premise: the quick search's `adtcore:type` and the

@@ -3514,8 +3514,13 @@ Step 4 names.
     are replaced by evidence that reads no package counter:
     - **what the live cases claim (DO26: the problem is a search returning an object that
       holds nothing of what was searched):** in the mask cases and the known-hit cases,
-      (a) every hit's `devclass` is among the packages `SearchObject` over `DEVC` names for that
-      mask, read first with `livePrepare`; (b) every hit is real — its line, read back with the
+      (a) for a mask search with `include_subpackages: false`, every hit's `devclass` is among
+      the packages `SearchObject` over `DEVC` names for that mask, read first with
+      `livePrepare`; (a′) for a tree search (`include_subpackages: true`, e.g. the ABAP Cloud
+      known-hit case in the configured build package), every hit's `devclass` is the named
+      package or one of its descendants, the tree read first with `livePrepare`
+      (`GetPackageTree`, or `GetPackageContents` with subpackages — whichever the read tools
+      offer for the package's subpackage names); (b) every hit is real — its line, read back with the
       hit object's own read tool (`GetFunctionModule` for a `FUGR/FF` hit with its
       `function_group_name`, `GetFunctionInclude` / `GetInclude`, `GetClass` and the local
       includes, `GetProgram`, `GetInterface`, the CDS / BDEF / DDLX / SRVD reads — through

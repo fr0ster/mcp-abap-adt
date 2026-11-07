@@ -135,7 +135,7 @@ binds, and each step names the spec section it carries out. Every step ends gree
     - `npm run docs:tools`.
 ## Test coverage (spec §8)
 
-The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D23 (spec §9), then C3–C16, each with
+The stage runs after step 17 and before step 18. It is written as tasks C1, C2, C2a–C2e, then the defect stage D1–D24 (spec §9), then C3–C16, each with
 its own steps. The owner's decisions are recorded at the end of this section ("Owner's decisions
 and open items") and applied in the tasks; O1–O12 and the findings (a) and (b) are decided;
 nothing is open.
@@ -2547,6 +2547,10 @@ the on-premise tunnel and the trial session, and nothing of it runs before then.
 
 #### D23a. Sources, versions, failures, dedup, description (no SAP; starts now)
 
+*The D23a review's first item — `SearchSource` holding the instance's main-call queue for its
+whole scan — is covered by D24 (`SearchSource` back on the long-tool list, on its own
+session).*
+
 - [ ] **Step 1: Every source-bearing object SAP lists is scanned, each in the asked version.**
   The reader per type (adt-clients 43, `AdtClient`), each taking the call's `version`:
 
@@ -2663,15 +2667,125 @@ the on-premise tunnel and the trial session, and nothing of it runs before then.
   completion or names its incomplete part; the text-search key check; a `VIEW*` measurement
   (D23a Step 2).
 
-**Owner decision to flag, not decided here (DO11):** `time_budget_ms` and the tool's `timeout`
-field are deadlines inside the server, which the no-built-in-timeouts rule covers. The
-options:
-- (a) keep both, as named exceptions;
-- (b) remove both in favour of paging by `start_at` / `max_objects`, the call ending on its
-  result;
-- (c) keep only the consumer's abort (the MCP cancel), with neither field.
+**DO11, decided by D24 (2026-11-07):** no server-side deadline remains: `SearchSource`'s
+`time_budget_ms` and `timeout` go with every long tool's `timeout`; a running read is ended
+by `DiscardBackgroundRun`. D23 does not touch either field; D24 removes them.
 
-The choice is the owner's. D23's steps do not touch either field until it is made.
+### D24. Long tools: no timeout, their own session, background by default, cancel by discard (owner, 2026-11-07)
+
+**The owner's decisions.**
+1. **No server-side deadline remains anywhere.** `timeout` is removed from every listed long
+   tool — `LONG_TOOLS` in `src/lib/longTools.ts` and `tools/long-handlers.json`:
+   - full: `GetWhereUsed`, `SearchObject`, `GetPackageContents`, `GetPackageTree`,
+     `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `RuntimeListFeeds`,
+     `ListTransports`, `GetSqlQuery`, `GetTableContents`, `GetObjectInfo`, `DescribeByList`,
+     `GetATCFindings`, `ListATCResults`, `GetATCResult`, `RuntimeGetProfilerTraceData`,
+     `RuntimeAnalyzeProfilerTrace`;
+   - compact: `HandlerWhereUsed`, `HandlerSearch`, `HandlerDumpList`, `HandlerGetData`,
+     `HandlerProfileView`, `HandlerGet`.
+
+   `SearchSource`'s `time_budget_ms`, a deadline inside the server, goes with them (DO11 is
+   decided by this). `timeoutField`, `TIMEOUT_FIELD`, `withLongToolAdvice` and the timed-out
+   answer are removed wherever nothing uses them any more.
+2. **Every listed long tool keeps its own ABAP session** (`runLongCall`,
+   `src/lib/longCall.ts`: its own connection, logged off after the answer). **`SearchSource`
+   goes back onto the list.** It left because the list required `timeout`, and so it holds
+   the instance's main-call queue for its whole scan (the D23a review). The list is about the
+   session, not a timeout.
+3. **`background` on every listed long tool, defaulting to `true`.** The existing mechanism
+   (`src/lib/backgroundRuns/*`, the `IBackgroundRuns` strategy; `GetBackgroundRun`,
+   `ListBackgroundRuns`, `DiscardBackgroundRun`):
+   - a call **without** the argument (or with `background: true`) answers at once with a
+     `run_handle`, and the read runs on its own session;
+   - `background: false` runs in the same call, synchronously, on its own session — today's
+     behaviour minus `timeout`.
+
+   **The code-running tools keep their own default:** `RuntimeRunClass`, `RuntimeRunProgram`
+   and `HandlerProfileRun` take `background` with no default today (without it the call
+   waits). That is unchanged.
+4. **`DiscardBackgroundRun` cancels a running read.**
+   - On a **running** read run (a long tool's), it cancels: the run's own session is logged
+     off, SAP ends the read, and the run's kept answer becomes "cancelled". This is safe
+     because long tools only read.
+   - On a **finished** run, it removes the kept answer, as today.
+   - On a **running code run** (`RuntimeRunClass`, `RuntimeRunProgram`, `HandlerProfileRun`),
+     a started run still runs to its end: discard refuses it while it runs, as today.
+   - The caller check stays: an unknown handle and someone else's handle answer alike, "not
+     available".
+5. **State.** `GetBackgroundRun` answers `running`, `finished` with the answer, or `cancelled`.
+   `ListBackgroundRuns` lists the caller's runs with that state. Both answers gain
+   `cancelled`.
+
+**Files:** `src/lib/longTools.ts`, `tools/long-handlers.json`,
+`src/lib/longCall.ts` (`runLongCall`), `src/lib/backgroundRuns/{tools,run,answers,port,contract}.ts`,
+`src/embeddable/BaseMcpServer.ts` (the background branch of the dispatch),
+`src/lib/handlers/base/BaseHandlerGroup.ts`, `src/handlers/system/readonly/handleSearchSource.ts`
+and `src/lib/search-source/orchestrator.ts` (`time_budget_ms`), each long tool's schema,
+`background-runs-memory/src/InMemoryBackgroundRuns.ts` (the `cancelled` state), the
+listed-schema and surface fixtures, `tools/tool-search.json` (generated), `docs/` tool docs,
+CHANGELOG, MIGRATION-24.0.
+
+**Steps (red first):**
+- [ ] **Step 1: Red tests.**
+  - `'no long tool declares timeout'`: the listed-schema test, on every binary, for every
+    `LONG_TOOLS` entry; `'SearchSource declares no time_budget_ms'`.
+  - `'SearchSource is a long tool and runs on its own connection'`: it is in `LONG_TOOLS`, and
+    on `adtStandIn` its requests go on a session other than the instance's main one, which is
+    logged off after the answer; the main-call queue is free while it runs.
+  - `'a long tool called without background answers a run_handle'`, for each long tool (one
+    test per tool, table-driven over `LONG_TOOLS`): the answer is the handle at once, and the
+    read runs on its own session.
+  - `'background: false answers the result in the call'`, for each long tool: today's answer,
+    on its own session.
+  - `'a code run's background default is unchanged'`: `RuntimeRunClass` without `background`
+    waits for the run, as today.
+  - `'Discard of a running read run cancels it'`: on `adtStandIn` with the read held, the
+    discard sends that session's logoff; `GetBackgroundRun` then answers `cancelled`, and
+    `ListBackgroundRuns` lists it as `cancelled`.
+  - `'Discard of a finished run removes its answer'` (as today).
+  - `'Discard of a running code run is refused'`: `RuntimeRunClass` in the background, still
+    running; the discard is refused and nothing is sent.
+  - `'an unknown and a foreign handle answer alike'`: Get, List and Discard, for a handle that
+    never existed and for another caller's.
+- [ ] **Step 2:** Remove `timeout` (and `time_budget_ms`) from the schemas, handlers and
+  `runLongCall`; remove the timed-out answer and the helpers nothing uses. Put `SearchSource`
+  on the list.
+- [ ] **Step 3:** Give every long tool `background`, default `true`, through the existing
+  background-run port, keeping the code-running tools' own field and default. The
+  background branch of the dispatch runs a long tool on its own session (`runLongCall`), so
+  a background read and a synchronous one share one path.
+- [ ] **Step 4:** Extend the run record with `cancelled`, and `DiscardBackgroundRun`:
+  cancel a running read run (log off its session, mark it `cancelled`), remove a finished
+  one, refuse a running code run. `IBackgroundRuns` gains what the cancel needs, typed in
+  the port's contract; `InMemoryBackgroundRuns` implements it.
+- [ ] **Step 5: Descriptions,** functional only:
+  - each long tool: "Runs on an ABAP session of its own. By default the call answers at once
+    with a run_handle, read with GetBackgroundRun; with background false it answers the
+    result in the call.";
+  - `DiscardBackgroundRun`: "Ends the run named by run_handle: a running read is cancelled
+    and its session logged off; a finished run's answer is removed; a running code run is
+    refused.";
+  - `GetBackgroundRun` / `ListBackgroundRuns`: the states, `cancelled` included.
+
+  Description tests under the functional-descriptions guard; the advice text that went with
+  `timeout` goes.
+- [ ] **Step 6: CHANGELOG and MIGRATION-24.0.**
+  - CHANGELOG: Removed — `timeout` on every long tool, and `SearchSource`'s
+    `time_budget_ms`; Added — `background` on every long tool, `cancelled` in the run
+    answers; Changed — `DiscardBackgroundRun` cancels a running read; `SearchSource` runs on
+    its own session.
+  - **MIGRATION-24.0, breaking:** today a call to a long tool answers its result directly. From
+    24.0.0 a call **without** `background` answers a `run_handle` at once, and the result is
+    read with `GetBackgroundRun`. A caller that wants the result in the call passes
+    `background: false`. `timeout` and `time_budget_ms` are gone. A running read is ended
+    with `DiscardBackgroundRun`. The code-running tools' `background` is unchanged.
+- [ ] **Step 7: Coverage.** The ledger's long-tool keys gain a background case and a
+  `background: false` case in their pins; C16's background-run family gains the cancel case.
+- [ ] **Step 8: Live cases (owed until the systems are restored),** on both systems: a
+  background `GetSqlQuery` or `SearchSource`, cancelled by `DiscardBackgroundRun` mid-run;
+  `GetBackgroundRun` answers `cancelled`; the run's session is gone afterwards (its logoff
+  answered).
+- [ ] **Step 9:** Commit.
 
 ### Defect-stage owner decisions (decided 2026-11-04)
 
@@ -2697,9 +2811,8 @@ The choice is the owner's. D23's steps do not touch either field until it is mad
 - **DO8:** the outline tool is `GetObjectOutline`.
 - **DO10 (#25):** `content_uri` comes from the object's version list and is read as given;
   the version tools' contracts do not change.
-- **DO11 (open, D23):** `SearchSource`'s `time_budget_ms` and `timeout` — keep as named
-  exceptions, remove in favour of `start_at` / `max_objects` paging, or keep only the
-  consumer's abort.
+- **DO11 (decided, D24):** `SearchSource`'s `time_budget_ms` and `timeout` are removed with every
+  long tool's `timeout`; a running read is ended by `DiscardBackgroundRun`.
 - **DO9:** the prose guard recognises SAP-derived values by type and flow, with no allowlist;
   values that cross modules are left to review.
 

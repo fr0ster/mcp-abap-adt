@@ -28,6 +28,7 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 
 ### Changed — for an embedder of `@mcp-abap-adt/lib/config`
 
+- **`ShutdownProcess` is now `{ on, stdin?, stdout? }`** (`@mcp-abap-adt/lib/state`), and every `processLike` option (`LauncherEdges`, the HTTP and SSE launchers' and `installTransportShutdown`'s) takes it; `processEdges()` hands the process's `on`, `stdin` and `stdout`, not `process` itself. **Migrating:** nothing — an object that is structurally wider, `process` or an `EventEmitter` included, still fits.
 - **`parseConfigArg()` without an argument reads the program's arguments** (`process.argv.slice(2)`); it read the whole `process.argv`, so a script path starting with `--conf` was taken for the option. **Migrating:** nothing, unless you relied on that; a call that passes `argv` reads what it is given, as before.
 
 ### Removed — breaking for an embedder of `@mcp-abap-adt/lib/utils`

@@ -4,7 +4,6 @@
  * broker, no store, no login. The tools are the `ToolSet` the command passes.
  */
 
-import type { EventEmitter } from 'node:events';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import {
   answerVersionOrHelp,
@@ -20,7 +19,10 @@ import {
 } from '@mcp-abap-adt/lib/embeddable';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
+import {
+  type ShutdownProcess,
+  stderrStateLogger,
+} from '@mcp-abap-adt/lib/state';
 import {
   fullToolSet,
   registryOf,
@@ -59,7 +61,7 @@ export interface HttpLauncherDeps {
   stderr: (line: string) => void;
   exit: (code: number) => void;
   /** Where the shutdown listens: `process` in the program. */
-  processLike: EventEmitter;
+  processLike: ShutdownProcess;
 }
 
 const HELP_SECTIONS = `

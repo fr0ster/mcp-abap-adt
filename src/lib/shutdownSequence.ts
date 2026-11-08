@@ -36,7 +36,6 @@
  * Nothing is written to stdout, and no line carries an error's message.
  */
 
-import type { EventEmitter } from 'node:events';
 import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
 import { forceClose, logoffsAnswered } from './ownedConnections';
@@ -62,11 +61,22 @@ export async function logOffAtOnce(): Promise<void> {
   await logoffsAnswered();
 }
 
-/** What the shutdown listens on: the process, or a test's stand-in. */
-export type ShutdownProcess = EventEmitter & {
-  stdin?: EventEmitter;
-  stdout?: EventEmitter;
-};
+/** A stream the shutdown watches: it only registers listeners on it. */
+export interface ShutdownStream {
+  on(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+/**
+ * What the shutdown listens on: the process (`processEdges()` hands its
+ * `on`, `stdin` and `stdout`), or a test's stand-in. The shutdown only
+ * registers listeners, so an object that is structurally wider — `process`
+ * itself, an `EventEmitter` — fits.
+ */
+export interface ShutdownProcess {
+  on(event: string, listener: (...args: unknown[]) => void): void;
+  stdin?: ShutdownStream | undefined;
+  stdout?: ShutdownStream | undefined;
+}
 
 /**
  * The signals that start the orderly shutdown (a second one forces it):

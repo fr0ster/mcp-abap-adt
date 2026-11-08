@@ -19,6 +19,7 @@ import {
   recorded,
   runTool,
   temporaryDir,
+  writeAt,
 } from './toolRuns';
 
 const scratch = temporaryDir('npm-test-');
@@ -299,6 +300,203 @@ describe('npm test', () => {
       run.stdout,
     );
     assert.deepEqual(recorded(record), ['jest']);
+  });
+
+  describe('every Jest positional decides the by-path mode', () => {
+    const sources = {
+      'fix/src/__tests__/first.test.ts': jestSource('alpha', 'FAIL_ALPHA'),
+      'fix/src/__tests__/secondSuite.test.ts': jestSource('beta', 'FAIL_BETA'),
+    };
+    // No character of this directory means anything to a pattern.
+    const plain = fixtureRepo(
+      path.join(scratch.dir, 'positionals'),
+      [],
+      sources,
+    );
+    const plainRoot = path.join(plain, 'fix', 'src');
+    // The `+` is what a regular expression reads as a quantifier: a file of
+    // this directory that runs ran by path, not as a pattern.
+    const quantified = fixtureRepo(
+      path.join(scratch.dir, 'positionals+'),
+      [],
+      sources,
+    );
+    const root = path.join(quantified, 'fix', 'src');
+    const first = path.join(root, '__tests__', 'first.test.ts');
+
+    it('a named existing Jest file beside a pattern: both are patterns', () => {
+      // By path, Jest would read `secondSuite` as a file and run nothing of
+      // it. The named file is written relative and with `/`, a pattern that
+      // matches it on every platform.
+      const named = path
+        .relative(REPO, path.join(plainRoot, '__tests__', 'first.test.ts'))
+        .split(path.sep)
+        .join('/');
+      const record = path.join(scratch.dir, 'positionals-pattern.record');
+      const run = runTool(
+        'npm-test.mjs',
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          plain,
+          '--roots',
+          plainRoot,
+          named,
+          'secondSuite',
+        ],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(recorded(record).sort(), ['alpha', 'beta']);
+    });
+
+    it('a pattern beside --roots is a pattern, not a root', () => {
+      // Jest's `--roots=<dir>` takes every value after it: a pattern handed
+      // to Jest after it would be one more root, and every file would run.
+      const record = path.join(scratch.dir, 'positionals-root.record');
+      const run = runTool(
+        'npm-test.mjs',
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          plain,
+          '--roots',
+          plainRoot,
+          'secondSuite',
+        ],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(recorded(record), ['beta']);
+    });
+
+    const options = [
+      ['-t', 'alpha'],
+      ['--testNamePattern', 'alpha'],
+      ['--testNamePattern=alpha'],
+      ['--test-name-pattern', 'alpha'],
+    ];
+    for (const [index, option] of options.entries()) {
+      it(`${option.join(' ')} beside a named file: by path, the value no positional`, () => {
+        // Were the value a positional, it would name no file, the mode would
+        // be patterns, and the path with its `+` would match nothing.
+        const record = path.join(
+          scratch.dir,
+          `positionals-option-${index}.record`,
+        );
+        const run = runTool(
+          'npm-test.mjs',
+          [
+            '--concurrency',
+            '1',
+            '--repo',
+            quantified,
+            '--roots',
+            root,
+            ...option,
+            first,
+          ],
+          environment({ RECORD: record }),
+        );
+        assert.equal(run.status, 0, run.stdout + run.stderr);
+        assert.deepEqual(recorded(record), ['alpha']);
+      });
+    }
+
+    it('an unknown option is refused, nothing run', () => {
+      const record = path.join(scratch.dir, 'positionals-unknown.record');
+      const run = runTool(
+        'npm-test.mjs',
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          quantified,
+          '--roots',
+          root,
+          '--noSuchOption',
+          first,
+        ],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 1, run.stdout + run.stderr);
+      assert.ok(
+        run.stderr.includes('npm-test: --noSuchOption is not a Jest option'),
+        run.stderr,
+      );
+      assert.deepEqual(recorded(record), []);
+    });
+  });
+
+  describe("a file named by path obeys Jest's roots and ignores", () => {
+    // Jest runs over a configuration built by the repository's own
+    // `jestConfig` from a fixture list: the live suites' directories ignored
+    // as in `jest.config.js`, and the fixture list's files ignored as the
+    // repository's are. The tool's own list (the fixture repository's) is
+    // empty, so every named file reaches Jest, by path.
+    const repo = fixtureRepo(path.join(scratch.dir, 'by-path+'), [], {
+      'in/src/__tests__/kept.test.ts': jestSource('kept', 'FAIL_KEPT'),
+      'in/src/__tests__/integration/live.test.ts': jestSource(
+        'live',
+        'FAIL_LIVE',
+      ),
+      'in/src/__tests__/listed.test.ts': jestSource('listed', 'FAIL_LISTED'),
+      'out/src/__tests__/outside.test.ts': jestSource(
+        'outside',
+        'FAIL_OUTSIDE',
+      ),
+    });
+    const root = path.join(repo, 'in', 'src');
+    const kept = path.join(root, '__tests__', 'kept.test.ts');
+    const listedFile = path.join(root, '__tests__', 'listed.test.ts');
+    const jestList = writeAt(
+      repo,
+      'jest-list.json',
+      JSON.stringify([
+        path.relative(REPO, listedFile).split(path.sep).join('/'),
+      ]),
+    );
+    const config = writeAt(
+      repo,
+      'jest.config.js',
+      `module.exports = require(${JSON.stringify(path.join(REPO, 'jest.config.js'))}).jestConfig(${JSON.stringify(jestList)});\n`,
+    );
+    const cases: Array<[string, string]> = [
+      [
+        'outside every root',
+        path.join(repo, 'out', 'src', '__tests__', 'outside.test.ts'),
+      ],
+      [
+        'under an ignored live directory',
+        path.join(root, '__tests__', 'integration', 'live.test.ts'),
+      ],
+      ['on the node:test list', listedFile],
+    ];
+    for (const [index, [where, file]] of cases.entries()) {
+      it(`a named file ${where} runs nothing`, () => {
+        const record = path.join(scratch.dir, `by-path-${index}.record`);
+        const run = runTool(
+          'npm-test.mjs',
+          [
+            '--concurrency',
+            '1',
+            '--repo',
+            repo,
+            '--roots',
+            root,
+            kept,
+            file,
+            '--config',
+            config,
+          ],
+          environment({ RECORD: record }),
+        );
+        assert.equal(run.status, 0, run.stdout + run.stderr);
+        assert.deepEqual(recorded(record), ['kept']);
+      });
+    }
   });
 
   describe('a filtered run succeeds on both runners', () => {

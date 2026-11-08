@@ -111,12 +111,22 @@ first fails, and `npm test` fails when either does.
   `npm test` passes `1`, today's in-band behaviour, until the figures are measured.
 - **Variables without a shell.** `--env NAME=VALUE` sets a variable for the run on every
   platform.
-- **Selecting files.** `npm test -- <path>.test.ts` sends a listed file to the runner and any
-  other to Jest — as exact paths (`--runTestsByPath`) when every named `….test.ts` is an existing
-  file, else as Jest's patterns, as before (Jest reads all its positional arguments one way); a runner, or Jest, given none of the named files is skipped. `--roots <dir>`
-  (the sub-packages' `npm test`) selects that root on both runners; a root with no listed file
-  runs Jest alone, with a line saying the runner was skipped. With `--roots`, a named file outside
-  every root runs on neither runner. Other arguments are Jest's.
+- **Selecting files.** `npm test -- <path>.test.ts` sends a listed file to the runner; every other
+  positional argument (a file or a pattern) goes to Jest — as exact paths (`--runTestsByPath`)
+  when every one of them is an existing file, else all as Jest's patterns, as before (Jest reads
+  all its positional arguments one way). A runner, or Jest, given none of the named files is
+  skipped. By path, Jest's `--roots`, `testMatch` and `testPathIgnorePatterns` still apply: a
+  named file outside every root, under an ignored live directory or on the node:test list does
+  not run under Jest. `--roots <dir>` (the sub-packages' `npm test`) selects that root on both
+  runners; a root with no listed file runs Jest alone, with a line saying the runner was skipped.
+  With `--roots`, a named file outside every root runs on neither runner.
+- **Jest's options.** Other options are Jest's, read as Jest reads them, from Jest's own option
+  table (`jest-cli`'s `yargsOptions`): an option's value is never taken for a file or a pattern
+  (`-t <name>`, `--config <file>`, `--testNamePattern=<x>`), and an array option
+  (`--reporters`, `--testPathIgnorePatterns`, …) takes every argument after it up to the next
+  option, as in Jest — so name files and patterns before such an option. An option Jest does not
+  know is refused before anything runs, and so is a group of short options whose letters before
+  the last take a value (`-tx`; write `-t x`).
 - **One list, one guard.** A file is on the list or found by Jest, never both and never neither
   (`src/__tests__/unit/runner/partition.test.ts`, which reads Jest's discovery by
   `jest --listTests --json` over its configuration without the live suites' ignores, until

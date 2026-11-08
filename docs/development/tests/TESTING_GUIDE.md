@@ -89,6 +89,11 @@ npm --prefix http test          # http's own suites (its exports), from the repo
 
 A package's `test:check` still type-checks its tests against its own `tsconfig.test.json`.
 
+**Node for the tests: 22.15 or later.** The files on node:test load the same names through a
+resolve hook registered with `module.registerHooks`, which Node has since 22.15. The package's
+`engines` (`>=22.0.0`) is what the server needs to run and is unchanged; developing and running
+the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
+
 ### The install matrix (`SKIP_INSTALL_MATRIX`)
 
 `src/__tests__/unit/installMatrix.test.ts` proves that every server process loads one copy of

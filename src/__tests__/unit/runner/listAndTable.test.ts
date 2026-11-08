@@ -185,7 +185,12 @@ describe('one list, one name table', () => {
     for (const [name, target] of table) {
       const resolved = ts.resolveModuleName(name, from, parsed.options, ts.sys)
         .resolvedModule?.resolvedFileName;
-      expect([name, resolved]).toEqual([name, path.join(REPO, target)]);
+      // TypeScript answers `/` separators on every platform; `path.normalize`
+      // gives the platform's own, as `path.join` does.
+      expect([
+        name,
+        resolved === undefined ? undefined : path.normalize(resolved),
+      ]).toEqual([name, path.join(REPO, target)]);
     }
   });
 

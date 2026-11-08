@@ -1,64 +1,74 @@
 /**
  * Files production code reads beside itself (D27, spec §2): production code
- * that reads a repository file by its own location — `require('<relative>')`
- * of a file that is not code, or `__dirname` joined or resolved with literal
- * parts — finds it in the test build, because the node:test build places it
- * there from one list (`tools/node-test-placed.json`). The guard reads every
- * production source with the TypeScript parser and fails on a read the list
- * does not place, on a read whose target it cannot state, and on an entry no
- * read needs. The build's placement itself is `build.test.ts`'s.
+ * that reads a repository file by its own location finds it in the test
+ * build, because the node:test build places it there from one list
+ * (`tools/node-test-placed.json`). The guard reads the production program
+ * through the TypeScript checker (`locationReads.ts` states what it follows
+ * and what it refuses) and fails on a read the list does not place, on any
+ * way to the module's location whose target it cannot state, and on an entry
+ * no read needs. The build's placement itself is `build.test.ts`'s.
+ *
+ * Each fixture is a small production tree under a temporary repository,
+ * read as the repository's own sources are: one refused form per case, and a
+ * clean counter-example beside them.
  */
 import assert from 'node:assert/strict';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import {
+  type LocationReads,
   locationReads,
+  OWNER_GRANTED_FILE,
   PLACED_LIST,
   placementFindings,
-  productionSourceDirs,
+  productionProgram,
+  productionSources,
+  programOver,
   readPlaced,
+  WHY,
 } from './locationReads';
 import { REPO, temporaryDir, writeAt } from './toolRuns';
 
 const scratch = temporaryDir('placed-files-');
 after(() => scratch.remove());
 
-/**
- * `<source>: <why>` → why that finding reads no file. An entry that matches
- * no finding fails too, so the list cannot rot.
- */
-const NOT_READS: ReadonlyMap<string, string> = new Map([
-  [
-    'src/lib/instance.ts: __filename, a location the scan does not resolve',
-    'the registering copy is only shown, never resolved, read or compared (the module says so)',
-  ],
-]);
+let fixtures = 0;
 
-/** The findings of a fixture repository, as `<line>: <why>` per source. */
-function unstatedOf(repo: string): string[] {
-  return locationReads(repo, [path.join(repo, 'pkg', 'src')]).unstated.map(
-    (finding) => `${finding.by}:${finding.line}: ${finding.why}`,
+/** A fixture repository holding `files` (path → lines), scanned under `dir`. */
+function scan(
+  files: Readonly<Record<string, readonly string[]>>,
+  dir = 'pkg/src',
+): {
+  reads: LocationReads;
+  unstated: string[];
+} {
+  fixtures += 1;
+  const repo = path.join(scratch.dir, `repo-${fixtures}`);
+  for (const [file, lines] of Object.entries(files)) {
+    writeAt(repo, file, [...lines, ''].join('\n'));
+  }
+  const sources = productionSources(path.join(repo, ...dir.split('/')));
+  const reads = locationReads(
+    repo,
+    programOver(path.join(REPO, 'tsconfig.json'), sources),
+    sources,
   );
+  return {
+    reads,
+    unstated: reads.unstated.map(
+      (finding) => `${finding.by}:${finding.line}: ${finding.why}`,
+    ),
+  };
 }
+
+const FS = "import { readdirSync, readFileSync } from 'node:fs';";
+const PATH = "import * as path from 'node:path';";
 
 describe('files production code reads beside itself', () => {
   it('the list places exactly the files production code reads by its location', () => {
-    const reads = locationReads(REPO, productionSourceDirs(REPO));
-    const allowed = reads.unstated.filter((finding) =>
-      NOT_READS.has(`${finding.by}: ${finding.why}`),
-    );
-    assert.deepEqual(
-      reads.unstated.filter((finding) => !allowed.includes(finding)),
-      [],
-    );
-    assert.deepEqual(
-      [...NOT_READS.keys()].filter(
-        (key) =>
-          !allowed.some((finding) => `${finding.by}: ${finding.why}` === key),
-      ),
-      [],
-      'an entry of NOT_READS matches no finding',
-    );
+    const { program, sources } = productionProgram(REPO);
+    const reads = locationReads(REPO, program, sources);
+    assert.deepEqual(reads.unstated, []);
     assert.ok(reads.targets.length > 0, 'no read found');
     assert.deepEqual(
       placementFindings(reads, readPlaced(REPO)),
@@ -68,42 +78,29 @@ describe('files production code reads beside itself', () => {
   });
 
   it('a read the list places passes; one it does not place, and an entry no read needs, fail', () => {
-    const repo = path.join(scratch.dir, 'reads');
-    writeAt(repo, 'pkg/package.json', '{}\n');
-    writeAt(repo, 'tools/table.json', '[]\n');
-    writeAt(
-      repo,
-      'pkg/src/version.ts',
-      [
-        "import { readFileSync } from 'node:fs';",
-        "import { join } from 'node:path';",
-        "export const V = readFileSync(join(__dirname, '..', 'package.json'), 'utf8');",
-        '',
-      ].join('\n'),
-    );
-    writeAt(
-      repo,
-      'pkg/src/table.ts',
-      [
+    const { reads, unstated } = scan({
+      'pkg/package.json': ['{}'],
+      'tools/table.json': ['[]'],
+      'pkg/src/version.ts': [
+        FS,
+        PATH,
+        "export const V = readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8');",
+      ],
+      'pkg/src/table.ts': [
         "export const T: unknown = require('../../tools/table.json');",
         // Code is compiled, not placed.
         "export const C: unknown = require('./version');",
-        '',
-      ].join('\n'),
-    );
-    // A test reads its data from the repository: never a production read.
-    writeAt(
-      repo,
-      'pkg/src/__tests__/data.test.ts',
-      "export const D: unknown = require('../../../tools/table.json');\n",
-    );
-    const reads = locationReads(repo, [path.join(repo, 'pkg', 'src')]);
-    assert.deepEqual(unstatedOf(repo), []);
+      ],
+      // A test reads its data from the repository: never a production read.
+      'pkg/src/__tests__/data.test.ts': [
+        "export const D: unknown = require('../../../tools/table.json');",
+      ],
+    });
+    assert.deepEqual(unstated, []);
     assert.deepEqual(reads.targets, [
       { target: 'pkg/package.json', by: 'pkg/src/version.ts' },
       { target: 'tools/table.json', by: 'pkg/src/table.ts' },
     ]);
-
     assert.deepEqual(
       placementFindings(reads, ['pkg/package.json', 'tools/table.json']),
       [],
@@ -119,180 +116,425 @@ describe('files production code reads beside itself', () => {
       ]),
       ['tools/other.json: placed, read by no production code'],
     );
+    // A listed directory places what is under it.
+    assert.deepEqual(placementFindings(reads, ['pkg', 'tools']), []);
   });
 
-  it('a read whose target it cannot state fails', () => {
-    const repo = path.join(scratch.dir, 'unstated');
-    writeAt(
-      repo,
-      'pkg/src/dynamic.ts',
-      [
-        "import { readFileSync } from 'node:fs';",
-        "import { join } from 'node:path';",
-        "const name = 'package.json';",
-        'export const A = readFileSync(join(__dirname, name));',
-        'export const B = readFileSync(__dirname);',
-        '',
-      ].join('\n'),
+  describe('every way to the module location the scan does not resolve is refused', () => {
+    const refusedForm = (name: string, lines: readonly string[], why: string) =>
+      it(name, () => {
+        const { unstated } = scan({ 'pkg/src/form.ts': lines });
+        assert.ok(
+          unstated.some((finding) => finding.endsWith(`: ${why}`)),
+          unstated.join('\n'),
+        );
+      });
+    refusedForm(
+      'module.filename',
+      ['export const F = module.filename;'],
+      WHY.module,
     );
-    assert.deepEqual(
-      locationReads(repo, [path.join(repo, 'pkg', 'src')]).targets,
-      [],
+    refusedForm(
+      "module['require']",
+      ["export const R: unknown = module['require']('./x.json');"],
+      WHY.module,
     );
-    assert.deepEqual(unstatedOf(repo), [
-      'pkg/src/dynamic.ts:4: __dirname not joined with literal parts',
-      'pkg/src/dynamic.ts:5: __dirname not joined with literal parts',
-    ]);
-  });
-
-  it('every location mechanism the scan does not resolve is refused', () => {
-    const repo = path.join(scratch.dir, 'mechanisms');
-    writeAt(
-      repo,
-      'pkg/src/mechanisms.ts',
+    refusedForm(
+      'a destructured module',
+      ['const { filename } = module;', 'export const F = filename;'],
+      WHY.module,
+    );
+    refusedForm(
+      'process.argv[1]',
+      ['export const P = process.argv[1];'],
+      WHY.argv,
+    );
+    refusedForm(
+      'process.argv as a value',
+      ['const args = process.argv;', 'export const P = args[1];'],
+      WHY.argv,
+    );
+    refusedForm(
+      'a destructured process',
+      ['const { argv } = process;', 'export const P = argv[1];'],
+      WHY.process,
+    );
+    refusedForm(
+      'process.mainModule',
+      ['export const M = process.mainModule;'],
+      WHY.mainModule,
+    );
+    refusedForm(
+      'process handed to a type that has argv',
       [
-        "import { readFileSync } from 'node:fs';",
-        "import { createRequire } from 'node:module';",
-        "import * as path from 'node:path';",
-        "import { fileURLToPath } from 'node:url';",
-        "export const A = require.resolve('./x.json');",
+        'function inspect(p: NodeJS.Process): string | undefined { return p.argv[1]; }',
+        'export const I = inspect(process);',
+      ],
+      WHY.process,
+    );
+    refusedForm(
+      'require.resolve',
+      ["export const A = require.resolve('./x.json');"],
+      WHY.require,
+    );
+    refusedForm(
+      'require of a computed name',
+      ["const name = './x.json';", 'export const F: unknown = require(name);'],
+      WHY.require,
+    );
+    refusedForm(
+      'require held as a value',
+      ['const r = require;', "export const H: unknown = r('./x.json');"],
+      WHY.require,
+    );
+    refusedForm(
+      'import() of a computed name',
+      ["const name = './x.json';", 'export const G = import(name);'],
+      WHY.importCall,
+    );
+    refusedForm(
+      'new URL(…, import.meta.url)',
+      [
+        FS,
         "export const B = readFileSync(new URL('./x.json', import.meta.url));",
-        'export const C = path.dirname(fileURLToPath(import.meta.url));',
-        "export const D = readFileSync(path.join(__filename, '..', 'x.json'));",
-        'const load = createRequire(C);',
-        "export const E: unknown = load('./x.json');",
-        "const name = './x.json';",
-        'export const F: unknown = require(name);',
-        'export const G = import(name);',
-        'const r = require;',
-        "export const H: unknown = r('./x.json');",
-        '',
-      ].join('\n'),
+      ],
+      WHY.importMeta,
     );
-    assert.deepEqual(unstatedOf(repo), [
-      'pkg/src/mechanisms.ts:2: createRequire, a location the scan does not resolve',
-      'pkg/src/mechanisms.ts:5: require not called with one literal',
-      'pkg/src/mechanisms.ts:6: import.meta, a location the scan does not resolve',
-      'pkg/src/mechanisms.ts:7: import.meta, a location the scan does not resolve',
-      'pkg/src/mechanisms.ts:8: __filename, a location the scan does not resolve',
-      'pkg/src/mechanisms.ts:9: createRequire, a location the scan does not resolve',
-      'pkg/src/mechanisms.ts:12: require not called with one literal',
-      'pkg/src/mechanisms.ts:13: import() not called with one literal',
-      'pkg/src/mechanisms.ts:14: require not called with one literal',
-    ]);
+    refusedForm(
+      'createRequire',
+      [
+        "import { createRequire } from 'node:module';",
+        "export const E: unknown = createRequire('/x')('./x.json');",
+      ],
+      WHY.createRequire,
+    );
+    refusedForm(
+      'createRequire renamed',
+      [
+        "import { createRequire as make } from 'node:module';",
+        "export const E: unknown = make('/x')('./x.json');",
+      ],
+      WHY.createRequire,
+    );
+    refusedForm(
+      'Module.createRequire',
+      [
+        "import Module from 'node:module';",
+        "export const E: unknown = Module.createRequire('/x')('./x.json');",
+      ],
+      WHY.createRequire,
+    );
+    refusedForm(
+      '__filename read whole',
+      [FS, 'export const S = readFileSync(__filename);'],
+      WHY.ownFile,
+    );
+    refusedForm(
+      '__dirname read whole',
+      [FS, 'export const S = readdirSync(__dirname);'],
+      WHY.ownFile,
+    );
+    refusedForm(
+      '__filename kept in an object (as src/lib/instance.ts does)',
+      [
+        "export const I = { file: typeof __filename === 'string' ? __filename : 'bundled' };",
+      ],
+      WHY.unfollowed,
+    );
+
+    it('clean: what reads no location, and what the scan resolves', () => {
+      const { reads, unstated } = scan({
+        'pkg/x.json': ['{}'],
+        'pkg/src/clean.ts': [
+          FS,
+          PATH,
+          "export const stdio = process.argv.includes('--stdio');",
+          'export const rest = process.argv.slice(2);',
+          'export const first = process.argv[2];',
+          "export const env = process.env['HOME'];",
+          'function listen(on: { exitCode?: number | string | undefined }): void { void on; }',
+          'listen(process);',
+          "export const kind = typeof __filename === 'string';",
+          "export const S = readFileSync(path.join(__filename, '..', '..', 'x.json'));",
+          "export const T: unknown = require('node:path');",
+        ],
+      });
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, [
+        { target: 'pkg/x.json', by: 'pkg/src/clean.ts' },
+      ]);
+    });
   });
 
-  it('a path from __dirname is followed through its bindings to what is read', () => {
-    const repo = path.join(scratch.dir, 'bindings');
-    writeAt(repo, 'pkg/package.json', '{}\n');
-    writeAt(repo, 'pkg/fixtures/a.json', '"a"\n');
-    writeAt(
-      repo,
-      'pkg/src/bound.ts',
-      [
-        "import { readdirSync, readFileSync } from 'node:fs';",
-        "import { join } from 'node:path';",
-        // Literal parts on a binding: the file read is the target, not the base.
-        "const base = join(__dirname, '..');",
-        "export const V = readFileSync(join(base, 'package.json'), 'utf8');",
-        // A computed part on a directory: the directory is placed whole.
-        "export const FIXTURES = join(__dirname, '..', 'fixtures');",
-        'export function read(name: string): string {',
-        "  return readFileSync(join(FIXTURES, `${name}.json`), 'utf8');",
-        '}',
-        'export const ALL = readdirSync(FIXTURES);',
-        '',
-      ].join('\n'),
-    );
-    // Another production file reads under the exported directory.
-    writeAt(
-      repo,
-      'pkg/src/user.ts',
-      [
-        "import { readFileSync } from 'node:fs';",
-        "import { join } from 'node:path';",
-        "import { FIXTURES as here } from './bound';",
-        'export const U = (name: string) => readFileSync(join(here, name));',
-        '',
-      ].join('\n'),
-    );
-    const reads = locationReads(repo, [path.join(repo, 'pkg', 'src')]);
-    assert.deepEqual(unstatedOf(repo), []);
-    assert.deepEqual(reads.targets, [
-      { target: 'pkg/fixtures', by: 'pkg/src/bound.ts' },
-      { target: 'pkg/package.json', by: 'pkg/src/bound.ts' },
-    ]);
+  describe("the owner's exception: src/lib/instance.ts's display-only __filename", () => {
+    const SHAPE =
+      "  file: typeof __filename === 'string' ? __filename : 'bundled',";
+    it('clean: the exact shape at its site', () => {
+      const { reads, unstated } = scan(
+        { [OWNER_GRANTED_FILE]: ['export const I = {', SHAPE, '};'] },
+        'src',
+      );
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, []);
+    });
+    it('another use of __filename in that file is refused', () => {
+      const { unstated } = scan(
+        {
+          [OWNER_GRANTED_FILE]: [
+            FS,
+            'export const I = {',
+            SHAPE,
+            '};',
+            'export const S = readFileSync(__filename);',
+          ],
+        },
+        'src',
+      );
+      assert.deepEqual(unstated, [`${OWNER_GRANTED_FILE}:5: ${WHY.ownFile}`]);
+    });
+    it('a variant of the shape is refused', () => {
+      const { unstated } = scan(
+        {
+          [OWNER_GRANTED_FILE]: [
+            'export const I = {',
+            "  file: typeof __filename === 'string' ? __filename : 'elsewhere',",
+            '};',
+          ],
+        },
+        'src',
+      );
+      assert.deepEqual(unstated, [
+        `${OWNER_GRANTED_FILE}:2: ${WHY.unfollowed}`,
+      ]);
+    });
+    it('the shape in another file is refused', () => {
+      const { unstated } = scan(
+        { 'src/lib/other.ts': ['export const I = {', SHAPE, '};'] },
+        'src',
+      );
+      assert.deepEqual(unstated, [`src/lib/other.ts:2: ${WHY.unfollowed}`]);
+    });
   });
 
-  it('a path from __dirname the scan cannot follow is refused', () => {
-    const repo = path.join(scratch.dir, 'unfollowed');
-    writeAt(repo, 'pkg/package.json', '{}\n');
-    writeAt(
-      repo,
-      'pkg/src/lost.ts',
+  describe('a computed part is taken only when it cannot leave its base', () => {
+    const files = (read: string): Record<string, readonly string[]> => ({
+      'pkg/fixtures/a.json': ['"a"'],
+      'pkg/fixtures/b.json': ['"b"'],
+      'pkg/src/under.ts': [
+        FS,
+        PATH,
+        "const base = path.join(__dirname, '..', 'fixtures');",
+        read,
+      ],
+    });
+    const refusedPart = (name: string, read: string, why: string) =>
+      it(name, () => {
+        const { unstated } = scan(files(read));
+        assert.deepEqual(unstated, [`pkg/src/under.ts:4: ${why}`]);
+      });
+    refusedPart(
+      'a string part',
+      'export const R = (name: string) => readFileSync(path.join(base, name));',
+      WHY.computedUnbounded('pkg/fixtures'),
+    );
+    refusedPart(
+      'a template part',
+      'export const R = (name: string) => readFileSync(path.join(base, `${name}.json`));',
+      WHY.computedUnbounded('pkg/fixtures'),
+    );
+    refusedPart(
+      'a literal-typed part that climbs',
+      "export const R = (up: '../a.json') => readFileSync(path.join(base, up));",
+      WHY.computedUnbounded('pkg/fixtures'),
+    );
+    refusedPart(
+      'a literal-typed absolute part',
+      "export const R = (at: '/etc/a.json') => readFileSync(path.join(base, at));",
+      WHY.computedUnbounded('pkg/fixtures'),
+    );
+    refusedPart(
+      'any computed part under resolve',
+      "export const R = (name: 'a.json') => readFileSync(path.resolve(base, name));",
+      WHY.computedResolve,
+    );
+
+    it('a literal part that climbs is stated, and placed only by its own entry', () => {
+      const { reads, unstated } = scan(
+        files("export const R = readFileSync(path.join(base, '../x.json'));"),
+      );
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, [
+        { target: 'pkg/x.json', by: 'pkg/src/under.ts' },
+      ]);
+      assert.deepEqual(placementFindings(reads, ['pkg/fixtures']), [
+        'pkg/x.json: read by pkg/src/under.ts, not placed',
+        'pkg/fixtures: placed, read by no production code',
+      ]);
+    });
+
+    it('clean: a part bounded to literals is followed to each of them', () => {
+      const { reads, unstated } = scan(
+        files(
+          "export const R = (name: 'a.json' | 'b.json') => readFileSync(path.join(base, name));",
+        ),
+      );
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, [
+        { target: 'pkg/fixtures/a.json', by: 'pkg/src/under.ts' },
+        { target: 'pkg/fixtures/b.json', by: 'pkg/src/under.ts' },
+      ]);
+    });
+  });
+
+  describe('a location is followed through every export, by symbol', () => {
+    const exporter: Record<string, readonly string[]> = {
+      'pkg/fixtures/a.json': ['"a"'],
+      'pkg/src/dir.ts': [
+        PATH,
+        "export const DIR = path.join(__dirname, '..', 'fixtures');",
+        'export default DIR;',
+      ],
+      'pkg/src/reexport.ts': ["export { DIR as HERE } from './dir.js';"],
+      'pkg/src/star.ts': ["export * from './reexport';"],
+    };
+    const refusedThrough = (name: string, lines: readonly string[]) =>
+      it(name, () => {
+        const { unstated } = scan({ ...exporter, 'pkg/src/user.ts': lines });
+        assert.deepEqual(unstated, [
+          `pkg/src/user.ts:4: ${WHY.computedUnbounded('pkg/fixtures')}`,
+        ]);
+      });
+    refusedThrough('a re-export chain with .js specifiers', [
+      FS,
+      PATH,
+      "import { HERE } from './star.js';",
+      'export const U = (name: string) => readFileSync(path.join(HERE, name));',
+    ]);
+    refusedThrough('a default export', [
+      FS,
+      PATH,
+      "import Dir from './dir';",
+      'export const U = (name: string) => readFileSync(path.join(Dir, name));',
+    ]);
+    refusedThrough('a namespace import', [
+      FS,
+      PATH,
+      "import * as dir from './dir';",
+      'export const U = (name: string) => readFileSync(path.join(dir.DIR, name));',
+    ]);
+
+    it('clean: a literal read through the chain is its target', () => {
+      const { reads, unstated } = scan({
+        ...exporter,
+        'pkg/src/user.ts': [
+          FS,
+          PATH,
+          "import { HERE } from './star.js';",
+          "export const U = readFileSync(path.join(HERE, 'a.json'));",
+        ],
+      });
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, [
+        { target: 'pkg/fixtures', by: 'pkg/src/dir.ts' },
+        { target: 'pkg/fixtures/a.json', by: 'pkg/src/user.ts' },
+      ]);
+    });
+  });
+
+  describe('callees and references are resolved by symbol, not by name', () => {
+    it('a join of its own is not the one of node:path', () => {
+      const { unstated } = scan({
+        'pkg/src/own.ts': [
+          'function join(a: string, b: string): string { return a + b; }',
+          "export const J = join(__dirname, 'x.json');",
+        ],
+      });
+      assert.deepEqual(unstated, [`pkg/src/own.ts:2: ${WHY.call}`]);
+    });
+
+    it('a destructured join is not followed', () => {
+      const { unstated } = scan({
+        'pkg/src/own.ts': [
+          PATH,
+          'const { join } = path;',
+          "export const J = join(__dirname, 'x.json');",
+        ],
+      });
+      assert.deepEqual(unstated, [`pkg/src/own.ts:3: ${WHY.call}`]);
+    });
+
+    it('clean: a same-named binding in another scope is another symbol', () => {
+      const { reads, unstated } = scan({
+        'pkg/package.json': ['{}'],
+        'pkg/src/scopes.ts': [
+          FS,
+          PATH,
+          "const base = path.join(__dirname, '..');",
+          "export const V = readFileSync(path.join(base, 'package.json'));",
+          'export function other(name: string): Buffer {',
+          "  const base = '/elsewhere';",
+          '  return readFileSync(path.join(base, name));',
+          '}',
+          // A local __dirname is not the module's.
+          'export function shadow(__dirname: string, name: string): Buffer {',
+          '  return readFileSync(path.join(__dirname, name));',
+          '}',
+        ],
+      });
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, [
+        { target: 'pkg/package.json', by: 'pkg/src/scopes.ts' },
+      ]);
+    });
+  });
+
+  describe('a location bound where the scan cannot follow it is refused', () => {
+    const refusedBinding = (
+      name: string,
+      lines: readonly string[],
+      why: string,
+      line: number,
+    ) =>
+      it(name, () => {
+        const { unstated } = scan({
+          'pkg/package.json': ['{}'],
+          'pkg/src/lost.ts': [FS, PATH, ...lines],
+        });
+        assert.deepEqual(unstated, [`pkg/src/lost.ts:${line}: ${why}`]);
+      });
+    refusedBinding(
+      'a let',
       [
-        "import { readFileSync } from 'node:fs';",
-        "import { join } from 'node:path';",
-        // A computed part on a file: what is read is not stated.
-        "const manifest = join(__dirname, '..', 'package.json');",
-        "export const A = (name: string) => readFileSync(join(manifest, '..', name));",
-        // A binding the scan cannot hold to one value.
-        "let moving = join(__dirname, '..');",
-        "moving = '/elsewhere';",
-        // A path built by text, not by a join.
-        "const dir = join(__dirname, '..');",
+        "let moving = path.join(__dirname, '..');",
+        "moving = '/x';",
+        'export const M = moving;',
+      ],
+      WHY.binding,
+      3,
+    );
+    refusedBinding(
+      'a concatenation',
+      [
+        "const dir = path.join(__dirname, '..');",
         "export const B = readFileSync(dir + '/package.json');",
-        'export const C = { dir };',
-        '',
-      ].join('\n'),
+      ],
+      WHY.unfollowed,
+      4,
     );
-    // An exported location imported as a namespace: its uses are not followed.
-    writeAt(
-      repo,
-      'pkg/src/exported.ts',
+    refusedBinding(
+      'an object',
+      ["const dir = path.join(__dirname, '..');", 'export const C = { dir };'],
+      WHY.unfollowed,
+      4,
+    );
+    refusedBinding(
+      'a computed part on a file',
       [
-        "import { join } from 'node:path';",
-        "export const DIR = join(__dirname, '..');",
-        '',
-      ].join('\n'),
+        "const manifest = path.join(__dirname, '..', 'package.json');",
+        "export const A = (name: string) => readFileSync(path.join(manifest, '..', name));",
+      ],
+      WHY.computedUnbounded('pkg/package.json'),
+      4,
     );
-    writeAt(
-      repo,
-      'pkg/src/namespace.ts',
-      [
-        "import * as exported from './exported';",
-        'export const N = exported;',
-        '',
-      ].join('\n'),
-    );
-    // An exported file imported by name: its uses there are followed too.
-    writeAt(
-      repo,
-      'pkg/src/manifest.ts',
-      [
-        "import { join } from 'node:path';",
-        "export const MANIFEST = join(__dirname, '..', 'package.json');",
-        '',
-      ].join('\n'),
-    );
-    writeAt(
-      repo,
-      'pkg/src/byName.ts',
-      [
-        "import { readFileSync } from 'node:fs';",
-        "import { join } from 'node:path';",
-        "import { MANIFEST } from './manifest';",
-        'export const M = (name: string) => readFileSync(join(MANIFEST, name));',
-        '',
-      ].join('\n'),
-    );
-    assert.deepEqual(unstatedOf(repo), [
-      'pkg/src/byName.ts:4: a computed part joined onto pkg/package.json, which is not a directory',
-      'pkg/src/lost.ts:4: a computed part joined onto pkg/package.json, which is not a directory',
-      'pkg/src/lost.ts:5: a path from __dirname bound by a non-const declaration',
-      'pkg/src/lost.ts:8: a path from __dirname used where the scan cannot follow it',
-      'pkg/src/lost.ts:9: a path from __dirname used where the scan cannot follow it',
-      'pkg/src/namespace.ts:1: a module exporting a path from __dirname imported other than by name',
-    ]);
   });
 });

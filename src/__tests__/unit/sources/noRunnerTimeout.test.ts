@@ -5,8 +5,11 @@
  *
  * - `--test-timeout` in an npm script (node:test's per-test bound);
  * - `{ timeout }` on a `test`, `it`, `describe` / `suite` or hook (`before`,
- *   `after`, `beforeEach`, `afterEach`) in a node:test file, read from the
- *   file's syntax tree with the TypeScript compiler API;
+ *   `after`, `beforeEach`, `afterEach`) in a node:test file, read with the
+ *   TypeScript type checker over a program of those files: a call counts
+ *   when its signature resolves to node:test's declaration, and an argument
+ *   when its type may carry a `timeout` property, an object held in a
+ *   variable included;
  * - `--test-force-exit` in an npm script (node:test's force exit);
  * - `--forceExit` in an npm script (Jest's), except the four pairs the live
  *   scripts carry until they move to node:test (`ALLOWED_FORCE_EXIT`; step
@@ -17,7 +20,7 @@
  * root's and that of each package directory at the root, found on disk.
  * Each fixture under `__fixtures__/runnerTimeouts/refused` is refused by its
  * own check alone; the two under `clean` by none. No regular expression: a
- * script's words are read by `scriptWords`, a source by the compiler.
+ * script's words are read by `scriptWords`, a source by the type checker.
  */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -206,131 +209,161 @@ function manifests(): string[] {
 
 // ---------------------------------------------------------------- sources
 
-/** The node:test functions that take options: tests, suites and hooks. */
-const TEST_FUNCTIONS = new Set([
+/**
+ * The names node:test declares its tests, suites and hooks under, and their
+ * modifiers: `test` (also exported as `it`, the default export and the test
+ * context's `t.test`), `suite` (also `describe`), the four hooks (also the
+ * test context's `t.before` …), and `skip` / `todo` / `only` (`test.skip`,
+ * `describe.only`, the top-level shorthands). A test context's `t.skip()` and
+ * `t.todo()` share the names and take no options. Other node:test calls
+ * (`run`, `t.waitFor`, `t.plan`, `mock`) are not tests and are not read.
+ */
+const TEST_DECLARATIONS = new Set([
   'test',
-  'it',
-  'describe',
   'suite',
   'before',
   'after',
   'beforeEach',
   'afterEach',
+  'skip',
+  'todo',
+  'only',
 ]);
-const MODIFIERS = new Set(['skip', 'todo', 'only']);
 
-/**
- * The local names a file binds to node:test's test functions: a named import
- * by the name it imports (`test as check` is `test`), the default import as
- * `test` (node:test's default export).
- */
-function nodeTestBindings(source: ts.SourceFile): Set<string> {
-  const bound = new Set<string>();
-  for (const statement of source.statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !ts.isStringLiteral(statement.moduleSpecifier) ||
-      statement.moduleSpecifier.text !== 'node:test'
-    ) {
-      continue;
-    }
-    const clause = statement.importClause;
-    if (clause === undefined) continue;
-    if (clause.name !== undefined) bound.add(clause.name.text);
-    const named = clause.namedBindings;
-    if (named === undefined || !ts.isNamedImports(named)) continue;
-    for (const element of named.elements) {
-      const imported = (element.propertyName ?? element.name).text;
-      if (TEST_FUNCTIONS.has(imported)) bound.add(element.name.text);
-    }
-  }
-  return bound;
-}
-
-/**
- * A call of a test, a suite or a hook: a name bound to one of node:test's,
- * a member of that name on anything (a namespace import, a test context's
- * `t.test` / `t.beforeEach`), or a modifier of either (`test.skip`).
- */
-function isTestCallee(
-  callee: ts.Expression,
-  bound: ReadonlySet<string>,
-): boolean {
-  if (ts.isParenthesizedExpression(callee)) {
-    return isTestCallee(callee.expression, bound);
-  }
-  if (ts.isIdentifier(callee)) return bound.has(callee.text);
-  if (ts.isPropertyAccessExpression(callee)) {
-    const name = callee.name.text;
-    if (TEST_FUNCTIONS.has(name)) return true;
-    return MODIFIERS.has(name) && isTestCallee(callee.expression, bound);
-  }
-  return false;
-}
-
-/** A property name that is `timeout`: plain, quoted or computed from a literal. */
-function namesTimeout(name: ts.PropertyName): boolean {
-  const named = ts.isComputedPropertyName(name) ? name.expression : name;
+/** `declare module "node:test"`: where `@types/node` declares node:test. */
+function isNodeTestModule(node: ts.Node): boolean {
   return (
-    (ts.isIdentifier(named) ||
-      ts.isStringLiteral(named) ||
-      ts.isNoSubstitutionTemplateLiteral(named)) &&
-    named.text === 'timeout'
+    ts.isModuleDeclaration(node) &&
+    ts.isStringLiteral(node.name) &&
+    node.name.text === 'node:test'
   );
 }
 
 /**
- * The `timeout` properties of an argument written as an object literal
- * (through parentheses, `satisfies` and `as`), a spread object literal's
- * included. An options object held in a variable is not read: the scan reads
- * syntax, not types.
+ * A call of a node:test test, suite or hook: the signature the type checker
+ * resolves the call to is declared in node:test's module under one of
+ * `TEST_DECLARATIONS`. However the function is reached — a named or default
+ * import, an alias, a variable holding it, a test context — the declaration
+ * is the same; a method of that name on any other object is not node:test's.
  */
-function timeoutProperties(argument: ts.Expression): ts.Node[] {
-  let value = argument;
-  while (
-    ts.isParenthesizedExpression(value) ||
-    ts.isSatisfiesExpression(value) ||
-    ts.isAsExpression(value)
-  ) {
-    value = value.expression;
+function isNodeTestCall(
+  checker: ts.TypeChecker,
+  call: ts.CallExpression,
+): boolean {
+  const declaration = checker.getResolvedSignature(call)?.declaration;
+  if (declaration === undefined || ts.isJSDocSignature(declaration)) {
+    return false;
   }
-  if (!ts.isObjectLiteralExpression(value)) return [];
-  return value.properties.flatMap((property): ts.Node[] => {
-    if (ts.isSpreadAssignment(property)) {
-      return timeoutProperties(property.expression);
-    }
-    if (ts.isShorthandPropertyAssignment(property)) {
-      return property.name.text === 'timeout' ? [property] : [];
-    }
-    return namesTimeout(property.name) ? [property] : [];
+  const name = declaration.name;
+  return (
+    name !== undefined &&
+    ts.isIdentifier(name) &&
+    TEST_DECLARATIONS.has(name.text) &&
+    ts.findAncestor(declaration, isNodeTestModule) !== undefined
+  );
+}
+
+/**
+ * Whether a value of `type` may carry a `timeout` property, read from the
+ * type, not the syntax, so an options object held in a variable is seen.
+ * When the type cannot rule it out, the answer is yes (the scan refuses
+ * more, never less): `any` and `unknown`; a union or an intersection when
+ * any member may (a union's property is not one of the union's own unless
+ * every member has it); a type parameter by its constraint, and one without
+ * a constraint. Otherwise the apparent type (a primitive's wrapper) has the
+ * property or not: a declared `TestOptions`, whose `timeout` is optional,
+ * may.
+ */
+function mayHoldTimeout(checker: ts.TypeChecker, type: ts.Type): boolean {
+  if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
+    return true;
+  }
+  if (type.isUnionOrIntersection()) {
+    return type.types.some((member) => mayHoldTimeout(checker, member));
+  }
+  if (type.isTypeParameter()) {
+    const constraint = checker.getBaseConstraintOfType(type);
+    return constraint === undefined || mayHoldTimeout(checker, constraint);
+  }
+  return checker.getApparentType(type).getProperty('timeout') !== undefined;
+}
+
+/**
+ * Whether an argument may carry a `timeout`: its type, or for a spread
+ * (`test(...args)`) the type of the elements it spreads; a spread of a type
+ * with no element type may.
+ */
+function argumentMayHoldTimeout(
+  checker: ts.TypeChecker,
+  argument: ts.Expression,
+): boolean {
+  if (!ts.isSpreadElement(argument)) {
+    return mayHoldTimeout(checker, checker.getTypeAtLocation(argument));
+  }
+  const spread = checker.getApparentType(
+    checker.getTypeAtLocation(argument.expression),
+  );
+  const elements = checker.getIndexInfoOfType(spread, ts.IndexKind.Number);
+  return elements === undefined || mayHoldTimeout(checker, elements.type);
+}
+
+/**
+ * A type-checked program over `files`, with the node:test build's options
+ * (`tsconfig.node-test.json`: its `types`, the name table's `paths`), so a
+ * call resolves as it does in the build.
+ */
+function scanProgram(files: readonly string[]): ts.Program {
+  const configFile = path.join(REPO, 'tsconfig.node-test.json');
+  const parsed = ts.getParsedCommandLineOfConfigFile(
+    configFile,
+    {},
+    {
+      ...ts.sys,
+      onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+        throw new Error(
+          ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+        );
+      },
+    },
+  );
+  if (parsed === undefined) throw new Error(`${configFile}: not read`);
+  assert.deepEqual(parsed.errors, []);
+  return ts.createProgram({
+    rootNames: files,
+    options: { ...parsed.options, noEmit: true },
   });
 }
 
-/** Every `{ timeout }` on a test, a suite or a hook in a source file. */
-function sourceFindings(file: string): Finding[] {
-  const source = ts.createSourceFile(
-    file,
-    fs.readFileSync(file, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
+/**
+ * Every argument that may carry a `timeout` on a node:test test, suite or
+ * hook in a file of `program`. The file must type-check: a call the checker
+ * cannot resolve would be read as no test.
+ */
+function sourceFindings(program: ts.Program, file: string): Finding[] {
+  const source = program.getSourceFile(file);
+  if (source === undefined) throw new Error(`${file}: not in the program`);
+  const problems = [
+    ...program.getSyntacticDiagnostics(source),
+    ...program.getSemanticDiagnostics(source),
+  ].map((diagnostic) =>
+    ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
   );
-  const bound = nodeTestBindings(source);
+  assert.deepEqual(problems, [], `${rel(file)} does not type-check`);
+  const checker = program.getTypeChecker();
   const found: Finding[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && isTestCallee(node.expression, bound)) {
+    if (ts.isCallExpression(node) && isNodeTestCall(checker, node)) {
       for (const argument of node.arguments) {
-        for (const property of timeoutProperties(argument)) {
-          const line =
-            source.getLineAndCharacterOfPosition(property.getStart(source))
-              .line + 1;
-          found.push({
-            check: '{ timeout }',
-            file: rel(file),
-            at: String(line),
-            text: property.getText(source),
-          });
-        }
+        if (!argumentMayHoldTimeout(checker, argument)) continue;
+        const line =
+          source.getLineAndCharacterOfPosition(argument.getStart(source)).line +
+          1;
+        found.push({
+          check: '{ timeout }',
+          file: rel(file),
+          at: String(line),
+          text: argument.getText(source),
+        });
       }
     }
     ts.forEachChild(node, visit);
@@ -375,9 +408,9 @@ describe('the repository', () => {
   });
 
   it('no node:test file passes { timeout } to a test, a suite or a hook', () => {
-    const found = listed.flatMap((source) =>
-      sourceFindings(path.join(REPO, ...source.split('/'))),
-    );
+    const files = listed.map((source) => path.join(REPO, ...source.split('/')));
+    const program = scanProgram(files);
+    const found = files.flatMap((file) => sourceFindings(program, file));
     assert.deepEqual(found, []);
   });
 
@@ -411,18 +444,32 @@ describe('the repository', () => {
 });
 
 describe('the scan refuses each fixture by its own check alone', () => {
-  const fixture = (kind: 'refused' | 'clean', name: string) =>
-    path.join(FIXTURES, kind, name);
+  type Kind = 'refused' | 'clean';
+  const KINDS: readonly Kind[] = ['refused', 'clean'];
+  const fixture = (kind: Kind, name: string) => path.join(FIXTURES, kind, name);
+  /** One program over every source fixture, built at the first scan. */
+  let program: ts.Program | undefined;
+  const sourceFixtures = (): ts.Program => {
+    program ??= scanProgram(
+      KINDS.flatMap((kind) =>
+        fs
+          .readdirSync(path.join(FIXTURES, kind))
+          .filter((name) => name.endsWith('.ts'))
+          .map((name) => fixture(kind, name)),
+      ),
+    );
+    return program;
+  };
   const scanFixture = (file: string): Finding[] =>
     file.endsWith('.json')
       ? outsideAllowed(scriptFindings(file))
-      : sourceFindings(file);
+      : sourceFindings(sourceFixtures(), file);
   /** Each refused fixture, its check, and how many findings it holds. */
   const REFUSED: ReadonlyArray<readonly [string, Check, number]> = [
     ['testTimeout.json', '--test-timeout', 4],
     ['testForceExit.json', '--test-force-exit', 3],
     ['forceExit.json', '--forceExit', 1],
-    ['timeoutOnTest.ts', '{ timeout }', 8],
+    ['timeoutOnTest.ts', '{ timeout }', 11],
     ['timeoutOnIt.ts', '{ timeout }', 3],
     ['timeoutOnDescribe.ts', '{ timeout }', 3],
     ['timeoutOnHook.ts', '{ timeout }', 5],

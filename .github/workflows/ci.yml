@@ -8,6 +8,9 @@ on:
 
 jobs:
   build-and-test:
+    # The name the branch ruleset requires, word for word: the matrix's
+    # test-concurrency key must not change it.
+    name: build-and-test (${{ matrix.os }}, ${{ matrix.node-version }})
     # A hung test is capped here instead of by GitHub's 6-hour default. The
     # slowest cell took ~21 minutes (windows-latest, Node 22, 2026-10-22); on
     # Windows the suite has hung for 40+ minutes before (see SKIP_INSTALL_MATRIX).

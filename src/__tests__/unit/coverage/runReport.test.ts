@@ -44,13 +44,8 @@ let statuses: Array<{ fullName: string; status: string }>;
 beforeAll(async () => {
   runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-report-test-'));
   process.env.MCP_ABAP_ADT_COVERAGE_RUN = runDir;
-  const config: unknown = JSON.parse(
-    fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
-  );
-  const rootJest: unknown =
-    typeof config === 'object' && config !== null
-      ? Reflect.get(config, 'jest')
-      : undefined;
+  // Jest's configuration as `jest.config.js` builds it (an untyped module).
+  const rootJest: unknown = require(path.join(REPO, 'jest.config.js'));
   const { results } = await runCLI(
     {
       _: [],

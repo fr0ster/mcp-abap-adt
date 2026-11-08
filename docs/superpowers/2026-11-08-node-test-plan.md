@@ -90,7 +90,7 @@ the steps that name them.
    type checker, Jest and the hook read one file, and no equality guard is needed.
 
    **Steps (red first):**
-   - [ ] Red, under Jest (the runner comes in step 4):
+   - [x] Red, under Jest (the runner comes in step 4):
      - `'Jest's mapper is the table'` — the loaded configuration's `moduleNameMapper` holds
        exactly the table's names, each to its target, and the `.js` rule;
      - `'Jest ignores every listed path'` — with a temporary list of one existing file, the
@@ -101,9 +101,9 @@ the steps that name them.
      - `'the hook answers only the table's names'` — a name not in the table goes to Node's
        own resolution, a table name to its compiled file;
      - `'nothing reads package.json jest'` — the manifest has no `jest` block.
-   - [ ] The two files, `jest.config.js`, `tsconfig.test.json`, the readers; every Jest suite
+   - [x] The two files, `jest.config.js`, `tsconfig.test.json`, the readers; every Jest suite
      green, the same counts (`--listTests` before and after equal); `test:check` green.
-   - [ ] Load-bearing, mutating the readers, not the data:
+   - [x] Load-bearing, mutating the readers, not the data:
      - `jest.config.js` builds its ignores without the list — `'Jest ignores every listed
        path'` red;
      - `jest.config.js` drops one table entry while mapping — `'Jest's mapper is the table'`
@@ -111,7 +111,7 @@ the steps that name them.
      - `tsconfig.test.json` gets a `paths` block of its own — `'the type checker's paths are
        the table'` red;
      - the hook answers a name outside the table — its test red.
-   - [ ] CHANGELOG / MIGRATION only if a consumer of the scripts sees the move (Jest's
+   - [x] CHANGELOG / MIGRATION only if a consumer of the scripts sees the move (Jest's
      configuration is the repository's own: expected none; stated in the commit).
    **Commit:** `test: D27 — one list, one name table; Jest and the type checker read both`.
 

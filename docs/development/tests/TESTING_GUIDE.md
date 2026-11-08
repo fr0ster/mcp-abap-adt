@@ -73,9 +73,12 @@ npm test -- --testPathPatterns="class|unitTest|cds"
 
 ### One Jest configuration for every package
 
-The root `package.json` holds the repository's only Jest configuration: its `roots` name the root `src` and every
+The root `jest.config.js` holds the repository's only Jest configuration: its `roots` name the root `src` and every
 package's `src` (`server-runtime`, `server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, the compact packages and
-the six `-ro` packages), and its `moduleNameMapper` resolves every sibling package to its sources. The root
+the six `-ro` packages), and its `moduleNameMapper` resolves every sibling package to its sources. The mapper is built
+from the package-name table, `tsconfig.paths.json` (each name and its source entry), which `tsconfig.test.json` also
+extends for the type checker; the table is the only list of those names. Jest ignores every file listed in
+`tools/node-test-files.json`, the test files that run on node:test instead. The root
 `npm test` runs every package's suites once. A package's own `npm test` runs that same configuration for its folder
 only (`npm --prefix .. test -- --roots <package>/src`), so it works from inside the package:
 

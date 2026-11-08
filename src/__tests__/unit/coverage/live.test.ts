@@ -179,13 +179,8 @@ describe('liveCall and the refusal stop', () => {
   });
 
   it('a call is logged with its file and test, whatever the test then does', async () => {
-    const config: unknown = JSON.parse(
-      fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
-    );
-    const rootJest: unknown =
-      typeof config === 'object' && config !== null
-        ? Reflect.get(config, 'jest')
-        : undefined;
+    // Jest's configuration as `jest.config.js` builds it (an untyped module).
+    const rootJest: unknown = require(path.join(REPO, 'jest.config.js'));
     const fixtures = path.join(__dirname, '__fixtures__', 'live');
     const { results } = await runCLI(
       {

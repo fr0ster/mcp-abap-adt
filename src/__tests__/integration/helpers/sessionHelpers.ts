@@ -154,23 +154,6 @@ export async function createTestConnectionAndSession(): Promise<{
       connectionSource = 'env';
     }
 
-    // Which credentials the connection carries — presence and length only,
-    // never a character of a token or secret.
-    if (process.env.DEBUG_TESTS === 'true') {
-      const connectionConfig = connection.getConfig();
-      sessionLogger?.debug(
-        `[getTestSession] Connection tokens: ${JSON.stringify({
-          hasJwtToken: !!connectionConfig.jwtToken,
-          jwtTokenLength: connectionConfig.jwtToken?.length ?? 0,
-          hasRefreshToken: !!connectionConfig.refreshToken,
-          refreshTokenLength: connectionConfig.refreshToken?.length ?? 0,
-          hasUaaUrl: !!connectionConfig.uaaUrl,
-          hasUaaClientId: !!connectionConfig.uaaClientId,
-          hasUaaClientSecret: !!connectionConfig.uaaClientSecret,
-        })}`,
-      );
-    }
-
     // Connect once (same as adt-clients tests - no double connect)
     await connection.connect();
 

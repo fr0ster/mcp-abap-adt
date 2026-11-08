@@ -154,51 +154,19 @@ export async function createTestConnectionAndSession(): Promise<{
       connectionSource = 'env';
     }
 
-    // Log token info from connection (what's actually used in session)
+    // Which credentials the connection carries — presence and length only,
+    // never a character of a token or secret.
     if (process.env.DEBUG_TESTS === 'true') {
-      let connectionConfig: any;
-      try {
-        // getConfig() is not part of IAbapConnection interface, use type assertion
-        connectionConfig = (connection as any).getConfig?.();
-      } catch (error: any) {
-        sessionLogger?.warn(
-          `[getTestSession] Failed to get connection config: ${error?.message}`,
-        );
-      }
-
-      const connectionConfigJwtToken = connectionConfig?.jwtToken;
-      const connectionConfigRefreshToken = connectionConfig?.refreshToken;
-
-      // For refresh token, show only first 10 and last 10 chars (it's shorter than JWT)
-      const refreshTokenPreview = connectionConfigRefreshToken
-        ? connectionConfigRefreshToken.length > 20
-          ? `${connectionConfigRefreshToken.substring(0, 10)}...${connectionConfigRefreshToken.substring(connectionConfigRefreshToken.length - 10)}`
-          : `${connectionConfigRefreshToken.substring(0, 10)}...` // If too short, show only first 10
-        : 'empty';
-
+      const connectionConfig = connection.getConfig();
       sessionLogger?.debug(
         `[getTestSession] Connection tokens: ${JSON.stringify({
-          hasJwtToken: !!connectionConfigJwtToken,
-          jwtTokenStart: connectionConfigJwtToken
-            ? `${connectionConfigJwtToken.substring(0, 20)}...`
-            : 'empty',
-          jwtTokenEnd:
-            connectionConfigJwtToken && connectionConfigJwtToken.length > 20
-              ? `...${connectionConfigJwtToken.substring(connectionConfigJwtToken.length - 20)}`
-              : 'empty',
-          jwtTokenLength: connectionConfigJwtToken?.length || 0,
-          hasRefreshToken: !!connectionConfigRefreshToken,
-          refreshTokenPreview: refreshTokenPreview,
-          refreshTokenLength: connectionConfigRefreshToken?.length || 0,
-          hasUaaUrl: !!connectionConfig?.uaaUrl,
-          hasUaaClientId: !!connectionConfig?.uaaClientId,
-          hasUaaClientSecret: !!connectionConfig?.uaaClientSecret,
-          canRefresh: !!(
-            connectionConfigRefreshToken &&
-            connectionConfig?.uaaUrl &&
-            connectionConfig?.uaaClientId &&
-            connectionConfig?.uaaClientSecret
-          ),
+          hasJwtToken: !!connectionConfig.jwtToken,
+          jwtTokenLength: connectionConfig.jwtToken?.length ?? 0,
+          hasRefreshToken: !!connectionConfig.refreshToken,
+          refreshTokenLength: connectionConfig.refreshToken?.length ?? 0,
+          hasUaaUrl: !!connectionConfig.uaaUrl,
+          hasUaaClientId: !!connectionConfig.uaaClientId,
+          hasUaaClientSecret: !!connectionConfig.uaaClientSecret,
         })}`,
       );
     }

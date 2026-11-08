@@ -18,19 +18,28 @@
  *   its target; the source's own file or directory is refused (the test build
  *   holds the compiled one);
  * - the value of a `const`: every reference to its symbol, in every
- *   production source, is followed in turn; one exported (`export`, an
- *   `export { … }` or an `export default`) is a target too, served whole to
- *   code the scan does not see;
+ *   production source, is followed in turn — by name, or as a namespace's
+ *   member (`m.NAME`, `m['NAME']`, the checker's property of the namespace
+ *   type); one exported (`export`, an `export { … }` or an
+ *   `export default`) is a target too, served whole to code the scan does
+ *   not see; a module exporting one, used other than for a literal member
+ *   (a computed key, passed whole, destructured) or loaded by `require` /
+ *   `import()`, is refused;
  * - the operand of `typeof`: nothing is read.
  * One use is the owner's exception (`isOwnerGranted`): `src/lib/instance.ts`'s
- * display-only `__filename`.
+ * display-only `__filename`, at its one registration site.
  * Every other use of a location value is refused, and so is every other way
  * to the module's own location: `module`, `import.meta`, `createRequire`, a
  * `require` not called with one literal, an `import()` not called with one,
- * `process.argv` read where it can name the program (anything but
- * `.includes(<literal>)`, `.slice(<n ≥ 2>)` and `[<n ≥ 2>]`),
- * `process.mainModule`, and `process` handed where the receiving type has an
- * `argv` or a `mainModule`. A `require`, `import()`, `import` or
+ * a `require` / `import()` of `module`, `node:module`, `process` or
+ * `node:process`, and the members of `process` that name the program, by
+ * symbol however they are reached (the global, a default, namespace or named
+ * import of `node:process`, a re-export, a literal key): `argv` read where it
+ * can name the executable or the script (anything but `.includes(<literal>)`,
+ * `.slice(<n ≥ 2>)` and `[<n ≥ 2>]`) and `mainModule`; and `process` handed
+ * whole where the receiving type has an `argv` or a `mainModule`. `execPath`
+ * and `argv0` name the Node executable, `cwd()` the working directory: none
+ * is the module's location in the repository, so none is refused. A `require`, `import()`, `import` or
  * `export … from` of a relative file that is not code is a target.
  *
  * The placement list (`tools/node-test-placed.json`) is what the node:test
@@ -206,7 +215,12 @@ interface Known {
   filename: ts.Symbol | undefined;
   module: ts.Symbol | undefined;
   require: ts.Symbol | undefined;
-  process: ts.Symbol | undefined;
+  /** The global `process`, and the `process` / `node:process` modules. */
+  process: ReadonlySet<ts.Symbol>;
+  /** `process.argv` and `process.mainModule`, the members naming the program. */
+  argv: ts.Symbol | undefined;
+  mainModule: ts.Symbol | undefined;
+  object: ts.Symbol | undefined;
 }
 
 function knownSymbols(checker: ts.TypeChecker): Known {
@@ -240,6 +254,11 @@ function knownSymbols(checker: ts.TypeChecker): Known {
   }
   const global = (name: string) =>
     checker.resolveName(name, undefined, ts.SymbolFlags.Value, false);
+  const processGlobal = global('process');
+  const processType =
+    processGlobal === undefined
+      ? undefined
+      : checker.getTypeOfSymbol(processGlobal);
   return {
     join: platformType?.getProperty('join'),
     resolve: platformType?.getProperty('resolve'),
@@ -251,7 +270,16 @@ function knownSymbols(checker: ts.TypeChecker): Known {
     filename: global('__filename'),
     module: global('module'),
     require: global('require'),
-    process: global('process'),
+    process: new Set(
+      [
+        processGlobal,
+        ambient.get('"process"'),
+        ambient.get('"node:process"'),
+      ].flatMap((symbol) => (symbol === undefined ? [] : [symbol])),
+    ),
+    argv: processType?.getProperty('argv'),
+    mainModule: processType?.getProperty('mainModule'),
+    object: global('Object'),
   };
 }
 
@@ -283,6 +311,9 @@ export const WHY = {
   argv: 'process.argv read where it can name the program',
   mainModule: 'process.mainModule, a location the scan does not resolve',
   process: 'process handed where its argv or mainModule can be read',
+  moduleWhole:
+    'a module exporting a location used other than by a literal member',
+  builtinRequire: 'node:process or node:module loaded by require or import()',
 } as const;
 
 /** Every location read of `sources`, read through `program`'s checker. */
@@ -323,24 +354,71 @@ export function locationReads(
     return undefined;
   };
 
-  // Every identifier of the production sources by the symbol it refers to.
-  const references = new Map<ts.Symbol, ts.Identifier[]>();
+  /** The member an element access with a literal key reads, its alias resolved. */
+  const memberOf = (
+    access: ts.ElementAccessExpression,
+  ): ts.Symbol | undefined =>
+    ts.isStringLiteralLike(access.argumentExpression)
+      ? resolved(
+          checker
+            .getTypeAtLocation(access.expression)
+            .getProperty(access.argumentExpression.text),
+        )
+      : undefined;
+
+  // Every identifier of the production sources, and every element access
+  // with a literal key, by the symbol it refers to.
+  const references = new Map<ts.Symbol, ts.Node[]>();
   for (const source of parsed) {
     const visit = (node: ts.Node): void => {
-      if (ts.isIdentifier(node)) {
-        const symbol = symbolOf(node);
-        if (symbol !== undefined) {
-          const list = references.get(symbol);
-          if (list === undefined) references.set(symbol, [node]);
-          else list.push(node);
-        }
+      const symbol = ts.isIdentifier(node)
+        ? symbolOf(node)
+        : ts.isElementAccessExpression(node)
+          ? memberOf(node)
+          : undefined;
+      if (symbol !== undefined) {
+        const list = references.get(symbol);
+        if (list === undefined) references.set(symbol, [node]);
+        else list.push(node);
       }
       ts.forEachChild(node, visit);
     };
     visit(source);
   }
-  const referencesTo = (symbol: ts.Symbol | undefined): ts.Identifier[] =>
+  const referencesTo = (symbol: ts.Symbol | undefined): ts.Node[] =>
     symbol === undefined ? [] : (references.get(symbol) ?? []);
+
+  /** Whether `node` names what an import, an export or a declaration binds. */
+  const declares = (node: ts.Node): boolean => {
+    const at = node.parent;
+    return (
+      ts.isImportSpecifier(at) ||
+      ts.isImportClause(at) ||
+      ts.isNamespaceImport(at) ||
+      ts.isNamespaceExport(at) ||
+      ts.isExportSpecifier(at) ||
+      (ts.isImportEqualsDeclaration(at) && at.name === node)
+    );
+  };
+  /** The node holding a referenced value: `m.NAME` for its name, else itself. */
+  const valueAt = (reference: ts.Node): ts.Node => {
+    const at = reference.parent;
+    return ts.isPropertyAccessExpression(at) && at.name === reference
+      ? at
+      : reference;
+  };
+  /** Whether `node` is only read for a member: `node.x` or `node['x']`. */
+  const memberRead = (node: ts.Node): boolean => {
+    const at = node.parent;
+    return (
+      (ts.isPropertyAccessExpression(at) && at.expression === node) ||
+      (ts.isElementAccessExpression(at) &&
+        at.expression === node &&
+        ts.isStringLiteralLike(at.argumentExpression))
+    );
+  };
+  /** The const location bindings found, the exported among them. */
+  const locations = new Set<ts.Symbol>();
 
   const refuse = (node: ts.Node, why: string) => {
     const source = node.getSourceFile();
@@ -391,6 +469,48 @@ export function locationReads(
       return false;
     }
     const test = choice.condition;
+    // The registration site: `registry().push(Object.freeze({ file: … }))`,
+    // a statement of the module, `registry` a function of this file.
+    const property = choice.parent;
+    const literal = property.parent;
+    const freeze = literal.parent;
+    const push = freeze.parent;
+    if (
+      !ts.isPropertyAssignment(property) ||
+      property.initializer !== choice ||
+      !ts.isIdentifier(property.name) ||
+      property.name.text !== 'file' ||
+      !ts.isObjectLiteralExpression(literal) ||
+      !ts.isCallExpression(freeze) ||
+      freeze.arguments.length !== 1 ||
+      freeze.arguments[0] !== literal ||
+      !ts.isPropertyAccessExpression(freeze.expression) ||
+      freeze.expression.name.text !== 'freeze' ||
+      !ts.isIdentifier(freeze.expression.expression) ||
+      symbolOf(freeze.expression.expression) !== symbols.object ||
+      !ts.isCallExpression(push) ||
+      push.arguments.length !== 1 ||
+      push.arguments[0] !== freeze ||
+      !ts.isPropertyAccessExpression(push.expression) ||
+      push.expression.name.text !== 'push' ||
+      !ts.isCallExpression(push.expression.expression) ||
+      push.expression.expression.arguments.length !== 0 ||
+      !ts.isIdentifier(push.expression.expression.expression) ||
+      !ts.isExpressionStatement(push.parent) ||
+      !ts.isSourceFile(push.parent.parent)
+    ) {
+      return false;
+    }
+    const registry = symbolOf(push.expression.expression.expression);
+    const declaration = registry?.declarations?.[0];
+    if (
+      registry?.declarations?.length !== 1 ||
+      declaration === undefined ||
+      !ts.isFunctionDeclaration(declaration) ||
+      declaration.getSourceFile() !== node.getSourceFile()
+    ) {
+      return false;
+    }
     return (
       ts.isBinaryExpression(test) &&
       test.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
@@ -471,6 +591,7 @@ export function locationReads(
       const symbol = checker.getSymbolAtLocation(parent.name);
       if (symbol === undefined || seen.has(symbol)) return;
       const next = new Set(seen).add(symbol);
+      locations.add(symbol);
       if (
         (ts.getCombinedModifierFlags(parent) & ts.ModifierFlags.Export) !==
         0
@@ -480,26 +601,13 @@ export function locationReads(
       for (const reference of referencesTo(symbol)) {
         if (reference === parent.name) continue;
         const at = reference.parent;
-        if (
-          ts.isImportSpecifier(at) ||
-          ts.isImportClause(at) ||
-          ts.isNamespaceImport(at) ||
-          ts.isImportEqualsDeclaration(at)
-        ) {
-          continue;
-        }
         if (ts.isExportSpecifier(at) || ts.isExportAssignment(at)) {
           read(at, target);
           continue;
         }
-        // `m.NAME` through a namespace import: the access holds the value.
-        follow(
-          ts.isPropertyAccessExpression(at) && at.name === reference
-            ? at
-            : reference,
-          target,
-          next,
-        );
+        if (declares(reference)) continue;
+        // `m.NAME` or `m['NAME']` through a namespace: the access holds it.
+        follow(valueAt(reference), target, next);
       }
       return;
     }
@@ -525,19 +633,18 @@ export function locationReads(
     );
   };
 
-  const processUse = (reference: ts.Identifier): void => {
-    const at = reference.parent;
-    if (!ts.isPropertyAccessExpression(at) || at.expression !== reference) {
-      if (!processContained(outermost(reference))) {
-        refuse(reference, WHY.process);
-      }
-      return;
+  /** A value of `process` (the global or a module): only its members are read. */
+  const processUse = (reference: ts.Node): void => {
+    if (declares(reference) || memberRead(reference)) return;
+    if (!processContained(outermost(reference))) {
+      refuse(reference, WHY.process);
     }
-    if (at.name.text === 'mainModule') {
-      refuse(at, WHY.mainModule);
-      return;
-    }
-    if (at.name.text !== 'argv') return;
+  };
+
+  /** `argv`, however reached: only past the executable and the script. */
+  const argvUse = (reference: ts.Node): void => {
+    if (declares(reference)) return;
+    const at = outermost(valueAt(reference));
     const use = at.parent;
     if (ts.isElementAccessExpression(use) && use.expression === at) {
       const index = integerLiteral(use.argumentExpression);
@@ -564,6 +671,32 @@ export function locationReads(
     }
     refuse(at, WHY.argv);
   };
+
+  /** The module a relative or package specifier of `from` names, if any. */
+  const moduleNamed = (
+    specifier: string,
+    from: ts.SourceFile,
+  ): ts.Symbol | undefined => {
+    const file = ts.resolveModuleName(
+      specifier,
+      from.fileName,
+      program.getCompilerOptions(),
+      ts.sys,
+    ).resolvedModule?.resolvedFileName;
+    const source = file === undefined ? undefined : program.getSourceFile(file);
+    return source === undefined
+      ? undefined
+      : checker.getSymbolAtLocation(source);
+  };
+  /** `require` / `import()` of a builtin that reaches the program's location. */
+  const BUILTINS: ReadonlySet<string> = new Set([
+    'module',
+    'node:module',
+    'process',
+    'node:process',
+  ]);
+  /** Module loads by a literal, checked once the locations are known. */
+  const loads: { node: ts.Node; specifier: string }[] = [];
 
   for (const source of parsed) {
     const here = path.dirname(path.resolve(source.fileName));
@@ -597,6 +730,8 @@ export function locationReads(
           refuse(node, WHY.importCall);
         } else if (nonCode(first.text)) {
           read(node, path.resolve(here, first.text));
+        } else {
+          loads.push({ node, specifier: first.text });
         }
       }
       if (
@@ -610,7 +745,7 @@ export function locationReads(
     visit(source);
   }
 
-  const ofScan = (references: ts.Identifier[]) =>
+  const ofScan = (references: ts.Node[]) =>
     references.filter((reference) => scanned.has(reference.getSourceFile()));
   for (const reference of ofScan(referencesTo(symbols.dirname))) {
     follow(
@@ -653,10 +788,49 @@ export function locationReads(
           first.text,
         ),
       );
+    } else {
+      loads.push({ node: call, specifier: first.text });
     }
   }
-  for (const reference of referencesTo(symbols.process)) {
-    processUse(reference);
+  for (const symbol of symbols.process) {
+    for (const reference of referencesTo(symbol)) processUse(reference);
+  }
+  for (const reference of referencesTo(symbols.argv)) argvUse(reference);
+  for (const reference of referencesTo(symbols.mainModule)) {
+    if (!declares(reference)) refuse(valueAt(reference), WHY.mainModule);
+  }
+
+  // A module exporting a location, used whole: by its namespace other than
+  // for a literal member, or loaded by `require` / `import()`.
+  const locationModules = new Set<ts.Symbol>();
+  for (const source of program.getSourceFiles()) {
+    const module = checker.getSymbolAtLocation(source);
+    if (
+      module !== undefined &&
+      checker.getExportsOfModule(module).some((member) => {
+        const target = resolved(member);
+        return target !== undefined && locations.has(target);
+      })
+    ) {
+      locationModules.add(module);
+    }
+  }
+  for (const module of locationModules) {
+    for (const reference of referencesTo(module)) {
+      if (!declares(reference) && !memberRead(reference)) {
+        refuse(reference, WHY.moduleWhole);
+      }
+    }
+  }
+  for (const { node, specifier } of loads) {
+    if (BUILTINS.has(specifier)) {
+      refuse(node, WHY.builtinRequire);
+      continue;
+    }
+    const module = moduleNamed(specifier, node.getSourceFile());
+    if (module !== undefined && locationModules.has(module)) {
+      refuse(node, WHY.moduleWhole);
+    }
   }
 
   const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);

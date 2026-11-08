@@ -267,52 +267,254 @@ describe('files production code reads beside itself', () => {
   });
 
   describe("the owner's exception: src/lib/instance.ts's display-only __filename", () => {
-    const SHAPE =
-      "  file: typeof __filename === 'string' ? __filename : 'bundled',";
-    it('clean: the exact shape at its site', () => {
+    const SHAPE = "typeof __filename === 'string' ? __filename : 'bundled'";
+    /** The registry and its one registration site, as instance.ts has them. */
+    const site = (file: string): readonly string[] => [
+      'function registry(): { file: string }[] { return []; }',
+      'registry().push(',
+      '  Object.freeze({',
+      `    file: ${file},`,
+      '  }),',
+      ');',
+    ];
+    const instance = (lines: readonly string[]) =>
+      scan({ [OWNER_GRANTED_FILE]: lines }, 'src').unstated;
+
+    it('clean: the exact shape at its registration site', () => {
       const { reads, unstated } = scan(
-        { [OWNER_GRANTED_FILE]: ['export const I = {', SHAPE, '};'] },
+        { [OWNER_GRANTED_FILE]: site(SHAPE) },
         'src',
       );
       assert.deepEqual(unstated, []);
       assert.deepEqual(reads.targets, []);
     });
     it('another use of __filename in that file is refused', () => {
-      const { unstated } = scan(
-        {
-          [OWNER_GRANTED_FILE]: [
-            FS,
-            'export const I = {',
-            SHAPE,
-            '};',
-            'export const S = readFileSync(__filename);',
-          ],
-        },
-        'src',
+      assert.deepEqual(
+        instance([
+          FS,
+          ...site(SHAPE),
+          'export const S = readFileSync(__filename);',
+        ]),
+        [`${OWNER_GRANTED_FILE}:8: ${WHY.ownFile}`],
       );
-      assert.deepEqual(unstated, [`${OWNER_GRANTED_FILE}:5: ${WHY.ownFile}`]);
+    });
+    it('the shape wrapped in a read is refused', () => {
+      assert.deepEqual(
+        instance([
+          FS,
+          ...site(SHAPE),
+          `export const S = readFileSync(${SHAPE});`,
+        ]),
+        [`${OWNER_GRANTED_FILE}:8: ${WHY.unfollowed}`],
+      );
+    });
+    it('the shape assigned to a variable, then read, is refused', () => {
+      assert.deepEqual(
+        instance([
+          FS,
+          ...site(SHAPE),
+          `const f = ${SHAPE};`,
+          'export const S = readFileSync(f);',
+        ]),
+        [`${OWNER_GRANTED_FILE}:8: ${WHY.unfollowed}`],
+      );
+    });
+    it('the shape in an object that is not the registration is refused', () => {
+      assert.deepEqual(
+        instance(['export const I = {', `  file: ${SHAPE},`, '};']),
+        [`${OWNER_GRANTED_FILE}:2: ${WHY.unfollowed}`],
+      );
     });
     it('a variant of the shape is refused', () => {
-      const { unstated } = scan(
-        {
-          [OWNER_GRANTED_FILE]: [
-            'export const I = {',
-            "  file: typeof __filename === 'string' ? __filename : 'elsewhere',",
-            '};',
-          ],
-        },
-        'src',
+      assert.deepEqual(
+        instance(
+          site("typeof __filename === 'string' ? __filename : 'elsewhere'"),
+        ),
+        [`${OWNER_GRANTED_FILE}:4: ${WHY.unfollowed}`],
       );
-      assert.deepEqual(unstated, [
-        `${OWNER_GRANTED_FILE}:2: ${WHY.unfollowed}`,
-      ]);
     });
     it('the shape in another file is refused', () => {
-      const { unstated } = scan(
-        { 'src/lib/other.ts': ['export const I = {', SHAPE, '};'] },
-        'src',
-      );
-      assert.deepEqual(unstated, [`src/lib/other.ts:2: ${WHY.unfollowed}`]);
+      const { unstated } = scan({ 'src/lib/other.ts': site(SHAPE) }, 'src');
+      assert.deepEqual(unstated, [`src/lib/other.ts:4: ${WHY.unfollowed}`]);
+    });
+  });
+
+  describe('a location exported by a module is followed through its namespace', () => {
+    const base: Record<string, readonly string[]> = {
+      'pkg/secret.json': ['{}'],
+      'pkg/fixtures/a.json': ['"a"'],
+      'pkg/src/base.ts': [
+        PATH,
+        "export const BASE = path.join(__dirname, '..', 'fixtures');",
+      ],
+    };
+    it('a member read with a literal key is followed to its target', () => {
+      const { reads, unstated } = scan({
+        ...base,
+        'pkg/src/user.ts': [
+          FS,
+          PATH,
+          "import * as locations from './base.js';",
+          "export const S = readFileSync(path.join(locations['BASE'], '..', 'secret.json'));",
+        ],
+      });
+      assert.deepEqual(unstated, []);
+      assert.deepEqual(reads.targets, [
+        { target: 'pkg/fixtures', by: 'pkg/src/base.ts' },
+        { target: 'pkg/secret.json', by: 'pkg/src/user.ts' },
+      ]);
+    });
+    const refusedWhole = (
+      name: string,
+      lines: readonly string[],
+      line: number,
+    ) =>
+      it(name, () => {
+        const { unstated } = scan({
+          ...base,
+          'pkg/src/user.ts': [FS, PATH, ...lines],
+        });
+        assert.deepEqual(unstated, [
+          `pkg/src/user.ts:${line}: ${WHY.moduleWhole}`,
+        ]);
+      });
+    refusedWhole(
+      'a member read with a computed key',
+      [
+        "import * as locations from './base.js';",
+        "export const S = (key: 'BASE') => readFileSync(path.join(locations[key], 'a.json'));",
+      ],
+      4,
+    );
+    refusedWhole(
+      'the namespace passed whole',
+      [
+        "import * as locations from './base.js';",
+        'export const all = Object.values(locations);',
+      ],
+      4,
+    );
+    refusedWhole(
+      'the namespace destructured',
+      [
+        "import * as locations from './base.js';",
+        'const { BASE } = locations;',
+        "export const S = readFileSync(path.join(BASE, '..', 'secret.json'));",
+      ],
+      4,
+    );
+    refusedWhole(
+      'the module required',
+      ["export const S: unknown = require('./base');"],
+      3,
+    );
+    refusedWhole(
+      'the module imported dynamically',
+      ["export const S = import('./base.js');"],
+      3,
+    );
+  });
+
+  describe('the members of process that name the program are resolved by symbol', () => {
+    const refusedArgv = (
+      name: string,
+      files: Record<string, readonly string[]>,
+      why: string,
+    ) =>
+      it(name, () => {
+        const { unstated } = scan(files);
+        assert.ok(
+          unstated.some((finding) => finding.endsWith(`: ${why}`)),
+          unstated.join('\n'),
+        );
+      });
+    refusedArgv(
+      'argv imported from node:process',
+      {
+        'pkg/src/a.ts': [
+          "import { argv } from 'node:process';",
+          'export const P = argv[1];',
+        ],
+      },
+      WHY.argv,
+    );
+    refusedArgv(
+      'argv imported under another name',
+      {
+        'pkg/src/a.ts': [
+          "import { argv as args } from 'process';",
+          'export const P = args[1];',
+        ],
+      },
+      WHY.argv,
+    );
+    refusedArgv(
+      'argv re-exported',
+      {
+        'pkg/src/again.ts': ["export { argv } from 'node:process';"],
+        'pkg/src/a.ts': [
+          "import { argv } from './again.js';",
+          'export const P = argv[1];',
+        ],
+      },
+      WHY.argv,
+    );
+    refusedArgv(
+      'the default import of node:process',
+      {
+        'pkg/src/a.ts': [
+          "import proc from 'node:process';",
+          'export const P = proc.argv[1];',
+        ],
+      },
+      WHY.argv,
+    );
+    refusedArgv(
+      'a namespace import of node:process',
+      {
+        'pkg/src/a.ts': [
+          "import * as proc from 'node:process';",
+          'export const P = proc.argv[1];',
+        ],
+      },
+      WHY.argv,
+    );
+    refusedArgv(
+      'argv read with a literal key',
+      { 'pkg/src/a.ts': ["export const P = process['argv'][1];"] },
+      WHY.argv,
+    );
+    refusedArgv(
+      'mainModule imported from node:process',
+      {
+        'pkg/src/a.ts': [
+          "import { mainModule } from 'node:process';",
+          'export const M = mainModule;',
+        ],
+      },
+      WHY.mainModule,
+    );
+    refusedArgv(
+      'node:process required',
+      {
+        'pkg/src/a.ts': [
+          "export const P: unknown = require('node:process').argv[1];",
+        ],
+      },
+      WHY.builtinRequire,
+    );
+
+    it('clean: argv from node:process read past the program', () => {
+      const { unstated } = scan({
+        'pkg/src/a.ts': [
+          "import { argv } from 'node:process';",
+          "import proc from 'node:process';",
+          'export const rest = argv.slice(2);',
+          "export const stdio = proc.argv.includes('--stdio');",
+          'export const path = proc.execPath;',
+        ],
+      });
+      assert.deepEqual(unstated, []);
     });
   });
 

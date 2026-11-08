@@ -120,13 +120,21 @@ first fails, and `npm test` fails when either does.
   not run under Jest. `--roots <dir>` (the sub-packages' `npm test`) selects that root on both
   runners; a root with no listed file runs Jest alone, with a line saying the runner was skipped.
   With `--roots`, a named file outside every root runs on neither runner.
-- **Jest's options.** Other options are Jest's, read as Jest reads them, from Jest's own option
-  table (`jest-cli`'s `yargsOptions`): an option's value is never taken for a file or a pattern
-  (`-t <name>`, `--config <file>`, `--testNamePattern=<x>`), and an array option
+- **Jest's options.** Other arguments are Jest's, read by Jest's own parser (`jest-cli`'s
+  `buildArgv`, the function `jest` reads its command line with), and handed to Jest as given:
+  the files and patterns are the positional arguments it reads. An option's value is never taken
+  for a file or a pattern (`-t <name>`, `--config <file>`, `--testNamePattern=<x>`, `-it=<x>`);
+  a boolean option takes a following `true` / `false`, its `--no-` form none, as yargs reads
+  them (`--cache false x` is `cache: false` and a pattern `x`; `--no-cache false x` is
+  `cache: false` and two patterns, `false` and `x`); an array option
   (`--reporters`, `--testPathIgnorePatterns`, …) takes every argument after it up to the next
-  option, as in Jest — so name files and patterns before such an option. An option Jest does not
-  know is refused before anything runs, and so is a group of short options whose letters before
-  the last take a value (`-tx`; write `-t x`).
+  option — so name files and patterns before such an option. What Jest refuses (an option it does
+  not know, a failed check of its own) is refused before anything runs, in Jest's words. A named
+  node:test file reaches Jest too, which ignores every file of the list.
+- **Fixture repositories.** `--repo <dir>` (the runner's own tests) builds and runs `<dir>`'s
+  node:test list and gives Jest `<dir>/jest.config.js` as its configuration (unless `--config` is
+  given), so a fixture's run reaches nothing of this repository's suite; a fixture without its
+  own configuration fails.
 - **One list, one guard.** A file is on the list or found by Jest, never both and never neither
   (`src/__tests__/unit/runner/partition.test.ts`, which reads Jest's discovery by
   `jest --listTests --json` over its configuration without the live suites' ignores, until

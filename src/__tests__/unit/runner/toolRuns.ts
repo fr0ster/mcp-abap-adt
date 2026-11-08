@@ -25,17 +25,19 @@ function finished(run: SpawnSyncReturns<string>): ToolRun {
 }
 
 /**
- * `node <script> …args` from the repository root. `env` replaces the
+ * `node <script> …args` from `cwd`, the repository root by default (a
+ * fixture repository's tool runs pass the fixture). `env` replaces the
  * environment; without it the child gets this process's.
  */
 export function runNode(
   script: string,
   args: readonly string[],
   env: NodeJS.ProcessEnv = environment(),
+  cwd: string = REPO,
 ): ToolRun {
   return finished(
     spawnSync(process.execPath, [script, ...args], {
-      cwd: REPO,
+      cwd,
       encoding: 'utf8',
       env,
       maxBuffer: 64 * 1024 * 1024,
@@ -43,13 +45,14 @@ export function runNode(
   );
 }
 
-/** `node tools/<name> …args` from the repository root. */
+/** `node tools/<name> …args` from `cwd`, the repository root by default. */
 export function runTool(
   name: string,
   args: readonly string[],
   env: NodeJS.ProcessEnv = environment(),
+  cwd: string = REPO,
 ): ToolRun {
-  return runNode(path.join(REPO, 'tools', name), args, env);
+  return runNode(path.join(REPO, 'tools', name), args, env, cwd);
 }
 
 /**
@@ -133,11 +136,53 @@ export function filesUnder(dir: string): string[] {
   return found.sort();
 }
 
+/** The characters a regular expression gives a meaning to. */
+const SPECIAL = '\\^$.*+?()[]{}|';
+
+/** `text` as a pattern matching exactly itself, as `jest.config.js` writes one. */
+function literal(text: string): string {
+  let pattern = '';
+  for (const character of text) {
+    pattern += SPECIAL.includes(character) ? `\\${character}` : character;
+  }
+  return `^${pattern}$`;
+}
+
+/**
+ * A fixture repository's own Jest configuration: its directory is the root
+ * directory and the one root, so no run over it reaches this repository's
+ * suite, with or without `--roots`; Jest's files are found as in
+ * `jest.config.js` (`testMatch` of `__tests__` `.test.ts` files, ts-jest with this
+ * repository's `tsconfig.test.json`), and every file of the fixture's
+ * node:test list is ignored by its exact path, as the repository's are.
+ */
+function fixtureJestConfig(dir: string, listed: readonly string[]): string {
+  const root = dir.split(path.sep).join('/');
+  const config = {
+    rootDir: dir,
+    roots: ['<rootDir>'],
+    testMatch: ['**/__tests__/**/*.test.ts'],
+    transform: {
+      '^.+\\.ts$': [
+        require.resolve('ts-jest'),
+        { tsconfig: path.join(REPO, 'tsconfig.test.json') },
+      ],
+    },
+    moduleFileExtensions: ['ts', 'js', 'json'],
+    testPathIgnorePatterns: [
+      '/node_modules/',
+      ...listed.map((source) => literal(`${root}/${source}`)),
+    ],
+  };
+  return `module.exports = ${JSON.stringify(config, null, 2)};\n`;
+}
+
 /**
  * A fixture repository: `sources` (path → text, written with `/`) and a
  * node:test list of `listed`. Its `tsconfig.node-test.json` extends the
  * repository's and builds into its own `.test-build/`; it names one stub
- * file, as the repository's names its preload.
+ * file, as the repository's names its preload. Its `jest.config.js` is its
+ * own (`fixtureJestConfig`); `npm-test.mjs --repo` hands it to Jest.
  */
 export function fixtureRepo(
   dir: string,
@@ -145,6 +190,7 @@ export function fixtureRepo(
   sources: Readonly<Record<string, string>>,
 ): string {
   writeAt(dir, 'tools/node-test-files.json', JSON.stringify(listed));
+  writeAt(dir, 'jest.config.js', fixtureJestConfig(dir, listed));
   writeAt(dir, 'stub.ts', 'export {};\n');
   writeAt(
     dir,

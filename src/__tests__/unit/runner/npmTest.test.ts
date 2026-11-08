@@ -166,6 +166,103 @@ describe('npm test', () => {
     });
   });
 
+  describe('a named file obeys the root filter on both runners', () => {
+    const repo = fixtureRepo(
+      path.join(scratch.dir, 'named'),
+      ['in/src/__tests__/inside.test.ts', 'out/src/__tests__/outside.test.ts'],
+      {
+        'in/src/__tests__/inside.test.ts': nodeTestSource(
+          'inside',
+          'FAIL_INSIDE',
+        ),
+        'out/src/__tests__/outside.test.ts': nodeTestSource(
+          'outside',
+          'FAIL_OUTSIDE',
+        ),
+      },
+    );
+    const root = path.join(repo, 'in', 'src');
+    const inside = path.join(root, '__tests__', 'inside.test.ts');
+    const outside = path.join(
+      repo,
+      'out',
+      'src',
+      '__tests__',
+      'outside.test.ts',
+    );
+
+    it('the runner refuses a named file outside every root', () => {
+      const built = runTool('build-node-tests.mjs', ['--repo', repo]);
+      assert.equal(built.status, 0, built.stderr);
+      const record = path.join(scratch.dir, 'named-runner-out.record');
+      const run = runTool(
+        'run-tests.mjs',
+        ['--repo', repo, '--concurrency', '1', '--root', root, outside],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 1);
+      assert.ok(
+        run.stderr.includes(`no named file under ${root}: no test file to run`),
+        run.stderr,
+      );
+      assert.deepEqual(recorded(record), []);
+    });
+
+    it('the runner runs a named file inside a root', () => {
+      const built = runTool('build-node-tests.mjs', ['--repo', repo]);
+      assert.equal(built.status, 0, built.stderr);
+      const record = path.join(scratch.dir, 'named-runner-in.record');
+      const run = runTool(
+        'run-tests.mjs',
+        ['--repo', repo, '--concurrency', '1', '--root', root, inside, outside],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(recorded(record), ['inside']);
+    });
+
+    it('the tool skips the runner for a named file outside every root', () => {
+      assert.deepEqual(
+        listed(['--repo', repo, '--roots', root, outside]).nodeTest,
+        [],
+      );
+      const record = path.join(scratch.dir, 'named-tool-out.record');
+      const run = runTool(
+        'npm-test.mjs',
+        ['--concurrency', '1', '--repo', repo, '--roots', root, outside],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.ok(
+        run.stdout.includes(
+          `npm-test: no named node:test file under ${root}; the runner skipped`,
+        ),
+        run.stdout,
+      );
+      assert.deepEqual(recorded(record), []);
+    });
+
+    it('the tool runs a named file inside a root', () => {
+      const record = path.join(scratch.dir, 'named-tool-in.record');
+      const run = runTool(
+        'npm-test.mjs',
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          repo,
+          '--roots',
+          root,
+          inside,
+          outside,
+        ],
+        environment({ RECORD: record }),
+      );
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(recorded(record), ['inside']);
+    });
+  });
+
   describe('a filtered run succeeds on both runners', () => {
     const repo = fixtureRepo(
       path.join(scratch.dir, 'both'),

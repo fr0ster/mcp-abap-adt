@@ -12,7 +12,9 @@
 //   alone, and a line says the runner was skipped.
 // - A named `….test.ts` file on the node:test list goes to the runner, any
 //   other to Jest; a runner given no named file while others were named is
-//   skipped, and so is Jest.
+//   skipped, and so is Jest. With `--roots`, a named file outside every root
+//   runs on neither (Jest applies its `--roots`; the runner's selection is
+//   intersected with the roots, and an empty one skips the runner).
 // - `--concurrency <N>` goes to the runner. The `test` script passes `1`:
 //   today's in-band behaviour, until the concurrency is measured (plan
 //   step 8). `TEST_CONCURRENCY` reaches the runner when no option is given.
@@ -99,7 +101,12 @@ const listed = new Set(runnerList([]));
 const ownRepo = repo === undefined ? OWN_REPO : resolve(repo);
 const isListed = (file) =>
   listed.has(relative(ownRepo, resolve(file)).split(sep).join('/'));
-const namedRunner = named.filter(isListed);
+// With `--roots`, a named file outside every root runs on neither runner:
+// Jest applies its `--roots` to it, and the runner's list mode does the same.
+const namedRunner =
+  named.length > 0 && roots.length > 0
+    ? runnerList([...rootArgs, ...named.filter(isListed)])
+    : named.filter(isListed);
 const namedJest = named.filter((file) => !isListed(file));
 
 const runJest = named.length === 0 || namedJest.length > 0;
@@ -131,7 +138,11 @@ if (runJest) {
 
 if (runnerSelection.length === 0) {
   console.log(
-    `npm-test: no node:test file under ${roots.join(', ') || 'the named files'}; the runner skipped`,
+    named.length === 0
+      ? `npm-test: no node:test file under ${roots.join(', ') || 'the node:test list'}; the runner skipped`
+      : roots.length === 0
+        ? 'npm-test: no named file is a node:test file; the runner skipped'
+        : `npm-test: no named node:test file under ${roots.join(', ')}; the runner skipped`,
   );
 } else if (
   node(join(TOOLS, 'build-node-tests.mjs'), repoArgs, false).status !== 0

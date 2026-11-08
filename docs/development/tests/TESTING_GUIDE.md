@@ -114,7 +114,8 @@ first fails, and `npm test` fails when either does.
 - **Selecting files.** `npm test -- <path>.test.ts` sends a listed file to the runner and any
   other to Jest; a runner, or Jest, given none of the named files is skipped. `--roots <dir>`
   (the sub-packages' `npm test`) selects that root on both runners; a root with no listed file
-  runs Jest alone, with a line saying the runner was skipped. Other arguments are Jest's.
+  runs Jest alone, with a line saying the runner was skipped. With `--roots`, a named file outside
+  every root runs on neither runner. Other arguments are Jest's.
 - **One list, one guard.** A file is on the list or found by Jest, never both and never neither
   (`src/__tests__/unit/runner/partition.test.ts`, which reads Jest's discovery by
   `jest --listTests --json` over its configuration without the live suites' ignores, until

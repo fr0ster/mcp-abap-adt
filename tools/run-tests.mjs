@@ -12,6 +12,8 @@
 //   given no file looks for files of its own, and a broken list would pass.
 // - A file named is run as named and must exist: a `….test.ts` source is run
 //   as its compiled file, which must exist too; a `….test.js` file as it is.
+//   With `--root`, a named file outside every root is not run (as Jest's
+//   `--roots` does), and a selection left empty is refused.
 // - `--concurrency <N>` is how many files run at once; without it, the
 //   variable `TEST_CONCURRENCY` gives it (the last `--concurrency` wins over
 //   the variable). With neither, the run is refused: there is no default — the
@@ -103,20 +105,37 @@ function isUnder(dir, file) {
   return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
-/** The sources of the list under the roots asked for, or all of them. */
-function selectedSources() {
-  const listed = readList(repo);
-  if (roots.length === 0) return listed;
-  const dirs = roots.map((root) => {
+/** The directories of `--root`, each required to exist. */
+function rootDirs() {
+  return roots.map((root) => {
     const dir = resolve(root);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) {
       fail(`--root ${root}: no such directory`);
     }
     return dir;
   });
-  return listed.filter((source) =>
-    dirs.some((dir) => isUnder(dir, sourceFile(repo, source))),
+}
+
+/** Whether `file` is under a root asked for; with no root, every file is. */
+function inRoots(dirs, file) {
+  return dirs.length === 0 || dirs.some((dir) => isUnder(dir, file));
+}
+
+/** The sources of the list under the roots asked for, or all of them. */
+function selectedSources() {
+  const dirs = rootDirs();
+  return readList(repo).filter((source) =>
+    inRoots(dirs, sourceFile(repo, source)),
   );
+}
+
+/**
+ * The named files under the roots asked for: a named file outside every
+ * root is not run, as Jest does with its `--roots`.
+ */
+function selectedNamed() {
+  const dirs = rootDirs();
+  return named.filter((arg) => inRoots(dirs, resolve(arg)));
 }
 
 /** A named file as the compiled file to run. */
@@ -134,7 +153,7 @@ function namedFile(arg) {
 }
 
 if (listOnly) {
-  for (const source of named.length > 0 ? named : selectedSources()) {
+  for (const source of named.length > 0 ? selectedNamed() : selectedSources()) {
     console.log(source);
   }
   process.exit(0);
@@ -157,7 +176,11 @@ if (
 
 let files;
 if (named.length > 0) {
-  files = named.map(namedFile);
+  const chosen = selectedNamed();
+  if (chosen.length === 0) {
+    fail(`no named file under ${roots.join(', ')}: no test file to run`);
+  }
+  files = chosen.map(namedFile);
 } else {
   const sources = selectedSources();
   if (sources.length === 0) {

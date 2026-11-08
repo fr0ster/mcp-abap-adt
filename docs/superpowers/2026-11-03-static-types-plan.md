@@ -2979,6 +2979,26 @@ Step 4 names.
     `['FUGR']` select as before. CHANGELOG (24.0.0): Changed — a hit's type is its ADT code
     where the main type was ambiguous (`PROG/I`, `FUGR/I`); a group include is its own object,
     counted apart from its group with its own allowance and capped flag.
+- [ ] **Step 4b3: A program include is one object, however many groups list it (DO28, owner).**
+  Reviewed in e745e5ac: a `/programs/includes/` include that two function groups list (or that
+  a package also holds as its own `PROG/I` node) is fetched once, but each listing answers its
+  hits and counts it — `snippets` and `lines` repeat them, `objects` merges the entries and adds
+  their counts, `scanned.objects` / `objects_with_hits` count it twice, `scanned.sources` once.
+  From DO28 a `PROG/I` is one object of the call, keyed by its name:
+  - its hits are answered once and it is counted once in `scanned.objects` and
+    `objects_with_hits`, with one `max_hits_per_object` allowance and one capped flag; a later
+    listing of the same include adds nothing (no hit, no count, no read);
+  - the occurrence answered is deterministic — the first in walk order (the targets' order, then
+    the group's member order), whatever order the concurrent reads finish in; its `devclass` is
+    that occurrence's;
+  - the same on the sequential and the batched path; `max_hits` and the chunk boundary are
+    unchanged.
+  - **Red first**, one test per claim, each shown red against e745e5ac: two groups listing one
+    include (snippets once, `scanned.objects` once, `objects` count not doubled); a package's own
+    `PROG/I` node also listed by a group; the order (the later-finishing first occurrence still
+    answers); one allowance across the listings with `max_hits_per_object`; both paths.
+  - MIGRATION-24.0 / CHANGELOG (unreleased, the `SearchSource` entries): a program include
+    listed by several groups is one object, answered and counted once.
 - [ ] **Step 4c: A refused level excludes only its branch (DO19).** Today a refused level of
   a walk ends the asked package's whole walk: `levelOf` (`src/lib/strategies/packageWalk.ts`)
   throws for a refused level — and, under `missingLevel: 'refused'`, which `SearchSource` passes
@@ -4832,6 +4852,10 @@ stand-in.
   a group include hit is its own object, like a module — counted apart in `scanned.objects` /
   `objects_with_hits`, with its own `max_hits_per_object` allowance and capped flag (amending
   DO18 for includes).
+- **DO28 (2026-11-08, D23b Step 4b3):** a program include (`PROG/I`) listed by several function
+  groups, or by a group and its package, is one object of the call: its hits answered once,
+  counted once in `scanned.objects` / `objects_with_hits`, one allowance and capped flag; the
+  first occurrence in walk order answers.
 
 ## Test coverage — the families
 

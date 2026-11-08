@@ -22,6 +22,7 @@ import type { AnswerLevel } from './answerLevel';
 import type { LineMatchStrategy } from './lineMatch';
 import {
   createPackageContentsFetcher,
+  type EnumeratedObject,
   type EnumerateInput,
   enumerateScanTargets,
   type PackageContentsFetcher,
@@ -220,6 +221,27 @@ interface ObjectAnswer {
   sources: number;
   /** The hits answered so far, against `max_hits_per_object`. */
   total: number;
+  /** The program include this object is (DO28), by its call-wide key; `undefined` for any other object. */
+  programInclude: string | undefined;
+}
+
+/**
+ * The program include a unit of `target` is (DO28): a `PROG/I` node read as
+ * its own target, or a `/programs/includes/` include a function group lists
+ * — one object of the call, keyed by its name, however many list it.
+ */
+function programIncludeOf(
+  target: EnumeratedObject,
+  unit: SourceUnit,
+): string | undefined {
+  if (unit.member !== undefined) {
+    return unit.member.object_type === 'PROG/I'
+      ? unit.member.name.toUpperCase()
+      : undefined;
+  }
+  return target.code === 'PROG/I'
+    ? target.object_name.toUpperCase()
+    : undefined;
 }
 
 async function runWithLimit<T>(
@@ -308,6 +330,12 @@ export async function runSearchSource(
   // counters count the work done).
   const sourcesRead = new Set<string>();
 
+  // Each program include of the call is one object (DO28): the position of
+  // the target whose occurrence answers it — the first in walk order seen so
+  // far. A later occurrence adds nothing; an earlier one finishing later
+  // takes it over, and only the first in walk order is answered below.
+  const includeOwners = new Map<string, number>();
+
   // Each target's answer, by its index.
   const answers: Array<ObjectAnswer[] | undefined> = Array.from(
     { length: targets.length },
@@ -324,7 +352,10 @@ export async function runSearchSource(
       // Each object of the target its own bookkeeping (DO18, DO27): the
       // target itself, and every module and include read under it.
       const objects = new Map<string, ObjectAnswer>();
-      const objectOf = (unit: SourceUnit): ObjectAnswer => {
+      const objectOf = (
+        unit: SourceUnit,
+        programInclude: string | undefined,
+      ): ObjectAnswer => {
         const key =
           unit.member === undefined
             ? ''
@@ -336,6 +367,7 @@ export async function runSearchSource(
           capped: false,
           sources: 0,
           total: 0,
+          programInclude,
         };
         objects.set(key, created);
         return created;
@@ -387,7 +419,15 @@ export async function runSearchSource(
         version,
         deps.sapAnswers,
       )) {
-        const object = objectOf(unit);
+        // A program include an earlier target answers: nothing here — no
+        // hit, no count, no room of `max_hits` (the read was the call's one).
+        const programInclude = programIncludeOf(target, unit);
+        if (programInclude !== undefined) {
+          const owner = includeOwners.get(programInclude);
+          if (owner !== undefined && owner < index) continue;
+          includeOwners.set(programInclude, index);
+        }
+        const object = objectOf(unit, programInclude);
         object.sources++;
         sourcesRead.add(unit.source);
         const terms = {
@@ -454,8 +494,15 @@ export async function runSearchSource(
   let objectsRead = 0;
   let objectsWithHits = 0;
   let truncatedByObjectCap = false;
-  for (const answer of answers) {
+  for (const [index, answer] of answers.entries()) {
     for (const object of answer ?? []) {
+      // A program include answered by the first occurrence in walk order only.
+      if (
+        object.programInclude !== undefined &&
+        includeOwners.get(object.programInclude) !== index
+      ) {
+        continue;
+      }
       if (object.sources > 0) objectsRead++;
       if (object.hits.length > 0) objectsWithHits++;
       if (object.capped) truncatedByObjectCap = true;

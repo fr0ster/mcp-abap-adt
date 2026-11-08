@@ -296,6 +296,13 @@ in one run, answers only the hits with counters of what it did, and skips what i
   in `scanned.objects` / `scanned.objects_with_hits`, with its own `max_hits_per_object`
   allowance and capped flag (it shared the group's). `object_types: ['PROG']` and `['FUGR']`
   select as before.
+- **A program include is one object, however many function groups list it** (DO28). An
+  include two groups list under `/programs/includes/`, or one a group lists and its package
+  also holds as its own `PROG/I`, is answered and counted once: its hits once in `results`,
+  once in `scanned.objects` / `scanned.objects_with_hits`, one `max_hits_per_object` allowance
+  and capped flag; the first listing in the scan order (the packages', then the group's
+  members') answers, with its `devclass`. A later listing adds nothing, and takes no room of
+  `max_hits`.
 - **New, nothing to do:** without them the answer is the hits with lines and snippets. To keep a
   large answer small, pass `answer: 'objects'` (one entry per object and include with its number
   of hits) or `'lines'` (no snippets), `max_hits` (the scan stops once the answer holds that many;

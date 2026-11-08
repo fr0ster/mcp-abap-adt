@@ -2979,7 +2979,7 @@ Step 4 names.
     `['FUGR']` select as before. CHANGELOG (24.0.0): Changed — a hit's type is its ADT code
     where the main type was ambiguous (`PROG/I`, `FUGR/I`); a group include is its own object,
     counted apart from its group with its own allowance and capped flag.
-- [ ] **Step 4b3: A program include is one object, however many groups list it (DO28, owner).**
+- [x] **Step 4b3: A program include is one object, however many groups list it (DO28, owner).**
   Reviewed in e745e5ac: a `/programs/includes/` include that two function groups list (or that
   a package also holds as its own `PROG/I` node) is fetched once, but each listing answers its
   hits and counts it — `snippets` and `lines` repeat them, `objects` merges the entries and adds

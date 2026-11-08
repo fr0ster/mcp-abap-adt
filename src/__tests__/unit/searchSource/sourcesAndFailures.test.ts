@@ -55,6 +55,7 @@ import {
   skipSapAnswers,
   undecided,
 } from '../../../lib/search-source/readFailure';
+import { readingOnce } from '../../../lib/search-source/sourceReader';
 import { carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { statusError } from '../../helpers/batchEnvelope';
@@ -684,14 +685,15 @@ describe('SearchSource: one read per source', () => {
   );
 
   it.each(PATHS)(
-    'a cache hit counts for both owners; the source read once counts once (%s)',
+    'the include both groups list is one object (DO28); the source read once counts once (%s)',
     async (batch) => {
       const { result } = searchShared({}, batch === 'absent');
       const payload = payloadOf(await result);
+      expect(payload.results).toHaveLength(2);
       expect(payload.scanned).toEqual({
-        objects: 2,
+        objects: 1,
         sources: 1,
-        objects_with_hits: 2,
+        objects_with_hits: 1,
       });
     },
   );
@@ -3427,5 +3429,266 @@ describe("D23b: a hit's type is its ADT code where the main type is ambiguous (D
         }).success,
       ).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D23b: a program include is one object, however many groups list it (DO28)
+// ---------------------------------------------------------------------------
+
+describe('D23b: a program include is one object, however many groups list it (DO28)', () => {
+  const INC_URI = '/sap/bc/adt/programs/includes/lzshared';
+  /**
+   * `ZDUPA` holds the function groups `ZGA` and `ZGB`, each with a module of
+   * its own (one hit) and both listing the program include `LZSHARED` (two
+   * hits) under `/programs/includes/`, and the group `ZGC` with a module
+   * (one hit); `ZDUPB` holds `LZSHARED` as its own `PROG/I` node.
+   */
+  const DUP: Repository = {
+    nodes: {
+      [nodeKey('ZDUPA')]: { types: [{ type: 'FUGR/F', nodeId: '000001' }] },
+      [nodeKey('ZDUPA', '1')]: {
+        objects: [
+          { type: 'FUGR/F', name: 'ZGA' },
+          { type: 'FUGR/F', name: 'ZGB' },
+          { type: 'FUGR/F', name: 'ZGC' },
+        ],
+      },
+      [nodeKey('ZDUPB')]: { types: [{ type: 'PROG/I', nodeId: '000001' }] },
+      [nodeKey('ZDUPB', '1')]: {
+        objects: [{ type: 'PROG/I', name: 'LZSHARED' }],
+      },
+    },
+    sources: {
+      'FM Z_GA_FM': 'marker a',
+      'FM Z_GB_FM': 'marker b',
+      'FM Z_GC_FM': 'marker c',
+      'INCLUDE LZSHARED': 'marker shared 1\nmarker shared 2',
+    },
+    fugrChildren: {
+      ZGA: [
+        [
+          'FUGR/FF',
+          'Z_GA_FM',
+          '/sap/bc/adt/functions/groups/zga/fmodules/z_ga_fm',
+        ],
+        ['FUGR/I', 'LZSHARED', INC_URI],
+      ],
+      ZGB: [
+        [
+          'FUGR/FF',
+          'Z_GB_FM',
+          '/sap/bc/adt/functions/groups/zgb/fmodules/z_gb_fm',
+        ],
+        ['FUGR/I', 'LZSHARED', INC_URI],
+      ],
+      ZGC: [
+        [
+          'FUGR/FF',
+          'Z_GC_FM',
+          '/sap/bc/adt/functions/groups/zgc/fmodules/z_gc_fm',
+        ],
+      ],
+    },
+    masks: {},
+  };
+  const P = [['served'], ['absent']] as const;
+  const search = (
+    fake: Fake,
+    absent: boolean,
+    args: Record<string, unknown> = {},
+  ) => searchOn(fake, { query: 'marker', ...args }, absent);
+  /** A hit as the tests read it. */
+  interface Hit {
+    object_name: string;
+    devclass: string;
+    line: number;
+  }
+  const shared = (results: Hit[]) =>
+    results.filter((h) => h.object_name === 'LZSHARED');
+  const sharedReads = (fake: Fake) =>
+    sentUrls(fake).filter((url) => url.startsWith(`${INC_URI}/`));
+
+  it.each(P)(
+    'two groups listing one include: its hits once, counted once (%s)',
+    async (batch) => {
+      const absent = batch === 'absent';
+      const fake = standOn(DUP);
+      const snippets = payloadOf(
+        await search(fake, absent, { packages: ['ZDUPA'] }),
+      );
+      expect(shared(snippets.results)).toEqual([
+        {
+          devclass: 'ZDUPA',
+          object_type: 'PROG/I',
+          object_name: 'LZSHARED',
+          include: 'LZSHARED',
+          line: 1,
+          snippet: 'marker shared 1',
+        },
+        {
+          devclass: 'ZDUPA',
+          object_type: 'PROG/I',
+          object_name: 'LZSHARED',
+          include: 'LZSHARED',
+          line: 2,
+          snippet: 'marker shared 2',
+        },
+      ]);
+      // Three modules and the one include.
+      expect(snippets.scanned).toEqual({
+        objects: 4,
+        sources: 4,
+        objects_with_hits: 4,
+      });
+      expect(sharedReads(fake)).toHaveLength(1);
+      const objects = payloadOf(
+        await search(standOn(DUP), absent, {
+          packages: ['ZDUPA'],
+          answer: 'objects',
+        }),
+      );
+      expect(shared(objects.results)).toEqual([
+        {
+          devclass: 'ZDUPA',
+          object_type: 'PROG/I',
+          object_name: 'LZSHARED',
+          include: 'LZSHARED',
+          hits: 2,
+        },
+      ]);
+    },
+  );
+
+  it.each(P)(
+    "a package's own PROG/I node also listed by a group: one object, the group's occurrence answers (%s)",
+    async (batch) => {
+      const fake = standOn(DUP);
+      const { results, scanned } = payloadOf(
+        await search(fake, batch === 'absent', {
+          packages: ['ZDUPA', 'ZDUPB'],
+        }),
+      );
+      expect(shared(results).map((h) => `${h.devclass}:${h.line}`)).toEqual([
+        'ZDUPA:1',
+        'ZDUPA:2',
+      ]);
+      expect(scanned).toEqual({ objects: 4, sources: 4, objects_with_hits: 4 });
+      expect(sharedReads(fake)).toHaveLength(1);
+    },
+  );
+
+  it.each(P)(
+    'one max_hits_per_object allowance across the listings (%s)',
+    async (batch) => {
+      const { results, truncated, scanned } = payloadOf(
+        await search(standOn(DUP), batch === 'absent', {
+          packages: ['ZDUPA', 'ZDUPB'],
+          max_hits_per_object: 1,
+        }),
+      );
+      expect(shared(results).map((h) => `${h.devclass}:${h.line}`)).toEqual([
+        'ZDUPA:1',
+      ]);
+      expect(truncated.by_object_cap).toBe(true);
+      expect(scanned).toEqual({ objects: 4, sources: 4, objects_with_hits: 4 });
+    },
+  );
+
+  it.each(P)(
+    'a later listing takes no room of max_hits: the hits after it still answer (%s)',
+    async (batch) => {
+      // Walk order: Z_GA_FM (1), LZSHARED under ZGA (2), Z_GB_FM (1),
+      // LZSHARED under ZGB (nothing), Z_GC_FM (1): five hits hold max_hits.
+      const { results, truncated } = payloadOf(
+        await search(standOn(DUP), batch === 'absent', {
+          packages: ['ZDUPA'],
+          max_hits: 5,
+        }),
+      );
+      expect(results.map(hitLabel)).toEqual([
+        'LZSHARED/LZSHARED',
+        'LZSHARED/LZSHARED',
+        'Z_GA_FM@ZGA',
+        'Z_GB_FM@ZGB',
+        'Z_GC_FM@ZGC',
+      ]);
+      expect(truncated.by_max_hits).toBe(false);
+    },
+  );
+
+  it('the first occurrence in walk order answers, however the reads finish', async () => {
+    const GROUP_A: PackageContentItem = {
+      name: 'ZGA',
+      type: 'FUGR/F',
+      packageName: 'ZPA',
+      isPackage: false,
+    };
+    const GROUP_B: PackageContentItem = {
+      ...GROUP_A,
+      name: 'ZGB',
+      packageName: 'ZPB',
+    };
+    const events: string[] = [];
+    const fake = sourcesFrom(
+      { 'INC:LZSHARED': 'marker shared 1\nmarker shared 2' },
+      (read) => events.push(`read ${read.name}`),
+    );
+    // Each group lists the include under `/programs/includes/`.
+    const listed = {
+      ok: true as const,
+      value: [
+        {
+          objecttype: 'FUGR/I',
+          objectname: 'LZSHARED',
+          objecturi: INC_URI,
+        },
+      ],
+    };
+    // The first group's structure answers only once the second group's
+    // include was read and its scan has run on: the later occurrence finishes
+    // first.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reader = readingOnce({
+      readSource: (read) => {
+        const answer = fake.readSource(read);
+        setImmediate(release);
+        return answer;
+      },
+      readStructure: async (group) => {
+        if (group === 'ZGA') {
+          await gate;
+          events.push('structure ZGA');
+        } else {
+          events.push(`structure ${group}`);
+        }
+        return listed;
+      },
+    });
+    const result = await runSearchSource(
+      {
+        lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
+        fetchPackageContents: async (name) =>
+          listing(name, name === 'ZPA' ? [GROUP_A] : [GROUP_B]),
+        sourceReader: reader,
+        resolvePackages: exactPackages,
+      },
+      { query: 'marker', packages: ['ZPA', 'ZPB'], concurrency: 2 },
+    );
+    // The second group's include was read before the first group's
+    // structure answered.
+    expect(events).toEqual(['structure ZGB', 'read LZSHARED', 'structure ZGA']);
+    expect(result.results.map((h) => `${h.devclass}:${h.object_name}`)).toEqual(
+      ['ZPA:LZSHARED', 'ZPA:LZSHARED'],
+    );
+    expect(result.scanned).toEqual({
+      objects: 1,
+      sources: 1,
+      objects_with_hits: 1,
+    });
   });
 });

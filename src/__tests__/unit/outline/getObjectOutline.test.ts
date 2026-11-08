@@ -12,7 +12,7 @@
  * the schema parse and the real adt-clients request are part of it.
  */
 
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { type PinCase, recordCase } from '../../helpers/pinCases';
 
 /** A corpus document as SAP's `200` answer. */

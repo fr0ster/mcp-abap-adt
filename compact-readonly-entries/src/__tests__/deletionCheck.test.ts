@@ -8,10 +8,10 @@
  * Real adt-clients code runs over a recording connection.
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
 import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,

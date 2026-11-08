@@ -19,11 +19,11 @@
 import { compactDeleteSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
 import { holdingLockOf } from '../../../src/__tests__/helpers/heldLocks';
 import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
 import {
   handleHandlerDelete,

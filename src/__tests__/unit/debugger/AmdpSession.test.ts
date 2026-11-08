@@ -1,12 +1,12 @@
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
-import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import { runWithRequestSignal } from '../../../lib/requestSignal';
 import { payloadCarriedBy } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   AMDP_BREAK_LINE,

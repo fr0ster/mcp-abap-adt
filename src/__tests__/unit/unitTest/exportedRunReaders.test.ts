@@ -17,7 +17,7 @@ import {
 } from '../../../handlers/unit_test/high/handleGetCdsUnitTestResult';
 import { handleGetUnitTest } from '../../../handlers/unit_test/high/handleGetUnitTest';
 import { handleGetUnitTestResultOnce } from '../../../handlers/unit_test/high/handleGetUnitTestResult';
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type RecordingConnection,
   recordingConnection,

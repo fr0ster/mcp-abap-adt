@@ -7,7 +7,7 @@
  * SAP's answers are the documents D1 captured.
  */
 
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { pinCases } from '../../helpers/pinCases';
 
 const CLASS = [

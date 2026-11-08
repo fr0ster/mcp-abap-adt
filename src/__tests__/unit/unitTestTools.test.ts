@@ -22,11 +22,11 @@ import {
   functionGroupTestInclude,
   programTestInclude,
 } from '../../handlers/unit_test/shared/writeTests';
-import { corpusBody } from '../../lib/adtCorpus';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { corpusBody } from '../helpers/adtCorpus';
 import { moduleInGroup } from '../helpers/functionModuleMetadata';
 import {
   type RecordedRequest,

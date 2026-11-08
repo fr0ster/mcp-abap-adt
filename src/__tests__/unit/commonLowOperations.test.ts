@@ -7,10 +7,10 @@ import { handleCheckObject } from '../../handlers/common/low/handleCheckObject';
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured } from '../../lib/strategies/reading';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,

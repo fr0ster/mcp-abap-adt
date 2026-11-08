@@ -16,13 +16,13 @@
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleHandlerGet } from '../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
 import { RUN_START_WITHOUT_ID } from '../../../src/handlers/common/low/handleActivateObject';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
 
 // The process declares its system type, as every launcher requires: the ADT

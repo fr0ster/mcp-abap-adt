@@ -14,7 +14,7 @@ import {
   handleRunAbapUnit,
   TOOL_DEFINITION,
 } from '../../handlers/unit_test/high/handleRunAbapUnit';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
 import { jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,

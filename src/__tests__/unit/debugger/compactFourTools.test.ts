@@ -16,7 +16,6 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody } from '../../../lib/adtCorpus';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import {
   AmdpSession,
@@ -29,6 +28,7 @@ import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,
 } from '../../../lib/toolSet';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 import { toolAnswer } from '../../helpers/toolAnswer';
 

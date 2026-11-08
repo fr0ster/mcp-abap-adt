@@ -20,12 +20,12 @@ import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage';
 import { handleUpdatePackage } from '../../handlers/package/high/handleUpdatePackage';
-import { corpusBody } from '../../lib/adtCorpus';
 import type {
   HandlerContext,
   HandlerEntry,
   ToolArgs,
 } from '../../lib/handlers/interfaces';
+import { corpusBody } from '../helpers/adtCorpus';
 import { holdingLockOf } from '../helpers/heldLocks';
 import {
   parityConnection,

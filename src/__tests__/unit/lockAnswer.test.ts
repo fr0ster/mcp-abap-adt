@@ -5,12 +5,12 @@
  */
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody } from '../../lib/adtCorpus';
 import { answer } from '../../lib/answer';
 import {
   analyseLock,
   carriesLockHandle,
 } from '../../lib/strategies/lockAnswer';
+import { corpusBody } from '../helpers/adtCorpus';
 
 const LOCKED =
   '<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><LOCK_HANDLE>4D88C06807F74D8FF36049093A5016DE</LOCK_HANDLE><CORRNR/></DATA></asx:values></asx:abap>';

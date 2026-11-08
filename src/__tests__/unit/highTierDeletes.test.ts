@@ -71,9 +71,9 @@ import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
 import { handleCheckTableType } from '../../handlers/table_type/high/handleCheckTableType';
 import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
-import { corpusBody } from '../../lib/adtCorpus';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { parseStructure } from '../../lib/strategies/reading';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,

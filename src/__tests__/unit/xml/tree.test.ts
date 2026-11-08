@@ -3,7 +3,7 @@
  * reader over documents of the corpus (`tests/fixtures/adt`) parsed as the
  * readers parse them (`parseStructure`), and over JSON.
  */
-import { corpusBody } from '../../../lib/adtCorpus';
+
 import {
   attributeOf,
   firstAttribute,
@@ -22,6 +22,7 @@ import {
   listOf,
   text,
 } from '../../../lib/xml/tree';
+import { corpusBody } from '../../helpers/adtCorpus';
 
 const inactive = parseStructure(
   corpusBody('activation-still-inactive--01-activation'),

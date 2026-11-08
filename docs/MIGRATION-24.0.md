@@ -126,6 +126,10 @@ group validations refuse a taken name with `SEVERITY` `ERROR` and a sentence, wi
 **The rule:** SAP's answers and errors are judged by their T100 key (message class and number)
 and message type; where SAP gives no key, by the structured verdict, its text relayed as it came.
 
+## Embedders: `parseConfigArg()` reads the program arguments
+
+`parseConfigArg()` (`@mcp-abap-adt/lib/config`) without an argument reads `process.argv.slice(2)`, no longer the executable and the script path; pass `argv` to read anything else.
+
 ## Callers of the checked deletes: the delete is sent once the check permits it
 
 **Changed:** `DeleteBehaviorDefinition`, `DeleteBehaviorImplementation`, `DeleteCdsUnitTest`,

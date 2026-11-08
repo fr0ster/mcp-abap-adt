@@ -1,5 +1,5 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import { patchFunctionGroupXml } from '../../lib/strategies/functionGroupPatch';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * `patchFunctionGroupXml`'s own test, standalone from any handler — proves

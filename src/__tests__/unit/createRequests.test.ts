@@ -20,12 +20,12 @@
  */
 
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { corpusBody } from '../../lib/adtCorpus';
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { corpusBody } from '../helpers/adtCorpus';
 import { jsonFind, listedJson } from '../helpers/listedJson';
 import {
   type PinnedRequest,

@@ -85,7 +85,6 @@ import { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirt
 import { handleActivateTable } from '../../handlers/table/low/handleActivateTable';
 import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
-import { corpusBody } from '../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { listedTool } from '../../lib/listedTool';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
@@ -96,6 +95,7 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 import { sessionContext } from '../../lib/utils';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   fakeClientOfWithFactory,

@@ -22,7 +22,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   BATCH_MODE_ON_WORDS,
   BATCH_MODE_OTHER_WORDS,
@@ -53,6 +52,7 @@ import {
   fullReadOnlyToolSet,
   fullToolSet,
 } from '../../../lib/toolSet';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type EnvelopeAnswer,
   envelopeConnection,

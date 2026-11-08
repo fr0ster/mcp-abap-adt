@@ -1,7 +1,7 @@
 import { handleCheckMetadataExtension as high } from '../../handlers/ddlx/high/handleCheckMetadataExtension';
 import { handleCheckMetadataExtension as low } from '../../handlers/ddlx/low/handleCheckMetadataExtension';
-import { corpusBody } from '../../lib/adtCorpus';
 import { parseStructure } from '../../lib/strategies/reading';
+import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 
 /**

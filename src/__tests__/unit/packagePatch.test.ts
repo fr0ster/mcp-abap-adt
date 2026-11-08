@@ -1,5 +1,5 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import { patchPackageXml } from '../../lib/strategies/packagePatch';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * `patchPackageXml`'s own test, standalone from any handler — proves the

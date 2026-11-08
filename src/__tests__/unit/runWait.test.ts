@@ -50,7 +50,7 @@ import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../handlers/unit_test/high/handleRunUnitTest';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
 import { declaredRequired, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,

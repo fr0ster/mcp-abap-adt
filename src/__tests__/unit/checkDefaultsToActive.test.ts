@@ -25,8 +25,8 @@ import { handleCheckStructure as strucHigh } from '../../handlers/structure/high
 import { handleCheckStructure as strucLow } from '../../handlers/structure/low/handleCheckStructure';
 import { handleCheckTable as tablHigh } from '../../handlers/table/high/handleCheckTable';
 import { handleCheckTable as tablLow } from '../../handlers/table/low/handleCheckTable';
-import { corpusBody } from '../../lib/adtCorpus';
 import { parseStructure } from '../../lib/strategies/reading';
+import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
 

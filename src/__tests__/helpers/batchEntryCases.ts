@@ -10,7 +10,7 @@
  * end the call before it shows what it sends next).
  */
 
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from './adtCorpus';
 
 export interface BatchEntryCase {
   tool: string;

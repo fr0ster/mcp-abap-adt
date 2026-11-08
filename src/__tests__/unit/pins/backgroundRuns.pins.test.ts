@@ -21,7 +21,7 @@
  * stated as that variant.
  */
 
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import type { McpResult } from '../../helpers/pinCases';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 

@@ -65,7 +65,6 @@ import { handleGetCdsUnitTestStatus } from '../../handlers/unit_test/high/handle
 import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest';
 import { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus';
-import { corpusBody } from '../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
@@ -76,6 +75,7 @@ import {
   verbatim,
 } from '../../lib/strategies/reading';
 import { child, listOf } from '../../lib/xml/tree';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   fakeClientOfWithFactory,

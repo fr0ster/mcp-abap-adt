@@ -20,9 +20,9 @@
  */
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody } from '../../../lib/adtCorpus';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { answerSourceRead } from '../../../lib/handlers/sourceRange';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { moduleInGroup } from '../../helpers/functionModuleMetadata';
 import { type PinCase, recordCase } from '../../helpers/pinCases';
 

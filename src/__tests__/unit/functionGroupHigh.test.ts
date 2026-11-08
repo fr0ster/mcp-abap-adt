@@ -1,5 +1,5 @@
 import { handleUpdateFunctionGroup } from '../../handlers/function/high/handleUpdateFunctionGroup';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOfWithFactory,
   okResponse,

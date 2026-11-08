@@ -1,5 +1,5 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import { patchDataElementXml } from '../../lib/strategies/dataElementPatch';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * `patchDataElementXml`'s own test, standalone from any handler.

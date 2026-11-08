@@ -1,4 +1,3 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import { patchDomainXml } from '../../lib/strategies/domainPatch';
 import { patchTableTypeXml } from '../../lib/strategies/tableTypePatch';
 import {
@@ -8,6 +7,7 @@ import {
   patchXmlElementAttribute,
   XmlPatchError,
 } from '../../lib/strategies/xmlPatch';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /** A value carrying each replacement pattern String.prototype.replace reads. */
 const PATTERNS = ['$&', '$1', '$$', '$`', "$'"];

@@ -18,7 +18,6 @@ import { handleHandlerActivate } from '../../../compact-modify/src/handlers/hand
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import { handleGetActivationResults } from '../../handlers/common/readonly/handleGetActivationRun';
-import { corpusBody } from '../../lib/adtCorpus';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import {
   activationExecutedOf,
@@ -30,6 +29,7 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { corpusBody } from '../helpers/adtCorpus';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 const CHECKLIST = 'xmlns:chkl="http://www.sap.com/abapxml/checklist"';

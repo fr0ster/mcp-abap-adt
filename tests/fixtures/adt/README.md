@@ -538,10 +538,11 @@ file as the documentation of why the readings look the way they do.
 - `adtRefusal.ts` imports `fast-xml-parser` and nothing else. No MCP type, no
   handler, no config, nothing from this repository.
 - The corpus is plain files. No generator, no build step.
-- The fixture location is spelled once, in `src/lib/adtCorpus.ts`. Every test
-  asks that module. Moving the corpus is one edit, not one per test file.
+- The fixture location is spelled once, in `src/__tests__/helpers/adtCorpus.ts`
+  (test support, resolved from the repository root). Every test asks that
+  module. Moving the corpus is one edit, not one per test file.
 
-**What goes:** `src/lib/adtRefusal.ts`, `src/lib/adtCorpus.ts`,
+**What goes:** `src/lib/adtRefusal.ts`, `src/__tests__/helpers/adtCorpus.ts`,
 `tests/fixtures/adt/` entire, `src/__tests__/unit/adtRefusalReadings.test.ts`,
 `adtRefusalCorpus.test.ts`, `adtMetadataShapes.test.ts`, and this README.
 

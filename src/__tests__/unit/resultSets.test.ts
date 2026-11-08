@@ -11,7 +11,6 @@ import {
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import type { AdtReading } from '../../lib/strategies/reading';
 import {
   ourUnitTest,
@@ -19,6 +18,7 @@ import {
   READING_BY_SLOT,
   resultsFor,
 } from '../../lib/strategies/resultSets';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 describe('the slot table', () => {
   it('knows a reading for every slot every shipped set declares', () => {

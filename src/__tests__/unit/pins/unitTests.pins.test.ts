@@ -16,7 +16,7 @@
  * - `HandlerUnitTestResult`: the compact result tool, which reads only the
  *   result.
  */
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { type McpResult, pinCases } from '../../helpers/pinCases';
 
 const RUN = 'FA53C505DD7B1FD1ABB8599833A05D44';

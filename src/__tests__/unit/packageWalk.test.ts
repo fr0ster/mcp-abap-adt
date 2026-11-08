@@ -1,7 +1,6 @@
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { HandlerContext } from '../../handlers/interfaces';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   assembleList,
   assembleTree,
@@ -14,6 +13,7 @@ import {
   walkPackage,
 } from '../../lib/strategies/packageWalk';
 import { succeeded } from '../../lib/strategies/stepResponse';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * The walk, offline, over the levels the corpus recorded.

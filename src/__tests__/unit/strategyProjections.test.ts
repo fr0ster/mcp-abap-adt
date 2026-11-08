@@ -1,4 +1,3 @@
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   project,
   terseActivation,
@@ -8,6 +7,7 @@ import {
   terseWrite,
 } from '../../lib/strategies/projections';
 import { parseStructure } from '../../lib/strategies/reading';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * One parse, three answers, against real documents.

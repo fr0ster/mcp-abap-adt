@@ -1,10 +1,10 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import {
   patchTableTypeXml,
   readTableTypeDefinition,
 } from '../../lib/strategies/tableTypePatch';
 import { readStoredDefinition } from '../../lib/strategies/tableTypeStored';
 import { XmlPatchError } from '../../lib/strategies/xmlPatch';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * The document SAP answers for STRING_TABLE, byte for byte (the corpus

@@ -4,10 +4,10 @@ import {
   handleRunATC,
   TOOL_DEFINITION,
 } from '../../handlers/atc/high/handleRunATC';
-import { corpusBody } from '../../lib/adtCorpus';
 import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
 import { declareSystemKind } from '../../lib/systemKind';
+import { corpusBody } from '../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 import { jsonAt, listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';

@@ -11,12 +11,12 @@ import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { runCLI } from 'jest';
-import { corpusBody } from '../../../lib/adtCorpus';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type AdtStandIn,
   adtStandIn,

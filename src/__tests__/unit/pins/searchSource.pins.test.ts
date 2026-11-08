@@ -10,7 +10,7 @@
  *   confirmed), then its source; SAP's answers are the corpus documents.
  */
 
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { envelopeResponse } from '../../helpers/batchEnvelope';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 

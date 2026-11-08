@@ -11,7 +11,7 @@
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

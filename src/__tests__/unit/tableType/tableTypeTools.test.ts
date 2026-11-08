@@ -30,7 +30,6 @@ import {
   TOOL_DEFINITION as UpdateTableType_Tool,
 } from '../../../handlers/table_type/high/handleUpdateTableType';
 import { handleActivateTableType } from '../../../handlers/table_type/low/handleActivateTableType';
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   VERSION_SOURCE_KINDS,
   VERSIONED_KINDS,
@@ -45,6 +44,7 @@ import {
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 import {
   type RecordingConnection,

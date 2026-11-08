@@ -1,4 +1,3 @@
-import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import {
   locationId,
   readAmdpEvents,
@@ -7,6 +6,7 @@ import {
   terseAmdpEvent,
 } from '../../../lib/debugger/amdpReadings';
 import { TERSE_STACK_FRAMES } from '../../../lib/debugger/readings';
+import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import {
   AMDP_BREAK_LINE,
   AMDP_MAIN_ID,

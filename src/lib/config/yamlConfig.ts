@@ -22,10 +22,11 @@ export type YamlConfig = Record<string, unknown>;
 
 /**
  * `--conf` / `--config` as given on the command line, or undefined. Plain
- * code over the arguments.
+ * code over the arguments; by default the program's own (`process.argv`
+ * after the executable and the script path, which are never read).
  */
 export function parseConfigArg(
-  argv: readonly string[] = process.argv,
+  argv: readonly string[] = process.argv.slice(2),
 ): string | undefined {
   for (const name of [CONF_ROW.cli, ...(CONF_ROW.cliAliases ?? [])]) {
     for (let i = 0; i < argv.length; i++) {

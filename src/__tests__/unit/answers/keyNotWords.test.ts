@@ -15,7 +15,6 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { handleCreateFunctionGroup } from '../../../handlers/function/high/handleCreateFunctionGroup';
 import { dumpSummaryOf } from '../../../handlers/system/readonly/handleRuntimeGetDumpById';
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   rfcAddressRefusalFor,
   rfcAddressRefusalOf,
@@ -30,6 +29,7 @@ import {
   parseValidationResponse,
   return_error,
 } from '../../../lib/utils';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires.

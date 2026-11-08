@@ -10,7 +10,7 @@
  */
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from './adtCorpus';
 import { moduleMetadataDocument } from './functionModuleMetadata';
 import {
   type RecordedRequest,

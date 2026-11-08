@@ -1,9 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { child, entries, isElement } from './xml/tree';
+import { child, entries, isElement } from '../../lib/xml/tree';
+import { repositoryRoot } from './repoRoot';
 
 /**
- * Where the raw ADT corpus lives, resolved in one place.
+ * Where the raw ADT corpus lives, resolved in one place: in the repository,
+ * from its root (`repositoryRoot`), so a test reads it there whether it runs
+ * from its source (Jest) or from the node:test build. Test support only: no
+ * production code reads the corpus.
  *
  * The readings left, into `@mcp-abap-adt/adt-strategies`, and the corpus went
  * with them — that repository tests them against it. This copy stays because
@@ -15,9 +19,7 @@ import { child, entries, isElement } from './xml/tree';
  * See `tests/fixtures/adt/README.md` for what the corpus is.
  */
 export const ADT_CORPUS_DIR = path.join(
-  __dirname,
-  '..',
-  '..',
+  repositoryRoot(__dirname),
   'tests',
   'fixtures',
   'adt',

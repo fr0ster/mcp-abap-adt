@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [24.0.0] - 2026-11-08
+## [24.0.0] - 2026-11-09
 
 A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the compiler can check is checked by the compiler. A tool's arguments are a zod schema, which is both their type and the one check of a call; an entry carries its call, typed by that schema; every production source is free of type assertions, `any`, non-null `!` and suppression comments, and a gate keeps it so. Over MCP the tools list as in 23.1.0, except the arguments named below; what changes is the TypeScript surface an embedder compiles against, and the answers to arguments that never reached a handler as declared. Every breaking item has its **Migrating:** note, and [the 24.0 migration note](docs/MIGRATION-24.0.md) collects them. The eighteen packages are all at 24.0.0, every sibling range at `^24.0.0`; the ADT dependencies move to `@mcp-abap-adt/adt-clients` 43.0.1, `@mcp-abap-adt/adt-strategies` 0.19.1 and `@mcp-abap-adt/interfaces-adt` 26 (below).
 
@@ -25,6 +25,10 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 - **`return_response(response: ResponseText)`** (`{ readonly data: string }`, exported from `@mcp-abap-adt/lib/utils`) answers `McpResult`; it took an `AxiosResponse`. **Migrating:** an answer whose `data` is not text does not compile — pass the text.
 - **`IHttpApplication.use` is two overloads,** `use(handler)` and `use(path, handler)`, as Express states it, so an Express application is an `IHttpApplication` without a cast; `RouteHandler` and `IHttpApplication` are typed by `@types/express` 5, a dependency of `@mcp-abap-adt/lib` and `@mcp-abap-adt/server-runtime` now (it was absent, so their express types read as `any`). **Migrating:** an application whose `use` takes a different signature implements the two forms.
 - **The logger adapters take `unknown`** beside the message, as `ILogger` does (they took `any`).
+
+### Changed — for an embedder of `@mcp-abap-adt/lib/config`
+
+- **`parseConfigArg()` without an argument reads the program's arguments** (`process.argv.slice(2)`); it read the whole `process.argv`, so a script path starting with `--conf` was taken for the option. **Migrating:** nothing, unless you relied on that; a call that passes `argv` reads what it is given, as before.
 
 ### Removed — breaking for an embedder of `@mcp-abap-adt/lib/utils`
 

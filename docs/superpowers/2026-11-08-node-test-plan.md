@@ -372,9 +372,9 @@ the steps that name them.
       registers a connection the hook would close (Appendix B2); a file step 1 finds that
       does is changed here to close its own;
     - the no-timeout scan's shrinking list (step 5) emptied.
-    - a test moved to node:test that reads the ADT corpus reads the repository's corpus
-      through the repository-root helper, not `ADT_CORPUS_DIR` (in the node:test build that
-      names the copy placed beside the compiled `adtCorpus.js`, step 9).
+    - a test moved to node:test that reads the ADT corpus reads it through the moved helper
+      `helpers/adtCorpus.ts`, whose `ADT_CORPUS_DIR` resolves from the repository root, so
+      the corpus is read from the repository, never from the build (step 9).
     **Steps (red first):**
     - [ ] Red, as node:test files run through `node --test` with the new reporter:
       - the reporter: `passes` → `passed`; a failing body → `failed`; a failing `afterEach`

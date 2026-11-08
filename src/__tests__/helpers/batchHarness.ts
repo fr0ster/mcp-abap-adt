@@ -14,7 +14,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CompactModifyHandlersGroup } from '../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../compact-readonly-entries/src/group';
-import { corpusBody } from '../../lib/adtCorpus';
 import { requestKind, type SessionKind } from '../../lib/batch/sessionKind';
 import {
   HighLevelHandlersGroup,
@@ -27,6 +26,7 @@ import type {
   HandlerContext,
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
+import { corpusBody } from './adtCorpus';
 import type { BatchEntryCase } from './batchEntryCases';
 import { holdingLockOf } from './heldLocks';
 import { LOCK_SUCCESS_XML } from './recordingConnection';

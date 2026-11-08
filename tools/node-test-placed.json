@@ -12,7 +12,6 @@
   "server/package.json",
   "sse-ro/package.json",
   "sse/package.json",
-  "tests/fixtures/adt",
   "tools/batch-handlers.json",
   "tools/tool-search.json"
 ]

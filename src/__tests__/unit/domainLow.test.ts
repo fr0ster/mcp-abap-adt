@@ -5,11 +5,11 @@ import {
 import { handleActivateDomain } from '../../handlers/domain/low/handleActivateDomain';
 import { handleCheckDomain } from '../../handlers/domain/low/handleCheckDomain';
 import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
-import { corpusBody } from '../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,

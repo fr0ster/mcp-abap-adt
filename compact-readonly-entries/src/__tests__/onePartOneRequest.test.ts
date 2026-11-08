@@ -22,12 +22,12 @@
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetServiceBindingPreviewUrl } from '@mcp-abap-adt/lib/handlers/read';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
 
 // The process declares its system type, as every launcher requires: the ADT

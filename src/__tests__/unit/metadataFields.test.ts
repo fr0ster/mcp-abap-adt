@@ -5,13 +5,14 @@
  * attribute quoted with apostrophes, an entity, attributes in another order —
  * reads as XML says.
  */
-import { corpusBody } from '../../lib/adtCorpus';
+
 import {
   classIncludeTypesOf,
   includeContextUriOf,
   packageRefNameOf,
   whereUsedScopeTypesOf,
 } from '../../lib/strategies/metadataFields';
+import { corpusBody } from '../helpers/adtCorpus';
 
 const CLASS = corpusBody('read-metadata-class--01-classes-zbpmcpshriroot');
 

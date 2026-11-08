@@ -3,9 +3,9 @@
  * (`tests/fixtures/adt`) parses and builds back to its own text.
  */
 import { readdirSync } from 'node:fs';
-import { ADT_CORPUS_DIR, corpusBody } from '../../../lib/adtCorpus';
 import { buildOrdered, parseOrdered } from '../../../lib/xml/ordered';
 import { isList } from '../../../lib/xml/tree';
+import { ADT_CORPUS_DIR, corpusBody } from '../../helpers/adtCorpus';
 
 const SUFFIX = '.body.xml';
 const cases = readdirSync(ADT_CORPUS_DIR)

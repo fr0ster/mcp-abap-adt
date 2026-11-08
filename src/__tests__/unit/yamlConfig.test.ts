@@ -20,6 +20,7 @@ import { readStartupConfig } from '../../lib/config/startup';
 import {
   generateConfigTemplateIfNeeded,
   loadYamlConfig,
+  parseConfigArg,
   validateYamlConfig,
 } from '../../lib/config/yamlConfig';
 
@@ -169,5 +170,34 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
         expect(exits).toEqual([1]);
       }
     });
+  });
+});
+
+describe('parseConfigArg reads the program arguments by default', () => {
+  /** `process.argv` as `argv` while `body` runs, then restored. */
+  function withArgv<T>(argv: string[], body: () => T): T {
+    const saved = process.argv;
+    process.argv = argv;
+    try {
+      return body();
+    } finally {
+      process.argv = saved;
+    }
+  }
+
+  it('a script path starting with --conf is not read', () => {
+    expect(
+      withArgv(['/usr/bin/node', '--conf=/from/the/script/path.yaml'], () =>
+        parseConfigArg(),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('a --conf among the arguments is read', () => {
+    expect(
+      withArgv(['/usr/bin/node', '/bin/server', '--conf=/etc/given.yaml'], () =>
+        parseConfigArg(),
+      ),
+    ).toBe('/etc/given.yaml');
   });
 });

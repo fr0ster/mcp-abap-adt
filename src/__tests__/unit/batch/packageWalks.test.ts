@@ -24,10 +24,10 @@ import { handleGetPackageContents } from '../../../handlers/package/readonly/han
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
-import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
+import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import {
   envelopeConnection,
   envelopeResponse as envelopeOf,

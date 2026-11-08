@@ -214,15 +214,45 @@ the steps that name them.
    **Files:** none committed but the findings; the probe is a hand-run script, deleted after
    the run, its results written into `src/__tests__/integration/README.md`'s draft section
    and into this plan.
-   - [ ] On each OS of CI's matrix where it can be run, and on Node 22 and 24: a node:test
+   - [x] On each OS of CI's matrix where it can be run, and on Node 22 and 24: a node:test
      fixture file whose test body awaits work and whose `after` hook runs a cleanup that takes
      long enough to be interrupted, run through the runner. Ctrl-C (SIGINT; on Windows the
      console's Ctrl-C) once during the body, once during the cleanup, and twice. Record which
      process gets the signal (runner, `node --test`, the file's process), what the running
      test and hook see (`t.signal`, `process` events), whether the hook finishes, and the
      exit code.
+     **Run** (2026-11-08): Linux only — Node 26.7.0 on the host, 22.23.4 and 24.20.0 in the
+     official `node:22` / `node:24` images on a copy of the tree; SIGINT to the runner's process
+     group (a terminal's Ctrl-C) and to the runner's pid alone; the file with no listener, a
+     SIGINT listener, and SIGINT + SIGTERM listeners; `node --test` directly as a reference.
+     The three versions behaved the same (Measured). Findings (Measured unless tagged; the
+     table is in `src/__tests__/integration/README.md`, "Interrupts (draft)"):
+     - the runner (`spawnSync`, no handler) dies on the SIGINT at once (signal SIGINT, 130 in a
+       shell), whether the signal comes to the group or to it alone, and waits for nothing;
+     - `node --test` handles SIGINT: reports the file cancelled, sends SIGTERM to the file's
+       process 1–4 ms later, and exits 1 without waiting for that process to end;
+     - the file's process gets the group's SIGINT; node:test installs no SIGINT/SIGTERM
+       listener there; with none, or a SIGINT listener only, it is killed (by the SIGINT or the
+       SIGTERM) and the running hook never finishes; with both listeners it survives, and a
+       hook interrupted mid-cleanup finishes — after the runner and `node --test` have exited,
+       as an orphan whose output nobody reads; interrupted in the body, the body runs on, the
+       hook starts and the process ends during it (cause not established);
+     - `t.signal` and the hook's signal are never aborted by an interrupt;
+     - SIGINT to the runner's pid alone: only the runner ends; `node --test` and the file run
+       to their natural end as orphans (the hook finishes, exit 0);
+     - a second group SIGINT finds the group empty (ESRCH) unless the file ignores both
+       signals, and then changes nothing;
+     - no process was left: every one had ended by itself within 20 s.
+     **Not measured:** macOS and Windows (CI's other runners), a TTY.
    - [ ] The findings decide the mechanism of step 12; if they show the first interrupt cannot
      be made to let a cleanup finish on some platform, that goes to the owner before step 12.
+     **Status:** on Linux (Node 22, 24, 26) the first interrupt as it stands cuts a running
+     cleanup (Measured); a cleanup finished only when its process ignored both SIGINT and
+     SIGTERM, and then after the run had ended (Measured). That a mechanism in the runner and
+     the live helpers can make it finish before the run exits is an Inference, not measured;
+     macOS and Windows are unmeasured. So this goes to the owner before step 12, with a
+     proposal for measuring macOS and Windows (a temporary CI job running the probe on CI's
+     `macos-latest` and `windows-latest` runners).
 
 ## The scans and the measurements (spec §4, §2)
 

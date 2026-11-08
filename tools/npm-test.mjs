@@ -16,8 +16,12 @@
 //   and its refusal of an unknown option), resolved from the installed
 //   `jest`. Its positional arguments (`_`) are the named files and patterns;
 //   an option's value is never one. What it refuses, nothing runs for, with
-//   its words. The arguments go to Jest as they were given; the tool's own
-//   options are added before the first `--`, so none reads as a positional.
+//   its words. The arguments go to Jest as they were given, each of the
+//   tool's own options (`--roots`, `--concurrency`, `--repo`, `--list`)
+//   replaced by a boundary that keeps the reading of what follows it; the
+//   options the tool adds go before the first `--`, so none reads as a
+//   positional. `--help` and `--version` are Jest's: they print and end
+//   the run, `--list` or not.
 // - A positional `….test.ts` on the node:test list goes to the runner; every
 //   other positional (a file or a pattern) is Jest's — by path
 //   (`--runTestsByPath`) when every one is an existing file, else all as
@@ -71,7 +75,14 @@ let repo;
 let listOnly = false;
 
 // The tool's own options; everything else, in order, is Jest's. After `--`
-// every argument is a positional, Jest's.
+// every argument is a positional, Jest's. Each of the tool's options taken
+// out leaves `BOUNDARY` in its place, so what follows reads as it did:
+// without it, `--reporters default --roots src secondSuite` would hand Jest
+// `--reporters default secondSuite`, and `secondSuite` would be a reporter.
+// The boundary is an option Jest knows that changes nothing — the tool
+// passes `--passWithNoTests` to Jest in any case — written with its value,
+// so it takes no `true` / `false` after it.
+const BOUNDARY = '--passWithNoTests=true';
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i += 1) {
   const arg = args[i];
@@ -98,7 +109,9 @@ for (let i = 0; i < args.length; i += 1) {
     break;
   } else {
     jestArgs.push(arg);
+    continue;
   }
+  jestArgs.push(BOUNDARY);
 }
 
 // Jest's reading of its arguments. A refusal of yargs' own (a failed check)

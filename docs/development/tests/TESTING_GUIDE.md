@@ -128,9 +128,12 @@ first fails, and `npm test` fails when either does.
   them (`--cache false x` is `cache: false` and a pattern `x`; `--no-cache false x` is
   `cache: false` and two patterns, `false` and `x`); an array option
   (`--reporters`, `--testPathIgnorePatterns`, …) takes every argument after it up to the next
-  option — so name files and patterns before such an option. What Jest refuses (an option it does
-  not know, a failed check of its own) is refused before anything runs, in Jest's words. A named
-  node:test file reaches Jest too, which ignores every file of the list.
+  option — so name files and patterns before such an option. The tool's own options (`--roots`,
+  `--concurrency`, `--repo`, `--list`) end such an option as any option does, though Jest never
+  sees them. What Jest refuses (an option it does not know, a failed check of its own) is refused
+  before anything runs, in Jest's words. A named node:test file reaches Jest too, which ignores
+  every file of the list. `--help` and `--version` print Jest's answer and end the run, with
+  `--list` too (no JSON).
 - **Fixture repositories.** `--repo <dir>` (the runner's own tests) builds and runs `<dir>`'s
   node:test list and gives Jest `<dir>/jest.config.js` as its configuration (unless `--config` is
   given), so a fixture's run reaches nothing of this repository's suite; a fixture without its

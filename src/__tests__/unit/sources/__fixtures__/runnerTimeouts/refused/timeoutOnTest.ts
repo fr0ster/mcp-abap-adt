@@ -27,3 +27,12 @@ function withEither(either: { timeout: number } | { concurrency: number }) {
 withEither({ concurrency: 1 });
 const held = test;
 held('a test held in a variable', { timeout: 1000 }, () => {});
+// An index signature the key `timeout` fits: the type names no `timeout`,
+// the value holds one.
+const indexed: { concurrency: number; [key: string]: number } = {
+  concurrency: 1,
+  timeout: 1000,
+};
+test('bounded through an index signature', indexed, () => {});
+const patterned: { [key: `time${string}`]: number } = { timeout: 1000 };
+test('bounded through a template index signature', patterned, () => {});

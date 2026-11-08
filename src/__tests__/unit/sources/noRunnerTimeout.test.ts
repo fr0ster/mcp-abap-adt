@@ -271,8 +271,9 @@ function isNodeTestCall(
  * any member may (a union's property is not one of the union's own unless
  * every member has it); a type parameter by its constraint, and one without
  * a constraint. Otherwise the apparent type (a primitive's wrapper) has the
- * property or not: a declared `TestOptions`, whose `timeout` is optional,
- * may.
+ * property, or an index signature the key `timeout` fits, or neither: a
+ * declared `TestOptions`, whose `timeout` is optional, may; so may
+ * `{ [key: string]: number }`.
  */
 function mayHoldTimeout(checker: ts.TypeChecker, type: ts.Type): boolean {
   if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
@@ -285,7 +286,15 @@ function mayHoldTimeout(checker: ts.TypeChecker, type: ts.Type): boolean {
     const constraint = checker.getBaseConstraintOfType(type);
     return constraint === undefined || mayHoldTimeout(checker, constraint);
   }
-  return checker.getApparentType(type).getProperty('timeout') !== undefined;
+  const apparent = checker.getApparentType(type);
+  if (apparent.getProperty('timeout') !== undefined) return true;
+  // An index signature the key `timeout` fits (`[key: string]`, a
+  // template such as `[key: \`time${string}\`]`) types a `timeout`
+  // without naming one; a number or symbol key does not fit it.
+  const key = checker.getStringLiteralType('timeout');
+  return checker
+    .getIndexInfosOfType(apparent)
+    .some((index) => checker.isTypeAssignableTo(key, index.keyType));
 }
 
 /**
@@ -469,7 +478,7 @@ describe('the scan refuses each fixture by its own check alone', () => {
     ['testTimeout.json', '--test-timeout', 4],
     ['testForceExit.json', '--test-force-exit', 3],
     ['forceExit.json', '--forceExit', 1],
-    ['timeoutOnTest.ts', '{ timeout }', 11],
+    ['timeoutOnTest.ts', '{ timeout }', 13],
     ['timeoutOnIt.ts', '{ timeout }', 3],
     ['timeoutOnDescribe.ts', '{ timeout }', 3],
     ['timeoutOnHook.ts', '{ timeout }', 5],

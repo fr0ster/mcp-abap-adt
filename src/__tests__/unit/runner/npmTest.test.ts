@@ -447,6 +447,90 @@ describe('npm test', () => {
       assert.deepEqual(recorded(record).sort(), ['alpha', 'gamma']);
     });
 
+    // The tool's own options taken out of the arguments keep the boundary
+    // they were: an array option before one of them ends there. Each case
+    // runs the plain fixture from its directory; the record is what ran.
+    const boundaries: Array<[string, string[], string[]]> = [
+      [
+        'an array option, then --roots, then a pattern: the pattern stays a pattern',
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          plain,
+          'fix/src/__tests__/first.test.ts',
+          '--reporters',
+          'default',
+          '--roots',
+          plainRoot,
+          'secondSuite',
+        ],
+        ['alpha', 'beta'],
+      ],
+      [
+        'an array option, then --concurrency, then a pattern; --repo and --roots last',
+        [
+          '--reporters',
+          'default',
+          '--concurrency',
+          '1',
+          'secondSuite',
+          '--repo',
+          plain,
+          '--roots',
+          plainRoot,
+        ],
+        ['beta'],
+      ],
+      [
+        "an array option ended by the person's own --",
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          plain,
+          '--roots',
+          plainRoot,
+          '--reporters',
+          'default',
+          '--',
+          'secondSuite',
+        ],
+        ['beta'],
+      ],
+      [
+        'an array option at the very end',
+        [
+          '--concurrency',
+          '1',
+          '--repo',
+          plain,
+          '--roots',
+          plainRoot,
+          'secondSuite',
+          '--reporters',
+          'default',
+        ],
+        ['beta'],
+      ],
+    ];
+    for (const [index, [title, args, ran]] of boundaries.entries()) {
+      it(title, () => {
+        const record = path.join(
+          scratch.dir,
+          `positionals-boundary-${index}.record`,
+        );
+        const run = runTool(
+          'npm-test.mjs',
+          args,
+          environment({ RECORD: record }),
+          plain,
+        );
+        assert.equal(run.status, 0, run.stdout + run.stderr);
+        assert.deepEqual(recorded(record).sort(), ran);
+      });
+    }
+
     it('an unknown option is refused, nothing run', () => {
       const record = path.join(scratch.dir, 'positionals-unknown.record');
       const run = runTool(

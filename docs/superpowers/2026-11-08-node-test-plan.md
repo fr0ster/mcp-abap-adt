@@ -551,16 +551,345 @@ the steps that name them.
 
 ## Appendix A — the first wave's files and their counts
 
-Filled by step 1.
+Taken by step 1 on the branch before any change of this wave (Jest 30.5.2, Node 26.7.0). Paths are
+relative to `src/__tests__/` unless they start with a package directory. Labels: **Measured**
+(a run), **Counted** (read from the source), **Code**.
+
+**Discovery** (Measured, `npm test -- --listTests --json`, which returns before
+`globalSetup`): the unit run discovers 550 files; with `--testPathIgnorePatterns=/node_modules/`
+Jest finds 608. The 58 not in the unit run are exactly the 55 `*.test.ts` under
+`integration/` and the 3 under `admin/shared-deps/` (Measured, `find` and the two lists
+compared); no other file is outside the unit run.
+
+**The 20 unit files of the wave** (Measured: `npm test -- --json --outputFile=… <the 20
+paths>`, the JSON result's `assertionResults` per file; 20 suites, 326 tests, 307 passed,
+19 skipped, run with `SKIP_INSTALL_MATRIX=true`):
+
+| File | Tests | Outcome in that run |
+|---|---|---|
+| `unit/coverage/liveDescribe.test.ts` | 2 | 2 passed |
+| `unit/coverage/liveScripts.test.ts` | 6 | 6 passed |
+| `unit/coverage/runReport.test.ts` | 10 | 10 passed |
+| `unit/coverage/refusalStop.test.ts` | 12 | 12 passed |
+| `unit/coverage/live.test.ts` | 19 | 19 passed |
+| `unit/coverage/coverageLedger.test.ts` | 73 | 73 passed |
+| `unit/sources/noDerivationFromAuthorization.test.ts` | 27 | 27 passed |
+| `unit/sources/noProseMatching.test.ts` | 19 | 19 passed |
+| `unit/sources/noChainInstanceof.test.ts` | 40 | 40 passed |
+| `unit/sources/noRegexOverInput.test.ts` | 14 | 14 passed |
+| `unit/sources/typeCodeScan.test.ts` | 14 | 14 passed |
+| `unit/sources/typeCodeLiterals.test.ts` | 3 | 3 passed |
+| `unit/sources/staticTypes.test.ts` | 19 | 19 passed |
+| `unit/analyseOmissions.test.ts` | 18 | 18 passed |
+| `unit/adtHeaders/headerCallSites.test.ts` | 6 | 6 passed |
+| `unit/coverage/hardModeBinaries.test.ts` | 9 | 9 passed |
+| `server-runtime/src/stdio/__tests__/cancel/loginBound.test.ts` | 10 | 10 passed |
+| `unit/installMatrix.test.ts` | 19 | 19 skipped (`it.skip`) |
+| `unit/binSmoke.test.ts` | 1 | 1 passed |
+| `unit/descriptions/toolRetrievalVectors.test.ts` | 5 | 5 passed |
+
+- The six machinery tests are the first six rows, the seven TypeScript-program scans the
+  next seven, the four slow suites the next four, the two install suites and the Ollama
+  suite the last three.
+- `installMatrix`: 19 tests, all skipped in that run by `SKIP_INSTALL_MATRIX=true`; the
+  count does not depend on the skip (Code: `const skippable = SKIPPED ? it.skip : it`).
+- `toolRetrievalVectors`: 5 tests, one per entry of `MODELS` (Code: `it` or `it.skip` per
+  model); all five ran, the local Ollama serving every model.
+
+**The 58 live files** (Counted, never run: the call sites of `it` / `test` and their
+`.skip` / `.only` forms, read with the TypeScript parser, and each call site inside a loop
+expanded by hand from the table it loops over; no file uses `.each`, and no helper under
+`integration/helpers/` registers a test). 194 tests plus `liveConnection`'s 1 or N: 195
+without `MCP_LIVE_ENV_PATHS`. Under `integration/`: 188 + `liveConnection`; under
+`admin/shared-deps/`: 7.
+
+| File | Tests | How counted |
+|---|---|---|
+| `integration/batch/amdpHttpHandle.test.ts` | 1 |  |
+| `integration/batch/batchedReadsTiming.test.ts` | 19 | 2 call sites in loops: 6 `CASES` × 2 scopes + 7 `SHARED_CASES` |
+| `integration/batch/communicationBatch.test.ts` | 3 | 1 call site over 3 kinds |
+| `integration/batch/debuggerBatch.test.ts` | 6 | 2 call sites, each over 3 kinds |
+| `integration/batch/noCommunicationBatch.test.ts` | 1 |  |
+| `integration/batch/refusalFollowUps.test.ts` | 6 | 2 call sites, each over 3 kinds |
+| `integration/coverage/activate.live.test.ts` | 1 |  |
+| `integration/coverage/backgroundRuns.live.test.ts` | 7 |  |
+| `integration/coverage/createLanguage.live.test.ts` | 1 |  |
+| `integration/coverage/functionModuleGroup.live.test.ts` | 6 |  |
+| `integration/coverage/heldLocks.live.test.ts` | 1 |  |
+| `integration/coverage/outline.live.test.ts` | 4 |  |
+| `integration/coverage/searchSource.live.test.ts` | 12 |  |
+| `integration/coverage/unitTests.live.test.ts` | 5 |  |
+| `integration/debugger/DebuggerHandlers.test.ts` | 17 |  |
+| `integration/high/behaviorDefinitionAndImplementation/BehaviorDefinitionAndImplementationHighHandlers.test.ts` | 1 |  |
+| `integration/high/check/CheckHighHandlers.test.ts` | 14 |  |
+| `integration/high/class/ClassCrudClientDirect.test.ts` | 1 |  |
+| `integration/high/class/ClassHighHandlers.test.ts` | 1 |  |
+| `integration/high/class/ClassLocalIncludesHandlers.test.ts` | 1 |  |
+| `integration/high/dataElement/DataElementHighHandlers.test.ts` | 1 |  |
+| `integration/high/domain/DomainHighHandlers.test.ts` | 1 |  |
+| `integration/high/function/FunctionHighHandlers.test.ts` | 1 |  |
+| `integration/high/function/FunctionIncludeHighHandlers.test.ts` | 1 |  |
+| `integration/high/include/IncludeHighHandlers.test.ts` | 3 |  |
+| `integration/high/interface/InterfaceHighHandlers.test.ts` | 1 |  |
+| `integration/high/metadataExtension/MetadataExtensionHighHandlers.test.ts` | 1 |  |
+| `integration/high/package/PackageHighHandlers.test.ts` | 1 |  |
+| `integration/high/program/ProgramHighHandlers.test.ts` | 1 |  |
+| `integration/high/serviceBinding/ServiceBindingHighHandlers.test.ts` | 1 |  |
+| `integration/high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts` | 1 |  |
+| `integration/high/structure/StructureHighHandlers.test.ts` | 1 |  |
+| `integration/high/system/SystemHighHandlers.test.ts` | 5 |  |
+| `integration/high/table/TableHighHandlers.test.ts` | 1 |  |
+| `integration/high/table_type/TableTypeHighHandlers.test.ts` | 1 |  |
+| `integration/high/transport/TransportedObjectCrud.test.ts` | 1 |  |
+| `integration/high/transport/TransportObjectToolsCrud.test.ts` | 1 |  |
+| `integration/high/unitTest/CdsUnitTestHighHandlers.test.ts` | 1 |  |
+| `integration/high/unitTest/ClassUnitTestHighHandlers.test.ts` | 1 |  |
+| `integration/high/unitTest/FunctionGroupUnitTestHighHandlers.test.ts` | 1 |  |
+| `integration/high/unitTest/ProgramUnitTestHighHandlers.test.ts` | 1 |  |
+| `integration/live/liveConnection.test.ts` | 1 or N | without `MCP_LIVE_ENV_PATHS`: one `it.skip`; with N paths: N cases (one per destination) |
+| `integration/readOnly/atc/AtcHandlers.test.ts` | 4 |  |
+| `integration/readOnly/function/FunctionIncludeReadOnlyHandlers.test.ts` | 3 |  |
+| `integration/readOnly/function/GetFunctionModuleHandlers.test.ts` | 1 |  |
+| `integration/readOnly/include/IncludeMainProgramsHandlers.test.ts` | 1 |  |
+| `integration/readOnly/structure/GetStructuresListHandler.test.ts` | 1 |  |
+| `integration/readOnly/system/RuntimeFeedHandlers.test.ts` | 7 |  |
+| `integration/readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts` | 8 |  |
+| `integration/readOnly/system/SearchSourceHandler.test.ts` | 11 |  |
+| `integration/readOnly/system/SqlQueryHandlers.test.ts` | 2 |  |
+| `integration/readOnly/system/TableContentsHandlers.test.ts` | 2 |  |
+| `integration/readOnly/system/WhereUsedHandlers.test.ts` | 7 |  |
+| `integration/readOnly/transport/ListTransportsHandlers.test.ts` | 2 |  |
+| `integration/server/EmbeddableMcpServer.systemType.test.ts` | 3 |  |
+| `admin/shared-deps/check.test.ts` | 5 |  |
+| `admin/shared-deps/setup.test.ts` | 1 |  |
+| `admin/shared-deps/teardown.test.ts` | 1 |  |
+
+**The Ollama suite's helpers** (Code, imports read): `toolRetrievalVectors.test.ts` imports
+`descriptions/catalog.ts`, `harness.ts`, `heldOut.ts`, `ollama.ts`, `queries.ts`,
+`retrieval.ts` (and `heldOut.ts` reads `heldOutQueries.json` and `heldOutBaseline.json`).
+**None is used by this suite alone:** every one is also reached by
+`descriptions/toolRetrieval.test.ts` (the lexical suite, staying on Jest) — `ollama.ts`
+through `harness.ts`, which imports `embed` from it; the lexical suite calls neither
+`servedModels` nor `embed` (Code) — and `catalog.ts` also by `unit/abapUnitRunTool`,
+`unit/sources/descriptionsFunctional` and `descriptions/toolSearchTable`. None of the six uses
+a Jest API (Code, the type checker: no identifier bound to Jest's declarations). So step 16's
+"those only it uses" is the empty set: the helpers stay in place, shared by both runners
+(a discrepancy with step 16's file list, which names `ollama.ts`, `harness.ts`,
+`retrieval.ts` as moving with it).
+
+**Jest API in the wave's files** (Code, grep), for the conversion: `jest.setTimeout` in
+`runReport`, `refusalStop`, `live`, `coverageLedger`, `noDerivationFromAuthorization`,
+`noProseMatching`, `noRegexOverInput`, `hardModeBinaries`, `loginBound`, `installMatrix`,
+`binSmoke`, `integration/live/liveConnection`; `jest.spyOn` / `jest.restoreAllMocks` in
+`coverageLedger` (1 / 1) and `loginBound` (2 / 1, and the type `jest.SpyInstance`); `runCLI`
+from `jest` in `runReport`, `live`, `coverageLedger`. Asymmetric matchers in live files:
+`DebuggerHandlers` 7 `expect.stringContaining` **and 1 `expect.stringMatching`**,
+`coverage/backgroundRuns.live` **1 `expect.arrayContaining`** — step 11 names only
+`DebuggerHandlers`' `stringContaining` (a discrepancy: two more matchers to turn into plain
+checks, the `stringMatching` one without a regular expression over the value).
 
 ## Appendix B — shared code that reaches Jest
 
-Filled by step 1.
+Taken by step 1 (Code): one TypeScript program over all 608 test files under
+`tsconfig.test.json`; every import, export-from, `require`, dynamic `import()` and
+`import()` type resolved to a repository file; a module "uses Jest" when an identifier in it
+(`jest`, `expect`, `describe`, `it`, `test`, the hooks, their `f…` / `x…` forms) resolves to a
+declaration of `@types/jest` / `@jest/*`, or it imports a Jest package. The closure of the 78
+wave files (58 live, 20 unit) holds exactly five non-test modules that use Jest:
+
+| Module | Jest API | Reached by (wave) | Also reached by files staying on Jest |
+|---|---|---|---|
+| `integration/helpers/live.ts` | `describe`, `beforeAll`, `afterAll`, `expect` (`getState`) | the 8 `coverage/*.live` files; `unit/coverage/{liveDescribe,refusalStop,live}` | none |
+| `helpers/pinCases.ts` | `expect`, `it`, `jest` | the 8 `coverage/*.live` files and the same 3 machinery tests, all through `live.ts` (`import { servedEntries }`, its only import from `pinCases.ts`) | 41 files (the pin suites, `unit/coverage/pinCases`, …) |
+| `integration/helpers/testHelpers.ts` | `expect` | all 58 live files; `unit/coverage/{liveDescribe,refusalStop,live,hardModeBinaries}` | 4: `unit/coverage/{launchedServers,hardModeLauncher,configuredSystemKind,closeEvery}`, each through `integration/helpers/testers/hardMode.ts` → `sessionHelpers.ts` → `testHelpers.ts` (`closeEvery` via `integration/helpers/launchedServers.ts`) |
+| `integration/high/unitTest/unitTestSteps.ts` | `expect` (`expectTestsRan`) | the 4 `high/unitTest/*` live files | none |
+| `server-runtime/src/stdio/__tests__/helpers/loginStand.ts` | `jest.spyOn(process.stderr, 'write')` | `server-runtime/…/cancel/loginBound` (step 14) | 20 files: 16 under `server-runtime/src/stdio/__tests__/`, `server-runtime/src/__tests__/heldLocksTransports`, `unit/coverage/launchedServers`, `unit/shutdown/{lockHeldLogoff,undoFailsLogoff}` |
+
+- **Confirmed as known:** `pinCases.ts` through `live.ts`'s `servedEntries`; `testHelpers.ts`'s
+  `expect`; `sharedObjects.ts`, `testers/HighTester.ts` and `testers/LambdaTester.ts` use no
+  Jest API themselves and reach it through `testHelpers.ts` (Code, the checker).
+- **Not in the plan's "known now" — `integration/high/unitTest/unitTestSteps.ts`:** a live
+  helper using `expect`, reached only by the four `high/unitTest` live files; it moves with
+  them in step 11 (Appendix B's integration helpers).
+- **Not in the plan's "known now" — `server-runtime/…/helpers/loginStand.ts`:** it spies on
+  `process.stderr.write` with `jest.spyOn`, is imported by `loginBound` and by 20 files that
+  stay on Jest. Step 14 names only `loginBound`'s own spies; moving `loginBound` needs
+  `loginStand.ts` in a runner-free form that its 20 Jest importers keep using (or a split),
+  which step 14 does not state.
+- **`testHelpers.ts` is shared with four files that stay on Jest** (and with
+  `hardModeBinaries`, on Jest until step 14): when step 11 puts it on `node:assert/strict`,
+  those keep importing it under Jest (Inference: `node:assert` runs under Jest unchanged).
+- One type-only edge into a Jest module exists (`helpers/functionModuleMetadata.ts` →
+  `pinCases.ts`, `import type`); no wave file reaches it through that edge alone.
+
+### Appendix B2 — what the Jest hook closes
+
+Taken by step 1 (Code, the same program; calls read as call expressions):
+
+- **Callers of `trackConnection`** — exactly the five the plan names, plus the fake one:
+  `integration/helpers/sessionHelpers.ts` (2, both inside `createTestConnectionAndSession`),
+  `integration/helpers/live.ts` (1), `integration/coverage/backgroundRuns.live` (1),
+  `integration/coverage/searchSource.live` (1), `integration/high/class/ClassCrudClientDirect`
+  (1); `unit/harness/testLogoffs` (1, fakes, drained by its own `closeTrackedConnections`).
+  `endTestConnection` registers nothing (Code, `openConnections.ts`).
+- **Test files reaching a caller** through imports, and the runner each is on after step 11:
+
+| Files | Reaches | Runner after step 11 |
+|---|---|---|
+| 57 of the 58 live files (all but `integration/batch/refusalFollowUps`, which reaches none) | `sessionHelpers.ts` and/or `live.ts`, or is a caller | node:test (step 11) |
+| `unit/coverage/{refusalStop,live,liveDescribe}` | `sessionHelpers.ts`, `live.ts` | node:test (step 11) |
+| `unit/coverage/hardModeBinaries` | `sessionHelpers.ts` (via `testers/hardMode.ts`) | **Jest until step 14** |
+| `unit/coverage/{launchedServers,hardModeLauncher,configuredSystemKind,closeEvery}` | `sessionHelpers.ts` (via `testers/hardMode.ts`; `closeEvery` via `launchedServers.ts`) | **Jest** (later task) |
+| `unit/harness/testLogoffs` | itself a caller; calls `closeTrackedConnections` | Jest |
+
+- **Not in the plan's "known now":** five Jest unit files reach a `trackConnection` caller —
+  `hardModeBinaries`, `launchedServers`, `hardModeLauncher`, `configuredSystemKind`,
+  `closeEvery` — all through `testers/hardMode.ts`'s import of `createTestConnectionAndSession`.
+  **None of them calls a registering function at run time** (Code, grep: the five name none of
+  `createTestConnectionAndSession`, `testConnectionLogOn`, `trackConnection`, `liveRunner`;
+  `hardMode.ts` calls `createTestConnectionAndSession` only in `testConnectionLogOn`, which
+  only `integration/batch/{amdpHttpHandle,communicationBatch,debuggerBatch}` call). So the
+  plan's conclusion holds: no file left on Jest relies on the hook at run time, and step 11
+  can remove it.
+- **But step 11's guard as written would be red on them:** `'no Jest file leaves a tracked
+  connection to a hook'` is specified over "the TypeScript import graph": none reaches
+  `trackConnection` unless it calls `closeTrackedConnections`. By import reach,
+  `launchedServers`, `hardModeLauncher`, `configuredSystemKind` and `closeEvery` (and
+  `hardModeBinaries` through steps 11–13) reach it and do not close. The guard needs either a
+  reach that counts only calls of a registering function, or these files handled — for the
+  controller and the owner; not changed here.
 
 ## Appendix C — the bounds and their readers
 
-Filled by step 1.
+Taken by step 1 (Code, grep over `src`, `server-runtime/src`, `scripts`, `tools`, `tests`).
+
+**`getTimeout`** (`integration/helpers/configHelpers.ts:457`: `timeouts[operationType] ||
+timeouts.default || 60000` over `test_settings.timeouts`): 53 files name it (as the plan
+says), of which 49 call it — every live file but the 8 `coverage/*.live` and
+`live/liveConnection`, 171 calls — and 4 are not live test files: `configHelpers.ts` (the definition),
+`testers/LambdaTester.ts` (imports it, never calls it), `high/class/ClassHighHandlers.example.ts`
+(an example, not a test; `testers/README.md` points to it; 1 call), and
+`unit/sources/noReadDeadlines.test.ts` (a scan of the product code that names `getTimeout`
+as an identifier the *package* must not export; not a reader, and not touched by step 13).
+Calls in the 49 live files by argument: `'long'` 144, `'medium'` 19, `'default'` 8. Per file (calls; arguments):
+
+| File | Calls |
+|---|---|
+| `admin/shared-deps/{check,setup,teardown}` | 1 each; long |
+| `integration/batch/amdpHttpHandle` | 1; long |
+| `integration/batch/batchedReadsTiming` | 3; long |
+| `integration/batch/communicationBatch` | 1; long |
+| `integration/batch/{debuggerBatch,noCommunicationBatch,refusalFollowUps}` | 2 each; long |
+| `integration/debugger/DebuggerHandlers` | 21; long |
+| `integration/high/behaviorDefinitionAndImplementation/…HighHandlers` | 2; long |
+| `integration/high/check/CheckHighHandlers` | 28; long 15, medium 13 |
+| `integration/high/class/ClassCrudClientDirect` | 1; long |
+| `integration/high/class/{ClassHighHandlers,ClassLocalIncludesHandlers}` | 2 each; long |
+| `integration/high/{dataElement,domain,function/FunctionHigh,function/FunctionIncludeHigh,interface,program,structure,table,table_type}/…` | 1 each; long |
+| `integration/high/include/IncludeHighHandlers` | 3; long |
+| `integration/high/{metadataExtension,package,serviceBinding,serviceDefinition}/…` | 2 each; long |
+| `integration/high/system/SystemHighHandlers` | 6; long 5, default 1 |
+| `integration/high/transport/{TransportedObjectCrud,TransportObjectToolsCrud}` | 3 each; long |
+| `integration/high/unitTest/{Cds,Class,FunctionGroup,Program}UnitTestHighHandlers` | 2 each; long |
+| `integration/readOnly/atc/AtcHandlers` | 5; long |
+| `integration/readOnly/function/FunctionIncludeReadOnlyHandlers` | 3; medium |
+| `integration/readOnly/function/GetFunctionModuleHandlers` | 1; medium |
+| `integration/readOnly/include/IncludeMainProgramsHandlers` | 2; long |
+| `integration/readOnly/structure/GetStructuresListHandler` | 1; medium |
+| `integration/readOnly/system/RuntimeFeedHandlers` | 8; long |
+| `integration/readOnly/system/RuntimeProfilingAndDumpsHandlers` | 9; long |
+| `integration/readOnly/system/SearchSourceHandler` | 12; long 11, medium 1 |
+| `integration/readOnly/system/{SqlQueryHandlers,TableContentsHandlers}` | 3 each; long 2, default 1 |
+| `integration/readOnly/system/WhereUsedHandlers` | 8; long 6, default 2 |
+| `integration/readOnly/transport/ListTransportsHandlers` | 3; long |
+| `integration/server/EmbeddableMcpServer.systemType` | 3; default |
+
+**The keys under `test_settings` in `tests/test-config.yaml.template`** and their readers:
+
+| Key | Reader |
+|---|---|
+| `timeout` (120000) | **none** |
+| `timeouts.default`, `timeouts.long` | `getTimeout('default' / 'long')` |
+| `timeouts.create`, `timeouts.test` | **none** (no `getTimeout('create' / 'test')`) |
+| `timeouts.delay` (3000) | **none** — no `getTimeout('delay')` and no other read |
+| (`timeouts.medium`) | not in the template; the 19 `getTimeout('medium')` calls get `timeouts.default` |
+| `operation_delays.{lock,unlock,update,create,cleanup,default}` (3000 each) | `getOperationDelay(operation, testCase?)` (`configHelpers.ts:585`: the case's `params.operation_delays[operation]`, else `test_settings.operation_delays[operation]`, else its `default`, else 3000) |
+
+**The other time keys a live suite reads** (all per test case, under `params`):
+
+| Key | Reader |
+|---|---|
+| `params.operation_delays.*` (in the template under several cases: `create`, `lock`, `update`, `unlock`, `default`, `cleanup`, `delete`, `delete_retry`) | `getOperationDelay` — called as `'create'` 18, `'update'` 12, `'activate'` 1, `'create_verify'` 1, and with a computed name in `testers/LambdaTester.ts` (3); its callers: `testers/{HighTester,LambdaTester}.ts`, `testers/types.ts` (the context's type), and `integration/high/{behaviorDefinitionAndImplementation,class/ClassCrudClientDirect,class/ClassHighHandlers,class/ClassLocalIncludesHandlers,function/FunctionHighHandlers,function/FunctionIncludeHighHandlers,include,metadataExtension,table_type,transport/TransportedObjectCrud,transport/TransportObjectToolsCrud}/…` |
+| `params.poll_timeout_ms` (120000) | `readOnly/atc/AtcHandlers` (a `Date.now()` deadline, default 120000) |
+| `params.poll_interval_ms` (3000) | `readOnly/atc/AtcHandlers` (the pause between polls, default 3000) |
+| `params.trace_feed_retry_delay_ms`, `params.dump_feed_retry_delay_ms` | `readOnly/system/RuntimeProfilingAndDumpsHandlers` (the pause between feed reads; with `trace_feed_retries` / `dump_feed_retries`) |
+| `params.profiled_run_trace_retry_delay_ms` | `readOnly/system/RuntimeProfilingAndDumpsHandlers`, passed to the `RuntimeRunClass` tool as its `trace_retry_delay_ms` argument (a tool parameter of the product, with `profiled_run_max_trace_attempts` → `max_trace_attempts`) |
+| `params.trace_read_retry_delay_ms`, `params.trace_read_retries` | **none** |
+
+**The pause helpers** these keys feed: `integration/helpers/testHelpers.ts` `delay(ms)` —
+imported by `testers/{HighTester,LambdaTester}.ts`, `helpers/rapFixtures.ts`,
+`readOnly/atc/AtcHandlers` and `high/{behaviorDefinitionAndImplementation,class/ClassCrudClientDirect,function/FunctionHighHandlers,function/FunctionIncludeHighHandlers,include,table_type,transport/TransportedObjectCrud,transport/TransportObjectToolsCrud}/…`;
+local `setTimeout` pauses fed by `getOperationDelay` in
+`high/{class/ClassHighHandlers,class/ClassLocalIncludesHandlers,class/ClassCrudClientDirect,metadataExtension}/…`
+and a local `delay` in `readOnly/system/RuntimeProfilingAndDumpsHandlers`. Fixed pauses that
+read no key: `batch/refusalFollowUps` and `debugger/DebuggerHandlers` (`pause`),
+`admin/shared-deps/setup` (2000 ms once).
+
+**Discrepancies with the plan's "known now":**
+- `timeouts.delay` is read by nothing (named as a key a live suite reads); likewise
+  `test_settings.timeout`, `timeouts.create`, `timeouts.test`, and the runtime suite's
+  `trace_read_retry_delay_ms` and `trace_read_retries`.
+- Not named by the plan or P3: `test_settings.operation_delays.*` and every case's
+  `params.operation_delays.*` (through `getOperationDelay`), the ATC suite's
+  `poll_interval_ms` (beside `poll_timeout_ms`), and the runtime suite's
+  `*_retry_delay_ms` keys — one of which is a product tool argument
+  (`trace_retry_delay_ms`), not a test pause. Whether P3's "every bound, `timeouts.delay`
+  and `poll_timeout_ms`" covers these is the owner's; step 1 only lists them.
 
 ## Appendix D — the scripts that run Jest
 
-Filled by step 1.
+Taken by step 1 (Code, `package.json` of the root and of each package, the two workflows).
+
+**Root scripts that run Jest** (every one through `jest` with `package.json` `jest`; that
+configuration ignores `__tests__/admin/` and `__tests__/integration/`, `maxWorkers: 1`,
+`testTimeout: 600000`, `globalSetup`, `globalTeardown`, `setupFilesAfterEnv`):
+
+| Script | Pre-script | Flags |
+|---|---|---|
+| `test` | `pretest`: `build:test-reporter` | `--passWithNoTests` |
+| `test:integration` | `pretest:integration`: `build:test-reporter` | `--testPathPatterns=integration`, `--testPathIgnorePatterns='__tests__/admin/'`, `--runInBand`, `--passWithNoTests`, **`--forceExit`**, `--reporters=default`, `--reporters=./build/test-reporter/coverageReporter.js` |
+| `test:coverage-family` | `pretest:coverage-family`: `build:test-reporter` | `--reporters=default`, `--reporters=./build/test-reporter/coverageReporter.js`, `--testPathIgnorePatterns='__tests__/admin/'`, `--runInBand`, **`--forceExit`** (the family's paths come after `--`) |
+| `test:live-connection` | — | `--testPathIgnorePatterns='__tests__/admin/'`, `--runInBand`, **`--forceExit`**, the path `src/__tests__/integration/live/liveConnection.test.ts` |
+| `test:high` | — | `--testPathPatterns='integration.*High'`, `--testPathIgnorePatterns='__tests__/admin/'`, `--runInBand`, `--passWithNoTests`, **`--forceExit`** |
+| `shared:setup` | — | `--testPathPatterns='admin/shared-deps/setup'`, `--testPathIgnorePatterns='[]'`, `--runInBand`, `--passWithNoTests` |
+| `shared:teardown` | — | `--testPathPatterns='admin/shared-deps/teardown'`, `--testPathIgnorePatterns='[]'`, `--runInBand`, `--passWithNoTests` |
+| `shared:check` | — | `--testPathPatterns='admin/shared-deps/check'`, `--testPathIgnorePatterns='[]'`, `--runInBand`, `--passWithNoTests` |
+
+- The four `--forceExit` pairs are exactly step 5's allowed list: `test:integration`,
+  `test:coverage-family`, `test:high`, `test:live-connection` (confirmed). No script uses
+  `--roots`; none uses `--testTimeout`.
+- Beside them, the reporter scripts the live machinery needs: `build:test-reporter`
+  (`tsc -p tsconfig.reporter.json`, run by the three `pre…` scripts) and
+  `check:test-reporter` (loads the built reporter); `test:check` type-checks the tests
+  (`tsc --noEmit -p tsconfig.test.json`), runs no Jest.
+- **The 17 sub-package `test` scripts** forward to the root with `--roots`, each
+  `npm --prefix .. test -- --roots <package>/src`: `background-runs-memory`,
+  `responsible-rules`, `server-runtime`, `server`, `http`, `sse`, `compact-readonly-entries`,
+  `compact-modify`, `compact`, `compact-http`, `compact-sse`, `core-ro`, `http-ro`, `sse-ro`,
+  `compact-ro`, `compact-http-ro`, `compact-sse-ro`. No sub-package script calls `jest`
+  itself.
+- **Outside the scripts:** `tools/run-program-hard-test.js` runs `npm test --
+  --testPathPattern=<pattern>` (a hand-run tool, not an npm script). Measured: Jest 30.5.2
+  refuses that option ("Option "testPathPattern" was replaced by "--testPathPatterns""), and
+  `npm test`'s ignores would exclude `integration/` anyway, so the tool cannot run today.
+  Not in the plan; noted for the owner, not changed.
+
+**CI steps that run one:**
+
+| Workflow | Step | Script | Matrix | Env |
+|---|---|---|---|---|
+| `ci.yml` (`build-and-test`) | `Run tests` | `npm test` (with `pretest`) | ubuntu, macOS, Windows × Node 22, 24 | `SKIP_INSTALL_MATRIX` `false` only on ubuntu + Node 22, else `true` |
+| `release.yml` (`test`) | `Run tests` | `npm test` (with `pretest`) | ubuntu × Node 22, 24 | `SKIP_INSTALL_MATRIX` `false` on Node 22, `true` on 24 |
+
+No workflow runs a live script, a `shared:*` script or a sub-package `test`; the other CI
+steps (`lint:check`, `build`, `test:check`, every package's `test:check`) run no Jest.

@@ -15,7 +15,7 @@ when its rule is broken, the rule is broken once on purpose, the test is seen re
 change is reverted. A moved file keeps its path and its test count (N1's appendix); a
 difference is named in the commit.
 
-**The owner's answers** to the plan's questions (P1–P7) are recorded at the end and bind
+**The owner's answers** to the plan's questions (P1–P8) are recorded at the end and bind
 the steps that name them.
 
 ## Baseline
@@ -429,8 +429,10 @@ the steps that name them.
         in one script — the no-timeout scan red (its allowed list is empty now).
     **Commit:** `test: D27 — the live suites and their machinery on node:test`.
 
-12. **The first interrupt lets a running cleanup finish** (spec §3), by step 6's findings.
-    **Files:** the runner and the live helpers, per the findings; a node:test fixture.
+12. **The first interrupt lets a running cleanup finish** (spec §3), by step 6's findings and
+    the owner's answer P8.
+    **Files:** the runner (one process per file, each in a group of its own; the two-interrupt
+    handling of P8); a node:test fixture.
     **Steps (red first):**
     - [ ] Red: the fixture of step 6, run through the runner by a test that sends one
       interrupt while its cleanup runs: the cleanup's end is recorded before the process
@@ -575,7 +577,7 @@ the steps that name them.
       not touched by this wave) for the later task;
     - the owner's answers to P1–P7 (below).
 
-## The owner's answers (P1–P7)
+## The owner's answers (P1–P8)
 
 - **P1 — the list and Jest's configuration.** The list exists nowhere yet and is made here
   (step 3): one list file is the single source of which files run on node:test. Jest's
@@ -616,6 +618,13 @@ the steps that name them.
   Whether the trace and the dump are listed at once after the run is measured live first
   (step 19's runs, before the change lands); if either is not, the measurement goes to the
   owner before step 13 commits — no loop, delay or limit is put back on its own.
+- **P8 — the first interrupt: the runner holds it** (step 12, by step 6's findings). The runner
+  starts each test file in a process group of its own (`detached`; on Windows a console group of
+  its own), so a terminal's Ctrl-C reaches the runner alone. On the first interrupt the runner
+  starts no further file, says on stderr that it waits for the running files and that a second
+  interrupt stops the run, and waits for every running file to end by itself — its tests and
+  its cleanups included. On the second interrupt it ends the process tree of every file still
+  running. No flag reaches the live helpers: a running file runs to its end.
 
 ## Appendix A — the first wave's files and their counts
 

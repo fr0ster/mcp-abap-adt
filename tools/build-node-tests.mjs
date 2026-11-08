@@ -8,15 +8,22 @@
 // (`tools/node-test-files.json`), with what they import, into it. `tsc -p`
 // cannot take the list from a JSON file, so the program is built here through
 // TypeScript's own API; `noEmitOnError` in the configuration means a failed
-// compile emits nothing, and the build exits non-zero.
+// compile emits nothing, and the build exits non-zero. After a successful
+// compile it places the files of `tools/node-test-placed.json` beside the
+// compiled code (spec §2, "Files production code reads beside itself").
 //
 // `--repo` names another repository holding its own list and
 // `tsconfig.node-test.json` (the runner's tests build fixtures that way); the
 // default is the repository this file belongs to.
-import { rmSync } from 'node:fs';
+import { cpSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { OWN_REPO, readList, sourceFile } from './node-test-list.mjs';
+import {
+  OWN_REPO,
+  readList,
+  readPlaced,
+  sourceFile,
+} from './node-test-list.mjs';
 
 function fail(words) {
   console.error(`build-node-tests: ${words}`);
@@ -64,6 +71,15 @@ if (parsed.errors.length > 0) {
 const outDir = parsed.options.outDir;
 if (outDir === undefined) fail(`${configFile} names no outDir`);
 
+// Read before the clean: a list that cannot be placed fails the build with
+// nothing removed or emitted.
+let placed;
+try {
+  placed = readPlaced(repo);
+} catch (error) {
+  fail(error.message);
+}
+
 rmSync(outDir, { recursive: true, force: true });
 
 const program = ts.createProgram({
@@ -84,3 +100,10 @@ if (diagnostics.length > 0) {
   process.exit(1);
 }
 if (emitted.emitSkipped) fail('the compiler emitted nothing');
+
+// The files production code reads by its own location, placed beside the
+// compiled code at their repository paths (spec §2), fresh after the clean.
+for (const entry of placed) {
+  const parts = entry.split('/');
+  cpSync(join(repo, ...parts), join(outDir, ...parts), { recursive: true });
+}

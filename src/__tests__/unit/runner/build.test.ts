@@ -135,6 +135,53 @@ describe('the node:test build', () => {
     assert.deepEqual(recorded(record), ['listed']);
   });
 
+  it('the build places the listed files beside the compiled code', () => {
+    const repo = fixtureRepo(path.join(scratch.dir, 'placed'), [LISTED], {
+      [LISTED]: nodeTestSource('listed', 'FAIL_LISTED'),
+      'pkg/package.json': '{"version":"1.2.3"}\n',
+      'fixtures/dir/a.json': '"a"\n',
+      'fixtures/dir/deeper/b.json': '"b"\n',
+    });
+    writeAt(
+      repo,
+      'tools/node-test-placed.json',
+      JSON.stringify(['fixtures/dir', 'pkg/package.json']),
+    );
+    // Left from an earlier build: the clean removes it before the placement.
+    writeAt(repo, '.test-build/pkg/package.json', '{"version":"0.0.0"}\n');
+    const built = build(repo);
+    assert.equal(built.status, 0, built.stderr);
+    assert.deepEqual(filesUnder(path.join(repo, '.test-build')), [
+      'fixtures/dir/a.json',
+      'fixtures/dir/deeper/b.json',
+      'pkg/package.json',
+      'src/__tests__/listed.test.js',
+      'src/__tests__/listed.test.js.map',
+      'stub.js',
+      'stub.js.map',
+    ]);
+    assert.equal(
+      fs.readFileSync(
+        path.join(repo, '.test-build', 'pkg', 'package.json'),
+        'utf8',
+      ),
+      '{"version":"1.2.3"}\n',
+    );
+
+    // An entry that names no file of the repository: the build fails.
+    writeAt(
+      repo,
+      'tools/node-test-placed.json',
+      JSON.stringify(['pkg/missing.json']),
+    );
+    const refused = build(repo);
+    assert.equal(refused.status, 1);
+    assert.ok(
+      refused.stderr.includes('pkg/missing.json: no such repository path'),
+      refused.stderr,
+    );
+  });
+
   it('a failed compile runs nothing', () => {
     const other = 'src/__tests__/other.test.ts';
     const repo = fixtureRepo(
@@ -148,7 +195,13 @@ describe('the node:test build', () => {
           '',
         ].join('\n'),
         [other]: nodeTestSource('other', 'FAIL_OTHER'),
+        'pkg/package.json': '{}\n',
       },
+    );
+    writeAt(
+      repo,
+      'tools/node-test-placed.json',
+      JSON.stringify(['pkg/package.json']),
     );
     const built = build(repo);
     assert.notEqual(built.status, 0);

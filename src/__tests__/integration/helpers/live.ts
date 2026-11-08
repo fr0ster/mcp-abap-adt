@@ -47,12 +47,12 @@ import { HeldLocks } from '../../../lib/state/heldLocks';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { fullToolSet } from '../../../lib/toolSet';
 import { servedTools as plainEntries } from '../../helpers/batchHarness';
-import { servedEntries } from '../../helpers/pinCases';
 import {
   inProcessServer,
   type PinServer,
   type ServerSource,
 } from '../../helpers/pinServer';
+import { servedEntries } from '../../helpers/servedEntries';
 import type { SystemKind } from '../../helpers/servedTools';
 import { toolAnswer } from '../../helpers/toolAnswer';
 import { type CoverageKey, keyOf } from '../../unit/coverage/coverageKeys';

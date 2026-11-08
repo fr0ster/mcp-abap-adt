@@ -5,7 +5,7 @@
 // node:test: repository source paths (`src/__tests__/….test.ts`, written with
 // `/`). Each one's compiled file is the same path under `.test-build/`, `.js`
 // for `.ts`.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,6 +52,44 @@ export function readList(repo) {
       source.split('/').some((part) => part === '' || part === '..')
     ) {
       throw new Error(`${file}: not a repository test source path: ${source}`);
+    }
+  }
+  return listed;
+}
+
+/**
+ * The placement list (spec §2, "Files production code reads beside itself"):
+ * `tools/node-test-placed.json`, the repository paths (files or directories,
+ * written with `/`) that production code reads by its own location. The
+ * build places each at the same path under `.test-build/`, beside the
+ * compiled code that reads it; the guard (`unit/runner/placedFiles.test.ts`)
+ * holds the list to the reads.
+ */
+export function placedFile(repo) {
+  return join(repo, 'tools', 'node-test-placed.json');
+}
+
+/** The placement list's paths, each one of the repository, or the read throws. */
+export function readPlaced(repo) {
+  const file = placedFile(repo);
+  const listed = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(listed)) {
+    throw new Error(`${file}: not a list`);
+  }
+  for (const entry of listed) {
+    if (
+      typeof entry !== 'string' ||
+      entry.includes('\\') ||
+      entry.startsWith('/') ||
+      entry.includes(':') ||
+      entry
+        .split('/')
+        .some((part) => part === '' || part === '.' || part === '..')
+    ) {
+      throw new Error(`${file}: not a repository path: ${entry}`);
+    }
+    if (!existsSync(join(repo, ...entry.split('/')))) {
+      throw new Error(`${file}: ${entry}: no such repository path`);
     }
   }
   return listed;

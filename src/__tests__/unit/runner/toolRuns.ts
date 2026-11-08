@@ -178,8 +178,9 @@ function fixtureJestConfig(dir: string, listed: readonly string[]): string {
 }
 
 /**
- * A fixture repository: `sources` (path → text, written with `/`) and a
- * node:test list of `listed`. Its `tsconfig.node-test.json` extends the
+ * A fixture repository: `sources` (path → text, written with `/`), a
+ * node:test list of `listed` and an empty placement list
+ * (`tools/node-test-placed.json`). Its `tsconfig.node-test.json` extends the
  * repository's and builds into its own `.test-build/`; it names one stub
  * file, as the repository's names its preload. Its `jest.config.js` is its
  * own (`fixtureJestConfig`); `npm-test.mjs --repo` hands it to Jest.
@@ -190,6 +191,7 @@ export function fixtureRepo(
   sources: Readonly<Record<string, string>>,
 ): string {
   writeAt(dir, 'tools/node-test-files.json', JSON.stringify(listed));
+  writeAt(dir, 'tools/node-test-placed.json', '[]\n');
   writeAt(dir, 'jest.config.js', fixtureJestConfig(dir, listed));
   writeAt(dir, 'stub.ts', 'export {};\n');
   writeAt(

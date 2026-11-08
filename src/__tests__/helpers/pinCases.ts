@@ -27,14 +27,10 @@ import crypto from 'node:crypto';
 import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { compactToolSet } from '../../../compact/src/launcher';
 import type { McpResult } from '../../lib/answer';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import type { HandlerEntry, ToolArgs } from '../../lib/handlers/interfaces';
-import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
-import { listedTool, statedEnvironment } from '../../lib/listedTool';
 import { declareSystemKind } from '../../lib/systemKind';
-import { fullToolSet } from '../../lib/toolSet';
 import { endTestConnection } from '../integration/helpers/openConnections';
 import {
   type CoverageKey,
@@ -54,10 +50,12 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from './recordingConnection';
+import { servedEntries } from './servedEntries';
 import type { SystemKind } from './servedTools';
 import { toolAnswer } from './toolAnswer';
 
 export type { McpResult, PinSetup };
+export { servedEntries };
 
 /** The clock every pin runs at. */
 export const PIN_EPOCH = Date.UTC(2026, 0, 1);
@@ -316,36 +314,6 @@ export function installPinFakes(seed: string): () => void {
 
 // ---------------------------------------------------------------------------
 // Running a case
-
-/** The tools a variant serves through their entries, by name. */
-const entriesByVariant = new Map<
-  SystemKind,
-  ReadonlyMap<string, HandlerEntry>
->();
-
-export function servedEntries(
-  variant: SystemKind,
-): ReadonlyMap<string, HandlerEntry> {
-  const known = entriesByVariant.get(variant);
-  if (known !== undefined) return known;
-  const environment = statedEnvironment(variant);
-  const entries = new Map<string, HandlerEntry>();
-  for (const toolSet of [fullToolSet, compactToolSet]) {
-    for (const transport of ['stdio', 'http'] as const) {
-      for (const group of toolSet.groups(noConnectionContext(), transport)) {
-        for (const entry of group.getHandlers()) {
-          const name = entry.toolDefinition.name;
-          if (entries.has(name)) continue;
-          if (listedTool(entry.toolDefinition, environment).listed) {
-            entries.set(name, entry);
-          }
-        }
-      }
-    }
-  }
-  entriesByVariant.set(variant, entries);
-  return entries;
-}
 
 /** The entry `variant` serves as `tool`; refused when it serves none. */
 function entryOf(

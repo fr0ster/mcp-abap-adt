@@ -303,11 +303,20 @@ the steps that name them.
    names, `helpers/pinCases.ts` (imports it), `integration/helpers/live.ts` (imports it),
    and the Appendix B modules that move with the live files, left in place for step 11.
    **Steps (red first):**
-   - [ ] Red: a node:test file on the list that imports the new module through the node:test
+   - [x] Red: a node:test file on the list that imports the new module through the node:test
      build — it fails to compile while the module reaches `pinCases.ts`.
-   - [ ] Extract; `pinCases.ts` imports from the module; every Jest pin suite passes unchanged
+   - [x] Extract; `pinCases.ts` imports from the module; every Jest pin suite passes unchanged
      (Appendix A's counts for them untouched).
-   - [ ] Load-bearing: import `pinCases.ts` from the new module again — the build test red.
+   - [x] Load-bearing: import `pinCases.ts` from the new module again — the build test red.
+   - [x] **Files production code reads beside itself** (spec §2, the owner's amendment; found
+     here: the module's run needs `server-runtime/package.json`, `compact/package.json` and
+     `tools/tool-search.json` beside the compiled code, Measured). One list,
+     `tools/node-test-placed.json`, placed by `tools/build-node-tests.mjs` after a successful
+     compile; the guard `unit/runner/placedFiles.test.ts` reads production sources with the
+     TypeScript parser and fails on a read the list does not place, an entry no read needs,
+     and a `__dirname` use whose target it cannot state. Red first; load-bearing: drop an entry
+     — the guard and the `servedEntries` test red; the build places nothing — the placement
+     test red; `.json` counted as code — the guard red.
    **Commit:** `test: D27 — the live files' shared code needs no test runner`.
 
 10. **The coverage guard reads node:test's forms** (spec §3, "The coverage guard sees

@@ -158,6 +158,7 @@ The rest stays on Jest, and both runners are green, until the later task moves i
   moved test finds the repository root and its fixtures through one helper, never through
   the depth of `__dirname`. Files a test reads as data (`__fixtures__`, JSON fixtures, the
   sources a scan reads) are read from the repository, not copied into the build.
+- **Files production code reads beside itself.** Production code that reads a repository file by its own location (a package's `package.json`, a `tools/*.json` table, a fixture directory it serves) finds that file in the test build where it finds it in `dist/`: the node:test build places exactly those files beside the compiled code, from one list, and a guard test fails when production code reads a file by its location that the list does not place. This is not copying test data: a file a test reads as data is still read from the repository.
 - **Sibling packages by name: a preloaded resolve hook** (owner; no `node_modules` links).
   One table maps each of the repository's package names to its source entry. The runner
   preloads a compiled hook in every file's process that answers exactly those names with

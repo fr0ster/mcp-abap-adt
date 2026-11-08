@@ -264,9 +264,12 @@ describe('npm test', () => {
   });
 
   it('a named Jest file with --roots runs no node:test file', () => {
-    // Both runners' files under one root; only the Jest file is named.
+    // Both runners' files under one root; only the Jest file is named. The
+    // `+` in the path is what a regular expression reads as a quantifier:
+    // a named file is a path, not a Jest pattern (on Windows, a `\.` of a
+    // `\.test-fixtures` segment is the same), so it must run all the same.
     const repo = fixtureRepo(
-      path.join(scratch.dir, 'named-jest'),
+      path.join(scratch.dir, 'named+jest'),
       ['fix/src/__tests__/nodeOnly.test.ts'],
       {
         'fix/src/__tests__/nodeOnly.test.ts': nodeTestSource(

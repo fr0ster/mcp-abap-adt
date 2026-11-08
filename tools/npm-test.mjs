@@ -11,7 +11,7 @@
 //   node:test list (every sub-package until its first file moves) runs Jest
 //   alone, and a line says the runner was skipped.
 // - A named `….test.ts` file on the node:test list goes to the runner, any
-//   other to Jest; a runner given no named file while others were named is
+//   other to Jest (by path when every such file exists, else as patterns); a runner given no named file while others were named is
 //   skipped, and so is Jest. With `--roots`, a named file outside every root
 //   runs on neither (Jest applies its `--roots`; the runner's selection is
 //   intersected with the roots, and an empty one skips the runner).
@@ -29,6 +29,7 @@
 // so a compile error in a node:test file does not hide Jest's result; when it
 // fails, the runner does not run and the run fails.
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -113,11 +114,21 @@ const namedJest = named.filter((file) => !isListed(file));
 
 const runJest = named.length === 0 || namedJest.length > 0;
 const runnerSelection = named.length > 0 ? namedRunner : runnerList(rootArgs);
+// Named files that all exist go to Jest with `--runTestsByPath`: Jest reads
+// a positional argument as a regular expression over the path, and a path is
+// not one — a `+` or `(` in it, or on Windows a separator before a `.` (as
+// in `\.test-fixtures`), keeps the file from matching itself. By path, the
+// roots and the ignores still apply. A named `….test.ts` that is not an
+// existing file is a pattern, as Jest has always read it, and then every
+// positional argument is a pattern (Jest reads them all one way).
+const byPath =
+  namedJest.length > 0 && namedJest.every((file) => existsSync(resolve(file)));
 // The named files come first and each root as `--roots=<dir>`: Jest's
 // `--roots` takes every value after it, so `--roots <dir> <file>` would make
 // the file a root.
 const jestRun = [
   '--passWithNoTests',
+  ...(byPath ? ['--runTestsByPath'] : []),
   ...namedJest,
   ...roots.map((root) => `--roots=${root}`),
   ...jestArgs,

@@ -243,16 +243,20 @@ the steps that name them.
      - a second group SIGINT finds the group empty (ESRCH) unless the file ignores both
        signals, and then changes nothing;
      - no process was left: every one had ended by itself within 20 s.
-     **Not measured:** macOS and Windows (CI's other runners), a TTY.
+     **macOS and Windows** (Measured on GitHub Actions, Node 22.23.4 and 24.22.2, two runs, a
+     throwaway job removed afterwards; full text in `src/__tests__/integration/README.md`): macOS
+     is the same as Linux in every case; on Windows the first console Ctrl-C ends every process of
+     the run at once — no listener variant lets the cleanup finish, and killing the runner alone
+     takes `node --test` and the file with it. **Not measured:** a TTY.
    - [ ] The findings decide the mechanism of step 12; if they show the first interrupt cannot
      be made to let a cleanup finish on some platform, that goes to the owner before step 12.
      **Status:** on Linux (Node 22, 24, 26) the first interrupt as it stands cuts a running
      cleanup (Measured); a cleanup finished only when its process ignored both SIGINT and
      SIGTERM, and then after the run had ended (Measured). That a mechanism in the runner and
      the live helpers can make it finish before the run exits is an Inference, not measured;
-     macOS and Windows are unmeasured. So this goes to the owner before step 12, with a
-     proposal for measuring macOS and Windows (a temporary CI job running the probe on CI's
-     `macos-latest` and `windows-latest` runners).
+     macOS behaves as Linux; on Windows no listener in the file can keep a cleanup alive
+     (Measured), so the runner and `node --test` would both have to survive the first Ctrl-C and
+     not end the file (Inference). This goes to the owner before step 12.
 
 ## The scans and the measurements (spec §4, §2)
 

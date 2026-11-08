@@ -15,7 +15,7 @@ when its rule is broken, the rule is broken once on purpose, the test is seen re
 change is reverted. A moved file keeps its path and its test count (N1's appendix); a
 difference is named in the commit.
 
-**The owner's answers** to the plan's questions (P1–P5) are recorded at the end and bind
+**The owner's answers** to the plan's questions (P1–P7) are recorded at the end and bind
 the steps that name them.
 
 ## Baseline
@@ -348,16 +348,21 @@ the steps that name them.
       - the per-file close: a fixture file that opens a tracked connection ends with it
         closed, after its own hooks;
       - `'no Jest file leaves a tracked connection to a hook'` — over Jest's `--listTests`
-        (child process) and the TypeScript import graph of those files: none reaches
-        `trackConnection` unless it also calls `closeTrackedConnections` itself
-        (`testLogoffs`);
+        (child process): no Jest file calls a function that registers a tracked connection
+        (`trackConnection`, or a helper whose body calls it, such as `testConnectionLogOn`)
+        unless it also calls `closeTrackedConnections` itself (`testLogoffs`) — calls, not
+        reachability through imports (P6): the Jest files that import `sessionHelpers.ts`
+        through `testers/hardMode.ts` and register nothing (Appendix B2) pass;
       - the coverage guard (moved): the union of Jest's discovery and the runner's list
         (step 4's child-process read), a pin in a file of either runner found, a pin in a
         file of neither refused.
     - [ ] The machinery, then the live files: each converted (spec §4); `getTimeout`
       arguments dropped from every case (spec §3, "No bound"); the integration helpers of
-      Appendix B on `node:assert/strict`; `DebuggerHandlers`' `expect.stringContaining`
-      checks as string checks.
+      Appendix B on `node:assert/strict` (`high/unitTest/unitTestSteps.ts` with the four
+      `high/unitTest` live files; `testHelpers.ts` stays importable by the Jest files that
+      reach it — Appendix B — and their run stays green); `DebuggerHandlers`' 7
+      `expect.stringContaining` and 1 `expect.stringMatching`, and `coverage/backgroundRuns.live`'s
+      `expect.arrayContaining`, as plain checks.
     - [ ] Every live file ends without a force exit: each file is run on its own through the
       runner without a test config (its cases skip) and with the stand-ins where it has them;
       a file that does not end has an open handle, found and fixed in the file or the helper,
@@ -398,7 +403,7 @@ the steps that name them.
     **Commit:** `test: D27 — a cleanup running at the first interrupt finishes`.
 
 13. **No bound, no delay, no poll limit in a live test** (spec §3, "No bound on a live
-    test"; P3), by Appendix C.
+    test"; P3, P7), by Appendix C.
     **Files:** `integration/helpers/configHelpers.ts` (`getTimeout`, the delay helper and
     their readers), every reader Appendix C lists, the ATC live suite
     (`readOnly/atc/AtcHandlers.test.ts`, `poll_timeout_ms`), `tests/test-config.yaml.template`
@@ -424,7 +429,11 @@ the steps that name them.
 
 14. **The slow unit suites** (spec §4): `unit/analyseOmissions`,
     `unit/adtHeaders/headerCallSites`, `unit/coverage/hardModeBinaries`,
-    `server-runtime/src/stdio/__tests__/cancel/loginBound` (spies → `mock.method`).
+    `server-runtime/src/stdio/__tests__/cancel/loginBound` (spies → `mock.method`). Its
+    helper `loginStand.ts` spies with `jest.spyOn(process.stderr, 'write')` and 20 Jest files
+    also use it (Appendix B): its stderr capture is made runner-independent (a plain
+    replacement of `process.stderr.write` restored in the helper's own teardown), so both
+    runners use the one helper; those 20 files stay green.
     **Files:** the four files, the runner's list, `server-runtime`'s `tsconfig.test.json` if
     its types need `node:test`.
     **Steps:** each moved with its count; `server-runtime`'s `test:check` and
@@ -456,8 +465,10 @@ the steps that name them.
     **Commit:** `test: D27 — the install suites in a run of their own`.
 
 16. **The Ollama suite leaves the unit run: `test:retrieval`** (spec §4).
-    **Files:** `unit/descriptions/toolRetrievalVectors` and its helpers (`ollama.ts`,
-    `harness.ts`, `retrieval.ts`, …, those only it uses), `package.json`
+    **Files:** `unit/descriptions/toolRetrievalVectors` (its helpers `ollama.ts`,
+    `harness.ts`, `retrieval.ts`, … stay where they are: each is also used by
+    `toolRetrieval.test.ts`, which stays on Jest, and none uses a Jest API — Appendix A),
+    `package.json`
     (`test:retrieval`, not in CI), the docs (where it runs, how it skips).
     **Steps (red first):**
     - [ ] Red: step 15's guard extended to `test:retrieval`'s files — red while the suite is
@@ -525,9 +536,9 @@ the steps that name them.
     - step 2's and step 19's per-system counts;
     - the sub-packages' own `tsconfig.test.json` path lists (copies of a part of the table,
       not touched by this wave) for the later task;
-    - the owner's answers to P1–P5 (below).
+    - the owner's answers to P1–P7 (below).
 
-## The owner's answers (P1–P5)
+## The owner's answers (P1–P7)
 
 - **P1 — the list and Jest's configuration.** The list exists nowhere yet and is made here
   (step 3): one list file is the single source of which files run on node:test. Jest's
@@ -542,12 +553,24 @@ the steps that name them.
   between operations is a guess; an operation ends on its result) and the ATC suite's
   `poll_timeout_ms` (a poll ends on the run's status, as the product code already does):
   removed from the template, the helpers and their readers, red first where a test can show
-  it (step 13).
+  it (step 13). **Extended by P7.**
 - **P4 — the reference.** A fresh Jest live run on each system kind before the move, each
   with the owner's go (step 2).
 - **P5 — Jest's discovery.** The partition and coverage guards read Jest's list by running
   `jest --listTests --json` in a child process; no node:test file imports Jest (steps 4,
   11).
+- **P6 — the hook guard counts calls.** `'no Jest file leaves a tracked connection to a
+  hook'` refuses a Jest file that calls a registering function without closing, not one that
+  only reaches `trackConnection` through imports (step 11).
+- **P7 — every pause and retry in a test goes.** Beside P3's keys, every test-side pause or
+  retry of Appendix C goes the same way in step 13: `test_settings.operation_delays.*` and
+  each case's `params.operation_delays.*` (`getOperationDelay` and its callers), the ATC
+  suite's `poll_interval_ms`, the runtime suite's `trace_feed_retry_delay_ms` and
+  `dump_feed_retry_delay_ms`, and the keys read by nothing (`timeouts.delay`,
+  `test_settings.timeout`, `timeouts.create`, `timeouts.test`, `trace_read_retry_delay_ms`,
+  `trace_read_retries`). `RuntimeRunClass`'s own argument `trace_retry_delay_ms` is the
+  product's and is not changed; the test key `profiled_run_trace_retry_delay_ms` that feeds
+  it goes, and the case calls the tool without it.
 
 ## Appendix A — the first wave's files and their counts
 

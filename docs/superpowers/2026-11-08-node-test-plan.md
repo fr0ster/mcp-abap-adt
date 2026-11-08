@@ -266,9 +266,9 @@ the steps that name them.
    `staticTypes` (`.test.ts`), `unit/sources/helpers/*Scan.ts` where they read the repository
    by `__dirname`, the runner's list.
    **Steps (red first):**
-   - [ ] Each file onto the list, converted (spec §4, "How a file moves"); `jest.setTimeout`
+   - [x] Each file onto the list, converted (spec §4, "How a file moves"); `jest.setTimeout`
      goes. Its test count is Appendix A's.
-   - [ ] Load-bearing: each scan's own refusal fixtures stay red under node:test — break one
+   - [x] Load-bearing: each scan's own refusal fixtures stay red under node:test — break one
      fixture's rule in the sources scanned (or point the scan at a refused fixture) and see it
      fail; and make `jest.config.js` drop the list from its ignores — the partition guard red
      (every moved scan then on both runners).
@@ -575,7 +575,7 @@ the steps that name them.
     - step 2's and step 19's per-system counts;
     - the sub-packages' own `tsconfig.test.json` path lists (copies of a part of the table,
       not touched by this wave) for the later task;
-    - the owner's answers to P1–P7 (below).
+    - the owner's answers to P1–P8 (below).
 
 ## The owner's answers (P1–P8)
 

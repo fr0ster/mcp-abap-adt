@@ -22,16 +22,16 @@
  * findings; each under `clean` passes.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   createDerivationProgram,
   productionSources,
 } from './helpers/authorizationDerivationScan';
-import { rel } from './helpers/failureScan';
+import { REPO, rel } from './helpers/failureScan';
 import { type ProseForm, scanProse } from './helpers/proseScan';
-
-jest.setTimeout(300_000);
 
 describe('production', () => {
   const files = productionSources();
@@ -39,20 +39,33 @@ describe('production', () => {
 
   it('scans every package, the scripts and the tools', () => {
     const scanned = files.map(rel);
-    expect(scanned).toContain('src/lib/utils.ts');
-    expect(scanned).toContain('src/lib/logger.ts');
-    expect(scanned).toContain('server-runtime/src/stdio/launcher.ts');
-    expect(scanned).toContain('tools/runtime-profiling-dumps-explorer.js');
-    expect(scanned).toContain('scripts/portable/smoke.mjs');
+    assert.deepEqual(
+      [
+        'src/lib/utils.ts',
+        'src/lib/logger.ts',
+        'server-runtime/src/stdio/launcher.ts',
+        'tools/runtime-profiling-dumps-explorer.js',
+        'scripts/portable/smoke.mjs',
+      ].filter((file) => !scanned.includes(file)),
+      [],
+    );
   });
 
   it('matches no SAP text by its words', () => {
-    expect(scanProse(program, files)).toEqual([]);
+    assert.deepEqual(scanProse(program, files), []);
   });
 });
 
 describe('the scan refuses each form, and only those', () => {
-  const root = path.join(__dirname, '__fixtures__', 'prose');
+  const root = path.join(
+    REPO,
+    'src',
+    '__tests__',
+    'unit',
+    'sources',
+    '__fixtures__',
+    'prose',
+  );
   const listed = (dir: string) =>
     fs
       .readdirSync(path.join(root, dir))
@@ -80,22 +93,22 @@ describe('the scan refuses each form, and only those', () => {
   };
 
   it('has a fixture for every refused form, each with its expectation', () => {
-    expect(refused.map((file) => path.basename(file, '.ts')).sort()).toEqual(
+    assert.deepEqual(
+      refused.map((file) => path.basename(file, '.ts')).sort(),
       Object.keys(expected).sort(),
     );
   });
 
-  it.each(refused.map((file) => [path.basename(file, '.ts'), file]))(
-    'refuses %s',
-    (name, file) => {
-      expect(of(file)).toEqual(expected[name]);
-    },
-  );
+  for (const file of refused) {
+    const name = path.basename(file, '.ts');
+    it(`refuses ${name}`, () => {
+      assert.deepEqual(of(file), expected[name]);
+    });
+  }
 
-  it.each(clean.map((file) => [path.basename(file, '.ts'), file]))(
-    'accepts %s',
-    (_name, file) => {
-      expect(of(file)).toEqual([]);
-    },
-  );
+  for (const file of clean) {
+    it(`accepts ${path.basename(file, '.ts')}`, () => {
+      assert.deepEqual(of(file), []);
+    });
+  }
 });

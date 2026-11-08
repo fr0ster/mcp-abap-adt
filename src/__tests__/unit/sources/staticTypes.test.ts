@@ -14,8 +14,11 @@
  * be reported under its rule alone; the one under `clean` must not be.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { REPO, rel } from './helpers/failureScan';
 import {
   type Escape,
@@ -117,8 +120,8 @@ describe('production sources', () => {
   const escapes = files.flatMap(scanFile);
 
   it('scans the root src, scripts and every package src', () => {
-    expect(directories).toEqual(
-      expect.arrayContaining([
+    assert.deepEqual(
+      [
         'src',
         'scripts',
         'server/src',
@@ -130,41 +133,67 @@ describe('production sources', () => {
         'background-runs-memory/src',
         'responsible-rules/src',
         'compact-sse-ro/src',
-      ]),
+      ].filter((dir) => !directories.includes(dir)),
+      [],
     );
     for (const dir of directories) {
-      expect(files.some((file) => rel(file).startsWith(`${dir}/`))).toBe(true);
+      assert.equal(
+        files.some((file) => rel(file).startsWith(`${dir}/`)),
+        true,
+        dir,
+      );
     }
     const scanned = files.map(rel);
-    expect(scanned).toContain('src/lib/batch/phases.ts');
-    expect(scanned).toContain('scripts/list-tools.ts');
-    expect(scanned).toContain('server-runtime/src/stdio/launcher.ts');
-    expect(scanned.some((file) => file.includes('__tests__'))).toBe(false);
-    expect(scanned.some((file) => file.endsWith('.test.ts'))).toBe(false);
-    expect(scanned.some((file) => file.includes('__fixtures__'))).toBe(false);
+    assert.deepEqual(
+      [
+        'src/lib/batch/phases.ts',
+        'scripts/list-tools.ts',
+        'server-runtime/src/stdio/launcher.ts',
+      ].filter((file) => !scanned.includes(file)),
+      [],
+    );
+    assert.equal(
+      scanned.some((file) => file.includes('__tests__')),
+      false,
+    );
+    assert.equal(
+      scanned.some((file) => file.endsWith('.test.ts')),
+      false,
+    );
+    assert.equal(
+      scanned.some((file) => file.includes('__fixtures__')),
+      false,
+    );
   });
 
   it('holds no escape but the blocked assertions', () => {
-    expect(escapes.filter((found) => !isBlocked(found))).toEqual([]);
+    assert.deepEqual(
+      escapes.filter((found) => !isBlocked(found)),
+      [],
+    );
   });
 
   it('still finds every blocked assertion (a stale entry fails)', () => {
     for (const blocked of BLOCKED) {
-      expect(escapes).toContainEqual({ rule: 'assertion', ...blocked });
+      const wanted: Escape = { rule: 'assertion', ...blocked };
+      assert.ok(
+        escapes.some((found) => isDeepStrictEqual(found, wanted)),
+        `${blocked.where} ${blocked.text}`,
+      );
     }
   });
 
   it("exempts from Biome's assertion rule exactly the tests and the blocked files", () => {
     const tests = ['**/__tests__/**', '**/*.test.ts', '**/*.spec.ts'];
     const blockedFiles = BLOCKED.map((blocked) => fileOf(blocked.where));
-    expect(biomeAssertionExemptions().sort()).toEqual(
+    assert.deepEqual(
+      biomeAssertionExemptions().sort(),
       [...new Set([...tests, ...blockedFiles])].sort(),
     );
   });
 
-  it.each(['lint', 'lint:check', 'build'])(
-    'the root %s runs Biome over every production directory',
-    (script) => {
+  for (const script of ['lint', 'lint:check', 'build']) {
+    it(`the root ${script} runs Biome over every production directory`, () => {
       // Its directories are exactly the production directories; every other
       // entry names a file that exists (the node:test tools, D27).
       const paths = biomeCheckPaths(script);
@@ -172,20 +201,32 @@ describe('production sources', () => {
         const at = path.join(REPO, entry);
         return fs.existsSync(at) && fs.statSync(at).isDirectory();
       };
-      expect(paths.filter(isDirectory).sort()).toEqual([...directories].sort());
+      assert.deepEqual(
+        paths.filter(isDirectory).sort(),
+        [...directories].sort(),
+      );
       const files = paths.filter((entry) => !isDirectory(entry));
-      expect(
+      assert.deepEqual(
         files.filter((entry) => {
           const at = path.join(REPO, entry);
           return !fs.existsSync(at) || !fs.statSync(at).isFile();
         }),
-      ).toEqual([]);
-    },
-  );
+        [],
+      );
+    });
+  }
 });
 
 describe('the scan refuses each escape, and only those', () => {
-  const root = path.join(__dirname, '__fixtures__/typeEscapes');
+  const root = path.join(
+    REPO,
+    'src',
+    '__tests__',
+    'unit',
+    'sources',
+    '__fixtures__',
+    'typeEscapes',
+  );
   const fixture = (kind: 'refused' | 'clean', name: string) =>
     path.join(root, kind, `${name}.ts`);
   const REFUSED: ReadonlyArray<readonly [string, EscapeRule]> = [
@@ -206,7 +247,7 @@ describe('the scan refuses each escape, and only those', () => {
       .readdirSync(path.join(root, 'refused'))
       .map((name) => path.basename(name, '.ts'))
       .sort();
-    expect(onDisk).toEqual(REFUSED.map(([name]) => name).sort());
+    assert.deepEqual(onDisk, REFUSED.map(([name]) => name).sort());
     const rules: EscapeRule[] = [
       'assertion',
       'any',
@@ -216,16 +257,18 @@ describe('the scan refuses each escape, and only those', () => {
       '@ts-nocheck',
       'biome-ignore',
     ];
-    expect(new Set(REFUSED.map(([, rule]) => rule))).toEqual(new Set(rules));
+    assert.deepEqual(new Set(REFUSED.map(([, rule]) => rule)), new Set(rules));
   });
 
-  it.each(REFUSED)('refuses %s under %s alone', (name, rule) => {
-    const found = scanFile(fixture('refused', name));
-    expect(found.length).toBeGreaterThan(0);
-    expect(new Set(found.map((one) => one.rule))).toEqual(new Set([rule]));
-  });
+  for (const [name, rule] of REFUSED) {
+    it(`refuses ${name} under ${rule} alone`, () => {
+      const found = scanFile(fixture('refused', name));
+      assert.ok(found.length > 0, `${name}: nothing found`);
+      assert.deepEqual(new Set(found.map((one) => one.rule)), new Set([rule]));
+    });
+  }
 
   it('accepts as const, <const>, satisfies, the logical ! and the words in a string', () => {
-    expect(scanFile(fixture('clean', 'allowed'))).toEqual([]);
+    assert.deepEqual(scanFile(fixture('clean', 'allowed')), []);
   });
 });

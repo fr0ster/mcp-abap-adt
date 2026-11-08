@@ -13,27 +13,32 @@
  * and must be reported; the one under `clean` must not be.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { REPO } from './helpers/failureScan';
 import { productionSources, regexSitesIn } from './helpers/regexScan';
-
-// One program over every production source: the type checker reads each
-// receiver of `match` / `matchAll` / `search`.
-jest.setTimeout(300_000);
 
 describe('no regular expression in production code', () => {
   it('scans src, scripts, tools and every package, outside tests and fixtures', () => {
     const files = productionSources();
     const roots = new Set(files.map((file) => file.split('/')[0]));
     for (const root of ['src', 'scripts', 'tools', 'server-runtime']) {
-      expect(roots.has(root)).toBe(true);
+      assert.equal(roots.has(root), true, root);
     }
-    expect(files.some((file) => file.endsWith('.cjs'))).toBe(true);
-    expect(files.some((file) => file.endsWith('.mjs'))).toBe(true);
-    expect(files.some((file) => file.endsWith('.js'))).toBe(true);
+    for (const extension of ['.cjs', '.mjs', '.js']) {
+      assert.equal(
+        files.some((file) => file.endsWith(extension)),
+        true,
+        extension,
+      );
+    }
     for (const excluded of ['__tests__', '__fixtures__', 'docs']) {
-      expect(files.some((file) => file.split('/').includes(excluded))).toBe(
+      assert.equal(
+        files.some((file) => file.split('/').includes(excluded)),
         false,
+        excluded,
       );
     }
   });
@@ -42,20 +47,32 @@ describe('no regular expression in production code', () => {
     const found = regexSitesIn(productionSources()).map(
       (site) => `${site.where} ${site.text}`,
     );
-    expect(found).toEqual([]);
+    assert.deepEqual(found, []);
   });
 
   describe('fixtures', () => {
-    const root = path.join(__dirname, '__fixtures__/regex');
+    const root = path.join(
+      REPO,
+      'src',
+      '__tests__',
+      'unit',
+      'sources',
+      '__fixtures__',
+      'regex',
+    );
     const listed = (dir: string) =>
       fs.readdirSync(path.join(root, dir)).map((name) => `${dir}/${name}`);
 
-    it.each(listed('refused'))('refuses %s', (file) => {
-      expect(regexSitesIn([file], root)).toHaveLength(1);
-    });
+    for (const file of listed('refused')) {
+      it(`refuses ${file}`, () => {
+        assert.equal(regexSitesIn([file], root).length, 1);
+      });
+    }
 
-    it.each(listed('clean'))('accepts %s', (file) => {
-      expect(regexSitesIn([file], root)).toEqual([]);
-    });
+    for (const file of listed('clean')) {
+      it(`accepts ${file}`, () => {
+        assert.deepEqual(regexSitesIn([file], root), []);
+      });
+    }
   });
 });

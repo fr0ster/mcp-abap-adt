@@ -10,11 +10,14 @@
  * an entry that matches no finding fails too, so the list cannot rot.
  */
 
+import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { productionFiles, typeCodeFindings } from './helpers/typeCodeScan';
 
-const ROOT = join(__dirname, '../../../..');
+const ROOT = repositoryRoot(__dirname);
 const TSCONFIG = join(ROOT, 'tsconfig.test.json');
 
 /** `src`, and the `src` of every package directory of the repository. */
@@ -79,19 +82,23 @@ describe('type codes in production source come from the tables', () => {
   );
 
   it('scans src and every package directory', () => {
-    expect(SOURCE_DIRS.length).toBeGreaterThan(10);
+    assert.ok(SOURCE_DIRS.length > 10, `${SOURCE_DIRS.length} directories`);
   });
 
   it('types every code literal and names only table codes in comments and strings', () => {
-    expect(
+    assert.deepEqual(
       findings
         .filter((finding) => !ALLOWED.has(finding.key))
         .map((finding) => finding.line),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('keeps no allow-list entry that matches no finding', () => {
     const keys = new Set(findings.map((finding) => finding.key));
-    expect([...ALLOWED.keys()].filter((key) => !keys.has(key))).toEqual([]);
+    assert.deepEqual(
+      [...ALLOWED.keys()].filter((key) => !keys.has(key)),
+      [],
+    );
   });
 });

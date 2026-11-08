@@ -3,5 +3,12 @@
   "src/__tests__/unit/runner/npmTest.test.ts",
   "src/__tests__/unit/runner/partition.test.ts",
   "src/__tests__/unit/runner/runner.test.ts",
-  "src/__tests__/unit/sources/noRunnerTimeout.test.ts"
+  "src/__tests__/unit/sources/noChainInstanceof.test.ts",
+  "src/__tests__/unit/sources/noDerivationFromAuthorization.test.ts",
+  "src/__tests__/unit/sources/noProseMatching.test.ts",
+  "src/__tests__/unit/sources/noRegexOverInput.test.ts",
+  "src/__tests__/unit/sources/noRunnerTimeout.test.ts",
+  "src/__tests__/unit/sources/staticTypes.test.ts",
+  "src/__tests__/unit/sources/typeCodeLiterals.test.ts",
+  "src/__tests__/unit/sources/typeCodeScan.test.ts"
 ]

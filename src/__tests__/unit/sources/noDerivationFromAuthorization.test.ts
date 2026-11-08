@@ -24,8 +24,10 @@
  * its own form alone; each under `clean` passes.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   CREDENTIAL_DECLARATIONS,
   createDerivationProgram,
@@ -40,8 +42,6 @@ import {
 } from './helpers/authorizationDerivationScan';
 import { REPO, rel } from './helpers/failureScan';
 
-jest.setTimeout(300_000);
-
 describe('production and the test helpers', () => {
   const production = productionSources();
   const helpers = testHelperSources();
@@ -50,68 +50,85 @@ describe('production and the test helpers', () => {
   const findings = scanDerivations(program, files, new Set(production));
 
   it('scans every test-helper tree, found by walking the packages', () => {
-    expect(testHelperDirectories()).toEqual(
-      expect.arrayContaining([
+    const directories = testHelperDirectories();
+    assert.deepEqual(
+      [
         'src/__tests__/helpers',
         'src/__tests__/integration/helpers',
         'server-runtime/src/stdio/__tests__/helpers',
-      ]),
+      ].filter((dir) => !directories.includes(dir)),
+      [],
     );
     const scanned = files.map(rel);
-    expect(scanned).toContain('src/lib/utils.ts');
-    expect(scanned).toContain('server-runtime/src/stdio/launcher.ts');
-    expect(scanned).toContain(
-      'src/__tests__/integration/helpers/realmCheck.ts',
+    assert.deepEqual(
+      [
+        'src/lib/utils.ts',
+        'server-runtime/src/stdio/launcher.ts',
+        'src/__tests__/integration/helpers/realmCheck.ts',
+        'server-runtime/src/stdio/__tests__/helpers/loginStand.ts',
+        'compact/tools/generate-docs.js',
+      ].filter((file) => !scanned.includes(file)),
+      [],
     );
-    expect(scanned).toContain(
-      'server-runtime/src/stdio/__tests__/helpers/loginStand.ts',
+    assert.equal(
+      scanned.some((file) => file.startsWith('tools/')),
+      true,
     );
-    expect(scanned.some((file) => file.startsWith('tools/'))).toBe(true);
-    expect(scanned).toContain('compact/tools/generate-docs.js');
   });
 
   it('reads every authorization field of the config types, the settings left out', () => {
     for (const [owner, settings] of CREDENTIAL_DECLARATIONS) {
       const declared = declaredAuthorization(program, owner);
       // Every setting left out is a member the type declares: none is stale.
-      expect({ owner, settings: declared.settings }).toEqual({
-        owner,
-        settings: [...settings].sort(),
-      });
-      expect({ owner, read: declared.authorization.length > 0 }).toEqual({
-        owner,
-        read: true,
-      });
+      assert.deepEqual(
+        { owner, settings: declared.settings },
+        { owner, settings: [...settings].sort() },
+      );
+      assert.deepEqual(
+        { owner, read: declared.authorization.length > 0 },
+        { owner, read: true },
+      );
     }
-    expect(declaredAuthorization(program, 'ISapConfig').authorization).toEqual([
-      'authType',
-      'certKeyPath',
-      'certPassphrase',
-      'certPath',
-      'certPfxPath',
-      'jwtToken',
-      'kerberosService',
-      'kerberosSpn',
-      'password',
-      'refreshToken',
-      'sessionCookies',
-      'sncLib',
-      'sncMyName',
-      'sncPartnerName',
-      'sncQop',
-      'uaaClientId',
-      'uaaClientSecret',
-      'uaaUrl',
-    ]);
+    assert.deepEqual(
+      declaredAuthorization(program, 'ISapConfig').authorization,
+      [
+        'authType',
+        'certKeyPath',
+        'certPassphrase',
+        'certPath',
+        'certPfxPath',
+        'jwtToken',
+        'kerberosService',
+        'kerberosSpn',
+        'password',
+        'refreshToken',
+        'sessionCookies',
+        'sncLib',
+        'sncMyName',
+        'sncPartnerName',
+        'sncQop',
+        'uaaClientId',
+        'uaaClientSecret',
+        'uaaUrl',
+      ],
+    );
   });
 
   it('derives no kind from a credential and decodes no token', () => {
-    expect(findings).toEqual([]);
+    assert.deepEqual(findings, []);
   });
 });
 
 describe('the scan refuses each form, and only those', () => {
-  const root = path.join(__dirname, '__fixtures__', 'kindFromCredential');
+  const root = path.join(
+    REPO,
+    'src',
+    '__tests__',
+    'unit',
+    'sources',
+    '__fixtures__',
+    'kindFromCredential',
+  );
   const refusedDir = path.join(root, 'refused');
   const cleanDir = path.join(root, 'clean');
   const refused = fs
@@ -166,37 +183,37 @@ describe('the scan refuses each form, and only those', () => {
   };
 
   it('has a fixture for every refused form, each with its expectation', () => {
-    expect(refused.map((file) => path.basename(file, '.ts')).sort()).toEqual(
+    assert.deepEqual(
+      refused.map((file) => path.basename(file, '.ts')).sort(),
       Object.keys(expected).sort(),
     );
   });
 
-  it.each(refused.map((file) => [path.basename(file, '.ts'), file]))(
-    'refuses %s by its own form alone',
-    (name, file) => {
-      expect(of(file, findings)).toEqual(expected[name]);
-    },
-  );
+  for (const file of refused) {
+    const name = path.basename(file, '.ts');
+    it(`refuses ${name} by its own form alone`, () => {
+      assert.deepEqual(of(file, findings), expected[name]);
+    });
+  }
 
-  it.each(clean.map((file) => [path.basename(file, '.ts'), file]))(
-    'accepts %s',
-    (_name, file) => {
-      expect(of(file, findings)).toEqual([]);
-    },
-  );
+  for (const file of clean) {
+    it(`accepts ${path.basename(file, '.ts')}`, () => {
+      assert.deepEqual(of(file, findings), []);
+    });
+  }
 
   it('accepts the explicit-kind resolver, statedSystemKind, unchanged', () => {
-    expect(of(statedSystemKind, findings)).toEqual([]);
+    assert.deepEqual(of(statedSystemKind, findings), []);
   });
 
   it("accepts the realm check's exp read as a test helper, and refuses it as production", () => {
-    expect(of(realmExp, findings)).toEqual([]);
+    assert.deepEqual(of(realmExp, findings), []);
     const asProductionFindings = scanDerivations(
       program,
       [realmExp],
       new Set([realmExp]),
     );
-    expect(of(realmExp, asProductionFindings)).toEqual([
+    assert.deepEqual(of(realmExp, asProductionFindings), [
       { form: 'decode', rule: 'decode' },
       { form: 'decode', rule: 'decode' },
       { form: 'decode', rule: 'decode' },

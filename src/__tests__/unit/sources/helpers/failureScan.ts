@@ -21,8 +21,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../../helpers/repoRoot';
 
-export const REPO = path.resolve(__dirname, '../../../../..');
+/**
+ * The repository root, found from here under Jest and from the node:test
+ * build (`.test-build/`) alike: never a count of `..` from `__dirname`.
+ */
+export const REPO = repositoryRoot(__dirname);
 
 export interface Finding {
   readonly rule: 'instanceof' | 'thrown';

@@ -224,11 +224,18 @@ describe('the node:test build', () => {
     }
 
     // This file imports a sibling by name: it compiled in the node:test build,
-    // and the name ran through the hook to its compiled file.
-    assert.ok(SYSTEM_TYPES.length > 0);
-    assert.equal(
-      require.resolve('@mcp-abap-adt/responsible-rules'),
-      path.join(REPO, '.test-build', 'responsible-rules', 'src', 'index.js'),
+    // and the `require` of that name ran through the hook to its compiled
+    // file, the module this file holds. (`require.resolve` is not answered by
+    // `module.registerHooks` on Node 22 — measured on 22.23.4 — so the module
+    // cache is read instead: the hook covers `require` on every Node.)
+    const loaded: unknown =
+      require.cache[
+        path.join(REPO, '.test-build', 'responsible-rules', 'src', 'index.js')
+      ]?.exports;
+    assert.ok(
+      typeof loaded === 'object' && loaded !== null && 'SYSTEM_TYPES' in loaded,
+      'the compiled responsible-rules is not the loaded module',
     );
+    assert.equal(loaded.SYSTEM_TYPES, SYSTEM_TYPES);
   });
 });

@@ -7,7 +7,6 @@
  */
 import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
@@ -68,12 +67,25 @@ export function environment(
   return { ...env, ...set };
 }
 
-/** A temporary directory, removed by `remove()`. */
+/**
+ * Where the fixtures live: `.test-fixtures/` at the repository root
+ * (gitignored, under none of Jest's roots), not the system's temporary
+ * directory. A Jest run over a fixture root in the Windows runner's
+ * temporary directory (`C:\Users\RUNNER~1\…`, another drive than the
+ * checkout) found no test, while the same run passed on Linux and macOS
+ * (CI, measured; which part of that path Jest refused is not established).
+ * Under the checkout, the fixtures are on its drive and under its spelling,
+ * as every root Jest finds tests in is.
+ */
+export const FIXTURES = path.join(REPO, '.test-fixtures');
+
+/** A temporary directory under `FIXTURES`, removed by `remove()`. */
 export function temporaryDir(prefix: string): {
   dir: string;
   remove(): void;
 } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  fs.mkdirSync(FIXTURES, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(FIXTURES, prefix));
   return {
     dir,
     remove: () => fs.rmSync(dir, { recursive: true, force: true }),

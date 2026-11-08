@@ -165,6 +165,43 @@ describe('files production code reads beside itself', () => {
       WHY.mainModule,
     );
     refusedForm(
+      'process held under a type with no argv, then read',
+      [
+        FS,
+        'const hidden: object = process;',
+        "export const S = readFileSync(String(Reflect.get(hidden, 'argv')));",
+      ],
+      WHY.process,
+    );
+    refusedForm(
+      'process given to Reflect',
+      ["export const P: unknown = Reflect.get(process, 'argv');"],
+      WHY.process,
+    );
+    refusedForm(
+      'process spread',
+      ['export const P = { ...process };'],
+      WHY.process,
+    );
+    refusedForm(
+      'process returned',
+      ['export function current(): object { return process; }'],
+      WHY.process,
+    );
+    refusedForm(
+      'process handed to a type with no argv',
+      [
+        'function listen(on: { exitCode?: number | string | undefined }): void { void on; }',
+        'listen(process);',
+      ],
+      WHY.process,
+    );
+    refusedForm(
+      'process read with a computed key',
+      ["const key = 'argv';", 'export const P: unknown = process[key];'],
+      WHY.process,
+    );
+    refusedForm(
       'process handed to a type that has argv',
       [
         'function inspect(p: NodeJS.Process): string | undefined { return p.argv[1]; }',
@@ -252,8 +289,7 @@ describe('files production code reads beside itself', () => {
           'export const rest = process.argv.slice(2);',
           'export const first = process.argv[2];',
           "export const env = process.env['HOME'];",
-          'function listen(on: { exitCode?: number | string | undefined }): void { void on; }',
-          'listen(process);',
+          "process.on('exit', () => undefined);",
           "export const kind = typeof __filename === 'string';",
           "export const S = readFileSync(path.join(__filename, '..', '..', 'x.json'));",
           "export const T: unknown = require('node:path');",
@@ -268,17 +304,48 @@ describe('files production code reads beside itself', () => {
 
   describe("the owner's exception: src/lib/instance.ts's display-only __filename", () => {
     const SHAPE = "typeof __filename === 'string' ? __filename : 'bundled'";
-    /** The registry and its one registration site, as instance.ts has them. */
-    const site = (file: string): readonly string[] => [
-      'function registry(): { file: string }[] { return []; }',
+    /**
+     * The process-wide registry, its one registration site (line 14) and its
+     * one reader, as src/lib/instance.ts has them.
+     */
+    const site = (file: string): string[] => [
+      "const REGISTRY = Symbol.for('@mcp-abap-adt/lib/instances');",
+      'function isRegistry(value: unknown): value is { file: string }[] {',
+      '  return Array.isArray(value);',
+      '}',
+      'function registry(): { file: string }[] {',
+      '  const found: unknown = Reflect.get(globalThis, REGISTRY);',
+      '  if (isRegistry(found)) return found;',
+      '  const created: { file: string }[] = [];',
+      '  Reflect.set(globalThis, REGISTRY, created);',
+      '  return created;',
+      '}',
       'registry().push(',
       '  Object.freeze({',
       `    file: ${file},`,
       '  }),',
       ');',
+      'export function libInstances(): readonly { file: string }[] {',
+      '  return Object.freeze([...registry()]);',
+      '}',
     ];
+    const AFTER = site(SHAPE).length + 1;
     const instance = (lines: readonly string[]) =>
       scan({ [OWNER_GRANTED_FILE]: lines }, 'src').unstated;
+    /** The site with `from` replaced by `to` (each exactly once). */
+    const changed = (from: string, to: string): string[] => {
+      const lines = site(SHAPE);
+      const at = lines.indexOf(from);
+      assert.notEqual(at, -1, from);
+      lines[at] = to;
+      return lines;
+    };
+    const refusedSite = (name: string, lines: readonly string[]) =>
+      it(name, () => {
+        assert.deepEqual(instance(lines), [
+          `${OWNER_GRANTED_FILE}:14: ${WHY.unfollowed}`,
+        ]);
+      });
 
     it('clean: the exact shape at its registration site', () => {
       const { reads, unstated } = scan(
@@ -288,35 +355,83 @@ describe('files production code reads beside itself', () => {
       assert.deepEqual(unstated, []);
       assert.deepEqual(reads.targets, []);
     });
+    refusedSite('a push that is not Array.prototype.push', [
+      ...changed('registry().push(', 'sink().push('),
+      'function sink() {',
+      '  return { push(entry: { file: string }): void { void readFileSync(entry.file); } };',
+      '}',
+      FS,
+    ]);
+    it('a push of a type of its own, on the process-wide registry, is refused', () => {
+      const lines = site(SHAPE).map((line) =>
+        line
+          .replace('value is { file: string }[]', 'value is Store')
+          .replace(
+            'function registry(): { file: string }[]',
+            'function registry(): Store',
+          )
+          .replace('const created: { file: string }[]', 'const created: Store'),
+      );
+      assert.equal(lines.filter((line) => line.includes('Store')).length, 3);
+      assert.deepEqual(
+        instance([
+          ...lines,
+          'interface Store { push(entry: { file: string }): number; [Symbol.iterator](): Iterator<{ file: string }>; }',
+        ]),
+        [`${OWNER_GRANTED_FILE}:14: ${WHY.unfollowed}`],
+      );
+    });
+    refusedSite(
+      'a registry that is not the process-wide array',
+      changed('  return created;', '  return [];'),
+    );
+    refusedSite(
+      'a registry kept under another key',
+      changed(
+        '  const found: unknown = Reflect.get(globalThis, REGISTRY);',
+        "  const found: unknown = Reflect.get(globalThis, 'other');",
+      ),
+    );
+    refusedSite('a registry read elsewhere', [
+      ...site(SHAPE),
+      'export const leak = registry();',
+    ]);
+    refusedSite(
+      'a registry read by another function',
+      changed(
+        'export function libInstances(): readonly { file: string }[] {',
+        'export function others(): readonly { file: string }[] {',
+      ),
+    );
     it('another use of __filename in that file is refused', () => {
       assert.deepEqual(
         instance([
-          FS,
           ...site(SHAPE),
           'export const S = readFileSync(__filename);',
+          FS,
         ]),
-        [`${OWNER_GRANTED_FILE}:8: ${WHY.ownFile}`],
+        [`${OWNER_GRANTED_FILE}:${AFTER}: ${WHY.ownFile}`],
       );
     });
     it('the shape wrapped in a read is refused', () => {
       assert.deepEqual(
         instance([
-          FS,
           ...site(SHAPE),
           `export const S = readFileSync(${SHAPE});`,
+          FS,
         ]),
-        [`${OWNER_GRANTED_FILE}:8: ${WHY.unfollowed}`],
+        [`${OWNER_GRANTED_FILE}:${AFTER}: ${WHY.unfollowed}`],
       );
     });
     it('the shape assigned to a variable, then read, is refused', () => {
       assert.deepEqual(
         instance([
-          FS,
           ...site(SHAPE),
           `const f = ${SHAPE};`,
           'export const S = readFileSync(f);',
+          FS,
         ]),
-        [`${OWNER_GRANTED_FILE}:8: ${WHY.unfollowed}`],
+        [`${OWNER_GRANTED_FILE}:${AFTER}: ${WHY.unfollowed}`],
       );
     });
     it('the shape in an object that is not the registration is refused', () => {
@@ -325,17 +440,13 @@ describe('files production code reads beside itself', () => {
         [`${OWNER_GRANTED_FILE}:2: ${WHY.unfollowed}`],
       );
     });
-    it('a variant of the shape is refused', () => {
-      assert.deepEqual(
-        instance(
-          site("typeof __filename === 'string' ? __filename : 'elsewhere'"),
-        ),
-        [`${OWNER_GRANTED_FILE}:4: ${WHY.unfollowed}`],
-      );
-    });
+    refusedSite(
+      'a variant of the shape',
+      site("typeof __filename === 'string' ? __filename : 'elsewhere'"),
+    );
     it('the shape in another file is refused', () => {
       const { unstated } = scan({ 'src/lib/other.ts': site(SHAPE) }, 'src');
-      assert.deepEqual(unstated, [`src/lib/other.ts:4: ${WHY.unfollowed}`]);
+      assert.deepEqual(unstated, [`src/lib/other.ts:14: ${WHY.unfollowed}`]);
     });
   });
 

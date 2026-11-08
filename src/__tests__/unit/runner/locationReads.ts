@@ -27,7 +27,10 @@
  *   `import()`, is refused;
  * - the operand of `typeof`: nothing is read.
  * One use is the owner's exception (`isOwnerGranted`): `src/lib/instance.ts`'s
- * display-only `__filename`, at its one registration site.
+ * display-only `__filename`, at its one registration site: the entry
+ * `Array.prototype.push`es onto the process-wide registry, which only
+ * `libInstances()` reads (`isOwnerGranted`, `processWideRegistry`,
+ * `readOnlyByLibInstances`).
  * Every other use of a location value is refused, and so is every other way
  * to the module's own location: `module`, `import.meta`, `createRequire`, a
  * `require` not called with one literal, an `import()` not called with one,
@@ -36,8 +39,9 @@
  * symbol however they are reached (the global, a default, namespace or named
  * import of `node:process`, a re-export, a literal key): `argv` read where it
  * can name the executable or the script (anything but `.includes(<literal>)`,
- * `.slice(<n ≥ 2>)` and `[<n ≥ 2>]`) and `mainModule`; and `process` handed
- * whole where the receiving type has an `argv` or a `mainModule`. `execPath`
+ * `.slice(<n ≥ 2>)` and `[<n ≥ 2>]`) and `mainModule`; and `process` used
+ * other than for a named member (assigned, passed, spread, returned, given
+ * to `Reflect` or `Object`, read by a computed key). `execPath`
  * and `argv0` name the Node executable, `cwd()` the working directory: none
  * is the module's location in the repository, so none is refused. A `require`, `import()`, `import` or
  * `export … from` of a relative file that is not code is a target.
@@ -221,6 +225,11 @@ interface Known {
   argv: ts.Symbol | undefined;
   mainModule: ts.Symbol | undefined;
   object: ts.Symbol | undefined;
+  reflect: ts.Symbol | undefined;
+  globalThis: ts.Symbol | undefined;
+  symbol: ts.Symbol | undefined;
+  /** The standard library's declarations of `Array.prototype.push`. */
+  arrayPush: readonly ts.Declaration[];
 }
 
 function knownSymbols(checker: ts.TypeChecker): Known {
@@ -255,6 +264,12 @@ function knownSymbols(checker: ts.TypeChecker): Known {
   const global = (name: string) =>
     checker.resolveName(name, undefined, ts.SymbolFlags.Value, false);
   const processGlobal = global('process');
+  const arrayType = checker.resolveName(
+    'Array',
+    undefined,
+    ts.SymbolFlags.Type,
+    false,
+  );
   const processType =
     processGlobal === undefined
       ? undefined
@@ -280,6 +295,14 @@ function knownSymbols(checker: ts.TypeChecker): Known {
     argv: processType?.getProperty('argv'),
     mainModule: processType?.getProperty('mainModule'),
     object: global('Object'),
+    reflect: global('Reflect'),
+    globalThis: global('globalThis'),
+    symbol: global('Symbol'),
+    arrayPush:
+      arrayType === undefined
+        ? []
+        : (checker.getDeclaredTypeOfSymbol(arrayType).getProperty('push')
+            ?.declarations ?? []),
   };
 }
 
@@ -310,7 +333,7 @@ export const WHY = {
   importCall: 'import() not called with one literal',
   argv: 'process.argv read where it can name the program',
   mainModule: 'process.mainModule, a location the scan does not resolve',
-  process: 'process handed where its argv or mainModule can be read',
+  process: 'process used other than for a named member',
   moduleWhole:
     'a module exporting a location used other than by a literal member',
   builtinRequire: 'node:process or node:module loaded by require or import()',
@@ -452,6 +475,172 @@ export function locationReads(
     return values;
   };
 
+  /** Whether `call` is `Object.freeze(<only>)`, `Object` the global. */
+  const freezes = (call: ts.Node, only: ts.Node): boolean =>
+    ts.isCallExpression(call) &&
+    call.arguments.length === 1 &&
+    call.arguments[0] === only &&
+    ts.isPropertyAccessExpression(call.expression) &&
+    call.expression.name.text === 'freeze' &&
+    ts.isIdentifier(call.expression.expression) &&
+    symbolOf(call.expression.expression) === symbols.object;
+
+  /** Whether `node` is the identifier of a global (`Reflect`, `globalThis`). */
+  const isGlobal = (node: ts.Node | undefined, global: ts.Symbol | undefined) =>
+    node !== undefined &&
+    global !== undefined &&
+    ts.isIdentifier(node) &&
+    symbolOf(node) === global;
+
+  /** The key of `Reflect.<verb>(globalThis, KEY, …)`: KEY's symbol, if it is one. */
+  const globalKey = (node: ts.Node | undefined, verb: string) => {
+    if (
+      node === undefined ||
+      !ts.isCallExpression(node) ||
+      !ts.isPropertyAccessExpression(node.expression) ||
+      node.expression.name.text !== verb ||
+      !isGlobal(node.expression.expression, symbols.reflect) ||
+      !isGlobal(node.arguments[0], symbols.globalThis)
+    ) {
+      return undefined;
+    }
+    const key = node.arguments[1];
+    if (key === undefined || !ts.isIdentifier(key)) return undefined;
+    const symbol = symbolOf(key);
+    const declaration = symbol?.declarations?.[0];
+    // `const KEY = Symbol.for('<literal>')`.
+    const init =
+      declaration !== undefined && ts.isVariableDeclaration(declaration)
+        ? declaration.initializer
+        : undefined;
+    return init !== undefined &&
+      ts.isCallExpression(init) &&
+      ts.isPropertyAccessExpression(init.expression) &&
+      init.expression.name.text === 'for' &&
+      isGlobal(init.expression.expression, symbols.symbol) &&
+      init.arguments.length === 1 &&
+      init.arguments[0] !== undefined &&
+      ts.isStringLiteral(init.arguments[0])
+      ? symbol
+      : undefined;
+  };
+
+  /**
+   * Whether `registry` answers only the process-wide array: each `return`
+   * gives a const of its own that is either `Reflect.get(globalThis, KEY)` or
+   * an empty array the body stores with `Reflect.set(globalThis, KEY, it)`,
+   * one KEY for all.
+   */
+  const processWideRegistry = (registry: ts.FunctionDeclaration): boolean => {
+    const body = registry.body;
+    if (body === undefined) return false;
+    const returns: ts.ReturnStatement[] = [];
+    const stored = new Set<ts.Symbol>();
+    const keys = new Set<ts.Symbol>();
+    const visit = (node: ts.Node): void => {
+      if (ts.isFunctionLike(node)) return;
+      if (ts.isReturnStatement(node)) returns.push(node);
+      if (ts.isExpressionStatement(node)) {
+        const key = globalKey(node.expression, 'set');
+        const value =
+          ts.isCallExpression(node.expression) &&
+          node.expression.arguments.length === 3
+            ? node.expression.arguments[2]
+            : undefined;
+        const held =
+          value !== undefined && ts.isIdentifier(value)
+            ? symbolOf(value)
+            : undefined;
+        if (key !== undefined && held !== undefined) {
+          keys.add(key);
+          stored.add(held);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(body, visit);
+    if (returns.length === 0) return false;
+    for (const statement of returns) {
+      const value = statement.expression;
+      const held =
+        value !== undefined && ts.isIdentifier(value)
+          ? symbolOf(value)
+          : undefined;
+      const declaration = held?.declarations?.[0];
+      if (
+        held === undefined ||
+        declaration === undefined ||
+        !ts.isVariableDeclaration(declaration) ||
+        !ts.isVariableDeclarationList(declaration.parent) ||
+        (declaration.parent.flags & ts.NodeFlags.Const) === 0 ||
+        declaration.getSourceFile() !== registry.getSourceFile() ||
+        declaration.pos < body.pos ||
+        declaration.end > body.end
+      ) {
+        return false;
+      }
+      const init = declaration.initializer;
+      const read = globalKey(init, 'get');
+      if (read !== undefined) {
+        keys.add(read);
+        continue;
+      }
+      if (
+        init === undefined ||
+        !ts.isArrayLiteralExpression(init) ||
+        init.elements.length !== 0 ||
+        !stored.has(held)
+      ) {
+        return false;
+      }
+    }
+    return keys.size === 1;
+  };
+
+  /**
+   * Whether every reference to `registry` but the registration site
+   * (`site`, the `registry()` call) is `libInstances()`'s one statement,
+   * `return Object.freeze([...registry()])`: the array goes nowhere else.
+   */
+  const readOnlyByLibInstances = (
+    registry: ts.Symbol,
+    site: ts.Node,
+  ): boolean =>
+    referencesTo(registry).every((reference) => {
+      const call = reference.parent;
+      if (call === site) return true;
+      if (declares(reference)) return true;
+      if (ts.isFunctionDeclaration(call) && call.name === reference) {
+        return true;
+      }
+      if (
+        !ts.isCallExpression(call) ||
+        call.expression !== reference ||
+        call.arguments.length !== 0
+      ) {
+        return false;
+      }
+      // Walked up one checked step at a time: a source file has no parent.
+      const spread = call.parent;
+      if (!ts.isSpreadElement(spread)) return false;
+      const list = spread.parent;
+      if (!ts.isArrayLiteralExpression(list) || list.elements.length !== 1) {
+        return false;
+      }
+      const freeze = list.parent;
+      if (!freezes(freeze, list)) return false;
+      const statement = freeze.parent;
+      if (!ts.isReturnStatement(statement)) return false;
+      const block = statement.parent;
+      if (!ts.isBlock(block) || block.statements.length !== 1) return false;
+      const reader = block.parent;
+      return (
+        ts.isFunctionDeclaration(reader) &&
+        reader.name?.text === 'libInstances' &&
+        (ts.getCombinedModifierFlags(reader) & ts.ModifierFlags.Export) !== 0
+      );
+    });
+
   /** Whether `node` is the owner's exception (`OWNER_GRANTED_FILE`). */
   const isOwnerGranted = (node: ts.Node): boolean => {
     if (slashed(root, node.getSourceFile().fileName) !== OWNER_GRANTED_FILE) {
@@ -503,11 +692,18 @@ export function locationReads(
     }
     const registry = symbolOf(push.expression.expression.expression);
     const declaration = registry?.declarations?.[0];
+    const pushed = calleeOf(push);
     if (
-      registry?.declarations?.length !== 1 ||
+      registry === undefined ||
+      registry.declarations?.length !== 1 ||
       declaration === undefined ||
       !ts.isFunctionDeclaration(declaration) ||
-      declaration.getSourceFile() !== node.getSourceFile()
+      declaration.getSourceFile() !== node.getSourceFile() ||
+      // The standard library's `Array.prototype.push`, not a method of its own.
+      pushed?.declarations?.some((at) => symbols.arrayPush.includes(at)) !==
+        true ||
+      !processWideRegistry(declaration) ||
+      !readOnlyByLibInstances(registry, push.expression.expression)
     ) {
       return false;
     }
@@ -615,30 +811,15 @@ export function locationReads(
     refuse(node, WHY.unfollowed);
   };
 
-  /** Whether `node` reaches a type with no `argv` and no `mainModule`. */
-  const processContained = (node: ts.Node): boolean => {
-    if (!ts.isExpression(node)) return false;
-    const type = checker.getContextualType(node);
-    if (type === undefined) return false;
-    const members = type.isUnion() ? type.types : [type];
-    return members.every(
-      (member) =>
-        (member.flags &
-          (ts.TypeFlags.Any |
-            ts.TypeFlags.Unknown |
-            ts.TypeFlags.TypeParameter)) ===
-          0 &&
-        member.getProperty('argv') === undefined &&
-        member.getProperty('mainModule') === undefined,
-    );
-  };
-
-  /** A value of `process` (the global or a module): only its members are read. */
+  /**
+   * A value of `process` (the global or a module): only a named member is
+   * read (`process.x`, `process['x']`; `argv` and `mainModule` are judged by
+   * their own symbols). Anywhere else — assigned, passed, spread, returned,
+   * given to `Reflect` or `Object`, read by a computed key — it is refused.
+   */
   const processUse = (reference: ts.Node): void => {
     if (declares(reference) || memberRead(reference)) return;
-    if (!processContained(outermost(reference))) {
-      refuse(reference, WHY.process);
-    }
+    refuse(reference, WHY.process);
   };
 
   /** `argv`, however reached: only past the executable and the script. */

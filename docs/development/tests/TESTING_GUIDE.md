@@ -107,8 +107,11 @@ first fails, and `npm test` fails when either does.
   failed compile emits nothing). `npm test` runs it after Jest.
 - **One process per file.** node:test's default; the runner refuses `--test-isolation`.
 - **Concurrency is a setting, with no default.** The runner takes `--concurrency <N>`, or the
-  variable `TEST_CONCURRENCY` when no option is given; with neither it refuses to run.
-  `npm test` passes `1`, today's in-band behaviour, until the figures are measured.
+  variable `TEST_CONCURRENCY` when no option is given; with neither it refuses to run. The
+  number is the resources' of the machine running it, so each run states it: `npm test` passes
+  `2` (a developer machine), and CI passes its own per cell after it
+  (`npm test -- --concurrency <N>`; given twice, the last one wins) — `2` on every runner
+  kind, from `ci.yml`'s matrix, and `2` in `release.yml`. The figures are below.
 - **Variables without a shell.** `--env NAME=VALUE` sets a variable for the run on every
   platform.
 - **Selecting files.** `npm test -- <path>.test.ts` sends a listed file to the runner; every other
@@ -142,6 +145,61 @@ first fails, and `npm test` fails when either does.
   (`src/__tests__/unit/runner/partition.test.ts`, which reads Jest's discovery by
   `jest --listTests --json` over its configuration without the live suites' ignores, until
   those move to node:test too).
+
+### The node:test run's concurrency (measured)
+
+**Measured 2026-11-08** (D27). The node:test set of that day — 12 files: the runner's own tests
+and the TypeScript-program scans — built with `npm run test:build` and run with
+`node tools/run-tests.mjs --concurrency C`. Every run passed. Measured with a hand-run probe:
+every node process of the run (the runner, `node --test`, each file and what it starts) sampled
+its RSS every 20 ms from a worker thread and recorded `process.resourceUsage().maxRSS` at exit.
+The whole-run peak is the highest sum of the live processes' RSS. The probe's own cost per process
+(14–20 MB, measured) is subtracted. Each value was run at least three times, the values
+interleaved; the figures are min / median / max. Largest file is the median of each run's largest
+file process.
+
+| Machine (CPUs / parallelism / RAM) | Node | C | Wall time, s | Whole-run peak RSS, MB | Largest file, MB |
+|---|---|---|---|---|---|
+| Developer machine, Linux x64 (16 / 16 / 31 GB) | 26 | 1 | 75.9 / 76.5 / 76.9 | 1512 / 1522 / 1535 | 1420 |
+| | | 2 | 40.0 / 42.0 / 64.9 | 1996 / 2091 / 2267 | 1425 |
+| | | 4 | 32.9 / 42.4 / 46.1 | 3225 / 3487 / 3750 | 1422 |
+| | | 16 | 34.2 / 40.5 / 47.3 | 4628 / 5101 / 5212 | 1432 |
+| ubuntu-latest (4 / 4 / 15.6 GB) | 22 | 1 | 103.4 / 104.1 / 104.5 | 1218 / 2053 / 2104 | 1948 |
+| | | 2 | 66.7 / 67.2 / 68.0 | 1642 / 1797 / 1821 | 1122 |
+| | | 4 | 64.7 / 65.3 / 66.0 | 2859 / 2909 / 2928 | 1106 |
+| | 24 | 1 | 91.4 / 91.6 / 95.3 | 1281 / 1288 / 1291 | 1188 |
+| | | 2 | 58.4 / 59.1 / 59.2 | 1996 / 2014 / 2045 | 1222 |
+| | | 4 | 57.1 / 57.1 / 57.5 | 3191 / 3207 / 3270 | 1322 |
+| macos-latest, arm64 (3 / 3 / 7 GB) | 22 | 1 | 143.3 / 153.2 / 164.9 | 1127 / 1277 / 1503 | 1200 |
+| | | 2 | 77.4 / 78.4 / 80.7 | 1577 / 1641 / 1713 | 1021 |
+| | | 3 | 73.7 / 85.1 / 102.8 | 2096 / 2353 / 2491 | 1132 |
+| | | 4 | 86.8 / 93.4 / 95.3 | 2629 / 2861 / 2922 | 1047 |
+| | 24 | 1 | 98.6 / 114.0 / 137.8 | 1304 / 1437 / 1446 | 1339 |
+| | | 2 | 57.4 / 60.2 / 79.2 | 1807 / 1950 / 2198 | 1257 |
+| | | 3 | 55.2 / 57.6 / 89.7 | 2747 / 2761 / 2935 | 1295 |
+| | | 4 | 61.6 / 67.5 / 85.8 | 2951 / 2999 / 3091 | 1095 |
+| windows-latest (4 / 4 / 16 GB) | 22 | 1 | 158.5 / 160.9 / 163.1 | 1043 / 1081 / 1224 | 1005 |
+| | | 2 | 107.4 / 108.6 / 109.9 | 1420 / 1606 / 1644 | 1108 |
+| | | 4 | 107.4 / 109.3 / 117.8 | 2476 / 2479 / 2694 | 1049 |
+| | 24 | 1 | 110.4 / 113.3 / 113.3 | 1261 / 1383 / 1387 | 1303 |
+| | | 2 | 74.4 / 74.5 / 76.0 | 1850 / 1996 / 2219 | 1258 |
+| | | 4 | 71.1 / 73.2 / 88.7 | 3051 / 3086 / 3130 | 1262 |
+
+On the developer machine at C=1, the TypeScript-program scans each take 0.3–1.4 GB
+(`noRegexOverInput` the most, 1420 MB). `npmTest.test.ts` takes 31 s and starts 324 processes,
+1.1 GB as a tree.
+
+**What the figures support: 2, everywhere.**
+- From 2 on, `npmTest.test.ts`, the longest file at every setting, bounds the wall time.
+- 1 is 1.5–2× slower on every machine.
+- 4 costs 0.9–1.4 GB more than 2 (medians) for at most 2 s, and on the developer machine
+  nothing beyond the noise.
+- On macos-latest (3 cores, 7 GB) wall time rises above 2: on Node 22, 3 and 4 are slower than 2;
+  on Node 24, 3 is within the noise of 2 and 4 is slower.
+- At 2 the whole run peaks at 1.6–2.3 GB, safe on every runner kind.
+
+The figures belong to this list: when files are added to it, measure again and update the
+setting.
 
 ### The install matrix (`SKIP_INSTALL_MATRIX`)
 

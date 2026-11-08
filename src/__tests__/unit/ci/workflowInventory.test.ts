@@ -126,6 +126,16 @@ const INSTALL_MATRIX_GATE = {
   'release.yml': `SKIP_INSTALL_MATRIX: ${expression("matrix.node-version == 22 && 'false' || 'true'")}`,
 } as const;
 
+/**
+ * Each workflow's `npm test` passes the node:test runner's concurrency
+ * explicitly (D27 step 8): ci.yml per cell from its matrix, release.yml its
+ * one value; the runner has no default.
+ */
+const TEST_RUN = {
+  'ci.yml': `run: npm test -- --concurrency ${expression('matrix.test-concurrency')}`,
+  'release.yml': 'run: npm test -- --concurrency 2',
+} as const;
+
 /** The lines of the step named `name`, up to the next step. */
 function step(lines: string[], name: string): string[] {
   const start = lines.findIndex((line) => line.trim() === `- name: ${name}`);
@@ -140,7 +150,7 @@ describe.each(WORKFLOWS)('%s runs the install matrix in one cell', (file) => {
 
   it("the npm test step's SKIP_INSTALL_MATRIX: 'false' only on ubuntu-latest + Node 22", () => {
     const run = step(lines, 'Run tests').map((line) => line.trim());
-    expect(run).toContain('run: npm test');
+    expect(run).toContain(TEST_RUN[file]);
     expect(run).toContain('env:');
     expect(
       run.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
@@ -154,6 +164,12 @@ describe.each(WORKFLOWS)('%s runs the install matrix in one cell', (file) => {
       expect(text).toContain(
         'os: [ubuntu-latest, macos-latest, windows-latest]',
       );
+      // Every runner kind sets the concurrency its npm test passes.
+      for (const os of ['ubuntu-latest', 'macos-latest', 'windows-latest']) {
+        const at = lines.findIndex((line) => line.trim() === `- os: ${os}`);
+        expect(at).toBeGreaterThanOrEqual(0);
+        expect(lines[at + 1]?.trim()).toBe('test-concurrency: 2');
+      }
     } else {
       // The test job, the first of the file.
       expect(

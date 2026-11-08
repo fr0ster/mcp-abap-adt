@@ -275,10 +275,19 @@ the steps that name them.
    **Commit:** `test: D27 — the TypeScript-program scans on node:test`.
 
 8. **Measure the node:test unit run's concurrency** (spec §2, "Concurrency is a setting").
-   - [ ] With the scans on the list, run the node:test unit set at concurrency 1, 2, 4 and the
+   - [x] With the scans on the list, run the node:test unit set at concurrency 1, 2, 4 and the
      machine's available parallelism, on a developer machine and on each CI runner kind: peak
      RSS of each file's process and of the whole run, and wall time. Record the figures.
-   - [ ] **Decision point:** the setting each run uses — `npm test` on CI (per runner kind)
+     **Run** (2026-11-08, Measured): a hand-run probe, deleted after the run, on the developer
+     machine (Linux, 16 CPUs, Node 26) and on GitHub Actions (ubuntu, macOS, Windows × Node 22,
+     24; a throwaway branch and job, removed afterwards); the figures are in
+     `docs/development/tests/TESTING_GUIDE.md`, "The node:test run's concurrency (measured)".
+   - [x] **Decision point:** the owner chose `2` on every CI runner kind and locally (from 2 on
+     `npmTest.test.ts` bounds the wall time; 4 costs 0.9–1.4 GB for at most 2 s; macOS slows
+     above 2). `npm test` passes `2`; `ci.yml` passes it per cell from its matrix and
+     `release.yml` explicitly (`npm test -- --concurrency <N>`, the last wins); the runner keeps
+     no default.
+     **Decision point (the step's text):** the setting each run uses — `npm test` on CI (per runner kind)
      and locally — is written from the figures: the CI workflow passes it explicitly, the
      docs state the measured figures and which value they support, and the runner keeps no
      default. If the figures show no safe single value for a runner kind, CI passes `1`

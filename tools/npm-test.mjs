@@ -32,9 +32,11 @@
 //   `--roots`, a named file outside every root runs on neither (Jest applies
 //   its `--roots`, by path too; the runner's selection is intersected with
 //   the roots, and an empty one skips the runner).
-// - `--concurrency <N>` goes to the runner. The `test` script passes `1`:
-//   today's in-band behaviour, until the concurrency is measured (plan
-//   step 8). `TEST_CONCURRENCY` reaches the runner when no option is given.
+// - `--concurrency <N>` goes to the runner; given twice, the last wins. The
+//   `test` script passes `2`, the measured setting for a developer machine
+//   (docs/development/tests/TESTING_GUIDE.md, "Concurrency is a setting");
+//   CI passes its own per cell after it (`npm test -- --concurrency <N>`).
+//   `TEST_CONCURRENCY` reaches the runner when no option is given.
 // - `--repo <dir>` goes to the build and the runner, and to Jest as its
 //   configuration, `<dir>/jest.config.js`, unless `--config` is given:
 //   a fixture repository in the runner's own tests is a repository of its

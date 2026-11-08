@@ -263,6 +263,41 @@ describe('npm test', () => {
     });
   });
 
+  it('a named Jest file with --roots runs no node:test file', () => {
+    // Both runners' files under one root; only the Jest file is named.
+    const repo = fixtureRepo(
+      path.join(scratch.dir, 'named-jest'),
+      ['fix/src/__tests__/nodeOnly.test.ts'],
+      {
+        'fix/src/__tests__/nodeOnly.test.ts': nodeTestSource(
+          'node',
+          'FAIL_NODE',
+        ),
+        'fix/src/__tests__/jestOnly.test.ts': jestSource('jest', 'FAIL_JEST'),
+      },
+    );
+    const root = path.join(repo, 'fix', 'src');
+    const jestFile = path.join(root, '__tests__', 'jestOnly.test.ts');
+    assert.deepEqual(
+      listed(['--repo', repo, '--roots', root, jestFile]).nodeTest,
+      [],
+    );
+    const record = path.join(scratch.dir, 'named-jest.record');
+    const run = runTool(
+      'npm-test.mjs',
+      ['--concurrency', '1', '--repo', repo, '--roots', root, jestFile],
+      environment({ RECORD: record }),
+    );
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.ok(
+      run.stdout.includes(
+        `npm-test: no named node:test file under ${root}; the runner skipped`,
+      ),
+      run.stdout,
+    );
+    assert.deepEqual(recorded(record), ['jest']);
+  });
+
   describe('a filtered run succeeds on both runners', () => {
     const repo = fixtureRepo(
       path.join(scratch.dir, 'both'),

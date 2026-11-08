@@ -103,19 +103,24 @@ const isListed = (file) =>
   listed.has(relative(ownRepo, resolve(file)).split(sep).join('/'));
 // With `--roots`, a named file outside every root runs on neither runner:
 // Jest applies its `--roots` to it, and the runner's list mode does the same.
+// No named file on the list is an empty selection, never the whole list.
+const namedListed = named.filter(isListed);
 const namedRunner =
-  named.length > 0 && roots.length > 0
-    ? runnerList([...rootArgs, ...named.filter(isListed)])
-    : named.filter(isListed);
+  namedListed.length > 0 && roots.length > 0
+    ? runnerList([...rootArgs, ...namedListed])
+    : namedListed;
 const namedJest = named.filter((file) => !isListed(file));
 
 const runJest = named.length === 0 || namedJest.length > 0;
 const runnerSelection = named.length > 0 ? namedRunner : runnerList(rootArgs);
+// The named files come first and each root as `--roots=<dir>`: Jest's
+// `--roots` takes every value after it, so `--roots <dir> <file>` would make
+// the file a root.
 const jestRun = [
   '--passWithNoTests',
-  ...roots.flatMap((root) => ['--roots', root]),
-  ...jestArgs,
   ...namedJest,
+  ...roots.map((root) => `--roots=${root}`),
+  ...jestArgs,
 ];
 
 if (listOnly) {

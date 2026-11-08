@@ -432,13 +432,18 @@ the steps that name them.
 12. **The first interrupt lets a running cleanup finish** (spec §3), by step 6's findings and
     the owner's answer P8.
     **Files:** the runner (one process per file, each in a group of its own; the two-interrupt
-    handling of P8); a node:test fixture.
+    handling and the stop of P8); `liveSuite` (the stop checked before each case); node:test
+    fixtures.
     **Steps (red first):**
     - [ ] Red: the fixture of step 6, run through the runner by a test that sends one
       interrupt while its cleanup runs: the cleanup's end is recorded before the process
-      exits. A second interrupt does what step 6 recorded, and the docs say so.
+      exits. A second interrupt ends every file's process tree, and the docs say so.
+    - [ ] Red: a `liveSuite` fixture of three cases, interrupted once during the first: the
+      first case and its cleanup finish, the other two are reported skipped with the reason,
+      and no further file starts.
     - [ ] The mechanism step 6 shows works on every platform it was measured on.
-    - [ ] Load-bearing: remove the mechanism — the fixture's cleanup is cut, the test red.
+    - [ ] Load-bearing: remove the process groups — the fixture's cleanup is cut, the test red;
+      remove the stop check in `liveSuite` — the other two cases run, the skip test red.
     **Commit:** `test: D27 — a cleanup running at the first interrupt finishes`.
 
 13. **No bound, no delay, no poll limit in a live test** (spec §3, "No bound on a live
@@ -621,10 +626,13 @@ the steps that name them.
 - **P8 — the first interrupt: the runner holds it** (step 12, by step 6's findings). The runner
   starts each test file in a process group of its own (`detached`; on Windows a console group of
   its own), so a terminal's Ctrl-C reaches the runner alone. On the first interrupt the runner
-  starts no further file, says on stderr that it waits for the running files and that a second
-  interrupt stops the run, and waits for every running file to end by itself — its tests and
-  its cleanups included. On the second interrupt it ends the process tree of every file still
-  running. No flag reaches the live helpers: a running file runs to its end.
+  starts no further file, tells every running file to stop, says on stderr that it waits for the
+  running files and that a second interrupt stops the run, and waits for every running file to
+  end by itself. A file told to stop finishes the case it is running, that case's cleanup
+  included, and skips its remaining cases: `liveSuite` checks the stop before each case. On the
+  second interrupt the runner ends the process tree of every file still running. How the stop
+  reaches a file (a file or a channel the runner owns, no signal) is the step's to choose and
+  name.
 
 ## Appendix A — the first wave's files and their counts
 

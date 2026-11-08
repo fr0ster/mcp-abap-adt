@@ -23,7 +23,11 @@ import {
 import { createTestLogger } from './loggerHelpers';
 import { trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
-import { guardedTestConnection, refuseAfterMarker } from './refusalGuard';
+import {
+  type GuardedConnection,
+  guardedTestConnection,
+  refuseAfterMarker,
+} from './refusalGuard';
 import { extractSessionState } from './testHelpers';
 
 /**
@@ -53,9 +57,8 @@ const sessionLogger = createTestLogger('connection');
 export interface SessionInfo {
   session_id: string;
   session_state: {
+    /** The connection's `sessionCookies()`; empty over RFC. A secret. */
     cookies: string;
-    csrf_token: string;
-    cookie_store: Record<string, string>;
   };
 }
 
@@ -64,7 +67,7 @@ export interface SessionInfo {
  * provider from the factory, one provider for the whole process.
  * `null` when the config names no destination or the destination fails.
  */
-async function createConnectionViaBroker(): Promise<IAbapConnection | null> {
+async function createConnectionViaBroker(): Promise<GuardedConnection | null> {
   try {
     const target = await getTestDestination();
     if (!target) return null;
@@ -114,7 +117,7 @@ export async function createTestConnectionAndSession(): Promise<{
     // Check if environment.env is explicitly configured — skip auth broker
     const hasExplicitEnv = !!loadTestConfig()?.environment?.env;
 
-    let connection: IAbapConnection | null = null;
+    let connection: GuardedConnection | null = null;
     let connectionSource: 'auth_broker' | 'env' | 'unknown' = 'unknown';
 
     // Try AuthBroker only when no explicit env file is configured
@@ -201,11 +204,7 @@ export async function createTestConnectionAndSession(): Promise<{
     }
 
     // Connect once (same as adt-clients tests - no double connect)
-    // connect() is not part of IAbapConnection interface, use type assertion
-    const connectionAny = connection as any;
-    if (connectionAny.connect) {
-      await connectionAny.connect();
-    }
+    await connection.connect();
 
     // Resolve system context (legacy detection) so createAdtClient() picks the correct client
     await primeSystemContext(connection);
@@ -213,44 +212,24 @@ export async function createTestConnectionAndSession(): Promise<{
     // Generate session ID
     const sessionId = randomUUID().replace(/-/g, '');
 
-    // Get session state directly from connection (same as adt-clients tests)
-    // Note: getCookies() and getCsrfToken() exist in concrete classes but not in IAbapConnection interface
-    const cookies = connectionAny.getCookies?.() || '';
-    const csrfToken = connectionAny.getCsrfToken?.() || '';
-
-    if (!cookies && !csrfToken) {
-      const isRfc = process.env.SAP_CONNECTION_TYPE?.toLowerCase() === 'rfc';
-      if (!isRfc) {
-        throw new Error(
-          'Failed to get session state. Connection may not be properly initialized.',
-        );
-      }
-    }
-
-    // Get cookie store from connection if available
-    const cookieStore: Record<string, string> = {};
-    try {
-      // Cookie store is typically internal to connection, so we'll use empty object
-      // The cookies string contains all necessary information
-    } catch (error) {
-      // Ignore - cookie store is optional
+    // The session the connection holds, as the guarded connection declares
+    // it: `sessionCookies()`. The concrete class's `getCookies()` /
+    // `getCsrfToken()` are protected and not on the guard, so reading them
+    // found nothing and refused every HTTP connection. `null` before a
+    // session and over RFC, whose session no cookie names.
+    const config = connection.getConfig();
+    const cookies = connection.sessionCookies();
+    if (cookies === null && config.connectionType !== 'rfc') {
+      throw new Error(
+        'Failed to get session state. Connection may not be properly initialized.',
+      );
     }
 
     const session: SessionInfo = {
       session_id: sessionId,
-      session_state: {
-        cookies: cookies || '',
-        csrf_token: csrfToken || '',
-        cookie_store: cookieStore,
-      },
+      session_state: { cookies: cookies ?? '' },
     };
-
-    let authType: string | undefined;
-    try {
-      authType = (connection as any)?.getConfig?.()?.authType;
-    } catch {
-      authType = undefined;
-    }
+    const authType: string = config.authType;
 
     return {
       connection,

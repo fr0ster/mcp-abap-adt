@@ -386,8 +386,9 @@ the steps that name them.
       - `liveSuite` runs its cases without a config — its skip test red;
       - drop the per-file close — `'a tracked connection is closed after the file's hooks'`
         red;
-      - import `sessionHelpers.ts` from a Jest unit fixture file that never closes — `'no
-        Jest file leaves a tracked connection to a hook'` red;
+      - a Jest unit fixture file that calls a registering function (`testConnectionLogOn`)
+        and never closes — `'no Jest file leaves a tracked connection to a hook'` red; a
+        fixture that only imports `sessionHelpers.ts` stays green (P6);
       - give one live script concurrency 2 — `liveScripts`' test red; restore `--forceExit`
         in one script — the no-timeout scan red (its allowed list is empty now).
     **Commit:** `test: D27 — the live suites and their machinery on node:test`.
@@ -570,7 +571,15 @@ the steps that name them.
   `test_settings.timeout`, `timeouts.create`, `timeouts.test`, `trace_read_retry_delay_ms`,
   `trace_read_retries`). `RuntimeRunClass`'s own argument `trace_retry_delay_ms` is the
   product's and is not changed; the test key `profiled_run_trace_retry_delay_ms` that feeds
-  it goes, and the case calls the tool without it.
+  it goes, and the case calls the tool without it (the schema makes it optional;
+  likewise `profiled_run_max_trace_attempts`, which feeds the tool's `max_trace_attempts`).
+  The runtime suite's feed loops go with their keys (`trace_feed_retries`,
+  `dump_feed_retries`, the two `*_retry_delay_ms`, `dump_candidates_per_poll`): after the
+  run, the trace feed and the dump feed are each read once, and the dump read checks every
+  title-matched entry; the dump loop's fallback to "whatever the feed showed last" goes.
+  Whether the trace and the dump are listed at once after the run is measured live first
+  (step 19's runs, before the change lands); if either is not, the measurement goes to the
+  owner before step 13 commits — no loop, delay or limit is put back on its own.
 
 ## Appendix A — the first wave's files and their counts
 
@@ -698,7 +707,7 @@ through `harness.ts`, which imports `embed` from it; the lexical suite calls nei
 a Jest API (Code, the type checker: no identifier bound to Jest's declarations). So step 16's
 "those only it uses" is the empty set: the helpers stay in place, shared by both runners
 (a discrepancy with step 16's file list, which names `ollama.ts`, `harness.ts`,
-`retrieval.ts` as moving with it).
+`retrieval.ts` as moving with it). **Resolved:** step 16 now keeps the helpers in place.
 
 **Jest API in the wave's files** (Code, grep), for the conversion: `jest.setTimeout` in
 `runReport`, `refusalStop`, `live`, `coverageLedger`, `noDerivationFromAuthorization`,
@@ -710,6 +719,7 @@ from `jest` in `runReport`, `live`, `coverageLedger`. Asymmetric matchers in liv
 `coverage/backgroundRuns.live` **1 `expect.arrayContaining`** — step 11 names only
 `DebuggerHandlers`' `stringContaining` (a discrepancy: two more matchers to turn into plain
 checks, the `stringMatching` one without a regular expression over the value).
+**Resolved:** step 11 now names all three.
 
 ## Appendix B — shared code that reaches Jest
 
@@ -738,7 +748,8 @@ wave files (58 live, 20 unit) holds exactly five non-test modules that use Jest:
   `process.stderr.write` with `jest.spyOn`, is imported by `loginBound` and by 20 files that
   stay on Jest. Step 14 names only `loginBound`'s own spies; moving `loginBound` needs
   `loginStand.ts` in a runner-free form that its 20 Jest importers keep using (or a split),
-  which step 14 does not state.
+  which step 14 does not state. **Resolved:** step 14 now makes its stderr capture
+  runner-independent, one helper for both runners.
 - **`testHelpers.ts` is shared with four files that stay on Jest** (and with
   `hardModeBinaries`, on Jest until step 14): when step 11 puts it on `node:assert/strict`,
   those keep importing it under Jest (Inference: `node:assert` runs under Jest unchanged).
@@ -780,7 +791,7 @@ Taken by step 1 (Code, the same program; calls read as call expressions):
   `launchedServers`, `hardModeLauncher`, `configuredSystemKind` and `closeEvery` (and
   `hardModeBinaries` through steps 11–13) reach it and do not close. The guard needs either a
   reach that counts only calls of a registering function, or these files handled — for the
-  controller and the owner; not changed here.
+  controller and the owner; not changed here. **Resolved by P6:** the guard counts calls.
 
 ## Appendix C — the bounds and their readers
 
@@ -866,8 +877,7 @@ read no key: `batch/refusalFollowUps` and `debugger/DebuggerHandlers` (`pause`),
   `params.operation_delays.*` (through `getOperationDelay`), the ATC suite's
   `poll_interval_ms` (beside `poll_timeout_ms`), and the runtime suite's
   `*_retry_delay_ms` keys — one of which is a product tool argument
-  (`trace_retry_delay_ms`), not a test pause. Whether P3's "every bound, `timeouts.delay`
-  and `poll_timeout_ms`" covers these is the owner's; step 1 only lists them.
+  (`trace_retry_delay_ms`), not a test pause. **Resolved by P7.**
 
 ## Appendix D — the scripts that run Jest
 

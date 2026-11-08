@@ -32,7 +32,6 @@ interface SearchSourceResult {
     snippet: string;
   }>;
   scanned: {
-    packages: number;
     objects: number;
     sources: number;
     objects_with_hits: number;
@@ -450,7 +449,9 @@ describe('SearchSource Handler Integration', () => {
         expect(result.isError).toBe(false);
         const data = parseResult(result);
         expect(data.results).toEqual([]);
-        expect(data.scanned.packages).toBe(0);
+        // No package counter (DO26): a missing package is no hit, nothing counted.
+        expect('packages' in data.scanned).toBe(false);
+        expect(data.scanned.objects).toBe(0);
       });
     },
     getTimeout('medium'),

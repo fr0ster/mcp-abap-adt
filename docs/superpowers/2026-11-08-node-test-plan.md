@@ -198,14 +198,14 @@ the steps that name them.
    **Files:** a new source scan beside `unit/sources/` (a node:test file on the list), its
    fixtures.
    **Steps (red first):**
-   - [ ] Red: one fixture each — `--test-timeout` in a script, `{ timeout }` on a `test`, an
+   - [x] Red: one fixture each — `--test-timeout` in a script, `{ timeout }` on a `test`, an
      `it`, a `describe`, a hook, `--test-force-exit` in a script, `--forceExit` in a script —
      each refused by its own check alone, and `clean` by none. The scan reads node:test
      files and every npm script. Until step 11 it allows exactly four script/flag pairs —
      `test:integration` `--forceExit`, `test:coverage-family` `--forceExit`, `test:high`
      `--forceExit`, `test:live-connection` `--forceExit` (Appendix D confirms them) — and
      refuses any other pair and any addition to the list; step 11 empties it.
-   - [ ] Load-bearing: delete each check in turn — its fixture passes, so the test is red;
+   - [x] Load-bearing: delete each check in turn — its fixture passes, so the test is red;
      add `--forceExit` to `shared:setup` — refused as a pair outside the list.
    **Commit:** `test: D27 — no runner timeout and no force exit; the scan`.
 

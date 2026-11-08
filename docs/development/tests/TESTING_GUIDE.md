@@ -94,6 +94,32 @@ resolve hook registered with `module.registerHooks`, which Node has since 22.15.
 `engines` (`>=22.0.0`) is what the server needs to run and is unchanged; developing and running
 the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
 
+### Two runners: Jest and node:test
+
+The tests are moving from Jest to Node's own runner, `node:test`. Until the last one moves,
+`npm test` (`tools/npm-test.mjs`) runs both: Jest over its files, then the node:test build and
+`tools/run-tests.mjs` over the files of `tools/node-test-files.json`. Both run even when the
+first fails, and `npm test` fails when either does.
+
+- **The build.** `npm run test:build` removes `.test-build/` and compiles the listed files, with
+  what they import, into it, with the options of `tsconfig.node-test.json` (`types` is `node`
+  alone, so a listed file that reaches a Jest global does not compile; `noEmitOnError`, so a
+  failed compile emits nothing). `npm test` runs it after Jest.
+- **One process per file.** node:test's default; the runner refuses `--test-isolation`.
+- **Concurrency is a setting, with no default.** The runner takes `--concurrency <N>`, or the
+  variable `TEST_CONCURRENCY` when no option is given; with neither it refuses to run.
+  `npm test` passes `1`, today's in-band behaviour, until the figures are measured.
+- **Variables without a shell.** `--env NAME=VALUE` sets a variable for the run on every
+  platform.
+- **Selecting files.** `npm test -- <path>.test.ts` sends a listed file to the runner and any
+  other to Jest; a runner, or Jest, given none of the named files is skipped. `--roots <dir>`
+  (the sub-packages' `npm test`) selects that root on both runners; a root with no listed file
+  runs Jest alone, with a line saying the runner was skipped. Other arguments are Jest's.
+- **One list, one guard.** A file is on the list or found by Jest, never both and never neither
+  (`src/__tests__/unit/runner/partition.test.ts`, which reads Jest's discovery by
+  `jest --listTests --json` over its configuration without the live suites' ignores, until
+  those move to node:test too).
+
 ### The install matrix (`SKIP_INSTALL_MATRIX`)
 
 `src/__tests__/unit/installMatrix.test.ts` proves that every server process loads one copy of

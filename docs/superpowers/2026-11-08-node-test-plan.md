@@ -126,13 +126,15 @@ the steps that name them.
    helper for moved tests, `package.json` scripts (`test`, a `test:build`, the Biome
    lists naming `tools/run-tests.mjs`), CI unchanged (it runs `npm test`).
    **Steps (red first):**
-   - [ ] Red, as node:test files (the first on the list):
+   - [x] Red, as node:test files (the first on the list):
      - `'the runner refuses an empty run'`, `'a named file must exist'`, `'options go before
        files'`, `'--env sets a variable without a shell'` — on a temporary list;
      - `'a file belongs to exactly one runner'` — the partition guard: every `*.test.ts` of
        the 18 roots is on the runner's list or found by Jest's discovery, never both, never
        neither; every listed path names a file. Jest's discovery is read by running Jest's
        own `--listTests --json` in a child process, not by importing Jest (P5);
+       the guard's discovery is Jest's config without its live ignores until step 11
+       (`jest.config.js` exports them as `liveIgnores`; the owner's decision);
      - `'the node:test build refuses a Jest global'` — a fixture compiled with the node:test
        build configuration that uses `expect` fails to compile;
      - `'every test configuration takes its paths from the table'` — step 3's guard widened:
@@ -163,18 +165,18 @@ the steps that name them.
      - `'a filtered run succeeds on both runners'` — a fixture root with one passing Jest
        file and one listed passing node:test file: the tool's real run exits 0, both
        runners ran, each its one file; with either file failing, the run fails;
-   - [ ] The runner (auth-errors' model: `process.execPath`, options before files, a run with
+   - [x] The runner (auth-errors' model: `process.execPath`, options before files, a run with
      no file refused, `--env NAME=VALUE`), with: the source path → compiled path mapping, the
      preload of step 3's hook, the concurrency setting (an option and one documented
      variable; none given is refused), a root filter (`--root <dir>`, spec §5), and a list
      mode that prints what it would run.
-   - [ ] `npm test` runs Jest, then the runner, both even when the first fails; the script
+   - [x] `npm test` runs Jest, then the runner, both even when the first fails; the script
      fails when either does (spec §5, decision). A small `tools/` script runs the two, since
      `&&` stops at the first. It translates the sub-packages' `--roots <dir>` for both
      runners, so `npm --prefix <package> test` keeps working, unchanged, from this commit on.
      Until step 8 measures it, `npm test` passes concurrency `1`, today's in-band behaviour,
      stated as such in the script's comment.
-   - [ ] Load-bearing: put one file on both runners, then on neither, then list a missing
+   - [x] Load-bearing: put one file on both runners, then on neither, then list a missing
      path — each red; remove the `types: ["node"]` restriction — the build fixture green,
      so the test red; let `npm test`'s first runner fail — the second still runs and the
      script fails; drop the removal of `.test-build/` — `'the build starts clean'` red;
@@ -186,7 +188,7 @@ the steps that name them.
      runner run with an empty selection fails'` red; drop `tsconfig.paths.json` from
      `tsconfig.node-test.json`'s `extends`, or give it a `paths` block — `'every test
      configuration takes its paths from the table'` red.
-   - [ ] **Dependencies** (spec §9): `package.json`'s `dependencies` unchanged and no package
+   - [x] **Dependencies** (spec §9): `package.json`'s `dependencies` unchanged and no package
      added to `devDependencies`; after `npm install`, `package-lock.json` has no
      `"link": true` and no `resolved` outside `registry.npmjs.org` (counted by a one-line
      read of the lockfile; both counts 0), recorded in the commit. Repeated in step 20.

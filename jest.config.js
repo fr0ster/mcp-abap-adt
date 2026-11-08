@@ -24,6 +24,15 @@ const ROOT = __dirname;
 const NAME_TABLE = path.join(ROOT, 'tsconfig.paths.json');
 const NODE_TEST_LIST = path.join(ROOT, 'tools', 'node-test-files.json');
 
+/**
+ * The directories of the live suites, which the unit run ignores: the live
+ * scripts run them with ignores of their own. The partition guard
+ * (`unit/runner/partition.test.ts`) drops exactly these to read what Jest
+ * runs in any of its scripts; step 11 of the node:test plan moves the live
+ * suites to node:test and removes these ignores, and that use with them.
+ */
+const LIVE_IGNORES = ['__tests__/admin/', '__tests__/integration/'];
+
 /** The characters a regular expression gives a meaning to. */
 const SPECIAL = '\\^$.*+?()[]{}|';
 
@@ -115,11 +124,7 @@ function jestConfig(listFile) {
       '!src/**/__tests__/**',
       '!src/**/index.ts',
     ],
-    testPathIgnorePatterns: [
-      '__tests__/admin/',
-      '__tests__/integration/',
-      ...listedIgnores(listFile),
-    ],
+    testPathIgnorePatterns: [...LIVE_IGNORES, ...listedIgnores(listFile)],
     maxWorkers: 1,
     testTimeout: 600000,
     globalSetup: '<rootDir>/src/__tests__/integration/globalSetup.ts',
@@ -135,3 +140,6 @@ module.exports = jestConfig(NODE_TEST_LIST);
 // reader that spreads the configuration (`unit/coverage/live.test.ts`,
 // `runReport.test.ts`) copies the settings alone.
 Object.defineProperty(module.exports, 'jestConfig', { value: jestConfig });
+Object.defineProperty(module.exports, 'liveIgnores', {
+  value: Object.freeze([...LIVE_IGNORES]),
+});

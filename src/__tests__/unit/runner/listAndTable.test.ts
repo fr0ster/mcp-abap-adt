@@ -5,8 +5,9 @@
  * node:test; `tsconfig.paths.json` the one table of this repository's package
  * names and their source entries. Jest's configuration (`jest.config.js`)
  * builds its `moduleNameMapper` from the table and ignores every listed path;
- * `tsconfig.test.json` takes its `paths` from the table through `extends`;
  * the node:test resolve hook answers the table's names and nothing else.
+ * That every test configuration takes its `paths` from the table is checked
+ * under node:test (`build.test.ts`).
  * Jest's configuration is read as Jest loads it, by running Jest in a child
  * process (`--showConfig`, `--listTests`), never by importing it.
  */
@@ -17,7 +18,6 @@ import type { ResolveFnOutput, ResolveHookContext } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import * as ts from 'typescript';
 import { readNameTable } from '../../helpers/nameTable';
 import { tableResolve } from '../../helpers/resolveHook';
 
@@ -130,67 +130,30 @@ describe('one list, one name table', () => {
         list,
         JSON.stringify(['src/__tests__/unit/ci/ipsSummary.test.ts']),
       );
-      const config = path.join(dir, 'jest.config.js');
-      fs.writeFileSync(
-        config,
-        `module.exports = require(${JSON.stringify(
-          path.join(REPO, 'jest.config.js'),
-        )}).jestConfig(${JSON.stringify(list)});\n`,
-      );
-      const withList = ['--config', config];
+      const empty = path.join(dir, 'empty.json');
+      fs.writeFileSync(empty, JSON.stringify([]));
+      // A configuration over `listFile`: compared with one over an empty
+      // list, since the repository's own list is not empty.
+      const configWith = (name: string, listFile: string): string[] => {
+        const config = path.join(dir, name);
+        fs.writeFileSync(
+          config,
+          `module.exports = require(${JSON.stringify(
+            path.join(REPO, 'jest.config.js'),
+          )}).jestConfig(${JSON.stringify(listFile)});\n`,
+        );
+        return ['--config', config];
+      };
+      const withList = configWith('jest.config.js', list);
+      const withEmpty = configWith('empty.config.js', empty);
       expect(loadedConfig(withList).testPathIgnorePatterns).toHaveLength(3);
       const found = listedTests(withList);
-      const foundWithout = listedTests();
+      const foundWithout = listedTests(withEmpty);
       expect(foundWithout).toContain(listedFile);
       expect(found).not.toContain(listedFile);
       expect(found).toHaveLength(foundWithout.length - 1);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("the type checker's paths are the table", () => {
-    const file = path.join(REPO, 'tsconfig.test.json');
-    const read = ts.readConfigFile(file, ts.sys.readFile);
-    const raw: unknown = read.config;
-    expect(read.error).toBeUndefined();
-    if (typeof raw !== 'object' || raw === null || !('extends' in raw)) {
-      throw new Error('tsconfig.test.json: no extends');
-    }
-    expect(raw.extends).toEqual(['./tsconfig.json', './tsconfig.paths.json']);
-    const own: unknown = 'compilerOptions' in raw ? raw.compilerOptions : {};
-    expect(typeof own === 'object' && own !== null && 'paths' in own).toBe(
-      false,
-    );
-
-    const parsed = ts.getParsedCommandLineOfConfigFile(
-      file,
-      {},
-      {
-        ...ts.sys,
-        onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
-          throw new Error(
-            ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-          );
-        },
-      },
-    );
-    if (parsed === undefined) throw new Error('tsconfig.test.json: unread');
-    const table = readNameTable(REPO);
-    expect(Object.entries(parsed.options.paths ?? {})).toEqual(
-      [...table].map(([name, target]) => [name, [target]]),
-    );
-    // Each name resolves to its source from a test, as the checker resolves it.
-    const from = path.join(REPO, 'src', '__tests__', 'unit', 'any.test.ts');
-    for (const [name, target] of table) {
-      const resolved = ts.resolveModuleName(name, from, parsed.options, ts.sys)
-        .resolvedModule?.resolvedFileName;
-      // TypeScript answers `/` separators on every platform; `path.normalize`
-      // gives the platform's own, as `path.join` does.
-      expect([
-        name,
-        resolved === undefined ? undefined : path.normalize(resolved),
-      ]).toEqual([name, path.join(REPO, target)]);
     }
   });
 

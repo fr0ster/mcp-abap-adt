@@ -1,1 +1,6 @@
-[]
+[
+  "src/__tests__/unit/runner/build.test.ts",
+  "src/__tests__/unit/runner/npmTest.test.ts",
+  "src/__tests__/unit/runner/partition.test.ts",
+  "src/__tests__/unit/runner/runner.test.ts"
+]

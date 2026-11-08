@@ -165,7 +165,21 @@ describe('production sources', () => {
   it.each(['lint', 'lint:check', 'build'])(
     'the root %s runs Biome over every production directory',
     (script) => {
-      expect(biomeCheckPaths(script).sort()).toEqual([...directories].sort());
+      // Its directories are exactly the production directories; every other
+      // entry names a file that exists (the node:test tools, D27).
+      const paths = biomeCheckPaths(script);
+      const isDirectory = (entry: string): boolean => {
+        const at = path.join(REPO, entry);
+        return fs.existsSync(at) && fs.statSync(at).isDirectory();
+      };
+      expect(paths.filter(isDirectory).sort()).toEqual([...directories].sort());
+      const files = paths.filter((entry) => !isDirectory(entry));
+      expect(
+        files.filter((entry) => {
+          const at = path.join(REPO, entry);
+          return !fs.existsSync(at) || !fs.statSync(at).isFile();
+        }),
+      ).toEqual([]);
     },
   );
 });

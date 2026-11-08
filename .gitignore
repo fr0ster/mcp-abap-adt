@@ -121,3 +121,6 @@ desktop.ini
 .mcp.json
 dist-portable/
 .superpowers/
+
+# The node:test build (D27): `npm run test:build`, removed before each build.
+/.test-build/

@@ -304,6 +304,12 @@ Carries: *One shape per connection type* for every builder. Evidence: E.8.
 - **No whole-object spread across shapes.** A builder copies its own shape's fields; it never
   spreads a value of the other shape or of the whole union into a branch literal.
 - **No cast** in production code; a test needing an ill-typed value uses `@ts-expect-error`.
+- **The construction guard decides on types** (`rfcConfigConstruction`, owner's decision):
+  wherever a value becomes a config, the source's type must fit a member without a key that
+  member forbids; a source whose keys cannot be established (`any`) is refused. **Not covered**
+  (owner's decision; each pinned by a fixture under `limits/`): destructuring defaults,
+  `yield`, getter returns and config-constrained generics. The compiler closes the whole class
+  only with `exactOptionalPropertyTypes`, a separate task after 24.0.0.
 
 ## 10. Docs
 

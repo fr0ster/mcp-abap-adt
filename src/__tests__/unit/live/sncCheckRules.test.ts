@@ -11,7 +11,9 @@ import { describe, it } from 'node:test';
 import * as dotenv from 'dotenv';
 import {
   checkSncEnv,
+  expectedRealmFor,
   parseSncCheckArguments,
+  realmCheckUrlFor,
   SncCheckUsageError,
   statedKeyNames,
 } from '../../../../tests/live/sncCheckRules';
@@ -157,10 +159,15 @@ describe('the arguments', () => {
         error instanceof SncCheckUsageError && error.message.includes(words),
     );
 
-  it('each option is required', () => {
+  it('--env is required; --realm and --realm-url are optional overrides', () => {
     refused(OK.slice(2), '--env is required');
-    refused([...OK.slice(0, 2), ...OK.slice(4)], '--realm is required');
-    refused(OK.slice(0, 4), '--realm-url is required');
+    assert.deepEqual(parseSncCheckArguments(OK.slice(0, 2)), {
+      env: 'dest.env',
+    });
+    assert.deepEqual(parseSncCheckArguments(OK.slice(0, 4)), {
+      env: 'dest.env',
+      realm: 'Realm Name',
+    });
   });
 
   it('a value is required, and an option once', () => {
@@ -181,6 +188,97 @@ describe('the arguments', () => {
     refused(
       [...OK.slice(0, 4), '--realm-url', 'ftp://system.example.test'],
       '--realm-url must be',
+    );
+  });
+});
+
+describe('the expected realm', () => {
+  const ARGS = { env: 'dest.env' } as const;
+
+  it('derived from SAP_MASTER_SYSTEM and SAP_CLIENT: the realm measured on premise', () => {
+    assert.deepEqual(
+      expectedRealmFor(
+        ARGS,
+        dotenv.parse('SAP_MASTER_SYSTEM=SYX\nSAP_CLIENT=100\n'),
+      ),
+      { realm: 'SAP NetWeaver Application Server [SYX/100]', derived: true },
+    );
+  });
+
+  it('--realm, when given, is used as is', () => {
+    assert.deepEqual(
+      expectedRealmFor(
+        { ...ARGS, realm: 'Another Realm' },
+        dotenv.parse('SAP_MASTER_SYSTEM=SYX\nSAP_CLIENT=100\n'),
+      ),
+      { realm: 'Another Realm', derived: false },
+    );
+  });
+
+  for (const [missing, text] of [
+    ['SAP_MASTER_SYSTEM', 'SAP_CLIENT=100\n'],
+    ['SAP_CLIENT', 'SAP_MASTER_SYSTEM=SYX\n'],
+  ] as const) {
+    it(`${missing} missing and no --realm: refused, naming it and the two ways out`, () => {
+      assert.throws(
+        () => expectedRealmFor(ARGS, dotenv.parse(text)),
+        (error: unknown) =>
+          error instanceof SncCheckUsageError &&
+          error.message.includes(`the .env states no ${missing}`) &&
+          error.message.includes(`add ${missing} to the .env, or pass --realm`),
+      );
+    });
+  }
+});
+
+describe('the realm-check URL', () => {
+  const ARGS = { env: 'dest.env' } as const;
+
+  it('derived from SAP_ASHOST and SAP_SYSNR: the ICM default HTTP port 80<NN>', () => {
+    assert.deepEqual(
+      realmCheckUrlFor(
+        ARGS,
+        dotenv.parse('SAP_ASHOST=system.example.test\nSAP_SYSNR=00\n'),
+      ),
+      { url: 'http://system.example.test:8000', derived: true },
+    );
+  });
+
+  it('--realm-url, when given, is used as is', () => {
+    assert.deepEqual(
+      realmCheckUrlFor(
+        { ...ARGS, realmUrl: 'https://system.example.test:44300' },
+        dotenv.parse('SAP_ASHOST=system.example.test\nSAP_SYSNR=00\n'),
+      ),
+      { url: 'https://system.example.test:44300', derived: false },
+    );
+  });
+
+  it('a message-server .env without --realm-url is refused', () => {
+    assert.throws(
+      () =>
+        realmCheckUrlFor(
+          ARGS,
+          dotenv.parse('SAP_MSHOST=ms\nSAP_SYSID=SYX\nSAP_GROUP=G\n'),
+        ),
+      (error: unknown) =>
+        error instanceof SncCheckUsageError &&
+        error.message.includes(
+          '--realm-url is required: the .env states no SAP_ASHOST',
+        ),
+    );
+  });
+
+  it('a system number that is not two digits is refused', () => {
+    assert.throws(
+      () =>
+        realmCheckUrlFor(
+          ARGS,
+          dotenv.parse('SAP_ASHOST=system.example.test\nSAP_SYSNR=0\n'),
+        ),
+      (error: unknown) =>
+        error instanceof SncCheckUsageError &&
+        error.message.includes('no two-digit SAP_SYSNR'),
     );
   });
 });

@@ -6,8 +6,14 @@
 //      the sap-rfc-lite binding loads (the one check); the SNC library, found as
 //      SncLogonProvider's default locator finds it;
 //   2. the .env: key NAMES only, never a value; the SNC destination's keys;
-//   3. the realm check against --realm-url: an unauthenticated GET of the ADT
-//      discovery must answer 401 with exactly --realm (no logon);
+//   3. the realm check: an unauthenticated GET of the ADT discovery must
+//      answer 401 with exactly the expected realm (no logon) — --realm when
+//      given, else "SAP NetWeaver Application Server
+//      [<SAP_MASTER_SYSTEM>/<SAP_CLIENT>]" derived from the .env (the realm
+//      measured on premise) —,
+//      at --realm-url when given,
+//      else at http://<SAP_ASHOST>:80<SAP_SYSNR> derived from the .env (the
+//      ICM's default HTTP port; a message-server .env needs --realm-url);
 //   4. `npm run build` when dist is missing or older than src;
 //   5. `npm run test:live-connection` on this .env (the live connection test:
 //      the installed server started over stdio, tools listed, one tool
@@ -27,11 +33,16 @@
 //   - the destination's .env: SAP_CONNECTION_TYPE=rfc, SAP_AUTH_TYPE=snc,
 //     SAP_SYSTEM_TYPE=onprem, SAP_ASHOST + SAP_SYSNR (or SAP_MSHOST with
 //     SAP_MSSERV or SAP_SYSID and SAP_GROUP), SAP_CLIENT, SAP_LANGUAGE,
-//     SAP_SNC_PARTNERNAME; no SAP_URL, SAP_USERNAME, SAP_PASSWORD
+//     SAP_SNC_PARTNERNAME, SAP_MASTER_SYSTEM (for the expected realm);
+//     no SAP_URL, SAP_USERNAME, SAP_PASSWORD
 //     (SAP_RESPONSIBLE too, where the system answers no systeminformation).
 //
 // The command (any shell — PowerShell, cmd, bash, zsh):
-//   npm run test:live-snc -- --env <path to .env> --realm <expected realm> --realm-url <http(s) URL of the same system>
+//   npm run test:live-snc -- --env <path to .env>
+// Overrides, each optional: --realm <expected realm> (when the .env states no
+// SAP_MASTER_SYSTEM, or the system's realm has another form), and --realm-url
+// <http(s) URL of the same system> (when its HTTP port is not 80<SAP_SYSNR>,
+// or the .env names a message server).
 // Run it from any directory: the log, live-snc-<timestamp>.log, is written
 // to the directory the command is typed in, and a relative --env is read from
 // there. Upload the log it names at the end.
@@ -48,7 +59,9 @@ import { fileURLToPath } from 'node:url';
 import * as dotenv from 'dotenv';
 import {
   checkSncEnv,
+  expectedRealmFor,
   parseSncCheckArguments,
+  realmCheckUrlFor,
   statedKeyNames,
 } from './sncCheckRules.ts';
 import {
@@ -111,6 +124,9 @@ try {
   fail('arguments', wordsOf(error));
 }
 const envPath = path.resolve(HERE, args.env);
+/** The realm and the realm-check URL step 3 settles on, handed on to the live run. */
+let realm = '';
+let realmUrl = '';
 fs.writeFileSync(LOG, '');
 say(`SNC live check — log: ${LOG}`);
 
@@ -195,9 +211,20 @@ say(`SNC live check — log: ${LOG}`);
   say('');
   say(`=== ${name}`);
   try {
-    const url = realmCheckUrlOf('rfc', undefined, args.realmUrl, '--realm-url');
-    say(`unauthenticated GET of the ADT discovery at --realm-url, expecting 401 with --realm`);
-    await realmCheck('onprem', url, args.realm, { jwt: undefined });
+    const stated = dotenv.parse(fs.readFileSync(envPath, 'utf8'));
+    const expected = expectedRealmFor(args, stated);
+    realm = expected.realm;
+    say(
+      `expected realm: ${realm} (${expected.derived ? 'derived from SAP_MASTER_SYSTEM and SAP_CLIENT' : 'from --realm'})`,
+    );
+    const target = realmCheckUrlFor(args, stated);
+    realmUrl = target.url;
+    const url = realmCheckUrlOf('rfc', undefined, target.url, '--realm-url');
+    say(
+      `realm-check URL: ${url} (${target.derived ? 'derived from SAP_ASHOST and SAP_SYSNR' : 'from --realm-url'})`,
+    );
+    say('unauthenticated GET of the ADT discovery there, expecting 401 with the expected realm');
+    await realmCheck('onprem', url, realm, { jwt: undefined });
   } catch (error) {
     fail(name, `${wordsOf(error)} — nothing else was sent`);
   }
@@ -282,8 +309,8 @@ function newestUnder(dir) {
   say(`=== ${name}`);
   const { code, output } = await runNpm(['run', 'test:live-connection'], {
     MCP_LIVE_ENV_PATHS: envPath,
-    MCP_LIVE_EXPECTED_REALMS: args.realm,
-    MCP_LIVE_REALM_CHECK_URLS: args.realmUrl,
+    MCP_LIVE_EXPECTED_REALMS: realm,
+    MCP_LIVE_REALM_CHECK_URLS: realmUrl,
   });
   const line = output.split('\n').find((each) => each.trim().startsWith('Tests:'));
   liveCounts = line === undefined ? 'no Jest summary line' : line.trim();

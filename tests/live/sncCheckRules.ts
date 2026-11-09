@@ -25,8 +25,10 @@ import {
 /** The check's three inputs. */
 export interface SncCheckArguments {
   readonly env: string;
-  readonly realm: string;
-  readonly realmUrl: string;
+  /** `--realm` as given; absent, it is derived from the `.env` (`expectedRealmFor`). */
+  readonly realm?: string;
+  /** `--realm-url` as given; absent, it is derived from the `.env` (`realmCheckUrlFor`). */
+  readonly realmUrl?: string;
 }
 
 /** The arguments the command takes, each with its value. */
@@ -35,7 +37,10 @@ type Option = (typeof OPTIONS)[number];
 
 /** The command line the owner types, for the refusals. */
 export const USAGE =
-  'npm run test:live-snc -- --env <path to .env> --realm <expected realm> --realm-url <http(s) URL of the same system>';
+  'npm run test:live-snc -- --env <path to .env> [--realm <expected realm>] [--realm-url <http(s) URL of the same system>]';
+
+/** The options a run must state; `--realm` and `--realm-url` are overrides. */
+const REQUIRED: readonly Option[] = ['--env'];
 
 /** A refusal of the command line, in fixed words naming the option. */
 export class SncCheckUsageError extends Error {}
@@ -45,9 +50,10 @@ function isOption(word: string): word is Option {
 }
 
 /**
- * `--env <path> --realm <realm> --realm-url <url>`, each also as
- * `--x=value`; each exactly once and non-blank; `--realm-url` an absolute
- * http(s) URL. Anything else is refused naming the option.
+ * `--env <path> [--realm <realm>] [--realm-url <url>]`, each also as
+ * `--x=value`; each at most once and non-blank, `--env` required;
+ * `--realm-url`, when given, an absolute http(s) URL. Anything else is
+ * refused naming the option.
  */
 export function parseSncCheckArguments(
   argv: readonly string[],
@@ -77,14 +83,16 @@ export function parseSncCheckArguments(
     }
     values.set(name, value.trim());
   }
-  for (const option of OPTIONS) {
+  for (const option of REQUIRED) {
     if (!values.has(option)) {
       throw new SncCheckUsageError(`${option} is required; usage: ${USAGE}`);
     }
   }
   const env = values.get('--env') ?? '';
-  const realm = values.get('--realm') ?? '';
-  const realmUrl = values.get('--realm-url') ?? '';
+  const realm = values.get('--realm');
+  const realmUrl = values.get('--realm-url');
+  const given = { env, ...(realm !== undefined && { realm }) };
+  if (realmUrl === undefined) return given;
   let protocol: string | undefined;
   try {
     protocol = new URL(realmUrl).protocol;
@@ -96,7 +104,86 @@ export function parseSncCheckArguments(
       `--realm-url must be an absolute http(s) URL of the system; usage: ${USAGE}`,
     );
   }
-  return { env, realm, realmUrl };
+  return { ...given, realmUrl };
+}
+
+/** The expected realm, and whether it was derived from the `.env`. */
+export interface ExpectedRealm {
+  readonly realm: string;
+  readonly derived: boolean;
+}
+
+/**
+ * The realm the system's `401` must name: `--realm` as given; else derived
+ * from the `.env` as `SAP NetWeaver Application Server
+ * [<SAP_MASTER_SYSTEM>/<SAP_CLIENT>]` — the realm measured on premise. A key it needs that the `.env` does not
+ * state is refused, naming it and the two ways out. This derivation exists
+ * only in this temporary check.
+ */
+export function expectedRealmFor(
+  args: SncCheckArguments,
+  env: Readonly<Record<string, string>>,
+): ExpectedRealm {
+  if (args.realm !== undefined) return { realm: args.realm, derived: false };
+  const master = stated(env, 'SAP_MASTER_SYSTEM');
+  const client = stated(env, 'SAP_CLIENT');
+  for (const [key, value] of [
+    ['SAP_MASTER_SYSTEM', master],
+    ['SAP_CLIENT', client],
+  ] as const) {
+    if (value === undefined) {
+      throw new SncCheckUsageError(
+        `the expected realm cannot be derived: the .env states no ${key} — add ${key} to the .env, or pass --realm <expected realm>`,
+      );
+    }
+  }
+  return {
+    realm: `SAP NetWeaver Application Server [${master}/${client}]`,
+    derived: true,
+  };
+}
+
+/** The realm-check URL, and whether it was derived from the `.env`. */
+export interface RealmCheckTarget {
+  readonly url: string;
+  readonly derived: boolean;
+}
+
+/** Whether `text` is exactly two ASCII digits. Plain code. */
+function isTwoDigits(text: string): boolean {
+  if (text.length !== 2) return false;
+  for (const character of text) {
+    if (character < '0' || character > '9') return false;
+  }
+  return true;
+}
+
+/**
+ * The URL the realm check runs against: `--realm-url` as given; else
+ * derived from the `.env` as `http://<SAP_ASHOST>:80<SAP_SYSNR>`, the ICM's
+ * default HTTP port of the instance (00 → 8000). A message-server `.env`
+ * states no `SAP_ASHOST` to derive from, so `--realm-url` is then required.
+ * This derivation exists only in this temporary check — the product derives
+ * nothing from an address.
+ */
+export function realmCheckUrlFor(
+  args: SncCheckArguments,
+  env: Readonly<Record<string, string>>,
+): RealmCheckTarget {
+  if (args.realmUrl !== undefined) return { url: args.realmUrl, derived: false };
+  const ashost = stated(env, 'SAP_ASHOST');
+  const sysnr = stated(env, 'SAP_SYSNR');
+  if (ashost === undefined) {
+    throw new SncCheckUsageError(
+      `--realm-url is required: the .env states no SAP_ASHOST (a message-server destination) to derive the realm-check URL from; usage: ${USAGE}`,
+    );
+  }
+  if (sysnr === undefined || !isTwoDigits(sysnr)) {
+    throw new SncCheckUsageError(
+      `--realm-url is required: the .env states no two-digit SAP_SYSNR to derive the realm-check URL from; usage: ${USAGE}`,
+    );
+  }
+  return { url: `http://${ashost}:80${sysnr}`, derived: true };
 }
 
 /** One fault of the `.env`: the key, and what to do about it. */

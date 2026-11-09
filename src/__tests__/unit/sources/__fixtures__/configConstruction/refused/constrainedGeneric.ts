@@ -1,4 +1,7 @@
-// Known limit: a config-constrained generic hides the caller's type.
+// Refused (forbidden-key): the argument of a config-constrained generic —
+// its parameter's contextual type is a config, so the caller's value is
+// checked where it is passed (a known limit until the guard read types
+// under exactOptionalPropertyTypes).
 import type { ISapRfcConfig } from '@mcp-abap-adt/interfaces-auth-sap';
 
 const bad: {

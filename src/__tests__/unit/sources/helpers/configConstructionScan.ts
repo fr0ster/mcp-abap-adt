@@ -16,9 +16,11 @@
  *   place's contextual type) and the source (the expression's type); each
  *   constituent of a union source must fit some member of the target. Where
  *   the value comes from — a literal, a variable, a call, parentheses, a
- *   chain, a spread — does not matter. A key the source declares, optional
- *   or not, with any type but `never` is carried (`url?: undefined` too);
- *   only an absent key, or one typed `never`, is omitted;
+ *   chain, a spread — does not matter. A key is carried when the checker's
+ *   type of it (instantiated and merged, under `exactOptionalPropertyTypes`
+ *   in the guard's own program) has a constituent that is neither `never`
+ *   nor the missing type — `url?: undefined` is carried, `url?: never`
+ *   (also through `Box<never>`) is not;
  * - `unknown-keys` — a value that becomes a config while its keys cannot be
  *   established: `any`, `unknown`, or a type with no property that is no
  *   config (`undefined` and `null` are no value and pass).
@@ -31,9 +33,11 @@
  * - a getter's return (`get config() { return bad; }` under a config-typed
  *   property): the getter declares no return type, so its return has no
  *   config target;
- * - a config-constrained generic (`<T extends ISapRfcConfig>(value: T)`):
- *   the source is the type parameter, whose properties are its
- *   constraint's — the caller's own type, carrying the key, is not seen.
+ * - a forbidden key merged by an intersection (`ISapRfcApplicationServer &
+ *   { url?: undefined }`, either order): the checker merges `never &
+ *   undefined` to `never`, so the key reads as absent — while the production
+ *   compile (without `exactOptionalPropertyTypes`) accepts a value with
+ *   `url: undefined` of this type (pinned by `clean/mergedNeverUndefined*.ts`).
  */
 
 import * as fs from 'node:fs';
@@ -129,30 +133,21 @@ function membersOf(type: ts.Type): ts.Type[] {
 }
 
 /**
- * The type a property is declared with: its written type where it has one
- * (`url?: never` is `never`, `url?: undefined` is `undefined` — the optional
- * mark adds nothing), else the checker's type of the symbol.
- */
-function declaredTypeOf(checker: ts.TypeChecker, property: ts.Symbol): ts.Type {
-  for (const declaration of property.getDeclarations() ?? []) {
-    if (
-      (ts.isPropertySignature(declaration) ||
-        ts.isPropertyDeclaration(declaration)) &&
-      declaration.type !== undefined
-    ) {
-      return checker.getTypeFromTypeNode(declaration.type);
-    }
-  }
-  return checker.getTypeOfSymbol(property);
-}
-
-/**
- * Whether the source carries `property`: it declares it — optional or not —
- * with any type but `never`. Only a key absent from the source, or typed
- * `never`, counts as omitted.
+ * Whether `property` is carried: its checker type — instantiated and merged,
+ * read in the scan's own program under `exactOptionalPropertyTypes` — has a
+ * constituent that is neither `never` nor the checker's missing type. Under
+ * that flag `url?: never` reads as the missing type alone (an `undefined`-
+ * flagged type that is not `checker.getUndefinedType()`), and
+ * `url?: undefined` as the real `undefined`, which is carried. Only an
+ * absent key, or one the checker types `never`, counts as omitted.
  */
 function carries(checker: ts.TypeChecker, property: ts.Symbol): boolean {
-  return (declaredTypeOf(checker, property).flags & ts.TypeFlags.Never) === 0;
+  const undefinedType = checker.getUndefinedType();
+  return constituentsOf(checker.getTypeOfSymbol(property)).some(
+    (each) =>
+      (each.flags & ts.TypeFlags.Never) === 0 &&
+      ((each.flags & ts.TypeFlags.Undefined) === 0 || each === undefinedType),
+  );
 }
 
 function propertyName(
@@ -219,18 +214,14 @@ function constituentsOf(type: ts.Type): ts.Type[] {
   return type.isUnion() ? [...type.types] : [type];
 }
 
-/** Whether `member` forbids `name` (`?: never`). */
+/** Whether `member` forbids `name`: declares it, and it carries nothing (`?: never`). */
 function forbids(
   checker: ts.TypeChecker,
   member: ts.Type,
   name: string,
 ): boolean {
   const property = member.getProperty(name);
-  if (property === undefined) return false;
-  const declared = checker.getNonNullableType(
-    declaredTypeOf(checker, property),
-  );
-  return (declared.flags & ts.TypeFlags.Never) !== 0;
+  return property !== undefined && !carries(checker, property);
 }
 
 /** What a source constituent's keys say against the target. */
@@ -331,7 +322,14 @@ export function scanConstruction(
   root: string,
   forms: readonly BecomesForm[] = BECOMES,
 ): ConstructionFinding[] {
-  const program = ts.createProgram({ rootNames: files, options });
+  // The guard's own program: `exactOptionalPropertyTypes` makes the checker
+  // tell `url?: never` (the missing type) from `url?: undefined` (the real
+  // `undefined`), through instantiation and merging. The production compile
+  // is not affected; this program's diagnostics are not read, only types.
+  const program = ts.createProgram({
+    rootNames: files,
+    options: { ...options, exactOptionalPropertyTypes: true },
+  });
   const checker = program.getTypeChecker();
   const found: ConstructionFinding[] = [];
   const wanted = new Set(files.map((file) => path.resolve(file)));

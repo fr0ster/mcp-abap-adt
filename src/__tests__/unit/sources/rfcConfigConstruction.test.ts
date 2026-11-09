@@ -63,6 +63,7 @@ const REFUSED: ReadonlyArray<[string, ConstructionRule]> = [
   ['spreadOfVariable.ts', 'forbidden-key'],
   ['optionalUndefined.ts', 'forbidden-key'],
   ['anySource.ts', 'unknown-keys'],
+  ['constrainedGeneric.ts', 'forbidden-key'],
   // One per place a value becomes a config (BECOMES).
   ['formVariable.ts', 'forbidden-key'],
   ['formProperty.ts', 'forbidden-key'],
@@ -119,10 +120,15 @@ describe('the construction scan', () => {
  * drift silently.
  */
 const KNOWN_LIMITS: readonly string[] = [
-  'constrainedGeneric.ts',
   'destructuringDefault.ts',
   'getterReturn.ts',
   'yieldValue.ts',
+];
+
+/** The merged `never & undefined` limit: its two orders, in clean/. */
+const KNOWN_LIMITS_IN_CLEAN: readonly string[] = [
+  'mergedNeverUndefined.ts',
+  'mergedNeverUndefinedReversed.ts',
 ];
 
 describe('the known limits of the construction scan', () => {
@@ -138,6 +144,15 @@ describe('the known limits of the construction scan', () => {
     OPTIONS,
     REPO,
   );
+  // A limit whose value compiles clean under the guard's own reading: its
+  // fixture lives in clean/, and is pinned here by name.
+  for (const file of KNOWN_LIMITS_IN_CLEAN) {
+    it(`known limit, not found: clean/${file}`, () => {
+      const at = path.join(FIXTURES, 'clean', file);
+      assert.ok(fs.existsSync(at), `clean/${file} is missing`);
+      assert.deepEqual(scanConstruction([at], OPTIONS, REPO), []);
+    });
+  }
   for (const file of KNOWN_LIMITS) {
     it(`known limit, not found: ${file}`, () => {
       assert.deepEqual(

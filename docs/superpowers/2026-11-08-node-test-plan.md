@@ -120,7 +120,7 @@ the steps that name them.
    sub-package `package.json` only if its `test` script must change (the tool's translation
    is meant to make that unnecessary), the node:test build configuration
    (`tsconfig.node-test.json`: `extends` `["./tsconfig.json", "./tsconfig.paths.json"]`, no
-   `paths` of its own, `types: ["node"]`, `outDir` `.test-build/`, `noEmitOnError`),
+   `paths` of its own, `types: ["node"]`, `outDir` `.test-build/tree/`, `noEmitOnError`),
    `.gitignore` (`.test-build/`), step 3's list file (its
    first entries), which `jest.config.js` already ignores, the repository-root
    helper for moved tests, `package.json` scripts (`test`, a `test:build`, the Biome

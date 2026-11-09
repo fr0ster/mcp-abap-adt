@@ -17,6 +17,8 @@
  * Run: npm test -- --testPathPatterns=readOnly/structure/GetStructuresListHandler
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetStructuresList } from '../../../../handlers/structure/readonly/handleGetStructuresList';
 import {
@@ -57,7 +59,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
   let hasConfig = false;
   let mcp: HardModeClient | null = null;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       if (isHardModeEnabled()) {
         mcp = await createHardModeClient('full');
@@ -76,7 +78,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
     if (mcp) {
       await mcp.close();
       mcp = null;
@@ -111,127 +113,123 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
     return null;
   };
 
-  it(
-    'should recursively list the structures embedded in the base structure',
-    async () => {
-      const reason = skipReason();
-      if (reason) {
-        testLogger?.info(`⏭️  Skipping test: ${reason}`);
-        return;
-      }
+  it('should recursively list the structures embedded in the base structure', async () => {
+    const reason = skipReason();
+    if (reason) {
+      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      return;
+    }
 
-      const testCase = getEnabledTestCase(
-        'get_structures_list_readonly',
-        'list_embedded_structures',
+    const testCase = getEnabledTestCase(
+      'get_structures_list_readonly',
+      'list_embedded_structures',
+    );
+    if (!testCase) {
+      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      return;
+    }
+    if (!isTestAvailableForSystem(testCase.available_in)) {
+      testLogger?.info(
+        `⏭️  Skipping test: not available on ${statedKindWords()}`,
       );
-      if (!testCase) {
-        testLogger?.info('⏭️  Skipping test: No test case configuration');
-        return;
-      }
-      if (!isTestAvailableForSystem(testCase.available_in)) {
+      return;
+    }
+
+    const structureName = testCase.params.structure_name;
+    const expectedInclude = String(
+      testCase.params.expected_include,
+    ).toUpperCase();
+
+    testLogger?.info(`📋 Listing structures embedded in ${structureName}...`);
+
+    const response = await invoke(
+      'GetStructuresList',
+      { structure_name: structureName, version: 'active' },
+      () =>
+        handleGetStructuresList(
+          createHandlerContext({
+            connection: connection!,
+            logger: testLogger,
+          }),
+          { structure_name: structureName, version: 'active' },
+        ),
+    );
+
+    if (response.isError) {
+      const errorMsg = response.content[0]?.text || 'Unknown error';
+      if (
+        errorMsg.includes('not found') ||
+        errorMsg.includes('Could not read') ||
+        errorMsg.includes('404') ||
+        errorMsg.includes('500')
+      ) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${statedKindWords()}`,
+          `⏭️  Skipping test: Shared structure not found: ${errorMsg}`,
         );
         return;
       }
+      throw new Error(`GetStructuresList failed: ${errorMsg}`);
+    }
 
-      const structureName = testCase.params.structure_name;
-      const expectedInclude = String(
-        testCase.params.expected_include,
-      ).toUpperCase();
+    const data = parseHandlerResponse(response);
+    assert.equal(data.success, true);
 
-      testLogger?.info(`📋 Listing structures embedded in ${structureName}...`);
+    const tree = data.tree as StructureNode;
+    assert.ok(tree !== undefined);
+    assert.equal(tree.kind, 'root');
+    assert.equal(tree.structure, structureName.toUpperCase());
 
-      const response = await invoke(
-        'GetStructuresList',
-        { structure_name: structureName, version: 'active' },
-        () =>
-          handleGetStructuresList(
-            createHandlerContext({
-              connection: connection!,
-              logger: testLogger,
-            }),
-            { structure_name: structureName, version: 'active' },
-          ),
+    const child = (tree.children ?? []).find(
+      (node) => node.structure === expectedInclude,
+    );
+    assert.ok(child !== undefined);
+    assert.equal(child?.kind, 'include');
+
+    // Append (extension) child — config-driven; only asserted when the test
+    // case provides `expected_append` (the extension is created out-of-band,
+    // since adt-clients cannot create `extend type` objects).
+    //
+    // **Out-of-band means it may not be here.** The config names an
+    // extension somebody created by hand on one system, and nothing in
+    // this repository creates it on another — on trial, `ZOK_S_APPEND`
+    // answers 404 and SAP reports zero where-used references for the base
+    // structure, scoped or unscoped (measured 2026-09-16 by a one-off script,
+    // `scripts/probe-migration-failures.ts`, since removed in #234). Asserting the child anyway
+    // turned a missing test fixture into a failure that reads like a
+    // defect in the walk. So: when the named extension is absent from the
+    // tree, say which of the two it is — an extension that is not on this
+    // system, or a walk that lost one it should have found — by asking
+    // whether the tool can see the object at all.
+    const expectedAppend = testCase.params.expected_append
+      ? String(testCase.params.expected_append).toUpperCase()
+      : null;
+    if (expectedAppend) {
+      const appendChild = (tree.children ?? []).find(
+        (node) => node.structure === expectedAppend,
       );
-
-      if (response.isError) {
-        const errorMsg = response.content[0]?.text || 'Unknown error';
-        if (
-          errorMsg.includes('not found') ||
-          errorMsg.includes('Could not read') ||
-          errorMsg.includes('404') ||
-          errorMsg.includes('500')
-        ) {
+      if (!appendChild) {
+        const probe = await handleGetStructuresList(
+          createHandlerContext({
+            connection: connection!,
+            logger: testLogger,
+          }),
+          { structure_name: expectedAppend },
+        );
+        if (probe.isError) {
           testLogger?.info(
-            `⏭️  Skipping test: Shared structure not found: ${errorMsg}`,
+            `⏭️  Skipping the append assertion: ${expectedAppend} does not exist on this system — ${probe.content[0]?.text?.slice(0, 200)}`,
           );
           return;
         }
-        throw new Error(`GetStructuresList failed: ${errorMsg}`);
       }
+      assert.ok(appendChild !== undefined);
+      assert.equal(appendChild?.kind, 'append');
+    }
 
-      const data = parseHandlerResponse(response);
-      expect(data.success).toBe(true);
-
-      const tree = data.tree as StructureNode;
-      expect(tree).toBeDefined();
-      expect(tree.kind).toBe('root');
-      expect(tree.structure).toBe(structureName.toUpperCase());
-
-      const child = (tree.children ?? []).find(
-        (node) => node.structure === expectedInclude,
-      );
-      expect(child).toBeDefined();
-      expect(child?.kind).toBe('include');
-
-      // Append (extension) child — config-driven; only asserted when the test
-      // case provides `expected_append` (the extension is created out-of-band,
-      // since adt-clients cannot create `extend type` objects).
-      //
-      // **Out-of-band means it may not be here.** The config names an
-      // extension somebody created by hand on one system, and nothing in
-      // this repository creates it on another — on trial, `ZOK_S_APPEND`
-      // answers 404 and SAP reports zero where-used references for the base
-      // structure, scoped or unscoped (measured 2026-09-16 by a one-off script,
-      // `scripts/probe-migration-failures.ts`, since removed in #234). Asserting the child anyway
-      // turned a missing test fixture into a failure that reads like a
-      // defect in the walk. So: when the named extension is absent from the
-      // tree, say which of the two it is — an extension that is not on this
-      // system, or a walk that lost one it should have found — by asking
-      // whether the tool can see the object at all.
-      const expectedAppend = testCase.params.expected_append
-        ? String(testCase.params.expected_append).toUpperCase()
-        : null;
-      if (expectedAppend) {
-        const appendChild = (tree.children ?? []).find(
-          (node) => node.structure === expectedAppend,
-        );
-        if (!appendChild) {
-          const probe = await handleGetStructuresList(
-            createHandlerContext({
-              connection: connection!,
-              logger: testLogger,
-            }),
-            { structure_name: expectedAppend },
-          );
-          if (probe.isError) {
-            testLogger?.info(
-              `⏭️  Skipping the append assertion: ${expectedAppend} does not exist on this system — ${probe.content[0]?.text?.slice(0, 200)}`,
-            );
-            return;
-          }
-        }
-        expect(appendChild).toBeDefined();
-        expect(appendChild?.kind).toBe('append');
-      }
-
-      testLogger?.info(
-        `✅ GetStructuresList completed: found include ${expectedInclude}${
-          expectedAppend ? ` + append ${expectedAppend}` : ''
-        }`,
-      );
-    },
-    getTimeout('medium'),
-  );
+    testLogger?.info(
+      `✅ GetStructuresList completed: found include ${expectedInclude}${
+        expectedAppend ? ` + append ${expectedAppend}` : ''
+      }`,
+    );
+  });
 });

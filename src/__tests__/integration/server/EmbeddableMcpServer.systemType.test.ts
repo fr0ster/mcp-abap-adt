@@ -12,6 +12,8 @@
  * Run: npm test -- --testPathPattern=integration/server
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, before, describe, test } from 'node:test';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { getTimeout, loadTestEnv } from '../helpers/configHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
@@ -30,7 +32,7 @@ describe('EmbeddableMcpServer systemType option (real connection)', () => {
   // would delete the configured one.
   let ORIGINAL_SAP_SYSTEM_TYPE: string | undefined;
 
-  beforeAll(async () => {
+  before(async () => {
     await loadTestEnv();
     ORIGINAL_SAP_SYSTEM_TYPE = process.env.SAP_SYSTEM_TYPE;
   });
@@ -43,63 +45,51 @@ describe('EmbeddableMcpServer systemType option (real connection)', () => {
     }
   });
 
-  test(
-    'systemType="onprem" registers onprem-only tools (CreateProgram etc.)',
-    async () => {
-      const { connection } = await createTestConnectionAndSession();
-      process.env.SAP_SYSTEM_TYPE = 'cloud';
+  test('systemType="onprem" registers onprem-only tools (CreateProgram etc.)', async () => {
+    const { connection } = await createTestConnectionAndSession();
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
 
-      const server = new EmbeddableMcpServer({
-        connection,
-        exposition: ['high'],
-        systemType: 'onprem',
-      });
+    const server = new EmbeddableMcpServer({
+      connection,
+      exposition: ['high'],
+      systemType: 'onprem',
+    });
 
-      const names = getRegisteredToolNames(server);
+    const names = getRegisteredToolNames(server);
 
-      expect(names.has('CreateProgram')).toBe(true);
-      expect(names.has('UpdateProgram')).toBe(true);
-      expect(names.has('DeleteProgram')).toBe(true);
-    },
-    getTimeout('default'),
-  );
+    assert.equal(names.has('CreateProgram'), true);
+    assert.equal(names.has('UpdateProgram'), true);
+    assert.equal(names.has('DeleteProgram'), true);
+  });
 
-  test(
-    'systemType="cloud" filters out onprem-only tools despite env=onprem',
-    async () => {
-      const { connection } = await createTestConnectionAndSession();
-      process.env.SAP_SYSTEM_TYPE = 'onprem';
+  test('systemType="cloud" filters out onprem-only tools despite env=onprem', async () => {
+    const { connection } = await createTestConnectionAndSession();
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
 
-      const server = new EmbeddableMcpServer({
-        connection,
-        exposition: ['high'],
-        systemType: 'cloud',
-      });
+    const server = new EmbeddableMcpServer({
+      connection,
+      exposition: ['high'],
+      systemType: 'cloud',
+    });
 
-      const names = getRegisteredToolNames(server);
+    const names = getRegisteredToolNames(server);
 
-      expect(names.has('CreateProgram')).toBe(false);
-      expect(names.has('UpdateProgram')).toBe(false);
-      expect(names.has('DeleteProgram')).toBe(false);
-    },
-    getTimeout('default'),
-  );
+    assert.equal(names.has('CreateProgram'), false);
+    assert.equal(names.has('UpdateProgram'), false);
+    assert.equal(names.has('DeleteProgram'), false);
+  });
 
-  test(
-    'no systemType option → falls back to SAP_SYSTEM_TYPE env var',
-    async () => {
-      const { connection } = await createTestConnectionAndSession();
-      process.env.SAP_SYSTEM_TYPE = 'onprem';
+  test('no systemType option → falls back to SAP_SYSTEM_TYPE env var', async () => {
+    const { connection } = await createTestConnectionAndSession();
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
 
-      const server = new EmbeddableMcpServer({
-        connection,
-        exposition: ['high'],
-      });
+    const server = new EmbeddableMcpServer({
+      connection,
+      exposition: ['high'],
+    });
 
-      const names = getRegisteredToolNames(server);
+    const names = getRegisteredToolNames(server);
 
-      expect(names.has('CreateProgram')).toBe(true);
-    },
-    getTimeout('default'),
-  );
+    assert.equal(names.has('CreateProgram'), true);
+  });
 });

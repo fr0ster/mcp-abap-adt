@@ -14,6 +14,8 @@
  * Run: npm test -- --testPathPatterns=readOnly/function/FunctionIncludeReadOnly
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetFunctionInclude } from '../../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import { handleListFunctionGroupIncludes } from '../../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
@@ -48,7 +50,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
   let hasConfig = false;
   let mcp: HardModeClient | null = null;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       if (isHardModeEnabled()) {
         mcp = await createHardModeClient('full');
@@ -67,7 +69,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
     if (mcp) {
       await mcp.close();
       mcp = null;
@@ -102,237 +104,223 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
     return null;
   };
 
-  it(
-    'should read the TOP include of the shared function group',
-    async () => {
-      const reason = skipReason();
-      if (reason) {
-        testLogger?.info(`⏭️  Skipping test: ${reason}`);
-        return;
-      }
+  it('should read the TOP include of the shared function group', async () => {
+    const reason = skipReason();
+    if (reason) {
+      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      return;
+    }
 
-      const testCase = getEnabledTestCase(
-        'read_function_include_readonly',
-        'read_top_include',
+    const testCase = getEnabledTestCase(
+      'read_function_include_readonly',
+      'read_top_include',
+    );
+    if (!testCase) {
+      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      return;
+    }
+    if (!isTestAvailableForSystem(testCase.available_in)) {
+      testLogger?.info(
+        `⏭️  Skipping test: not available on ${statedKindWords()}`,
       );
-      if (!testCase) {
-        testLogger?.info('⏭️  Skipping test: No test case configuration');
-        return;
-      }
-      if (!isTestAvailableForSystem(testCase.available_in)) {
+      return;
+    }
+
+    const functionGroupName = testCase.params.function_group_name;
+    const includeName = testCase.params.include_name;
+
+    testLogger?.info(
+      `📖 Reading include ${includeName} of group ${functionGroupName}...`,
+    );
+
+    const response = await invoke(
+      'GetFunctionInclude',
+      {
+        function_group_name: functionGroupName,
+        include_name: includeName,
+        version: 'active',
+      },
+      () =>
+        handleGetFunctionInclude(
+          createHandlerContext({
+            connection: connection!,
+            logger: testLogger,
+          }),
+          {
+            function_group_name: functionGroupName,
+            include_name: includeName,
+            version: 'active',
+          },
+        ),
+    );
+
+    if (response.isError) {
+      const errorMsg = response.content[0]?.text || 'Unknown error';
+      if (
+        errorMsg.includes('not found') ||
+        errorMsg.includes('404') ||
+        errorMsg.includes('500')
+      ) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${statedKindWords()}`,
+          `⏭️  Skipping test: Shared FUGR/include not found (run shared:setup first): ${errorMsg}`,
         );
         return;
       }
+      throw new Error(`GetFunctionInclude failed: ${errorMsg}`);
+    }
 
-      const functionGroupName = testCase.params.function_group_name;
-      const includeName = testCase.params.include_name;
+    const data = parseHandlerResponse(response);
+    assert.equal(data.success, true);
+    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
+    assert.equal(data.include_name, includeName.toUpperCase());
 
+    testLogger?.info(`✅ GetFunctionInclude completed: ${includeName}`);
+  });
+
+  it('should list the includes of the shared function group', async () => {
+    const reason = skipReason();
+    if (reason) {
+      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      return;
+    }
+
+    const testCase = getEnabledTestCase(
+      'list_function_group_includes_readonly',
+      'list_includes',
+    );
+    if (!testCase) {
+      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      return;
+    }
+    if (!isTestAvailableForSystem(testCase.available_in)) {
       testLogger?.info(
-        `📖 Reading include ${includeName} of group ${functionGroupName}...`,
+        `⏭️  Skipping test: not available on ${statedKindWords()}`,
       );
+      return;
+    }
 
-      const response = await invoke(
-        'GetFunctionInclude',
-        {
-          function_group_name: functionGroupName,
-          include_name: includeName,
-          version: 'active',
-        },
-        () =>
-          handleGetFunctionInclude(
-            createHandlerContext({
-              connection: connection!,
-              logger: testLogger,
-            }),
-            {
-              function_group_name: functionGroupName,
-              include_name: includeName,
-              version: 'active',
-            },
-          ),
-      );
+    const functionGroupName = testCase.params.function_group_name;
 
-      if (response.isError) {
-        const errorMsg = response.content[0]?.text || 'Unknown error';
-        if (
-          errorMsg.includes('not found') ||
-          errorMsg.includes('404') ||
-          errorMsg.includes('500')
-        ) {
-          testLogger?.info(
-            `⏭️  Skipping test: Shared FUGR/include not found (run shared:setup first): ${errorMsg}`,
-          );
-          return;
-        }
-        throw new Error(`GetFunctionInclude failed: ${errorMsg}`);
-      }
+    testLogger?.info(`📋 Listing includes of group ${functionGroupName}...`);
 
-      const data = parseHandlerResponse(response);
-      expect(data.success).toBe(true);
-      expect(data.function_group_name).toBe(functionGroupName.toUpperCase());
-      expect(data.include_name).toBe(includeName.toUpperCase());
+    const response = await invoke(
+      'ListFunctionGroupIncludes',
+      { function_group_name: functionGroupName },
+      () =>
+        handleListFunctionGroupIncludes(
+          createHandlerContext({
+            connection: connection!,
+            logger: testLogger,
+          }),
+          { function_group_name: functionGroupName },
+        ),
+    );
 
-      testLogger?.info(`✅ GetFunctionInclude completed: ${includeName}`);
-    },
-    getTimeout('medium'),
-  );
-
-  it(
-    'should list the includes of the shared function group',
-    async () => {
-      const reason = skipReason();
-      if (reason) {
-        testLogger?.info(`⏭️  Skipping test: ${reason}`);
-        return;
-      }
-
-      const testCase = getEnabledTestCase(
-        'list_function_group_includes_readonly',
-        'list_includes',
-      );
-      if (!testCase) {
-        testLogger?.info('⏭️  Skipping test: No test case configuration');
-        return;
-      }
-      if (!isTestAvailableForSystem(testCase.available_in)) {
+    if (response.isError) {
+      const errorMsg = response.content[0]?.text || 'Unknown error';
+      if (
+        errorMsg.includes('not found') ||
+        errorMsg.includes('404') ||
+        errorMsg.includes('500')
+      ) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${statedKindWords()}`,
+          `⏭️  Skipping test: Shared FUGR not found (run shared:setup first): ${errorMsg}`,
         );
         return;
       }
+      throw new Error(`ListFunctionGroupIncludes failed: ${errorMsg}`);
+    }
 
-      const functionGroupName = testCase.params.function_group_name;
+    const data = parseHandlerResponse(response);
+    assert.equal(data.success, true);
+    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
+    assert.equal(Array.isArray(data.includes), true);
 
-      testLogger?.info(`📋 Listing includes of group ${functionGroupName}...`);
+    const includeNames = (data.includes as any[]).map((inc) =>
+      String(typeof inc === 'string' ? inc : (inc?.name ?? inc)).toUpperCase(),
+    );
+    const topInclude = `L${functionGroupName.toUpperCase()}TOP`;
 
-      const response = await invoke(
-        'ListFunctionGroupIncludes',
-        { function_group_name: functionGroupName },
-        () =>
-          handleListFunctionGroupIncludes(
-            createHandlerContext({
-              connection: connection!,
-              logger: testLogger,
-            }),
-            { function_group_name: functionGroupName },
-          ),
-      );
+    // The TOP include must be present. ListFunctionGroupIncludes returns ALL
+    // FUGR/I includes faithfully (including the generated L<FUGR>UXX collector);
+    // filtering the collector is a backup-tool concern, not this read tool's.
+    assert.ok(includeNames.includes(topInclude));
 
-      if (response.isError) {
-        const errorMsg = response.content[0]?.text || 'Unknown error';
-        if (
-          errorMsg.includes('not found') ||
-          errorMsg.includes('404') ||
-          errorMsg.includes('500')
-        ) {
-          testLogger?.info(
-            `⏭️  Skipping test: Shared FUGR not found (run shared:setup first): ${errorMsg}`,
-          );
-          return;
-        }
-        throw new Error(`ListFunctionGroupIncludes failed: ${errorMsg}`);
-      }
+    testLogger?.info(
+      `✅ ListFunctionGroupIncludes completed: ${data.total} include(s)`,
+    );
+  });
 
-      const data = parseHandlerResponse(response);
-      expect(data.success).toBe(true);
-      expect(data.function_group_name).toBe(functionGroupName.toUpperCase());
-      expect(Array.isArray(data.includes)).toBe(true);
+  it('should list the function modules of the shared function group', async () => {
+    const reason = skipReason();
+    if (reason) {
+      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      return;
+    }
 
-      const includeNames = (data.includes as any[]).map((inc) =>
-        String(
-          typeof inc === 'string' ? inc : (inc?.name ?? inc),
-        ).toUpperCase(),
-      );
-      const topInclude = `L${functionGroupName.toUpperCase()}TOP`;
-
-      // The TOP include must be present. ListFunctionGroupIncludes returns ALL
-      // FUGR/I includes faithfully (including the generated L<FUGR>UXX collector);
-      // filtering the collector is a backup-tool concern, not this read tool's.
-      expect(includeNames).toContain(topInclude);
-
+    const testCase = getEnabledTestCase(
+      'list_function_modules_readonly',
+      'list_modules',
+    );
+    if (!testCase) {
+      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      return;
+    }
+    if (!isTestAvailableForSystem(testCase.available_in)) {
       testLogger?.info(
-        `✅ ListFunctionGroupIncludes completed: ${data.total} include(s)`,
+        `⏭️  Skipping test: not available on ${statedKindWords()}`,
       );
-    },
-    getTimeout('medium'),
-  );
+      return;
+    }
 
-  it(
-    'should list the function modules of the shared function group',
-    async () => {
-      const reason = skipReason();
-      if (reason) {
-        testLogger?.info(`⏭️  Skipping test: ${reason}`);
-        return;
-      }
+    const functionGroupName = testCase.params.function_group_name;
+    // The shared FM that lives in ZMCP_SHR_FGRP (see check_function_module_high).
+    const expectedFm = 'Z_MCP_SHR_FM';
 
-      const testCase = getEnabledTestCase(
-        'list_function_modules_readonly',
-        'list_modules',
-      );
-      if (!testCase) {
-        testLogger?.info('⏭️  Skipping test: No test case configuration');
-        return;
-      }
-      if (!isTestAvailableForSystem(testCase.available_in)) {
+    testLogger?.info(
+      `📋 Listing function modules of group ${functionGroupName}...`,
+    );
+
+    const response = await invoke(
+      'ListFunctionModules',
+      { function_group_name: functionGroupName },
+      () =>
+        handleListFunctionModules(
+          createHandlerContext({
+            connection: connection!,
+            logger: testLogger,
+          }),
+          { function_group_name: functionGroupName },
+        ),
+    );
+
+    if (response.isError) {
+      const errorMsg = response.content[0]?.text || 'Unknown error';
+      if (
+        errorMsg.includes('not found') ||
+        errorMsg.includes('404') ||
+        errorMsg.includes('500')
+      ) {
         testLogger?.info(
-          `⏭️  Skipping test: not available on ${statedKindWords()}`,
+          `⏭️  Skipping test: Shared FUGR not found (run shared:setup first): ${errorMsg}`,
         );
         return;
       }
+      throw new Error(`ListFunctionModules failed: ${errorMsg}`);
+    }
 
-      const functionGroupName = testCase.params.function_group_name;
-      // The shared FM that lives in ZMCP_SHR_FGRP (see check_function_module_high).
-      const expectedFm = 'Z_MCP_SHR_FM';
+    const data = parseHandlerResponse(response);
+    assert.equal(data.success, true);
+    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
+    assert.equal(Array.isArray(data.function_modules), true);
 
-      testLogger?.info(
-        `📋 Listing function modules of group ${functionGroupName}...`,
-      );
+    const moduleNames = (data.function_modules as any[]).map((fm) =>
+      String(typeof fm === 'string' ? fm : (fm?.name ?? fm)).toUpperCase(),
+    );
+    assert.ok(moduleNames.includes(expectedFm.toUpperCase()));
 
-      const response = await invoke(
-        'ListFunctionModules',
-        { function_group_name: functionGroupName },
-        () =>
-          handleListFunctionModules(
-            createHandlerContext({
-              connection: connection!,
-              logger: testLogger,
-            }),
-            { function_group_name: functionGroupName },
-          ),
-      );
-
-      if (response.isError) {
-        const errorMsg = response.content[0]?.text || 'Unknown error';
-        if (
-          errorMsg.includes('not found') ||
-          errorMsg.includes('404') ||
-          errorMsg.includes('500')
-        ) {
-          testLogger?.info(
-            `⏭️  Skipping test: Shared FUGR not found (run shared:setup first): ${errorMsg}`,
-          );
-          return;
-        }
-        throw new Error(`ListFunctionModules failed: ${errorMsg}`);
-      }
-
-      const data = parseHandlerResponse(response);
-      expect(data.success).toBe(true);
-      expect(data.function_group_name).toBe(functionGroupName.toUpperCase());
-      expect(Array.isArray(data.function_modules)).toBe(true);
-
-      const moduleNames = (data.function_modules as any[]).map((fm) =>
-        String(typeof fm === 'string' ? fm : (fm?.name ?? fm)).toUpperCase(),
-      );
-      expect(moduleNames).toContain(expectedFm.toUpperCase());
-
-      testLogger?.info(
-        `✅ ListFunctionModules completed: ${data.total} module(s)`,
-      );
-    },
-    getTimeout('medium'),
-  );
+    testLogger?.info(
+      `✅ ListFunctionModules completed: ${data.total} module(s)`,
+    );
+  });
 });

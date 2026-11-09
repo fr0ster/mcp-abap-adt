@@ -7,6 +7,8 @@
  * Run: npm test -- --testPathPatterns=readOnly/function/GetFunctionModule
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetFunctionModule } from '../../../../handlers/function_module/high/handleGetFunctionModule';
 import {
@@ -39,7 +41,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
   let hasConfig = false;
   let mcp: HardModeClient | null = null;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       if (isHardModeEnabled()) {
         mcp = await createHardModeClient('full');
@@ -58,114 +60,110 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
     if (mcp) {
       await mcp.close();
       mcp = null;
     }
   });
 
-  it(
-    'should read shared function module',
-    async () => {
-      if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
-        testLogger?.info(
-          '⏭️  Skipping test: No configuration, connection or session',
-        );
-        return;
-      }
-
-      // Get FM from shared_dependencies
-      const sharedFM = resolveSharedDependency(
-        'function_modules',
-        'Z_MCP_BLD_SHR_FM',
-      );
-      if (!sharedFM) {
-        testLogger?.info(
-          '⏭️  Skipping test: No shared function module configured',
-        );
-        return;
-      }
-
-      if (!isTestAvailableForSystem(sharedFM.available_in)) {
-        testLogger?.info(
-          `⏭️  Skipping test: not available on ${statedKindWords()}`,
-        );
-        return;
-      }
-
-      const functionModuleName = sharedFM.name;
-      const functionGroupName = sharedFM.group;
-
+  it('should read shared function module', async () => {
+    if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
       testLogger?.info(
-        `📖 Reading function module ${functionModuleName} from group ${functionGroupName}...`,
+        '⏭️  Skipping test: No configuration, connection or session',
       );
+      return;
+    }
 
-      const invoke = async (
-        toolName: string,
-        args: Record<string, unknown>,
-        directCall: () => Promise<any>,
-      ) => {
-        if (!isHardModeEnabled()) {
-          return directCall();
-        }
-        if (!mcp) {
-          throw new Error('Hard mode MCP client is not initialized');
-        }
-        try {
-          return await callTool(mcp, [toolName], args);
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: error?.message || String(error) }],
-          };
-        }
-      };
+    // Get FM from shared_dependencies
+    const sharedFM = resolveSharedDependency(
+      'function_modules',
+      'Z_MCP_BLD_SHR_FM',
+    );
+    if (!sharedFM) {
+      testLogger?.info(
+        '⏭️  Skipping test: No shared function module configured',
+      );
+      return;
+    }
 
-      const response = await invoke(
-        'GetFunctionModule',
-        {
+    if (!isTestAvailableForSystem(sharedFM.available_in)) {
+      testLogger?.info(
+        `⏭️  Skipping test: not available on ${statedKindWords()}`,
+      );
+      return;
+    }
+
+    const functionModuleName = sharedFM.name;
+    const functionGroupName = sharedFM.group;
+
+    testLogger?.info(
+      `📖 Reading function module ${functionModuleName} from group ${functionGroupName}...`,
+    );
+
+    const invoke = async (
+      toolName: string,
+      args: Record<string, unknown>,
+      directCall: () => Promise<any>,
+    ) => {
+      if (!isHardModeEnabled()) {
+        return directCall();
+      }
+      if (!mcp) {
+        throw new Error('Hard mode MCP client is not initialized');
+      }
+      try {
+        return await callTool(mcp, [toolName], args);
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error?.message || String(error) }],
+        };
+      }
+    };
+
+    const response = await invoke(
+      'GetFunctionModule',
+      {
+        function_module_name: functionModuleName,
+        function_group_name: functionGroupName,
+        version: 'active',
+      },
+      () => {
+        const ctx = createHandlerContext({
+          connection: connection!,
+          logger: testLogger,
+        });
+        return handleGetFunctionModule(ctx, {
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
           version: 'active',
-        },
-        () => {
-          const ctx = createHandlerContext({
-            connection: connection!,
-            logger: testLogger,
-          });
-          return handleGetFunctionModule(ctx, {
-            function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
-            version: 'active',
-          });
-        },
-      );
+        });
+      },
+    );
 
-      if (response.isError) {
-        const errorMsg = response.content[0]?.text || 'Unknown error';
-        // Skip if FM not found (shared:setup not run yet)
-        if (
-          errorMsg.includes('not found') ||
-          errorMsg.includes('404') ||
-          errorMsg.includes('500')
-        ) {
-          testLogger?.info(
-            `⏭️  Skipping test: Shared FM not found on system (run shared:setup first): ${errorMsg}`,
-          );
-          return;
-        }
-        throw new Error(`GetFunctionModule failed: ${errorMsg}`);
+    if (response.isError) {
+      const errorMsg = response.content[0]?.text || 'Unknown error';
+      // Skip if FM not found (shared:setup not run yet)
+      if (
+        errorMsg.includes('not found') ||
+        errorMsg.includes('404') ||
+        errorMsg.includes('500')
+      ) {
+        testLogger?.info(
+          `⏭️  Skipping test: Shared FM not found on system (run shared:setup first): ${errorMsg}`,
+        );
+        return;
       }
+      throw new Error(`GetFunctionModule failed: ${errorMsg}`);
+    }
 
-      const data = parseHandlerResponse(response);
-      expect(data.success).toBe(true);
-      expect(data.function_module_name).toBe(functionModuleName.toUpperCase());
-      expect(data.function_group_name).toBe(functionGroupName.toUpperCase());
-      expect(data.source).toBeDefined();
+    const data = parseHandlerResponse(response);
+    assert.equal(data.success, true);
+    assert.equal(data.function_module_name, functionModuleName.toUpperCase());
+    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
+    assert.ok(data.source !== undefined);
 
-      testLogger?.info(`✅ GetFunctionModule completed: ${functionModuleName}`);
-    },
-    getTimeout('medium'),
-  );
+    testLogger?.info(`✅ GetFunctionModule completed: ${functionModuleName}`);
+  });
 });

@@ -38,9 +38,11 @@
  * is a JSON-RPC frame — a stray line there corrupts the protocol. It reports
  * only those facts: no path, no `.env` value, no answer text, no stderr.
  */
+import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import * as dotenv from 'dotenv';
 import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/brokerFactory';
@@ -49,6 +51,7 @@ import {
   installedFile,
   installPackedRelease,
 } from '../../helpers/installedRelease';
+import { assertEquals } from '../helpers/liveAssert';
 import { endTestConnection } from '../helpers/openConnections';
 import {
   parseRealmCheckUrls,
@@ -189,13 +192,10 @@ if (ENV_PATHS.length === 0) {
   });
 } else {
   describe('live connection: the installed server over stdio', () => {
-    // Packing and installing, then one logon per destination.
-    jest.setTimeout(10 * 60 * 1000);
-
     let workdir: string;
     let bin: string;
 
-    beforeAll(() => {
+    before(() => {
       workdir = mkdtempSync(join(tmpdir(), 'mcp-live-'));
       installPackedRelease(workdir, [
         '.',
@@ -209,7 +209,7 @@ if (ENV_PATHS.length === 0) {
       bin = installedFile(workdir, 'core', 'bin', 'mcp-abap-adt.js');
     });
 
-    afterAll(() => {
+    after(() => {
       if (workdir !== undefined)
         // Retried: on Windows a just-exited child can hold a file for a moment.
         rmSync(workdir, {
@@ -222,12 +222,15 @@ if (ENV_PATHS.length === 0) {
 
     ENV_PATHS.forEach((envPath, index) => {
       it(`destination #${index + 1}: lists and calls GetAdtTypes, then exits 0`, async () => {
-        expect(existsSync(bin)).toBe(true);
+        assert.equal(existsSync(bin), true);
         // Report the fact, never the path: a file name may name a system.
-        expect({
-          destination: index + 1,
-          envFileExists: existsSync(envPath),
-        }).toEqual({ destination: index + 1, envFileExists: true });
+        assertEquals(
+          {
+            destination: index + 1,
+            envFileExists: existsSync(envPath),
+          },
+          { destination: index + 1, envFileExists: true },
+        );
 
         // Guarded: the parent logs on with the same destination first, and
         // every answer is read for a credential refusal; no SDK client, no
@@ -250,16 +253,19 @@ if (ENV_PATHS.length === 0) {
         try {
           const listed = await step('tools/list', () => server.listTools());
           const tools = listed.map((t) => t.name);
-          expect(tools).toContain('GetAdtTypes');
+          assert.ok(tools.includes('GetAdtTypes'));
 
           const result = await step('tools/call GetAdtTypes', () =>
             server.call('GetAdtTypes', {}),
           );
-          expect({
-            tool: 'GetAdtTypes',
-            isError: result.isError,
-            answered: result.content.length > 0,
-          }).toEqual({ tool: 'GetAdtTypes', isError: false, answered: true });
+          assertEquals(
+            {
+              tool: 'GetAdtTypes',
+              isError: result.isError,
+              answered: result.content.length > 0,
+            },
+            { tool: 'GetAdtTypes', isError: false, answered: true },
+          );
         } finally {
           // The shutdown a client would trigger: SIGTERM where signals reach a
           // child; on Windows the end of stdin, which the server also obeys.
@@ -270,12 +276,15 @@ if (ENV_PATHS.length === 0) {
           await server.close();
         }
 
-        expect({ exitCode: code }).toEqual({ exitCode: 0 });
-        expect({
-          strayStdoutLines: strayLines(child.stdout()),
-        }).toEqual({
-          strayStdoutLines: 0,
-        });
+        assertEquals({ exitCode: code }, { exitCode: 0 });
+        assertEquals(
+          {
+            strayStdoutLines: strayLines(child.stdout()),
+          },
+          {
+            strayStdoutLines: 0,
+          },
+        );
       });
     });
   });

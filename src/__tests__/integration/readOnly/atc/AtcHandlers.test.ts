@@ -12,12 +12,15 @@
  * Run: npm run test:integration -- src/__tests__/integration/readOnly/atc
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import { handleGetATCFindings } from '../../../../handlers/atc/high/handleGetATCFindings';
 import { handleGetATCResult } from '../../../../handlers/atc/high/handleGetATCResult';
 import { handleGetATCRunStatus } from '../../../../handlers/atc/high/handleGetATCRunStatus';
 import { handleListATCResults } from '../../../../handlers/atc/high/handleListATCResults';
 import { handleRunATC } from '../../../../handlers/atc/high/handleRunATC';
 import { getTimeout } from '../../helpers/configHelpers';
+import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -37,7 +40,7 @@ describe('ATC Handlers Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('atc-test');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester('run_atc', 'default_variant', 'atc-test');
     await tester.beforeAll(
       async () => {
@@ -47,9 +50,9 @@ describe('ATC Handlers Integration', () => {
         // Read-only: ATC changes nothing in the checked object.
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async () => {});
   });
 
@@ -86,28 +89,28 @@ describe('ATC Handlers Integration', () => {
       throw new Error(`GetATCFindings failed: ${extractErrorMessage(result)}`);
     }
     const data = payload(result);
-    expect(data.worklist_id).toBe(worklistId);
-    expect(data.objects_checked).toBeGreaterThanOrEqual(1);
-    expect(Array.isArray(data.findings)).toBe(true);
-    expect(data.finding_count).toBe(data.findings.length);
-    expect(data.finding_count).toBeGreaterThanOrEqual(params.min_findings ?? 0);
+    assert.equal(data.worklist_id, worklistId);
+    assert.ok(data.objects_checked >= 1);
+    assert.equal(Array.isArray(data.findings), true);
+    assert.equal(data.finding_count, data.findings.length);
+    assert.ok(data.finding_count >= (params.min_findings ?? 0));
     const byPriority = Object.values(data.by_priority ?? {}).reduce(
       (sum: number, n: any) => sum + Number(n),
       0,
     );
-    expect(byPriority).toBeLessThanOrEqual(data.finding_count);
+    assert.ok(byPriority <= data.finding_count);
     for (const finding of data.findings) {
-      expect(typeof finding.object).toBe('string');
-      expect(finding.object.length).toBeGreaterThan(0);
-      expect(typeof finding.object_type).toBe('string');
+      assert.equal(typeof finding.object, 'string');
+      assert.ok(finding.object.length > 0);
+      assert.equal(typeof finding.object_type, 'string');
       if (finding.priority !== undefined) {
-        expect([1, 2, 3]).toContain(Number(finding.priority));
+        assert.ok([1, 2, 3].includes(Number(finding.priority)));
       }
       if (finding.line !== undefined) {
-        expect(finding.line).toBeGreaterThan(0);
+        assert.ok(finding.line > 0);
       }
-      expect(typeof finding.check).toBe('string');
-      expect(typeof finding.message).toBe('string');
+      assert.equal(typeof finding.check, 'string');
+      assert.equal(typeof finding.message, 'string');
     }
     logger?.info(
       `ATC ${params.check_variant} on ${params.object_name}: ${data.objects_checked} object(s), ${data.finding_count} finding(s) ${JSON.stringify(data.by_priority ?? {})}`,
@@ -115,197 +118,169 @@ describe('ATC Handlers Integration', () => {
     return data;
   }
 
-  it(
-    'runs without waiting, polls the run to its end, and reads the findings',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
-        const args = runArgs(params, false);
+  it('runs without waiting, polls the run to its end, and reads the findings', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, params } = context;
+      const args = runArgs(params, false);
 
-        const started = await tester.invokeToolOrHandler(
-          'RunATC',
-          args,
+      const started = await tester.invokeToolOrHandler(
+        'RunATC',
+        args,
+        async () =>
+          handleRunATC(
+            createHandlerContext({ connection, logger }),
+            args as any,
+          ),
+      );
+      if (started.isError) {
+        throw new Error(`RunATC failed: ${extractErrorMessage(started)}`);
+      }
+      const run = payload(started);
+      assert.equal(run.success, true);
+      assert.equal(run.check_variant, params.check_variant);
+      assert.equal(run.waited, false);
+      assert.equal(typeof run.worklist_id, 'string');
+      assert.equal(typeof run.run_id, 'string');
+
+      const deadline = Date.now() + (params.poll_timeout_ms ?? 120000);
+      let finished = false;
+      while (!finished) {
+        const polled = await tester.invokeToolOrHandler(
+          'GetATCRunStatus',
+          { run_id: run.run_id },
           async () =>
-            handleRunATC(
+            handleGetATCRunStatus(
               createHandlerContext({ connection, logger }),
-              args as any,
+              { run_id: run.run_id } as any,
             ),
         );
-        if (started.isError) {
-          throw new Error(`RunATC failed: ${extractErrorMessage(started)}`);
-        }
-        const run = payload(started);
-        expect(run.success).toBe(true);
-        expect(run.check_variant).toBe(params.check_variant);
-        expect(run.waited).toBe(false);
-        expect(typeof run.worklist_id).toBe('string');
-        expect(typeof run.run_id).toBe('string');
-
-        const deadline = Date.now() + (params.poll_timeout_ms ?? 120000);
-        let finished = false;
-        while (!finished) {
-          const polled = await tester.invokeToolOrHandler(
-            'GetATCRunStatus',
-            { run_id: run.run_id },
-            async () =>
-              handleGetATCRunStatus(
-                createHandlerContext({ connection, logger }),
-                { run_id: run.run_id } as any,
-              ),
+        if (polled.isError) {
+          throw new Error(
+            `GetATCRunStatus failed: ${extractErrorMessage(polled)}`,
           );
-          if (polled.isError) {
+        }
+        const status = payload(polled);
+        assert.equal(typeof status.is_finished, 'boolean');
+        finished = status.is_finished;
+        if (!finished) {
+          if (Date.now() > deadline) {
             throw new Error(
-              `GetATCRunStatus failed: ${extractErrorMessage(polled)}`,
+              `ATC run ${run.run_id} still "${status.status}" after ${params.poll_timeout_ms ?? 120000} ms`,
             );
           }
-          const status = payload(polled);
-          expect(typeof status.is_finished).toBe('boolean');
-          finished = status.is_finished;
-          if (!finished) {
-            if (Date.now() > deadline) {
-              throw new Error(
-                `ATC run ${run.run_id} still "${status.status}" after ${params.poll_timeout_ms ?? 120000} ms`,
-              );
-            }
-            await delay(params.poll_interval_ms ?? 3000);
-          }
+          await delay(params.poll_interval_ms ?? 3000);
         }
+      }
 
-        await readFindings(connection, run.worklist_id, params);
-      });
-    },
-    getTimeout('long'),
-  );
+      await readFindings(connection, run.worklist_id, params);
+    });
+  });
 
-  it(
-    'runs and waits, then reads the same kind of findings',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
-        const args = runArgs(params, true);
+  it('runs and waits, then reads the same kind of findings', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, params } = context;
+      const args = runArgs(params, true);
 
-        const done = await tester.invokeToolOrHandler(
-          'RunATC',
-          args,
-          async () =>
-            handleRunATC(
-              createHandlerContext({ connection, logger }),
-              args as any,
-            ),
-        );
-        if (done.isError) {
-          throw new Error(`RunATC failed: ${extractErrorMessage(done)}`);
-        }
-        const run = payload(done);
-        expect(run.waited).toBe(true);
-        expect(run.run_id).toBeUndefined();
-        expect(typeof run.finding_stats).toBe('string');
+      const done = await tester.invokeToolOrHandler('RunATC', args, async () =>
+        handleRunATC(createHandlerContext({ connection, logger }), args as any),
+      );
+      if (done.isError) {
+        throw new Error(`RunATC failed: ${extractErrorMessage(done)}`);
+      }
+      const run = payload(done);
+      assert.equal(run.waited, true);
+      assert.equal(run.run_id, undefined);
+      assert.equal(typeof run.finding_stats, 'string');
 
-        await readFindings(connection, run.worklist_id, params);
-      });
-    },
-    getTimeout('long'),
-  );
+      await readFindings(connection, run.worklist_id, params);
+    });
+  });
 
   /**
    * The run's stored result, found in the list of every user's results of the
    * last day (a list to rely on states its ages: SAP's own window moved,
    * measured), holds the findings its worklist holds.
    */
-  it(
-    'lists the stored result of a run and reads the findings its worklist holds',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
-        const args = runArgs(params, true);
-        const done = await tester.invokeToolOrHandler(
-          'RunATC',
-          args,
-          async () =>
-            handleRunATC(
-              createHandlerContext({ connection, logger }),
-              args as any,
-            ),
-        );
-        if (done.isError) {
-          throw new Error(`RunATC failed: ${extractErrorMessage(done)}`);
-        }
-        const run = payload(done);
-        const fromWorklist = await readFindings(
-          connection,
-          run.worklist_id,
-          params,
-        );
+  it('lists the stored result of a run and reads the findings its worklist holds', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, params } = context;
+      const args = runArgs(params, true);
+      const done = await tester.invokeToolOrHandler('RunATC', args, async () =>
+        handleRunATC(createHandlerContext({ connection, logger }), args as any),
+      );
+      if (done.isError) {
+        throw new Error(`RunATC failed: ${extractErrorMessage(done)}`);
+      }
+      const run = payload(done);
+      const fromWorklist = await readFindings(
+        connection,
+        run.worklist_id,
+        params,
+      );
 
-        const listArgs = { created_by: '*', age_min: 0, age_max: 1 };
-        const listed = await tester.invokeToolOrHandler(
-          'ListATCResults',
-          listArgs,
-          async () =>
-            handleListATCResults(
-              createHandlerContext({ connection, logger }),
-              listArgs,
-            ),
+      const listArgs = { created_by: '*', age_min: 0, age_max: 1 };
+      const listed = await tester.invokeToolOrHandler(
+        'ListATCResults',
+        listArgs,
+        async () =>
+          handleListATCResults(
+            createHandlerContext({ connection, logger }),
+            listArgs,
+          ),
+      );
+      if (listed.isError) {
+        throw new Error(
+          `ListATCResults failed: ${extractErrorMessage(listed)}`,
         );
-        if (listed.isError) {
-          throw new Error(
-            `ListATCResults failed: ${extractErrorMessage(listed)}`,
-          );
-        }
-        const list = payload(listed);
-        expect(list.result_count).toBe(list.results.length);
-        const ours = list.results.filter(
-          (r: any) => r.title === params.object_name,
-        );
-        expect(ours.length).toBeGreaterThanOrEqual(1);
-        const newest = ours.reduce((a: any, b: any) =>
-          String(b.created_at) > String(a.created_at) ? b : a,
-        );
+      }
+      const list = payload(listed);
+      assert.equal(list.result_count, list.results.length);
+      const ours = list.results.filter(
+        (r: any) => r.title === params.object_name,
+      );
+      assert.ok(ours.length >= 1);
+      const newest = ours.reduce((a: any, b: any) =>
+        String(b.created_at) > String(a.created_at) ? b : a,
+      );
 
-        const readArgs = { display_id: newest.display_id };
-        const read = await tester.invokeToolOrHandler(
-          'GetATCResult',
-          readArgs,
-          async () =>
-            handleGetATCResult(
-              createHandlerContext({ connection, logger }),
-              readArgs,
-            ),
-        );
-        if (read.isError) {
-          throw new Error(`GetATCResult failed: ${extractErrorMessage(read)}`);
-        }
-        const result = payload(read);
-        expect(result.display_id).toBe(newest.display_id);
-        expect(result.title).toBe(params.object_name);
-        expect(result.objects_checked).toBe(fromWorklist.objects_checked);
-        const checks = (findings: any[]) =>
-          findings.map((f) => `${f.object}|${f.line}|${f.check}`).sort();
-        expect(checks(result.findings)).toEqual(checks(fromWorklist.findings));
-        logger?.info(
-          `ATC result ${newest.display_id} of ${list.result_count} listed: ${result.finding_count} finding(s)`,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+      const readArgs = { display_id: newest.display_id };
+      const read = await tester.invokeToolOrHandler(
+        'GetATCResult',
+        readArgs,
+        async () =>
+          handleGetATCResult(
+            createHandlerContext({ connection, logger }),
+            readArgs,
+          ),
+      );
+      if (read.isError) {
+        throw new Error(`GetATCResult failed: ${extractErrorMessage(read)}`);
+      }
+      const result = payload(read);
+      assert.equal(result.display_id, newest.display_id);
+      assert.equal(result.title, params.object_name);
+      assert.equal(result.objects_checked, fromWorklist.objects_checked);
+      const checks = (findings: any[]) =>
+        findings.map((f) => `${f.object}|${f.line}|${f.check}`).sort();
+      assertEquals(checks(result.findings), checks(fromWorklist.findings));
+      logger?.info(
+        `ATC result ${newest.display_id} of ${list.result_count} listed: ${result.finding_count} finding(s)`,
+      );
+    });
+  });
 
-  it(
-    'refuses a run with no objects',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection } = context;
-        const result = await tester.invokeToolOrHandler(
-          'RunATC',
-          { objects: [] },
-          async () =>
-            handleRunATC(createHandlerContext({ connection, logger }), {
-              objects: [],
-            } as any),
-        );
-        expect(result.isError).toBe(true);
-      });
-    },
-    getTimeout('long'),
-  );
+  it('refuses a run with no objects', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
+      const result = await tester.invokeToolOrHandler(
+        'RunATC',
+        { objects: [] },
+        async () =>
+          handleRunATC(createHandlerContext({ connection, logger }), {
+            objects: [],
+          } as any),
+      );
+      assert.equal(result.isError, true);
+    });
+  });
 });

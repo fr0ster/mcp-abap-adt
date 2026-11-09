@@ -12,6 +12,15 @@
  *   its `liveSuite` names, and each problem of its place.
  * - `checkLedger`: the ledger against the required keys and the scans.
  *
+ * The test functions are Jest's globals or node:test's, recognised by their
+ * import from `node:test` (`test`, `it`, `describe`, `suite`, `before`,
+ * `after`, `beforeEach`, `afterEach`); their `.skip`, `.todo` and `.only`
+ * are read alike. node:test's other ways to skip, focus or run a case at
+ * once with others — an options object carrying `skip`, `todo`, `only` or
+ * `concurrency`, a call of `skip` or `todo` on a test context, and a
+ * node:test function imported under another name — are each a problem of
+ * their own.
+ *
  * A reference with a problem is reported by its problem and still matched
  * as present for its key (so one defect is one finding); it is never
  * reported as an orphan besides.
@@ -42,6 +51,14 @@ export type Problem =
   | 'only'
   | 'failing'
   | 'concurrent'
+  // node:test's forms
+  | 'skip-option'
+  | 'todo-option'
+  | 'only-option'
+  | 'concurrency-option'
+  | 'context-skip'
+  | 'context-todo'
+  | 'runner-renamed'
   // pin rows
   | 'rows-not-array'
   | 'row-not-literal'
@@ -171,11 +188,72 @@ const MODIFIERS: Readonly<Record<string, Modifier>> = {
   failing: 'failing',
 };
 
-/** What Jest call `call` is: its base and modifier; `undefined` for any other call. */
+/** node:test's test functions, by the name `node:test` exports them under. */
+const NODE_BASES: Readonly<Record<string, JestBase>> = {
+  test: 'test',
+  it: 'test',
+  describe: 'describe',
+  suite: 'describe',
+  before: 'hook',
+  after: 'hook',
+  beforeEach: 'hook',
+  afterEach: 'hook',
+};
+
+/** A file's test functions: Jest's globals and what it imports from `node:test`. */
+interface Runner {
+  readonly bases: Readonly<Record<string, readonly [JestBase, Modifier]>>;
+  /** A node:test function imported under another name (or as a namespace). */
+  readonly renamed: boolean;
+}
+
+const runners = new WeakMap<ts.SourceFile, Runner>();
+
+/** The test functions of `file`, read once. */
+function runnerOf(file: ts.SourceFile): Runner {
+  const known = runners.get(file);
+  if (known !== undefined) return known;
+  const bases: Record<string, readonly [JestBase, Modifier]> = { ...BASES };
+  let renamed = false;
+  for (const statement of file.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== 'node:test'
+    ) {
+      continue;
+    }
+    const clause = statement.importClause;
+    // The default export is `test`; under any other name it is renamed.
+    if (clause?.name !== undefined) {
+      if (clause.name.text === 'test') bases.test = ['test', undefined];
+      else renamed = true;
+    }
+    const bindings = clause?.namedBindings;
+    if (bindings !== undefined && ts.isNamespaceImport(bindings)) {
+      renamed = true;
+    }
+    if (bindings !== undefined && ts.isNamedImports(bindings)) {
+      for (const element of bindings.elements) {
+        const imported = (element.propertyName ?? element.name).text;
+        const base = NODE_BASES[imported];
+        if (base === undefined) continue;
+        if (element.name.text !== imported) renamed = true;
+        else bases[imported] = [base, undefined];
+      }
+    }
+  }
+  const runner: Runner = { bases, renamed };
+  runners.set(file, runner);
+  return runner;
+}
+
+/** What test call `call` is: its base and modifier; `undefined` for any other call. */
 function jestCall(
   call: ts.CallExpression,
 ): { base: JestBase; modifier: Modifier } | undefined {
   const callee = call.expression;
+  const BASES = runnerOf(call.getSourceFile()).bases;
   if (ts.isIdentifier(callee)) {
     const known = BASES[callee.text];
     return known === undefined
@@ -288,6 +366,88 @@ function callsOf(file: ts.SourceFile, name: string): ts.CallExpression[] {
 const lineOf = (file: ts.SourceFile, node: ts.Node): number =>
   file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1;
 
+/** node:test's options that skip, focus or run a case at once with others. */
+const OPTION_PROBLEMS: Readonly<Record<string, Problem>> = {
+  skip: 'skip-option',
+  todo: 'todo-option',
+  only: 'only-option',
+  concurrency: 'concurrency-option',
+};
+
+/** The option problems of the test or describe calls around `node`. */
+function optionProblems(node: ts.Node): Problem[] {
+  const found: Problem[] = [];
+  for (let at = node.parent; at !== undefined; at = at.parent) {
+    if (!ts.isCallExpression(at)) continue;
+    const kind = jestCall(at);
+    if (kind?.base !== 'test' && kind?.base !== 'describe') continue;
+    for (const argument of at.arguments) {
+      if (!ts.isObjectLiteralExpression(argument)) continue;
+      for (const property of argument.properties) {
+        const name =
+          property.name === undefined ? undefined : nameOf(property.name);
+        const problem = name === undefined ? undefined : OPTION_PROBLEMS[name];
+        if (problem !== undefined && !found.includes(problem)) {
+          found.push(problem);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * The context problems of a test callback: a call of `skip` or `todo` on its
+ * first parameter, the test context.
+ */
+function contextProblems(callback: ts.Node): Problem[] {
+  if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) {
+    return [];
+  }
+  const context = callback.parameters[0]?.name;
+  if (context === undefined || !ts.isIdentifier(context)) return [];
+  const found: Problem[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === context.text
+    ) {
+      const member = node.expression.name.text;
+      const problem =
+        member === 'skip'
+          ? 'context-skip'
+          : member === 'todo'
+            ? 'context-todo'
+            : undefined;
+      if (problem !== undefined && !found.includes(problem)) {
+        found.push(problem);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(callback);
+  return found;
+}
+
+/** The context problems of every test callback of `file`. */
+function fileContextProblems(file: ts.SourceFile): Problem[] {
+  const found: Problem[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && jestCall(node)?.base === 'test') {
+      for (const argument of node.arguments) {
+        for (const problem of contextProblems(argument)) {
+          if (!found.includes(problem)) found.push(problem);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+
 /** The place problems every registration shares. */
 function placeProblems(call: ts.CallExpression, only: boolean): Problem[] {
   const problems: Problem[] = [];
@@ -295,6 +455,8 @@ function placeProblems(call: ts.CallExpression, only: boolean): Problem[] {
   if (modifiedAround(call, ['failing'])) problems.push('failing');
   if (modifiedAround(call, ['concurrent'])) problems.push('concurrent');
   if (only) problems.push('only');
+  problems.push(...optionProblems(call));
+  if (runnerOf(call.getSourceFile()).renamed) problems.push('runner-renamed');
   return problems;
 }
 
@@ -465,9 +627,12 @@ function pinRow(
 export function scanUnitText(filePath: string, text: string): PinRef[] {
   const file = parse(filePath, text);
   const only = hasOnly(file);
+  // A pin row's tests are made by `pinCases`; a test context skipped
+  // anywhere in a pin file is the file's.
+  const contexts = fileContextProblems(file);
   const refs: PinRef[] = [];
   for (const call of callsOf(file, 'pinCases')) {
-    const place = placeProblems(call, only);
+    const place = [...placeProblems(call, only), ...contexts];
     if (!collected(call)) place.push('not-executable');
     const [rows] = call.arguments;
     if (rows === undefined || !ts.isArrayLiteralExpression(rows)) {
@@ -673,6 +838,9 @@ function liveRef(
     return ref(suiteOf(call)?.systems ?? []);
   }
   if (!collected(test)) problems.push('not-executable');
+  for (const argument of test.arguments) {
+    problems.push(...contextProblems(argument));
+  }
   const suite = suiteOf(test);
   if (suite === undefined) {
     problems.push('live-outside-suite');

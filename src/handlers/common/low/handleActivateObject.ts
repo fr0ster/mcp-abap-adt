@@ -171,7 +171,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description:
-      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
+      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages; objects SAP left inactive are an error naming them in still_inactive.',
     inputSchema: activateObjectSchema(variant),
   })),
 } as const;

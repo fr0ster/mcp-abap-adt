@@ -820,7 +820,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -1272,4 +1272,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-08*
+*Last updated: 2026-11-09*

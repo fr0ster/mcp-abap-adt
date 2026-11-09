@@ -1054,7 +1054,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -1862,13 +1862,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.
+**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages; objects SAP left inactive are an error naming them in still_inactive.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes. Their family's activate() always sends preauditRequested=true.
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
 ---
 
@@ -4662,4 +4662,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-08*
+*Last updated: 2026-11-09*

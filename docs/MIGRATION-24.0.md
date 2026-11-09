@@ -9,9 +9,10 @@ code. Go through the section that fits how you use the server; the [CHANGELOG](.
 every item.
 
 The packages are the eighteen of 23.1.x, all at **24.0.0**, every sibling range at `^24.0.0`. The
-ADT dependencies move to `@mcp-abap-adt/adt-clients` 44, `@mcp-abap-adt/adt-strategies` 0.21 and
-`@mcp-abap-adt/interfaces-adt` 26.1 (`@mcp-abap-adt/compact-modify` too): what that changes for a
-caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" below (44
+ADT dependencies move to `@mcp-abap-adt/adt-clients` 45, `@mcp-abap-adt/adt-strategies` 0.22 and
+`@mcp-abap-adt/interfaces-adt` 27 (`@mcp-abap-adt/compact-modify` too): what that changes for a
+caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" and
+"Callers of the activation tools: an activation SAP did not carry out is an error" below (44
 adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 20,
 `@mcp-abap-adt/interfaces-auth-sap` 4 and `@mcp-abap-adt/interfaces-adt-connection` 4, the
 destination path to `@mcp-abap-adt/auth-broker` 5.1, `@mcp-abap-adt/auth-stores` 5.1 and
@@ -635,6 +636,36 @@ and change the program's type after it is created.
   (`0.1` was sent as `0`).
 - **A create's description, name, package and references are escaped** in the create body: a
   description holding `&`, `<` or `"` makes a well-formed request now.
+
+## Callers of the activation tools: an activation SAP did not carry out is an error
+
+SAP_BASIS 751 answers an activation sent with `preauditRequested=true` with the objects still
+inactive (`ioc:inactiveObjects`) and activates nothing; S/4HANA 2025 answers a checklist saying no
+activation ran, with no message, both when there was nothing to do and when objects stayed
+inactive (both measured, [#351](https://github.com/fr0ster/mcp-abap-adt/issues/351)). 23.x answered
+the first as a success with `activation_not_stated: true` and the second as `nothing_to_activate`.
+
+| 23.x answered | 24.0 answers |
+|---|---|
+| success, `activation_not_stated: true`, `objects` | `isError`, `still_inactive: [{ name, type, uri, parent_uri? }]` |
+| success, `nothing_to_activate: true`, objects still inactive | `isError`, `still_inactive` (the inactive list is read once after such an answer) |
+| success, `nothing_to_activate: true`, nothing left inactive | the same |
+
+This holds for every tool that activates: the `Activate*` tools, `ActivateObjects`,
+`ActivateObjectLow`, compact `HandlerActivate`, and every create or update with an activate step.
+
+- **What you do:** read `isError` and `still_inactive`. To activate what is listed, send the
+  objects again with `preaudit: false` (`ActivateObjects`, `ActivateObjectLow`, `HandlerActivate`);
+  one object of a type with a family now takes `preaudit` as given, where it always sent
+  `preauditRequested=true`.
+- **A group activation reads discovery first.** `ActivateObjects` and `ActivateObjectLow` with more
+  than one object, or one of a type with no family, send `GET /sap/bc/adt/discovery` before the
+  activation: the activation runs where the system offers them, else one
+  `POST /sap/bc/adt/activation` for all the objects. A discovery that cannot be read is an error at
+  step `discovery`, with nothing activated. A run whose results say no activation ran and give no
+  message is followed by one `GET /sap/bc/adt/activation/inactiveobjects`: the run's objects still
+  listed are the error above; a read that fails is an error at step `inactiveObjects`. Compact
+  `HandlerActivate` stays one request.
 
 ## Callers of `GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols`: removed
 

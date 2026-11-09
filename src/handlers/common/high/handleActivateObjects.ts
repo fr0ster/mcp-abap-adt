@@ -2,8 +2,10 @@ import * as z from 'zod';
 /**
  * ActivateObjects Handler - Group/mass activation of ABAP repository objects
  *
- * Activates one or multiple objects in a single call.
- * Uses the ADT group activation endpoint (/sap/bc/adt/activation).
+ * Activates one or multiple objects in a single call, through
+ * `handleActivateObject`: one object of a type with a family is that family's
+ * activate; any other call is a group activation, on the endpoint the
+ * system's discovery offers (the activation runs, else `/activation`).
  */
 
 import type { ProjectionVariant } from '../../../lib/adtProjections';
@@ -21,7 +23,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description:
-      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once.',
+      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages; objects SAP left inactive are an error naming them in still_inactive.',
     inputSchema: activateObjectsSchema(variant),
   })),
 } as const;

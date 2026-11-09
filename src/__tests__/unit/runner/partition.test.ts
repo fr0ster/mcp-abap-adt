@@ -5,19 +5,15 @@
  * never neither — and every listed path names a file.
  *
  * Jest's discovery is read by running Jest's own `--listTests --json` in a
- * child process (never by importing Jest), over Jest's configuration without
- * its live ignores: the live suites are Jest's through the live scripts,
- * which replace those ignores with their own. The configuration is built in
- * a temporary directory from `jestConfig(list)` with exactly the ignores
- * `jest.config.js` exports as `liveIgnores` dropped; this guard names no
- * directory and no pattern. Step 11 of the node:test plan moves the live
- * suites to node:test and removes the live ignores, and this with them.
+ * child process (never by importing Jest), over the repository's own
+ * configuration: since the live suites moved to node:test (D27 step 11) it
+ * has no live ignores, and this guard names no directory and no pattern.
  */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
-import { JEST, REPO, runNode, temporaryDir, writeAt } from './toolRuns';
+import { JEST, REPO, runNode } from './toolRuns';
 
 const LIST = path.join(REPO, 'tools', 'node-test-files.json');
 
@@ -61,30 +57,12 @@ function jestRoots(): string[] {
   return strings(config.roots, 'jest --showConfig roots');
 }
 
-/** What Jest discovers over its configuration without its live ignores. */
+/** What Jest discovers over the repository's configuration. */
 function jestDiscovery(): string[] {
-  const scratch = temporaryDir('partition-');
-  try {
-    const config = writeAt(
-      scratch.dir,
-      'jest.config.js',
-      [
-        `const base = require(${JSON.stringify(path.join(REPO, 'jest.config.js'))});`,
-        `const config = base.jestConfig(${JSON.stringify(LIST)});`,
-        'config.testPathIgnorePatterns = config.testPathIgnorePatterns.filter(',
-        '  (pattern) => !base.liveIgnores.includes(pattern),',
-        ');',
-        'module.exports = config;',
-        '',
-      ].join('\n'),
-    );
-    return strings(
-      JSON.parse(jest(['--config', config, '--listTests', '--json'])),
-      'jest --listTests --json',
-    );
-  } finally {
-    scratch.remove();
-  }
+  return strings(
+    JSON.parse(jest(['--listTests', '--json'])),
+    'jest --listTests --json',
+  );
 }
 
 /** Every `*.test.ts` under `dir`, as absolute paths. */

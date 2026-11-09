@@ -561,18 +561,14 @@ describe('npm test', () => {
 
   describe("a file named by path obeys Jest's roots and ignores", () => {
     // Jest runs over a configuration built by the repository's own
-    // `jestConfig` from a fixture list: the live suites' directories ignored
-    // as in `jest.config.js`, and the fixture list's files ignored as the
-    // repository's are; its roots are the fixture's directory alone, so it
+    // `jestConfig` from a fixture list: the fixture list's files ignored as
+    // the repository's are (a live suite is on the node:test list and runs
+    // only under a live npm script: `liveRun.test.ts`); its roots are the fixture's directory alone, so it
     // reaches nothing of this repository, and its ts-jest takes this
     // repository's `tsconfig.test.json` by its full path. The tool's own list (the fixture
     // repository's) is empty, so every named file reaches Jest, by path.
     const repo = fixtureRepo(path.join(scratch.dir, 'by-path+'), [], {
       'in/src/__tests__/kept.test.ts': jestSource('kept', 'FAIL_KEPT'),
-      'in/src/__tests__/integration/live.test.ts': jestSource(
-        'live',
-        'FAIL_LIVE',
-      ),
       'in/src/__tests__/listed.test.ts': jestSource('listed', 'FAIL_LISTED'),
       'out/src/__tests__/outside.test.ts': jestSource(
         'outside',
@@ -606,10 +602,6 @@ describe('npm test', () => {
       [
         'outside every root',
         path.join(repo, 'out', 'src', '__tests__', 'outside.test.ts'),
-      ],
-      [
-        'under an ignored live directory',
-        path.join(root, '__tests__', 'integration', 'live.test.ts'),
       ],
       ['on the node:test list', listedFile],
     ];

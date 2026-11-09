@@ -8,10 +8,10 @@
  *   `tsconfig.paths.json` (`compilerOptions.paths`: each name and its source
  *   entry, `./…` from the root), each name anchored, plus Jest's own rule for
  *   a relative `./x.js` import, which lives only here;
- * - `testPathIgnorePatterns` is the two directories of the live suites plus
- *   every path of the node:test list, `tools/node-test-files.json` (the
- *   repository source paths of the files that run on node:test), each an
- *   exact path, so no file runs on both runners.
+ * - `testPathIgnorePatterns` is every path of the node:test list,
+ *   `tools/node-test-files.json` (the repository source paths of the files
+ *   that run on node:test, the live suites among them), each an exact path,
+ *   so no file runs on both runners.
  *
  * `rootDir` is stated, since `jestConfig` may be called from a configuration
  * elsewhere (`unit/runner/listAndTable.test.ts` builds one with a temporary
@@ -23,15 +23,6 @@ const path = require('node:path');
 const ROOT = __dirname;
 const NAME_TABLE = path.join(ROOT, 'tsconfig.paths.json');
 const NODE_TEST_LIST = path.join(ROOT, 'tools', 'node-test-files.json');
-
-/**
- * The directories of the live suites, which the unit run ignores: the live
- * scripts run them with ignores of their own. The partition guard
- * (`unit/runner/partition.test.ts`) drops exactly these to read what Jest
- * runs in any of its scripts; step 11 of the node:test plan moves the live
- * suites to node:test and removes these ignores, and that use with them.
- */
-const LIVE_IGNORES = ['__tests__/admin/', '__tests__/integration/'];
 
 /** The characters a regular expression gives a meaning to. */
 const SPECIAL = '\\^$.*+?()[]{}|';
@@ -124,7 +115,7 @@ function jestConfig(listFile) {
       '!src/**/__tests__/**',
       '!src/**/index.ts',
     ],
-    testPathIgnorePatterns: [...LIVE_IGNORES, ...listedIgnores(listFile)],
+    testPathIgnorePatterns: listedIgnores(listFile),
     maxWorkers: 1,
     testTimeout: 600000,
   };
@@ -135,6 +126,3 @@ module.exports = jestConfig(NODE_TEST_LIST);
 // reader that spreads the configuration (`unit/coverage/live.test.ts`,
 // `runReport.test.ts`) copies the settings alone.
 Object.defineProperty(module.exports, 'jestConfig', { value: jestConfig });
-Object.defineProperty(module.exports, 'liveIgnores', {
-  value: Object.freeze([...LIVE_IGNORES]),
-});

@@ -146,7 +146,9 @@ describe('one list, one name table', () => {
       };
       const withList = configWith('jest.config.js', list);
       const withEmpty = configWith('empty.config.js', empty);
-      expect(loadedConfig(withList).testPathIgnorePatterns).toHaveLength(3);
+      // The list's one path, and nothing else since the live ignores went
+      // (D27 step 11: the live suites are on the list).
+      expect(loadedConfig(withList).testPathIgnorePatterns).toHaveLength(1);
       const found = listedTests(withList);
       const foundWithout = listedTests(withEmpty);
       expect(foundWithout).toContain(listedFile);

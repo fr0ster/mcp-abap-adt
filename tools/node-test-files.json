@@ -1,4 +1,7 @@
 [
+  "src/__tests__/admin/shared-deps/check.test.ts",
+  "src/__tests__/admin/shared-deps/setup.test.ts",
+  "src/__tests__/admin/shared-deps/teardown.test.ts",
   "src/__tests__/integration/batch/amdpHttpHandle.test.ts",
   "src/__tests__/integration/batch/batchedReadsTiming.test.ts",
   "src/__tests__/integration/batch/communicationBatch.test.ts",

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { before, describe, it } from 'node:test';
 import {
   appendStructureDocuments,
   behaviorDefinitionDocuments,
@@ -512,7 +514,7 @@ describe('Admin: Setup shared dependencies', () => {
   // reads as "the shared objects are set up".
   let connectionError: Error | undefined;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       const result = await createTestConnectionAndSession();
       connection = result.connection;
@@ -524,1548 +526,1532 @@ describe('Admin: Setup shared dependencies', () => {
     }
   });
 
-  it(
-    'should create all shared dependencies and group-activate',
-    async () => {
-      if (connectionError) {
-        throw new Error(
-          `No connection to the system, nothing was set up: ${connectionError.message}`,
-        );
-      }
+  it('should create all shared dependencies and group-activate', async () => {
+    if (connectionError) {
+      throw new Error(
+        `No connection to the system, nothing was set up: ${connectionError.message}`,
+      );
+    }
 
-      const sharedConfig = getSharedDependenciesConfig();
-      if (!sharedConfig) {
-        throw new Error(
-          'No shared_dependencies in tests/test-config.yaml, nothing to do',
-        );
-      }
+    const sharedConfig = getSharedDependenciesConfig();
+    if (!sharedConfig) {
+      throw new Error(
+        'No shared_dependencies in tests/test-config.yaml, nothing to do',
+      );
+    }
 
-      const packageName = resolvePackageName(sharedConfig);
-      const transportRequest = resolveTransportRequest(sharedConfig);
+    const packageName = resolvePackageName(sharedConfig);
+    const transportRequest = resolveTransportRequest(sharedConfig);
 
-      // 1. Package
-      testsLogger?.info?.('Setting up shared package...');
-      await ensureSharedPackage(client, testsLogger);
+    // 1. Package
+    testsLogger?.info?.('Setting up shared package...');
+    await ensureSharedPackage(client, testsLogger);
 
-      // 2. Create all objects WITHOUT activation (direct ADT client calls)
-      const results: Array<{
-        type: string;
-        name: string;
-        status: string;
-      }> = [];
+    // 2. Create all objects WITHOUT activation (direct ADT client calls)
+    const results: Array<{
+      type: string;
+      name: string;
+      status: string;
+    }> = [];
 
-      // Collect names for group activation
-      // The shared objects include programs, which only the on-premise
-      // table activates: the group activation is the on-premise client's.
-      const toActivate: GroupObject<AdtGroupActivationCode<'onprem'>>[] = [];
+    // Collect names for group activation
+    // The shared objects include programs, which only the on-premise
+    // table activates: the group activation is the on-premise client's.
+    const toActivate: GroupObject<AdtGroupActivationCode<'onprem'>>[] = [];
 
-      // --- Tables ---
-      const tables = sharedConfig.tables || [];
-      if (tables.length > 0) {
-        testsLogger?.info?.(
-          `Creating Tables (${tables.length}) without activation...`,
-        );
-        for (const item of tables) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            let exists = false;
-            try {
-              const readResult = await client
-                .getTable(tableDocuments)
-                .read({ tableName: item.name }, 'workingArea', {
-                  analyse: analyseException,
-                });
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              const createdTable = await client.getTable(tableDocuments).create(
-                {
-                  tableName: item.name,
-                  packageName,
-                  description: item.description || 'Shared test table',
-                  source: item.source,
-                  transportRequest,
-                },
-                {
-                  headers: DEFAULT_ADT_HEADERS['table.create'],
-                  analyse: analyseException,
-                },
-              );
-              if (!createdTable.ok) {
-                throw new Error(createdTable.getError().message);
-              }
-              testsLogger?.info?.(`Created table ${item.name}`);
-            }
-
-            // Always update source code to ensure it matches config
-            if (
-              item.source &&
-              !(await sameActiveSource(client, 'table', item.name, item.source))
-            ) {
-              try {
-                await writeSource(
-                  handleUpdateTable(
-                    { connection, logger: undefined } as any,
-                    {
-                      table_name: item.name,
-                      ddl_code: item.source,
-                      activate: false,
-                    } as any,
-                  ),
-                );
-                testsLogger?.info?.(`Updated table ${item.name} source`);
-              } catch (updateError: any) {
-                testsLogger?.error?.(
-                  `Update table ${item.name} source failed: ${updateError.message}`,
-                );
-                results.push({
-                  type: 'tables',
-                  name: item.name,
-                  status: `FAILED: source not written: ${updateError.message}`,
-                });
-              }
-            }
-
-            results.push({
-              type: 'tables',
-              name: item.name,
-              status: exists ? 'existed' : 'created',
-            });
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: TYPE_CODES.tables,
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            // If create fails with auth/conflict but object may exist, still add to activate
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `Table ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'tables',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.tables,
-              });
-            } else {
-              testsLogger?.error?.(
-                `Failed to setup table ${item.name}: ${msg}`,
-              );
-              results.push({
-                type: 'tables',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
+    // --- Tables ---
+    const tables = sharedConfig.tables || [];
+    if (tables.length > 0) {
+      testsLogger?.info?.(
+        `Creating Tables (${tables.length}) without activation...`,
+      );
+      for (const item of tables) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
         }
-      }
-
-      // --- Structures ---
-      // Structures must be created SEQUENTIALLY with per-item activation:
-      // a base structure that contains `include <other>;` requires the
-      // included structure to already exist AND be active. Config lists the
-      // include first and the base second, so processing in list order with
-      // immediate activation satisfies the dependency. These are NOT added to
-      // the group-activation list (they are already active by this point).
-      const structures = sharedConfig.structures || [];
-      if (structures.length > 0) {
-        testsLogger?.info?.(
-          `Creating Structures (${structures.length}) sequentially with activation...`,
-        );
-        for (const item of structures) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping structure ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
+        try {
+          let exists = false;
           try {
-            let exists = false;
+            const readResult = await client
+              .getTable(tableDocuments)
+              .read({ tableName: item.name }, 'workingArea', {
+                analyse: analyseException,
+              });
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (!exists) {
+            const createdTable = await client.getTable(tableDocuments).create(
+              {
+                tableName: item.name,
+                packageName,
+                description: item.description || 'Shared test table',
+                source: item.source,
+                transportRequest,
+              },
+              {
+                headers: DEFAULT_ADT_HEADERS['table.create'],
+                analyse: analyseException,
+              },
+            );
+            if (!createdTable.ok) {
+              throw new Error(createdTable.getError().message);
+            }
+            testsLogger?.info?.(`Created table ${item.name}`);
+          }
+
+          // Always update source code to ensure it matches config
+          if (
+            item.source &&
+            !(await sameActiveSource(client, 'table', item.name, item.source))
+          ) {
             try {
-              const readResult = await client
-                .getStructure(structureDocuments)
-                .read({ structureName: item.name }, 'workingArea', {
-                  analyse: analyseException,
-                });
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              try {
-                // create() only builds the skeleton (does NOT apply ddlCode)
-                const createdStructure = await client
-                  .getStructure(structureDocuments)
-                  .create(
-                    {
-                      structureName: item.name,
-                      packageName,
-                      description: item.description || 'Shared test structure',
-                      transportRequest,
-                    },
-                    {
-                      headers: DEFAULT_ADT_HEADERS['structure.create'],
-                      analyse: analyseException,
-                    },
-                  );
-                if (!createdStructure.ok) {
-                  throw new Error(createdStructure.getError().message);
-                }
-                testsLogger?.info?.(`Created structure ${item.name}`);
-              } catch (createError: any) {
-                const cmsg =
-                  createError instanceof Error
-                    ? createError.message
-                    : String(createError);
-                if (
-                  cmsg.includes('409') ||
-                  cmsg.includes('already exist') ||
-                  cmsg.includes('NoAccess')
-                ) {
-                  testsLogger?.warn?.(
-                    `Structure ${item.name} create issue (may already exist): ${cmsg.substring(0, 120)}`,
-                  );
-                } else {
-                  throw createError;
-                }
-              }
-            }
-
-            // Apply the real DDL source, then activate immediately so that a
-            // later base structure can reference this one via `include`.
-            if (
-              item.source &&
-              !(await sameActiveSource(
-                client,
-                'structure',
-                item.name,
-                item.source,
-              ))
-            ) {
               await writeSource(
-                handleUpdateStructure(
+                handleUpdateTable(
                   { connection, logger: undefined } as any,
                   {
-                    structure_name: item.name,
+                    table_name: item.name,
                     ddl_code: item.source,
                     activate: false,
                   } as any,
                 ),
               );
-              testsLogger?.info?.(`Updated structure ${item.name} source`);
-            }
-            const activatedStructure = await client
-              .getStructure(structureDocuments)
-              .activate(
-                { structureName: item.name },
-                {
-                  headers: DEFAULT_ADT_HEADERS['structure.activate'],
-                  analyse: analyseActivation,
-                },
+              testsLogger?.info?.(`Updated table ${item.name} source`);
+            } catch (updateError: any) {
+              testsLogger?.error?.(
+                `Update table ${item.name} source failed: ${updateError.message}`,
               );
-            if (!activatedStructure.ok) {
-              throw new Error(activatedStructure.getError().message);
+              results.push({
+                type: 'tables',
+                name: item.name,
+                status: `FAILED: source not written: ${updateError.message}`,
+              });
             }
-            testsLogger?.info?.(`Activated structure ${item.name}`);
+          }
 
-            results.push({
-              type: 'structures',
-              name: item.name,
-              status: exists ? 'existed' : 'created',
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            testsLogger?.error?.(
-              `Failed to setup structure ${item.name}: ${msg}`,
+          results.push({
+            type: 'tables',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.tables,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          // If create fails with auth/conflict but object may exist, still add to activate
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `Table ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
             );
             results.push({
-              type: 'structures',
+              type: 'tables',
+              name: item.name,
+              status: 'existed',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.tables,
+            });
+          } else {
+            testsLogger?.error?.(`Failed to setup table ${item.name}: ${msg}`);
+            results.push({
+              type: 'tables',
               name: item.name,
               status: `FAILED: ${msg}`,
             });
           }
         }
       }
+    }
 
-      // --- Views ---
-      const views = sharedConfig.views || [];
-      if (views.length > 0) {
-        testsLogger?.info?.(
-          `Creating Views (${views.length}) without activation...`,
-        );
-        for (const item of views) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
+    // --- Structures ---
+    // Structures must be created SEQUENTIALLY with per-item activation:
+    // a base structure that contains `include <other>;` requires the
+    // included structure to already exist AND be active. Config lists the
+    // include first and the base second, so processing in list order with
+    // immediate activation satisfies the dependency. These are NOT added to
+    // the group-activation list (they are already active by this point).
+    const structures = sharedConfig.structures || [];
+    if (structures.length > 0) {
+      testsLogger?.info?.(
+        `Creating Structures (${structures.length}) sequentially with activation...`,
+      );
+      for (const item of structures) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping structure ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          let exists = false;
           try {
-            let exists = false;
+            const readResult = await client
+              .getStructure(structureDocuments)
+              .read({ structureName: item.name }, 'workingArea', {
+                analyse: analyseException,
+              });
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (!exists) {
             try {
-              const readResult = await client
-                .getDdl(ddlDocuments)
-                .read({ ddlName: item.name }, 'workingArea', {
-                  analyse: analyseException,
-                });
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              const createdDdl = await client.getDdl(ddlDocuments).create(
-                {
-                  ddlName: item.name,
-                  packageName,
-                  description: item.description || 'Shared test view',
-                  source: item.source,
-                  transportRequest,
-                },
-                {
-                  headers: DEFAULT_ADT_HEADERS['ddl.create'],
-                  analyse: analyseException,
-                },
-              );
-              if (!createdDdl.ok) {
-                throw new Error(createdDdl.getError().message);
-              }
-              testsLogger?.info?.(`Created view ${item.name}`);
-            }
-
-            if (
-              item.source &&
-              !(await sameActiveSource(client, 'ddl', item.name, item.source))
-            ) {
-              try {
-                await writeSource(
-                  handleUpdateDdl(
-                    { connection, logger: undefined } as any,
-                    {
-                      ddl_name: item.name,
-                      ddl_source: item.source,
-                      activate: false,
-                    } as any,
-                  ),
-                );
-                testsLogger?.info?.(`Updated view ${item.name} source`);
-              } catch (updateError: any) {
-                testsLogger?.warn?.(
-                  `Update view ${item.name} source failed (${updateError.message}), trying force-save...`,
-                );
-                try {
-                  await forceSaveViewSource(
-                    client,
-                    item.name,
-                    item.source,
+              // create() only builds the skeleton (does NOT apply ddlCode)
+              const createdStructure = await client
+                .getStructure(structureDocuments)
+                .create(
+                  {
+                    structureName: item.name,
+                    packageName,
+                    description: item.description || 'Shared test structure',
                     transportRequest,
-                  );
-                  testsLogger?.info?.(
-                    `Force-saved source for view ${item.name}`,
-                  );
-                } catch (forceSaveError: any) {
-                  testsLogger?.error?.(
-                    `Force-save view ${item.name} also failed: ${forceSaveError.message}`,
-                  );
-                  results.push({
-                    type: 'views',
-                    name: item.name,
-                    status: `FAILED: source not written: ${forceSaveError.message}`,
-                  });
-                }
+                  },
+                  {
+                    headers: DEFAULT_ADT_HEADERS['structure.create'],
+                    analyse: analyseException,
+                  },
+                );
+              if (!createdStructure.ok) {
+                throw new Error(createdStructure.getError().message);
+              }
+              testsLogger?.info?.(`Created structure ${item.name}`);
+            } catch (createError: any) {
+              const cmsg =
+                createError instanceof Error
+                  ? createError.message
+                  : String(createError);
+              if (
+                cmsg.includes('409') ||
+                cmsg.includes('already exist') ||
+                cmsg.includes('NoAccess')
+              ) {
+                testsLogger?.warn?.(
+                  `Structure ${item.name} create issue (may already exist): ${cmsg.substring(0, 120)}`,
+                );
+              } else {
+                throw createError;
               }
             }
+          }
 
+          // Apply the real DDL source, then activate immediately so that a
+          // later base structure can reference this one via `include`.
+          if (
+            item.source &&
+            !(await sameActiveSource(
+              client,
+              'structure',
+              item.name,
+              item.source,
+            ))
+          ) {
+            await writeSource(
+              handleUpdateStructure(
+                { connection, logger: undefined } as any,
+                {
+                  structure_name: item.name,
+                  ddl_code: item.source,
+                  activate: false,
+                } as any,
+              ),
+            );
+            testsLogger?.info?.(`Updated structure ${item.name} source`);
+          }
+          const activatedStructure = await client
+            .getStructure(structureDocuments)
+            .activate(
+              { structureName: item.name },
+              {
+                headers: DEFAULT_ADT_HEADERS['structure.activate'],
+                analyse: analyseActivation,
+              },
+            );
+          if (!activatedStructure.ok) {
+            throw new Error(activatedStructure.getError().message);
+          }
+          testsLogger?.info?.(`Activated structure ${item.name}`);
+
+          results.push({
+            type: 'structures',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          testsLogger?.error?.(
+            `Failed to setup structure ${item.name}: ${msg}`,
+          );
+          results.push({
+            type: 'structures',
+            name: item.name,
+            status: `FAILED: ${msg}`,
+          });
+        }
+      }
+    }
+
+    // --- Views ---
+    const views = sharedConfig.views || [];
+    if (views.length > 0) {
+      testsLogger?.info?.(
+        `Creating Views (${views.length}) without activation...`,
+      );
+      for (const item of views) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          let exists = false;
+          try {
+            const readResult = await client
+              .getDdl(ddlDocuments)
+              .read({ ddlName: item.name }, 'workingArea', {
+                analyse: analyseException,
+              });
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (!exists) {
+            const createdDdl = await client.getDdl(ddlDocuments).create(
+              {
+                ddlName: item.name,
+                packageName,
+                description: item.description || 'Shared test view',
+                source: item.source,
+                transportRequest,
+              },
+              {
+                headers: DEFAULT_ADT_HEADERS['ddl.create'],
+                analyse: analyseException,
+              },
+            );
+            if (!createdDdl.ok) {
+              throw new Error(createdDdl.getError().message);
+            }
+            testsLogger?.info?.(`Created view ${item.name}`);
+          }
+
+          if (
+            item.source &&
+            !(await sameActiveSource(client, 'ddl', item.name, item.source))
+          ) {
+            try {
+              await writeSource(
+                handleUpdateDdl(
+                  { connection, logger: undefined } as any,
+                  {
+                    ddl_name: item.name,
+                    ddl_source: item.source,
+                    activate: false,
+                  } as any,
+                ),
+              );
+              testsLogger?.info?.(`Updated view ${item.name} source`);
+            } catch (updateError: any) {
+              testsLogger?.warn?.(
+                `Update view ${item.name} source failed (${updateError.message}), trying force-save...`,
+              );
+              try {
+                await forceSaveViewSource(
+                  client,
+                  item.name,
+                  item.source,
+                  transportRequest,
+                );
+                testsLogger?.info?.(`Force-saved source for view ${item.name}`);
+              } catch (forceSaveError: any) {
+                testsLogger?.error?.(
+                  `Force-save view ${item.name} also failed: ${forceSaveError.message}`,
+                );
+                results.push({
+                  type: 'views',
+                  name: item.name,
+                  status: `FAILED: source not written: ${forceSaveError.message}`,
+                });
+              }
+            }
+          }
+
+          results.push({
+            type: 'views',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.views,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `View ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+            );
             results.push({
               type: 'views',
               name: item.name,
-              status: exists ? 'existed' : 'created',
+              status: 'existed',
             });
             toActivate.push({
               name: item.name.toUpperCase(),
               type: TYPE_CODES.views,
             });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `View ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'views',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.views,
-              });
-            } else {
-              testsLogger?.error?.(`Failed to setup view ${item.name}: ${msg}`);
-              results.push({
-                type: 'views',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
-        }
-      }
-
-      // --- Behavior definitions ---
-      const bdefs = sharedConfig.behavior_definitions || [];
-      if (bdefs.length > 0) {
-        testsLogger?.info?.(
-          `Creating Behavior definitions (${bdefs.length}) without activation...`,
-        );
-        for (const item of bdefs) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            let exists = false;
-            try {
-              const readResult = await client
-                .getBehaviorDefinition(behaviorDefinitionDocuments)
-                .read({ name: item.name }, 'active', {
-                  analyse: analyseException,
-                });
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              const createdBehaviorDefinition = await client
-                .getBehaviorDefinition(behaviorDefinitionDocuments)
-                .create(
-                  {
-                    name: item.name,
-                    packageName,
-                    rootEntity: item.root_entity || item.name,
-                    implementationType: item.implementation_type || 'Managed',
-                    description: item.description || 'Shared test BDEF',
-                    source: item.source,
-                    transportRequest,
-                  },
-                  {
-                    headers: DEFAULT_ADT_HEADERS['behaviorDefinition.create'],
-                    analyse: analyseException,
-                  },
-                );
-              if (!createdBehaviorDefinition.ok) {
-                throw new Error(createdBehaviorDefinition.getError().message);
-              }
-              testsLogger?.info?.(`Created behavior definition ${item.name}`);
-            }
-
-            if (
-              item.source &&
-              !(await sameActiveSource(client, 'bdef', item.name, item.source))
-            ) {
-              try {
-                await writeSource(
-                  handleUpdateBehaviorDefinition(
-                    { connection, logger: undefined } as any,
-                    {
-                      name: item.name,
-                      source_code: item.source,
-                      activate: false,
-                    } as any,
-                  ),
-                );
-                testsLogger?.info?.(
-                  `Updated behavior definition ${item.name} source`,
-                );
-              } catch (updateError: any) {
-                testsLogger?.error?.(
-                  `Update BDEF ${item.name} source failed: ${updateError.message}`,
-                );
-                results.push({
-                  type: 'behavior_definitions',
-                  name: item.name,
-                  status: `FAILED: source not written: ${updateError.message}`,
-                });
-              }
-            }
-
+          } else {
+            testsLogger?.error?.(`Failed to setup view ${item.name}: ${msg}`);
             results.push({
-              type: 'behavior_definitions',
-              name: item.name,
-              status: exists ? 'existed' : 'created',
-            });
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: TYPE_CODES.behavior_definitions,
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `BDEF ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'behavior_definitions',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.behavior_definitions,
-              });
-            } else {
-              testsLogger?.error?.(
-                `Failed to setup behavior definition ${item.name}: ${msg}`,
-              );
-              results.push({
-                type: 'behavior_definitions',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
-        }
-      }
-
-      // --- Classes (implementation classes for BDEFs) ---
-      const classes = sharedConfig.classes || [];
-      if (classes.length > 0) {
-        testsLogger?.info?.(
-          `Creating Classes (${classes.length}) without activation...`,
-        );
-        for (const item of classes) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            let exists = false;
-            try {
-              const readResult = await client
-                .getClass(classDocuments)
-                .read({ className: item.name }, 'workingArea', {
-                  analyse: analyseException,
-                });
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (exists) {
-              testsLogger?.info?.(`Class ${item.name} already exists`);
-              results.push({
-                type: 'classes',
-                name: item.name,
-                status: 'existed',
-              });
-            } else {
-              const createdClass = await client.getClass(classDocuments).create(
-                {
-                  className: item.name,
-                  packageName,
-                  description: item.description || 'Shared test class',
-                  transportRequest,
-                },
-                {
-                  headers: DEFAULT_ADT_HEADERS['class.create'],
-                  analyse: analyseException,
-                },
-              );
-              if (!createdClass.ok) {
-                throw new Error(createdClass.getError().message);
-              }
-              testsLogger?.info?.(`Created class ${item.name}`);
-              results.push({
-                type: 'classes',
-                name: item.name,
-                status: 'created',
-              });
-            }
-
-            if (
-              item.source &&
-              !(await sameActiveSource(client, 'class', item.name, item.source))
-            ) {
-              await writeSource(
-                handleUpdateClass(
-                  { connection, logger: undefined } as any,
-                  {
-                    class_name: item.name,
-                    source_code: item.source,
-                    activate: false,
-                  } as any,
-                ),
-              );
-              testsLogger?.info?.(`Updated class ${item.name} source`);
-            }
-
-            // The class's ABAP Unit test classes, where the configuration
-            // gives them (the shared unit-test container). They activate
-            // with the class.
-            if (
-              item.test_classes &&
-              !(await sameActiveSource(
-                client,
-                'testClasses',
-                item.name,
-                item.test_classes,
-              ))
-            ) {
-              await writeSource(
-                handleUpdateLocalTestClass(
-                  { connection, logger: undefined } as any,
-                  {
-                    class_name: item.name,
-                    test_class_code: item.test_classes,
-                    activate_on_update: false,
-                  } as any,
-                ),
-              );
-              testsLogger?.info?.(`Updated class ${item.name} test classes`);
-            }
-
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: TYPE_CODES.classes,
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `Class ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'classes',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.classes,
-              });
-            } else {
-              testsLogger?.error?.(
-                `Failed to create class ${item.name}: ${msg}`,
-              );
-              results.push({
-                type: 'classes',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
-        }
-      }
-
-      // --- Function Groups ---
-      const functionGroups = sharedConfig.function_groups || [];
-      if (functionGroups.length > 0) {
-        testsLogger?.info?.(
-          `Creating Function Groups (${functionGroups.length}) without activation...`,
-        );
-        for (const item of functionGroups) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping function group ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            let exists = false;
-            try {
-              // A function group has no source of its own — only a document
-              // (IAdtMetadataReadable, not IAdtReadable): AdtFunctionGroup.d.ts.
-              const readResult = await client
-                .getFunctionGroup(functionGroupDocuments)
-                .readMetadata(
-                  { functionGroupName: item.name },
-                  { version: 'workingArea', analyse: analyseException },
-                );
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              const createdFunctionGroup = await client
-                .getFunctionGroup(functionGroupDocuments)
-                .create(
-                  {
-                    functionGroupName: item.name,
-                    description:
-                      item.description || 'Shared test function group',
-                    packageName,
-                    transportRequest,
-                  },
-                  {
-                    headers: DEFAULT_ADT_HEADERS['functionGroup.create'],
-                    analyse: analyseException,
-                  },
-                );
-              if (!createdFunctionGroup.ok) {
-                throw new Error(createdFunctionGroup.getError().message);
-              }
-              testsLogger?.info?.(`Created function group ${item.name}`);
-            }
-
-            results.push({
-              type: 'function_groups',
-              name: item.name,
-              status: exists ? 'existed' : 'created',
-            });
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: TYPE_CODES.function_groups,
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `Function group ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'function_groups',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.function_groups,
-              });
-            } else {
-              testsLogger?.error?.(
-                `Failed to setup function group ${item.name}: ${msg}`,
-              );
-              results.push({
-                type: 'function_groups',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
-        }
-      }
-
-      // --- Function Modules ---
-      const functionModules = sharedConfig.function_modules || [];
-      if (functionModules.length > 0) {
-        testsLogger?.info?.(
-          `Creating Function Modules (${functionModules.length}) without activation...`,
-        );
-        for (const item of functionModules) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping function module ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            let exists = false;
-            try {
-              const readResult = await client
-                .getFunctionModule(functionModuleDocuments)
-                .read(
-                  {
-                    functionModuleName: item.name,
-                    functionGroupName: item.group,
-                  },
-                  'workingArea',
-                  { analyse: analyseException },
-                );
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              // `create` posts a metadata document only — no create in
-              // adt-clients 19 carries source (IAdtCreatable.create's own
-              // comment) — so the empty `source` this used to send is
-              // dropped rather than ported; it never reached the wire either
-              // way, and the type now says so.
-              const createdFunctionModule = await client
-                .getFunctionModule(functionModuleDocuments)
-                .create(
-                  {
-                    functionModuleName: item.name,
-                    functionGroupName: item.group,
-                    description:
-                      item.description || 'Shared test function module',
-                    transportRequest,
-                  },
-                  {
-                    headers: DEFAULT_ADT_HEADERS['functionModule.create'],
-                    analyse: analyseException,
-                  },
-                );
-              if (!createdFunctionModule.ok) {
-                throw new Error(createdFunctionModule.getError().message);
-              }
-              testsLogger?.info?.(`Created function module ${item.name}`);
-            }
-
-            // Update source code if provided
-            if (
-              item.source &&
-              !(await sameActiveSource(
-                client,
-                'functionModule',
-                item.name,
-                item.source,
-                item.group,
-              ))
-            ) {
-              try {
-                const lockResponse = await client
-                  .getFunctionModule(functionModuleDocuments)
-                  .lock(
-                    {
-                      functionModuleName: item.name,
-                      functionGroupName: item.group,
-                    },
-                    { analyse: analyseException },
-                  );
-                if (!lockResponse.ok) {
-                  throw new Error(lockResponse.getError().message);
-                }
-                const lockHandle = lockResponse.getResult().value;
-                // Both failures, raised together, write first — see
-                // `forceSaveViewSource` above for why logging the refused
-                // release is not enough.
-                const moduleFailures: string[] = [];
-                try {
-                  const updated = await client
-                    .getFunctionModule(functionModuleDocuments)
-                    .update(
-                      {
-                        functionModuleName: item.name,
-                        functionGroupName: item.group,
-                        transportRequest,
-                      },
-                      {
-                        headers: DEFAULT_ADT_HEADERS['functionModule.update'],
-                        source: item.source,
-                        lockHandle,
-                        analyse: analyseException,
-                      },
-                    );
-                  if (!updated.ok) {
-                    moduleFailures.push(
-                      `write refused: ${updated.getError().message}`,
-                    );
-                  } else {
-                    testsLogger?.info?.(
-                      `Updated function module ${item.name} source`,
-                    );
-                  }
-                } catch (error: unknown) {
-                  moduleFailures.push(
-                    `write threw: ${(error as Error)?.message ?? String(error)}`,
-                  );
-                }
-                try {
-                  const releasedModule = await client
-                    .getFunctionModule(functionModuleDocuments)
-                    .unlock(
-                      {
-                        functionModuleName: item.name,
-                        functionGroupName: item.group,
-                      },
-                      lockHandle,
-                      { analyse: analyseException },
-                    );
-                  if (!releasedModule.ok) {
-                    moduleFailures.push(
-                      `🔒 the lock was NOT released and stays on function module ${item.name}: ${releasedModule.getError().message}`,
-                    );
-                  }
-                } catch (error: unknown) {
-                  moduleFailures.push(
-                    `🔒 the lock was NOT released and stays on function module ${item.name}: ${(error as Error)?.message ?? String(error)}`,
-                  );
-                }
-                if (moduleFailures.length > 0) {
-                  throw new Error(`${item.name}: ${moduleFailures.join('; ')}`);
-                }
-              } catch (updateError: any) {
-                testsLogger?.error?.(
-                  `Update function module ${item.name} source failed: ${updateError.message}`,
-                );
-                results.push({
-                  type: 'function_modules',
-                  name: item.name,
-                  status: `FAILED: source not written: ${updateError.message}`,
-                });
-              }
-            }
-
-            results.push({
-              type: 'function_modules',
-              name: item.name,
-              status: exists ? 'existed' : 'created',
-            });
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: TYPE_CODES.function_modules,
-              // A module is addressed through its group; without it the
-              // activation URI is built with the module's name in the group's
-              // place, and the whole batch answers 500 invalidFunctionGroup.
-              parentName: item.group.toUpperCase(),
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `Function module ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'function_modules',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.function_modules,
-                parentName: item.group.toUpperCase(),
-              });
-            } else {
-              testsLogger?.error?.(
-                `Failed to setup function module ${item.name}: ${msg}`,
-              );
-              results.push({
-                type: 'function_modules',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
-        }
-      }
-
-      // --- Service Definitions ---
-      const serviceDefinitions = sharedConfig.service_definitions || [];
-      if (serviceDefinitions.length > 0) {
-        testsLogger?.info?.(
-          `Creating Service Definitions (${serviceDefinitions.length}) without activation...`,
-        );
-        for (const item of serviceDefinitions) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping service definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            let exists = false;
-            try {
-              const readResult = await client
-                .getServiceDefinition(serviceDefinitionDocuments)
-                .read({ serviceDefinitionName: item.name }, 'active', {
-                  analyse: analyseException,
-                });
-              exists = readResult.ok;
-            } catch {
-              exists = false;
-            }
-
-            if (!exists) {
-              const createdServiceDefinition = await client
-                .getServiceDefinition(serviceDefinitionDocuments)
-                .create(
-                  {
-                    serviceDefinitionName: item.name,
-                    packageName,
-                    description:
-                      item.description || 'Shared test service definition',
-                    source: item.source,
-                    transportRequest,
-                  },
-                  {
-                    headers: DEFAULT_ADT_HEADERS['serviceDefinition.create'],
-                    analyse: analyseException,
-                  },
-                );
-              if (!createdServiceDefinition.ok) {
-                throw new Error(createdServiceDefinition.getError().message);
-              }
-              testsLogger?.info?.(`Created service definition ${item.name}`);
-            }
-
-            if (
-              item.source &&
-              !(await sameActiveSource(client, 'srvd', item.name, item.source))
-            ) {
-              try {
-                await writeSource(
-                  handleUpdateServiceDefinition(
-                    { connection, logger: undefined } as any,
-                    {
-                      service_definition_name: item.name,
-                      source_code: item.source,
-                      activate: false,
-                    } as any,
-                  ),
-                );
-                testsLogger?.info?.(
-                  `Updated service definition ${item.name} source`,
-                );
-              } catch (updateError: any) {
-                testsLogger?.error?.(
-                  `Update service definition ${item.name} source failed: ${updateError.message}`,
-                );
-                results.push({
-                  type: 'service_definitions',
-                  name: item.name,
-                  status: `FAILED: source not written: ${updateError.message}`,
-                });
-              }
-            }
-
-            results.push({
-              type: 'service_definitions',
-              name: item.name,
-              status: exists ? 'existed' : 'created',
-            });
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: TYPE_CODES.service_definitions,
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (
-              msg.includes('409') ||
-              msg.includes('already exist') ||
-              msg.includes('NoAccess')
-            ) {
-              testsLogger?.warn?.(
-                `Service definition ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
-              );
-              results.push({
-                type: 'service_definitions',
-                name: item.name,
-                status: 'existed',
-              });
-              toActivate.push({
-                name: item.name.toUpperCase(),
-                type: TYPE_CODES.service_definitions,
-              });
-            } else {
-              testsLogger?.error?.(
-                `Failed to setup service definition ${item.name}: ${msg}`,
-              );
-              results.push({
-                type: 'service_definitions',
-                name: item.name,
-                status: `FAILED: ${msg}`,
-              });
-            }
-          }
-        }
-      }
-
-      // --- Domains, data elements, interfaces, programs, metadata extensions ---
-      //
-      // Created through this repository's own handlers — the paths their
-      // integration suites prove on this system — with `activate: false`;
-      // the group activation below activates them with everything else. A
-      // handler answers `isError` rather than throwing, and that answer is
-      // what decides here: an `isError` is a failure, never a log line.
-      const handlerCtx = { connection, logger: undefined } as any;
-      const answerText = (a: any) =>
-        (a?.content ?? []).map((c: any) => c.text).join('');
-      const existsBySearch = async (name: string, typeCode: string) => {
-        const found = await handleSearchObject(handlerCtx, {
-          object_name: name,
-          maxResults: 10,
-        });
-        return answerText(found)
-          .split(/\r?\n/)
-          .some((line: string) =>
-            line.toUpperCase().startsWith(`${name.toUpperCase()}\t${typeCode}`),
-          );
-      };
-      const viaHandlers: Array<{
-        section: string;
-        label: string;
-        typeCode: AdtGroupActivationCode<'onprem'>;
-        create: (item: any) => Promise<any[]>;
-        /** Writes the configured source; runs for an existing object too. */
-        update?: (item: any) => Promise<any>;
-      }> = [
-        {
-          section: 'domains',
-          label: 'domain',
-          typeCode: 'DOMA/DD',
-          create: async (item) => [
-            await handleCreateDomain(handlerCtx, {
-              domain_name: item.name,
-              description: item.description || 'Shared test domain',
-              package_name: packageName,
-              datatype: item.datatype || 'CHAR',
-              length: item.length ?? 10,
-              decimals: item.decimals ?? 0,
-              // Active at once: CreateDataElement activates what it creates,
-              // and refuses "No active domain … available" (DO 315) for a
-              // data element whose domain is still inactive.
-              activate: true,
-            } as any),
-          ],
-        },
-        {
-          section: 'data_elements',
-          label: 'data element',
-          typeCode: 'DTEL/DE',
-          create: async (item) => [
-            await handleCreateDataElement(handlerCtx, {
-              data_element_name: item.name,
-              description: item.description || 'Shared test data element',
-              package_name: packageName,
-              type_kind: item.type_kind || 'domain',
-              type_name: item.type_name,
-              data_type: item.data_type,
-              length: item.length,
-              decimals: item.decimals,
-              short_label: item.short_label,
-              medium_label: item.medium_label,
-              long_label: item.long_label,
-              heading_label: item.heading_label,
-            } as any),
-          ],
-        },
-        {
-          section: 'interfaces',
-          label: 'interface',
-          typeCode: 'INTF/OI',
-          create: async (item) => [
-            await handleCreateInterface(handlerCtx, {
-              interface_name: item.name,
-              description: item.description || 'Shared test interface',
-              package_name: packageName,
-            } as any),
-          ],
-          update: (item) =>
-            handleUpdateInterface(handlerCtx, {
-              interface_name: item.name,
-              source_code: item.source,
-              activate: false,
-            } as any),
-        },
-        {
-          section: 'programs',
-          label: 'program',
-          typeCode: 'PROG/P',
-          create: async (item) => [
-            await handleCreateProgram(handlerCtx, {
-              program_name: item.name,
-              description: item.description || 'Shared test program',
-              package_name: packageName,
-            } as any),
-          ],
-          update: (item) =>
-            handleUpdateProgram(handlerCtx, {
-              program_name: item.name,
-              source_code: item.source,
-              activate: false,
-            } as any),
-        },
-        {
-          section: 'metadata_extensions',
-          label: 'metadata extension',
-          typeCode: 'DDLX/EX',
-          create: async (item) => [
-            await handleCreateMetadataExtension(handlerCtx, {
-              name: item.name,
-              description: item.description || 'Shared test metadata extension',
-              package_name: packageName,
-              activate: false,
-            } as any),
-          ],
-          update: (item) =>
-            handleUpdateMetadataExtension(handlerCtx, {
-              name: item.name,
-              source_code: item.source,
-              activate: false,
-            } as any),
-        },
-        {
-          // No handler in this project creates an append structure; the
-          // client does, the way the structure handlers use it: a metadata
-          // create naming the base structure, then the `extend type` source
-          // under a lock. The base must be active first — the structures
-          // above are activated one by one as they are written.
-          section: 'append_structures',
-          label: 'append structure',
-          typeCode: 'TABL/DS',
-          create: async (item) => {
-            const createdAppendStructure = await client
-              .getAppendStructure(appendStructureDocuments)
-              .create(
-                {
-                  appendStructureName: item.name,
-                  baseObject: item.base_structure,
-                  packageName,
-                  description: item.description || 'Shared append structure',
-                },
-                {
-                  headers: DEFAULT_ADT_HEADERS['appendStructure.create'],
-                  analyse: analyseException,
-                },
-              );
-            if (!createdAppendStructure.ok) {
-              throw new Error(createdAppendStructure.getError().message);
-            }
-            return [];
-          },
-          update: async (item) => {
-            const obj = client.getAppendStructure(appendStructureDocuments);
-            const written = await withLock(
-              () =>
-                obj.lock(
-                  { appendStructureName: item.name },
-                  { analyse: analyseException },
-                ),
-              (lockHandle) =>
-                obj.update(
-                  { appendStructureName: item.name },
-                  {
-                    headers: DEFAULT_ADT_HEADERS['appendStructure.update'],
-                    source: item.source,
-                    lockHandle,
-                    analyse: analyseException,
-                  },
-                ),
-              (lockHandle) =>
-                obj.unlock({ appendStructureName: item.name }, lockHandle, {
-                  analyse: analyseException,
-                }),
-              { type: 'APPEND_STRUCTURE', name: item.name },
-            );
-            return written.ok
-              ? { isError: false }
-              : {
-                  isError: true,
-                  content: [{ type: 'text', text: written.getError().message }],
-                };
-          },
-        },
-      ];
-      for (const kind of viaHandlers) {
-        const items: any[] = sharedConfig[kind.section] || [];
-        if (items.length === 0) continue;
-        testsLogger?.info?.(
-          `Creating ${kind.label}s (${items.length}) without activation...`,
-        );
-        for (const item of items) {
-          if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(
-              `Skipping ${kind.label} ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
-            );
-            continue;
-          }
-          try {
-            if (await existsBySearch(item.name, kind.typeCode)) {
-              testsLogger?.info?.(`${kind.label} ${item.name} already exists`);
-              results.push({
-                type: kind.section,
-                name: item.name,
-                status: 'existed',
-              });
-            } else {
-              for (const answered of await kind.create(item)) {
-                if (answered?.isError) {
-                  throw new Error(answerText(answered).substring(0, 800));
-                }
-              }
-              testsLogger?.info?.(`Created ${kind.label} ${item.name}`);
-              results.push({
-                type: kind.section,
-                name: item.name,
-                status: 'created',
-              });
-            }
-            const readKinds: Partial<Record<string, string>> = {
-              'INTF/OI': 'interface',
-              'PROG/P': 'program',
-              'DDLX/EX': 'ddlx',
-              'TABL/DS': 'append',
-            };
-            const readKind = readKinds[kind.typeCode];
-            if (
-              kind.update &&
-              item.source &&
-              !(
-                readKind &&
-                (await sameActiveSource(
-                  client,
-                  readKind,
-                  item.name,
-                  item.source,
-                ))
-              )
-            ) {
-              const updated = await kind.update(item);
-              if (updated?.isError) {
-                throw new Error(
-                  `source not written: ${answerText(updated).substring(0, 800)}`,
-                );
-              }
-              testsLogger?.info?.(`Updated ${kind.label} ${item.name} source`);
-            }
-            toActivate.push({
-              name: item.name.toUpperCase(),
-              type: kind.typeCode,
-            });
-          } catch (error: any) {
-            const msg = error instanceof Error ? error.message : String(error);
-            testsLogger?.error?.(
-              `Failed to create ${kind.label} ${item.name}: ${msg}`,
-            );
-            results.push({
-              type: kind.section,
+              type: 'views',
               name: item.name,
               status: `FAILED: ${msg}`,
             });
           }
         }
       }
+    }
 
-      // 3. Activate all objects.
-      //
-      // Preferred path: a single bulk group-activate (resolves cross-object
-      // dependency ordering in one activation run). On cloud, however,
-      // bulk-activating many objects can exceed the activation-run request
-      // timeout (adt-clients uses a fixed ~45s timeout that is NOT overridable
-      // via activateObjectsGroup). Retrying the full group after a timeout just
-      // burns another 45s, so on timeout we skip straight to the batched
-      // fallback: activate in small chunks (each chunk is one cheap activation
-      // run well under the limit), two passes to resolve ordering between
-      // dependents (pass 2 retries only what failed in pass 1).
-      if (toActivate.length > 0) {
-        const isTimeout = (err: any) =>
-          err?.code === 'ECONNABORTED' || /timeout/i.test(err?.message || '');
-
-        const maxActivationAttempts = 3;
-        let groupActivated = false;
-        for (let attempt = 1; attempt <= maxActivationAttempts; attempt++) {
+    // --- Behavior definitions ---
+    const bdefs = sharedConfig.behavior_definitions || [];
+    if (bdefs.length > 0) {
+      testsLogger?.info?.(
+        `Creating Behavior definitions (${bdefs.length}) without activation...`,
+      );
+      for (const item of bdefs) {
+        if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
+            `Skipping behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
+          continue;
+        }
+        try {
+          let exists = false;
           try {
-            const outcome = await activateGroupOnce(connection, toActivate);
-            testsLogger?.info?.(
-              `${outcome.said}, ${outcome.messages.length} message(s)`,
-            );
+            const readResult = await client
+              .getBehaviorDefinition(behaviorDefinitionDocuments)
+              .read({ name: item.name }, 'active', {
+                analyse: analyseException,
+              });
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
 
-            const errors = outcome.messages.filter(isRefusal);
-            const warnings = outcome.messages.filter((m) =>
-              /^[WI]$|^warning$/i.test(m.type),
-            );
+          if (!exists) {
+            const createdBehaviorDefinition = await client
+              .getBehaviorDefinition(behaviorDefinitionDocuments)
+              .create(
+                {
+                  name: item.name,
+                  packageName,
+                  rootEntity: item.root_entity || item.name,
+                  implementationType: item.implementation_type || 'Managed',
+                  description: item.description || 'Shared test BDEF',
+                  source: item.source,
+                  transportRequest,
+                },
+                {
+                  headers: DEFAULT_ADT_HEADERS['behaviorDefinition.create'],
+                  analyse: analyseException,
+                },
+              );
+            if (!createdBehaviorDefinition.ok) {
+              throw new Error(createdBehaviorDefinition.getError().message);
+            }
+            testsLogger?.info?.(`Created behavior definition ${item.name}`);
+          }
 
-            if (errors.length > 0) {
-              if (attempt < maxActivationAttempts) {
-                testsLogger?.warn?.(
-                  `Activation attempt ${attempt} had ${errors.length} error(s), retrying...`,
-                );
-                continue;
-              }
+          if (
+            item.source &&
+            !(await sameActiveSource(client, 'bdef', item.name, item.source))
+          ) {
+            try {
+              await writeSource(
+                handleUpdateBehaviorDefinition(
+                  { connection, logger: undefined } as any,
+                  {
+                    name: item.name,
+                    source_code: item.source,
+                    activate: false,
+                  } as any,
+                ),
+              );
+              testsLogger?.info?.(
+                `Updated behavior definition ${item.name} source`,
+              );
+            } catch (updateError: any) {
               testsLogger?.error?.(
-                `Group activation errors:\n${errors
-                  .map(
-                    (e) =>
-                      `  ${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
-                  )
-                  .join('\n')}`,
+                `Update BDEF ${item.name} source failed: ${updateError.message}`,
               );
-            } else {
-              testsLogger?.info?.('Group activation completed successfully');
-              groupActivated = true;
+              results.push({
+                type: 'behavior_definitions',
+                name: item.name,
+                status: `FAILED: source not written: ${updateError.message}`,
+              });
             }
-            if (warnings.length > 0) {
-              testsLogger?.warn?.(
-                `Group activation warnings:\n${warnings
-                  .map(
-                    (w) =>
-                      `  ${w.objectName ? `${w.objectName}: ` : ''}${w.text}`,
-                  )
-                  .join('\n')}`,
+          }
+
+          results.push({
+            type: 'behavior_definitions',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.behavior_definitions,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `BDEF ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+            );
+            results.push({
+              type: 'behavior_definitions',
+              name: item.name,
+              status: 'existed',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.behavior_definitions,
+            });
+          } else {
+            testsLogger?.error?.(
+              `Failed to setup behavior definition ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: 'behavior_definitions',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
+          }
+        }
+      }
+    }
+
+    // --- Classes (implementation classes for BDEFs) ---
+    const classes = sharedConfig.classes || [];
+    if (classes.length > 0) {
+      testsLogger?.info?.(
+        `Creating Classes (${classes.length}) without activation...`,
+      );
+      for (const item of classes) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          let exists = false;
+          try {
+            const readResult = await client
+              .getClass(classDocuments)
+              .read({ className: item.name }, 'workingArea', {
+                analyse: analyseException,
+              });
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (exists) {
+            testsLogger?.info?.(`Class ${item.name} already exists`);
+            results.push({
+              type: 'classes',
+              name: item.name,
+              status: 'existed',
+            });
+          } else {
+            const createdClass = await client.getClass(classDocuments).create(
+              {
+                className: item.name,
+                packageName,
+                description: item.description || 'Shared test class',
+                transportRequest,
+              },
+              {
+                headers: DEFAULT_ADT_HEADERS['class.create'],
+                analyse: analyseException,
+              },
+            );
+            if (!createdClass.ok) {
+              throw new Error(createdClass.getError().message);
+            }
+            testsLogger?.info?.(`Created class ${item.name}`);
+            results.push({
+              type: 'classes',
+              name: item.name,
+              status: 'created',
+            });
+          }
+
+          if (
+            item.source &&
+            !(await sameActiveSource(client, 'class', item.name, item.source))
+          ) {
+            await writeSource(
+              handleUpdateClass(
+                { connection, logger: undefined } as any,
+                {
+                  class_name: item.name,
+                  source_code: item.source,
+                  activate: false,
+                } as any,
+              ),
+            );
+            testsLogger?.info?.(`Updated class ${item.name} source`);
+          }
+
+          // The class's ABAP Unit test classes, where the configuration
+          // gives them (the shared unit-test container). They activate
+          // with the class.
+          if (
+            item.test_classes &&
+            !(await sameActiveSource(
+              client,
+              'testClasses',
+              item.name,
+              item.test_classes,
+            ))
+          ) {
+            await writeSource(
+              handleUpdateLocalTestClass(
+                { connection, logger: undefined } as any,
+                {
+                  class_name: item.name,
+                  test_class_code: item.test_classes,
+                  activate_on_update: false,
+                } as any,
+              ),
+            );
+            testsLogger?.info?.(`Updated class ${item.name} test classes`);
+          }
+
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.classes,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `Class ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+            );
+            results.push({
+              type: 'classes',
+              name: item.name,
+              status: 'existed',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.classes,
+            });
+          } else {
+            testsLogger?.error?.(`Failed to create class ${item.name}: ${msg}`);
+            results.push({
+              type: 'classes',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
+          }
+        }
+      }
+    }
+
+    // --- Function Groups ---
+    const functionGroups = sharedConfig.function_groups || [];
+    if (functionGroups.length > 0) {
+      testsLogger?.info?.(
+        `Creating Function Groups (${functionGroups.length}) without activation...`,
+      );
+      for (const item of functionGroups) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping function group ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          let exists = false;
+          try {
+            // A function group has no source of its own — only a document
+            // (IAdtMetadataReadable, not IAdtReadable): AdtFunctionGroup.d.ts.
+            const readResult = await client
+              .getFunctionGroup(functionGroupDocuments)
+              .readMetadata(
+                { functionGroupName: item.name },
+                { version: 'workingArea', analyse: analyseException },
+              );
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (!exists) {
+            const createdFunctionGroup = await client
+              .getFunctionGroup(functionGroupDocuments)
+              .create(
+                {
+                  functionGroupName: item.name,
+                  description: item.description || 'Shared test function group',
+                  packageName,
+                  transportRequest,
+                },
+                {
+                  headers: DEFAULT_ADT_HEADERS['functionGroup.create'],
+                  analyse: analyseException,
+                },
+              );
+            if (!createdFunctionGroup.ok) {
+              throw new Error(createdFunctionGroup.getError().message);
+            }
+            testsLogger?.info?.(`Created function group ${item.name}`);
+          }
+
+          results.push({
+            type: 'function_groups',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.function_groups,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `Function group ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+            );
+            results.push({
+              type: 'function_groups',
+              name: item.name,
+              status: 'existed',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.function_groups,
+            });
+          } else {
+            testsLogger?.error?.(
+              `Failed to setup function group ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: 'function_groups',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
+          }
+        }
+      }
+    }
+
+    // --- Function Modules ---
+    const functionModules = sharedConfig.function_modules || [];
+    if (functionModules.length > 0) {
+      testsLogger?.info?.(
+        `Creating Function Modules (${functionModules.length}) without activation...`,
+      );
+      for (const item of functionModules) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping function module ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          let exists = false;
+          try {
+            const readResult = await client
+              .getFunctionModule(functionModuleDocuments)
+              .read(
+                {
+                  functionModuleName: item.name,
+                  functionGroupName: item.group,
+                },
+                'workingArea',
+                { analyse: analyseException },
+              );
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (!exists) {
+            // `create` posts a metadata document only — no create in
+            // adt-clients 19 carries source (IAdtCreatable.create's own
+            // comment) — so the empty `source` this used to send is
+            // dropped rather than ported; it never reached the wire either
+            // way, and the type now says so.
+            const createdFunctionModule = await client
+              .getFunctionModule(functionModuleDocuments)
+              .create(
+                {
+                  functionModuleName: item.name,
+                  functionGroupName: item.group,
+                  description:
+                    item.description || 'Shared test function module',
+                  transportRequest,
+                },
+                {
+                  headers: DEFAULT_ADT_HEADERS['functionModule.create'],
+                  analyse: analyseException,
+                },
+              );
+            if (!createdFunctionModule.ok) {
+              throw new Error(createdFunctionModule.getError().message);
+            }
+            testsLogger?.info?.(`Created function module ${item.name}`);
+          }
+
+          // Update source code if provided
+          if (
+            item.source &&
+            !(await sameActiveSource(
+              client,
+              'functionModule',
+              item.name,
+              item.source,
+              item.group,
+            ))
+          ) {
+            try {
+              const lockResponse = await client
+                .getFunctionModule(functionModuleDocuments)
+                .lock(
+                  {
+                    functionModuleName: item.name,
+                    functionGroupName: item.group,
+                  },
+                  { analyse: analyseException },
+                );
+              if (!lockResponse.ok) {
+                throw new Error(lockResponse.getError().message);
+              }
+              const lockHandle = lockResponse.getResult().value;
+              // Both failures, raised together, write first — see
+              // `forceSaveViewSource` above for why logging the refused
+              // release is not enough.
+              const moduleFailures: string[] = [];
+              try {
+                const updated = await client
+                  .getFunctionModule(functionModuleDocuments)
+                  .update(
+                    {
+                      functionModuleName: item.name,
+                      functionGroupName: item.group,
+                      transportRequest,
+                    },
+                    {
+                      headers: DEFAULT_ADT_HEADERS['functionModule.update'],
+                      source: item.source,
+                      lockHandle,
+                      analyse: analyseException,
+                    },
+                  );
+                if (!updated.ok) {
+                  moduleFailures.push(
+                    `write refused: ${updated.getError().message}`,
+                  );
+                } else {
+                  testsLogger?.info?.(
+                    `Updated function module ${item.name} source`,
+                  );
+                }
+              } catch (error: unknown) {
+                moduleFailures.push(
+                  `write threw: ${(error as Error)?.message ?? String(error)}`,
+                );
+              }
+              try {
+                const releasedModule = await client
+                  .getFunctionModule(functionModuleDocuments)
+                  .unlock(
+                    {
+                      functionModuleName: item.name,
+                      functionGroupName: item.group,
+                    },
+                    lockHandle,
+                    { analyse: analyseException },
+                  );
+                if (!releasedModule.ok) {
+                  moduleFailures.push(
+                    `🔒 the lock was NOT released and stays on function module ${item.name}: ${releasedModule.getError().message}`,
+                  );
+                }
+              } catch (error: unknown) {
+                moduleFailures.push(
+                  `🔒 the lock was NOT released and stays on function module ${item.name}: ${(error as Error)?.message ?? String(error)}`,
+                );
+              }
+              if (moduleFailures.length > 0) {
+                throw new Error(`${item.name}: ${moduleFailures.join('; ')}`);
+              }
+            } catch (updateError: any) {
+              testsLogger?.error?.(
+                `Update function module ${item.name} source failed: ${updateError.message}`,
+              );
+              results.push({
+                type: 'function_modules',
+                name: item.name,
+                status: `FAILED: source not written: ${updateError.message}`,
+              });
+            }
+          }
+
+          results.push({
+            type: 'function_modules',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.function_modules,
+            // A module is addressed through its group; without it the
+            // activation URI is built with the module's name in the group's
+            // place, and the whole batch answers 500 invalidFunctionGroup.
+            parentName: item.group.toUpperCase(),
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `Function module ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+            );
+            results.push({
+              type: 'function_modules',
+              name: item.name,
+              status: 'existed',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.function_modules,
+              parentName: item.group.toUpperCase(),
+            });
+          } else {
+            testsLogger?.error?.(
+              `Failed to setup function module ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: 'function_modules',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
+          }
+        }
+      }
+    }
+
+    // --- Service Definitions ---
+    const serviceDefinitions = sharedConfig.service_definitions || [];
+    if (serviceDefinitions.length > 0) {
+      testsLogger?.info?.(
+        `Creating Service Definitions (${serviceDefinitions.length}) without activation...`,
+      );
+      for (const item of serviceDefinitions) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping service definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          let exists = false;
+          try {
+            const readResult = await client
+              .getServiceDefinition(serviceDefinitionDocuments)
+              .read({ serviceDefinitionName: item.name }, 'active', {
+                analyse: analyseException,
+              });
+            exists = readResult.ok;
+          } catch {
+            exists = false;
+          }
+
+          if (!exists) {
+            const createdServiceDefinition = await client
+              .getServiceDefinition(serviceDefinitionDocuments)
+              .create(
+                {
+                  serviceDefinitionName: item.name,
+                  packageName,
+                  description:
+                    item.description || 'Shared test service definition',
+                  source: item.source,
+                  transportRequest,
+                },
+                {
+                  headers: DEFAULT_ADT_HEADERS['serviceDefinition.create'],
+                  analyse: analyseException,
+                },
+              );
+            if (!createdServiceDefinition.ok) {
+              throw new Error(createdServiceDefinition.getError().message);
+            }
+            testsLogger?.info?.(`Created service definition ${item.name}`);
+          }
+
+          if (
+            item.source &&
+            !(await sameActiveSource(client, 'srvd', item.name, item.source))
+          ) {
+            try {
+              await writeSource(
+                handleUpdateServiceDefinition(
+                  { connection, logger: undefined } as any,
+                  {
+                    service_definition_name: item.name,
+                    source_code: item.source,
+                    activate: false,
+                  } as any,
+                ),
+              );
+              testsLogger?.info?.(
+                `Updated service definition ${item.name} source`,
+              );
+            } catch (updateError: any) {
+              testsLogger?.error?.(
+                `Update service definition ${item.name} source failed: ${updateError.message}`,
+              );
+              results.push({
+                type: 'service_definitions',
+                name: item.name,
+                status: `FAILED: source not written: ${updateError.message}`,
+              });
+            }
+          }
+
+          results.push({
+            type: 'service_definitions',
+            name: item.name,
+            status: exists ? 'existed' : 'created',
+          });
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: TYPE_CODES.service_definitions,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (
+            msg.includes('409') ||
+            msg.includes('already exist') ||
+            msg.includes('NoAccess')
+          ) {
+            testsLogger?.warn?.(
+              `Service definition ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+            );
+            results.push({
+              type: 'service_definitions',
+              name: item.name,
+              status: 'existed',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.service_definitions,
+            });
+          } else {
+            testsLogger?.error?.(
+              `Failed to setup service definition ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: 'service_definitions',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
+          }
+        }
+      }
+    }
+
+    // --- Domains, data elements, interfaces, programs, metadata extensions ---
+    //
+    // Created through this repository's own handlers — the paths their
+    // integration suites prove on this system — with `activate: false`;
+    // the group activation below activates them with everything else. A
+    // handler answers `isError` rather than throwing, and that answer is
+    // what decides here: an `isError` is a failure, never a log line.
+    const handlerCtx = { connection, logger: undefined } as any;
+    const answerText = (a: any) =>
+      (a?.content ?? []).map((c: any) => c.text).join('');
+    const existsBySearch = async (name: string, typeCode: string) => {
+      const found = await handleSearchObject(handlerCtx, {
+        object_name: name,
+        maxResults: 10,
+      });
+      return answerText(found)
+        .split(/\r?\n/)
+        .some((line: string) =>
+          line.toUpperCase().startsWith(`${name.toUpperCase()}\t${typeCode}`),
+        );
+    };
+    const viaHandlers: Array<{
+      section: string;
+      label: string;
+      typeCode: AdtGroupActivationCode<'onprem'>;
+      create: (item: any) => Promise<any[]>;
+      /** Writes the configured source; runs for an existing object too. */
+      update?: (item: any) => Promise<any>;
+    }> = [
+      {
+        section: 'domains',
+        label: 'domain',
+        typeCode: 'DOMA/DD',
+        create: async (item) => [
+          await handleCreateDomain(handlerCtx, {
+            domain_name: item.name,
+            description: item.description || 'Shared test domain',
+            package_name: packageName,
+            datatype: item.datatype || 'CHAR',
+            length: item.length ?? 10,
+            decimals: item.decimals ?? 0,
+            // Active at once: CreateDataElement activates what it creates,
+            // and refuses "No active domain … available" (DO 315) for a
+            // data element whose domain is still inactive.
+            activate: true,
+          } as any),
+        ],
+      },
+      {
+        section: 'data_elements',
+        label: 'data element',
+        typeCode: 'DTEL/DE',
+        create: async (item) => [
+          await handleCreateDataElement(handlerCtx, {
+            data_element_name: item.name,
+            description: item.description || 'Shared test data element',
+            package_name: packageName,
+            type_kind: item.type_kind || 'domain',
+            type_name: item.type_name,
+            data_type: item.data_type,
+            length: item.length,
+            decimals: item.decimals,
+            short_label: item.short_label,
+            medium_label: item.medium_label,
+            long_label: item.long_label,
+            heading_label: item.heading_label,
+          } as any),
+        ],
+      },
+      {
+        section: 'interfaces',
+        label: 'interface',
+        typeCode: 'INTF/OI',
+        create: async (item) => [
+          await handleCreateInterface(handlerCtx, {
+            interface_name: item.name,
+            description: item.description || 'Shared test interface',
+            package_name: packageName,
+          } as any),
+        ],
+        update: (item) =>
+          handleUpdateInterface(handlerCtx, {
+            interface_name: item.name,
+            source_code: item.source,
+            activate: false,
+          } as any),
+      },
+      {
+        section: 'programs',
+        label: 'program',
+        typeCode: 'PROG/P',
+        create: async (item) => [
+          await handleCreateProgram(handlerCtx, {
+            program_name: item.name,
+            description: item.description || 'Shared test program',
+            package_name: packageName,
+          } as any),
+        ],
+        update: (item) =>
+          handleUpdateProgram(handlerCtx, {
+            program_name: item.name,
+            source_code: item.source,
+            activate: false,
+          } as any),
+      },
+      {
+        section: 'metadata_extensions',
+        label: 'metadata extension',
+        typeCode: 'DDLX/EX',
+        create: async (item) => [
+          await handleCreateMetadataExtension(handlerCtx, {
+            name: item.name,
+            description: item.description || 'Shared test metadata extension',
+            package_name: packageName,
+            activate: false,
+          } as any),
+        ],
+        update: (item) =>
+          handleUpdateMetadataExtension(handlerCtx, {
+            name: item.name,
+            source_code: item.source,
+            activate: false,
+          } as any),
+      },
+      {
+        // No handler in this project creates an append structure; the
+        // client does, the way the structure handlers use it: a metadata
+        // create naming the base structure, then the `extend type` source
+        // under a lock. The base must be active first — the structures
+        // above are activated one by one as they are written.
+        section: 'append_structures',
+        label: 'append structure',
+        typeCode: 'TABL/DS',
+        create: async (item) => {
+          const createdAppendStructure = await client
+            .getAppendStructure(appendStructureDocuments)
+            .create(
+              {
+                appendStructureName: item.name,
+                baseObject: item.base_structure,
+                packageName,
+                description: item.description || 'Shared append structure',
+              },
+              {
+                headers: DEFAULT_ADT_HEADERS['appendStructure.create'],
+                analyse: analyseException,
+              },
+            );
+          if (!createdAppendStructure.ok) {
+            throw new Error(createdAppendStructure.getError().message);
+          }
+          return [];
+        },
+        update: async (item) => {
+          const obj = client.getAppendStructure(appendStructureDocuments);
+          const written = await withLock(
+            () =>
+              obj.lock(
+                { appendStructureName: item.name },
+                { analyse: analyseException },
+              ),
+            (lockHandle) =>
+              obj.update(
+                { appendStructureName: item.name },
+                {
+                  headers: DEFAULT_ADT_HEADERS['appendStructure.update'],
+                  source: item.source,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            (lockHandle) =>
+              obj.unlock({ appendStructureName: item.name }, lockHandle, {
+                analyse: analyseException,
+              }),
+            { type: 'APPEND_STRUCTURE', name: item.name },
+          );
+          return written.ok
+            ? { isError: false }
+            : {
+                isError: true,
+                content: [{ type: 'text', text: written.getError().message }],
+              };
+        },
+      },
+    ];
+    for (const kind of viaHandlers) {
+      const items: any[] = sharedConfig[kind.section] || [];
+      if (items.length === 0) continue;
+      testsLogger?.info?.(
+        `Creating ${kind.label}s (${items.length}) without activation...`,
+      );
+      for (const item of items) {
+        if (!isTestAvailableForSystem(item.available_in)) {
+          testsLogger?.info?.(
+            `Skipping ${kind.label} ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+          );
+          continue;
+        }
+        try {
+          if (await existsBySearch(item.name, kind.typeCode)) {
+            testsLogger?.info?.(`${kind.label} ${item.name} already exists`);
+            results.push({
+              type: kind.section,
+              name: item.name,
+              status: 'existed',
+            });
+          } else {
+            for (const answered of await kind.create(item)) {
+              if (answered?.isError) {
+                throw new Error(answerText(answered).substring(0, 800));
+              }
+            }
+            testsLogger?.info?.(`Created ${kind.label} ${item.name}`);
+            results.push({
+              type: kind.section,
+              name: item.name,
+              status: 'created',
+            });
+          }
+          const readKinds: Partial<Record<string, string>> = {
+            'INTF/OI': 'interface',
+            'PROG/P': 'program',
+            'DDLX/EX': 'ddlx',
+            'TABL/DS': 'append',
+          };
+          const readKind = readKinds[kind.typeCode];
+          if (
+            kind.update &&
+            item.source &&
+            !(
+              readKind &&
+              (await sameActiveSource(client, readKind, item.name, item.source))
+            )
+          ) {
+            const updated = await kind.update(item);
+            if (updated?.isError) {
+              throw new Error(
+                `source not written: ${answerText(updated).substring(0, 800)}`,
               );
             }
-            break; // Success or final attempt — stop retrying
-          } catch (error: any) {
-            // Retrying the full group after a timeout wastes another ~45s and
-            // will time out again — go straight to the batched fallback.
-            if (isTimeout(error)) {
-              testsLogger?.warn?.(
-                `Group activation timed out (${error.message}); falling back to batched activation`,
-              );
-              break;
-            }
+            testsLogger?.info?.(`Updated ${kind.label} ${item.name} source`);
+          }
+          toActivate.push({
+            name: item.name.toUpperCase(),
+            type: kind.typeCode,
+          });
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          testsLogger?.error?.(
+            `Failed to create ${kind.label} ${item.name}: ${msg}`,
+          );
+          results.push({
+            type: kind.section,
+            name: item.name,
+            status: `FAILED: ${msg}`,
+          });
+        }
+      }
+    }
+
+    // 3. Activate all objects.
+    //
+    // Preferred path: a single bulk group-activate (resolves cross-object
+    // dependency ordering in one activation run). On cloud, however,
+    // bulk-activating many objects can exceed the activation-run request
+    // timeout (adt-clients uses a fixed ~45s timeout that is NOT overridable
+    // via activateObjectsGroup). Retrying the full group after a timeout just
+    // burns another 45s, so on timeout we skip straight to the batched
+    // fallback: activate in small chunks (each chunk is one cheap activation
+    // run well under the limit), two passes to resolve ordering between
+    // dependents (pass 2 retries only what failed in pass 1).
+    if (toActivate.length > 0) {
+      const isTimeout = (err: any) =>
+        err?.code === 'ECONNABORTED' || /timeout/i.test(err?.message || '');
+
+      const maxActivationAttempts = 3;
+      let groupActivated = false;
+      for (let attempt = 1; attempt <= maxActivationAttempts; attempt++) {
+        testsLogger?.info?.(
+          `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
+        );
+        try {
+          const outcome = await activateGroupOnce(connection, toActivate);
+          testsLogger?.info?.(
+            `${outcome.said}, ${outcome.messages.length} message(s)`,
+          );
+
+          const errors = outcome.messages.filter(isRefusal);
+          const warnings = outcome.messages.filter((m) =>
+            /^[WI]$|^warning$/i.test(m.type),
+          );
+
+          if (errors.length > 0) {
             if (attempt < maxActivationAttempts) {
               testsLogger?.warn?.(
-                `Activation attempt ${attempt} failed: ${error.message}, retrying...`,
+                `Activation attempt ${attempt} had ${errors.length} error(s), retrying...`,
               );
               continue;
             }
-            testsLogger?.warn?.(
-              `Group activation failed: ${error.message}; falling back to batched activation`,
-            );
-          }
-        }
-
-        // Fallback: bulk group-activate never succeeded (e.g. timed out on
-        // cloud). Activate in small chunks — far fewer activation runs than
-        // one-per-object, each well under the timeout. Two passes resolve
-        // ordering between dependents; pass 2 retries only the leftovers.
-        if (!groupActivated) {
-          const CHUNK_SIZE = 5;
-          let pending = toActivate;
-          let lastErrors = new Map<string, string>();
-
-          for (let pass = 1; pass <= 2 && pending.length > 0; pass++) {
-            testsLogger?.info?.(
-              `Fallback activation pass ${pass}/2: ${pending.length} object(s) in chunks of ${CHUNK_SIZE}...`,
-            );
-            const failedThisPass: typeof toActivate = [];
-            lastErrors = new Map();
-
-            for (let i = 0; i < pending.length; i += CHUNK_SIZE) {
-              const chunk = pending.slice(i, i + CHUNK_SIZE);
-              const recordFailure = (msg: string) => {
-                for (const obj of chunk) {
-                  failedThisPass.push(obj);
-                  lastErrors.set(`${obj.type} ${obj.name}`, msg);
-                }
-              };
-              try {
-                // The same activation as the bulk path above, chunk by chunk.
-                const chunkOutcome = await activateGroupOnce(connection, chunk);
-                const errs = chunkOutcome.messages.filter(isRefusal);
-                if (errs.length > 0) {
-                  recordFailure(
-                    errs
-                      .map(
-                        (e) =>
-                          `${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
-                      )
-                      .join('; '),
-                  );
-                }
-              } catch (e: any) {
-                recordFailure(e?.message || String(e));
-              }
-            }
-            pending = failedThisPass;
-          }
-
-          if (pending.length > 0) {
             testsLogger?.error?.(
-              `Fallback activation failed for:\n${[...lastErrors.entries()].map(([k, v]) => `  ${k}: ${v}`).join('\n')}`,
+              `Group activation errors:\n${errors
+                .map(
+                  (e) =>
+                    `  ${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
+                )
+                .join('\n')}`,
             );
-            results.push({
-              type: 'activation',
-              name: 'FALLBACK',
-              status: `FAILED: ${pending.length} object(s) not activated`,
-            });
           } else {
-            testsLogger?.info?.(
-              'Fallback activation completed successfully (batched group-activate)',
+            testsLogger?.info?.('Group activation completed successfully');
+            groupActivated = true;
+          }
+          if (warnings.length > 0) {
+            testsLogger?.warn?.(
+              `Group activation warnings:\n${warnings
+                .map(
+                  (w) =>
+                    `  ${w.objectName ? `${w.objectName}: ` : ''}${w.text}`,
+                )
+                .join('\n')}`,
             );
           }
+          break; // Success or final attempt — stop retrying
+        } catch (error: any) {
+          // Retrying the full group after a timeout wastes another ~45s and
+          // will time out again — go straight to the batched fallback.
+          if (isTimeout(error)) {
+            testsLogger?.warn?.(
+              `Group activation timed out (${error.message}); falling back to batched activation`,
+            );
+            break;
+          }
+          if (attempt < maxActivationAttempts) {
+            testsLogger?.warn?.(
+              `Activation attempt ${attempt} failed: ${error.message}, retrying...`,
+            );
+            continue;
+          }
+          testsLogger?.warn?.(
+            `Group activation failed: ${error.message}; falling back to batched activation`,
+          );
         }
       }
 
-      // 4. Confirm from the system. The activation answer says what the
-      // server stated; only GetInactiveObjects says what is true, and
-      // activation is asynchronous. "Group activation completed
-      // successfully" was logged over four inactive objects on premise.
-      if (toActivate.length > 0) {
-        let inactive: string[] = [];
-        for (let attempt = 1; attempt <= 8; attempt++) {
-          inactive = await stillInactive(
-            { connection, logger: undefined } as any,
-            toActivate,
+      // Fallback: bulk group-activate never succeeded (e.g. timed out on
+      // cloud). Activate in small chunks — far fewer activation runs than
+      // one-per-object, each well under the timeout. Two passes resolve
+      // ordering between dependents; pass 2 retries only the leftovers.
+      if (!groupActivated) {
+        const CHUNK_SIZE = 5;
+        let pending = toActivate;
+        let lastErrors = new Map<string, string>();
+
+        for (let pass = 1; pass <= 2 && pending.length > 0; pass++) {
+          testsLogger?.info?.(
+            `Fallback activation pass ${pass}/2: ${pending.length} object(s) in chunks of ${CHUNK_SIZE}...`,
           );
-          if (inactive.length === 0) break;
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        }
-        if (inactive.length > 0) {
-          testsLogger?.error?.(
-            `Still inactive after activation: ${inactive.join(', ')}`,
-          );
-          for (const name of inactive) {
-            results.push({
-              type: 'activation',
-              name,
-              status: 'FAILED: still inactive after activation',
-            });
+          const failedThisPass: typeof toActivate = [];
+          lastErrors = new Map();
+
+          for (let i = 0; i < pending.length; i += CHUNK_SIZE) {
+            const chunk = pending.slice(i, i + CHUNK_SIZE);
+            const recordFailure = (msg: string) => {
+              for (const obj of chunk) {
+                failedThisPass.push(obj);
+                lastErrors.set(`${obj.type} ${obj.name}`, msg);
+              }
+            };
+            try {
+              // The same activation as the bulk path above, chunk by chunk.
+              const chunkOutcome = await activateGroupOnce(connection, chunk);
+              const errs = chunkOutcome.messages.filter(isRefusal);
+              if (errs.length > 0) {
+                recordFailure(
+                  errs
+                    .map(
+                      (e) =>
+                        `${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
+                    )
+                    .join('; '),
+                );
+              }
+            } catch (e: any) {
+              recordFailure(e?.message || String(e));
+            }
           }
+          pending = failedThisPass;
+        }
+
+        if (pending.length > 0) {
+          testsLogger?.error?.(
+            `Fallback activation failed for:\n${[...lastErrors.entries()].map(([k, v]) => `  ${k}: ${v}`).join('\n')}`,
+          );
+          results.push({
+            type: 'activation',
+            name: 'FALLBACK',
+            status: `FAILED: ${pending.length} object(s) not activated`,
+          });
         } else {
           testsLogger?.info?.(
-            `Confirmed active: all ${toActivate.length} object(s)`,
+            'Fallback activation completed successfully (batched group-activate)',
           );
         }
       }
+    }
 
-      // Summary
-      const created = results.filter((r) => r.status === 'created');
-      const existed = results.filter((r) => r.status === 'existed');
-      const failed = results.filter((r) => r.status.startsWith('FAILED'));
-
-      testsLogger?.info?.(
-        `Setup complete: ${created.length} created, ${existed.length} already existed, ${failed.length} failed`,
-      );
-
-      if (failed.length > 0) {
-        for (const f of failed) {
-          testsLogger?.error?.(`  ${f.type}:${f.name} — ${f.status}`);
-        }
+    // 4. Confirm from the system. The activation answer says what the
+    // server stated; only GetInactiveObjects says what is true, and
+    // activation is asynchronous. "Group activation completed
+    // successfully" was logged over four inactive objects on premise.
+    if (toActivate.length > 0) {
+      let inactive: string[] = [];
+      for (let attempt = 1; attempt <= 8; attempt++) {
+        inactive = await stillInactive(
+          { connection, logger: undefined } as any,
+          toActivate,
+        );
+        if (inactive.length === 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
+      if (inactive.length > 0) {
+        testsLogger?.error?.(
+          `Still inactive after activation: ${inactive.join(', ')}`,
+        );
+        for (const name of inactive) {
+          results.push({
+            type: 'activation',
+            name,
+            status: 'FAILED: still inactive after activation',
+          });
+        }
+      } else {
+        testsLogger?.info?.(
+          `Confirmed active: all ${toActivate.length} object(s)`,
+        );
+      }
+    }
 
-      expect(failed.length).toBe(0);
-    },
-    getTimeout('long'),
-  );
+    // Summary
+    const created = results.filter((r) => r.status === 'created');
+    const existed = results.filter((r) => r.status === 'existed');
+    const failed = results.filter((r) => r.status.startsWith('FAILED'));
+
+    testsLogger?.info?.(
+      `Setup complete: ${created.length} created, ${existed.length} already existed, ${failed.length} failed`,
+    );
+
+    if (failed.length > 0) {
+      for (const f of failed) {
+        testsLogger?.error?.(`  ${f.type}:${f.name} — ${f.status}`);
+      }
+    }
+
+    assert.equal(failed.length, 0);
+  });
 });

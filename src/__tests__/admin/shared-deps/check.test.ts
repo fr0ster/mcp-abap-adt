@@ -17,10 +17,13 @@
  * Run:  npm run shared:check
  */
 
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { before, describe, it } from 'node:test';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { createAdtClient } from '../../../lib/clients';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   getSharedDependenciesConfig,
   getTimeout,
@@ -38,7 +41,7 @@ const testsLogger = createTestLogger('shared-check');
 /** The test config itself — the template does not count as a system */
 const TEST_CONFIG_PRESENT = fs.existsSync(
   testConfigPathFromEnv() ??
-    path.resolve(__dirname, '../../../../tests/test-config.yaml'),
+    path.join(repositoryRoot(__dirname), 'tests', 'test-config.yaml'),
 );
 
 /** Map dep_* param names to shared_dependencies section names */
@@ -133,7 +136,7 @@ describe('Config: shared_dependencies consistency', () => {
   const sharedConfig = getSharedDependenciesConfig();
 
   it('should have shared_dependencies section', () => {
-    expect(sharedConfig).toBeTruthy();
+    assert.ok(sharedConfig);
   });
 
   it('dep_* params should resolve to shared_dependencies entries', () => {
@@ -332,7 +335,7 @@ describe('Live: shared_dependencies exist on the system', () => {
   let client: IServerAdtClient | undefined;
   let connectionError: unknown;
 
-  beforeAll(async () => {
+  before(async () => {
     if (!TEST_CONFIG_PRESENT) return;
     try {
       const { connection } = await createTestConnectionAndSession();
@@ -369,9 +372,8 @@ describe('Live: shared_dependencies exist on the system', () => {
       testsLogger?.info?.(
         `Shared objects present: ${report.present.length}, absent: ${report.absent.length}, unreadable: ${report.unreadable.length}`,
       );
-      expect(results.length).toBeGreaterThan(0);
+      assert.ok(results.length > 0);
       if (report.message) throw new Error(report.message);
     },
-    getTimeout('long') * 20,
   );
 });

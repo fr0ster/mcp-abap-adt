@@ -42,7 +42,7 @@ cp tests/test-config.yaml.template tests/test-config.yaml
 **Required changes** (marked `# ← CHANGE`):
 - `environment.env` — session .env file name (`"your-system.env"`, `"another-system.env"`) from standard sessions folder
 - `environment.system_type` — `"onprem"`, `"cloud"`, or `"legacy"`
-- `environment.connection_type` — `"http"` (default) or `"rfc"`
+- `environment.connection_type` — `"http"` or `"rfc"`, required (no default); `"rfc"` also needs `environment.realm_check_url`, the HTTP URL the realm check runs against before anything is sent (it is never part of the destination).
 - `environment.ashost` / `sysnr` (or `mshost`, `msserv`, `sysid`, `group`), `client`, `language` — RFC only: the destination's address, client and logon language, over the session `.env`'s; an RFC destination states one address, `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 - `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
 - `environment.default_transport` — transport request or `""` for local packages

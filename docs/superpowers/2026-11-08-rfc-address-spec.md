@@ -285,7 +285,7 @@ Carries: *RFC works without a URL*. Evidence: E.7.
   URL the system answered absolute, which is kept; the V4 descriptor's `servicePath` is read from
   that path without `new URL`; the answer adds `origin: 'unknown'` and the note "The destination
   is RFC and states no URL: prefix the system's HTTP origin."; the description adds "Over RFC,
-  the paths are answered without an origin."
+  the URLs are answered as their paths and query, to prefix with the HTTP origin of the system."
 - **The managed connection's cache** follows connection's signature (§2).
 - **The start summary** shows the address fields over RFC where it shows the URL over HTTP.
 - **The debug line** in `utils.ts` and the leftover-session identity narrow on `connectionType`.

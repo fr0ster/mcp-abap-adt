@@ -1,6 +1,5 @@
 [
   "src/__tests__/unit/coverage/servedEntries.test.ts",
-  "src/__tests__/unit/live/sncCheckRules.test.ts",
   "src/__tests__/unit/runner/build.test.ts",
   "src/__tests__/unit/runner/npmTest.test.ts",
   "src/__tests__/unit/runner/partition.test.ts",

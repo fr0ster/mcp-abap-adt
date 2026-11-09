@@ -75,10 +75,12 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  * `chkl:messages` — did the activation happen, and what was said.
  *
  * **`activated: false` on a successful answer needs a word beside it.**
- * `activationExecuted="false"` with no messages is SAP saying it had nothing
- * to activate — an object that was already active — which
- * `analyseActivation` (`@mcp-abap-adt/adt-strategies` 0.2.0) reads as the
- * success it is, against the corpus case `activation-nothing-to-activate`.
+ * `activationExecuted="false"` with no messages answered both an object that
+ * was already active and an activation that left objects inactive; the
+ * member reads the inactive list after it, and `analyseActivation`
+ * (`@mcp-abap-adt/adt-strategies` 0.22.0) answers it as a success only when
+ * none of the objects the activation named is still listed — nothing to
+ * activate (fr0ster/mcp-abap-adt#351).
  * Left at `activated: false` alone, that answer reads to a caller as "it did
  * not work" while the tool reports no error. `nothing_to_activate` says which
  * of the two it is, and appears only in the case that was measured: the flag
@@ -107,54 +109,10 @@ export const terseActivation: Terse<unknown> = (value) => {
     };
   }
 
-  // `ioc:inactiveObjects` — what a function group's activate call answers
-  // instead of a `chkl:messages` checklist, measured live against
-  // `ActivateFunctionGroupLow` (2026-09-21). Not finding a checklist, this
-  // used to answer `undefined`, which `answer.ts` turns into
-  // `projection_failed`: a real, successful call reported as a broken one.
-  //
-  // **What it does not do is call it activated.** The document is a list of
-  // objects; it contains no verdict, and an activation that failed answers
-  // `200` just as this one did — that masking was the root of #154, and the
-  // rule this library works by is that a status code is not a result, the
-  // answer is. So this reading reports what the answer holds, the objects it
-  // named, and says plainly that the answer stated no outcome.
-  //
-  // Evidence that it is not a failure either, from the same run: a
-  // `GetInactiveObjects` read straight afterwards answered `count: 0`, so
-  // the objects named here were not left inactive. That is a measurement of
-  // the *system*, taken by a second request — which is exactly what
-  // `activation_not_stated` tells a caller to do, and exactly what a
-  // projection over one document cannot do for them.
-  //
-  // **And that read-back is a snapshot, not a proof.** Activation is
-  // asynchronous: the work can still be running when the next request goes
-  // out, so `count: 0` settled that run and `count` above zero would settle
-  // nothing — it would mean "not yet" as readily as "not done". A caller who
-  // needs certainty reads again; an LLM does that naturally, and a test that
-  // asserts once on the first read is asserting a race.
-  //
-  // `ioc:object` is itself an array per entry (`[""]` on the transport-only
-  // entry that opens the list, `[{ "ioc:ref": {...} }]` on an object one) —
-  // `first()` un-wraps it the same way every other reading here does.
-  const inactive = child(value, 'ioc:inactiveObjects');
-  if (inactive) {
-    const processed = listOf(child(inactive, 'ioc:entry'))
-      .map((entry) => child(first(child(entry, 'ioc:object')), 'ioc:ref'))
-      .filter((ref) => attrOf(ref, 'adtcore:name'))
-      .map((ref) => ({
-        type: attrOf(ref, 'adtcore:type') ?? '',
-        name: attrOf(ref, 'adtcore:name') ?? '',
-      }));
-    return {
-      // Deliberately not `activated`. The caller reads the state back — with
-      // `GetInactiveObjects`, which answers the question this document does
-      // not.
-      activation_not_stated: true,
-      ...(processed.length ? { objects: processed } : {}),
-    };
-  }
-
+  // `ioc:inactiveObjects` is no success: `analyseActivation` (adt-strategies
+  // 0.22.0) answers it as not activated, with the objects in `stillInactive`,
+  // before any projection runs (fr0ster/mcp-abap-adt#351). Any other document
+  // has no checklist to project.
   return undefined;
 };
 

@@ -125,6 +125,18 @@ function local(
  * See `@mcp-abap-adt/adt-strategies` and `tests/fixtures/adt/README.md`.
  */
 interface MessageCarrier {
+  /**
+   * What an activation left inactive — `IAdtActivationFailure.stillInactive`
+   * of `@mcp-abap-adt/adt-strategies` (0.22.0): the objects SAP listed
+   * (`ioc:inactiveObjects`), or the ones the inactive list read after a
+   * silent checklist still names (fr0ster/mcp-abap-adt#351).
+   */
+  stillInactive?: ReadonlyArray<{
+    uri: string;
+    type: string;
+    name: string;
+    parentUri?: string;
+  }>;
   messages?: ReadonlyArray<{
     type: string;
     text: string;
@@ -300,6 +312,18 @@ export function failurePayload(
       attemptedRequest(error.request),
     ]);
     if (hint !== undefined) payload.hint = hint;
+  }
+
+  // What an activation left inactive, field by field like the messages: the
+  // objects a caller names in its next call (activating them again with
+  // `preaudit: false`, or in a group).
+  if (error.stillInactive !== undefined && error.stillInactive.length > 0) {
+    payload.still_inactive = error.stillInactive.map((o) => ({
+      name: o.name,
+      type: o.type,
+      uri: o.uri,
+      ...(o.parentUri !== undefined ? { parent_uri: o.parentUri } : {}),
+    }));
   }
 
   // SAP's body, by who said no.

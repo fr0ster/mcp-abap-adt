@@ -88,11 +88,28 @@ describe('a success stays a success', () => {
    * repository relies on from the package, checked against the corpus rather
    * than assumed from a version number.
    */
-  it('nothing to activate is not a failure', () => {
+  it('nothing to activate is not a failure, judged by the empty inactive list read after it', () => {
     const name = 'activation-nothing-to-activate--01-activation';
     expect(corpusSidecar(name).response.status).toBe(200);
     expect(corpusBody(name)).not.toMatch(/<msg/);
-    expect(analyseActivation(ADT_NO_FAILURE, wire(name))).toBe(ADT_NO_FAILURE);
+    // adt-strategies 0.22.0 (fr0ster/mcp-abap-adt#351): the same document
+    // answered an activation that left objects inactive, so the member reads
+    // the inactive list after it and hands it as the third parameter.
+    const emptyList = wire(
+      'activation-reactivate-active-s4-2025--04-inactiveobjects',
+    );
+    expect(
+      analyseActivation(ADT_NO_FAILURE, wire(name), {
+        activation: {
+          named: ['/sap/bc/adt/oo/classes/zmcp_bld_ansch01'],
+          inactiveObjects: emptyList,
+        },
+      }),
+    ).toBe(ADT_NO_FAILURE);
+    // Without the list the outcome is not decided, and that is a failure.
+    expect(analyseActivation(ADT_NO_FAILURE, wire(name))).not.toBe(
+      ADT_NO_FAILURE,
+    );
   });
 
   it('an activation SAP refused with an E is still a failure', () => {

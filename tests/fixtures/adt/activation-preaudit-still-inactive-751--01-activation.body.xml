@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:type="CLAS/OC" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions" adtcore:type="CLAS/OCN/definitions" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/implementations" adtcore:type="CLAS/OCN/implementations" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/macros" adtcore:type="CLAS/OCN/macros" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/testclasses" adtcore:type="CLAS/OCN/testclasses" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSI" adtcore:type="CLAS/OSI" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSO" adtcore:type="CLAS/OSO" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSU" adtcore:type="CLAS/OSU" adtcore:name="ZCL_AI_ACT_PROBE" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_ai_act_probe" adtcore:packageName="$TMP" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+</ioc:inactiveObjects>

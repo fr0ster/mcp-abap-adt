@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<app:service xmlns:app="http://www.w3.org/2007/app" xmlns:atom="http://www.w3.org/2005/Atom">
+  <app:workspace>
+    <app:collection href="/sap/bc/adt/activation/inactiveobjects"/>
+    <app:collection href="/sap/bc/adt/activation"/>
+    <app:collection href="/sap/bc/adt/ddic/logs/activationgraph"/>
+  </app:workspace>
+</app:service>

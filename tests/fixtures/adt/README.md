@@ -146,6 +146,22 @@ The body is the answer byte for byte; it names no user. The sidecar keeps the re
 headers with `sap-adt-saplb` set to `REDACTED`. It was taken by a direct GET from a live
 test's connection, the request `searchObjects` (adt-clients) sends.
 
+| Case | What provoked it | What came back |
+|---|---|---|
+| `activation-preaudit-still-inactive-751` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true`, one class reference, SAP_BASIS 751 (fr0ster/mcp-abap-adt#351, 2026-11-09) | 200, `ioc:inactiveObjects` of eight entries, no message; nothing activated |
+| `activation-sync-activated-751` | the same reference with `preauditRequested=false`, the same system | 200, an empty body; activated |
+| `activation-runs-absent-751` | `POST /sap/bc/adt/activation/runs?…`, the same system | 404: the system's discovery lists no `/activation/runs` |
+| `system-description-751-partial` | `GET /sap/bc/adt/discovery`, the same system | the activation collections the issue lists, and nothing else |
+| `activation-group-alone-s4-2025` | a function group's reference alone, `preauditRequested=true` then `false`, with the inactive list after each, S/4HANA 2025, 2026-11-09 | `ioc:inactiveObjects` (01), then `chkl:messages` `activationExecuted="false"` with no message (04); the inactive list still naming the group and `SAPL<group>` (02, 03, 05, 06) |
+| `activation-reactivate-active-s4-2025` | a class activated (01), then again with `preauditRequested=false` (03), the inactive list after each, S/4HANA 2025, 2026-11-09 | `activationExecuted="true"`, then `activationExecuted="false"` with no message; every list empty — nothing to activate |
+
+Copied from adt-clients' corpus (`corpus/adt/answers/`, `corpus/adt/discovery/`), notes
+and placeholders as recorded there: the 751 cases come from the issue's measurements, and six
+of the eight `ioc` entries are reconstructed from the types the issue names (their notes say
+so); the S/4HANA 2025 cases were taken by a hand-run probe, transport numbers and the user as
+placeholders. The activation tests replay them (`activationNotActivated`, the group path's
+discovery choice, the read after a run's silent results).
+
 ## Refusals
 
 | Case | What provoked it | How SAP refused |

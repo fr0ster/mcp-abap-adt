@@ -283,31 +283,59 @@ export function getTestDestination(): Promise<TestDestination | null> {
 }
 
 /**
- * Make the configured destination available to the tests: its system URL
- * and client go into process.env (SAP_URL, SAP_CLIENT). The credential stays
- * in the provider — there is no token to copy; a connection gets it from
- * `getTestDestination()`.
+ * Make the configured destination available to the tests through
+ * process.env, by its wire: over HTTP its URL and client (SAP_URL,
+ * SAP_CLIENT); over RFC its stated address, client and language
+ * (SAP_ASHOST / SAP_SYSNR or the message-server keys, SAP_SAPROUTER,
+ * SAP_CLIENT, SAP_LANGUAGE) and no SAP_URL — an RFC destination has none.
+ * The credential stays in the provider — there is no token to copy; a
+ * connection gets it from `getTestDestination()`. Answers whether a
+ * destination was set up.
  * - If destination is specified → use the factory
  * - If destination is not specified → skip (tests will use .env directly)
  */
 export async function setupAuthBrokerForTests(_options?: {
   force?: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const target = await getTestDestination();
     if (!target) {
       authLogger?.debug(
         '[setupAuthBrokerForTests] No destination found, skipping (tests will use .env)',
       );
-      return;
+      return false;
     }
-    process.env.SAP_URL = target.settings.url;
-    if (target.settings.client) {
-      process.env.SAP_CLIENT = target.settings.client;
-    }
+    exportSettings(target.settings);
+    return true;
   } catch (error: any) {
     authLogger?.warn(
       `[setupAuthBrokerForTests] Failed: ${error?.message || String(error)}`,
     );
+    return false;
   }
+}
+
+/** `settings` into process.env, per wire (see `setupAuthBrokerForTests`). */
+export function exportSettings(settings: SapConfig): void {
+  if (settings.connectionType === 'rfc') {
+    delete process.env.SAP_URL;
+    process.env.SAP_CONNECTION_TYPE = 'rfc';
+    const stated: Array<[string, string | undefined]> = [
+      ['SAP_ASHOST', settings.ashost],
+      ['SAP_SYSNR', settings.sysnr],
+      ['SAP_MSHOST', settings.mshost],
+      ['SAP_MSSERV', settings.msserv],
+      ['SAP_SYSID', settings.sysid],
+      ['SAP_GROUP', settings.group],
+      ['SAP_SAPROUTER', settings.saprouter],
+      ['SAP_CLIENT', settings.client],
+      ['SAP_LANGUAGE', settings.language],
+    ];
+    for (const [name, value] of stated) {
+      if (value !== undefined) process.env[name] = value;
+    }
+    return;
+  }
+  process.env.SAP_URL = settings.url;
+  if (settings.client) process.env.SAP_CLIENT = settings.client;
 }

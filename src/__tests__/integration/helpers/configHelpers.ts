@@ -151,8 +151,8 @@ export async function loadTestEnv(): Promise<void> {
     if (useAuthBroker) {
       try {
         brokerAttempted = true;
-        await setupAuthBrokerForTests({ force: true });
-        brokerOk = !!process.env.SAP_URL;
+        // Over RFC the destination has no URL: its set-up answers itself.
+        brokerOk = await setupAuthBrokerForTests({ force: true });
         brokerSucceeded = brokerOk;
       } catch (error: any) {
         configLogger?.warn(
@@ -160,7 +160,7 @@ export async function loadTestEnv(): Promise<void> {
         );
       }
 
-      if (brokerOk && process.env.SAP_URL) {
+      if (brokerOk) {
         envLoaded = true;
         return;
       }

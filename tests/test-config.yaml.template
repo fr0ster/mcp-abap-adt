@@ -101,6 +101,11 @@ environment:
   # equal this value; empty refuses the run before anything logs on. On the
   # cloud it is not read: the session's JWT must not have expired instead.
   expected_realm: ""                         # ← CHANGE (on premise): the system's 401 realm
+  # RFC only (test-only, never part of the destination): an RFC destination
+  # states no URL, so the realm check runs against this HTTP URL of the
+  # system. Required when connection_type is "rfc"; not read over HTTP, which
+  # checks the session's SAP_URL.
+  realm_check_url: ""                        # ← CHANGE (RFC): the system's HTTP URL
   connection_type: "http"                    # "http" | "rfc"
   # RFC (rfc only): the destination states its address, client and language,
   # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)

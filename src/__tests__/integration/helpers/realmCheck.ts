@@ -8,6 +8,11 @@
  *   locally before anything is sent.
  * Any mismatch throws: the run stops before `globalSetup` logs on. No
  * credential travels with the check.
+ *
+ * Over RFC a destination states no URL (24.0.0): the check runs against the
+ * URL the test configuration states for it (`environment.realm_check_url`, a
+ * test-only setting that never reaches the destination); stated none, the run
+ * is refused before anything is sent (`realmCheckUrlOf`).
  */
 
 import type { SystemKind } from '../../helpers/servedTools';
@@ -19,6 +24,33 @@ export interface SessionFacts {
 }
 
 const DISCOVERY = '/sap/bc/adt/discovery';
+
+/** The words of an RFC run whose test configuration states no realm-check URL. */
+export function realmCheckUrlMissingWords(setting: string): string {
+  return `realm check: the destination is RFC and states no URL — set ${setting} to the system's HTTP URL, against which the 401 realm is checked; nothing was sent`;
+}
+
+/**
+ * The URL the realm check runs against: over RFC the test configuration's
+ * realm-check URL (`setting` names it in the refusal), refused when it states
+ * none; over HTTP the session's own URL, `undefined` when it states none (the
+ * caller's refusal).
+ */
+export function realmCheckUrlOf(
+  wire: 'http' | 'rfc' | undefined,
+  sessionUrl: string | undefined,
+  realmCheckUrl: string | undefined,
+  setting: string,
+): string | undefined {
+  if (wire === 'rfc') {
+    const url = realmCheckUrl?.trim();
+    if (url === undefined || url === '') {
+      throw new Error(realmCheckUrlMissingWords(setting));
+    }
+    return url;
+  }
+  return sessionUrl === undefined || sessionUrl === '' ? undefined : sessionUrl;
+}
 
 /** A JWT's payload member, decoded locally; `undefined` when unreadable. */
 function jwtClaim(token: string, claim: string): unknown {

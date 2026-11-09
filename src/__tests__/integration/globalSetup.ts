@@ -51,7 +51,7 @@ import {
 import { isLiveScript } from './helpers/liveScripts';
 import { endTestConnection } from './helpers/openConnections';
 import { restoreResolution } from './helpers/packageSources';
-import { realmCheck } from './helpers/realmCheck';
+import { realmCheck, realmCheckUrlOf } from './helpers/realmCheck';
 import {
   credentialRefused,
   guardedSend,
@@ -152,10 +152,30 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
   }
   const kind = stated === 'cloud' ? 'cloud' : 'onprem';
 
-  // The realm check, before the factory is built and before any logon.
+  // The realm check, before the factory is built and before any logon:
+  // against the session's SAP_URL over HTTP, against the test config's
+  // environment.realm_check_url over RFC (a test-only setting, never part
+  // of the destination).
   const session = sessionVariables(config);
-  const baseUrl = session.SAP_URL;
-  if (baseUrl === undefined || baseUrl === '') {
+  const wire = connectionTypeOf(
+    textAt(config, 'environment', 'connection_type') ||
+      process.env.SAP_CONNECTION_TYPE ||
+      session.SAP_CONNECTION_TYPE,
+  ).connectionType;
+  let baseUrl: string | undefined;
+  try {
+    baseUrl = realmCheckUrlOf(
+      wire,
+      session.SAP_URL,
+      textAt(config, 'environment', 'realm_check_url'),
+      'environment.realm_check_url',
+    );
+  } catch (error) {
+    throw new Error(
+      `[globalSetup] ${error instanceof Error ? error.message : 'realm check refused'}`,
+    );
+  }
+  if (baseUrl === undefined) {
     throw new Error(
       `[globalSetup] realm check: the session file of "${destination}" names no SAP_URL; nothing was sent`,
     );
@@ -205,10 +225,11 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
     }),
     // The wire as the run states it, else as the destination's own file
     // states it (as the launcher reads it); none is refused, naming it.
-    ...connectionTypeOf(
-      process.env.SAP_CONNECTION_TYPE ??
-        destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
-    ),
+    ...(wire !== undefined
+      ? { connectionType: wire }
+      : connectionTypeOf(
+          destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
+        )),
     browserStrategy: browserCallbackStrategy,
     // A login's prompts reach the person running the tests, on stderr.
     promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {

@@ -18,7 +18,10 @@
  * discovery `GET` must answer `401`: on premise with the realm
  * `MCP_LIVE_EXPECTED_REALMS` states for that destination (separated by the
  * same delimiter, one per `.env`, in order; empty refuses), on the cloud with
- * the session's JWT not expired.
+ * the session's JWT not expired. Against the `.env`'s `SAP_URL` over HTTP;
+ * an RFC `.env` states no URL, so its check runs against its entry of
+ * `MCP_LIVE_REALM_CHECK_URLS` (same delimiter, one per `.env`, in order),
+ * and an RFC destination without one is refused before anything is sent.
  *
  * **How the server is started.** The way a user's tree runs it: the library and
  * the core package are packed and installed together into a temporary directory
@@ -46,7 +49,7 @@ import {
   installPackedRelease,
 } from '../../helpers/installedRelease';
 import { endTestConnection } from '../helpers/openConnections';
-import { realmCheck } from '../helpers/realmCheck';
+import { realmCheck, realmCheckUrlOf } from '../helpers/realmCheck';
 import { guardedSend, guardedTestConnection } from '../helpers/refusalGuard';
 import { launchStdioScript } from '../helpers/testers/hardMode';
 
@@ -55,6 +58,9 @@ const ENV_PATHS = (process.env.MCP_LIVE_ENV_PATHS ?? '')
   .map((entry) => entry.trim())
   .filter((entry) => entry !== '');
 const EXPECTED_REALMS = (process.env.MCP_LIVE_EXPECTED_REALMS ?? '')
+  .split(delimiter)
+  .map((entry) => entry.trim());
+const REALM_CHECK_URLS = (process.env.MCP_LIVE_REALM_CHECK_URLS ?? '')
   .split(delimiter)
   .map((entry) => entry.trim());
 const EXTRA_ARGS = (process.env.MCP_LIVE_ARGS ?? '')
@@ -97,6 +103,7 @@ const silent = { info() {}, debug() {}, warn() {}, error() {} };
 function envFileLogOn(
   envPath: string,
   expectedRealm: string,
+  realmCheckUrl: string,
 ): () => Promise<void> {
   return async () => {
     const stated = dotenv.parse(readFileSync(envPath, 'utf8'));
@@ -115,9 +122,15 @@ function envFileLogOn(
         'the destination states no connection type (--connection-type in MCP_LIVE_ARGS, or SAP_CONNECTION_TYPE)',
       );
     }
-    // The realm check before anything logs on.
-    const url = stated.SAP_URL;
-    if (url === undefined || url === '') {
+    // The realm check before anything logs on: the .env's SAP_URL over
+    // HTTP, the destination's MCP_LIVE_REALM_CHECK_URLS entry over RFC.
+    const url = realmCheckUrlOf(
+      connectionType,
+      stated.SAP_URL,
+      realmCheckUrl,
+      'MCP_LIVE_REALM_CHECK_URLS',
+    );
+    if (url === undefined) {
       throw new Error('the destination names no SAP_URL');
     }
     await realmCheck(kind, url, expectedRealm, {
@@ -219,7 +232,11 @@ if (ENV_PATHS.length === 0) {
             argv: [bin, `--env-path=${envPath}`, ...EXTRA_ARGS],
             env: plainEnvironment(),
             cwd: workdir,
-            logOn: envFileLogOn(envPath, EXPECTED_REALMS[index] ?? ''),
+            logOn: envFileLogOn(
+              envPath,
+              EXPECTED_REALMS[index] ?? '',
+              REALM_CHECK_URLS[index] ?? '',
+            ),
           }),
         );
         const child = server.child;

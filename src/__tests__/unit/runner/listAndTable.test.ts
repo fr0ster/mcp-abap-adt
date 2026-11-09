@@ -158,7 +158,7 @@ describe('one list, one name table', () => {
   });
 
   it("the hook answers only the table's names", () => {
-    const buildDir = path.join(REPO, '.test-build');
+    const buildDir = path.join(REPO, '.test-build', 'tree');
     const hook = tableResolve(
       new Map([
         ['@mcp-abap-adt/lib', './src/index.ts'],

@@ -6,7 +6,7 @@
  *
  * Loaded from the test build, it finds the repository root through
  * `repoRoot.ts`, never by the depth of its own directory; the build
- * directory is `.test-build/` there.
+ * directory is `.test-build/tree/` there.
  */
 import { registerHooks } from 'node:module';
 import * as path from 'node:path';
@@ -16,5 +16,8 @@ import { tableResolve } from './resolveHook';
 
 const root = repositoryRoot(__dirname);
 registerHooks({
-  resolve: tableResolve(readNameTable(root), path.join(root, '.test-build')),
+  resolve: tableResolve(
+    readNameTable(root),
+    path.join(root, '.test-build', 'tree'),
+  ),
 });

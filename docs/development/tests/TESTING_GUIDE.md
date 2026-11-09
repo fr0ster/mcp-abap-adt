@@ -102,7 +102,8 @@ The tests are moving from Jest to Node's own runner, `node:test`. Until the last
 first fails, and `npm test` fails when either does.
 
 - **The build.** `npm run test:build` removes `.test-build/` and compiles the listed files, with
-  what they import, into it, with the options of `tsconfig.node-test.json` (`types` is `node`
+  what they import, into `.test-build/tree/` (one level down, so the repository root holds no
+  package-shaped directory when the build places the root manifest), with the options of `tsconfig.node-test.json` (`types` is `node`
   alone, so a listed file that reaches a Jest global does not compile; `noEmitOnError`, so a
   failed compile emits nothing). `npm test` runs it after Jest.
 - **One process per file.** node:test's default; the runner refuses `--test-isolation`.

@@ -126,6 +126,10 @@ group validations refuse a taken name with `SEVERITY` `ERROR` and a sentence, wi
 **The rule:** SAP's answers and errors are judged by their T100 key (message class and number)
 and message type; where SAP gives no key, by the structured verdict, its text relayed as it came.
 
+## Embedders: a copy of `lib` registers its version and a label, not a path
+
+`libInstances()` answers `LibInstance` = `LibCopy` (`{ version, label }`, from 24.0.0) | `EarlierLibCopy` (`{ file }`, a copy before 24.0.0); tell them apart with `'file' in entry`. The two-copies refusal names an earlier copy `a copy before 24.0.0`; an earlier copy's runtime prints `undefined` for a 24.0.0 entry and still refuses to start.
+
 ## Embedders: `ShutdownProcess` is `{ on, stdin?, stdout? }`
 
 `ShutdownProcess` (`@mcp-abap-adt/lib/state`), which every `processLike` option takes, is now `{ on, stdin?, stdout? }`; an object that is structurally wider, `process` included, still fits.

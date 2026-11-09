@@ -59,14 +59,16 @@ it keeps a future range mismatch from giving a dependent its own copy.
 **The guard.** Each loaded copy of `lib` registers itself once, when its
 `src/lib/instance.ts` loads, on a process-wide array
 (`globalThis[Symbol.for('@mcp-abap-adt/lib/instances')]`, read by `libInstances()`); every
-entry of `lib`'s `exports` imports it. The entry's `file` is the module's `__filename` —
-in a Node SEA executable, the executable's path — and `bundled` where there is none; it is
-only shown, never resolved or compared. Each transport's `main` in `server-runtime` reads it
+entry of `lib`'s `exports` imports it. From 24.0.0 the entry is `{ version, label }`: the
+package version, read from `lib`'s own manifest, and `bundled` inside a Node SEA executable
+(`node:sea`'s `isSea()`), `dist` otherwise — no path. An entry of a copy before 24.0.0,
+`{ file }`, stays on the array and counts; it is named `a copy before 24.0.0`, its file never
+read or shown (such a copy, reading a 24.0.0 entry, prints `undefined` for it). Each transport's `main` in `server-runtime` reads it
 first, before any parameter — so before `--version` and `--help` too — and with more than one
 copy prints one line on stderr and exits `1`:
 
 ```
-Two copies of @mcp-abap-adt/lib are loaded in this process (<file>, <file>): reinstall <package> (npm install -g <package>).
+Two copies of @mcp-abap-adt/lib are loaded in this process (<copy>, <copy>): reinstall <package> (npm install -g <package>).
 ```
 
 `<package>` is the binary's own package. `lib` itself refuses nothing, so an embedder sees no

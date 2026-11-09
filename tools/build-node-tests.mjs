@@ -2,7 +2,7 @@
 //
 //   node tools/build-node-tests.mjs [--repo <dir>]
 //
-// Removes `.test-build/`, then compiles, with the options of
+// Removes `.test-build/`, then compiles into `.test-build/tree/`, with the options of
 // `tsconfig.node-test.json`, the files that configuration names (the
 // runner's preload) and every source of the node:test list
 // (`tools/node-test-files.json`), with what they import, into it. `tsc -p`
@@ -16,9 +16,11 @@
 // `tsconfig.node-test.json` (the runner's tests build fixtures that way); the
 // default is the repository this file belongs to.
 import { cpSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import ts from 'typescript';
 import {
+  buildDir,
+  buildRoot,
   OWN_REPO,
   readList,
   readPlaced,
@@ -70,6 +72,9 @@ if (parsed.errors.length > 0) {
 }
 const outDir = parsed.options.outDir;
 if (outDir === undefined) fail(`${configFile} names no outDir`);
+if (resolve(outDir) !== resolve(buildDir(repo))) {
+  fail(`${configFile}: outDir must be ${buildDir(repo)}`);
+}
 
 // Read before the clean: a list that cannot be placed fails the build with
 // nothing removed or emitted.
@@ -80,7 +85,8 @@ try {
   fail(error.message);
 }
 
-rmSync(outDir, { recursive: true, force: true });
+// The whole build root goes, not only the compiled tree.
+rmSync(buildRoot(repo), { recursive: true, force: true });
 
 const program = ts.createProgram({
   rootNames: [

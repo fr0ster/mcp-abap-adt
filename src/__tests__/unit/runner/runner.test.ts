@@ -41,7 +41,7 @@ function recordingFixture(name: string, tests: readonly string[]): string {
 describe('the node:test runner', () => {
   it('the runner refuses an empty run', () => {
     const repo = fixtureRepo(path.join(scratch.dir, 'empty'), [], {});
-    fs.mkdirSync(path.join(repo, '.test-build'));
+    fs.mkdirSync(path.join(repo, '.test-build', 'tree'), { recursive: true });
     const run = runTool('run-tests.mjs', [
       '--repo',
       repo,

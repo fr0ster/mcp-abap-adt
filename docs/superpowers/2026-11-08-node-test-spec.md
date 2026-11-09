@@ -154,7 +154,7 @@ The rest stays on Jest, and both runners are green, until the later task moves i
   such import: a node:test file that reaches a Jest global, directly or through an import,
   fails the build. The integration helpers that use Jest's globals move with the live
   files.
-- **Paths a test reads.** A compiled test lives one directory deeper than its source. A
+- **Paths a test reads.** A compiled test lives two directories deeper than its source (`.test-build/tree/`). A
   moved test finds the repository root and its fixtures through one helper, never through
   the depth of `__dirname`. Files a test reads as data (`__fixtures__`, JSON fixtures, the
   sources a scan reads) are read from the repository, not copied into the build.

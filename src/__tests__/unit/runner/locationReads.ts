@@ -26,11 +26,6 @@
  *   (a computed key, passed whole, destructured) or loaded by `require` /
  *   `import()`, is refused;
  * - the operand of `typeof`: nothing is read.
- * One use is the owner's exception (`isOwnerGranted`): `src/lib/instance.ts`'s
- * display-only `__filename`, at its one registration site: the entry
- * `Array.prototype.push`es onto the process-wide registry, which only
- * `libInstances()` reads (`isOwnerGranted`, `processWideRegistry`,
- * `readOnlyByLibInstances`).
  * Every other use of a location value is refused, and so is every other way
  * to the module's own location: `module`, `import.meta`, `createRequire`, a
  * `require` not called with one literal, an `import()` not called with one,
@@ -224,12 +219,6 @@ interface Known {
   /** `process.argv` and `process.mainModule`, the members naming the program. */
   argv: ts.Symbol | undefined;
   mainModule: ts.Symbol | undefined;
-  object: ts.Symbol | undefined;
-  reflect: ts.Symbol | undefined;
-  globalThis: ts.Symbol | undefined;
-  symbol: ts.Symbol | undefined;
-  /** The standard library's declarations of `Array.prototype.push`. */
-  arrayPush: readonly ts.Declaration[];
 }
 
 function knownSymbols(checker: ts.TypeChecker): Known {
@@ -264,12 +253,6 @@ function knownSymbols(checker: ts.TypeChecker): Known {
   const global = (name: string) =>
     checker.resolveName(name, undefined, ts.SymbolFlags.Value, false);
   const processGlobal = global('process');
-  const arrayType = checker.resolveName(
-    'Array',
-    undefined,
-    ts.SymbolFlags.Type,
-    false,
-  );
   const processType =
     processGlobal === undefined
       ? undefined
@@ -294,28 +277,8 @@ function knownSymbols(checker: ts.TypeChecker): Known {
     ),
     argv: processType?.getProperty('argv'),
     mainModule: processType?.getProperty('mainModule'),
-    object: global('Object'),
-    reflect: global('Reflect'),
-    globalThis: global('globalThis'),
-    symbol: global('Symbol'),
-    arrayPush:
-      arrayType === undefined
-        ? []
-        : (checker.getDeclaredTypeOfSymbol(arrayType).getProperty('push')
-            ?.declarations ?? []),
   };
 }
-
-/**
- * The one use of a location the owner granted, by its file and its shape:
- * `typeof __filename === 'string' ? __filename : 'bundled'` in
- * `src/lib/instance.ts`. Owner-approved: the display-only location of a
- * second library copy, shown in the two-copies refusal
- * (`server-runtime/src/secondCopy.ts`) and never resolved or read. Any other
- * use of a location in that file, and this shape in any other file, stays a
- * finding.
- */
-export const OWNER_GRANTED_FILE = 'src/lib/instance.ts';
 
 export const WHY = {
   computedUnbounded: (base: string) =>
@@ -475,250 +438,6 @@ export function locationReads(
     return values;
   };
 
-  /** Whether `call` is `Object.freeze(<only>)`, `Object` the global. */
-  const freezes = (call: ts.Node, only: ts.Node): boolean =>
-    ts.isCallExpression(call) &&
-    call.arguments.length === 1 &&
-    call.arguments[0] === only &&
-    ts.isPropertyAccessExpression(call.expression) &&
-    call.expression.name.text === 'freeze' &&
-    ts.isIdentifier(call.expression.expression) &&
-    symbolOf(call.expression.expression) === symbols.object;
-
-  /** Whether `node` is the identifier of a global (`Reflect`, `globalThis`). */
-  const isGlobal = (node: ts.Node | undefined, global: ts.Symbol | undefined) =>
-    node !== undefined &&
-    global !== undefined &&
-    ts.isIdentifier(node) &&
-    symbolOf(node) === global;
-
-  /** The key of `Reflect.<verb>(globalThis, KEY, …)`: KEY's symbol, if it is one. */
-  const globalKey = (node: ts.Node | undefined, verb: string) => {
-    if (
-      node === undefined ||
-      !ts.isCallExpression(node) ||
-      !ts.isPropertyAccessExpression(node.expression) ||
-      node.expression.name.text !== verb ||
-      !isGlobal(node.expression.expression, symbols.reflect) ||
-      !isGlobal(node.arguments[0], symbols.globalThis)
-    ) {
-      return undefined;
-    }
-    const key = node.arguments[1];
-    if (key === undefined || !ts.isIdentifier(key)) return undefined;
-    const symbol = symbolOf(key);
-    const declaration = symbol?.declarations?.[0];
-    // `const KEY = Symbol.for('<literal>')`.
-    const init =
-      declaration !== undefined && ts.isVariableDeclaration(declaration)
-        ? declaration.initializer
-        : undefined;
-    return init !== undefined &&
-      ts.isCallExpression(init) &&
-      ts.isPropertyAccessExpression(init.expression) &&
-      init.expression.name.text === 'for' &&
-      isGlobal(init.expression.expression, symbols.symbol) &&
-      init.arguments.length === 1 &&
-      init.arguments[0] !== undefined &&
-      ts.isStringLiteral(init.arguments[0])
-      ? symbol
-      : undefined;
-  };
-
-  /**
-   * Whether `registry` answers only the process-wide array: each `return`
-   * gives a const of its own that is either `Reflect.get(globalThis, KEY)` or
-   * an empty array the body stores with `Reflect.set(globalThis, KEY, it)`,
-   * one KEY for all.
-   */
-  const processWideRegistry = (registry: ts.FunctionDeclaration): boolean => {
-    const body = registry.body;
-    if (body === undefined) return false;
-    const returns: ts.ReturnStatement[] = [];
-    const stored = new Set<ts.Symbol>();
-    const keys = new Set<ts.Symbol>();
-    const visit = (node: ts.Node): void => {
-      if (ts.isFunctionLike(node)) return;
-      if (ts.isReturnStatement(node)) returns.push(node);
-      if (ts.isExpressionStatement(node)) {
-        const key = globalKey(node.expression, 'set');
-        const value =
-          ts.isCallExpression(node.expression) &&
-          node.expression.arguments.length === 3
-            ? node.expression.arguments[2]
-            : undefined;
-        const held =
-          value !== undefined && ts.isIdentifier(value)
-            ? symbolOf(value)
-            : undefined;
-        if (key !== undefined && held !== undefined) {
-          keys.add(key);
-          stored.add(held);
-        }
-      }
-      ts.forEachChild(node, visit);
-    };
-    ts.forEachChild(body, visit);
-    if (returns.length === 0) return false;
-    for (const statement of returns) {
-      const value = statement.expression;
-      const held =
-        value !== undefined && ts.isIdentifier(value)
-          ? symbolOf(value)
-          : undefined;
-      const declaration = held?.declarations?.[0];
-      if (
-        held === undefined ||
-        declaration === undefined ||
-        !ts.isVariableDeclaration(declaration) ||
-        !ts.isVariableDeclarationList(declaration.parent) ||
-        (declaration.parent.flags & ts.NodeFlags.Const) === 0 ||
-        declaration.getSourceFile() !== registry.getSourceFile() ||
-        declaration.pos < body.pos ||
-        declaration.end > body.end
-      ) {
-        return false;
-      }
-      const init = declaration.initializer;
-      const read = globalKey(init, 'get');
-      if (read !== undefined) {
-        keys.add(read);
-        continue;
-      }
-      if (
-        init === undefined ||
-        !ts.isArrayLiteralExpression(init) ||
-        init.elements.length !== 0 ||
-        !stored.has(held)
-      ) {
-        return false;
-      }
-    }
-    return keys.size === 1;
-  };
-
-  /**
-   * Whether every reference to `registry` but the registration site
-   * (`site`, the `registry()` call) is `libInstances()`'s one statement,
-   * `return Object.freeze([...registry()])`: the array goes nowhere else.
-   */
-  const readOnlyByLibInstances = (
-    registry: ts.Symbol,
-    site: ts.Node,
-  ): boolean =>
-    referencesTo(registry).every((reference) => {
-      const call = reference.parent;
-      if (call === site) return true;
-      if (declares(reference)) return true;
-      if (ts.isFunctionDeclaration(call) && call.name === reference) {
-        return true;
-      }
-      if (
-        !ts.isCallExpression(call) ||
-        call.expression !== reference ||
-        call.arguments.length !== 0
-      ) {
-        return false;
-      }
-      // Walked up one checked step at a time: a source file has no parent.
-      const spread = call.parent;
-      if (!ts.isSpreadElement(spread)) return false;
-      const list = spread.parent;
-      if (!ts.isArrayLiteralExpression(list) || list.elements.length !== 1) {
-        return false;
-      }
-      const freeze = list.parent;
-      if (!freezes(freeze, list)) return false;
-      const statement = freeze.parent;
-      if (!ts.isReturnStatement(statement)) return false;
-      const block = statement.parent;
-      if (!ts.isBlock(block) || block.statements.length !== 1) return false;
-      const reader = block.parent;
-      return (
-        ts.isFunctionDeclaration(reader) &&
-        reader.name?.text === 'libInstances' &&
-        (ts.getCombinedModifierFlags(reader) & ts.ModifierFlags.Export) !== 0
-      );
-    });
-
-  /** Whether `node` is the owner's exception (`OWNER_GRANTED_FILE`). */
-  const isOwnerGranted = (node: ts.Node): boolean => {
-    if (slashed(root, node.getSourceFile().fileName) !== OWNER_GRANTED_FILE) {
-      return false;
-    }
-    const isFilename = (expression: ts.Expression) =>
-      ts.isIdentifier(expression) && symbolOf(expression) === symbols.filename;
-    const choice = node.parent;
-    if (
-      !ts.isIdentifier(node) ||
-      !isFilename(node) ||
-      !ts.isConditionalExpression(choice) ||
-      choice.whenTrue !== node
-    ) {
-      return false;
-    }
-    const test = choice.condition;
-    // The registration site: `registry().push(Object.freeze({ file: … }))`,
-    // a statement of the module, `registry` a function of this file.
-    const property = choice.parent;
-    const literal = property.parent;
-    const freeze = literal.parent;
-    const push = freeze.parent;
-    if (
-      !ts.isPropertyAssignment(property) ||
-      property.initializer !== choice ||
-      !ts.isIdentifier(property.name) ||
-      property.name.text !== 'file' ||
-      !ts.isObjectLiteralExpression(literal) ||
-      !ts.isCallExpression(freeze) ||
-      freeze.arguments.length !== 1 ||
-      freeze.arguments[0] !== literal ||
-      !ts.isPropertyAccessExpression(freeze.expression) ||
-      freeze.expression.name.text !== 'freeze' ||
-      !ts.isIdentifier(freeze.expression.expression) ||
-      symbolOf(freeze.expression.expression) !== symbols.object ||
-      !ts.isCallExpression(push) ||
-      push.arguments.length !== 1 ||
-      push.arguments[0] !== freeze ||
-      !ts.isPropertyAccessExpression(push.expression) ||
-      push.expression.name.text !== 'push' ||
-      !ts.isCallExpression(push.expression.expression) ||
-      push.expression.expression.arguments.length !== 0 ||
-      !ts.isIdentifier(push.expression.expression.expression) ||
-      !ts.isExpressionStatement(push.parent) ||
-      !ts.isSourceFile(push.parent.parent)
-    ) {
-      return false;
-    }
-    const registry = symbolOf(push.expression.expression.expression);
-    const declaration = registry?.declarations?.[0];
-    const pushed = calleeOf(push);
-    if (
-      registry === undefined ||
-      registry.declarations?.length !== 1 ||
-      declaration === undefined ||
-      !ts.isFunctionDeclaration(declaration) ||
-      declaration.getSourceFile() !== node.getSourceFile() ||
-      // The standard library's `Array.prototype.push`, not a method of its own.
-      pushed?.declarations?.some((at) => symbols.arrayPush.includes(at)) !==
-        true ||
-      !processWideRegistry(declaration) ||
-      !readOnlyByLibInstances(registry, push.expression.expression)
-    ) {
-      return false;
-    }
-    return (
-      ts.isBinaryExpression(test) &&
-      test.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
-      ts.isTypeOfExpression(test.left) &&
-      isFilename(test.left.expression) &&
-      ts.isStringLiteral(test.right) &&
-      test.right.text === 'string' &&
-      ts.isStringLiteral(choice.whenFalse) &&
-      choice.whenFalse.text === 'bundled'
-    );
-  };
-
   /** `use` holds the location `target`: follow it to what is read. */
   const follow = (
     use: ts.Node,
@@ -807,7 +526,6 @@ export function locationReads(
       }
       return;
     }
-    if (isOwnerGranted(node)) return;
     refuse(node, WHY.unfollowed);
   };
 

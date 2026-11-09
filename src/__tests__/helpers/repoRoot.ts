@@ -1,7 +1,7 @@
 /**
  * The repository root, for a test that runs from its source (Jest) or from
- * the node:test build (`.test-build/`), where a compiled file lives one
- * directory deeper than its source (D27). It is the nearest directory from
+ * the node:test build (`.test-build/tree/`), where a compiled file lives two
+ * directories deeper than its source (D27). It is the nearest directory from
  * `start` up that holds the package-name table, never a count of `..` from
  * `__dirname`.
  */

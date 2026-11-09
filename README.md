@@ -142,7 +142,8 @@ package brings everything it runs on — `server-runtime`, `lib` and the rest �
 no other server package, so installing two servers, in one command or in two, is fine and
 neither needs the other. Since 19.2.0 a process that loads two copies of `@mcp-abap-adt/lib`
 anyway does not start: it prints `Two copies of @mcp-abap-adt/lib are loaded in this process
-(…): reinstall <package> (npm install -g <package>).` and exits `1` — see
+(<copy>, <copy>): reinstall <package> (npm install -g <package>).` — each copy by its version
+and label, an earlier one as `a copy before 24.0.0` — and exits `1` — see
 [One `lib` per server process](docs/architecture/README.md#one-lib-per-server-process-1920).
 
 ### 1. Standalone MCP Server (Default)

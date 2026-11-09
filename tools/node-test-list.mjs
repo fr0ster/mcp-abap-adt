@@ -3,7 +3,7 @@
 //
 // `tools/node-test-files.json` is the one list of the test files that run on
 // node:test: repository source paths (`src/__tests__/….test.ts`, written with
-// `/`). Each one's compiled file is the same path under `.test-build/`, `.js`
+// `/`). Each one's compiled file is the same path under `.test-build/tree/`, `.js`
 // for `.ts`.
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,8 +16,15 @@ export const OWN_REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 export function listFile(repo) {
   return join(repo, 'tools', 'node-test-files.json');
 }
-export function buildDir(repo) {
+// The build root, `.test-build/`, removed whole before each build; the
+// compiled tree is one level inside it (`.test-build/tree/`), so the root
+// holds no package-shaped directory — `.test-build/` itself has no
+// `package.json`, even when the build places the root manifest.
+export function buildRoot(repo) {
   return join(repo, '.test-build');
+}
+export function buildDir(repo) {
+  return join(buildRoot(repo), 'tree');
 }
 
 /** A source path of the list, as a path of the platform under `repo`. */
@@ -61,7 +68,7 @@ export function readList(repo) {
  * The placement list (spec §2, "Files production code reads beside itself"):
  * `tools/node-test-placed.json`, the repository paths (files or directories,
  * written with `/`) that production code reads by its own location. The
- * build places each at the same path under `.test-build/`, beside the
+ * build places each at the same path under `.test-build/tree/`, beside the
  * compiled code that reads it; the guard (`unit/runner/placedFiles.test.ts`)
  * holds the list to the reads.
  */

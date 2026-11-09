@@ -1,7 +1,7 @@
 {
   // The node:test build (D27): `npm run test:build` (`tools/build-node-tests.mjs`)
   // compiles the preload below and every file of the node:test list
-  // (`tools/node-test-files.json`), with what they import, to `.test-build/`,
+  // (`tools/node-test-files.json`), with what they import, to `.test-build/tree/`,
   // after removing it. `paths` come from the package-name table through
   // `extends`; this file defines none of its own. `types` is `node` alone, so a
   // file of the list that reaches a Jest global, directly or through an import,
@@ -10,7 +10,7 @@
   "compilerOptions": {
     "types": ["node"],
     "rootDir": ".",
-    "outDir": "./.test-build",
+    "outDir": "./.test-build/tree",
     "noEmitOnError": true,
     "declaration": false,
     "declarationMap": false

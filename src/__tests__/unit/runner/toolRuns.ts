@@ -3,7 +3,7 @@
  * process, and fixture repositories — a temporary directory holding its own
  * node:test list (`tools/node-test-files.json`), its own
  * `tsconfig.node-test.json` (the repository's, by `extends`, built into the
- * fixture's own `.test-build/`) and its sources. Uses no test runner.
+ * fixture's own `.test-build/tree/`) and its sources. Uses no test runner.
  */
 import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -181,7 +181,7 @@ function fixtureJestConfig(dir: string, listed: readonly string[]): string {
  * A fixture repository: `sources` (path → text, written with `/`), a
  * node:test list of `listed` and an empty placement list
  * (`tools/node-test-placed.json`). Its `tsconfig.node-test.json` extends the
- * repository's and builds into its own `.test-build/`; it names one stub
+ * repository's and builds into its own `.test-build/tree/`; it names one stub
  * file, as the repository's names its preload. Its `jest.config.js` is its
  * own (`fixtureJestConfig`); `npm-test.mjs --repo` hands it to Jest.
  */
@@ -199,7 +199,7 @@ export function fixtureRepo(
     'tsconfig.node-test.json',
     JSON.stringify({
       extends: path.join(REPO, 'tsconfig.node-test.json'),
-      compilerOptions: { rootDir: '.', outDir: './.test-build' },
+      compilerOptions: { rootDir: '.', outDir: './.test-build/tree' },
       files: ['stub.ts'],
       include: [],
     }),

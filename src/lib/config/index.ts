@@ -6,7 +6,12 @@
 
 import '../instance.js';
 
-export { type LibInstance, libInstances } from '../instance.js';
+export {
+  type EarlierLibCopy,
+  type LibCopy,
+  type LibInstance,
+  libInstances,
+} from '../instance.js';
 export {
   type PackageManifest,
   packageManifestOf,

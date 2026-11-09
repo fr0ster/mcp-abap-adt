@@ -229,7 +229,7 @@ const entering = runtimeRoots.size > 0
   : [{ name: loaded[0].specifier, lib: loaded[0].lib, context: loaded[0].context }];
 const config = fromRequire('@mcp-abap-adt/lib/config');
 const instances = typeof config.libInstances === 'function'
-  ? config.libInstances().map((entry) => entry.file)
+  ? config.libInstances().map((entry) => ('file' in entry ? 'a copy before 24.0.0' : entry.version + ' ' + entry.label))
   : null;
 const seen = {};
 entering.forEach((enter, index) => {

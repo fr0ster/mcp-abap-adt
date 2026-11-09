@@ -25,7 +25,7 @@ import { repositoryRoot } from '../../../helpers/repoRoot';
 
 /**
  * The repository root, found from here under Jest and from the node:test
- * build (`.test-build/`) alike: never a count of `..` from `__dirname`.
+ * build (`.test-build/tree/`) alike: never a count of `..` from `__dirname`.
  */
 export const REPO = repositoryRoot(__dirname);
 

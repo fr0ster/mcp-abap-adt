@@ -29,7 +29,7 @@ const scratch = temporaryDir('node-test-build-');
 after(() => scratch.remove());
 
 const LISTED = 'src/__tests__/listed.test.ts';
-const COMPILED = '.test-build/src/__tests__/listed.test.js';
+const COMPILED = '.test-build/tree/src/__tests__/listed.test.js';
 
 function build(repo: string) {
   return runTool('build-node-tests.mjs', ['--repo', repo]);
@@ -104,25 +104,27 @@ describe('the node:test build', () => {
     const repo = fixtureRepo(path.join(scratch.dir, 'clean'), [LISTED], {
       [LISTED]: nodeTestSource('listed', 'FAIL_LISTED'),
     });
-    // A compiled test whose source no longer exists.
+    // A compiled test whose source no longer exists, and a file beside the
+    // tree: the build removes `.test-build/` whole.
     writeAt(
       repo,
-      '.test-build/src/__tests__/stale.test.js',
+      '.test-build/tree/src/__tests__/stale.test.js',
       "require('node:test').test('stale', () => { throw new Error('stale ran'); });\n",
     );
+    writeAt(repo, '.test-build/beside-the-tree.txt', 'stale\n');
     const built = build(repo);
     assert.equal(built.status, 0, built.stderr);
     assert.deepEqual(filesUnder(path.join(repo, '.test-build')), [
-      'src/__tests__/listed.test.js',
-      'src/__tests__/listed.test.js.map',
-      'stub.js',
-      'stub.js.map',
+      'tree/src/__tests__/listed.test.js',
+      'tree/src/__tests__/listed.test.js.map',
+      'tree/stub.js',
+      'tree/stub.js.map',
     ]);
 
     // Even with a stale file left, the runner runs the listed sources only.
     writeAt(
       repo,
-      '.test-build/src/__tests__/stale.test.js',
+      '.test-build/tree/src/__tests__/stale.test.js',
       "require('node:test').test('stale', () => { throw new Error('stale ran'); });\n",
     );
     const record = path.join(scratch.dir, 'clean.record');
@@ -148,21 +150,21 @@ describe('the node:test build', () => {
       JSON.stringify(['fixtures/dir', 'pkg/package.json']),
     );
     // Left from an earlier build: the clean removes it before the placement.
-    writeAt(repo, '.test-build/pkg/package.json', '{"version":"0.0.0"}\n');
+    writeAt(repo, '.test-build/tree/pkg/package.json', '{"version":"0.0.0"}\n');
     const built = build(repo);
     assert.equal(built.status, 0, built.stderr);
     assert.deepEqual(filesUnder(path.join(repo, '.test-build')), [
-      'fixtures/dir/a.json',
-      'fixtures/dir/deeper/b.json',
-      'pkg/package.json',
-      'src/__tests__/listed.test.js',
-      'src/__tests__/listed.test.js.map',
-      'stub.js',
-      'stub.js.map',
+      'tree/fixtures/dir/a.json',
+      'tree/fixtures/dir/deeper/b.json',
+      'tree/pkg/package.json',
+      'tree/src/__tests__/listed.test.js',
+      'tree/src/__tests__/listed.test.js.map',
+      'tree/stub.js',
+      'tree/stub.js.map',
     ]);
     assert.equal(
       fs.readFileSync(
-        path.join(repo, '.test-build', 'pkg', 'package.json'),
+        path.join(repo, '.test-build', 'tree', 'pkg', 'package.json'),
         'utf8',
       ),
       '{"version":"1.2.3"}\n',
@@ -180,6 +182,35 @@ describe('the node:test build', () => {
       refused.stderr.includes('pkg/missing.json: no such repository path'),
       refused.stderr,
     );
+  });
+
+  it('the build root holds no package.json, the root manifest placed', () => {
+    // A package-shaped directory is one with a package.json and a src: the
+    // compiled tree has both once the root manifest is placed, so it sits
+    // one level inside `.test-build/`, which holds neither.
+    const repo = fixtureRepo(path.join(scratch.dir, 'rootManifest'), [LISTED], {
+      [LISTED]: nodeTestSource('listed', 'FAIL_LISTED'),
+      'package.json': '{"name":"fixture","version":"1.0.0"}\n',
+    });
+    writeAt(
+      repo,
+      'tools/node-test-placed.json',
+      JSON.stringify(['package.json']),
+    );
+    const built = build(repo);
+    assert.equal(built.status, 0, built.stderr);
+    assert.ok(
+      fs.existsSync(path.join(repo, '.test-build', 'tree', 'package.json')),
+    );
+    assert.ok(fs.existsSync(path.join(repo, '.test-build', 'tree', 'src')));
+    assert.deepEqual(fs.readdirSync(path.join(repo, '.test-build')), ['tree']);
+
+    // The repository's own build, which this run was compiled by.
+    assert.equal(
+      fs.existsSync(path.join(REPO, '.test-build', 'package.json')),
+      false,
+    );
+    assert.equal(fs.existsSync(path.join(REPO, '.test-build', 'src')), false);
   });
 
   it('a failed compile runs nothing', () => {
@@ -283,7 +314,14 @@ describe('the node:test build', () => {
     // cache is read instead: the hook covers `require` on every Node.)
     const loaded: unknown =
       require.cache[
-        path.join(REPO, '.test-build', 'responsible-rules', 'src', 'index.js')
+        path.join(
+          REPO,
+          '.test-build',
+          'tree',
+          'responsible-rules',
+          'src',
+          'index.js',
+        )
       ]?.exports;
     assert.ok(
       typeof loaded === 'object' && loaded !== null && 'SYSTEM_TYPES' in loaded,

@@ -5,7 +5,7 @@
 //     [--env NAME=VALUE]... [--list] [node --test options]... [files]...
 //
 // - With no file, it runs the compiled file of every source on the list
-//   (`tools/node-test-files.json`), under `.test-build/` (`npm run
+//   (`tools/node-test-files.json`), under `.test-build/tree/` (`npm run
 //   test:build` makes it). `--root <dir>` keeps the sources under that
 //   directory (repeatable; the sub-packages' `--roots` reach it through
 //   `tools/npm-test.mjs`). A selection with no file is refused: `node --test`

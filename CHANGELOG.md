@@ -28,6 +28,7 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 
 ### Changed — for an embedder of `@mcp-abap-adt/lib/config`
 
+- **A copy of `lib` registers its version and a label, not a path.** From 24.0.0 each copy pushes `{ version, label }` (`label` `bundled` inside a Node SEA executable, `dist` otherwise) onto the process-wide registry; `LibInstance` is `LibCopy | EarlierLibCopy`, the second being an earlier copy's `{ file }`, which is kept and counted. The two-copies refusal names each copy by its version and label, and an older copy as `a copy before 24.0.0` — no path. **Migrating:** a reader of `libInstances()` tells the two shapes apart (`'file' in entry`); an older copy's runtime prints `undefined` for a 24.0.0 entry and still refuses to start.
 - **`ShutdownProcess` is now `{ on, stdin?, stdout? }`** (`@mcp-abap-adt/lib/state`), and every `processLike` option (`LauncherEdges`, the HTTP and SSE launchers' and `installTransportShutdown`'s) takes it; `processEdges()` hands the process's `on`, `stdin` and `stdout`, not `process` itself. **Migrating:** nothing — an object that is structurally wider, `process` or an `EventEmitter` included, still fits.
 - **`parseConfigArg()` without an argument reads the program's arguments** (`process.argv.slice(2)`); it read the whole `process.argv`, so a script path starting with `--conf` was taken for the option. **Migrating:** nothing, unless you relied on that; a call that passes `argv` reads what it is given, as before.
 

@@ -130,6 +130,33 @@ describe('3. RFC stating a URL', () => {
   });
 });
 
+describe('3. every URL key the file states', () => {
+  it('names each, in a fixed order', () => {
+    expectRefused(
+      rfc(
+        { ...APP, ...LOGON },
+        {
+          urlKey: 'XSUAA_MCP_URL',
+          statedUrlKeys: ['XSUAA_MCP_URL', 'SAP_URL'],
+        },
+      ),
+      'rfc-with-url',
+      ['SAP_URL', 'XSUAA_MCP_URL'],
+    );
+  });
+
+  it('a URL key other than the destination URL key refuses it too', () => {
+    expectRefused(
+      rfc(
+        { ...APP, ...LOGON },
+        { urlKey: 'XSUAA_MCP_URL', statedUrlKeys: ['SAP_URL'] },
+      ),
+      'rfc-with-url',
+      ['SAP_URL'],
+    );
+  });
+});
+
 describe('4. RFC with keys of both addresses', () => {
   it.each([
     ['mshost', 'SAP_MSHOST'],

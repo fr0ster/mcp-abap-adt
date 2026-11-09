@@ -260,3 +260,99 @@ describe('a complete RFC destination', () => {
     });
   });
 });
+
+describe('what a destination states is checked before its authentication is served', () => {
+  const CERTIFICATE = [
+    'SAP_CONNECTION_TYPE=rfc',
+    'SAP_AUTH_TYPE=certificate',
+    'SAP_ASHOST=host.example.test',
+    'SAP_SYSNR=00',
+    'SAP_CLIENT=100',
+    'SAP_LANGUAGE=EN',
+    'SAP_USERNAME=test',
+    'SAP_PASSWORD=placeholder',
+  ];
+
+  async function thrownBy(lines: string[]): Promise<unknown> {
+    base.writeSession('dest', lines);
+    try {
+      await factory({ connectionType: 'rfc' }).settingsFor('dest');
+    } catch (error) {
+      return error;
+    }
+    throw new Error('expected a refusal');
+  }
+
+  it('9. a client certificate over RFC: refused in its case, naming both keys', async () => {
+    const thrown = await thrownBy(CERTIFICATE);
+    expect(thrown).toBeInstanceOf(DestinationAddressRefusal);
+    if (!(thrown instanceof DestinationAddressRefusal)) return;
+    expect(thrown.case).toBe('certificate-over-rfc');
+    expect(thrown.keys).toEqual(['SAP_AUTH_TYPE', 'SAP_CONNECTION_TYPE']);
+  });
+
+  it('9 with 3: the URL answers first', async () => {
+    const thrown = await thrownBy([
+      ...CERTIFICATE,
+      'SAP_URL=https://sentinel.example.test',
+    ]);
+    expect(thrown).toBeInstanceOf(DestinationAddressRefusal);
+    if (!(thrown instanceof DestinationAddressRefusal)) return;
+    expect(thrown.case).toBe('rfc-with-url');
+    expect(thrown.keys).toEqual(['SAP_URL']);
+  });
+});
+
+describe('an XSUAA-shaped destination over RFC: every URL key of its file refuses it', () => {
+  const XSUAA_LINES = [
+    'XSUAA_AUTH_TYPE=basic',
+    'XSUAA_ASHOST=host.example.test',
+    'XSUAA_SYSNR=00',
+    'XSUAA_CLIENT=100',
+    'XSUAA_LANGUAGE=EN',
+  ];
+
+  beforeEach(() => {
+    base.writeFile('service-keys/dest.json', [
+      JSON.stringify({
+        url: 'https://uaa.example.test',
+        clientid: 'placeholder',
+        clientsecret: 'placeholder',
+      }),
+    ]);
+  });
+
+  async function refusedKeys(lines: string[]): Promise<readonly string[]> {
+    base.writeSession('dest', lines);
+    let thrown: unknown;
+    try {
+      await factory({ connectionType: 'rfc' }).settingsFor('dest');
+    } catch (error) {
+      thrown = error;
+    }
+    if (!(thrown instanceof DestinationAddressRefusal)) {
+      throw new Error(`not a DestinationAddressRefusal: ${String(thrown)}`);
+    }
+    expect(thrown.case).toBe('rfc-with-url');
+    return thrown.keys;
+  }
+
+  it('SAP_URL in its file: refused naming SAP_URL', async () => {
+    expect(
+      await refusedKeys([
+        'SAP_URL=https://sentinel.example.test',
+        ...XSUAA_LINES,
+      ]),
+    ).toEqual(['SAP_URL']);
+  });
+
+  it('SAP_URL and XSUAA_MCP_URL: both named in one refusal', async () => {
+    expect(
+      await refusedKeys([
+        'SAP_URL=https://sentinel.example.test',
+        'XSUAA_MCP_URL=https://sentinel.example.test',
+        ...XSUAA_LINES,
+      ]),
+    ).toEqual(['SAP_URL', 'XSUAA_MCP_URL']);
+  });
+});

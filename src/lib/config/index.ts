@@ -94,6 +94,7 @@ export {
   rfcConfigOf,
   type StatedRfcAddress,
   type StatedRfcDestination,
+  URL_KEYS,
 } from './rfcDestination.js';
 export {
   answerVersionOrHelp,

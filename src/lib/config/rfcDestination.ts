@@ -58,6 +58,11 @@ export interface DestinationStatement {
   /** The URL key the destination states its URL with, and its URL when it does. */
   readonly urlKey: DestinationUrlKey;
   readonly url?: string | undefined;
+  /**
+   * Over RFC: every URL key the destination's own file states (present and
+   * not blank), whichever its URL key is — each refuses it, named.
+   */
+  readonly statedUrlKeys?: readonly DestinationUrlKey[] | undefined;
   /** The destination keys in effect. */
   readonly keys: DestinationKeyValues;
 }
@@ -88,6 +93,12 @@ export interface StatedRfcDestination {
   readonly saprouter?: string;
   readonly address: StatedRfcAddress;
 }
+
+/** Every URL key a destination may state, in a fixed order. */
+export const URL_KEYS: readonly DestinationUrlKey[] = [
+  'SAP_URL',
+  'XSUAA_MCP_URL',
+];
 
 /** The one item of case 6 that names either service key. */
 export const MSSERV_OR_SYSID = 'SAP_MSSERV or SAP_SYSID';
@@ -188,7 +199,12 @@ export function checkDestinationStatement(
     }
     return { http: { url: stated.url } };
   }
-  if (stated.url !== undefined) return fault('rfc-with-url', [stated.urlKey]);
+  const urlKeys = URL_KEYS.filter(
+    (key) =>
+      (stated.url !== undefined && key === stated.urlKey) ||
+      (stated.statedUrlKeys ?? []).includes(key),
+  );
+  if (urlKeys.length > 0) return fault('rfc-with-url', urlKeys);
   const address = addressOf(keys);
   if ('fault' in address) return address;
   const lacking: string[] = [];
@@ -276,7 +292,7 @@ export function destinationAddressHint(
     case 'http-with-rfc-keys':
       return `Remove them from the destination, or state SAP_CONNECTION_TYPE=rfc: ${forms}`;
     case 'rfc-with-url':
-      return `Remove it from the destination's .env: an RFC destination states its address — SAP_ASHOST and SAP_SYSNR, or SAP_MSHOST with SAP_MSSERV or SAP_SYSID and SAP_GROUP`;
+      return `Remove it from the destination's .env (each one named): an RFC destination states its address — SAP_ASHOST and SAP_SYSNR, or SAP_MSHOST with SAP_MSSERV or SAP_SYSID and SAP_GROUP`;
     case 'two-addresses':
       return `Keep the keys of one address: ${forms}`;
     case 'no-address':

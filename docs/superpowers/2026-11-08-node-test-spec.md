@@ -194,14 +194,19 @@ The rest stays on Jest, and both runners are green, until the later task moves i
   run.
 - **The join key.** A test is named by its file and its name path — the titles from the file
   down to the test, in order, joined by one separator the package defines. `liveCall` and
-  the reporter build the key with the same function; Jest's `fullName` is not used.
-- **`liveCall` through an `AsyncLocalStorage`** (decision of this spec). `liveSuite`'s
-  cases set the current test (file and name path) in an `AsyncLocalStorage` for the
-  duration of the test's body; `liveCall` reads it and refuses outside a test, as it
-  refuses today. Reason: node:test has no global `expect.getState()`; passing the test
-  context `t` into every call would change every `liveCall` call site, and reading
-  `t.fullName` would tie the key to a Node version not checked for it (Inference). With the
-  storage no call site changes its arguments, and the key is the package's own (above).
+  the reporter build the key with the same function (see the next item for where the name
+  path comes from on node:test).
+- **`liveCall` through a current-test variable** (owner, 2026-11-10; replaces the earlier
+  `AsyncLocalStorage` decision). Measured on Node 22.23.4, 24.20.0 and 26.7.0: an
+  `AsyncLocalStorage` entered in `beforeEach` does not reach the test body, and a case the
+  live file registers itself with node:test cannot be wrapped in `als.run`. So `liveSuite`
+  registers a `beforeEach(t => …)` that sets a module-level current test (file and
+  `t.fullName`) and an `afterEach` that clears it; `liveCall` reads it and refuses outside a
+  test, as it refuses today. This is safe because a file's cases run one at a time (the
+  coverage guard refuses `concurrency`, the live scripts run at concurrency 1). The key's
+  name path is `t.fullName`, measured on every CI version; the reporter rebuilds the same
+  string from its event stack, and a test pins the two as equal, so a Node version that
+  changes `fullName` fails that test instead of mis-keying a run. No live file changes.
 - **The coverage guard sees node:test's forms.** `ledgerScan.ts` recognises the node:test
   functions (`test`, `it`, `describe`, `suite`, the hooks) imported from `node:test`, and
   their `.skip` / `.todo` / `.only` members as it does Jest's. In a live or pin file it
@@ -449,5 +454,4 @@ check:
 - Live files run one at a time (§3).
 - `npm test` runs both runners, even when the first fails (§5).
 - No `--forceExit` and no `--test-force-exit` (§3).
-- `liveCall` reads the current test from an `AsyncLocalStorage` that `liveSuite`'s cases set
-  (§3).
+- `liveCall` reads the current test from the variable `liveSuite`'s `beforeEach` sets (§3).

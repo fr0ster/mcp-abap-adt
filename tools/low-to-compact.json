@@ -3537,7 +3537,20 @@
           }
         }
       ],
+      "accepted": {
+        "kind": "discovery-read",
+        "reason": "24.0.0 (#351): the low tool reads the system's discovery first (GET /sap/bc/adt/discovery) and starts the activation run (POST /sap/bc/adt/activation/runs) only where the discovery offers it, else sends one POST /sap/bc/adt/activation for the objects; compact HandlerActivate reads no discovery and always sends POST /sap/bc/adt/activation/runs.",
+        "since": "24.0.0"
+      },
       "low_requests": [
+        {
+          "method": "GET",
+          "url": "/sap/bc/adt/discovery",
+          "headers": {
+            "Accept": "application/atomsvc+xml",
+            "sap-adt-request-id": "<sap-adt-request-id>"
+          }
+        },
         {
           "method": "POST",
           "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",

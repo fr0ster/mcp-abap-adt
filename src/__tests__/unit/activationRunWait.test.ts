@@ -103,8 +103,9 @@ describe('a group activation waits for its run on long polling alone', () => {
       { objects: OBJECTS },
     );
     expect(answered.isError).toBe(false);
+    // The discovery read and the run's start come first.
     const reads = connection.requests
-      .slice(1)
+      .slice(2)
       .map((request) => `${request.method} ${request.url}`);
     expect(reads).toEqual([
       `GET ${STATUS_URL}`,
@@ -130,10 +131,9 @@ describe('a group activation waits for its run on long polling alone', () => {
       { objects: OBJECTS },
     );
     expect(answered.isError).toBe(false);
-    expect(connection.requests).toHaveLength(6);
-    // Seven calls reach the connection: the discovery read first (answered
-    // by the recording connection without a place among its requests,
-    // fr0ster/mcp-abap-adt#351), then the six the run takes.
+    // Seven requests: the discovery read first (fr0ster/mcp-abap-adt#351),
+    // then the six the run takes.
+    expect(connection.requests).toHaveLength(7);
     expect(pendingAtReads).toEqual([0, 0, 0, 0, 0, 0, 0]);
     expect(jest.getTimerCount()).toBe(0);
   });
@@ -216,6 +216,7 @@ describe('a group activation waits for its run on long polling alone', () => {
     );
     expect(payload.run_status).toBe('finished');
     expect(connection.requests.map((request) => request.url)).toEqual([
+      '/sap/bc/adt/discovery',
       '/sap/bc/adt/activation/runs?method=activate&preauditRequested=true',
       STATUS_URL,
       STATUS_URL,

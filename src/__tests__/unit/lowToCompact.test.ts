@@ -21,6 +21,12 @@
  *   `adtcore:language` and `adtcore:masterLanguage` the low create wrote.
  * - `program-type-removed` (24.0.0): the same, and without the
  *   `program:programType` the low program create wrote.
+ * - `discovery-read` (24.0.0, #351): the low tool reads the system's
+ *   discovery first and picks the activation run or the single
+ *   `POST /activation` by it; compact `HandlerActivate` reads no discovery
+ *   and always starts the run. The low handler, run here today, sends the
+ *   row's `low_requests` (the discovery read first, on a discovery that
+ *   offers runs); the compact call sends them without the discovery read.
  * - `language-sent` (24.0.0, #348): a create given a language sends it as
  *   `sap-language` too, and writes the two language attributes together:
  *   the low request with the header, its body the same once the language
@@ -31,6 +37,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -51,6 +58,7 @@ import {
   TABLE_END,
   TABLE_START,
 } from '../helpers/lowToCompact';
+import { REQUEST_ID } from '../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -67,6 +75,12 @@ const TABLE = JSON.parse(
  * Every tool the low set registered before its removal — the list taken from
  * `LowLevelHandlersGroup` and `SystemHandlersGroup` on the branch, fixed here.
  */
+/** The objects of the ActivateObjectLow row's `low_call`. */
+const ACTIVATED_OBJECTS = [
+  { name: 'CLAS_A', type: 'CLAS/OC' },
+  { name: 'INTF_A', type: 'INTF/OI' },
+] as const;
+
 const LOW_TOOLS_BEFORE_REMOVAL = [
   'ActivateObjectLow',
   'UpdatePackageLow',
@@ -293,6 +307,32 @@ describe('the low set → compact mapping table', () => {
     },
   );
 
+  const discoveryRead = TABLE.rows.filter(
+    (r) => r.accepted?.kind === 'discovery-read',
+  );
+  it.each(discoveryRead.map((r) => [r.tool, r] as const))(
+    '%s (accepted, discovery read): the low handler reads discovery first; the compact call sends the rest',
+    async (_tool, row) => {
+      const [discovery, ...rest] = row.low_requests ?? [];
+      expect(discovery).toEqual({
+        method: 'GET',
+        url: '/sap/bc/adt/discovery',
+        headers: {
+          Accept: 'application/atomsvc+xml',
+          'sap-adt-request-id': REQUEST_ID,
+        },
+      });
+      // The low handler as it is today, on the same stand-in.
+      const connection = parityConnection();
+      await handleActivateObject(
+        { connection, logger: silentLogger },
+        { objects: [...ACTIVATED_OBJECTS], preaudit: true },
+      );
+      expect(parityRequests(connection.requests)).toEqual(row.low_requests);
+      expect(await compactRequests(row)).toEqual(rest);
+    },
+  );
+
   const checkedFirst = TABLE.rows.filter(
     (r) => r.accepted?.kind === 'group-checked',
   );
@@ -435,6 +475,8 @@ describe('the low set → compact mapping table', () => {
     ['CreateTableLow', 'language-unstated'],
     // 24.0.0 (the owner): no program type on create, which SAP ignores.
     ['CreateProgramLow', 'program-type-removed'],
+    // 24.0.0 (the owner, #351): the low tool picks the endpoint by discovery.
+    ['ActivateObjectLow', 'discovery-read'],
     // 24.0.0 (the owner, #2): a function module's group is checked first.
     ['CheckFunctionModuleLow', 'group-checked'],
     ['DeleteFunctionModuleLow', 'group-checked'],
@@ -443,12 +485,12 @@ describe('the low set → compact mapping table', () => {
     ['UpdateFunctionModuleLow', 'group-checked'],
   ];
 
-  it('accepts exactly the 23 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 24 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(23);
+    expect(ACCEPTED).toHaveLength(24);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
@@ -460,6 +502,7 @@ describe('the low set → compact mapping table', () => {
     );
     expect([...kinds].sort()).toEqual([
       'activation-run',
+      'discovery-read',
       'group-checked',
       'language-sent',
       'language-unstated',

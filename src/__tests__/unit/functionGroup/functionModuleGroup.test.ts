@@ -22,6 +22,7 @@ import {
   recordCase,
   runPinCase,
 } from '../../helpers/pinCases';
+import { REQUEST_ID } from '../../helpers/recordingConnection';
 
 /** The module's metadata read through ZPIN_FG at `version`. */
 function META(module: string, version: string): PinnedRequest {
@@ -328,6 +329,7 @@ const CASES: readonly GroupCase[] = [
   },
   {
     label: 'ActivateObjects with two FUGR/FF entries',
+    // A group activation reads the discovery before it starts the run (#351).
     tool: 'ActivateObjects',
     args: {
       objects: [
@@ -343,6 +345,15 @@ const CASES: readonly GroupCase[] = [
     matchRefused: false,
     checks: [META('ZPIN_FM', 'workingArea'), META('ZPIN_FM2', 'workingArea')],
     after: [
+      {
+        method: 'GET',
+        url: '/sap/bc/adt/discovery',
+        headers: {
+          Accept: 'application/atomsvc+xml',
+          'sap-adt-request-id': REQUEST_ID,
+        },
+        body: undefined,
+      },
       {
         method: 'POST',
         url: '/sap/bc/adt/activation/runs?method=activate&preauditRequested=true',

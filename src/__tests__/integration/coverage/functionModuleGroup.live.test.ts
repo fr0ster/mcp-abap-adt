@@ -19,7 +19,9 @@
  * read absent after (the module by a repository search: its read answers
  * no `404` while it is absent).
  */
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, before, it } from 'node:test';
 import {
   configuredSystemKind,
   resolvePackageName,
@@ -34,6 +36,7 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
+import { assertEquals } from '../helpers/liveAssert';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 const GROUP_A = `ZMCP_GA${SUFFIX}`;
@@ -84,11 +87,14 @@ function expectGroupRefused(step: string, answer: LiveAnswer): void {
     throw new Error(`${step} was not refused: ${answer.text}`);
   }
   const payload: unknown = JSON.parse(answer.text);
-  expect({ step, code: member(payload, 'code') }).toEqual({
-    step,
-    code: 'FUNCTION_GROUP_MISMATCH',
-  });
-  expect(String(member(payload, 'message'))).toContain(GROUP_A);
+  assertEquals(
+    { step, code: member(payload, 'code') },
+    {
+      step,
+      code: 'FUNCTION_GROUP_MISMATCH',
+    },
+  );
+  assert.ok(String(member(payload, 'message')).includes(GROUP_A));
 }
 
 /** The module's source, read through its own group at `version`. */
@@ -158,7 +164,7 @@ liveSuite(
   ['onprem', 'cloud'],
   'a function module addressed through a group',
   () => {
-    beforeAll(async () => {
+    before(async () => {
       await expectNoModule(MODULE);
       await createGroup(GROUP_A);
       await createGroup(GROUP_B);
@@ -190,10 +196,10 @@ liveSuite(
       );
       // The search finds the module it is later asked about: its absence
       // after the cleanup is the search's answer, not an empty one.
-      expect(await moduleFound(MODULE)).toBe(true);
+      assert.equal(await moduleFound(MODULE), true);
     });
 
-    afterAll(async () => {
+    after(async () => {
       await deleteRecorded();
       await expectNoModule(MODULE);
       await expectAbsent({
@@ -229,9 +235,9 @@ liveSuite(
           function_module_name: MODULE,
         }),
       );
-      expect(markersIn(String(member(JSON.parse(own.text), 'source')))).toEqual(
-        [FIRST],
-      );
+      assertEquals(markersIn(String(member(JSON.parse(own.text), 'source'))), [
+        FIRST,
+      ]);
     });
 
     it('UpdateFunctionModule through another group is refused and writes nothing; through its own group it writes', async () => {
@@ -245,8 +251,8 @@ liveSuite(
           ...onRequest(),
         }),
       );
-      expect(markersIn(await sourceOf('inactive'))).toEqual([FIRST]);
-      expect(markersIn(await sourceOf('active'))).toEqual([FIRST]);
+      assertEquals(markersIn(await sourceOf('inactive')), [FIRST]);
+      assertEquals(markersIn(await sourceOf('active')), [FIRST]);
 
       succeeded(
         'UpdateFunctionModule A',
@@ -258,7 +264,7 @@ liveSuite(
           ...onRequest(),
         }),
       );
-      expect(markersIn(await sourceOf('active'))).toEqual([SECOND]);
+      assertEquals(markersIn(await sourceOf('active')), [SECOND]);
     });
 
     it('HandlerLock through another group is refused; through its own group it locks and unlocks', async () => {
@@ -350,7 +356,7 @@ liveSuite(
           ...onRequest(),
         }),
       );
-      expect(markersIn(await sourceOf('active'))).toEqual([SECOND]);
+      assertEquals(markersIn(await sourceOf('active')), [SECOND]);
     });
 
     it("a module that does not exist is SAP's refusal of the metadata read, relayed with its key", async () => {
@@ -358,24 +364,27 @@ liveSuite(
         function_group_name: GROUP_A,
         function_module_name: ABSENT,
       });
-      expect(answer.isError).toBe(true);
+      assert.equal(answer.isError, true);
       const payload: unknown = JSON.parse(answer.text);
       const messages = member(payload, 'messages');
       const keys = Array.isArray(messages)
         ? messages.map((message) => member(message, 't100'))
         : [];
       // Measured on premise (2026-11-05): `404`, `FL 110`, whatever group.
-      expect({
-        step: member(payload, 'step'),
-        status: member(payload, 'status'),
-        code: member(payload, 'code'),
-        keys: keys.map((key) => [member(key, 'id'), member(key, 'no')]),
-      }).toEqual({
-        step: 'check function group',
-        status: 404,
-        code: undefined,
-        keys: [['FL', '110']],
-      });
+      assertEquals(
+        {
+          step: member(payload, 'step'),
+          status: member(payload, 'status'),
+          code: member(payload, 'code'),
+          keys: keys.map((key) => [member(key, 'id'), member(key, 'no')]),
+        },
+        {
+          step: 'check function group',
+          status: 404,
+          code: undefined,
+          keys: [['FL', '110']],
+        },
+      );
     });
   },
 );

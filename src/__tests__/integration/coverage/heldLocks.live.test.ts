@@ -17,7 +17,9 @@
  * create and recorded for cleanup before it; it is deleted after and read
  * absent.
  */
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, before, it } from 'node:test';
 import {
   configuredSystemKind,
   resolvePackageName,
@@ -32,6 +34,7 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
+import { assertEquals } from '../helpers/liveAssert';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 const CLASS = `ZMCP_HL${SUFFIX}`;
@@ -74,11 +77,14 @@ function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
 
 /** The refusal of a handle the instance does not hold. */
 function expectNotHeld(step: string, answer: LiveAnswer): void {
-  expect({ step, isError: answer.isError }).toEqual({ step, isError: true });
-  expect({ step, refused: answer.text.includes(NOT_HELD) }).toEqual({
-    step,
-    refused: true,
-  });
+  assertEquals({ step, isError: answer.isError }, { step, isError: true });
+  assertEquals(
+    { step, refused: answer.text.includes(NOT_HELD) },
+    {
+      step,
+      refused: true,
+    },
+  );
 }
 
 /** A member of a JSON value, read by shape. */
@@ -122,7 +128,7 @@ const unlockArgs = (lock_handle: string) => ({
 });
 
 liveSuite(['onprem', 'cloud'], 'held locks', () => {
-  beforeAll(async () => {
+  before(async () => {
     await expectNameFree({ tool: 'GetClass', args: { class_name: CLASS } });
     recordCreated('DeleteClass', { class_name: CLASS, ...onRequest() });
     succeeded(
@@ -136,7 +142,7 @@ liveSuite(['onprem', 'cloud'], 'held locks', () => {
     );
   });
 
-  afterAll(async () => {
+  after(async () => {
     await deleteRecorded();
     await expectAbsent({ tool: 'GetClass', args: { class_name: CLASS } });
   });
@@ -167,7 +173,7 @@ liveSuite(['onprem', 'cloud'], 'held locks', () => {
         'HandlerUnlock foreign',
         await livePrepare('HandlerUnlock', unlockArgs(FOREIGN)),
       );
-      expect(await markers()).toEqual([]);
+      assertEquals(await markers(), []);
 
       // The lock lives on after the refused unlock: the write under the
       // issued handle goes.
@@ -181,7 +187,7 @@ liveSuite(['onprem', 'cloud'], 'held locks', () => {
           ...onRequest(),
         }),
       );
-      expect(await markers()).toEqual([OWN]);
+      assertEquals(await markers(), [OWN]);
       succeeded(
         'HandlerDelete own',
         await livePrepare('HandlerDelete', {

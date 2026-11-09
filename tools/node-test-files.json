@@ -1,4 +1,12 @@
 [
+  "src/__tests__/integration/coverage/activate.live.test.ts",
+  "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+  "src/__tests__/integration/coverage/createLanguage.live.test.ts",
+  "src/__tests__/integration/coverage/functionModuleGroup.live.test.ts",
+  "src/__tests__/integration/coverage/heldLocks.live.test.ts",
+  "src/__tests__/integration/coverage/outline.live.test.ts",
+  "src/__tests__/integration/coverage/searchSource.live.test.ts",
+  "src/__tests__/integration/coverage/unitTests.live.test.ts",
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/live.test.ts",
   "src/__tests__/unit/coverage/liveDescribe.test.ts",

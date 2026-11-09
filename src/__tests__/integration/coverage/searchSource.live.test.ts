@@ -33,7 +33,9 @@
  * Nothing is created, changed or deleted.
  */
 
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, before, it } from 'node:test';
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
@@ -50,6 +52,7 @@ import {
   livePrepare,
   liveSuite,
 } from '../helpers/live';
+import { assertEquals } from '../helpers/liveAssert';
 import { endTestConnection, trackConnection } from '../helpers/openConnections';
 import { primeSystemContext } from '../helpers/primeSystemContext';
 import {
@@ -155,11 +158,12 @@ function expectHitsWithin(
   packages: readonly string[],
 ): void {
   const named = new Set(packages.map((name) => name.toUpperCase()));
-  expect(
+  assertEquals(
     results.filter(
       (hit) => !named.has(String(member(hit, 'devclass')).toUpperCase()),
     ),
-  ).toEqual([]);
+    [],
+  );
 }
 
 /**
@@ -363,13 +367,16 @@ async function expectHitsReal(
   query: string,
 ): Promise<void> {
   for (const hit of results) {
-    expect({
-      hit: `${member(hit, 'object_name')}:${member(hit, 'line')}`,
-      holds: (await hitLine(hit)).toUpperCase().includes(query.toUpperCase()),
-    }).toEqual({
-      hit: `${member(hit, 'object_name')}:${member(hit, 'line')}`,
-      holds: true,
-    });
+    assertEquals(
+      {
+        hit: `${member(hit, 'object_name')}:${member(hit, 'line')}`,
+        holds: (await hitLine(hit)).toUpperCase().includes(query.toUpperCase()),
+      },
+      {
+        hit: `${member(hit, 'object_name')}:${member(hit, 'line')}`,
+        holds: true,
+      },
+    );
   }
 }
 
@@ -404,10 +411,13 @@ function moduleHit(results: readonly unknown[]): unknown {
 
 /** No `no_hits` and no `failures` key: hits and counters only. */
 function expectHitsOnly(payload: unknown): void {
-  expect({
-    no_hits: member(payload, 'no_hits'),
-    failures: member(payload, 'failures'),
-  }).toEqual({ no_hits: undefined, failures: undefined });
+  assertEquals(
+    {
+      no_hits: member(payload, 'no_hits'),
+      failures: member(payload, 'failures'),
+    },
+    { no_hits: undefined, failures: undefined },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -434,8 +444,8 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
     const shared = sharedPackage();
     const mask = `*${shared.slice(1, 4)}*${shared.slice(-3)}*`;
     const named = await quickSearchPackages(mask);
-    expect(named.length).toBeGreaterThan(1);
-    expect(named).toContain(shared);
+    assert.ok(named.length > 1);
+    assert.ok(named.includes(shared));
     const answer = await liveCall('SearchSource', {
       packages: [mask],
       include_subpackages: false,
@@ -449,7 +459,7 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
   it('a * matching zero characters: hits only from the packages the quick search names', async () => {
     const mask = `${sharedPackage()}*`;
     const named = await quickSearchPackages(mask);
-    expect(named).toContain(sharedPackage());
+    assert.ok(named.includes(sharedPackage()));
     const answer = await liveCall('SearchSource', {
       packages: [mask],
       include_subpackages: false,
@@ -463,7 +473,7 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
   it('a mask with ?: hits only from the packages the quick search names', async () => {
     const mask = `${sharedPackage().slice(0, -1)}?`;
     const named = await quickSearchPackages(mask);
-    expect(named).toContain(sharedPackage());
+    assert.ok(named.includes(sharedPackage()));
     const answer = await liveCall('SearchSource', {
       packages: [mask],
       include_subpackages: false,
@@ -476,9 +486,9 @@ liveSuite(['onprem'], 'SearchSource package masks', () => {
 
   it('an exact name with a literal _: hits only from that package', async () => {
     const exact = sharedPackage();
-    expect(exact).toContain('_');
+    assert.ok(exact.includes('_'));
     const named = await quickSearchPackages(exact);
-    expect(named).toEqual([exact]);
+    assertEquals(named, [exact]);
     const answer = await liveCall('SearchSource', {
       packages: [exact],
       include_subpackages: false,
@@ -506,13 +516,16 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
     const payload = payloadOf('SearchSource', answer);
     expectHitsOnly(payload);
     const results = listOf(payload, 'results');
-    expect(scanned(payload, 'objects_with_hits')).toBe(objectsOf(results));
+    assert.equal(scanned(payload, 'objects_with_hits'), objectsOf(results));
     expectHitsWithin(results, tree);
     const hit = moduleHit(results);
-    expect({
-      function_group_name: member(hit, 'function_group_name'),
-      include: member(hit, 'include'),
-    }).toEqual({ function_group_name: sharedGroup(), include: undefined });
+    assertEquals(
+      {
+        function_group_name: member(hit, 'function_group_name'),
+        include: member(hit, 'include'),
+      },
+      { function_group_name: sharedGroup(), include: undefined },
+    );
     await expectHitsReal(results, sharedModule());
 
     // The module's hit, read with exactly the fields it names: the case
@@ -532,8 +545,8 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       end_line: line,
     });
     const source = sourceOf('GetFunctionModule', read);
-    expect(source.toUpperCase()).toContain(sharedModule());
-    expect(source).toContain(snippet.trim());
+    assert.ok(source.toUpperCase().includes(sharedModule()));
+    assert.ok(source.includes(snippet.trim()));
   });
 
   it('a package that does not exist yields no hit', async () => {
@@ -556,10 +569,13 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       query: sharedModule(),
     });
     const missing = payloadOf('SearchSource', alone);
-    expect({
-      results: listOf(missing, 'results'),
-      objects: scanned(missing, 'objects'),
-    }).toEqual({ results: [], objects: 0 });
+    assertEquals(
+      {
+        results: listOf(missing, 'results'),
+        objects: scanned(missing, 'objects'),
+      },
+      { results: [], objects: 0 },
+    );
   });
 
   it('answer objects names each object with its hit count', async () => {
@@ -572,15 +588,19 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
     });
     const payload = payloadOf('SearchSource', answer);
     const results = listOf(payload, 'results');
-    expect(results.length).toBeGreaterThan(0);
+    assert.ok(results.length > 0);
     for (const entry of results) {
-      expect({
-        line: member(entry, 'line'),
-        snippet: member(entry, 'snippet'),
-        counted: typeof member(entry, 'hits') === 'number',
-      }).toEqual({ line: undefined, snippet: undefined, counted: true });
+      assertEquals(
+        {
+          line: member(entry, 'line'),
+          snippet: member(entry, 'snippet'),
+          counted: typeof member(entry, 'hits') === 'number',
+        },
+        { line: undefined, snippet: undefined, counted: true },
+      );
     }
-    expect(member(moduleHit(results), 'function_group_name')).toBe(
+    assert.equal(
+      member(moduleHit(results), 'function_group_name'),
       sharedGroup(),
     );
   });
@@ -594,12 +614,15 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       answer: 'lines',
     });
     const results = listOf(payloadOf('SearchSource', answer), 'results');
-    expect(results.length).toBeGreaterThan(0);
+    assert.ok(results.length > 0);
     for (const hit of results) {
-      expect({
-        line: typeof member(hit, 'line'),
-        snippet: member(hit, 'snippet'),
-      }).toEqual({ line: 'number', snippet: undefined });
+      assertEquals(
+        {
+          line: typeof member(hit, 'line'),
+          snippet: member(hit, 'snippet'),
+        },
+        { line: 'number', snippet: undefined },
+      );
     }
   });
 
@@ -612,12 +635,15 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       answer: 'snippets',
     });
     const results = listOf(payloadOf('SearchSource', answer), 'results');
-    expect(results.length).toBeGreaterThan(0);
+    assert.ok(results.length > 0);
     for (const hit of results) {
-      expect({
-        line: typeof member(hit, 'line'),
-        snippet: typeof member(hit, 'snippet'),
-      }).toEqual({ line: 'number', snippet: 'string' });
+      assertEquals(
+        {
+          line: typeof member(hit, 'line'),
+          snippet: typeof member(hit, 'snippet'),
+        },
+        { line: 'number', snippet: 'string' },
+      );
     }
   });
 
@@ -630,15 +656,15 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
       max_hits: 1,
     });
     const payload = payloadOf('SearchSource', answer);
-    expect(listOf(payload, 'results')).toHaveLength(1);
-    expect(member(member(payload, 'truncated'), 'by_max_hits')).toBe(true);
+    assert.equal(listOf(payload, 'results').length, 1);
+    assert.equal(member(member(payload, 'truncated'), 'by_max_hits'), true);
   });
 });
 
 liveSuite(['onprem', 'cloud'], 'SearchSource measurements', () => {
   let connection: GuardedConnection | undefined;
 
-  beforeAll(async () => {
+  before(async () => {
     const kind = configuredSystemKind();
     const destination = await getTestDestination();
     if (destination === null || (kind !== 'onprem' && kind !== 'cloud')) {
@@ -654,7 +680,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource measurements', () => {
     connection = opened;
   });
 
-  afterAll(async () => {
+  after(async () => {
     const ending = connection;
     connection = undefined;
     if (ending !== undefined) await endTestConnection(ending);
@@ -671,7 +697,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource measurements', () => {
       .read({ className: `ZCL_${MISSING}`.slice(0, 30) }, 'active', {
         analyse: analyseException,
       });
-    expect(read.ok).toBe(false);
+    assert.equal(read.ok, false);
     if (read.ok) return;
     const error = read.getError();
     const shape = {
@@ -682,8 +708,8 @@ liveSuite(['onprem', 'cloud'], 'SearchSource measurements', () => {
     console.log(
       `[measured] ${configuredSystemKind()} source 404: ${JSON.stringify(shape)}`,
     );
-    expect(typeof shape.origin).toBe('string');
-    expect(shape.status).toBe(404);
+    assert.equal(typeof shape.origin, 'string');
+    assert.equal(shape.status, 404);
   });
 
   it('function modules named VIEW*: what the quick search lists and what a read answers', async () => {
@@ -720,7 +746,7 @@ liveSuite(['onprem', 'cloud'], 'SearchSource measurements', () => {
     console.log(
       `[measured] ${configuredSystemKind()} VIEW* modules: ${JSON.stringify({ status: listed.status, listed: uris.length, reads })}`,
     );
-    expect(listed.status).toBe(200);
-    for (const read of reads) expect(typeof read.status).toBe('number');
+    assert.equal(listed.status, 200);
+    for (const read of reads) assert.equal(typeof read.status, 'number');
   });
 });

@@ -13,7 +13,9 @@
  * right after the start, to see it running (C2b: a plain read answers in
  * 0.13–0.21 s, a run of ten classes took 36 s and more).
  */
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, it } from 'node:test';
 import {
   configuredSystemKind,
   resolvePackageName,
@@ -88,7 +90,7 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
   /** The run the case started, once its id came back. */
   const run: { id?: string } = {};
 
-  afterAll(async () => {
+  after(async () => {
     // A run still going holds its objects: wait for it to end (one long
     // poll SAP holds until then) before the classes are deleted.
     if (run.id !== undefined) {
@@ -152,8 +154,8 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
     });
     succeeded('activation_status', plain);
     const going = fieldOf(plain, 'status');
-    expect(typeof going).toBe('string');
-    expect(TERMINAL.has(String(going))).toBe(false);
+    assert.equal(typeof going, 'string');
+    assert.equal(TERMINAL.has(String(going)), false);
 
     // With it: held until the run ends, answered with the final status.
     const held = await liveCall('HandlerGet', {
@@ -163,7 +165,7 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
     });
     succeeded('activation_status with_long_polling', held);
     const ended = fieldOf(held, 'status');
-    expect(TERMINAL.has(String(ended))).toBe(true);
+    assert.equal(TERMINAL.has(String(ended)), true);
 
     // Read back: a plain read now answers the same final status.
     const after = await liveCall('HandlerGet', {
@@ -171,6 +173,6 @@ liveSuite(['onprem', 'cloud'], 'activation_status reads a run', () => {
       run_id: runId,
     });
     succeeded('activation_status after the run', after);
-    expect(fieldOf(after, 'status')).toBe(ended);
+    assert.equal(fieldOf(after, 'status'), ended);
   });
 });

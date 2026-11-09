@@ -15,7 +15,9 @@
  * `livePrepare`: `CreateClass` stands for its key in the class family's
  * live file (C3–C16), where the ledger names it on both systems.
  */
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, it } from 'node:test';
 import { XMLParser } from 'fast-xml-parser';
 import {
   resolvePackageName,
@@ -69,7 +71,7 @@ function languageSuite(system: 'onprem' | 'cloud', language: string): void {
     const name = `ZCL_MCP_LANG_${randomBytes(3).toString('hex').toUpperCase()}`;
     const recorded: string[] = [];
 
-    afterAll(async () => {
+    after(async () => {
       await deleteRecorded();
       for (const each of recorded) {
         await expectAbsent({ tool: 'GetClass', args: { class_name: each } });
@@ -106,7 +108,7 @@ function languageSuite(system: 'onprem' | 'cloud', language: string): void {
           part: 'metadata',
         }),
       );
-      expect(masterLanguageOf(metadataOf(metadata))).toBe(language);
+      assert.equal(masterLanguageOf(metadataOf(metadata)), language);
     });
   });
 }

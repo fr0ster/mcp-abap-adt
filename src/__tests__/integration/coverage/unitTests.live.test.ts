@@ -14,7 +14,9 @@
  * its create and recorded for cleanup before it; it is deleted after and read
  * absent.
  */
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, before, it } from 'node:test';
 import {
   configuredSystemKind,
   resolvePackageName,
@@ -30,6 +32,7 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
+import { assertEquals } from '../helpers/liveAssert';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 const CLASS = `ZMCP_UW${SUFFIX}`;
@@ -122,15 +125,18 @@ async function plainStatus(runId: string): Promise<string> {
 /** A finished run's answer: finished, with a result naming the test method. */
 function expectFinished(step: string, answer: LiveAnswer): void {
   const payload = payloadOf(succeeded(step, answer));
-  expect({ step, finished: member(payload, 'finished') }).toEqual({
-    step,
-    finished: true,
-  });
-  expect(JSON.stringify(member(payload, 'run_result'))).toContain('WAITS');
+  assertEquals(
+    { step, finished: member(payload, 'finished') },
+    {
+      step,
+      finished: true,
+    },
+  );
+  assert.ok(JSON.stringify(member(payload, 'run_result')).includes('WAITS'));
 }
 
 liveSuite(['onprem', 'cloud'], 'ABAP Unit run reads', () => {
-  beforeAll(async () => {
+  before(async () => {
     await expectNameFree({ tool: 'GetClass', args: { class_name: CLASS } });
     recordCreated('DeleteClass', { class_name: CLASS, ...onRequest() });
     succeeded(
@@ -161,7 +167,7 @@ liveSuite(['onprem', 'cloud'], 'ABAP Unit run reads', () => {
     );
   });
 
-  afterAll(async () => {
+  after(async () => {
     await deleteRecorded();
     await expectAbsent({ tool: 'GetClass', args: { class_name: CLASS } });
   });
@@ -172,20 +178,20 @@ liveSuite(['onprem', 'cloud'], 'ABAP Unit run reads', () => {
       run_id: UNKNOWN_RUN,
     });
     const took = Date.now() - begun;
-    expect(payloadOf(succeeded('GetUnitTestResult', answer))).toEqual({
+    assertEquals(payloadOf(succeeded('GetUnitTestResult', answer)), {
       success: true,
       run_id: UNKNOWN_RUN,
       status: 'NOT_STARTED',
     });
-    expect(took).toBeLessThan(AT_ONCE_MS);
+    assert.ok(took < AT_ONCE_MS);
   });
 
   it('GetUnitTestResult waits for a running run and answers its result', async () => {
     const runId = await startedRun();
-    expect(await plainStatus(runId)).toContain('RUNNING');
+    assert.ok((await plainStatus(runId)).includes('RUNNING'));
     const answer = await liveCall('GetUnitTestResult', { run_id: runId });
     expectFinished('GetUnitTestResult', answer);
-    expect(await plainStatus(runId)).toContain('FINISHED');
+    assert.ok((await plainStatus(runId)).includes('FINISHED'));
   });
 
   it('RunUnitTest waits for its run and answers the result', async () => {
@@ -209,7 +215,7 @@ liveSuite(['onprem', 'cloud'], 'ABAP Unit run reads', () => {
     );
     const answer = await liveCall('HandlerUnitTestResult', { run_id: runId });
     const payload = payloadOf(succeeded('HandlerUnitTestResult', answer));
-    expect(member(payload, 'run_id')).toBe(runId);
-    expect(JSON.stringify(member(payload, 'run_result'))).toContain('WAITS');
+    assert.equal(member(payload, 'run_id'), runId);
+    assert.ok(JSON.stringify(member(payload, 'run_result')).includes('WAITS'));
   });
 });

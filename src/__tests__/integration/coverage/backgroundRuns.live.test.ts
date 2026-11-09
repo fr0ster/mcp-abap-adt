@@ -43,6 +43,8 @@
  * promise the code under test settles; no timer, no polling.
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -94,6 +96,7 @@ import {
   liveSuite,
   useLiveRunner,
 } from '../helpers/live';
+import { assertEquals } from '../helpers/liveAssert';
 import { endTestConnection, trackConnection } from '../helpers/openConnections';
 import { primeSystemContext } from '../helpers/primeSystemContext';
 import {
@@ -458,11 +461,11 @@ function configuredSystem(): SystemKind {
  */
 function servedBy(toolSet: ToolSet): void {
   let runner: LiveRunner | undefined;
-  beforeAll(async () => {
+  before(async () => {
     runner = await serverRunner(configuredSystem(), toolSet);
     useLiveRunner(runner);
   });
-  afterAll(async () => {
+  after(async () => {
     useLiveRunner(undefined);
     const ending = runner;
     runner = undefined;
@@ -525,8 +528,8 @@ function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
 /** The run a start answered: its handle, the answer `running`. */
 function startedHandle(tool: string, answer: LiveAnswer): string {
   const started = itemOf(succeeded(tool, answer), 0);
-  expect(member(started, 'state')).toBe('running');
-  expect(member(started, 'tool')).toBe(tool);
+  assert.equal(member(started, 'state'), 'running');
+  assert.equal(member(started, 'tool'), tool);
   const handle = member(started, 'run_handle');
   if (typeof handle !== 'string' || handle === '') {
     throw new Error(`${tool} answered no run_handle: ${answer.text}`);
@@ -537,30 +540,34 @@ function startedHandle(tool: string, answer: LiveAnswer): string {
 /** A run read `finished`: its header, then the rows of the shared table. */
 function expectFinished(answer: LiveAnswer, handle: string, tool: string) {
   const header = itemOf(succeeded(`the run of ${tool}`, answer), 0);
-  expect(member(header, 'state')).toBe('finished');
-  expect(member(header, 'run_handle')).toBe(handle);
-  expect(member(header, 'tool')).toBe(tool);
+  assert.equal(member(header, 'state'), 'finished');
+  assert.equal(member(header, 'run_handle'), handle);
+  assert.equal(member(header, 'tool'), tool);
   expectRows(itemOf(answer, 1));
 }
 
 /** The rows of the shared table, as the read answers them. */
 function expectRows(payload: unknown): void {
-  expect(member(payload, 'sql_query')).toBe(query());
-  expect(Array.isArray(member(payload, 'columns'))).toBe(true);
-  expect(Array.isArray(member(payload, 'rows'))).toBe(true);
+  assert.equal(member(payload, 'sql_query'), query());
+  assert.equal(Array.isArray(member(payload, 'columns')), true);
+  assert.equal(Array.isArray(member(payload, 'rows')), true);
 }
 
 /** A read of a run that is gone: "not available". */
 function expectNotAvailable(answer: LiveAnswer): void {
-  expect(answer.isError).toBe(true);
-  expect(member(itemOf(answer, 0), 'error')).toBe(
+  assert.equal(answer.isError, true);
+  assert.equal(
+    member(itemOf(answer, 0), 'error'),
     'background_run_not_available',
   );
 }
 
 /** The tools a set lists, among them `names`. */
 async function expectListed(names: readonly string[]): Promise<void> {
-  expect(await current().tools()).toEqual(expect.arrayContaining([...names]));
+  const listed = await current().tools();
+  for (const name of names) {
+    assert.ok(listed.includes(name), `${name} is not listed`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -585,7 +592,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       expectNotAvailable(
         await livePrepare('GetBackgroundRun', { run_handle: handle }),
       );
-      expect(current().runs.finishCount(handle)).toBe(1);
+      assert.equal(current().runs.finishCount(handle), 1);
     });
 
     it('a long read with background false answers its result in the call, on a session of its own', async () => {
@@ -596,12 +603,12 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
         background: false,
       });
       const payload = itemOf(succeeded('GetSqlQuery', answered), 0);
-      expect(member(payload, 'run_handle')).toBeUndefined();
+      assert.equal(member(payload, 'run_handle'), undefined);
       expectRows(payload);
       // One connection of its own, logged off after the answer.
       const opened = current().own.slice(before);
-      expect(opened).toHaveLength(1);
-      expect(opened[0]?.logoffs()).toBe(1);
+      assert.equal(opened.length, 1);
+      assert.equal(opened[0]?.logoffs(), 1);
     });
 
     it('a background read discarded while it runs is cancelled, its session logged off', async () => {
@@ -614,33 +621,34 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       if (own === undefined) throw new Error('the run opened no connection');
       // Its request was sent; its answer is held, so the run is running.
       await own.entered;
-      expect(own.logoffs()).toBe(0);
+      assert.equal(own.logoffs(), 0);
 
       const discarded = await liveCall('DiscardBackgroundRun', {
         run_handle: handle,
       });
-      expect(itemOf(succeeded('DiscardBackgroundRun', discarded), 0)).toEqual({
+      assertEquals(itemOf(succeeded('DiscardBackgroundRun', discarded), 0), {
         run_handle: handle,
         state: 'cancelled',
       });
       // The run's own session: logged off once, by the server, its goodbye
       // settled; the connection is no longer connected.
-      expect(own.logoffs()).toBe(1);
+      assert.equal(own.logoffs(), 1);
       await own.connection.flushGoodbye();
-      expect(own.connection.isConnected()).toBe(false);
+      assert.equal(own.connection.isConnected(), false);
 
       const listed = await liveCall('ListBackgroundRuns', {});
       const runs = member(
         itemOf(succeeded('ListBackgroundRuns', listed), 0),
         'runs',
       );
-      expect(
+      assertEquals(
         Array.isArray(runs)
           ? runs
               .filter((run) => member(run, 'run_handle') === handle)
               .map((run) => member(run, 'state'))
           : runs,
-      ).toEqual(['cancelled']);
+        ['cancelled'],
+      );
 
       // The answer SAP gave reaches the run now, after the cancel.
       held.release();
@@ -648,15 +656,15 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       const cancelled = await liveCall('GetBackgroundRun', {
         run_handle: handle,
       });
-      expect(member(itemOf(cancelled, 0), 'state')).toBe('cancelled');
-      expect(cancelled.content[1]?.text).toBe(BACKGROUND_READ_CANCELLED_WORDS);
+      assert.equal(member(itemOf(cancelled, 0), 'state'), 'cancelled');
+      assert.equal(cancelled.content[1]?.text, BACKGROUND_READ_CANCELLED_WORDS);
       expectNotAvailable(
         await livePrepare('GetBackgroundRun', { run_handle: handle }),
       );
       // One end kept, the cancel's; the late answer kept nothing, and
       // nothing more was sent on the run's session.
-      expect(current().runs.finishCount(handle)).toBe(1);
-      expect(own.logoffs()).toBe(1);
+      assert.equal(current().runs.finishCount(handle), 1);
+      assert.equal(own.logoffs(), 1);
     });
   });
 
@@ -686,7 +694,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       expectNotAvailable(
         await livePrepare('GetBackgroundRun', { run_handle: handle }),
       );
-      expect(current().runs.finishCount(handle)).toBe(1);
+      assert.equal(current().runs.finishCount(handle), 1);
     });
   });
 
@@ -716,7 +724,7 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       expectNotAvailable(
         await livePrepare('HandlerBackgroundRunGet', { run_handle: handle }),
       );
-      expect(current().runs.finishCount(handle)).toBe(1);
+      assert.equal(current().runs.finishCount(handle), 1);
     });
   });
 });

@@ -13,7 +13,9 @@
  * the columns it names, and the line its implementation block starts on
  * holds `METHOD <name>`.
  */
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { after, it } from 'node:test';
 import {
   configuredSystemKind,
   resolvePackageName,
@@ -30,6 +32,7 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
+import { assertEquals } from '../helpers/liveAssert';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 const CLASS = `ZCL_MCP_OL_${SUFFIX}`;
@@ -192,7 +195,7 @@ const INTERFACE_SOURCE = [
 ].join('\n');
 
 liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
-  afterAll(async () => {
+  after(async () => {
     await deleteRecorded();
     await expectAbsent({ tool: 'GetClass', args: { class_name: CLASS } });
     await expectAbsent({
@@ -234,26 +237,31 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
     });
     const answer = succeeded('GetObjectOutline CLAS/OC', answered);
     const outline = member(payloadOf(answer), 'outline');
-    expect(member(outline, 'name')).toBe(CLASS);
+    assert.equal(member(outline, 'name'), CLASS);
     for (const [name, visibility] of [
       ['FIRST_METHOD', 'public'],
       ['SECOND_METHOD', 'private'],
     ] as const) {
       const method = childNamed(outline, name);
-      expect({ name, visibility: member(method, 'visibility') }).toEqual({
-        name,
-        visibility,
-      });
+      assertEquals(
+        { name, visibility: member(method, 'visibility') },
+        {
+          name,
+          visibility,
+        },
+      );
       const identifier = positionOf(method, 'definitionIdentifier');
-      expect(identifier.source.endsWith('/source/main')).toBe(true);
-      expect(identifier.start.line).toBe(identifier.end.line);
+      assert.equal(identifier.source.endsWith('/source/main'), true);
+      assert.equal(identifier.start.line, identifier.end.line);
       const line = await lineOf(read, identifier.start.line);
-      expect(line.slice(identifier.start.column, identifier.end.column)).toBe(
+      assert.equal(
+        line.slice(identifier.start.column, identifier.end.column),
         name.toLowerCase(),
       );
       const block = positionOf(method, 'implementationBlock');
       const first = await lineOf(read, block.start.line);
-      expect(first.slice(block.start.column)).toBe(
+      assert.equal(
+        first.slice(block.start.column),
         `METHOD ${name.toLowerCase()}.`,
       );
     }
@@ -287,10 +295,11 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
     });
     const answer = succeeded('GetObjectOutline INTF/OI', answered);
     const method = childNamed(member(payloadOf(answer), 'outline'), 'RUN');
-    expect(member(method, 'visibility')).toBe('public');
+    assert.equal(member(method, 'visibility'), 'public');
     const identifier = positionOf(method, 'definitionIdentifier');
     const line = await lineOf(read, identifier.start.line);
-    expect(line.slice(identifier.start.column, identifier.end.column)).toBe(
+    assert.equal(
+      line.slice(identifier.start.column, identifier.end.column),
       'run',
     );
   });
@@ -338,19 +347,21 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
     });
     const answer = succeeded('GetObjectOutline FUGR/F', answered);
     const module = childNamed(member(payloadOf(answer), 'outline'), MODULE);
-    expect(member(module, 'type')).toBe('FUGR/FF');
+    assert.equal(member(module, 'type'), 'FUGR/FF');
     const links = member(module, 'links');
     const sources = Array.isArray(links)
       ? links.map((link) => member(link, 'source'))
       : [];
-    expect(sources).toContain(
-      `/sap/bc/adt/functions/groups/${GROUP.toLowerCase()}/fmodules/${MODULE.toLowerCase()}/source/main`,
+    assert.ok(
+      sources.includes(
+        `/sap/bc/adt/functions/groups/${GROUP.toLowerCase()}/fmodules/${MODULE.toLowerCase()}/source/main`,
+      ),
     );
   });
 });
 
 liveSuite(['onprem'], 'GetObjectOutline states a program', () => {
-  afterAll(async () => {
+  after(async () => {
     await deleteRecorded();
     await expectAbsent({
       tool: 'GetProgram',
@@ -390,11 +401,11 @@ liveSuite(['onprem'], 'GetObjectOutline states a program', () => {
     });
     const answer = succeeded('GetObjectOutline PROG/P', answered);
     const form = childNamed(member(payloadOf(answer), 'outline'), 'MAIN_FORM');
-    expect(member(form, 'type')).toBe('PROG/PU');
+    assert.equal(member(form, 'type'), 'PROG/PU');
     const links = member(form, 'links');
     const fragments = Array.isArray(links)
       ? links.map((link) => member(link, 'fragment'))
       : [];
-    expect(fragments).toContain('type=PROG%2FPU;name=MAIN_FORM');
+    assert.ok(fragments.includes('type=PROG%2FPU;name=MAIN_FORM'));
   });
 });

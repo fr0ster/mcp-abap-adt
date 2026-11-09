@@ -96,9 +96,10 @@ bind-mount source is created by Docker as `root`, and the `node` user cannot wri
 
 A destination `.env` works as on a host: mount it and name it, e.g.
 `-v ./trial.env:/app/trial.env:ro … mcp-abap-adt-core --env-path=/app/trial.env`; the server copies
-only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`, `SAP_LANGUAGE` and the RFC message
-server's `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and `SAP_SAPROUTER` from it into the
-process. Without `--mcp` or `--env-path` the server starts in tool-inspection-only mode, which needs the
+only `SAP_CONNECTION_TYPE` and `SAP_SYSTEM_TYPE` from it into the process. The client, the language
+and the RFC address (`SAP_CLIENT`, `SAP_LANGUAGE`, `SAP_ASHOST`, `SAP_SYSNR`, the message-server
+keys) are read from the file as the destination's own, below the CLI and the container's
+environment. Without `--mcp` or `--env-path` the server starts in tool-inspection-only mode, which needs the
 system type too (`--system-type` or `SAP_SYSTEM_TYPE`) and lists that system type's tools.
 
 ### With compose

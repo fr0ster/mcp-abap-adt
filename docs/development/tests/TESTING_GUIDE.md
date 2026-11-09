@@ -32,6 +32,7 @@ The template works out of the box with sensible defaults. Edit **only** the line
 | `environment.env` | Session .env file name from sessions folder | `"your-system.env"`, `"another-system.env"` |
 | `environment.system_type` | SAP system type | `"onprem"`, `"cloud"`, `"legacy"` |
 | `environment.connection_type` | Connection protocol | `"http"` (default), `"rfc"` |
+| `environment.ashost`, `sysnr`, `client`, `language` (and `mshost`, `msserv`, `sysid`, `group`, `saprouter`) | RFC only: the destination's address, client and logon language, over the session `.env`'s — an RFC destination states one address, `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL` | `"saphost.example"`, `"00"`, `"100"`, `"EN"` |
 | `environment.default_package` | Dev package for test objects | `ZMCP_TEST`, `$TMP` |
 | `environment.default_transport` | Transport request (or `""` for local) | `SIDK900001` |
 | `shared_dependencies.package` | Package for shared test objects | `ZMCP_SHARED` |

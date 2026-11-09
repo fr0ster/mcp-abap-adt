@@ -9,10 +9,117 @@ code. Go through the section that fits how you use the server; the [CHANGELOG](.
 every item.
 
 The packages are the eighteen of 23.1.x, all at **24.0.0**, every sibling range at `^24.0.0`. The
-ADT dependencies move to `@mcp-abap-adt/adt-clients` 43.0.1, `@mcp-abap-adt/adt-strategies` 0.19.1 and
-`@mcp-abap-adt/interfaces-adt` 26 (`@mcp-abap-adt/compact-modify` too): what that changes for a
-caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
+ADT dependencies move to `@mcp-abap-adt/adt-clients` 44, `@mcp-abap-adt/adt-strategies` 0.21 and
+`@mcp-abap-adt/interfaces-adt` 26.1 (`@mcp-abap-adt/compact-modify` too): what that changes for a
+caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" below (44
+adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 20,
+`@mcp-abap-adt/interfaces-auth-sap` 4 and `@mcp-abap-adt/interfaces-adt-connection` 4, the
+destination path to `@mcp-abap-adt/auth-broker` 5.1, `@mcp-abap-adt/auth-stores` 5.1 and
+`@mcp-abap-adt/interfaces-auth-broker` 1.4: what that changes is under "RFC destinations: the
+address is stated" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
 `@mcp-abap-adt/server-runtime` now.
+
+## RFC destinations: the address is stated
+
+An RFC destination states its own address, its client and its logon language.
+No URL is part of it, and nothing about the RFC address is derived from one:
+no host from `SAP_URL`, no system number from its port, no default client,
+language or logon group.
+
+**What an existing RFC destination changes** (its `.env`, the environment, the
+CLI or YAML):
+
+- remove `SAP_URL`; an RFC destination that states one is refused;
+- add `SAP_ASHOST` — the host of the `SAP_URL` it had — and `SAP_SYSNR` — the
+  two digits of its port (`80NN` → `NN`, so `:8000` is `00`), or the
+  `SAP_SYSNR` it had in the process environment;
+- add `SAP_CLIENT` if it relied on the client `000`, and `SAP_LANGUAGE` if it
+  relied on `EN`: both are required over RFC;
+- through a message server: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (or
+  both) and `SAP_GROUP` — add `SAP_GROUP` if it relied on `PUBLIC`;
+- `SAP_SAPROUTER` goes with either address.
+
+```env
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=<user>
+SAP_PASSWORD=<password>
+SAP_CONNECTION_TYPE=rfc
+```
+
+**An HTTP destination** that states an RFC address key (`SAP_ASHOST`,
+`SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`,
+`SAP_SAPROUTER`) removes it: it is refused naming the key. `SAP_CLIENT` stays
+an HTTP key.
+
+**The keys and their precedence.** Each of `ashost`, `sysnr`, `mshost`,
+`msserv`, `sysid`, `group`, `saprouter`, `client` and `language` is read from
+every source in one order: the CLI (`--ashost`, …, `--client`, `--language`),
+then the process's own environment (`SAP_ASHOST`, …), then the destination's
+own `.env` (or a service key's fallback), then YAML (`ashost`, …). Values are
+trimmed; a blank one is unset. The system number is read from the `.env` like
+the rest of the address.
+
+**The destination's `.env` no longer feeds the process environment** for the
+client, the language or the address: only `SAP_CONNECTION_TYPE` and
+`SAP_SYSTEM_TYPE` join it. The master language of created objects is the
+destination's `SAP_LANGUAGE` in effect, not a process value the file set.
+
+**The connection type is decided first**: a destination that states none is
+refused before its settings are read.
+
+**The refusals**, before any connection opens, each naming keys and never a
+value; the first failing step answers, and a step names every faulty key:
+
+1. HTTP stating an RFC address key — names each;
+2. HTTP without a URL — names `SAP_URL` (or `XSUAA_MCP_URL`), as before;
+3. RFC stating a URL — the destination's own `SAP_URL`, or `XSUAA_MCP_URL`
+   for an XSUAA key; a service key's URL is not read over RFC, and the
+   process environment's `SAP_URL` is never read;
+4. RFC with keys of both addresses — names every stated key of both;
+5. RFC with no address key;
+6. an incomplete address — names what it lacks;
+7. RFC without `SAP_CLIENT` or `SAP_LANGUAGE`;
+8. ABAP Cloud over RFC — names `SAP_SYSTEM_TYPE`, `SAP_CONNECTION_TYPE`;
+9. a client certificate over RFC — names `SAP_AUTH_TYPE`,
+   `SAP_CONNECTION_TYPE` (`credentialFromSapConfig` refuses it too).
+
+The HTTP and SSE binaries refuse `--ashost`, `--sysnr`, `--client`,
+`--language` and their YAML keys, as they refuse the message-server options:
+RFC is stdio only.
+
+**Embedders.**
+
+- `@mcp-abap-adt/interfaces-auth-sap` 4: `ISapConfig` (and `SapConfig`) is a
+  union by `connectionType` — `ISapHttpConfig` (its `url`; absent
+  `connectionType` is HTTP) or `ISapRfcConfig` (an application server or a
+  message server, `client` and `language` required, no `url`). Narrow on
+  `connectionType` before reading `url`; build a config inside the branch that
+  narrowed it, as a literal of its shape, omitting a key that does not belong
+  (never setting it to `undefined`), with no cast and no spread of the other
+  shape.
+- `@mcp-abap-adt/connection` 20: the RFC address is read as stated; no
+  defaults.
+- `IAbapConnection.getBaseUrl()` answers `string | undefined` (`undefined`
+  over RFC).
+- `BackgroundRunCaller` is `{ system, client, user }`. An injected connection
+  that answers a URL is the system `["http", <URL>, ""]`; one that answers
+  none takes `EmbeddableMcpServerOptions.system`, and without it background
+  runs are refused (`background_runs_unavailable`).
+- `GetServiceBindingPreviewUrl` over RFC answers its URLs as paths and query
+  (a service URL the system answered absolute is kept), with
+  `origin: 'unknown'` and a note to prefix the system's HTTP origin.
+- `@mcp-abap-adt/lib/config`: `applyMessageServerFields`,
+  `MESSAGE_SERVER_ENV`, `MESSAGE_SERVER_FIELDS`, `MessageServerField`,
+  `rfcAddressRefusalOf` are gone; `DESTINATION_KEYS`, `DESTINATION_KEY_ENV`,
+  `RFC_ADDRESS_KEYS`, `checkDestinationStatement`, `rfcConfigOf` and the
+  refusal words are there.
+- An embedder that reads configuration from outside the type system (an env
+  file, the environment, YAML) validates it before it builds an `ISapConfig`;
+  a typed `SapConfig` handed to the server is used as typed.
 
 ## Embedders: a tool's `inputSchema` is a zod object
 

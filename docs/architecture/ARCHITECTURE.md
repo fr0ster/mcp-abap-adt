@@ -74,7 +74,7 @@ Every public function and method operates against well-defined input/output type
 | ADT Objects | `IAdtObject<TConfig, TState>`, `IAdtObjectState`, `IAdtObjectConfig` | CRUD lifecycle for ABAP objects |
 | Logging | `ILogger`, `LogLevel` | Structured logging |
 | Validation | `IHeaderValidationResult`, `IValidatedAuthConfig` | Header analysis |
-| SAP Config | `ISapConfig`, `SapAuthType` | SAP system configuration |
+| SAP Config | `ISapConfig` (the union of `ISapHttpConfig` and `ISapRfcConfig`, by `connectionType`), `SapAuthType` | SAP system configuration |
 | Headers | `HEADER_*` constants, header group arrays | HTTP header contracts |
 
 **Generic object model** -- every ABAP object type is modeled through two generic parameters:
@@ -262,6 +262,16 @@ type Source =
 | http | `headerSource(req.headers)` per request, on a new instance or the pooled one its `state_handle` names | one per request |
 | sse | `headerSource` of the `GET` that opened the connection | one per SSE connection |
 | embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
+
+**Where a configuration enters the type system.** Input from outside the type system is checked
+where it is read; past that point nothing checks again what the type proves:
+
+| Source | Where it enters | Who checks |
+|:---|:---|:---|
+| stdio destination: its means, its URL sources, the start parameters | `AuthBrokerFactory.readSettings` | the server, before any connection opens: an RFC destination states one address, its client and language and no URL (`checkDestinationStatement`, `DestinationAddressRefusal`) |
+| HTTP / SSE: `x-sap-*` headers | `credentialFromHeaders` | the server: `x-sap-url` required; the result is an `ISapHttpConfig` |
+| embedder: a typed `SapConfig` (`setConfigOverride`, `createAbapConnection`, the exported factories) | the embedder's code | the embedder: an embedder that reads configuration from outside the type system (an env file, the environment, YAML) validates it before it builds an `ISapConfig`, narrowed on `connectionType`, a literal of its shape; the server uses it as typed |
+| embedder: an injected `IAbapConnection` / `freshConnection` | the embedder's code | the embedder; `getBaseUrl()` is read as typed — `undefined` over RFC, then `EmbeddableMcpServerOptions.system` identifies the system of its background runs |
 
 The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.ts`): the published
 lib and the http and sse packages declare and reach no broker, stores or `interfaces-auth-broker`;

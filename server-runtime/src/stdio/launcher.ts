@@ -137,8 +137,8 @@ AUTHENTICATIONS (exactly three; a .env or service key stating another is refused
 SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
 
   Basic Authentication (on-premise):
-    SAP_URL                        SAP system URL (required)
-    SAP_CLIENT                     SAP client number (required for basic auth)
+    SAP_URL                        SAP system URL (required over HTTP; never over RFC)
+    SAP_CLIENT                     SAP client number (required over RFC)
     SAP_AUTH_TYPE                  Authentication type: basic|snc|jwt (required)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (required for a destination)
                                    Precedence: --connection-type, then the environment
@@ -151,7 +151,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    and how the system's answers are read
     SAP_USERNAME                   SAP username (required for basic auth)
     SAP_PASSWORD                   SAP password (required for basic auth)
-    SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
+    SAP_LANGUAGE                   Logon language (required over RFC) and master language
+                                   of created objects (e.g., EN, DE)
 
   SNC (passwordless logon over RFC; no SAP_USERNAME, no SAP_PASSWORD):
     SAP_AUTH_TYPE=snc with SAP_CONNECTION_TYPE=rfc (or --connection-type=rfc)
@@ -170,20 +171,18 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
   RFC Connection (any system with SAP NW RFC SDK):
     --connection-type=rfc          Enables RFC transport via SADT_REST_RFC_ENDPOINT
                                    (or SAP_CONNECTION_TYPE=rfc in the .env or the environment)
-    SAP_URL                        SAP system URL (host:port used to derive RFC params)
-    SAP_USERNAME                   SAP username
-    SAP_PASSWORD                   SAP password
-    SAP_CLIENT                     SAP client number
-    Through a message server and a logon group (load-balanced logon); each also
-    --mshost, --msserv, --sysid, --group, --saprouter, or the YAML key of that name.
-    Precedence: the CLI, then the environment (this file joins it), then YAML:
-    SAP_MSHOST                     Message server host. With it, the URL gives no RFC host
-                                   and no system number (SAP_SYSNR is not read)
-    SAP_MSSERV                     Message server service (name or port)
-    SAP_SYSID                      System id; SAP_MSSERV or SAP_SYSID is required with
-                                   SAP_MSHOST (refused naming both otherwise)
-    SAP_GROUP                      Logon group (connection default: PUBLIC)
-    SAP_SAPROUTER                  SAProuter string, with either addressing
+    An RFC destination states one address, its client and its language, and no
+    SAP_URL; nothing is derived from a URL and nothing has a default. Each key is
+    also --<key> and the YAML key <key> (ashost, sysnr, mshost, ..., client,
+    language). Precedence: the CLI, then the process environment, then this file,
+    then YAML:
+    SAP_ASHOST, SAP_SYSNR          An application server: its host and system number
+    SAP_MSHOST                     Or a message server: its host,
+    SAP_MSSERV / SAP_SYSID         its service (name or port) or system id, or both,
+    SAP_GROUP                      and its logon group (required with SAP_MSHOST)
+    SAP_SAPROUTER                  SAProuter string, with either address
+    SAP_CLIENT, SAP_LANGUAGE       Required
+    SAP_USERNAME, SAP_PASSWORD     Basic authentication (SNC takes neither)
     Requires: @mcp-abap-adt/sap-rfc-lite (an optional dependency, prebuilt for
     linux-x64 glibc, win32-x64 and darwin-arm64, nothing compiled on install;
     npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out) and,
@@ -237,9 +236,13 @@ EXAMPLES:
   # An explicit env file (a .env in the working directory is read only when named)
   ${program} --env-path=./.env
 
-  # RFC connection (any system with SAP NW RFC SDK)
+  # RFC connection (any system with SAP NW RFC SDK): the .env states its
+  # address (SAP_ASHOST, SAP_SYSNR), SAP_CLIENT and SAP_LANGUAGE, no SAP_URL
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)
   ${program} --env-path=my-system.env --connection-type=rfc
+
+  # RFC to an application server stated on the command line
+  ${program} --env-path=my-system.env --connection-type=rfc --ashost=<host> --sysnr=<NN> --client=<client> --language=<language>
 
   # RFC through a message server and a logon group
   ${program} --env-path=my-system.env --connection-type=rfc --mshost=<host> --sysid=<SID> --group=<group>

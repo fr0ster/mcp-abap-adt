@@ -60,12 +60,17 @@ mcp: TRIAL
 # env: trial
 # env-path: .env
 connection-type: http          # http | rfc — required for a destination, no default
-# RFC through a message server and a logon group (rfc only; mshost needs msserv or sysid):
-# mshost: msghost.example
-# msserv: sapmsABC
-# sysid: ABC
-# group: PUBLIC                # logon group; absent: connection's default PUBLIC
+# RFC (rfc only): one address, the client and the language; no URL. Below the CLI, the
+# environment and the destination's .env:
+# ashost: saphost.example      # an application server: its host
+# sysnr: "00"                  # and its system number
+# mshost: msghost.example      # or a message server: its host,
+# msserv: sapmsABC             # its service and/or
+# sysid: ABC                   # its system id,
+# group: <logon group>         # and its logon group (required with mshost)
 # saprouter: /H/router.example/S/3299/H/
+# client: "100"                # required over RFC
+# language: EN                 # required over RFC; also the master language of created objects
 system-type: cloud             # onprem | cloud | legacy
 unsafe: false                  # write named destinations' sessions to disk
 # auth-broker-path: ~/custom/path
@@ -84,11 +89,17 @@ browser-auth-port: 61001
 | `env` | string | - | Destination name resolved from the sessions store (`sessions/<name>.env`) |
 | `env-path` | string | - | Explicit path to `.env` file. Nothing is looked up in the working directory: a `.env` there is read only when named (`env-path: ./.env`) |
 | `connection-type` | string | — | SAP connection transport: `http` or `rfc`. Required for a destination unless the CLI, the environment or the destination's `.env` states it; no default |
-| `mshost` | string | — | RFC: the message server host. With it no RFC host or system number comes from the URL (`SAP_SYSNR` is not read); needs `msserv` or `sysid` — with neither, connection refuses naming both |
+| `ashost` | string | — | RFC: the application server host; with `sysnr`, the application-server address |
+| `sysnr` | string | — | RFC: the application server's two-digit system number |
+| `mshost` | string | — | RFC: the message server host; with `msserv` or `sysid` and `group`, the message-server address |
 | `msserv` | string | — | RFC: the message server service (name or port) |
 | `sysid` | string | — | RFC: the system id |
-| `group` | string | — (connection's `PUBLIC`) | RFC: the logon group; the server adds no default |
-| `saprouter` | string | — | RFC: the SAProuter string, with either addressing |
+| `group` | string | — | RFC: the logon group, required with `mshost`; no default |
+| `saprouter` | string | — | RFC: the SAProuter string, with either address |
+| `client` | string | — | The SAP client; required over RFC |
+| `language` | string | — | The logon language (required over RFC) and the master language of created objects |
+
+Each of these ranks below the CLI, the process environment and the destination's own `.env`. An RFC destination states exactly one address, its client and its language, and no URL; nothing is derived from a URL and nothing has a default.
 | `unsafe` | boolean | `false` | Write named destinations' sessions to disk instead of keeping them in memory |
 | `auth-broker-path` | string | - | Base directory of `service-keys/` and `sessions/` |
 | `browser` | string | `system` | Browser for a login: `system`, `auto`, `chrome`, `edge`, `firefox`, `none`, `headless` (mapped by the platform; excludes `browser-program`) |
@@ -138,8 +149,8 @@ state-idle-minutes: 30
 `state_handle`.
 
 Refused in `mcp-abap-adt-http`'s file: the destination and login keys (`mcp`, `env`, `env-path`,
-`auth-broker-path`, `allow-destination-header`, `unsafe`, `connection-type`, `mshost`, `msserv`,
-`sysid`, `group`, `saprouter`, `browser`, `browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`:
+`auth-broker-path`, `allow-destination-header`, `unsafe`, `connection-type`, `ashost`, `sysnr`,
+`mshost`, `msserv`, `sysid`, `group`, `saprouter`, `client`, `language`, `browser`, `browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`:
 ``<key> (config file): destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers``),
 `sse`, `exposition` and
 `transport`.

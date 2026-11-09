@@ -97,7 +97,7 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 23.x? See the [24.0 migration note](docs/MIGRATION-24.0.md) — over MCP two arguments become required (`CreateDomain`'s `package_name`, compact `HandlerCreate` `BEHAVIOR_IMPLEMENTATION`'s `behavior_definition`) and a few tools declare arguments their handlers already read; an embedder writes a tool's `inputSchema` in zod, builds an entry with `defineTool`, calls it as `entry.call(context, args)` and registers it with `registerTool(server, entry)`.
+Coming from 23.x? See the [24.0 migration note](docs/MIGRATION-24.0.md) — an RFC destination states its address (`SAP_ASHOST` and `SAP_SYSNR`, or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`; over MCP two arguments become required (`CreateDomain`'s `package_name`, compact `HandlerCreate` `BEHAVIOR_IMPLEMENTATION`'s `behavior_definition`) and a few tools declare arguments their handlers already read; an embedder writes a tool's `inputSchema` in zod, builds an entry with `defineTool`, calls it as `entry.call(context, args)` and registers it with `registerTool(server, entry)`.
 Coming from 22.x? See the [23.0 migration note](docs/MIGRATION-23.0.md) — `CreateProgram` no longer offers `include` (create an include with `CreateInclude`); an embedder registering the `./handlers` groups on its own `McpServer` states `systemType` (`SAP_SYSTEM_TYPE` is not read there), and `HandlerExporter` serves no background run and no debugger.
 Coming from 21.x? See the [22.0 migration note](docs/MIGRATION-22.0.md) — the tools, their enums and the object types each argument accepts are the declared system type's (onprem or cloud), inspection needs `--system-type` too, `function` / `func` are the function module, main types stand for their one code, `RunATC` on cloud offers no program, and `ValidateServiceBinding` requires `package_name`.
 Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only; over Streamable HTTP `state_handle` is an argument of every tool, and a long session keeps one SAP session across calls.
@@ -428,37 +428,43 @@ A JWT you already hold is not served over stdio: send it in the `x-sap-jwt-token
 `mcp-abap-adt-http` or `mcp-abap-adt-sse` (`@mcp-abap-adt/http`, `@mcp-abap-adt/sse`), or create
 the session with `mcp-auth`.
 
-For RFC connection:
+For RFC connection — the destination states its address, its client and its logon language, and no `SAP_URL`:
 ```bash
-SAP_URL=http://your-onprem-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
 ```
 
-`SAP_CONNECTION_TYPE=rfc` in the destination's `.env` (the `--env` / `--env-path` file, or `<auth-broker-path>/sessions/<name>.env` for `--mcp=<name>`) selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`); a port that follows no such rule needs `SAP_SYSNR` in the process environment. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK, a C++ toolchain, `SAPNWRFC_HOME` before the install).
+`SAP_CONNECTION_TYPE=rfc` in the destination's `.env` (the `--env` / `--env-path` file, or `<auth-broker-path>/sessions/<name>.env` for `--mcp=<name>`) selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`; the connection type is decided before anything else of the destination is read. An RFC destination states exactly one address — an application server (`SAP_ASHOST` and `SAP_SYSNR`, its two-digit system number) or a message server (below) — and `SAP_CLIENT` and `SAP_LANGUAGE`. Nothing is derived from a URL and nothing has a default. Each key is also a CLI option and a YAML key of its name (`--ashost`, `--sysnr`, `--client`, `--language`, …, YAML `ashost`, …), read in one order: the CLI, then the process environment, then the destination's own `.env` (or a service key's fallback), then YAML. The destination's `.env` does not feed the process environment for them. A destination that states a URL over RFC, two addresses, none, an incomplete one, or no client or language is refused at startup, naming the keys. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (the SAP NW RFC library at run time).
 
-**Through a message server and a logon group** (load-balanced logon): add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one of the two is required; `SAP_MSHOST` with neither is refused by `@mcp-abap-adt/connection`, naming both), and optionally `SAP_GROUP` (the logon group; `PUBLIC` when absent — connection's default, not the server's) and `SAP_SAPROUTER` (works with either addressing). Each is also `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, or the YAML key of that name, with the same precedence as the connection type; in the `.env` they belong to the `--env` / `--env-path` file. With `SAP_MSHOST` the RFC wire takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read; `SAP_URL` is still the system's URL. The server passes the five fields as configured and adds nothing. Logon through a message server is implemented and unit-tested, but not yet measured on a live system (as of 2026-10-20): if the SDK refuses `SAP_MSSERV` without `SAP_SYSID`, add `SAP_SYSID`.
+**Through a message server and a logon group** (load-balanced logon): instead of `SAP_ASHOST` and `SAP_SYSNR`, state `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (or both) and `SAP_GROUP` (the logon group). `SAP_SAPROUTER` goes with either address. Each is also `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, or the YAML key of that name, in the order above. The server passes the fields as stated and adds nothing. Logon through a message server is implemented and unit-tested, but not yet measured on a live system (as of 2026-10-20): if the SDK refuses `SAP_MSSERV` without `SAP_SYSID`, add `SAP_SYSID`.
 
 ```bash
-SAP_URL=http://your-onprem-system.example:8000
+SAP_MSHOST=your-message-server.example
+SAP_SYSID=ABC
+SAP_GROUP=<logon group>
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
-SAP_MSHOST=your-message-server.example
-SAP_SYSID=ABC
-SAP_GROUP=PUBLIC
 # Optional: SAP_MSSERV=sapmsABC, SAP_SAPROUTER=/H/your-router.example/S/3299/H/
 ```
 
+An embedder of `@mcp-abap-adt/lib` that reads a configuration from outside the type system (an env file, the environment, YAML) validates it before it builds an `ISapConfig` — the union of `ISapHttpConfig` and `ISapRfcConfig`, narrowed on `connectionType`; a typed `SapConfig` it hands to the server is used as typed. Over RFC `getBaseUrl()` answers `undefined`: `GetServiceBindingPreviewUrl` answers paths, and an injected connection's background runs need `EmbeddableMcpServerOptions.system`.
+
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
-SAP_URL=http://your-onprem-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
@@ -498,7 +504,9 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` or `rfc`; required for a destination unless its `.env`, the environment or YAML states it (no default)
+- `--ashost`, `--sysnr` - RFC to an application server (`SAP_ASHOST`, `SAP_SYSNR` — see above)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … — see above)
+- `--client`, `--language` - The client and the logon language (`SAP_CLIENT`, `SAP_LANGUAGE`); both required over RFC
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.

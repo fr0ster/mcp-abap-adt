@@ -21,6 +21,11 @@ let cached: IAdtSystemContext | undefined;
  * `undefined` when it states none. It fills only what the process context
  * lacks: a value an embedder stated (`setSystemContext`, `systemContext`) survives every request that sets a
  * context up. Sends nothing.
+ *
+ * The environment read here is the process's own: no destination's `.env`
+ * joins it (24.0.0). A destination's master language is its `SAP_LANGUAGE`
+ * in effect, handed with its system context (`withDestinationSystemContext`),
+ * and beats this process value.
  */
 export function systemContextFromConfiguration():
   | IAdtSystemContext

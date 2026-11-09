@@ -390,16 +390,19 @@ describe('the YAML template and validation come from the table', () => {
   it('holds core rows and no other binary keys', () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
+        'ashost',
         'auth-broker-path',
         'auth-debug',
         'batch',
         'browser',
         'browser-auth-port',
         'browser-program',
+        'client',
         'connection-type',
         'env',
         'env-path',
         'group',
+        'language',
         'login-timeout',
         'mcp',
         'msserv',
@@ -408,6 +411,7 @@ describe('the YAML template and validation come from the table', () => {
         'saprouter',
         'shutdown-timeout',
         'sysid',
+        'sysnr',
         'system-type',
         'unsafe',
       ].sort(),

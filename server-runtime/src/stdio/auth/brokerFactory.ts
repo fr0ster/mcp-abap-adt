@@ -31,6 +31,7 @@ import type {
   IAuthProviderError,
   IRenewalStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
+import type { IConnectionConfig } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
@@ -38,8 +39,9 @@ import {
   SettingsError,
 } from '@mcp-abap-adt/lib/auth';
 import {
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
+  DESTINATION_KEYS,
+  type DestinationKey,
+  type DestinationKeyValues,
 } from '@mcp-abap-adt/lib/config';
 import { getPlatformPaths } from '../config/platformPaths';
 import { countedProvider, ProviderGate } from './countedProvider';
@@ -55,7 +57,10 @@ import {
   handlerFor,
 } from './handlers';
 import type { IAuthBrokerFactory, SettleReport } from './IAuthBrokerFactory.js';
-import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
+import type {
+  IAuthBrokerFactoryConfig,
+  StartDestinationKeys,
+} from './IAuthBrokerFactoryConfig.js';
 import { brokerLogger, type LoginBound, loginBound } from './serverLogin';
 import {
   type RenewalMode,
@@ -113,6 +118,46 @@ const SILENT: ILogger = {
   error: () => {},
   debug: () => {},
 };
+
+/** The means field each destination key is read from. */
+const MEANS_FIELD = {
+  ashost: 'ashost',
+  sysnr: 'sysnr',
+  mshost: 'mshost',
+  msserv: 'msserv',
+  sysid: 'sysid',
+  group: 'group',
+  saprouter: 'saprouter',
+  client: 'sapClient',
+  language: 'language',
+} as const satisfies Record<DestinationKey, keyof IConnectionConfig>;
+
+/** `value` trimmed; a blank one is unset. */
+function stated(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/**
+ * The destination keys in effect: for each, the start's CLI or process
+ * environment, then the destination's means (its `.env`, then a service
+ * key's fallback, as its store merged them), then YAML — trimmed, a blank
+ * value unset. A key stated nowhere has no key.
+ */
+export function effectiveDestinationKeys(
+  start: StartDestinationKeys | undefined,
+  means: IConnectionConfig | null | undefined,
+): DestinationKeyValues {
+  const out: DestinationKeyValues = {};
+  for (const key of DESTINATION_KEYS) {
+    const value =
+      stated(start?.overMeans[key]) ??
+      stated(means?.[MEANS_FIELD[key]]) ??
+      stated(start?.underMeans[key]);
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
 
 const RENEWALS: Readonly<Record<RenewalMode, () => IRenewalStrategy>> = {
   'refresh-then-login': refreshThenLogin,
@@ -217,19 +262,16 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return settings;
   }
 
-  /** The message-server fields the server was started with, each only when set. */
-  private messageServer(): Pick<SapConfig, MessageServerField> {
-    const out: Pick<SapConfig, MessageServerField> = {};
-    for (const field of MESSAGE_SERVER_FIELDS) {
-      const value = this.config[field];
-      if (value !== undefined) out[field] = value;
-    }
-    return out;
+  /** The destination keys in effect for `destination` (`effectiveDestinationKeys`). */
+  async destinationKeysFor(destination: string): Promise<DestinationKeyValues> {
+    const { broker } = await this.buildOf(destination);
+    const means = await broker.getConnectionConfig(destination);
+    return effectiveDestinationKeys(this.config.destinationKeys, means);
   }
 
   private async readSettings(destination: string): Promise<SapConfig> {
-    const { broker, handler, vetted, stores } = await this.buildOf(destination);
-    const means = await broker.getConnectionConfig(destination);
+    const { handler, vetted, stores } = await this.buildOf(destination);
+    const keys = await this.destinationKeysFor(destination);
     // An XSUAA destination's URL is XSUAA_MCP_URL alone, never the key's url.
     const url = (await stores.urlStore.getConnectionConfig(destination))
       ?.serviceUrl;
@@ -242,13 +284,17 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     }
     const settings: SapConfig = {
       url,
-      ...(means?.sapClient ? { client: means.sapClient } : {}),
+      ...(keys.client !== undefined ? { client: keys.client } : {}),
       authType: vetted.authType,
       ...(this.config.connectionType
         ? { connectionType: this.config.connectionType }
         : {}),
-      // RFC through a message server: as configured, an absent field no key.
-      ...this.messageServer(),
+      // RFC through a message server: as stated, an absent field no key.
+      ...(keys.mshost !== undefined ? { mshost: keys.mshost } : {}),
+      ...(keys.msserv !== undefined ? { msserv: keys.msserv } : {}),
+      ...(keys.sysid !== undefined ? { sysid: keys.sysid } : {}),
+      ...(keys.group !== undefined ? { group: keys.group } : {}),
+      ...(keys.saprouter !== undefined ? { saprouter: keys.saprouter } : {}),
     };
     try {
       handler.checkSettings?.(settings, this.context);
@@ -267,16 +313,22 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
 
   /**
    * The responsible, the login and the master system the destination's own
-   * `.env` states, read once per process like its settings. The process environment is not
-   * read here: it is the server's fallback, after the destination.
+   * `.env` states, and the master language of its created objects — its
+   * `SAP_LANGUAGE` in effect (`effectiveDestinationKeys`) — read once per
+   * process like its settings. The process environment is read here only as
+   * the start parameters rank it.
    */
   systemContextFor(destination: string): Promise<DestinationSystemContext> {
     const cached = this.systemContexts.get(destination);
     if (cached) return cached;
-    const context = (async () =>
-      readDestinationSystemContext(
-        (await this.buildOf(destination)).stores.destinationFile,
-      ))();
+    const context = (async (): Promise<DestinationSystemContext> => {
+      const { stores } = await this.buildOf(destination);
+      const { language } = await this.destinationKeysFor(destination);
+      return {
+        ...readDestinationSystemContext(stores.destinationFile),
+        ...(language !== undefined ? { masterLanguage: language } : {}),
+      };
+    })();
     this.systemContexts.set(destination, context);
     context.catch(() => {
       if (this.systemContexts.get(destination) === context) {

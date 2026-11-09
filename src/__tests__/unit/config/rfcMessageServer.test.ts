@@ -1,15 +1,14 @@
 /**
- * RFC through a message server and a logon group: the environment's
- * `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and `SAP_SAPROUTER`
- * reach the `SapConfig` that `createConnection` is handed, as given — trimmed
- * as `SAP_CLIENT` is, nothing else. The server adds no default (`group`'s
- * `PUBLIC` is connection's) and decides nothing: connection refuses a
- * message server with neither `msserv` nor `sysid`, and that refusal reaches
- * the caller as it came.
+ * RFC through a message server and a logon group: a `SapConfig` stating
+ * `mshost`, `msserv`, `sysid`, `group` and `saprouter` reaches
+ * `createConnection` as given. The server adds no default and decides
+ * nothing: connection refuses a message server with neither `msserv` nor
+ * `sysid`, and that refusal reaches the caller as it came.
  *
- * The reader is `applyMessageServerFields` (`@mcp-abap-adt/lib/config`), on a
- * basic config built here: the two `getConfig()` copies that called it, and
- * guessed the rest of the config from the environment, are gone (#320).
+ * The config is built here from the variables, trimmed as the start reads
+ * them; the server's own reading of the keys (the start parameters, the
+ * destination's means) is `rfcMessageServerChain.test.ts`'s (24.0.0: the
+ * library reads no environment).
  */
 
 jest.mock('@mcp-abap-adt/connection', () => {
@@ -23,7 +22,6 @@ jest.mock('@mcp-abap-adt/connection', () => {
 
 import { createConnection, rfcParamsFrom } from '@mcp-abap-adt/connection';
 import {
-  applyMessageServerFields,
   RfcAddressRefusal,
   rfcAddressRefusalOf,
 } from '../../../lib/config/messageServer';
@@ -81,7 +79,10 @@ function readerOf(): Reader {
     };
     const client = process.env.SAP_CLIENT?.trim();
     if (client) config.client = client;
-    applyMessageServerFields(config, process.env);
+    for (const [env, field] of Object.entries(FIELDS)) {
+      const value = process.env[env]?.trim();
+      if (value) config[field] = value;
+    }
     return config;
   };
 }

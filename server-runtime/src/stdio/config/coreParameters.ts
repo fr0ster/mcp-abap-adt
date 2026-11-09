@@ -9,12 +9,12 @@
 import {
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKey,
   flagValue,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
-  MESSAGE_SERVER_ENV,
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
   numberValue,
   type Parameter,
   ParameterRefusal,
@@ -140,30 +140,55 @@ export const CORE_ROWS: readonly Parameter[] = [
 ];
 
 /**
- * RFC through a message server and a logon group (connection 18), in
- * `--connection-type`'s form: `SAP_X` → `--x` → `x`. Carried as configured;
- * no default here (`group`'s `PUBLIC` is connection's), no check (connection
- * refuses `mshost` with neither `msserv` nor `sysid`).
+ * The RFC address, the client and the logon language, in
+ * `--connection-type`'s form: `SAP_X` → `--x` → `x`. Each is read as stated
+ * — no default, no derivation; the destination's own `.env` ranks between
+ * the environment and YAML (the broker factory merges them).
  */
-const MESSAGE_SERVER_HELP: Readonly<Record<MessageServerField, string>> = {
+const DESTINATION_KEY_HELP: Readonly<Record<DestinationKey, string>> = {
+  ashost:
+    'RFC: the application server host; with --sysnr, the application-server address',
+  sysnr: 'RFC: the system number of the application server (two digits)',
   mshost:
-    'RFC: the message server host. With it, RFC logs on through the message server and takes no host or system number from the URL; needs --msserv or --sysid',
+    'RFC: the message server host; with --msserv or --sysid and --group, the message-server address',
   msserv: 'RFC: the message server service (name or port)',
   sysid: 'RFC: the system id, which names the message server service',
-  group: 'RFC: the logon group (connection default: PUBLIC)',
-  saprouter: 'RFC: the SAProuter string, with or without a message server',
+  group: 'RFC: the logon group of the message server, required with --mshost',
+  saprouter: 'RFC: the SAProuter string, with either address',
+  client: 'The SAP client; required over RFC',
+  language:
+    'The logon language (RFC, required) and the master language of created objects',
 };
 
-export const MESSAGE_SERVER_ROWS: readonly Parameter[] =
-  MESSAGE_SERVER_FIELDS.map((field) => ({
-    key: field,
-    cli: `--${field}`,
-    env: MESSAGE_SERVER_ENV[field],
-    yaml: field,
+export const DESTINATION_KEY_ROWS: readonly Parameter[] = DESTINATION_KEYS.map(
+  (key) => ({
+    key,
+    cli: `--${key}`,
+    env: DESTINATION_KEY_ENV[key],
+    yaml: key,
     kind: 'string',
     section: DESTINATION,
-    help: MESSAGE_SERVER_HELP[field],
-  }));
+    help: DESTINATION_KEY_HELP[key],
+  }),
+);
+
+/** The message server's five keys (`--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`). */
+export const MESSAGE_SERVER_KEYS = [
+  'mshost',
+  'msserv',
+  'sysid',
+  'group',
+  'saprouter',
+] as const satisfies readonly DestinationKey[];
+
+/**
+ * The message server's rows of {@link DESTINATION_KEY_ROWS}, as 19.1.0
+ * exported them; the table carries every destination key.
+ */
+export const MESSAGE_SERVER_ROWS: readonly Parameter[] =
+  DESTINATION_KEY_ROWS.filter((row) =>
+    MESSAGE_SERVER_KEYS.some((key) => key === row.key),
+  );
 
 /** The longest login bound: a day. */
 export const MAX_LOGIN_TIMEOUT_SECONDS = 86_400;
@@ -301,7 +326,7 @@ export function coreParameters(
       CONF_ROW,
       SYSTEM_TYPE_ROW,
       ...CORE_ROWS,
-      ...MESSAGE_SERVER_ROWS,
+      ...DESTINATION_KEY_ROWS,
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
@@ -377,6 +402,10 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
    * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
    */
   connectionTypeSource?: string;
+  /** RFC: the application server host (`--ashost`, `SAP_ASHOST`, `ashost`). */
+  ashost?: string;
+  /** RFC: the system number (`--sysnr`, `SAP_SYSNR`, `sysnr`). */
+  sysnr?: string;
   /** RFC: the message server host (`--mshost`, `SAP_MSHOST`, `mshost`). */
   mshost?: string;
   /** RFC: the message server service (`--msserv`, `SAP_MSSERV`, `msserv`). */
@@ -387,11 +416,16 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   group?: string;
   /** RFC: the SAProuter string (`--saprouter`, `SAP_SAPROUTER`, `saprouter`). */
   saprouter?: string;
+  /** The client (`--client`, `SAP_CLIENT`, `client`). */
+  client?: string;
+  /** The logon language (`--language`, `SAP_LANGUAGE`, `language`). */
+  language?: string;
   /**
-   * The form each message-server field came from, as `connectionTypeSource`:
-   * only the CLI form beats what the env file brings.
+   * The form each destination key came from (`--<key>`, `SAP_<KEY>`, or
+   * `<key> (config file)`): the CLI and the environment rank above the
+   * destination's own means, YAML below them.
    */
-  messageServerSource?: Partial<Record<MessageServerField, string>>;
+  destinationKeySource?: Partial<Record<DestinationKey, string>>;
 }
 
 const str = textValue;
@@ -458,23 +492,23 @@ export function readCoreConfig(
       values.loginTimeout === undefined ? undefined : source('loginTimeout'),
     connectionType: wordValue(values.connectionType, CONNECTION_TYPES),
     connectionTypeSource: source('connectionType'),
-    ...messageServerOf(values, source),
+    ...destinationKeysOf(values, source),
   };
 }
 
-/** The message-server fields set, each with its source; an unset one has no key. */
-function messageServerOf(
+/** The destination keys set, each with its source; an unset one has no key. */
+function destinationKeysOf(
   values: Record<string, ParameterValue>,
   source: (key: string) => string | undefined,
-): Pick<CoreConfig, MessageServerField | 'messageServerSource'> {
-  const out: Pick<CoreConfig, MessageServerField> = {};
-  const sources: Partial<Record<MessageServerField, string>> = {};
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = str(values[field]);
+): Pick<CoreConfig, DestinationKey | 'destinationKeySource'> {
+  const out: Pick<CoreConfig, DestinationKey> = {};
+  const sources: Partial<Record<DestinationKey, string>> = {};
+  for (const key of DESTINATION_KEYS) {
+    const value = str(values[key]);
     if (value === undefined) continue;
-    out[field] = value;
-    const from = source(field);
-    if (from !== undefined) sources[field] = from;
+    out[key] = value;
+    const from = source(key);
+    if (from !== undefined) sources[key] = from;
   }
-  return { ...out, messageServerSource: sources };
+  return { ...out, destinationKeySource: sources };
 }

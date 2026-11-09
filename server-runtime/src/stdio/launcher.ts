@@ -10,12 +10,12 @@ import {
 } from '@mcp-abap-adt/lib/auth';
 import {
   answerVersionOrHelp,
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKeyValues,
   generateHelp,
   type LauncherEdges,
   libInstances,
-  MESSAGE_SERVER_ENV,
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
   processEdges,
   readStartupConfig,
   rfcAddressRefusalOf,
@@ -53,10 +53,12 @@ import {
   destinationFailureWords,
   type IAuthBrokerFactoryConfig,
   promptLogger,
+  type StartDestinationKeys,
 } from './auth';
 import {
   type CoreConfig,
   coreParameters,
+  MESSAGE_SERVER_KEYS,
   readCoreConfig,
   statedLoginTimeout,
 } from './config/coreParameters';
@@ -414,13 +416,6 @@ function effectiveFromEnvironment<T extends string>(
   return word;
 }
 
-/** `config` without its message-server fields: they are read again after the env file. */
-function withoutMessageServer(config: CoreConfig): CoreConfig {
-  const rest: CoreConfig = { ...config };
-  for (const field of MESSAGE_SERVER_FIELDS) delete rest[field];
-  return rest;
-}
-
 /** The connection type: see {@link effectiveFromEnvironment}. */
 export function effectiveConnectionType(
   config: CoreConfig,
@@ -436,37 +431,50 @@ export function effectiveConnectionType(
 }
 
 /**
- * The message server's fields (RFC, connection 18), each as
- * {@link effectiveFromEnvironment} reads the connection type: the CLI, then
- * the process environment — which by now holds what the env file states,
- * never over a value set before — then YAML. Taken as given, trimmed; no
- * default, no check: connection refuses what it cannot dial.
+ * The destination keys the start parameters state (the RFC address, the
+ * client, the language), by rank against the destination's means: the CLI
+ * and the process's own environment above them, YAML below. A config made
+ * by hand, with no source, ranks above them, as the CLI does. Read once,
+ * at the start: no destination's `.env` joins the environment, so nothing
+ * is read again after it.
+ */
+export function startDestinationKeys(config: CoreConfig): StartDestinationKeys {
+  const overMeans: DestinationKeyValues = {};
+  const underMeans: DestinationKeyValues = {};
+  for (const key of DESTINATION_KEYS) {
+    const value = config[key];
+    if (value === undefined) continue;
+    const source = config.destinationKeySource?.[key];
+    const belowMeans =
+      source !== undefined &&
+      !source.startsWith('--') &&
+      source !== DESTINATION_KEY_ENV[key];
+    if (belowMeans) underMeans[key] = value;
+    else overMeans[key] = value;
+  }
+  return { overMeans, underMeans };
+}
+
+/**
+ * The message server's five fields of `config` as 19.1.0 read them: the CLI
+ * form, else `env`'s variable, else the value read (YAML) — trimmed, a blank
+ * one unset. The launcher no longer calls it: no destination's `.env` joins
+ * the environment, so the start reads the keys once
+ * ({@link startDestinationKeys}).
  */
 export function effectiveMessageServer(
   config: CoreConfig,
   env: NodeJS.ProcessEnv,
-): Pick<CoreConfig, MessageServerField> {
-  const out: Pick<CoreConfig, MessageServerField> = {};
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = config[field];
-    const source = config.messageServerSource?.[field];
+): Pick<CoreConfig, (typeof MESSAGE_SERVER_KEYS)[number]> {
+  const out: Pick<CoreConfig, (typeof MESSAGE_SERVER_KEYS)[number]> = {};
+  for (const key of MESSAGE_SERVER_KEYS) {
+    const value = config[key];
+    const source = config.destinationKeySource?.[key];
     const fromCli = value !== undefined && (source?.startsWith('--') ?? true);
     const stated = fromCli
       ? value
-      : env[MESSAGE_SERVER_ENV[field]]?.trim() || value;
-    if (stated) out[field] = stated;
-  }
-  return out;
-}
-
-/** The message-server fields set on `config`, as `SapConfig` takes them. */
-function messageServerOf(
-  config: Pick<CoreConfig, MessageServerField>,
-): Pick<IAuthBrokerFactoryConfig, MessageServerField> {
-  const out: Pick<IAuthBrokerFactoryConfig, MessageServerField> = {};
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = config[field];
-    if (value !== undefined) out[field] = value;
+      : env[DESTINATION_KEY_ENV[key]]?.trim() || value;
+    if (stated) out[key] = stated;
   }
   return out;
 }
@@ -520,7 +528,7 @@ export function factoryConfigFrom(
       browserAuthPort: config.browserAuthPort,
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
-    ...messageServerOf(config),
+    destinationKeys: startDestinationKeys(config),
     ...(config.renewal && { renewal: config.renewal }),
     ...(config.authDebug === true && { authDebug: true }),
     ...(config.loginTimeout !== undefined && {
@@ -774,12 +782,7 @@ async function launchStdio(
   if (connectionType) process.env.SAP_CONNECTION_TYPE = connectionType;
   // The connector reads the system type from the environment.
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
-  config = {
-    ...withoutMessageServer(config),
-    connectionType,
-    systemType,
-    ...effectiveMessageServer(config, process.env),
-  };
+  config = { ...config, connectionType, systemType };
 
   // The command's tool set: fixed by the command, never by a flag.
   const handlersRegistry = registryOf(options.toolSet, 'stdio');

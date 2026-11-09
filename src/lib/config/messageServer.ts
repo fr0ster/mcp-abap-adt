@@ -1,14 +1,16 @@
 import { rfcParamsFrom, type SapConfig } from '@mcp-abap-adt/connection';
 
 /**
- * RFC through a message server and a logon group (connection 18): the
- * `SapConfig` field each environment variable sets. The server carries them
- * as configured and decides nothing — no default (`group`'s `PUBLIC` is
- * connection's), no check (connection refuses `mshost` with neither
- * `msserv` nor `sysid`, naming both).
+ * The destination keys of an RFC address, and the client and the logon
+ * language: one list for every source — the CLI (`--<key>`), the process
+ * environment (`SAP_<KEY>`), the destination's own means (its `.env`, then a
+ * service key's fallback) and YAML (`<key>`). Read as stated: no default, no
+ * derivation.
  */
-/** The five fields, in a fixed order. */
-export const MESSAGE_SERVER_FIELDS = [
+/** The seven keys of an RFC address, in a fixed order. */
+export const RFC_ADDRESS_KEYS = [
+  'ashost',
+  'sysnr',
   'mshost',
   'msserv',
   'sysid',
@@ -16,29 +18,32 @@ export const MESSAGE_SERVER_FIELDS = [
   'saprouter',
 ] as const;
 
-export type MessageServerField = (typeof MESSAGE_SERVER_FIELDS)[number];
+export type RfcAddressKey = (typeof RFC_ADDRESS_KEYS)[number];
 
-export const MESSAGE_SERVER_ENV = {
+/** Every destination key of this list: the address, then the client and the language. */
+export const DESTINATION_KEYS = [
+  ...RFC_ADDRESS_KEYS,
+  'client',
+  'language',
+] as const;
+
+export type DestinationKey = (typeof DESTINATION_KEYS)[number];
+
+/** Each key's environment (and `.env`) name. */
+export const DESTINATION_KEY_ENV = {
+  ashost: 'SAP_ASHOST',
+  sysnr: 'SAP_SYSNR',
   mshost: 'SAP_MSHOST',
   msserv: 'SAP_MSSERV',
   sysid: 'SAP_SYSID',
   group: 'SAP_GROUP',
   saprouter: 'SAP_SAPROUTER',
-} as const satisfies Record<MessageServerField, string>;
+  client: 'SAP_CLIENT',
+  language: 'SAP_LANGUAGE',
+} as const satisfies Record<DestinationKey, string>;
 
-/**
- * Sets each field `env` states on `config`, trimmed as `SAP_CLIENT` is; a
- * field `env` does not state (or states blank) gets no key.
- */
-export function applyMessageServerFields(
-  config: SapConfig,
-  env: NodeJS.ProcessEnv,
-): void {
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = env[MESSAGE_SERVER_ENV[field]]?.trim();
-    if (value) config[field] = value;
-  }
-}
+/** A value of each key, each only when stated. */
+export type DestinationKeyValues = Partial<Record<DestinationKey, string>>;
 
 /**
  * connection's own refusal of an RFC address it cannot dial — a message

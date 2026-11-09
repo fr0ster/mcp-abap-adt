@@ -67,10 +67,12 @@ export {
 } from './binaries.js';
 export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
 export {
-  applyMessageServerFields,
-  MESSAGE_SERVER_ENV,
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKey,
+  type DestinationKeyValues,
+  RFC_ADDRESS_KEYS,
+  type RfcAddressKey,
   rfcAddressRefusalOf,
 } from './messageServer.js';
 export {

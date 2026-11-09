@@ -10,7 +10,7 @@
  * - **Handles**: 128 random bits as hex, after the host's `prefix` (an
  *   instance id, when the host routes handles between instances — the
  *   routing is the host's).
- * - **Ownership**: each run is its caller's (URL, client, backend user);
+ * - **Ownership**: each run is its caller's (system, client, backend user);
  *   another caller's handle reads exactly as an unknown one.
  * - **Limit**: {@link BACKGROUND_RUNS_PER_CALLER} per caller, running plus
  *   kept; no process-wide limit.
@@ -49,7 +49,7 @@ interface Kept {
 }
 
 function ownerKey(caller: BackgroundRunCaller): string {
-  return JSON.stringify([caller.url, caller.client, caller.user]);
+  return JSON.stringify([caller.system, caller.client, caller.user]);
 }
 
 /** An ended run's state: `cancelled` when its answer says so. */

@@ -80,6 +80,14 @@ export const BACKGROUND_RUNS_UNAVAILABLE_WORDS =
   'background runs are not available here: the host gave this server no store for them';
 
 /**
+ * `background_runs_unavailable` on an injected connection that answers no
+ * URL (RFC) when the host stated no `system`: a run is kept only for a
+ * caller whose system is known.
+ */
+export const BACKGROUND_RUNS_NO_SYSTEM_WORDS =
+  'background runs are not available here: the connection the host gave answers no URL, and the host stated no `system` (EmbeddableMcpServerOptions.system) to identify the system a run is kept for';
+
+/**
  * A `run_handle` that names no background run of the caller's: unknown or
  * someone else's — the same words for each.
  */
@@ -327,8 +335,14 @@ export class ServerRefusal extends Error {
    * `batchMorePartsWords`.
    */
   constructor(code: WordedCode, words: string);
+  /** `background_runs_unavailable` for an injected connection with no system known. */
+  constructor(
+    code: 'background_runs_unavailable',
+    words: typeof BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+  );
   constructor(code: ServerRefusalCode, words?: string) {
     const text =
+      (code === 'background_runs_unavailable' && words !== undefined) ||
       code === 'destination_refused' ||
       code === 'background_run_limit' ||
       code === 'batch_not_recordable' ||

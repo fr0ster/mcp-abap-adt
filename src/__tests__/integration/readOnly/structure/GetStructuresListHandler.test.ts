@@ -17,7 +17,7 @@
  * Run: npm test -- --testPathPatterns=readOnly/structure/GetStructuresListHandler
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetStructuresList } from '../../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   getEnabledTestCase,
@@ -52,7 +52,7 @@ interface StructureNode {
 }
 
 describe('GetStructuresList ReadOnly Handler Integration', () => {
-  let connection: AbapConnection | null = null;
+  let connection: IAbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
   let mcp: HardModeClient | null = null;

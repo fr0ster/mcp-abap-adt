@@ -1,4 +1,3 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
@@ -46,7 +45,7 @@ export interface EmbeddableMcpServerOptions {
    * ABAP connection to use for all handler calls
    * Injected from consumer (e.g., CloudSdkAbapConnection in cloud-llm-hub)
    */
-  connection: AbapConnection;
+  connection: IAbapConnection;
 
   /**
    * A connection of its own for an operation that needs a new ABAP session:
@@ -80,6 +79,17 @@ export interface EmbeddableMcpServerOptions {
    * long tool answers in the call.
    */
   backgroundRuns?: IBackgroundRuns;
+
+  /**
+   * The system the injected connection reaches, as a key of your choosing,
+   * when the connection answers no URL (`getBaseUrl()` answers `undefined`:
+   * RFC). Background runs are kept per system, client and user; a
+   * connection that answers a URL is keyed by it, and this is not read.
+   * Without a URL and without it, background runs are refused
+   * (`background_runs_unavailable`). Two different systems must be given
+   * different keys: a run of one is never served to the other.
+   */
+  system?: string;
 
   /**
    * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
@@ -295,6 +305,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'injected',
       connection: options.connection,
+      ...(options.system !== undefined && { system: options.system }),
       sessionId: 'embedded',
     });
 

@@ -79,11 +79,25 @@ import { return_error } from '../../../lib/utils';
 /** The resource `getSystemInformation` reads. */
 const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
 
+/** The note of an answer over RFC: its URLs carry no origin. */
+export const NO_ORIGIN_NOTE =
+  "The destination is RFC and states no URL: prefix the system's HTTP origin.";
+
+/**
+ * The path of a service URL: an absolute one's (the URL parser's), a path
+ * as it is up to its query.
+ */
+function pathOf(serviceUrl: string): string {
+  if (!serviceUrl.startsWith('/')) return new URL(serviceUrl).pathname;
+  const query = serviceUrl.indexOf('?');
+  return query === -1 ? serviceUrl : serviceUrl.slice(0, query);
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.',
+    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.',
   inputSchema: z.object({
     service_binding_name: z.string().describe('Service binding name.'),
     entity_set: z
@@ -141,7 +155,10 @@ export async function handleGetServiceBindingPreviewUrl(
   const definition = adt.getServiceDefinition(
     resultsFor(serviceDefinitionDocuments),
   );
-  const baseUrl = withoutTrailing(await connection.getBaseUrl(), '/');
+  // Over RFC the connection has no HTTP origin: the URLs are answered as
+  // their paths and query, and the answer says the origin is unknown.
+  const origin = await connection.getBaseUrl();
+  const baseUrl = origin === undefined ? '' : withoutTrailing(origin, '/');
 
   // `client` and `language` are what the preview URL carries and what a caller
   // has no way to know. ADT answers both from `systeminformation`, which this
@@ -377,7 +394,7 @@ export async function handleGetServiceBindingPreviewUrl(
           ? undefined
           : facts.protocol === 'odatav4'
             ? {
-                servicePath: new URL(serviceUrl).pathname,
+                servicePath: pathOf(serviceUrl),
                 entitySet,
                 navigation: navigation ?? '',
                 targetEntitySet: target ?? entitySet,
@@ -403,6 +420,7 @@ export async function handleGetServiceBindingPreviewUrl(
             'The service and $metadata URLs are how it is addressed.'
           : undefined,
 
+        origin === undefined ? NO_ORIGIN_NOTE : undefined,
         systemLookupFailed === undefined
           ? undefined
           : 'The client and language the system reports could not be read (system_information_failure), so the preview URL carries only what was passed in.',
@@ -421,6 +439,7 @@ export async function handleGetServiceBindingPreviewUrl(
         client,
         language,
         associations,
+        ...(origin === undefined && { origin: 'unknown' as const }),
         service_url: serviceUrl,
         service_url_source:
           category.serviceUrl === undefined ? 'composed' : 'system',

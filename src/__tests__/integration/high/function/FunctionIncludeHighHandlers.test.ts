@@ -25,7 +25,7 @@
  * Run: npm test -- --testPathPatterns=high/function/FunctionIncludeHigh
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleCreateFunctionInclude } from '../../../../handlers/function_include/high/handleCreateFunctionInclude';
@@ -60,7 +60,7 @@ import { delay, parseHandlerResponse } from '../../helpers/testHelpers';
 const testLogger = createTestLogger('function-include-high');
 
 describe('FunctionInclude High-Level Handlers Integration', () => {
-  let connection: AbapConnection | null = null;
+  let connection: IAbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
   let mcp: HardModeClient | null = null;

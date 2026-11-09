@@ -8,9 +8,9 @@
 import { BACKGROUND_RUNS_PER_CALLER, InMemoryBackgroundRuns } from '../index';
 
 describe('the in-memory store', () => {
-  const alice = { url: 'http://sys', client: '100', user: 'ALICE' };
-  const bob = { url: 'http://sys', client: '100', user: 'BOB' };
-  const otherClient = { url: 'http://sys', client: '200', user: 'ALICE' };
+  const alice = { system: 'http://sys', client: '100', user: 'ALICE' };
+  const bob = { system: 'http://sys', client: '100', user: 'BOB' };
+  const otherClient = { system: 'http://sys', client: '200', user: 'ALICE' };
   const run = { tool: 'RuntimeRunClass', object: 'X', started_at: 't0' };
   const answer = { content: [{ type: 'text' as const, text: 'out' }] };
 

@@ -9,7 +9,7 @@
  * - Lifecycle hooks (beforeAll, afterAll, beforeEach, afterEach)
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
@@ -117,7 +117,7 @@ export class LambdaTester {
    */
   async init(): Promise<void> {
     let hasConfig = false;
-    let connection: AbapConnection | null = null;
+    let connection: IAbapConnection | null = null;
     let session: SessionInfo | null = null;
     let logger: LoggerWithExtras | null = null;
     let testCase: any = null;
@@ -270,7 +270,7 @@ export class LambdaTester {
 
         this.context = {
           hasConfig: true,
-          connection: {} as AbapConnection,
+          connection: {} as IAbapConnection,
           session: {} as SessionInfo,
           logger,
           authType: undefined,
@@ -380,7 +380,7 @@ export class LambdaTester {
 
       this.context = {
         hasConfig: false,
-        connection: connection || ({} as AbapConnection),
+        connection: connection || ({} as IAbapConnection),
         session: session || ({} as SessionInfo),
         logger: errorLogger,
         authType: undefined,

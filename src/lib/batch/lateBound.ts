@@ -68,7 +68,7 @@ export class LateBoundConnection implements IAbapConnection {
     return this.target().connect();
   }
 
-  async getBaseUrl(): Promise<string> {
+  async getBaseUrl(): Promise<string | undefined> {
     return this.target().getBaseUrl();
   }
 

@@ -5,7 +5,6 @@ import {
   programDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type {
   AdtTypeCode,
   IAdtError,
@@ -275,7 +274,7 @@ export function parseEnhancementsFromXml(
  * program).
  */
 async function determineObjectTypeAndPath(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectName: string,
   manualProgramContext?: string,
   requestedType?: string,
@@ -617,7 +616,7 @@ async function getIncludesListInternal(
  * @returns Enhancement response for the single object
  */
 async function getEnhancementsForSingleObject(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectName: string,
   manualProgramContext?: string,
   requestedType?: string,

@@ -142,7 +142,8 @@ export function createRecorder(
     Promise.reject<T>(new ServerRefusal('batch_ended'));
   const recorder: Recorder = {
     connect: () => (ended() ? endedRefusal<void>() : batch.connect()),
-    getBaseUrl: () => (ended() ? endedRefusal<string>() : batch.getBaseUrl()),
+    getBaseUrl: () =>
+      ended() ? endedRefusal<string | undefined>() : batch.getBaseUrl(),
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type) => batch.setSessionType(type),
     getSessionType: () => batch.getSessionType(),

@@ -111,7 +111,7 @@ describe('an embedder', () => {
       });
       expect(
         strategy.list({
-          url: standIn.url,
+          system: JSON.stringify(['http', standIn.url, '']),
           client: '',
           user: 'EMBEDDED_USER',
         }),

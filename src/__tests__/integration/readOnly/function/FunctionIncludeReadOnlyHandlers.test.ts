@@ -14,7 +14,7 @@
  * Run: npm test -- --testPathPatterns=readOnly/function/FunctionIncludeReadOnly
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetFunctionInclude } from '../../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import { handleListFunctionGroupIncludes } from '../../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../../handlers/function_include/readonly/handleListFunctionModules';
@@ -43,7 +43,7 @@ import {
 const testLogger = createTestLogger('function-include-readonly');
 
 describe('FunctionInclude ReadOnly Handlers Integration', () => {
-  let connection: AbapConnection | null = null;
+  let connection: IAbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
   let mcp: HardModeClient | null = null;

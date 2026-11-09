@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,6 +26,7 @@ import {
   readGuarded,
 } from '../lib/auth/failures.js';
 import {
+  BACKGROUND_RUNS_NO_SYSTEM_WORDS,
   batchNotRecordableWords,
   batchNotServedWords,
   ServerRefusal,
@@ -201,9 +202,9 @@ interface BuiltConnection {
    * force (`CurrentCredential.take`).
    */
   credential: CurrentCredential;
-  connection: Promise<AbapConnection>;
+  connection: Promise<IAbapConnection>;
   /** The connection once its connect completed. */
-  ready?: AbapConnection;
+  ready?: IAbapConnection;
   /**
    * Calls handed this entry's connection and not yet done with it — counted
    * in the same turn it is handed out, before any await, so a replacement
@@ -225,7 +226,7 @@ interface BuiltConnection {
  * turn.
  */
 const heldFlows = new AsyncLocalStorage<
-  ReadonlyMap<object, AbapConnection | null>
+  ReadonlyMap<object, IAbapConnection | null>
 >();
 
 /**
@@ -274,7 +275,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** What each built connection's source stated about who creates objects. */
   private readonly systemContexts = new WeakMap<
-    AbapConnection,
+    IAbapConnection,
     DestinationSystemContext | undefined
   >();
 
@@ -315,7 +316,7 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly inFlight = new Set<Promise<unknown>>();
 
   /** The built entry of each connection handed out: what a release counts down. */
-  private readonly entries = new WeakMap<AbapConnection, BuiltConnection>();
+  private readonly entries = new WeakMap<IAbapConnection, BuiltConnection>();
 
   /**
    * The process's runtime files of the SAP sessions it holds — their owner,
@@ -736,7 +737,7 @@ export abstract class BaseMcpServer extends McpServer {
    * Every connection it returns is a use the caller must end with exactly
    * one `connectionReleased(connection)`.
    */
-  protected async getConnection(signal: AbortSignal): Promise<AbapConnection> {
+  protected async getConnection(signal: AbortSignal): Promise<IAbapConnection> {
     const context = this.connectionContext;
     if (!context) {
       throw new Error(
@@ -771,7 +772,7 @@ export abstract class BaseMcpServer extends McpServer {
     // This call is the entry's user from now on — counted before the await,
     // so a replacement in between cannot end the connection under it.
     held.users += 1;
-    let connection: AbapConnection;
+    let connection: IAbapConnection;
     try {
       // Awaited whatever the signal says: the connect is a send on the
       // instance's connection. The instance close and the process shutdown
@@ -935,7 +936,7 @@ export abstract class BaseMcpServer extends McpServer {
    * `x-sap-login`), its master system —; a host's connection's
    * (`statedCallOf`). The kind is the connection's (`systemKindOf`).
    */
-  private statedCall(connection: AbapConnection): SystemCall {
+  private statedCall(connection: IAbapConnection): SystemCall {
     const warn = (message: string) => this.logger?.warn?.(message);
     const destination = this.destinationOf.get(connection);
     if (destination === undefined) {
@@ -959,7 +960,7 @@ export abstract class BaseMcpServer extends McpServer {
    * rules is thrown, and nothing is kept.
    */
   private parametersFrom(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     lookup: SystemLookup,
   ): ResolvedSystemContext {
     const made = parametersOf(lookup, this.systemContextRules, () =>
@@ -983,7 +984,7 @@ export abstract class BaseMcpServer extends McpServer {
    * to make (no resolver).
    */
   private async requireSystem(
-    connection: AbapConnection,
+    connection: IAbapConnection,
   ): Promise<ResolvedSystemContext | undefined> {
     const resolver = this.systemContextResolver;
     if (resolver === null) return undefined;
@@ -1019,12 +1020,12 @@ export abstract class BaseMcpServer extends McpServer {
    * (`requireSystem`).
    */
   private async systemBeforeTool(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     holdsFlow: boolean,
     signal: AbortSignal,
-    taken: (connection: AbapConnection | undefined) => void,
+    taken: (connection: IAbapConnection | undefined) => void,
   ): Promise<{
-    connection: AbapConnection;
+    connection: IAbapConnection;
     system: ResolvedSystemContext | undefined;
   }> {
     if (this.systemContextResolver === null) {
@@ -1062,7 +1063,7 @@ export abstract class BaseMcpServer extends McpServer {
    * replaces it. Nothing else replaces the instance's connection: a
    * changed credential is put in force on it (`getConnection`).
    */
-  private isStaleBuilt(connection: AbapConnection): boolean {
+  private isStaleBuilt(connection: IAbapConnection): boolean {
     if (this.connectionContext?.kind !== 'built') return false;
     if (!this.entries.has(connection)) return false;
     return isSpent(connection);
@@ -1074,7 +1075,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private inHeldFlow<T>(
     holds: boolean,
-    connection: AbapConnection | undefined,
+    connection: IAbapConnection | undefined,
     fn: () => T,
   ): T {
     if (!holds || connection === undefined) return fn();
@@ -1095,7 +1096,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected async onMainConnection<T>(
     signal: AbortSignal,
-    send: (connection: AbapConnection) => Promise<T>,
+    send: (connection: IAbapConnection) => Promise<T>,
   ): Promise<T> {
     const held = heldFlows.getStore()?.get(this);
     // Held without a connection: the turn is this call's already.
@@ -1116,7 +1117,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async sendInTurn<T>(
     signal: AbortSignal,
-    send: (connection: AbapConnection) => Promise<T>,
+    send: (connection: IAbapConnection) => Promise<T>,
   ): Promise<T> {
     const connection = await this.getConnection(signal);
     try {
@@ -1145,7 +1146,7 @@ export abstract class BaseMcpServer extends McpServer {
    * release keeps a replaced connection open until the terminal close; a
    * second one would end it under another call.
    */
-  protected connectionReleased(connection: AbapConnection): void {
+  protected connectionReleased(connection: IAbapConnection): void {
     const entry = this.entries.get(connection);
     if (entry !== undefined) this.release(entry);
   }
@@ -1187,8 +1188,8 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private buildConnection(
     resolved: ResolvedConnection,
-    birth: (born: ResolvedConnection) => Promise<AbapConnection>,
-    failed: (connection: AbapConnection) => Promise<void> = (connection) =>
+    birth: (born: ResolvedConnection) => Promise<IAbapConnection>,
+    failed: (connection: IAbapConnection) => Promise<void> = (connection) =>
       endConnection(connection),
   ): BuiltConnection {
     const credential = resolved.credential;
@@ -1253,7 +1254,7 @@ export abstract class BaseMcpServer extends McpServer {
    * connected, its session is kept in a runtime file when the instance keeps
    * them (`sessionOf`).
    */
-  private async logOn(resolved: ResolvedConnection): Promise<AbapConnection> {
+  private async logOn(resolved: ResolvedConnection): Promise<IAbapConnection> {
     const connection = await this.connectedLogon(resolved);
     const identity = this.sessionOf(resolved);
     if (identity !== undefined) {
@@ -1265,7 +1266,7 @@ export abstract class BaseMcpServer extends McpServer {
   /** A connection built from `resolved`, owned as `built`, and connected with its logon. */
   private async connectedLogon(
     resolved: ResolvedConnection,
-  ): Promise<AbapConnection> {
+  ): Promise<IAbapConnection> {
     // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
     const connection = createAbapConnection(
@@ -1317,8 +1318,8 @@ export abstract class BaseMcpServer extends McpServer {
     claimed: ClaimedSession,
     identity: SessionIdentity,
     outcome: { session?: 'picked_up' | 'new' },
-  ): Promise<AbapConnection> {
-    let connection: AbapConnection;
+  ): Promise<IAbapConnection> {
+    let connection: IAbapConnection;
     try {
       connection = createAbapConnection(
         resolved.settings,
@@ -1350,7 +1351,7 @@ export abstract class BaseMcpServer extends McpServer {
         owner.release(claimed);
         throw error;
       }
-      let fresh: AbapConnection;
+      let fresh: IAbapConnection;
       try {
         fresh = await this.connectedLogon(resolved);
         // Closed since the logon settled: its close swept it; not adopted.
@@ -1448,7 +1449,7 @@ export abstract class BaseMcpServer extends McpServer {
    * Registers handlers from registry
    * Wraps handlers to inject connection as first parameter
    *
-   * Handler signature: (connection: AbapConnection, args: any) => Promise<any>
+   * Handler signature: (connection: IAbapConnection, args: any) => Promise<any>
    * Registered as: (args: any) => handler(getConnection(), args)
    *
    * This ensures connection is injected but NOT exposed in MCP tool signature
@@ -1537,7 +1538,7 @@ export abstract class BaseMcpServer extends McpServer {
               }
               return this.runConnectionless(entry.call, args, signal);
             }
-            let inUse: AbapConnection | undefined;
+            let inUse: IAbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
             // The batch a `BatchEnd` (or `DebugBatchEnd`) call ends: the one
             // of its kind open when it came.
@@ -2339,12 +2340,13 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Who calls, for the background runs: the destination (URL, client) and
+   * Who calls, for the background runs: the system (its key), the client and
    * the user its parameters name (`callerUserOf`: the responsible the rules
    * made with the connection — the system's user, else on-premise the
    * stated responsible, else the login), else the stated responsible, else
    * the login (`SAP_USERNAME`, `x-sap-login`), upper case. An injected
-   * connection names its URL. A user that cannot be determined is refused
+   * connection's system is its URL, else the `system` its host states;
+   * with neither, background runs are refused. A user that cannot be determined is refused
    * (`system_user_unknown`): a run is kept only for a known caller.
    */
   protected async backgroundCaller(
@@ -2357,24 +2359,36 @@ export abstract class BaseMcpServer extends McpServer {
     if (context.kind === 'injected') {
       const connection = context.connection;
       const url = await connection.getBaseUrl();
+      // A connection without a URL (RFC) is identified by the system its
+      // host states; with neither, no run is kept.
+      const system =
+        url === undefined
+          ? context.system
+          : JSON.stringify(['http', withoutTrailingSlashes(url.trim()), '']);
+      if (system === undefined) {
+        throw new ServerRefusal(
+          'background_runs_unavailable',
+          BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+        );
+      }
       const named = await this.callerUserOf(signal, () =>
         this.systems.get(connection),
       );
       const stated = statedCallOf(connection, this.systemType);
       return {
-        url: withoutTrailingSlashes(url.trim()),
+        system,
         client: '',
         user: callerUser(named, stated.responsible ?? stated.login),
       };
     }
     const resolved = await this.resolveCaller(signal);
-    const url = withoutTrailingSlashes((resolved.settings.url ?? '').trim());
+    const system = targetOf(resolved.settings);
     const client = (resolved.settings.client ?? '').trim();
     const named = await this.callerUserOf(signal, () =>
       this.destinationSystem(resolved.credential, targetOf(resolved.settings)),
     );
     return {
-      url,
+      system,
       client,
       user: callerUser(
         named,
@@ -2628,7 +2642,7 @@ export abstract class BaseMcpServer extends McpServer {
               ? [...callbackArgs.slice(0, -1), { ...last, signal }]
               : callbackArgs;
           let leaveFlow: (() => void) | undefined;
-          let inUse: AbapConnection | undefined;
+          let inUse: IAbapConnection | undefined;
           try {
             throwIfRequestAborted(signal);
             // Every call takes its turn, whatever its name or arguments: a
@@ -2774,7 +2788,7 @@ function callHandler(
  * connection says it is no longer connected (connection 16: a lost session
  * spends the instance). Such a connection is replaced, never reused.
  */
-function isSpent(connection: AbapConnection): boolean {
+function isSpent(connection: IAbapConnection): boolean {
   if (isEnded(connection)) return true;
   try {
     return hasMethod(connection, 'isConnected')

@@ -6,7 +6,7 @@
  * error and never a connection whose session is gone. One logoff.
  */
 
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
@@ -81,7 +81,7 @@ class Server extends BaseMcpServer {
       source: { resolve: async () => ({ settings: SETTINGS, credential }) },
     });
   }
-  connection(): Promise<AbapConnection> {
+  connection(): Promise<IAbapConnection> {
     return this.getConnection(new AbortController().signal);
   }
 }

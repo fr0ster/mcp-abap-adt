@@ -7,7 +7,7 @@
  * Run: npm test -- --testPathPatterns=readOnly/function/GetFunctionModule
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetFunctionModule } from '../../../../handlers/function_module/high/handleGetFunctionModule';
 import {
   getTimeout,
@@ -34,7 +34,7 @@ import {
 const testLogger = createTestLogger('get-function-module');
 
 describe('GetFunctionModule Handler Integration (read-only)', () => {
-  let connection: AbapConnection | null = null;
+  let connection: IAbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
   let mcp: HardModeClient | null = null;

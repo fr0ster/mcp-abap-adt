@@ -1,4 +1,4 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
 import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
 import {
@@ -194,7 +194,7 @@ export class StdioServer extends BaseMcpServer {
    */
   protected override async getConnection(
     signal: AbortSignal,
-  ): Promise<AbapConnection> {
+  ): Promise<IAbapConnection> {
     if (!this.destinations) throw new ServerRefusal('inspection_only');
     return super.getConnection(signal);
   }

@@ -28,7 +28,7 @@
  * fixed words, and runs a listed long tool in the call.
  *
  * **Every call is checked against the caller.** The caller is the
- * destination identity (URL, client) and the backend user the request
+ * system (its key), the client and the backend user the request
  * resolved. A handle is not authorization: `get` and `discard` of an
  * unknown handle and of someone else's answer the same — not available.
  *
@@ -41,10 +41,14 @@
  * Every method may answer a value or a promise of one.
  */
 
-/** Who calls: the destination identity and the backend user its request resolved. */
+/** Who calls: the system, the client and the backend user its request resolved. */
 export interface BackgroundRunCaller {
-  /** The system's URL, without a trailing slash. */
-  readonly url: string;
+  /**
+   * The system's key: a destination's system key (its wire and address,
+   * `adtSystemKey`); an injected connection's `["http", <URL>, ""]` when
+   * it answers a URL, else the `system` its embedder states.
+   */
+  readonly system: string;
   /** The client; `''` when none is stated. */
   readonly client: string;
   /** The backend user, upper case. */

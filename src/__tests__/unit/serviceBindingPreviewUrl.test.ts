@@ -12,7 +12,11 @@ import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
+import {
+  handleGetServiceBindingPreviewUrl,
+  NO_ORIGIN_NOTE,
+  TOOL_DEFINITION,
+} from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import {
   fakeClientOf,
   okResponse,
@@ -598,5 +602,123 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     expect(payload.service_url_source).toBe('composed');
     expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+  });
+
+  describe('over RFC: the connection answers no URL', () => {
+    const overRfc = async (args: Record<string, unknown>) => {
+      const answered = await handleGetServiceBindingPreviewUrl(
+        {
+          connection: {
+            getBaseUrl: async () => undefined,
+            getSessionId: () => null,
+          },
+          logger: undefined,
+        } as never,
+        args as never,
+      );
+      return JSON.parse(
+        (answered as { content: { text: string }[] }).content[0].text,
+      );
+    };
+    const serviceGroupAnswering = (serviceUrl: string) => async () =>
+      okResponse(
+        reading(`<?xml version="1.0" encoding="utf-8"?>
+<odatav2:serviceList xmlns:odatav2="http://www.sap.com/categories/odatav2">
+  <odatav2:services odatav2:serviceId="ZSB_STUDENT_V2" odatav2:serviceVersion="0001"
+    odatav2:serviceUrl="${serviceUrl}" odatav2:published="true"/>
+</odatav2:serviceList>`),
+      );
+
+    it('answers the paths and query, with origin unknown and the note', async () => {
+      fakeClient = clientFor({
+        binding: BINDING,
+        definition: DEFINITION,
+        view: ROOT_VIEW,
+      });
+      const payload = await overRfc({
+        service_binding_name: 'ZSB_STUDENT_V2',
+        client: '100',
+      });
+      expect(payload.service_url).toBe('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+      expect(payload.metadata_url).toBe(
+        '/sap/opu/odata/sap/ZSB_STUDENT_V2/$metadata',
+      );
+      expect(
+        payload.preview_url.startsWith(
+          '/sap/bc/adt/businessservices/odatav2/feap/',
+        ),
+      ).toBe(true);
+      expect(payload.preview_url).toContain('flp.html?');
+      expect(payload.preview_url).toContain('sap-client=100');
+      expect(payload.origin).toBe('unknown');
+      expect(payload.note).toContain(NO_ORIGIN_NOTE);
+    });
+
+    it('reads the V4 service path from the path itself', async () => {
+      fakeClient = clientFor({
+        binding: BINDING.replace('srvb:version="V2"', 'srvb:version="V4"'),
+        definition: DEFINITION,
+        view: ROOT_VIEW,
+      });
+      const payload = await overRfc({ service_binding_name: 'ZSB_STUDENT_V2' });
+      expect(payload.service_url).toBe(
+        '/sap/opu/odata4/sap/zsb_student_v2/srvd/sap/zsb_student_v2/0001/',
+      );
+      expect(payload.preview_descriptor).toBe(
+        '/sap/opu/odata4/sap/zsb_student_v2/srvd/sap/zsb_student_v2/0001/' +
+          '##student_data##to_ADDRESS##student_address##ZSB_STUDENT_V2##0001##ZSB_STUDENT_V2',
+      );
+      expect(
+        payload.preview_url.startsWith(
+          '/sap/bc/adt/businessservices/odatav4/feap/',
+        ),
+      ).toBe(true);
+    });
+
+    it('keeps a service URL the system answered absolute', async () => {
+      fakeClient = clientFor({
+        binding: BINDING,
+        definition: DEFINITION,
+        view: ROOT_VIEW,
+        serviceGroup: serviceGroupAnswering(
+          'https://system.example.test/sap/opu/odata/sap/ELSEWHERE/',
+        ),
+      });
+      const payload = await overRfc({ service_binding_name: 'ZSB_STUDENT_V2' });
+      expect(payload.service_url).toBe(
+        'https://system.example.test/sap/opu/odata/sap/ELSEWHERE/',
+      );
+      expect(payload.service_url_source).toBe('system');
+    });
+
+    it('answers a service URL the system answered as a path as that path', async () => {
+      fakeClient = clientFor({
+        binding: BINDING,
+        definition: DEFINITION,
+        view: ROOT_VIEW,
+        serviceGroup: serviceGroupAnswering('/sap/opu/odata/sap/ELSEWHERE/'),
+      });
+      const payload = await overRfc({ service_binding_name: 'ZSB_STUDENT_V2' });
+      expect(payload.service_url).toBe('/sap/opu/odata/sap/ELSEWHERE/');
+    });
+
+    it('over HTTP the answer carries no origin field and no RFC note', async () => {
+      fakeClient = clientFor({
+        binding: BINDING,
+        definition: DEFINITION,
+        view: ROOT_VIEW,
+      });
+      const payload = await payloadOf({
+        service_binding_name: 'ZSB_STUDENT_V2',
+      });
+      expect(payload.origin).toBeUndefined();
+      expect(payload.note ?? '').not.toContain(NO_ORIGIN_NOTE);
+    });
+
+    it('the description says how the URLs are answered over RFC', () => {
+      expect(TOOL_DEFINITION.description).toContain(
+        'Over RFC, the URLs are answered as their paths and query',
+      );
+    });
   });
 });

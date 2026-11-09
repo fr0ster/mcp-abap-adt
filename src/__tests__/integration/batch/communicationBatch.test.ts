@@ -51,11 +51,14 @@
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   assertNotSharedDependency,
   getEnabledTestCase,
@@ -65,6 +68,7 @@ import {
   resolveTransportRequest,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
+import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import {
   launchStdioScript,
@@ -73,7 +77,7 @@ import {
 
 const testLogger = createTestLogger('communication-batch');
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const MARKER = 'batch-communication-live';
 
 type Content = Array<{ type: string; text?: string }>;
@@ -288,7 +292,7 @@ async function phase(
   const begun = payloadOf(
     await served.call('HandlerBatch', { action: 'begin' }),
   );
-  expect(begun?.batch).toBe('on');
+  assert.equal(begun?.batch, 'on');
   const started = process.hrtime.bigint();
   for (const { tool, args } of calls) {
     const recorded = await served.call(tool, args);
@@ -322,12 +326,15 @@ async function phase(
       `received=${JSON.stringify(summary.received ?? null)}`,
     ].join('\t')}\n`,
   );
-  expect(ended.isError).not.toBe(true);
-  expect(summary.recorded).toBe(calls.length);
+  assert.notEqual(ended.isError, true);
+  assert.equal(summary.recorded, calls.length);
   // Every call sends one request at least; every part came.
-  expect(summary.sent).toBeGreaterThanOrEqual(calls.length);
-  expect(summary.received).toBe(summary.sent);
-  expect(entries.map((entry) => entry.number)).toEqual(numbers);
+  assert.ok(summary.sent >= calls.length);
+  assert.equal(summary.received, summary.sent);
+  assertEquals(
+    entries.map((entry) => entry.number),
+    numbers,
+  );
   return { summary, entries, recordMs, endMs };
 }
 
@@ -456,7 +463,7 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
       documentRead,
     );
     const document = payloadOf(documentRead.entries[0])?.metadata;
-    expect(typeof document).toBe('string');
+    assert.equal(typeof document, 'string');
     const domainDocument = patchDomainXml(String(document), {
       description: `Batch live domain ${MARKER}`,
       datatype: 'CHAR',
@@ -480,7 +487,7 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
       }
     }
     expectAllAnswered('lock', lockCalls, lock);
-    expect(held.size).toBe(objects.length);
+    assert.equal(held.size, objects.length);
     const handleOf = (object: TestObject) => held.get(object.name) as string;
 
     // 5. Write under the locks.
@@ -550,12 +557,14 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
       const object = objects[entry.number - 1] as TestObject;
       const body = payloadOf(entry);
       if (object.type === 'DOMAIN') {
-        expect(String(body?.metadata)).toContain(MARKER);
-        expect(String(body?.metadata)).toContain(
-          '<doma:datatype>CHAR</doma:datatype>',
+        assert.ok(String(body?.metadata).includes(MARKER));
+        assert.ok(
+          String(body?.metadata).includes(
+            '<doma:datatype>CHAR</doma:datatype>',
+          ),
         );
       } else {
-        expect(String(body?.source)).toContain(MARKER);
+        assert.ok(String(body?.source).includes(MARKER));
       }
     }
   } catch (error) {
@@ -664,32 +673,28 @@ async function cleanUp(
 describe('the communication batch through the served compact tools, on the system the test config names', () => {
   const kinds: Kind[] = ['onprem-http', 'onprem-rfc', 'cloud'];
   for (const kind of kinds) {
-    it(
-      `${KIND_WORDS[kind]}: reads, create, lock, write, unlock, activate, each a batch; answers per number; every object deleted`,
-      async () => {
-        const configured = configuredKind();
-        if (typeof configured !== 'string') {
-          testLogger?.info(
-            `⏭️  Skipping ${KIND_WORDS[kind]}: ${configured.reason}`,
-          );
-          return;
-        }
-        if (configured !== kind) {
-          testLogger?.info(
-            `⏭️  Skipping ${KIND_WORDS[kind]}: the test config names ${KIND_WORDS[configured]}; this case runs only there`,
-          );
-          return;
-        }
-        const testCase = getEnabledTestCase('batch', 'communication');
-        if (!testCase) {
-          testLogger?.info(
-            `⏭️  Skipping ${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
-          );
-          return;
-        }
-        await runOn(kind, testCase);
-      },
-      getTimeout('long'),
-    );
+    it(`${KIND_WORDS[kind]}: reads, create, lock, write, unlock, activate, each a batch; answers per number; every object deleted`, async () => {
+      const configured = configuredKind();
+      if (typeof configured !== 'string') {
+        testLogger?.info(
+          `⏭️  Skipping ${KIND_WORDS[kind]}: ${configured.reason}`,
+        );
+        return;
+      }
+      if (configured !== kind) {
+        testLogger?.info(
+          `⏭️  Skipping ${KIND_WORDS[kind]}: the test config names ${KIND_WORDS[configured]}; this case runs only there`,
+        );
+        return;
+      }
+      const testCase = getEnabledTestCase('batch', 'communication');
+      if (!testCase) {
+        testLogger?.info(
+          `⏭️  Skipping ${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
+        );
+        return;
+      }
+      await runOn(kind, testCase);
+    });
   }
 });

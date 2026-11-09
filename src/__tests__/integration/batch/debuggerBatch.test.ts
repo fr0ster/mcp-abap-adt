@@ -57,14 +57,17 @@
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
 import type { HandlerContext } from '../../../handlers/interfaces';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   amdpGateVerdict,
   databaseSource,
@@ -77,6 +80,7 @@ import {
   loadTestConfig,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
+import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 import {
@@ -91,7 +95,7 @@ import { createHandlerContext } from '../helpers/testHelpers';
 
 const testLogger = createTestLogger('debugger-batch');
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 
 type Content = Array<{ type: string; text?: string }>;
 type Answer = { content?: Content; isError?: boolean };
@@ -352,8 +356,8 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       placed: start?.breakpoints?.placed?.length,
       refused: start?.breakpoints?.refused,
     });
-    expect(started.isError).not.toBe(true);
-    expect(handle).toMatch(/^[0-9A-F]{32}$/);
+    assert.notEqual(started.isError, true);
+    assert.ok(isUpperHex(handle, 32));
 
     let stopped: any;
     for (let round = 0; round < 4 && stopped === undefined; round++) {
@@ -370,8 +374,8 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       if (state?.state === 'stopped') stopped = state;
     }
     say(kind, 'stopped at', stopped?.at);
-    expect(stopped?.at?.address?.line).toBe(stopLine);
-    expect(stopped?.at?.address?.object_name).toBe(className);
+    assert.equal(stopped?.at?.address?.line, stopLine);
+    assert.equal(stopped?.at?.address?.object_name, className);
 
     const calls: Array<{ tool: string; args: Record<string, unknown> }> = [
       { tool: 'DebugStep', args: { state_handle: handle, action: 'over' } },
@@ -383,8 +387,8 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
     ];
     const begun = await served.call('DebugBatchBegin', {});
     say(kind, 'begin', textOf(begun));
-    expect(begun.isError).not.toBe(true);
-    expect(payloadOf(begun)?.debug_batch).toBe('on');
+    assert.notEqual(begun.isError, true);
+    assert.equal(payloadOf(begun)?.debug_batch, 'on');
     batchOpen = true;
     const recordedAt = process.hrtime.bigint();
     for (const { tool, args } of calls) {
@@ -405,9 +409,9 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       record_ms: Math.round(Number(endAt - recordedAt) / 1e6),
       end_ms: Math.round(Number(endedAt - endAt) / 1e6),
     });
-    expect(ended.isError).not.toBe(true);
+    assert.notEqual(ended.isError, true);
     // One request per debugger operation; every part came.
-    expect(summary).toEqual({
+    assertEquals(summary, {
       recorded: calls.length,
       sent: calls.length,
       received: calls.length,
@@ -421,7 +425,10 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
         answer: payloadOf(entry) ?? textOf(entry),
       });
     }
-    expect(entries.map((entry) => entry.number)).toEqual([1, 2, 3]);
+    assertEquals(
+      entries.map((entry) => entry.number),
+      [1, 2, 3],
+    );
     const failed = entries.filter((entry) => entry.isError === true);
     if (failed.length > 0) {
       throw new Error(
@@ -435,16 +442,16 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
     }
 
     // 1: the step answered, the program not ended by it.
-    expect(payloadOf(entries[0])?.state).not.toBe('ended');
+    assert.notEqual(payloadOf(entries[0])?.state, 'ended');
     // 2: the stack read after the step: the next line.
-    expect(payloadOf(entries[1])?.at?.address?.line).toBe(stopLine + 1);
+    assert.equal(payloadOf(entries[1])?.at?.address?.line, stopLine + 1);
     // 3: the variable as the loop's first pass left it.
     const variables = payloadOf(entries[2]);
-    expect(Array.isArray(variables)).toBe(true);
+    assert.equal(Array.isArray(variables), true);
     const lvX = (variables as any[]).find(
       (v) => String(v?.name).toUpperCase() === 'LV_X',
     );
-    expect(String(lvX?.value).trim()).toBe('1');
+    assert.equal(String(lvX?.value).trim(), '1');
   } catch (error) {
     failure = error;
   } finally {
@@ -630,12 +637,12 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
           ? withoutHandles(textOf(started)).slice(0, 600)
           : undefined,
     });
-    expect(started.isError).not.toBe(true);
-    expect(handle).toMatch(/^[0-9A-F]{32}$/);
+    assert.notEqual(started.isError, true);
+    assert.ok(isUpperHex(handle, 32));
 
     const onBreak = await eventOf(['ON_BREAK'], 8);
     say(kind, 'amdp break', { line: onBreak?.line });
-    expect(onBreak?.line).toBe(tfLine);
+    assert.equal(onBreak?.line, tfLine);
 
     const calls: Array<{ tool: string; args: Record<string, unknown> }> = [
       {
@@ -646,8 +653,8 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
     ];
     const begun = await served.call('DebugBatchBegin', {});
     say(kind, 'amdp begin', textOf(begun));
-    expect(begun.isError).not.toBe(true);
-    expect(payloadOf(begun)?.debug_batch).toBe('on');
+    assert.notEqual(begun.isError, true);
+    assert.equal(payloadOf(begun)?.debug_batch, 'on');
     batchOpen = true;
     for (const { tool, args } of calls) {
       const recorded = await served.call(tool, args);
@@ -666,9 +673,9 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       summary,
       end_ms: Math.round(Number(endedAt - endAt) / 1e6),
     });
-    expect(ended.isError).not.toBe(true);
+    assert.notEqual(ended.isError, true);
     // One request per debugger operation; every part came.
-    expect(summary).toEqual({
+    assertEquals(summary, {
       recorded: calls.length,
       sent: calls.length,
       received: calls.length,
@@ -682,7 +689,10 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
         answer: payloadOf(entry) ?? textOf(entry),
       });
     }
-    expect(entries.map((entry) => entry.number)).toEqual([1, 2]);
+    assertEquals(
+      entries.map((entry) => entry.number),
+      [1, 2],
+    );
     const failed = entries.filter((entry) => entry.isError === true);
     if (failed.length > 0) {
       throw new Error(
@@ -695,9 +705,9 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       );
     }
     // 1: the rows of the table variable.
-    expect(Array.isArray(payloadOf(entries[0]))).toBe(true);
+    assert.equal(Array.isArray(payloadOf(entries[0])), true);
     // 2: the step answered.
-    expect(payloadOf(entries[1])?.state).toBe('moving');
+    assert.equal(payloadOf(entries[1])?.state, 'moving');
 
     // The step took effect: the debuggee moved on to its next event.
     const next = await eventOf(['ON_BREAK', 'ON_EXECUTION_END'], 4);
@@ -705,7 +715,7 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       kind: next?.kind,
       line: next?.line,
     });
-    expect(['ON_BREAK', 'ON_EXECUTION_END']).toContain(next?.kind);
+    assert.ok(['ON_BREAK', 'ON_EXECUTION_END'].includes(next?.kind));
   } catch (error) {
     failure = error;
   } finally {
@@ -794,40 +804,32 @@ function whereItRuns(
 describe('the debugger batch at a live stop, on the system the test config names', () => {
   const kinds: Kind[] = ['onprem-http', 'onprem-rfc', 'cloud'];
   for (const kind of kinds) {
-    it(
-      `${KIND_WORDS[kind]}: step, stack and variables in one DebugBatchEnd; answers per number; debugger state removed`,
-      async () => {
-        const where = whereItRuns(kind, 'this case');
-        if ('reason' in where) {
-          testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
-          return;
-        }
-        await debuggerBatchOn(kind, where.testCase);
-      },
-      getTimeout('long'),
-    );
+    it(`${KIND_WORDS[kind]}: step, stack and variables in one DebugBatchEnd; answers per number; debugger state removed`, async () => {
+      const where = whereItRuns(kind, 'this case');
+      if ('reason' in where) {
+        testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
+        return;
+      }
+      await debuggerBatchOn(kind, where.testCase);
+    });
   }
 
   for (const kind of kinds) {
-    it(
-      `${KIND_WORDS[kind]}: the AMDP debugger batch — DebugBatchBegin at an AMDP break, the data preview and a step recorded, one DebugBatchEnd, answers per number (on premise on HANA)`,
-      async () => {
-        if (kind === 'cloud') {
-          testLogger?.info(
-            '⏭️  Skipping the AMDP debugger batch on ABAP Cloud: it runs on premise on HANA',
-          );
-          return;
-        }
-        const where = whereItRuns(kind, 'the AMDP debugger batch');
-        if ('reason' in where) {
-          testLogger?.info(
-            `⏭️  Skipping the AMDP debugger batch ${KIND_WORDS[kind]}: ${where.reason}`,
-          );
-          return;
-        }
-        await amdpBatchOn(kind, where.testCase);
-      },
-      getTimeout('long'),
-    );
+    it(`${KIND_WORDS[kind]}: the AMDP debugger batch — DebugBatchBegin at an AMDP break, the data preview and a step recorded, one DebugBatchEnd, answers per number (on premise on HANA)`, async () => {
+      if (kind === 'cloud') {
+        testLogger?.info(
+          '⏭️  Skipping the AMDP debugger batch on ABAP Cloud: it runs on premise on HANA',
+        );
+        return;
+      }
+      const where = whereItRuns(kind, 'the AMDP debugger batch');
+      if ('reason' in where) {
+        testLogger?.info(
+          `⏭️  Skipping the AMDP debugger batch ${KIND_WORDS[kind]}: ${where.reason}`,
+        );
+        return;
+      }
+      await amdpBatchOn(kind, where.testCase);
+    });
   }
 });

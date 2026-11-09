@@ -36,6 +36,8 @@
  *             the RFC SDK's libraries on LD_LIBRARY_PATH.
  */
 
+import assert from 'node:assert/strict';
+import { before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
@@ -65,6 +67,7 @@ import {
   resolvePackageName,
 } from '../helpers/configHelpers';
 import { NO_KIND_STATED } from '../helpers/configuredSystemKind';
+import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
@@ -409,9 +412,9 @@ async function timeBothPaths(
   read: (context: HandlerContext) => Promise<unknown>,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
-  expect(isError(reference.answer)).toBe(false);
-  expect(itemErrors(reference.answer)).toEqual([]);
-  expect(reference.measure.envelopes).toBe(0);
+  assert.equal(isError(reference.answer), false);
+  assertEquals(itemErrors(reference.answer), []);
+  assert.equal(reference.measure.envelopes, 0);
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };
   // Compared once every repetition is timed, so a differing answer
@@ -423,8 +426,8 @@ async function timeBothPaths(
     for (const path of order) {
       const { answer, measure } = await measured(connection, path, read);
       answers.push({ path, answer });
-      if (path === 'sequential') expect(measure.envelopes).toBe(0);
-      else expect(measure.envelopes).toBeGreaterThan(0);
+      if (path === 'sequential') assert.equal(measure.envelopes, 0);
+      else assert.ok(measure.envelopes > 0);
       runs[path].push(measure);
     }
   }
@@ -447,7 +450,7 @@ async function timeBothPaths(
   }
 
   for (const { answer } of answers) {
-    expect(answer).toEqual(reference.answer);
+    assertEquals(answer, reference.answer);
   }
 }
 
@@ -459,7 +462,7 @@ describe('batched reads timed against the sequential path on the system the test
   const stated = configuredSystemKind();
   const served = stated !== undefined && stated !== 'legacy';
 
-  beforeAll(async () => {
+  before(async () => {
     if (!served) return;
     try {
       connection = (await createTestConnectionAndSession()).connection;
@@ -467,50 +470,16 @@ describe('batched reads timed against the sequential path on the system the test
     } catch (_error) {
       connection = null;
     }
-  }, getTimeout('long'));
+  });
 
   for (const tool of CASES) {
     for (const scope of ['the package', 'a larger package']) {
-      it(
-        `${tool.tool} on ${scope}: the same answer, timed on both paths`,
-        async () => {
-          if (!served) {
-            testLogger?.info(
-              stated === undefined
-                ? `⏭️  Skipping: ${NO_KIND_STATED}`
-                : '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
-            );
-            return;
-          }
-          if (connection === null) {
-            testLogger?.info(
-              '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
-            );
-            return;
-          }
-          const target = packages.find((p) => p.label === scope);
-          if (target === undefined) {
-            testLogger?.info(
-              `⏭️  Skipping ${tool.tool} on ${scope}: the config names no shared_dependencies.super_package`,
-            );
-            return;
-          }
-          const read = tool.read(target.name);
-
-          await timeBothPaths(connection, tool.tool, scope, read);
-        },
-        getTimeout('long'),
-      );
-    }
-  }
-
-  for (const shared of SHARED_CASES) {
-    it(
-      `${shared.tool} on the shared objects: the same answer, timed on both paths`,
-      async () => {
+      it(`${tool.tool} on ${scope}: the same answer, timed on both paths`, async () => {
         if (!served) {
           testLogger?.info(
-            '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+            stated === undefined
+              ? `⏭️  Skipping: ${NO_KIND_STATED}`
+              : '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
           );
           return;
         }
@@ -520,19 +489,40 @@ describe('batched reads timed against the sequential path on the system the test
           );
           return;
         }
-        const read = shared.prepare();
-        if (typeof read === 'string') {
-          testLogger?.info(`⏭️  Skipping ${shared.tool}: ${read}`);
+        const target = packages.find((p) => p.label === scope);
+        if (target === undefined) {
+          testLogger?.info(
+            `⏭️  Skipping ${tool.tool} on ${scope}: the config names no shared_dependencies.super_package`,
+          );
           return;
         }
-        await timeBothPaths(
-          connection,
-          shared.tool,
-          'the shared objects',
-          read,
+        const read = tool.read(target.name);
+
+        await timeBothPaths(connection, tool.tool, scope, read);
+      });
+    }
+  }
+
+  for (const shared of SHARED_CASES) {
+    it(`${shared.tool} on the shared objects: the same answer, timed on both paths`, async () => {
+      if (!served) {
+        testLogger?.info(
+          '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
         );
-      },
-      getTimeout('long'),
-    );
+        return;
+      }
+      if (connection === null) {
+        testLogger?.info(
+          '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
+        );
+        return;
+      }
+      const read = shared.prepare();
+      if (typeof read === 'string') {
+        testLogger?.info(`⏭️  Skipping ${shared.tool}: ${read}`);
+        return;
+      }
+      await timeBothPaths(connection, shared.tool, 'the shared objects', read);
+    });
   }
 });

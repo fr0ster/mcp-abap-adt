@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  createTestFactory,
   exportSettings,
   setupAuthBrokerForTests,
 } from '../../integration/helpers/authHelpers';
@@ -134,6 +135,43 @@ describe('setupAuthBrokerForTests over RFC', () => {
       expect(process.env.SAP_ASHOST).toBe('host.example.test');
       expect(process.env.SAP_SYSNR).toBe('00');
       expect(process.env.SAP_LANGUAGE).toBe('EN');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('the test factory takes the wire from the test config', () => {
+  it("environment.connection_type states it where the destination's file states none", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'broker-wire-'));
+    try {
+      fs.mkdirSync(path.join(dir, 'sessions'));
+      fs.writeFileSync(
+        path.join(dir, 'sessions', 'STAND.env'),
+        [
+          'SAP_URL=https://system.example.test',
+          'SAP_AUTH_TYPE=basic',
+          'SAP_USERNAME=placeholder-user',
+          'SAP_PASSWORD=placeholder-password',
+          'SAP_CLIENT=100',
+          '',
+        ].join('\n'),
+      );
+      const factory = createTestFactory(
+        {
+          auth_broker: {
+            paths: { service_keys_dir: dir },
+            abap: { destination: 'STAND' },
+            browser: 'none',
+          },
+          environment: { system_type: 'onprem', connection_type: 'http' },
+        },
+        'STAND',
+      );
+      await expect(factory.settingsFor('STAND')).resolves.toMatchObject({
+        url: 'https://system.example.test',
+        connectionType: 'http',
+      });
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

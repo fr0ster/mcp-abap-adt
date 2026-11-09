@@ -235,10 +235,13 @@ export function createTestFactory(
     ...(config?.auth_broker?.browser_auth_port !== undefined && {
       browserAuthPort: Number(config.auth_broker.browser_auth_port),
     }),
-    // The wire as the run states it; none stated is refused by the factory,
+    // The wire as the run states it — the test config's
+    // environment.connection_type, the environment, the destination's own
+    // file, in globalSetup's order; none stated is refused by the factory,
     // naming SAP_CONNECTION_TYPE.
     ...connectionTypeOf(
-      process.env.SAP_CONNECTION_TYPE ??
+      config?.environment?.connection_type ||
+        process.env.SAP_CONNECTION_TYPE ||
         destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
     ),
     browserStrategy: browserCallbackStrategy,

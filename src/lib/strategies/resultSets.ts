@@ -103,6 +103,11 @@ export const READING_BY_SLOT = {
   // to the DDL set in adt-clients 24; it reads the same answer.
   testDoubles: structured,
   activation: structured,
+  // Arrived with adt-clients 45.0.0, on `getUtils().activateObjects`: the
+  // synchronous group activation answers the same document a single object's
+  // activation does (`chkl:messages`, `ioc:inactiveObjects`, or nothing), so
+  // it is read the same way, and `terseActivation` projects it.
+  objectActivation: structured,
   validation: structured,
   deletion: structured,
   deleted: structured,

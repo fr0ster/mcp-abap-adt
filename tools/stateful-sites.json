@@ -85,7 +85,7 @@
     "function": "openStateful",
     "site": "setSessionType('stateful')",
     "count": 1,
-    "window": "the debuggee session: the debugger's own connection, opened fresh for a debug or AMDP debug session (held state), stateful for that session's life — the debugger's session, not a tool's",
+    "window": "the debuggee session: the debugger's own connection, opened fresh for a debug or AMDP debug session (held state), stateful for that session's life \u2014 the debugger's session, not a tool's",
     "stateless": "never: the connection is not reused; it ends with its logoff at the session's stop, the idle bound's stop, the host's stop or the instance's terminal close",
     "whose": "server"
   },
@@ -843,6 +843,15 @@
     "count": 1,
     "window": "the UNLOCK alone (one request)",
     "stateless": "in the same call: a finally sets it stateless, also when the UNLOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/utils/activationUtils.js",
+    "function": "keepingRequests",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none of its own: the connection an activation member hands its low-level function forwards setSessionType to the member's connection unchanged (adt-clients 45, the one read after a silent checklist); no activation function calls it",
+    "stateless": "whatever the member's connection is; the activation and the inactive-list read are stateless requests",
     "whose": "adt-clients"
   }
 ]

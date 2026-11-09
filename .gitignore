@@ -27,6 +27,8 @@ tests/test-config.yaml
 tests/test-config.*.yaml
 
 # Logs
+# The SNC live check's log (tests/live/sncCheck.mjs), uploaded by hand
+live-snc-*.log
 logs
 *.log
 npm-debug.log*

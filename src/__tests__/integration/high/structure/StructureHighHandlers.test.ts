@@ -14,6 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/structure
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateStructure } from '../../../../handlers/structure/high/handleCreateStructure';
 import { handleDeleteStructure } from '../../../../handlers/structure/high/handleDeleteStructure';
 import { handleUpdateStructure } from '../../../../handlers/structure/high/handleUpdateStructure';
@@ -23,7 +24,7 @@ import { HighTester } from '../../helpers/testers/HighTester';
 describe('Structure High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_structure',
       'builder_structure',
@@ -37,7 +38,7 @@ describe('Structure High-Level Handlers Integration', () => {
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +50,7 @@ describe('Structure High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Structure high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Structure high-level handlers', async () => {
+    await tester.run();
+  });
 });

@@ -5,6 +5,7 @@
  * Run: npm test -- --testPathPatterns=integration/high/unitTest/ClassUnitTestHighHandlers
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
@@ -22,7 +23,7 @@ describe('Unit Test High-Level Handlers (class)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('unit-test-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'class_unit_test',
       'full_workflow',
@@ -44,7 +45,7 @@ describe('Unit Test High-Level Handlers (class)', () => {
         );
       },
     );
-  }, getTimeout('long'));
+  });
 
   beforeEach(async () => {
     await tester.beforeEach(async (_context: LambdaTesterContext) => {});
@@ -54,89 +55,77 @@ describe('Unit Test High-Level Handlers (class)', () => {
     await tester.afterEach();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
-  it(
-    'Unit Test High-Level Handlers: create, run, update, run',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { params, packageName, transportRequest } = context;
-        const className: string | undefined = params?.class_name;
-        if (!className || !params?.test_class_source || !packageName) {
-          logger?.warn('class_unit_test not configured, skipping');
-          return;
-        }
-        const transport = { transport_request: transportRequest };
-        const { step } = stepsFor(tester, context);
-        const expected: string[] = params.expected_test_methods ?? [];
+  it('Unit Test High-Level Handlers: create, run, update, run', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { params, packageName, transportRequest } = context;
+      const className: string | undefined = params?.class_name;
+      if (!className || !params?.test_class_source || !packageName) {
+        logger?.warn('class_unit_test not configured, skipping');
+        return;
+      }
+      const transport = { transport_request: transportRequest };
+      const { step } = stepsFor(tester, context);
+      const expected: string[] = params.expected_test_methods ?? [];
 
-        // The class under test: tests go into its include once it is active.
-        await step(
-          'CreateClass',
-          {
-            class_name: className,
-            package_name: packageName,
-            description: 'ABAP Unit test class',
-            ...transport,
-          },
-          handleCreateClass,
-        );
-        await step(
-          'UpdateClass',
-          {
-            class_name: className,
-            source_code: params.class_source,
-            activate: true,
-            ...transport,
-          },
-          handleUpdateClass,
-        );
+      // The class under test: tests go into its include once it is active.
+      await step(
+        'CreateClass',
+        {
+          class_name: className,
+          package_name: packageName,
+          description: 'ABAP Unit test class',
+          ...transport,
+        },
+        handleCreateClass,
+      );
+      await step(
+        'UpdateClass',
+        {
+          class_name: className,
+          source_code: params.class_source,
+          activate: true,
+          ...transport,
+        },
+        handleUpdateClass,
+      );
 
-        await step(
-          'CreateUnitTest',
-          {
-            class_name: className,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleCreateUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunUnitTest',
-            { class_name: className },
-            handleRunUnitTest,
-          ),
-          expected,
-        );
+      await step(
+        'CreateUnitTest',
+        {
+          class_name: className,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleCreateUnitTest,
+      );
+      expectTestsRan(
+        await step('RunUnitTest', { class_name: className }, handleRunUnitTest),
+        expected,
+      );
 
-        await step(
-          'UpdateUnitTest',
-          {
-            class_name: className,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleUpdateUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunUnitTest',
-            { class_name: className },
-            handleRunUnitTest,
-          ),
-          expected,
-        );
+      await step(
+        'UpdateUnitTest',
+        {
+          class_name: className,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleUpdateUnitTest,
+      );
+      expectTestsRan(
+        await step('RunUnitTest', { class_name: className }, handleRunUnitTest),
+        expected,
+      );
 
-        await step(
-          'DeleteUnitTest',
-          { class_name: className, ...transport },
-          handleDeleteUnitTest,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+      await step(
+        'DeleteUnitTest',
+        { class_name: className, ...transport },
+        handleDeleteUnitTest,
+      );
+    });
+  });
 });

@@ -14,6 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/dataElement
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateDataElement } from '../../../../handlers/data_element/high/handleCreateDataElement';
 import { handleDeleteDataElement } from '../../../../handlers/data_element/high/handleDeleteDataElement';
 import { handleUpdateDataElement } from '../../../../handlers/data_element/high/handleUpdateDataElement';
@@ -23,7 +24,7 @@ import { HighTester } from '../../helpers/testers/HighTester';
 describe('DataElement High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_data_element',
       'builder_data_element',
@@ -37,7 +38,7 @@ describe('DataElement High-Level Handlers Integration', () => {
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +50,7 @@ describe('DataElement High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all DataElement high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all DataElement high-level handlers', async () => {
+    await tester.run();
+  });
 });

@@ -16,6 +16,8 @@
  * Run: npm test -- --testPathPattern=integration/class
  */
 
+import assert from 'node:assert/strict';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
@@ -35,7 +37,7 @@ describe('Class High-Level Handlers Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('class-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'create_class',
       'builder_class',
@@ -86,9 +88,9 @@ describe('Class High-Level Handlers Integration', () => {
         }
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async () => {});
   });
 
@@ -102,227 +104,223 @@ describe('Class High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Class high-level handlers',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const {
-          connection,
-          session,
-          objectName,
-          params,
-          packageName,
-          transportRequest,
-        } = context;
+  it('should test all Class high-level handlers', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const {
+        connection,
+        session,
+        objectName,
+        params,
+        packageName,
+        transportRequest,
+      } = context;
 
-        expect(objectName).toBeDefined();
-        expect(objectName).not.toBe('');
-        if (!objectName) {
-          throw new Error('objectName is required');
-        }
-        const className = objectName;
+      assert.ok(objectName !== undefined);
+      assert.notEqual(objectName, '');
+      if (!objectName) {
+        throw new Error('objectName is required');
+      }
+      const className = objectName;
 
-        // Step 1: Create (object in initial state, no source code)
-        logger?.info(`   • create: ${objectName}`);
-        const createLogger = createTestLogger('class-high-create');
-        const createResponse = await tester.invokeToolOrHandler(
-          'CreateClass',
-          {
+      // Step 1: Create (object in initial state, no source code)
+      logger?.info(`   • create: ${objectName}`);
+      const createLogger = createTestLogger('class-high-create');
+      const createResponse = await tester.invokeToolOrHandler(
+        'CreateClass',
+        {
+          class_name: objectName,
+          package_name: packageName,
+          ...(transportRequest && { transport_request: transportRequest }),
+          ...(params.description && { description: params.description }),
+          ...(params.superclass && { superclass: params.superclass }),
+        },
+        async () => {
+          const createCtx = createHandlerContext({
+            connection,
+            logger: createLogger,
+          });
+          return handleCreateClass(createCtx, {
             class_name: objectName,
             package_name: packageName,
             ...(transportRequest && { transport_request: transportRequest }),
             ...(params.description && { description: params.description }),
             ...(params.superclass && { superclass: params.superclass }),
-          },
-          async () => {
-            const createCtx = createHandlerContext({
-              connection,
-              logger: createLogger,
-            });
-            return handleCreateClass(createCtx, {
-              class_name: objectName,
-              package_name: packageName,
-              ...(transportRequest && { transport_request: transportRequest }),
-              ...(params.description && { description: params.description }),
-              ...(params.superclass && { superclass: params.superclass }),
-            });
-          },
+          });
+        },
+      );
+
+      assert.equal(createResponse.isError, false);
+      if (createResponse.isError) {
+        const errorMsg = extractErrorMessage(createResponse);
+        // Try to extract more detailed error information
+        let detailedError = errorMsg;
+        if (createResponse.content && createResponse.content.length > 0) {
+          const firstContent = createResponse.content[0];
+          if (firstContent.text) {
+            detailedError = firstContent.text;
+            createLogger?.error(`Create error: ${detailedError}`);
+          }
+        }
+        // Log full response for debugging
+        createLogger?.error(
+          `Full error response: ${JSON.stringify(createResponse.content, null, 2)}`,
         );
+        throw new Error(`Create failed: ${detailedError}`);
+      }
 
-        expect(createResponse.isError).toBe(false);
-        if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          // Try to extract more detailed error information
-          let detailedError = errorMsg;
-          if (createResponse.content && createResponse.content.length > 0) {
-            const firstContent = createResponse.content[0];
-            if (firstContent.text) {
-              detailedError = firstContent.text;
-              createLogger?.error(`Create error: ${detailedError}`);
-            }
-          }
-          // Log full response for debugging
-          createLogger?.error(
-            `Full error response: ${JSON.stringify(createResponse.content, null, 2)}`,
-          );
-          throw new Error(`Create failed: ${detailedError}`);
+      // CreateClass's terse projection is `terseWrite`: on success it
+      // answers the literal text "SUCCESS", not a JSON object — there is no
+      // `data`/`errors` field left to inspect (CHANGELOG Unreleased: "Terse
+      // writes answer the literal string `SUCCESS` ... uniformly across
+      // every write tool"; see src/lib/strategies/projections.ts
+      // `terseWrite`/`project()`). `JSON.parse('SUCCESS')` throws, so this
+      // no longer goes through `parseHandlerResponse`.
+      assert.equal(createResponse.content[0]?.text, 'SUCCESS');
+
+      logger?.success(`✅ create: ${objectName} completed successfully`);
+      // terseWrite carries no session fields either way — this was always
+      // a fallback to the current session, kept for parity with the other
+      // handler-test files that call it after a write.
+      updateSessionFromResponse(session, {});
+
+      // Wait a bit after creation before update to ensure object is ready
+      // Use delay from YAML config (operation_delays.create or default) via context
+      const delay = context.getOperationDelay('create');
+      logger?.info(`   • waiting ${delay}ms after creation before update...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      // Step 2: Update
+      logger?.info(`   • update: ${objectName}`);
+      const updateLogger = createTestLogger('class-high-update');
+      let updatedSourceCode = params.update_source_code;
+      if (!updatedSourceCode) {
+        const originalSourceCode = params.source_code || '';
+        updatedSourceCode = originalSourceCode.replace(
+          /PUBLIC SECTION\./,
+          'PUBLIC SECTION.\n    " Updated via MCP ABAP ADT test',
+        );
+        if (updatedSourceCode === originalSourceCode) {
+          updatedSourceCode = `${originalSourceCode}\n    " Updated via MCP ABAP ADT test`;
         }
+      }
 
-        // CreateClass's terse projection is `terseWrite`: on success it
-        // answers the literal text "SUCCESS", not a JSON object — there is no
-        // `data`/`errors` field left to inspect (CHANGELOG Unreleased: "Terse
-        // writes answer the literal string `SUCCESS` ... uniformly across
-        // every write tool"; see src/lib/strategies/projections.ts
-        // `terseWrite`/`project()`). `JSON.parse('SUCCESS')` throws, so this
-        // no longer goes through `parseHandlerResponse`.
-        expect(createResponse.content[0]?.text).toBe('SUCCESS');
-
-        logger?.success(`✅ create: ${objectName} completed successfully`);
-        // terseWrite carries no session fields either way — this was always
-        // a fallback to the current session, kept for parity with the other
-        // handler-test files that call it after a write.
-        updateSessionFromResponse(session, {});
-
-        // Wait a bit after creation before update to ensure object is ready
-        // Use delay from YAML config (operation_delays.create or default) via context
-        const delay = context.getOperationDelay('create');
-        logger?.info(`   • waiting ${delay}ms after creation before update...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-
-        // Step 2: Update
-        logger?.info(`   • update: ${objectName}`);
-        const updateLogger = createTestLogger('class-high-update');
-        let updatedSourceCode = params.update_source_code;
-        if (!updatedSourceCode) {
-          const originalSourceCode = params.source_code || '';
-          updatedSourceCode = originalSourceCode.replace(
-            /PUBLIC SECTION\./,
-            'PUBLIC SECTION.\n    " Updated via MCP ABAP ADT test',
-          );
-          if (updatedSourceCode === originalSourceCode) {
-            updatedSourceCode = `${originalSourceCode}\n    " Updated via MCP ABAP ADT test`;
-          }
-        }
-
-        const updateResponse = await tester.invokeToolOrHandler(
-          'UpdateClass',
-          {
+      const updateResponse = await tester.invokeToolOrHandler(
+        'UpdateClass',
+        {
+          class_name: className,
+          source_code: updatedSourceCode,
+          activate: true,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const updateCtx = createHandlerContext({
+            connection,
+            logger: updateLogger,
+          });
+          return handleUpdateClass(updateCtx, {
             class_name: className,
             source_code: updatedSourceCode,
             activate: true,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const updateCtx = createHandlerContext({
-              connection,
-              logger: updateLogger,
-            });
-            return handleUpdateClass(updateCtx, {
-              class_name: className,
-              source_code: updatedSourceCode,
-              activate: true,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
+          });
+        },
+      );
 
-        expect(updateResponse.isError).toBe(false);
-        if (updateResponse.isError) {
-          const errorMsg = extractErrorMessage(updateResponse);
-          // Try to extract more detailed error information
-          let detailedError = errorMsg;
-          if (updateResponse.content && updateResponse.content.length > 0) {
-            const firstContent = updateResponse.content[0];
-            if (firstContent.text) {
-              detailedError = firstContent.text;
-              updateLogger?.error(`Update error: ${detailedError}`);
-            }
+      assert.equal(updateResponse.isError, false);
+      if (updateResponse.isError) {
+        const errorMsg = extractErrorMessage(updateResponse);
+        // Try to extract more detailed error information
+        let detailedError = errorMsg;
+        if (updateResponse.content && updateResponse.content.length > 0) {
+          const firstContent = updateResponse.content[0];
+          if (firstContent.text) {
+            detailedError = firstContent.text;
+            updateLogger?.error(`Update error: ${detailedError}`);
           }
-          throw new Error(`Update failed: ${detailedError}`);
         }
+        throw new Error(`Update failed: ${detailedError}`);
+      }
 
-        // UpdateClass's terse projection is `terseWrite` too — same literal
-        // "SUCCESS" text on success, no `class_name`/`data`/`errors` fields
-        // (projections.ts `terseWrite`).
-        expect(updateResponse.content[0]?.text).toBe('SUCCESS');
+      // UpdateClass's terse projection is `terseWrite` too — same literal
+      // "SUCCESS" text on success, no `class_name`/`data`/`errors` fields
+      // (projections.ts `terseWrite`).
+      assert.equal(updateResponse.content[0]?.text, 'SUCCESS');
 
-        logger?.success(`✅ update: ${objectName} completed successfully`);
+      logger?.success(`✅ update: ${objectName} completed successfully`);
 
-        // Step 3: Get (read)
-        logger?.info(`   • get: ${objectName}`);
-        const getLogger = createTestLogger('class-high-get');
-        const getResponse = await tester.invokeToolOrHandler(
-          'GetClass',
-          {
+      // Step 3: Get (read)
+      logger?.info(`   • get: ${objectName}`);
+      const getLogger = createTestLogger('class-high-get');
+      const getResponse = await tester.invokeToolOrHandler(
+        'GetClass',
+        {
+          class_name: className,
+          version: 'active',
+        },
+        async () => {
+          const getCtx = createHandlerContext({
+            connection,
+            logger: getLogger,
+          });
+          return handleGetClass(getCtx, {
             class_name: className,
             version: 'active',
-          },
-          async () => {
-            const getCtx = createHandlerContext({
-              connection,
-              logger: getLogger,
-            });
-            return handleGetClass(getCtx, {
-              class_name: className,
-              version: 'active',
-            });
-          },
-        );
+          });
+        },
+      );
 
-        expect(getResponse.isError).toBe(false);
-        if (getResponse.isError) {
-          const errorMsg = extractErrorMessage(getResponse);
-          throw new Error(`Get failed: ${errorMsg}`);
-        }
+      assert.equal(getResponse.isError, false);
+      if (getResponse.isError) {
+        const errorMsg = extractErrorMessage(getResponse);
+        throw new Error(`Get failed: ${errorMsg}`);
+      }
 
-        const getData = parseHandlerResponse(getResponse);
-        expect(getData.success).toBe(true);
-        expect(getData.class_name).toBe(objectName);
-        expect(getData.source).toBeDefined();
-        expect(typeof getData.source).toBe('string');
+      const getData = parseHandlerResponse(getResponse);
+      assert.equal(getData.success, true);
+      assert.equal(getData.class_name, objectName);
+      assert.ok(getData.source !== undefined);
+      assert.equal(typeof getData.source, 'string');
 
-        logger?.success(`✅ get: ${objectName} completed successfully`);
+      logger?.success(`✅ get: ${objectName} completed successfully`);
 
-        // Step 4: Delete (high-level)
-        logger?.info(`   • delete (high): ${objectName}`);
-        const deleteLogger = createTestLogger('class-high-delete');
-        const deleteResponse = await tester.invokeToolOrHandler(
-          'DeleteClass',
-          {
+      // Step 4: Delete (high-level)
+      logger?.info(`   • delete (high): ${objectName}`);
+      const deleteLogger = createTestLogger('class-high-delete');
+      const deleteResponse = await tester.invokeToolOrHandler(
+        'DeleteClass',
+        {
+          class_name: className,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const deleteCtx = createHandlerContext({
+            connection,
+            logger: deleteLogger,
+          });
+          return handleDeleteClass(deleteCtx, {
             class_name: className,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const deleteCtx = createHandlerContext({
-              connection,
-              logger: deleteLogger,
-            });
-            return handleDeleteClass(deleteCtx, {
-              class_name: className,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
+          });
+        },
+      );
 
-        expect(deleteResponse.isError).toBe(false);
-        if (deleteResponse.isError) {
-          const errorMsg = extractErrorMessage(deleteResponse);
-          logger?.warn(`Delete failed: ${errorMsg}`);
-          // Don't fail test - object might already be deleted or cleanup will handle it
-        } else {
-          const deleteData = parseHandlerResponse(deleteResponse);
-          // DeleteClass's terse projection is `terseDeletion`, which answers
-          // `deleted`/`object` from ADT's own `del:deletionResult` document —
-          // it never had `success`/`class_name` fields (projections.ts
-          // `terseDeletion`).
-          expect(deleteData.deleted).toBe(true);
-          expect(deleteData.object).toBe(objectName);
-          logger?.success(
-            `✅ delete (high): ${objectName} completed successfully`,
-          );
-        }
-      });
-    },
-    getTimeout('long'),
-  );
+      assert.equal(deleteResponse.isError, false);
+      if (deleteResponse.isError) {
+        const errorMsg = extractErrorMessage(deleteResponse);
+        logger?.warn(`Delete failed: ${errorMsg}`);
+        // Don't fail test - object might already be deleted or cleanup will handle it
+      } else {
+        const deleteData = parseHandlerResponse(deleteResponse);
+        // DeleteClass's terse projection is `terseDeletion`, which answers
+        // `deleted`/`object` from ADT's own `del:deletionResult` document —
+        // it never had `success`/`class_name` fields (projections.ts
+        // `terseDeletion`).
+        assert.equal(deleteData.deleted, true);
+        assert.equal(deleteData.object, objectName);
+        logger?.success(
+          `✅ delete (high): ${objectName} completed successfully`,
+        );
+      }
+    });
+  });
 });

@@ -14,6 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/interface
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateInterface } from '../../../../handlers/interface/high/handleCreateInterface';
 import { handleDeleteInterface } from '../../../../handlers/interface/high/handleDeleteInterface';
 import { handleUpdateInterface } from '../../../../handlers/interface/high/handleUpdateInterface';
@@ -23,7 +24,7 @@ import { HighTester } from '../../helpers/testers/HighTester';
 describe('Interface High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_interface',
       'builder_interface',
@@ -37,7 +38,7 @@ describe('Interface High-Level Handlers Integration', () => {
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +50,7 @@ describe('Interface High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Interface high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Interface high-level handlers', async () => {
+    await tester.run();
+  });
 });

@@ -8,6 +8,8 @@
  * Run: npm test -- --testPathPattern=integration/high/check
  */
 
+import assert from 'node:assert/strict';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCheckBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckClass } from '../../../../handlers/class/high/handleCheckClass';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
@@ -28,6 +30,7 @@ import {
   getSharedDependenciesConfig,
   getTimeout,
 } from '../../helpers/configHelpers';
+import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -71,22 +74,22 @@ function expectAccepted(response: any, what: string): void {
       `${what} was refused: ${String(response?.content?.[0]?.text ?? '(no payload)').slice(0, 1200)}`,
     );
   }
-  expect(response.isError).toBe(false);
+  assert.equal(response.isError, false);
 }
 
 function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
-  expect(data.object_name).toBe(expectedObjectName.toUpperCase());
-  expect(data.ran).toBe(true);
-  expect(typeof data.status_text).toBe('string');
-  expect(data).not.toHaveProperty('session_id');
-  expect(data).not.toHaveProperty('session_state');
+  assert.equal(data.object_name, expectedObjectName.toUpperCase());
+  assert.equal(data.ran, true);
+  assert.equal(typeof data.status_text, 'string');
+  assert.ok(!('session_id' in data));
+  assert.ok(!('session_state' in data));
   // The shared objects are active and correct, and every check here asks
   // about the active version: an error is a broken test environment or a
   // broken implementation, not an answer to accept. Warnings may stand.
   const errors = (data.messages ?? []).filter(
     (m: { type?: string }) => m.type === 'E',
   );
-  expect(errors).toEqual([]);
+  assertEquals(errors, []);
 }
 
 describe('Check High-Level Handlers Integration', () => {
@@ -94,7 +97,7 @@ describe('Check High-Level Handlers Integration', () => {
   describe('CheckClass', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_class_high',
         'check_existing',
@@ -104,9 +107,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -116,41 +119,37 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing class and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.class_name;
+    it('should check existing class and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.class_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-class');
-          const response = await tester.invokeToolOrHandler(
-            'CheckClass',
-            { class_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckClass(ctx, {
-                class_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-class');
+        const response = await tester.invokeToolOrHandler(
+          'CheckClass',
+          { class_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckClass(ctx, {
+              class_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckClass — a finding is an answer, not a failure
@@ -164,7 +163,7 @@ describe('Check High-Level Handlers Integration', () => {
   describe('CheckClass finds an error', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_class_high',
         'check_findings',
@@ -187,9 +186,9 @@ describe('Check High-Level Handlers Integration', () => {
           );
         },
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -199,74 +198,68 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'answers the keyword error as a finding, not as a failed call',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger, packageName, transportRequest } =
-            context;
-          const objectName = params.class_name;
-          const ctx = () =>
-            createHandlerContext({
-              connection,
-              logger: createTestLogger('check-findings'),
-            });
+    it('answers the keyword error as a finding, not as a failed call', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger, packageName, transportRequest } =
+          context;
+        const objectName = params.class_name;
+        const ctx = () =>
+          createHandlerContext({
+            connection,
+            logger: createTestLogger('check-findings'),
+          });
 
-          logger?.info(`   • create: ${objectName}`);
-          const created = await handleCreateClass(ctx(), {
-            class_name: objectName,
-            description: params.description,
-            package_name: packageName,
-            ...(transportRequest && { transport_request: transportRequest }),
-          } as any);
-          expect(created.isError).toBe(false);
+        logger?.info(`   • create: ${objectName}`);
+        const created = await handleCreateClass(ctx(), {
+          class_name: objectName,
+          description: params.description,
+          package_name: packageName,
+          ...(transportRequest && { transport_request: transportRequest }),
+        } as any);
+        assert.equal(created.isError, false);
 
-          logger?.info(
-            `   • write the broken source (inactive): ${objectName}`,
-          );
-          const written = await handleUpdateClass(ctx(), {
-            class_name: objectName,
-            source_code: params.source_code,
-            ...(transportRequest && { transport_request: transportRequest }),
-            activate: false,
-          } as any);
-          expect(written.isError).toBe(false);
+        logger?.info(`   • write the broken source (inactive): ${objectName}`);
+        const written = await handleUpdateClass(ctx(), {
+          class_name: objectName,
+          source_code: params.source_code,
+          ...(transportRequest && { transport_request: transportRequest }),
+          activate: false,
+        } as any);
+        assert.equal(written.isError, false);
 
-          logger?.info(`   • check the inactive version: ${objectName}`);
-          const response = await tester.invokeToolOrHandler(
-            'CheckClass',
-            { class_name: objectName, version: 'inactive' },
-            async () =>
-              handleCheckClass(ctx(), {
-                class_name: objectName,
-                version: 'inactive',
-              }),
-          );
+        logger?.info(`   • check the inactive version: ${objectName}`);
+        const response = await tester.invokeToolOrHandler(
+          'CheckClass',
+          { class_name: objectName, version: 'inactive' },
+          async () =>
+            handleCheckClass(ctx(), {
+              class_name: objectName,
+              version: 'inactive',
+            }),
+        );
 
-          // Reported, not raised: the finding is the answer.
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          expect(data.object_name).toBe(objectName.toUpperCase());
-          expect(data.ran).toBe(true);
-          const errors = (data.messages ?? []).filter(
-            (m: { type?: string }) => m.type === 'E',
-          );
-          expect(errors.length).toBeGreaterThan(0);
+        // Reported, not raised: the finding is the answer.
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assert.equal(data.object_name, objectName.toUpperCase());
+        assert.equal(data.ran, true);
+        const errors = (data.messages ?? []).filter(
+          (m: { type?: string }) => m.type === 'E',
+        );
+        assert.ok(errors.length > 0);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${errors.length} error(s): ${errors.map((e: { text?: string }) => e.text).join('; ')}`,
-          );
-        });
-      },
-      getTimeout('long'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${errors.length} error(s): ${errors.map((e: { text?: string }) => e.text).join('; ')}`,
+        );
+      });
+    });
   });
 
   // CheckBehaviorDefinition
   describe('CheckBehaviorDefinition', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_bdef_high',
         'check_existing',
@@ -276,9 +269,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -288,52 +281,48 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing behavior definition and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.name;
+    it('should check existing behavior definition and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-bdef');
-          const response = await tester.invokeToolOrHandler(
-            'CheckBehaviorDefinition',
-            { name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckBehaviorDefinition(ctx, {
-                name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-bdef');
+        const response = await tester.invokeToolOrHandler(
+          'CheckBehaviorDefinition',
+          { name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckBehaviorDefinition(ctx, {
+              name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          // It used to take a name and nothing else, so it could only ask
-          // about the inactive version — which an active behaviour
-          // definition does not have ("Inactive version … does not exist").
-          // It asks about the active one now, like every check here.
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        // It used to take a name and nothing else, so it could only ask
+        // about the inactive version — which an active behaviour
+        // definition does not have ("Inactive version … does not exist").
+        // It asks about the active one now, like every check here.
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckDdl
   describe('CheckDdl', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_ddl_high',
         'check_existing',
@@ -343,9 +332,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -355,48 +344,44 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing CDS view and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.ddl_name;
+    it('should check existing CDS view and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.ddl_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-ddl');
-          const response = await tester.invokeToolOrHandler(
-            'CheckDdl',
-            { ddl_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckDdl(ctx, {
-                ddl_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-ddl');
+        const response = await tester.invokeToolOrHandler(
+          'CheckDdl',
+          { ddl_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckDdl(ctx, {
+              ddl_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckDomain
   describe('CheckDomain', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_domain_high',
         'check_existing',
@@ -406,9 +391,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -418,48 +403,44 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing domain and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.domain_name;
+    it('should check existing domain and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.domain_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-domain');
-          const response = await tester.invokeToolOrHandler(
-            'CheckDomain',
-            { domain_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckDomain(ctx, {
-                domain_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-domain');
+        const response = await tester.invokeToolOrHandler(
+          'CheckDomain',
+          { domain_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckDomain(ctx, {
+              domain_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckDataElement
   describe('CheckDataElement', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_data_element_high',
         'check_existing',
@@ -469,9 +450,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -481,48 +462,44 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing data element and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.data_element_name;
+    it('should check existing data element and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.data_element_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-dtel');
-          const response = await tester.invokeToolOrHandler(
-            'CheckDataElement',
-            { data_element_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckDataElement(ctx, {
-                data_element_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-dtel');
+        const response = await tester.invokeToolOrHandler(
+          'CheckDataElement',
+          { data_element_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckDataElement(ctx, {
+              data_element_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckTable
   describe('CheckTable', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_table_high',
         'check_existing',
@@ -532,9 +509,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -544,59 +521,55 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing table and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.table_name;
+    it('should check existing table and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.table_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-table');
-          const response = await tester.invokeToolOrHandler(
-            // `version` is not optional here, and the default is not the
-            // one this test wants. `CheckTableLow` defaults to `new`, which
-            // the check endpoint treats as `inactive`; the shared table is
-            // active-only, so SAP answers `status="notProcessed"` with
-            // `statusText="Inactive version for TABL ZMCP_SHR_RTABL does not
-            // exist"` — a check that never ran, which `analyseException` reports
-            // as the refusal it is. Before the migration the same answer was
-            // parsed into `success: false` inside an `isError: false`
-            // response, which is the masking this work removed. Asking for
-            // the active version is asking the question the test's own name
-            // states.
-            'CheckTable',
-            { table_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckTable(ctx, {
-                table_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-table');
+        const response = await tester.invokeToolOrHandler(
+          // `version` is not optional here, and the default is not the
+          // one this test wants. `CheckTableLow` defaults to `new`, which
+          // the check endpoint treats as `inactive`; the shared table is
+          // active-only, so SAP answers `status="notProcessed"` with
+          // `statusText="Inactive version for TABL ZMCP_SHR_RTABL does not
+          // exist"` — a check that never ran, which `analyseException` reports
+          // as the refusal it is. Before the migration the same answer was
+          // parsed into `success: false` inside an `isError: false`
+          // response, which is the masking this work removed. Asking for
+          // the active version is asking the question the test's own name
+          // states.
+          'CheckTable',
+          { table_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckTable(ctx, {
+              table_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckStructure
   describe('CheckStructure', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_structure_high',
         'check_existing',
@@ -606,9 +579,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -618,48 +591,44 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing structure and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.structure_name;
+    it('should check existing structure and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.structure_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-structure');
-          const response = await tester.invokeToolOrHandler(
-            'CheckStructure',
-            { structure_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckStructure(ctx, {
-                structure_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-structure');
+        const response = await tester.invokeToolOrHandler(
+          'CheckStructure',
+          { structure_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckStructure(ctx, {
+              structure_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckInterface
   describe('CheckInterface', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_interface_high',
         'check_existing',
@@ -669,9 +638,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -681,48 +650,44 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing interface and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.interface_name;
+    it('should check existing interface and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.interface_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-interface');
-          const response = await tester.invokeToolOrHandler(
-            'CheckInterface',
-            { interface_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckInterface(ctx, {
-                interface_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-interface');
+        const response = await tester.invokeToolOrHandler(
+          'CheckInterface',
+          { interface_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckInterface(ctx, {
+              interface_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckPackage
   describe('CheckPackage', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_package_high',
         'check_existing',
@@ -732,9 +697,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -744,55 +709,51 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing package and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          // The case's package, else the shared package the shared-objects
-          // setup creates (shared_dependencies.package): present on every
-          // system that ran it, whatever the configuration names it.
-          const objectName =
-            params.package_name ?? getSharedDependenciesConfig()?.package;
+    it('should check existing package and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        // The case's package, else the shared package the shared-objects
+        // setup creates (shared_dependencies.package): present on every
+        // system that ran it, whatever the configuration names it.
+        const objectName =
+          params.package_name ?? getSharedDependenciesConfig()?.package;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-package');
-          const response = await tester.invokeToolOrHandler(
-            'CheckPackage',
-            {
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-package');
+        const response = await tester.invokeToolOrHandler(
+          'CheckPackage',
+          {
+            package_name: objectName,
+            super_package: params.super_package,
+          },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckPackage(ctx, {
               package_name: objectName,
               super_package: params.super_package,
-            },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckPackage(ctx, {
-                package_name: objectName,
-                super_package: params.super_package,
-              });
-            },
-          );
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckProgram
   describe('CheckProgram', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_program_high',
         'check_existing',
@@ -802,9 +763,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -814,48 +775,44 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing program and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.program_name;
+    it('should check existing program and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.program_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-program');
-          const response = await tester.invokeToolOrHandler(
-            'CheckProgram',
-            { program_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckProgram(ctx, {
-                program_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-program');
+        const response = await tester.invokeToolOrHandler(
+          'CheckProgram',
+          { program_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckProgram(ctx, {
+              program_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckFunctionGroup
   describe('CheckFunctionGroup', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_function_group_high',
         'check_existing',
@@ -865,9 +822,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -877,58 +834,54 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing function group and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.function_group_name;
+    it('should check existing function group and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.function_group_name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-fgrp');
-          const response = await tester.invokeToolOrHandler(
-            'CheckFunctionGroup',
-            { function_group_name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckFunctionGroup(ctx, {
-                function_group_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-fgrp');
+        const response = await tester.invokeToolOrHandler(
+          'CheckFunctionGroup',
+          { function_group_name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckFunctionGroup(ctx, {
+              function_group_name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          // An active, healthy function group checks clean. This used to
-          // demand `MESSAGE(G46)` — "The REPORT/PROGRAM statement is missing,
-          // or the program type is INCLUDE." — as what SAP says about any
-          // function group (measured 2026-09-16). It is what SAP says about a
-          // group that was never activated, whose main program has not been
-          // generated yet: once the shared group was activated (an on-premise system,
-          // 2026-09-25) the same check answered no message at all, and the
-          // test failed on a correct answer. A shared object is active by
-          // definition, so this asserts the answer's shape, as CheckTable
-          // does, and not a finding the shared object must not have.
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        // An active, healthy function group checks clean. This used to
+        // demand `MESSAGE(G46)` — "The REPORT/PROGRAM statement is missing,
+        // or the program type is INCLUDE." — as what SAP says about any
+        // function group (measured 2026-09-16). It is what SAP says about a
+        // group that was never activated, whose main program has not been
+        // generated yet: once the shared group was activated (an on-premise system,
+        // 2026-09-25) the same check answered no message at all, and the
+        // test failed on a correct answer. A shared object is active by
+        // definition, so this asserts the answer's shape, as CheckTable
+        // does, and not a finding the shared object must not have.
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckFunctionModule
   describe('CheckFunctionModule', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_function_module_high',
         'check_existing',
@@ -938,9 +891,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -950,55 +903,51 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing function module and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.function_module_name;
+    it('should check existing function module and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.function_module_name;
 
-          logger?.info(
-            `   • check: ${objectName} (group: ${params.function_group_name})`,
-          );
-          const checkLogger = createTestLogger('check-fm');
-          const response = await tester.invokeToolOrHandler(
-            'CheckFunctionModule',
-            {
+        logger?.info(
+          `   • check: ${objectName} (group: ${params.function_group_name})`,
+        );
+        const checkLogger = createTestLogger('check-fm');
+        const response = await tester.invokeToolOrHandler(
+          'CheckFunctionModule',
+          {
+            function_group_name: params.function_group_name,
+            function_module_name: objectName,
+            version: 'active',
+          },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckFunctionModule(ctx, {
               function_group_name: params.function_group_name,
               function_module_name: objectName,
               version: 'active',
-            },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckFunctionModule(ctx, {
-                function_group_name: params.function_group_name,
-                function_module_name: objectName,
-                version: 'active',
-              });
-            },
-          );
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 
   // CheckMetadataExtension
   describe('CheckMetadataExtension', () => {
     let tester: LambdaTester;
 
-    beforeAll(async () => {
+    before(async () => {
       tester = new LambdaTester(
         'check_metadata_extension_high',
         'check_existing',
@@ -1008,9 +957,9 @@ describe('Check High-Level Handlers Integration', () => {
         async () => {},
         async () => {},
       );
-    }, getTimeout('long'));
+    });
 
-    afterAll(async () => {
+    after(async () => {
       await tester.afterAll(async () => {});
     });
     beforeEach(async () => {
@@ -1020,40 +969,36 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.afterEach();
     });
 
-    it(
-      'should check existing metadata extension and return normalized response',
-      async () => {
-        await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params, logger } = context;
-          const objectName = params.name;
+    it('should check existing metadata extension and return normalized response', async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params, logger } = context;
+        const objectName = params.name;
 
-          logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-ddlx');
-          const response = await tester.invokeToolOrHandler(
-            'CheckMetadataExtension',
-            { name: objectName, version: 'active' },
-            async () => {
-              const ctx = createHandlerContext({
-                connection,
-                logger: checkLogger,
-              });
-              return handleCheckMetadataExtension(ctx, {
-                name: objectName,
-                version: 'active',
-              });
-            },
-          );
+        logger?.info(`   • check: ${objectName}`);
+        const checkLogger = createTestLogger('check-ddlx');
+        const response = await tester.invokeToolOrHandler(
+          'CheckMetadataExtension',
+          { name: objectName, version: 'active' },
+          async () => {
+            const ctx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckMetadataExtension(ctx, {
+              name: objectName,
+              version: 'active',
+            });
+          },
+        );
 
-          expectAccepted(response, `check ${objectName}`);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+        expectAccepted(response, `check ${objectName}`);
+        const data = parseHandlerResponse(response);
+        assertNormalizedCheckResponse(data, objectName);
 
-          logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
-          );
-        });
-      },
-      getTimeout('medium'),
-    );
+        logger?.success(
+          `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+        );
+      });
+    });
   });
 });

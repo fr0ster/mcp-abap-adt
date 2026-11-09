@@ -25,6 +25,8 @@
  * Run: npm test -- --testPathPatterns=high/function/FunctionIncludeHigh
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
@@ -65,7 +67,7 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
   let hasConfig = false;
   let mcp: HardModeClient | null = null;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       if (isHardModeEnabled()) {
         mcp = await createHardModeClient('full');
@@ -85,313 +87,306 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
     if (mcp) {
       await mcp.close();
       mcp = null;
     }
   });
 
-  it(
-    'should run the FunctionInclude create/update/read/delete lifecycle',
-    async () => {
-      if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
-        testLogger?.info(
-          '⏭️  Skipping test: No configuration, connection or session',
-        );
-        return;
-      }
-
-      const testCase = getEnabledTestCase(
-        'function_include_high',
-        'full_workflow_high',
+  it('should run the FunctionInclude create/update/read/delete lifecycle', async () => {
+    if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
+      testLogger?.info(
+        '⏭️  Skipping test: No configuration, connection or session',
       );
-      if (!testCase) {
-        testLogger?.info('⏭️  Skipping test: No test case configuration');
-        return;
+      return;
+    }
+
+    const testCase = getEnabledTestCase(
+      'function_include_high',
+      'full_workflow_high',
+    );
+    if (!testCase) {
+      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      return;
+    }
+    if (!isTestAvailableForSystem(testCase.available_in)) {
+      testLogger?.info(
+        `⏭️  Skipping test: not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
+      );
+      return;
+    }
+
+    const functionGroupName = testCase.params.function_group_name;
+    // This test creates the group and deletes it again: never a shared one.
+    assertNotSharedDependency('function group', functionGroupName);
+    const includeName = testCase.params.include_name;
+    const description =
+      testCase.params.description || 'Custom include for lifecycle test';
+    const transportRequest = resolveTransportRequest(testCase);
+    const packageName = resolvePackageName(testCase);
+    const groupDescription =
+      testCase.params.function_group_description ||
+      'FG for the function include test';
+
+    if (!testCase.params.update_source_code) {
+      throw new Error(
+        'update_source_code is required in test configuration for function_include_high',
+      );
+    }
+    const updatedSourceCode: string = testCase.params.update_source_code;
+
+    const invoke = async (
+      toolName: string,
+      args: Record<string, unknown>,
+      directCall: () => Promise<any>,
+    ) => {
+      if (!isHardModeEnabled()) {
+        return directCall();
       }
-      if (!isTestAvailableForSystem(testCase.available_in)) {
-        testLogger?.info(
-          `⏭️  Skipping test: not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
-        );
-        return;
+      if (!mcp) {
+        throw new Error('Hard mode MCP client is not initialized');
       }
-
-      const functionGroupName = testCase.params.function_group_name;
-      // This test creates the group and deletes it again: never a shared one.
-      assertNotSharedDependency('function group', functionGroupName);
-      const includeName = testCase.params.include_name;
-      const description =
-        testCase.params.description || 'Custom include for lifecycle test';
-      const transportRequest = resolveTransportRequest(testCase);
-      const packageName = resolvePackageName(testCase);
-      const groupDescription =
-        testCase.params.function_group_description ||
-        'FG for the function include test';
-
-      if (!testCase.params.update_source_code) {
-        throw new Error(
-          'update_source_code is required in test configuration for function_include_high',
-        );
-      }
-      const updatedSourceCode: string = testCase.params.update_source_code;
-
-      const invoke = async (
-        toolName: string,
-        args: Record<string, unknown>,
-        directCall: () => Promise<any>,
-      ) => {
-        if (!isHardModeEnabled()) {
-          return directCall();
-        }
-        if (!mcp) {
-          throw new Error('Hard mode MCP client is not initialized');
-        }
-        try {
-          return await callTool(mcp, [toolName], args);
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: error?.message || String(error) }],
-          };
-        }
-      };
-
-      let groupCreated = false;
-      let created = false;
-
-      let passed = false;
       try {
-        // Step 0: the test's own function group
-        testLogger?.info(
-          `📦 High Create: Creating function group ${functionGroupName} in ${packageName} (transport: ${transportRequest || '(local)'})...`,
+        return await callTool(mcp, [toolName], args);
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error?.message || String(error) }],
+        };
+      }
+    };
+
+    let groupCreated = false;
+    let created = false;
+
+    let passed = false;
+    try {
+      // Step 0: the test's own function group
+      testLogger?.info(
+        `📦 High Create: Creating function group ${functionGroupName} in ${packageName} (transport: ${transportRequest || '(local)'})...`,
+      );
+      const groupArgs = {
+        function_group_name: functionGroupName,
+        description: groupDescription,
+        package_name: packageName,
+        transport_request: transportRequest,
+        activate: true,
+      };
+      const groupResponse = await invoke('CreateFunctionGroup', groupArgs, () =>
+        handleCreateFunctionGroup(
+          { connection: connection!, logger: testLogger },
+          groupArgs,
+        ),
+      );
+      if (groupResponse.isError) {
+        throw new Error(
+          `CreateFunctionGroup failed: ${groupResponse.content[0]?.text || 'Unknown error'}`,
         );
-        const groupArgs = {
+      }
+      groupCreated = true;
+      testLogger?.info(
+        `✅ High Create: Created function group ${functionGroupName}`,
+      );
+      await delay(getOperationDelay('create', testCase));
+
+      // Step 1: CreateFunctionInclude
+      testLogger?.info(
+        `📦 High Create: Creating include ${includeName} in ${functionGroupName} (transport: ${transportRequest || '(local)'})...`,
+      );
+      const createResponse = await invoke(
+        'CreateFunctionInclude',
+        {
           function_group_name: functionGroupName,
-          description: groupDescription,
-          package_name: packageName,
+          include_name: includeName,
+          description,
+          transport_request: transportRequest,
+        },
+        () =>
+          handleCreateFunctionInclude(
+            { connection: connection!, logger: testLogger },
+            {
+              function_group_name: functionGroupName,
+              include_name: includeName,
+              description,
+              transport_request: transportRequest,
+            },
+          ),
+      );
+
+      if (createResponse.isError) {
+        const errorMsg = createResponse.content[0]?.text || 'Unknown error';
+        const errorLower = errorMsg.toLowerCase();
+        if (
+          errorLower.includes('not authorized') ||
+          errorLower.includes('authorization')
+        ) {
+          testLogger?.warn(
+            `⚠️  Skipping test: No authorization to create function include: ${errorMsg}`,
+          );
+          return;
+        }
+        throw new Error(`CreateFunctionInclude failed: ${errorMsg}`);
+      }
+
+      created = true;
+      // CreateFunctionInclude's terse projection is `terseWrite`: on success
+      // it answers the literal text "SUCCESS", not a JSON object — `success`
+      // no longer exists to read (CHANGELOG Unreleased: "Terse writes answer
+      // the literal string `SUCCESS` ... uniformly across every write tool";
+      // see projections.ts `terseWrite`).
+      assert.equal(createResponse.content[0]?.text, 'SUCCESS');
+      testLogger?.info(`✅ High Create: Created include ${includeName}`);
+
+      await delay(getOperationDelay('create', testCase));
+
+      // Step 2: UpdateFunctionInclude
+      testLogger?.info(`📝 High Update: Updating include ${includeName}...`);
+      const updateResponse = await invoke(
+        'UpdateFunctionInclude',
+        {
+          function_group_name: functionGroupName,
+          include_name: includeName,
+          source_code: updatedSourceCode,
           transport_request: transportRequest,
           activate: true,
-        };
-        const groupResponse = await invoke(
-          'CreateFunctionGroup',
-          groupArgs,
-          () =>
-            handleCreateFunctionGroup(
-              { connection: connection!, logger: testLogger },
-              groupArgs,
-            ),
+        },
+        () =>
+          handleUpdateFunctionInclude(
+            { connection: connection!, logger: testLogger },
+            {
+              function_group_name: functionGroupName,
+              include_name: includeName,
+              source_code: updatedSourceCode,
+              transport_request: transportRequest,
+              activate: true,
+            },
+          ),
+      );
+
+      if (updateResponse.isError) {
+        throw new Error(
+          `UpdateFunctionInclude failed: ${updateResponse.content[0]?.text || 'Unknown error'}`,
         );
-        if (groupResponse.isError) {
-          throw new Error(
-            `CreateFunctionGroup failed: ${groupResponse.content[0]?.text || 'Unknown error'}`,
-          );
-        }
-        groupCreated = true;
-        testLogger?.info(
-          `✅ High Create: Created function group ${functionGroupName}`,
+      }
+      // UpdateFunctionInclude's terse projection is `terseWrite` too — same
+      // literal "SUCCESS" text, no `success` field (projections.ts
+      // `terseWrite`).
+      assert.equal(updateResponse.content[0]?.text, 'SUCCESS');
+      testLogger?.info(`✅ High Update: Updated include ${includeName}`);
+
+      await delay(getOperationDelay('update', testCase));
+
+      // Step 3: GetFunctionInclude — verify source round-trips
+      testLogger?.info(`📖 Read-back: Reading include ${includeName}...`);
+      const readResponse = await invoke(
+        'GetFunctionInclude',
+        {
+          function_group_name: functionGroupName,
+          include_name: includeName,
+          version: 'active',
+        },
+        () =>
+          handleGetFunctionInclude(
+            { connection: connection!, logger: testLogger },
+            {
+              function_group_name: functionGroupName,
+              include_name: includeName,
+              version: 'active',
+            },
+          ),
+      );
+
+      if (readResponse.isError) {
+        throw new Error(
+          `GetFunctionInclude failed: ${readResponse.content[0]?.text || 'Unknown error'}`,
         );
-        await delay(getOperationDelay('create', testCase));
-
-        // Step 1: CreateFunctionInclude
-        testLogger?.info(
-          `📦 High Create: Creating include ${includeName} in ${functionGroupName} (transport: ${transportRequest || '(local)'})...`,
+      }
+      const readData = parseHandlerResponse(readResponse);
+      assert.equal(readData.success, true);
+      assert.equal(readData.include_name, includeName.toUpperCase());
+      // Source should round-trip: assert a stable token from the snippet survives.
+      if (readData.source) {
+        assert.ok(
+          String(readData.source).includes('function-include-roundtrip'),
         );
-        const createResponse = await invoke(
-          'CreateFunctionInclude',
-          {
-            function_group_name: functionGroupName,
-            include_name: includeName,
-            description,
-            transport_request: transportRequest,
-          },
-          () =>
-            handleCreateFunctionInclude(
-              { connection: connection!, logger: testLogger },
-              {
-                function_group_name: functionGroupName,
-                include_name: includeName,
-                description,
-                transport_request: transportRequest,
-              },
-            ),
-        );
-
-        if (createResponse.isError) {
-          const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-          const errorLower = errorMsg.toLowerCase();
-          if (
-            errorLower.includes('not authorized') ||
-            errorLower.includes('authorization')
-          ) {
-            testLogger?.warn(
-              `⚠️  Skipping test: No authorization to create function include: ${errorMsg}`,
-            );
-            return;
-          }
-          throw new Error(`CreateFunctionInclude failed: ${errorMsg}`);
-        }
-
-        created = true;
-        // CreateFunctionInclude's terse projection is `terseWrite`: on success
-        // it answers the literal text "SUCCESS", not a JSON object — `success`
-        // no longer exists to read (CHANGELOG Unreleased: "Terse writes answer
-        // the literal string `SUCCESS` ... uniformly across every write tool";
-        // see projections.ts `terseWrite`).
-        expect(createResponse.content[0]?.text).toBe('SUCCESS');
-        testLogger?.info(`✅ High Create: Created include ${includeName}`);
-
-        await delay(getOperationDelay('create', testCase));
-
-        // Step 2: UpdateFunctionInclude
-        testLogger?.info(`📝 High Update: Updating include ${includeName}...`);
-        const updateResponse = await invoke(
-          'UpdateFunctionInclude',
-          {
-            function_group_name: functionGroupName,
-            include_name: includeName,
-            source_code: updatedSourceCode,
-            transport_request: transportRequest,
-            activate: true,
-          },
-          () =>
-            handleUpdateFunctionInclude(
-              { connection: connection!, logger: testLogger },
-              {
-                function_group_name: functionGroupName,
-                include_name: includeName,
-                source_code: updatedSourceCode,
-                transport_request: transportRequest,
-                activate: true,
-              },
-            ),
-        );
-
-        if (updateResponse.isError) {
-          throw new Error(
-            `UpdateFunctionInclude failed: ${updateResponse.content[0]?.text || 'Unknown error'}`,
-          );
-        }
-        // UpdateFunctionInclude's terse projection is `terseWrite` too — same
-        // literal "SUCCESS" text, no `success` field (projections.ts
-        // `terseWrite`).
-        expect(updateResponse.content[0]?.text).toBe('SUCCESS');
-        testLogger?.info(`✅ High Update: Updated include ${includeName}`);
-
-        await delay(getOperationDelay('update', testCase));
-
-        // Step 3: GetFunctionInclude — verify source round-trips
-        testLogger?.info(`📖 Read-back: Reading include ${includeName}...`);
-        const readResponse = await invoke(
-          'GetFunctionInclude',
-          {
-            function_group_name: functionGroupName,
-            include_name: includeName,
-            version: 'active',
-          },
-          () =>
-            handleGetFunctionInclude(
-              { connection: connection!, logger: testLogger },
-              {
-                function_group_name: functionGroupName,
-                include_name: includeName,
-                version: 'active',
-              },
-            ),
-        );
-
-        if (readResponse.isError) {
-          throw new Error(
-            `GetFunctionInclude failed: ${readResponse.content[0]?.text || 'Unknown error'}`,
-          );
-        }
-        const readData = parseHandlerResponse(readResponse);
-        expect(readData.success).toBe(true);
-        expect(readData.include_name).toBe(includeName.toUpperCase());
-        // Source should round-trip: assert a stable token from the snippet survives.
-        if (readData.source) {
-          expect(String(readData.source)).toContain(
-            'function-include-roundtrip',
-          );
-        }
-        testLogger?.info(`✅ Read-back: Verified include ${includeName}`);
-        passed = true;
-      } finally {
-        // Step 4: DeleteFunctionInclude (cleanup)
-        // A failed run keeps its objects for analysis (getCleanupAfterRun).
-        const shouldCleanup = getCleanupAfterRun(testCase, !passed);
-        if (created && shouldCleanup) {
-          try {
-            await delay(2000);
-            const deleteResponse = await invoke(
-              'DeleteFunctionInclude',
-              {
-                function_group_name: functionGroupName,
-                include_name: includeName,
-                transport_request: transportRequest,
-              },
-              () =>
-                handleDeleteFunctionInclude(
-                  { connection: connection!, logger: testLogger },
-                  {
-                    function_group_name: functionGroupName,
-                    include_name: includeName,
-                    transport_request: transportRequest,
-                  },
-                ),
-            );
-
-            if (!deleteResponse.isError) {
-              testLogger?.info(
-                `🧹 Cleaned up test function include: ${includeName}`,
-              );
-            } else {
-              testLogger?.warn(
-                `⚠️  Failed to delete function include ${includeName}: ${deleteResponse.content[0]?.text || 'Unknown error'}`,
-              );
-            }
-          } catch (cleanupError) {
-            testLogger?.warn(
-              `⚠️  Failed to cleanup function include ${includeName}: ${cleanupError}`,
-            );
-          }
-        } else if (created) {
-          testLogger?.info(
-            `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${includeName}`,
-          );
-        }
-
-        // The group goes after its include.
-        if (groupCreated && shouldCleanup) {
-          const deleteGroupArgs = {
-            function_group_name: functionGroupName,
-            transport_request: transportRequest,
-          };
-          const deleteGroupResponse = await invoke(
-            'DeleteFunctionGroup',
-            deleteGroupArgs,
+      }
+      testLogger?.info(`✅ Read-back: Verified include ${includeName}`);
+      passed = true;
+    } finally {
+      // Step 4: DeleteFunctionInclude (cleanup)
+      // A failed run keeps its objects for analysis (getCleanupAfterRun).
+      const shouldCleanup = getCleanupAfterRun(testCase, !passed);
+      if (created && shouldCleanup) {
+        try {
+          await delay(2000);
+          const deleteResponse = await invoke(
+            'DeleteFunctionInclude',
+            {
+              function_group_name: functionGroupName,
+              include_name: includeName,
+              transport_request: transportRequest,
+            },
             () =>
-              handleDeleteFunctionGroup(
+              handleDeleteFunctionInclude(
                 { connection: connection!, logger: testLogger },
-                deleteGroupArgs,
+                {
+                  function_group_name: functionGroupName,
+                  include_name: includeName,
+                  transport_request: transportRequest,
+                },
               ),
           );
-          if (deleteGroupResponse.isError) {
-            testLogger?.warn(
-              `⚠️  Failed to delete function group ${functionGroupName}: ${deleteGroupResponse.content[0]?.text || 'Unknown error'}`,
+
+          if (!deleteResponse.isError) {
+            testLogger?.info(
+              `🧹 Cleaned up test function include: ${includeName}`,
             );
           } else {
-            testLogger?.info(
-              `🧹 Cleaned up test function group: ${functionGroupName}`,
+            testLogger?.warn(
+              `⚠️  Failed to delete function include ${includeName}: ${deleteResponse.content[0]?.text || 'Unknown error'}`,
             );
           }
-        } else if (groupCreated) {
-          testLogger?.info(
-            `⚠️ Cleanup skipped - object left for analysis: ${functionGroupName}`,
+        } catch (cleanupError) {
+          testLogger?.warn(
+            `⚠️  Failed to cleanup function include ${includeName}: ${cleanupError}`,
           );
         }
+      } else if (created) {
+        testLogger?.info(
+          `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${includeName}`,
+        );
       }
-    },
-    getTimeout('long'),
-  );
+
+      // The group goes after its include.
+      if (groupCreated && shouldCleanup) {
+        const deleteGroupArgs = {
+          function_group_name: functionGroupName,
+          transport_request: transportRequest,
+        };
+        const deleteGroupResponse = await invoke(
+          'DeleteFunctionGroup',
+          deleteGroupArgs,
+          () =>
+            handleDeleteFunctionGroup(
+              { connection: connection!, logger: testLogger },
+              deleteGroupArgs,
+            ),
+        );
+        if (deleteGroupResponse.isError) {
+          testLogger?.warn(
+            `⚠️  Failed to delete function group ${functionGroupName}: ${deleteGroupResponse.content[0]?.text || 'Unknown error'}`,
+          );
+        } else {
+          testLogger?.info(
+            `🧹 Cleaned up test function group: ${functionGroupName}`,
+          );
+        }
+      } else if (groupCreated) {
+        testLogger?.info(
+          `⚠️ Cleanup skipped - object left for analysis: ${functionGroupName}`,
+        );
+      }
+    }
+  });
 });

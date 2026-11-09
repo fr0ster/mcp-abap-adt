@@ -7,6 +7,7 @@
  * Run: npm test -- --testPathPatterns=integration/high/unitTest/FunctionGroupUnitTestHighHandlers
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionModule } from '../../../../handlers/function/high/handleUpdateFunctionModule';
@@ -25,7 +26,7 @@ describe('Unit Test High-Level Handlers (function group)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('function-group-unit-test-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'function_group_unit_test',
       'full_workflow',
@@ -47,7 +48,7 @@ describe('Unit Test High-Level Handlers (function group)', () => {
         );
       },
     );
-  }, getTimeout('long'));
+  });
 
   beforeEach(async () => {
     await tester.beforeEach(async (_context: LambdaTesterContext) => {});
@@ -57,107 +58,103 @@ describe('Unit Test High-Level Handlers (function group)', () => {
     await tester.afterEach();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
-  it(
-    'Unit Test High-Level Handlers: create, run, update, run',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { params, packageName, transportRequest } = context;
-        const groupName: string | undefined = params?.function_group_name;
-        const moduleName: string | undefined = params?.function_module_name;
-        if (
-          !groupName ||
-          !moduleName ||
-          !params?.test_class_source ||
-          !packageName
-        ) {
-          logger?.warn('function_group_unit_test not configured, skipping');
-          return;
-        }
-        const transport = { transport_request: transportRequest };
-        const { step } = stepsFor(tester, context);
-        const expected: string[] = params.expected_test_methods ?? [];
+  it('Unit Test High-Level Handlers: create, run, update, run', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { params, packageName, transportRequest } = context;
+      const groupName: string | undefined = params?.function_group_name;
+      const moduleName: string | undefined = params?.function_module_name;
+      if (
+        !groupName ||
+        !moduleName ||
+        !params?.test_class_source ||
+        !packageName
+      ) {
+        logger?.warn('function_group_unit_test not configured, skipping');
+        return;
+      }
+      const transport = { transport_request: transportRequest };
+      const { step } = stepsFor(tester, context);
+      const expected: string[] = params.expected_test_methods ?? [];
 
-        await step(
-          'CreateFunctionGroup',
-          {
-            function_group_name: groupName,
-            package_name: packageName,
-            description: 'ABAP Unit test group',
-            ...transport,
-          },
-          handleCreateFunctionGroup,
-        );
-        await step(
-          'CreateFunctionModule',
-          {
-            function_group_name: groupName,
-            function_module_name: moduleName,
-            description: 'ABAP Unit test module',
-            ...transport,
-          },
-          handleCreateFunctionModule,
-        );
-        await step(
-          'UpdateFunctionModule',
-          {
-            function_group_name: groupName,
-            function_module_name: moduleName,
-            source_code: params.function_module_source,
-            activate: true,
-            ...transport,
-          },
-          handleUpdateFunctionModule,
-        );
+      await step(
+        'CreateFunctionGroup',
+        {
+          function_group_name: groupName,
+          package_name: packageName,
+          description: 'ABAP Unit test group',
+          ...transport,
+        },
+        handleCreateFunctionGroup,
+      );
+      await step(
+        'CreateFunctionModule',
+        {
+          function_group_name: groupName,
+          function_module_name: moduleName,
+          description: 'ABAP Unit test module',
+          ...transport,
+        },
+        handleCreateFunctionModule,
+      );
+      await step(
+        'UpdateFunctionModule',
+        {
+          function_group_name: groupName,
+          function_module_name: moduleName,
+          source_code: params.function_module_source,
+          activate: true,
+          ...transport,
+        },
+        handleUpdateFunctionModule,
+      );
 
+      await step(
+        'CreateFunctionGroupUnitTest',
+        {
+          function_group_name: groupName,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleCreateFunctionGroupUnitTest,
+      );
+      expectTestsRan(
         await step(
-          'CreateFunctionGroupUnitTest',
-          {
-            function_group_name: groupName,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleCreateFunctionGroupUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunFunctionGroupUnitTest',
-            { function_group_name: groupName },
-            handleRunFunctionGroupUnitTest,
-          ),
-          expected,
-        );
-        expectTestsRan(
-          await step(
-            'RunFunctionModuleUnitTest',
-            { function_module_name: moduleName },
-            handleRunFunctionModuleUnitTest,
-          ),
-          expected,
-        );
+          'RunFunctionGroupUnitTest',
+          { function_group_name: groupName },
+          handleRunFunctionGroupUnitTest,
+        ),
+        expected,
+      );
+      expectTestsRan(
+        await step(
+          'RunFunctionModuleUnitTest',
+          { function_module_name: moduleName },
+          handleRunFunctionModuleUnitTest,
+        ),
+        expected,
+      );
 
+      await step(
+        'UpdateFunctionGroupUnitTest',
+        {
+          function_group_name: groupName,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleUpdateFunctionGroupUnitTest,
+      );
+      expectTestsRan(
         await step(
-          'UpdateFunctionGroupUnitTest',
-          {
-            function_group_name: groupName,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleUpdateFunctionGroupUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunFunctionGroupUnitTest',
-            { function_group_name: groupName },
-            handleRunFunctionGroupUnitTest,
-          ),
-          expected,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+          'RunFunctionGroupUnitTest',
+          { function_group_name: groupName },
+          handleRunFunctionGroupUnitTest,
+        ),
+        expected,
+      );
+    });
+  });
 });

@@ -1,3 +1,4 @@
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Integration tests for ServiceDefinition High-Level Handlers
@@ -69,7 +70,7 @@ async function deleteServiceDefinitionWrapper(
 describe('ServiceDefinition High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_service_definition',
       'builder_service_definition',
@@ -83,9 +84,9 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
     await tester.beforeAll();
     // Verify CDS view prerequisites (ZOK_C_CDS_TEST) exist before ServiceDefinition test
     await ensureSharedObjects(tester.getConnection());
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -97,11 +98,7 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all ServiceDefinition high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all ServiceDefinition high-level handlers', async () => {
+    await tester.run();
+  });
 });

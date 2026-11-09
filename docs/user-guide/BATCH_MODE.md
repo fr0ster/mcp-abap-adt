@@ -207,7 +207,9 @@ yet (an answer without a run id is a failure with `step: start activation run`).
 with `with_long_polling: true` is `GET /sap/bc/adt/activation/runs/{run_id}?withLongPolling=true`:
 SAP holds that one request until the run ends and answers its final status (`finished`, `error` or
 `failed`). Without it the read answers at once, `running` while the run goes on; asking again is
-yours: the server sets no timer.
+yours: the server sets no timer. On a system whose discovery offers no activation runs
+(SAP_BASIS 751, 7.40), the run's `POST` answers SAP's refusal; a group activation there is
+`ActivateObjects` (the full set) or `ActivateObjectLow` (the low handlers group).
 
 Compact `HandlerDumpList` reads one page per call: the one `GET /sap/bc/adt/runtime/dumps` (or the
 system-messages or gateway-errors feed) with `$top` from 1 to 100 (SAP answers at most 100; `top`

@@ -664,8 +664,11 @@ This holds for every tool that activates: the `Activate*` tools, `ActivateObject
   `POST /sap/bc/adt/activation` for all the objects. A discovery that cannot be read is an error at
   step `discovery`, with nothing activated. A run whose results say no activation ran and give no
   message is followed by one `GET /sap/bc/adt/activation/inactiveobjects`: the run's objects still
-  listed are the error above; a read that fails is an error at step `inactiveObjects`. Compact
-  `HandlerActivate` stays one request.
+  listed are the error above; a read that fails is an error at step `inactiveObjects`.
+- **Compact `HandlerActivate` is one request and reads no discovery.** Its group form always sends
+  `POST /sap/bc/adt/activation/runs`. On a system whose discovery offers no activation runs
+  (SAP_BASIS 751, 7.40), it answers SAP's refusal; a group activation there is `ActivateObjects` (the
+  full set) or `ActivateObjectLow` (the low handlers group).
 
 ## Callers of `GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols`: removed
 

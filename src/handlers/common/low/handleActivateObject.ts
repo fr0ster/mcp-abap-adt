@@ -144,7 +144,7 @@ type SingleActivationApi =
  * (`SINGLE_ACTIVATION_NAMES`).
  */
 export function preauditDescription(variant: ProjectionVariant): string {
-  return `Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}, and so does a main type or a search name standing for one of these codes; any other call is a group activation.`;
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type or a search name standing for one of these codes; any other call is a group activation.`;
 }
 
 /**

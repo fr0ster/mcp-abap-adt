@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">
+<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">
   <ioc:entry>
     <ioc:object/>
     <ioc:transport ioc:user="SAPUSER01" ioc:linked="false">

@@ -156,7 +156,8 @@ test's connection, the request `searchObjects` (adt-clients) sends.
 | `activation-reactivate-active-s4-2025` | a class activated (01), then again with `preauditRequested=false` (03), the inactive list after each, S/4HANA 2025, 2026-11-09 | `activationExecuted="true"`, then `activationExecuted="false"` with no message; every list empty — nothing to activate |
 
 Copied from adt-clients' corpus (`corpus/adt/answers/`, `corpus/adt/discovery/`), notes
-and placeholders as recorded there: the 751 cases come from the issue's measurements, and six
+and placeholders as recorded there, laid out one element per line as that corpus keeps them,
+with no line break after the XML declaration (as SAP sends it, so the ordered round trip holds): the 751 cases come from the issue's measurements, and six
 of the eight `ioc` entries are reconstructed from the types the issue names (their notes say
 so); the S/4HANA 2025 cases were taken by a hand-run probe, transport numbers and the user as
 placeholders. The activation tests replay them (`activationNotActivated`, the group path's

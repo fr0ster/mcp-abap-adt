@@ -237,7 +237,7 @@
     "@mcp-abap-adt/adt-strategies": "^0.21.0",
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
-    "@mcp-abap-adt/connection": "^20.0.0",
+    "@mcp-abap-adt/connection": "^20.1.0",
     "@mcp-abap-adt/interfaces-adt": "^26.1.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^4.0.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",

@@ -6,6 +6,12 @@
  * owned connection logged off once — the instance's own and its held
  * state's — and the process exits `1` naming the tool still running and the
  * step it cut short.
+ *
+ * The shutdown timeout's timer is the test's to fire, not the clock's: the
+ * timer the shutdown sets with the timeout's delay is taken (the real
+ * `setTimeout` answers every other call), and the test fires it once it has
+ * seen that nothing exited before it. On real time a slow runner let the
+ * timeout fire before that check (CI, ubuntu / Node 24, measured once).
  */
 
 import { isUpdateOf } from '../../../../../src/__tests__/helpers/shutdownTools';
@@ -54,11 +60,29 @@ it.each([
     void s.callTool('LockedUpdate', { id: 'A' });
     await until(() => s.adt.requests.some((r) => isUpdateOf('A')(r.url)));
 
+    // The shutdown's own timer, taken when it is set, fired by the test.
+    let fire: (() => void) | undefined;
+    if (timeoutMs !== undefined) {
+      const real = globalThis.setTimeout;
+      const timers = jest
+        .spyOn(globalThis, 'setTimeout')
+        .mockImplementation((callback, ms) => {
+          if (ms !== timeoutMs || fire !== undefined) return real(callback, ms);
+          fire = () => callback();
+          timers.mockRestore();
+          // A handle the shutdown may clear; it fires nothing of its own.
+          return real(() => undefined, 0);
+        });
+    }
     s.processLike.emit('SIGTERM');
     await until(() => s.adt.logoffs() === 2);
     await turns(20);
     expect(s.exits).toEqual([]);
     if (timeoutMs === undefined) s.processLike.emit('SIGTERM');
+    else {
+      expect(fire).toBeDefined();
+      fire?.();
+    }
     expect(await s.exited).toBe(1);
     expect(s.shutdownLines).toEqual([
       '[MCP] Still running at the forced close: LockedUpdate',

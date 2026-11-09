@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 import type { TestEvent } from 'node:test/reporters';
+import { pathToFileURL } from 'node:url';
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
@@ -75,7 +76,9 @@ function runFixtures(names: readonly string[], runDir: string): string {
       '--test-concurrency=1',
       '--test-reporter=spec',
       '--test-reporter-destination=stdout',
-      `--test-reporter=${preload('integration', 'coverageReport', 'ledgerReporter.js')}`,
+      // A file URL: node loads a reporter as a module, and an absolute
+      // Windows path reads as a URL whose scheme is its drive letter.
+      `--test-reporter=${pathToFileURL(preload('integration', 'coverageReport', 'ledgerReporter.js')).href}`,
       '--test-reporter-destination=stdout',
       ...names.map(compiled),
     ],

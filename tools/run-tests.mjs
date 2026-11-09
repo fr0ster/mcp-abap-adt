@@ -43,15 +43,33 @@
 //   (`tearDownLiveRun`); the run fails when either the run or the teardown
 //   fails.
 //
+// - Every file runs in a `node --test` of its own, in a process group of its
+//   own (`detached`; on Windows a console process group of its own), at most
+//   `--concurrency` at once: a terminal's Ctrl-C reaches the runner alone
+//   (D27, P8). On the first interrupt the runner starts no further file,
+//   writes the stop file it names to every file (`MCP_ABAP_ADT_STOP_FILE`) —
+//   a live suite then finishes the case it runs, that case's cleanup
+//   included, and skips the rest (`liveDescribe`) —, says on stderr that it
+//   waits, and waits for every running file to end by itself. On the second
+//   it ends the process tree of every file still running. Either way the
+//   run fails, and under a live script the teardown still runs.
+//
 // Every file's process preloads the compiled resolve hook
 // (`src/__tests__/helpers/resolvePreload.ts`), which answers this
 // repository's package names with their compiled files, and the per-file
 // close (`src/__tests__/integration/helpers/closeConnectionsPreload.ts`): a
 // root `after` that closes the connections the file opened through the
 // helpers, after every hook of the file.
-import { spawnSync } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   buildDir,
@@ -305,25 +323,96 @@ if (liveScript) {
   Object.assign(env, process.env);
 }
 
-const run = spawnSync(
-  process.execPath,
-  [
-    '--require',
-    preload,
-    '--require',
-    closePreload,
-    '--test',
-    `--test-concurrency=${concurrency}`,
-    ...options,
-    ...files,
-  ],
-  { stdio: 'inherit', env },
-);
-let status = run.status ?? 1;
-if (run.error !== undefined) {
-  console.error(`run-tests: node --test did not start: ${run.error}`);
-  status = 1;
+// The stop file the runner owns: written on the first interrupt.
+const stopDir = mkdtempSync(join(tmpdir(), 'run-tests-stop-'));
+const STOP_FILE = join(stopDir, 'stop');
+env.MCP_ABAP_ADT_STOP_FILE = STOP_FILE;
+
+/** The files' processes still running, by pid. */
+const running = new Map();
+let interrupts = 0;
+
+/** Ends the process tree of `child`: its process group, or on Windows its tree. */
+function endTree(child) {
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+    });
+  } else {
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+    } catch {
+      // The group has ended already.
+    }
+  }
 }
+
+process.on('SIGINT', () => {
+  interrupts += 1;
+  if (interrupts === 1) {
+    writeFileSync(STOP_FILE, 'interrupted');
+    console.error(
+      'run-tests: interrupted — no further file starts; the running files finish their current case and its cleanup. Interrupt again to stop them now.',
+    );
+    return;
+  }
+  console.error(
+    'run-tests: interrupted again — the running files are stopped.',
+  );
+  for (const child of running.values()) endTree(child);
+});
+
+/** One file in a `node --test` of its own, in a process group of its own. */
+function runFile(file) {
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [
+        '--require',
+        preload,
+        '--require',
+        closePreload,
+        '--test',
+        '--test-concurrency=1',
+        ...options,
+        file,
+      ],
+      {
+        stdio: ['ignore', 'inherit', 'inherit'],
+        env,
+        detached: true,
+        windowsHide: true,
+      },
+    );
+    running.set(child.pid, child);
+    child.on('error', (error) => {
+      console.error(`run-tests: node --test did not start: ${error}`);
+      running.delete(child.pid);
+      resolve(1);
+    });
+    child.on('close', (code) => {
+      running.delete(child.pid);
+      resolve(code ?? 1);
+    });
+  });
+}
+
+/** Every file, at most `concurrency` at once; none started after an interrupt. */
+async function runAll() {
+  const queue = [...files];
+  let status = 0;
+  const lane = async () => {
+    while (queue.length > 0 && interrupts === 0) {
+      const file = queue.shift();
+      if ((await runFile(file)) !== 0) status = 1;
+    }
+  };
+  await Promise.all(Array.from({ length: Number(concurrency) }, () => lane()));
+  return interrupts > 0 ? 1 : status;
+}
+
+let status = await runAll();
+rmSync(stopDir, { recursive: true, force: true });
 if (liveScript) {
   const { tearDownLiveRun } = liveRunModule('globalTeardown');
   try {

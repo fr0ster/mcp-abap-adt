@@ -60,6 +60,26 @@ DEBUG_TESTS=true npm test -- --testPathPatterns=integration/high/class
 4. **Shared objects** are created once with `npm run shared:setup` and checked with
    `npm run shared:check`.
 
+## Interrupting a run (D27, step 12)
+
+The runner (`tools/run-tests.mjs`) starts every test file in a `node --test` of its own, in a
+process group of its own (`detached`; on Windows a console process group of its own), so a
+terminal's Ctrl-C reaches the runner alone.
+
+- **The first interrupt:** no further file starts; every running file is told to stop through
+  a file the runner owns (`MCP_ABAP_ADT_STOP_FILE`, no signal). A file finishes the case it is
+  running, that case's cleanup included; a live suite (`liveDescribe`) skips its remaining
+  cases with the reason ("the run was interrupted…"), and refuses their calls before they
+  send (node:test runs a skipped case's body all the same). The runner says on stderr that it
+  waits, waits for every running file to end by itself, and the run fails; under a live
+  script the teardown still runs.
+- **The second interrupt** ends the process tree of every file still running (the process
+  group on POSIX; `taskkill /T /F` on Windows): a cleanup still running is cut there.
+
+Tested on POSIX (`unit/runner/interrupt.test.ts`, which sends the interrupt to the runner's
+group as a terminal does); on Windows the console Ctrl-C cannot be sent by a test, and the
+mechanism is not measured there yet (step 6's findings below are what was measured before it).
+
 ## Interrupts (draft — D27, plan step 6)
 
 > **Draft.** Measured on 2026-11-08 for plan step 6 of D27; nothing here is a decision. Step 12

@@ -367,6 +367,32 @@ export function liveSuite(
   );
 }
 
+/** The words a case skips with once the run was interrupted. */
+export const INTERRUPTED =
+  'the run was interrupted: no further case runs (the case running then finished, its cleanup included)';
+
+/**
+ * Whether the runner asked the running files to stop (D27, P8): it writes
+ * the stop file it names in `MCP_ABAP_ADT_STOP_FILE` on the first
+ * interrupt.
+ */
+export function stopRequested(): boolean {
+  const file = process.env.MCP_ABAP_ADT_STOP_FILE;
+  return file !== undefined && file !== '' && fs.existsSync(file);
+}
+
+/**
+ * Whether the case running now is one the interrupt skipped: node:test runs
+ * a skipped case's body all the same, so its calls are refused. The case
+ * that was running at the interrupt, and every cleanup hook, still send.
+ */
+let skippedCase = false;
+
+/** Refuses a call of a case the interrupt skipped. */
+function refuseAfterStop(what: string): void {
+  if (skippedCase) throw new Error(`${what} is not sent: ${INTERRUPTED}`);
+}
+
 /** The test running now: its file (repository source path) and name path. */
 export interface CurrentTest {
   readonly file: string;
@@ -425,9 +451,18 @@ export function liveDescribe(
     });
     beforeEach((t) => {
       // A hook of a suite's case gets the case's context.
-      if ('fullName' in t) useCurrentTest(currentTestOf(t));
+      if (!('fullName' in t)) return;
+      // Interrupted: the case that ran finished; this one and the rest skip
+      // (and their calls are refused before they send).
+      if (stopRequested()) {
+        skippedCase = true;
+        t.skip(INTERRUPTED);
+        return;
+      }
+      useCurrentTest(currentTestOf(t));
     });
     afterEach(() => {
+      skippedCase = false;
       useCurrentTest(undefined);
     });
     describe('cases', body);
@@ -437,6 +472,7 @@ export function liveDescribe(
 /** A call that is not the one under test (a read-back, a cleanup): the marker checked, nothing logged. */
 async function send(tool: string, args: ToolArgs): Promise<LiveAnswer> {
   refuseAfterMarker(tool);
+  refuseAfterStop(tool);
   const answer = await current().call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
   return answer;
@@ -451,6 +487,7 @@ export async function liveCall(
   args: ToolArgs,
 ): Promise<LiveAnswer> {
   refuseAfterMarker(tool);
+  refuseAfterStop(tool);
   const running = currentTest;
   if (running === undefined) {
     throw new Error('liveCall runs inside a liveSuite case');

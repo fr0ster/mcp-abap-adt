@@ -49,10 +49,12 @@ afterEach(() => {
   base.remove();
 });
 
-/** A destination's `.env`: basic over RFC, no client, plus `extra`. */
+/** A destination's `.env`: basic over RFC, no URL and no client, plus `extra`. */
 function destinationLines(extra: string[]): string[] {
   return basicLines()
-    .filter((line) => !line.startsWith('SAP_CLIENT='))
+    .filter(
+      (line) => !line.startsWith('SAP_CLIENT=') && !line.startsWith('SAP_URL='),
+    )
     .map((line) =>
       line === 'SAP_CONNECTION_TYPE=http' ? 'SAP_CONNECTION_TYPE=rfc' : line,
     )
@@ -191,7 +193,7 @@ describe('two destinations in one process', () => {
   });
 
   it('each keeps its own client, language and address; the environment gets none of them', async () => {
-    const factory = factoryOf([], {});
+    const factory = factoryOf(['--connection-type=rfc'], {});
     expect(await factory.destinationKeysFor('a')).toEqual({
       ashost: 'host-a.example.test',
       sysnr: '00',
@@ -205,8 +207,23 @@ describe('two destinations in one process', () => {
       client: '200',
       language: 'FR',
     });
-    expect((await factory.settingsFor('a')).client).toBe('100');
-    expect((await factory.settingsFor('b')).client).toBe('200');
+    expect(await factory.settingsFor('a')).toEqual({
+      authType: 'basic',
+      connectionType: 'rfc',
+      client: '100',
+      language: 'DE',
+      ashost: 'host-a.example.test',
+      sysnr: '00',
+    });
+    expect(await factory.settingsFor('b')).toEqual({
+      authType: 'basic',
+      connectionType: 'rfc',
+      client: '200',
+      language: 'FR',
+      mshost: 'ms-b.example.test',
+      group: 'GROUP_B',
+      sysid: 'SYB',
+    });
     for (const [, , env] of FORMS) expect(process.env[env]).toBeUndefined();
   });
 

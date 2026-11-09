@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
@@ -2877,15 +2878,8 @@ interface Destination {
   responsible: string | undefined;
 }
 
-/**
- * The target system settings point at, as a key: the URL (no trailing
- * slash), the client and the wire.
- */
-function targetOf(settings: {
-  url?: string;
-  client?: string;
-  connectionType?: string;
-}): string {
+/** The target system settings point at, as a key (`adtSystemKey`). */
+function targetOf(settings: SapConfig): string {
   return adtSystemKey(settings);
 }
 

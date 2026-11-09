@@ -59,6 +59,11 @@ export interface IAuthBrokerFactoryConfig {
   /** How the connector reaches the system (`--connection-type`). */
   connectionType?: 'http' | 'rfc';
   /**
+   * The system type in effect (`--system-type`): ABAP Cloud over RFC is
+   * refused naming both keys.
+   */
+  systemType?: 'onprem' | 'cloud' | 'legacy';
+  /**
    * The destination keys the start parameters state (the RFC address, the
    * client, the language), by rank: `overMeans` — the CLI and the process's
    * own environment — beats the destination's means (its `.env`, then a

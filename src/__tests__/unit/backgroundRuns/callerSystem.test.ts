@@ -13,13 +13,21 @@ import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
+import { adtSystemKey } from '../../../lib/adtHeaders/systemKey';
 import { BACKGROUND_RUNS_NO_SYSTEM_WORDS } from '../../../lib/auth/serverRefusal';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
-import { clientOf, isClassRun, shippedGroups, silent, until } from './harness';
+import {
+  callerOn,
+  clientOf,
+  isClassRun,
+  shippedGroups,
+  silent,
+  until,
+} from './harness';
 
 beforeEach(() => {
   stateSystemKind();
@@ -216,6 +224,51 @@ describe('the background-run caller is { system, client, user }', () => {
     } finally {
       await a.close();
       await b.close();
+      await stand.close();
+    }
+  });
+
+  it("a destination's system is its system key", async () => {
+    // The system names the session's user itself (callerOn's answer).
+    const stand = await adtStandIn();
+    stand.body(isClassRun, 'run output');
+    const strategy = new InMemoryBackgroundRuns();
+    const caller = await callerOn(stand, strategy, { user: 'RUN_USER' });
+    try {
+      const started = await caller.call('RuntimeRunClass', RUN);
+      expect(started.isError).toBe(false);
+      const system = adtSystemKey({
+        url: stand.url,
+        client: '100',
+        authType: 'basic',
+      });
+      expect(
+        strategy.list({ system, client: '100', user: 'RUN_USER' }),
+      ).toHaveLength(1);
+    } finally {
+      await caller.close();
+      await stand.close();
+    }
+  });
+
+  it('system information goes over a connection that answers no URL', async () => {
+    const stand = await standIn();
+    const strategy = new InMemoryBackgroundRuns();
+    const server = await embedder(stand, strategy, undefined, {
+      system: 'SYSTEM_A',
+    });
+    try {
+      const started = await server.call('RuntimeRunClass', RUN);
+      expect(started.isError).toBe(false);
+      // The caller's user came from the system's own answer (ABAP Cloud).
+      expect(
+        stand.requests.some((r) =>
+          r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
+        ),
+      ).toBe(true);
+      expect(strategy.list(callerOf('SYSTEM_A'))).toHaveLength(1);
+    } finally {
+      await server.close();
       await stand.close();
     }
   });

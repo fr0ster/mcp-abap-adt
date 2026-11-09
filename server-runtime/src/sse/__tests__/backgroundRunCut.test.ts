@@ -96,7 +96,11 @@ it('the stream closes: the run it started is logged off at once and ends in the 
   const runA = sessionOf(runOf('ZCL_RUN_A'));
   const runB = sessionOf(runOf('ZCL_RUN_B'));
   const caller = {
-    system: adtSystemKey({ url: s.standIn.url, client: '100' }),
+    system: adtSystemKey({
+      url: s.standIn.url,
+      client: '100',
+      authType: 'jwt',
+    }),
     client: '100',
     user: 'SHUTDOWN_USER',
   };

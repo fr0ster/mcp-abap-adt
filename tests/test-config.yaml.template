@@ -90,7 +90,9 @@ lock_config:
 
 environment:
   # Connection: .env file from standard sessions folder (~/Documents/mcp-abap-adt/sessions/)
-  # Contains SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # HTTP: SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # RFC: no SAP_URL; SAP_ASHOST + SAP_SYSNR (or SAP_MSHOST with SAP_MSSERV or
+  # SAP_SYSID and SAP_GROUP), SAP_CLIENT, SAP_LANGUAGE, SAP_AUTH_TYPE, etc.
   env: ""                                    # ← CHANGE: session file name (e.g., "your-system.env", "another-system.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
@@ -100,14 +102,20 @@ environment:
   # cloud it is not read: the session's JWT must not have expired instead.
   expected_realm: ""                         # ← CHANGE (on premise): the system's 401 realm
   connection_type: "http"                    # "http" | "rfc"
-  # RFC through a message server and a logon group (optional; rfc only).
-  # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to
-  # dial the application server of SAP_URL. With mshost, msserv or sysid is required.
+  # RFC (rfc only): the destination states its address, client and language,
+  # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)
+  # over the .env's; leave "" to take the .env's. One address: ashost + sysnr
+  # (an application server), or mshost with msserv or sysid and group (a
+  # message server). Nothing is derived from a URL and nothing has a default.
+  ashost: ""                                 # application server host
+  sysnr: ""                                  # system number (two digits)
+  client: ""                                 # SAP client (required over RFC)
+  language: ""                               # logon language (required over RFC)
   mshost: ""                                 # message server host
   msserv: ""                                 # message server service (name or port)
   sysid: ""                                  # system id
-  group: ""                                  # logon group (connection default: PUBLIC)
-  saprouter: ""                              # SAProuter string
+  group: ""                                  # logon group (required with mshost)
+  saprouter: ""                              # SAProuter string, with either address
   # Test defaults
   # database_system: "HDB"                  # the system's database, stated (e.g. ABAP cloud,
                                              # whose system information names none); the AMDP

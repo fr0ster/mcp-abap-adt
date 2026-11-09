@@ -42,6 +42,7 @@ import {
   promptLogger,
 } from '@mcp-abap-adt/core/auth';
 import { RUN_VARIABLE, startRunDirectory } from './coverageReport/reportFormat';
+import { connectionTypeOf, destinationFileValue } from './helpers/authHelpers';
 import {
   configuredSystemKindOf,
   memberOf,
@@ -202,9 +203,12 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
     ...(callbackPort !== undefined && {
       browserAuthPort: Number(callbackPort),
     }),
-    ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
-      connectionType: 'rfc' as const,
-    }),
+    // The wire as the run states it, else as the destination's own file
+    // states it (as the launcher reads it); none is refused, naming it.
+    ...connectionTypeOf(
+      process.env.SAP_CONNECTION_TYPE ??
+        destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
+    ),
     browserStrategy: browserCallbackStrategy,
     // A login's prompts reach the person running the tests, on stderr.
     promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {

@@ -23,7 +23,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
-import { rfcAddressRefusalFor } from './config/messageServer';
 import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
@@ -354,6 +353,10 @@ export function siblingRecordOf(
   return records.get(connection);
 }
 
+/** An RFC config handed to the factory for ABAP Cloud, which has only HTTP. */
+export const CLOUD_OVER_RFC_WORDS =
+  'ABAP Cloud is served over HTTP: an RFC config (connectionType rfc) is not built for it — SAP_SYSTEM_TYPE, SAP_CONNECTION_TYPE';
+
 export function createAbapConnection(
   settings: SapConfig,
   credential: IAuthProvider,
@@ -376,19 +379,42 @@ export function createAbapConnection(
 ): CreatedConnection {
   // connection's `createConnection` with the system and the wire stated: the
   // choice is this server's, made from the settings as before; the connector
-  // and its transport are connection's (connection 16).
-  const common = {
-    config: settings,
-    credential,
-    logger,
-    ...(sessionId !== undefined ? { sessionId } : {}),
-  };
+  // and its transport are connection's (connection 16). Each spec's `config`
+  // is built inside the branch that narrowed the settings' wire.
+  const sessionPart = sessionId !== undefined ? { sessionId } : {};
   const resumed = session !== undefined ? { session } : {};
   const built = ((): CreatedConnection => {
+    if (settings.connectionType === 'rfc') {
+      // ABAP Cloud has one wire, HTTP: an RFC config is not built for it.
+      if (kind === 'cloud') {
+        throw new Error(CLOUD_OVER_RFC_WORDS);
+      }
+      // No `session` over RFC: its session is a conversation, which cannot
+      // be taken over (no runtime file is kept of one).
+      if (session !== undefined) {
+        throw new Error(
+          'An RFC session cannot be taken over by another process',
+        );
+      }
+      return createConnection({
+        config: settings,
+        credential,
+        logger,
+        ...sessionPart,
+        system: 'onprem',
+        transport: 'rfc',
+        wireLogger: wireLogger(logger),
+        rfc: rfcWireOptions(),
+      });
+    }
+
     if (kind === 'cloud') {
       return withHttpWireLog(
         createConnection({
-          ...common,
+          config: settings,
+          credential,
+          logger,
+          ...sessionPart,
           ...resumed,
           system: 'cloud',
           transport: 'http',
@@ -397,34 +423,14 @@ export function createAbapConnection(
       );
     }
 
-    if (settings.connectionType === 'rfc') {
-      // No `session` over RFC: its session is a conversation, which cannot
-      // be taken over (no runtime file is kept of one).
-      if (session !== undefined) {
-        throw new Error(
-          'An RFC session cannot be taken over by another process',
-        );
-      }
-      try {
-        return createConnection({
-          ...common,
-          system: 'onprem',
-          transport: 'rfc',
-          wireLogger: wireLogger(logger),
-          rfc: rfcWireOptions(),
-        });
-      } catch (error) {
-        // connection's refusal of an address it cannot dial, recognised by
-        // asking connection about this config, never by the error's words.
-        throw rfcAddressRefusalFor(settings) ?? error;
-      }
-    }
-
     // TLS material reaches the wire through the logon, not through the
     // transport's options.
     return withHttpWireLog(
       createConnection({
-        ...common,
+        config: settings,
+        credential,
+        logger,
+        ...sessionPart,
         ...resumed,
         system: 'onprem',
         transport: 'http',

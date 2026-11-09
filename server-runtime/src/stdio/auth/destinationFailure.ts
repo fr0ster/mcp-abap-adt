@@ -22,6 +22,12 @@ import {
   readOwn,
   ServerRefusal,
 } from '@mcp-abap-adt/lib/auth';
+import {
+  type DestinationAddressCase,
+  type DestinationAddressFault,
+  destinationAddressHint,
+  destinationAddressWords,
+} from '@mcp-abap-adt/lib/config';
 import type { AuthType } from './vocabulary';
 
 /**
@@ -81,6 +87,32 @@ export class UnsupportedAuthenticationError extends ServerRefusal {
     if (authType === 'jwt' && grantType === 'none') {
       UNSUPPORTED_HINTS.set(this, JWT_NONE_HINT);
     }
+  }
+}
+
+/**
+ * A destination whose address or logon is refused (24.0.0, the nine cases):
+ * the destination, the case and the keys it names — never a value. Answered
+ * `destination_refused` in the case's words, at the start and at a tool
+ * call alike.
+ */
+export class DestinationAddressRefusal extends DestinationRefusal {
+  readonly destination: string;
+  readonly case: DestinationAddressCase;
+  readonly keys: readonly string[];
+
+  constructor(destination: string, fault: DestinationAddressFault) {
+    super(destinationAddressWords(destination, fault));
+    this.name = 'DestinationAddressRefusal';
+    this.destination = destination;
+    this.case = fault.case;
+    this.keys = [...fault.keys];
+    const hint =
+      destinationAddressHint(fault) ??
+      fault.keys
+        .map((key) => (Object.hasOwn(HINTS, key) ? HINTS[key] : undefined))
+        .find((each) => each !== undefined);
+    if (hint !== undefined) UNSUPPORTED_HINTS.set(this, hint);
   }
 }
 

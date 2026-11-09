@@ -4,6 +4,7 @@
  * its provider, the same two things the server's transports use.
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
@@ -20,6 +21,8 @@ import {
   defaultLogger,
   getLogLevel,
 } from '@mcp-abap-adt/logger';
+import * as dotenv from 'dotenv';
+import { getPlatformPaths } from '../../../../server-runtime/src/stdio/config/platformPaths';
 import { loadTestConfig } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
 import { guardedSend } from './refusalGuard';
@@ -162,6 +165,34 @@ export interface TestDestination {
 }
 
 /** The destination the test config names, or undefined. */
+/**
+ * `key` as the destination's own `sessions/<destination>.env` states it (the
+ * file the launcher joins to the environment for the wire), when readable.
+ */
+export function destinationFileValue(
+  basePath: string | undefined,
+  destination: string,
+  key: string,
+): string | undefined {
+  const sessions = getPlatformPaths(basePath, 'sessions')[0];
+  if (sessions === undefined) return undefined;
+  try {
+    return dotenv.parse(
+      fs.readFileSync(path.join(sessions, `${destination}.env`), 'utf8'),
+    )[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** `SAP_CONNECTION_TYPE` as the factory takes it; absent unless one of the two. */
+export function connectionTypeOf(stated: string | undefined): {
+  connectionType?: 'http' | 'rfc';
+} {
+  const word = stated?.trim().toLowerCase();
+  return word === 'http' || word === 'rfc' ? { connectionType: word } : {};
+}
+
 function configuredDestination(config: any): string | undefined {
   return (
     config?.auth_broker?.abap?.destination ||
@@ -204,9 +235,12 @@ export function createTestFactory(
     ...(config?.auth_broker?.browser_auth_port !== undefined && {
       browserAuthPort: Number(config.auth_broker.browser_auth_port),
     }),
-    ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
-      connectionType: 'rfc' as const,
-    }),
+    // The wire as the run states it; none stated is refused by the factory,
+    // naming SAP_CONNECTION_TYPE.
+    ...connectionTypeOf(
+      process.env.SAP_CONNECTION_TYPE ??
+        destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
+    ),
     browserStrategy: browserCallbackStrategy,
     // A login's prompts reach the person running the tests, on stderr.
     promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {

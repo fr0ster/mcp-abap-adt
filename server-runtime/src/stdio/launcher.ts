@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { classify, logFields } from '@mcp-abap-adt/auth-errors';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
@@ -18,7 +19,6 @@ import {
   libInstances,
   processEdges,
   readStartupConfig,
-  rfcAddressRefusalOf,
 } from '@mcp-abap-adt/lib/config';
 import {
   InstanceBatch,
@@ -528,6 +528,7 @@ export function factoryConfigFrom(
       browserAuthPort: config.browserAuthPort,
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
+    ...(config.systemType && { systemType: config.systemType }),
     destinationKeys: startDestinationKeys(config),
     ...(config.renewal && { renewal: config.renewal }),
     ...(config.authDebug === true && { authDebug: true }),
@@ -641,14 +642,36 @@ export function startConnectionWords(
   if (read !== undefined) {
     return destinationFailureWords(error, destination, options);
   }
-  // connection's refusal of an RFC address it cannot dial (a message server
-  // with neither msserv nor sysid): its own fixed words, as it came.
-  const address = rfcAddressRefusalOf(error);
-  if (address !== undefined) {
-    return `Destination "${destination}" could not be connected at start: ${address}`;
-  }
   const sap = sapAnswerOf(error);
   return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;
+}
+
+/** Where the summary says the settings point: the URL over HTTP, the address over RFC. */
+function displayAddressOf(
+  settings: SapConfig,
+): Pick<AuthDisplayConfig, 'serviceUrl' | 'rfcAddress'> {
+  if (settings.connectionType !== 'rfc') return { serviceUrl: settings.url };
+  const rfcAddress: Array<[string, string]> =
+    settings.ashost !== undefined
+      ? [
+          ['RFC ashost', settings.ashost],
+          ['RFC sysnr', settings.sysnr],
+        ]
+      : [
+          ['RFC mshost', settings.mshost],
+          ...(settings.msserv !== undefined
+            ? [['RFC msserv', settings.msserv] satisfies [string, string]]
+            : []),
+          ...(settings.sysid !== undefined
+            ? [['RFC sysid', settings.sysid] satisfies [string, string]]
+            : []),
+          ['RFC group', settings.group],
+        ];
+  if (settings.saprouter !== undefined) {
+    rfcAddress.push(['RFC saprouter', settings.saprouter]);
+  }
+  rfcAddress.push(['Language', settings.language]);
+  return { rfcAddress };
 }
 
 /**
@@ -676,7 +699,7 @@ async function checkAndSummarise(
     const broker = await factory.getBroker(destination);
     const connConfig = await broker.getConnectionConfig(destination);
     const displayConfig: AuthDisplayConfig = {
-      serviceUrl: settings.url,
+      ...displayAddressOf(settings),
       sapClient: settings.client,
       authType: settings.authType,
       username: connConfig?.username,
@@ -855,6 +878,13 @@ async function launchStdio(
       if (config.mcpDestination) {
         assertDestinationName(config.mcpDestination, '--mcp');
       }
+      // Its wire is required (#320) and decided before its settings are
+      // read: they are read per wire.
+      if (connectionType === undefined) {
+        deps.stderr(`[MCP] ${startConnectionTypeRequiredWords(destination)}`);
+        deps.exit(1);
+        return;
+      }
       await checkAndSummarise(
         factory,
         destination,
@@ -884,13 +914,6 @@ async function launchStdio(
     deps.exit(1);
     return;
   }
-  // So is its wire (#320): an absent connection type is not HTTP.
-  if (destination && connectionType === undefined) {
-    deps.stderr(`[MCP] ${startConnectionTypeRequiredWords(destination)}`);
-    deps.exit(1);
-    return;
-  }
-
   // Inspection lists the declared variant's tool set: without a system type
   // there is none to list, and none is picked.
   if (!destination && systemType === undefined) {

@@ -73,7 +73,6 @@ export {
   type DestinationKeyValues,
   RFC_ADDRESS_KEYS,
   type RfcAddressKey,
-  rfcAddressRefusalOf,
 } from './messageServer.js';
 export {
   flagValue,
@@ -82,6 +81,20 @@ export {
   textValue,
   wordValue,
 } from './parameterValues.js';
+export {
+  checkDestinationStatement,
+  type DestinationAddressCase,
+  type DestinationAddressFault,
+  type DestinationStatement,
+  type DestinationUrlKey,
+  destinationAddressHint,
+  destinationAddressWords,
+  type MessageServerService,
+  MSSERV_OR_SYSID,
+  rfcConfigOf,
+  type StatedRfcAddress,
+  type StatedRfcDestination,
+} from './rfcDestination.js';
 export {
   answerVersionOrHelp,
   type LauncherEdges,

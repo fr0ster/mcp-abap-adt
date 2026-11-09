@@ -17,6 +17,7 @@
  * provider cache, the broker does.
  */
 
+import * as fs from 'node:fs';
 import {
   AuthBroker,
   type BrokerCallOptions,
@@ -24,7 +25,7 @@ import {
 } from '@mcp-abap-adt/auth-broker';
 import { classify } from '@mcp-abap-adt/auth-errors';
 import { refreshOnly, refreshThenLogin } from '@mcp-abap-adt/auth-providers';
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig, SapHttpConfig } from '@mcp-abap-adt/connection';
 import type {
   IAuthorizationStrategy,
   IAuthProvider,
@@ -39,12 +40,16 @@ import {
   SettingsError,
 } from '@mcp-abap-adt/lib/auth';
 import {
+  checkDestinationStatement,
   DESTINATION_KEYS,
   type DestinationKey,
   type DestinationKeyValues,
+  rfcConfigOf,
 } from '@mcp-abap-adt/lib/config';
+import * as dotenv from 'dotenv';
 import { getPlatformPaths } from '../config/platformPaths';
 import { countedProvider, ProviderGate } from './countedProvider';
+import { DestinationAddressRefusal } from './destinationFailure';
 import {
   type DestinationMode,
   type DestinationStores,
@@ -131,6 +136,32 @@ const MEANS_FIELD = {
   client: 'sapClient',
   language: 'language',
 } as const satisfies Record<DestinationKey, keyof IConnectionConfig>;
+
+/**
+ * `key` as the destination's own `.env` states it; absent when the file
+ * states none or cannot be read. Read only to refuse a URL over RFC.
+ */
+function ownFileValue(file: string, key: string): string | undefined {
+  try {
+    return dotenv.parse(fs.readFileSync(file, 'utf8'))[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** An HTTP destination's settings, as a literal of its shape. */
+function httpSettingsOf(
+  authType: SapHttpConfig['authType'],
+  url: string,
+  client: string | undefined,
+): SapHttpConfig {
+  return {
+    url,
+    ...(client !== undefined ? { client } : {}),
+    authType,
+    connectionType: 'http',
+  };
+}
 
 /** `value` trimmed; a blank one is unset. */
 function stated(value: string | undefined): string | undefined {
@@ -269,33 +300,59 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return effectiveDestinationKeys(this.config.destinationKeys, means);
   }
 
+  /**
+   * The destination's settings, checked where they enter the type system
+   * (24.0.0): the connection type is stated (the launcher refuses its
+   * absence first); the URL is read as the wire takes it — over HTTP from the
+   * URL store, over RFC only to refuse one the destination's own file states,
+   * the store asked nothing; the address, the client and the language as in
+   * effect (`destinationKeysFor`). The nine refusals of
+   * `checkDestinationStatement` come before any connection opens, as a
+   * `DestinationAddressRefusal`; a complete destination is built per wire,
+   * as a literal of its shape.
+   */
   private async readSettings(destination: string): Promise<SapConfig> {
-    const { handler, vetted, stores } = await this.buildOf(destination);
-    const keys = await this.destinationKeysFor(destination);
-    // An XSUAA destination's URL is XSUAA_MCP_URL alone, never the key's url.
-    const url = (await stores.urlStore.getConnectionConfig(destination))
-      ?.serviceUrl;
-    if (!url) {
+    const { connectionType } = this.config;
+    if (connectionType === undefined) {
       throw new DestinationConfigError(
         destination,
-        [stores.urlKey],
-        'the destination states no system URL',
+        ['SAP_CONNECTION_TYPE'],
+        'the destination states no connection type',
       );
     }
-    const settings: SapConfig = {
-      url,
-      ...(keys.client !== undefined ? { client: keys.client } : {}),
+    const { handler, vetted, stores } = await this.buildOf(destination);
+    const keys = await this.destinationKeysFor(destination);
+    const url =
+      connectionType === 'http'
+        ? // An XSUAA destination's URL is XSUAA_MCP_URL alone, never the key's url.
+          stated(
+            (await stores.urlStore.getConnectionConfig(destination))
+              ?.serviceUrl,
+          )
+        : stated(ownFileValue(stores.destinationFile, stores.urlKey));
+    const checked = checkDestinationStatement({
+      connectionType,
+      systemType: this.config.systemType,
       authType: vetted.authType,
-      ...(this.config.connectionType
-        ? { connectionType: this.config.connectionType }
-        : {}),
-      // RFC through a message server: as stated, an absent field no key.
-      ...(keys.mshost !== undefined ? { mshost: keys.mshost } : {}),
-      ...(keys.msserv !== undefined ? { msserv: keys.msserv } : {}),
-      ...(keys.sysid !== undefined ? { sysid: keys.sysid } : {}),
-      ...(keys.group !== undefined ? { group: keys.group } : {}),
-      ...(keys.saprouter !== undefined ? { saprouter: keys.saprouter } : {}),
-    };
+      urlKey: stores.urlKey,
+      url,
+      keys,
+    });
+    if ('fault' in checked) {
+      // HTTP without a URL: today's refusal, naming the URL key.
+      if (checked.fault.case === 'http-without-url') {
+        throw new DestinationConfigError(
+          destination,
+          [stores.urlKey],
+          'the destination states no system URL',
+        );
+      }
+      throw new DestinationAddressRefusal(destination, checked.fault);
+    }
+    const settings: SapConfig =
+      'rfc' in checked
+        ? rfcConfigOf({ authType: vetted.authType }, checked.rfc)
+        : httpSettingsOf(vetted.authType, checked.http.url, keys.client);
     try {
       handler.checkSettings?.(settings, this.context);
     } catch (error) {

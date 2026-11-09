@@ -15,10 +15,6 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { handleCreateFunctionGroup } from '../../../handlers/function/high/handleCreateFunctionGroup';
 import { dumpSummaryOf } from '../../../handlers/system/readonly/handleRuntimeGetDumpById';
-import {
-  rfcAddressRefusalFor,
-  rfcAddressRefusalOf,
-} from '../../../lib/config/messageServer';
 import { failureText } from '../../../lib/debugger/readings';
 import {
   resetSystemContextCache,
@@ -400,38 +396,6 @@ describe('return_error: network failures by their code, not their words', () => 
     expect(
       return_error(new Error('MCP error -32602: bad input')).content[0]?.text,
     ).toBe('MCP error -32602: bad input');
-  });
-});
-
-describe("connection's RFC address refusal, by its class", () => {
-  it('a config connection cannot dial is refused with its own words', () => {
-    const refusal = rfcAddressRefusalFor({
-      url: '',
-      authType: 'basic',
-      mshost: 'ms.example.com',
-    });
-    expect(refusal).toBeDefined();
-    expect(rfcAddressRefusalOf(refusal)).toBe(refusal?.message);
-  });
-
-  it('an error worded like it is not one', () => {
-    const refusal = rfcAddressRefusalFor({
-      url: '',
-      authType: 'basic',
-      mshost: 'ms.example.com',
-    });
-    expect(rfcAddressRefusalOf(new Error(refusal?.message))).toBeUndefined();
-  });
-
-  it('a config connection can dial is no refusal', () => {
-    expect(
-      rfcAddressRefusalFor({
-        url: '',
-        authType: 'basic',
-        mshost: 'ms.example.com',
-        sysid: 'XYZ',
-      }),
-    ).toBeUndefined();
   });
 });
 

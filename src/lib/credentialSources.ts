@@ -13,8 +13,12 @@ import {
   SamlAuthProvider,
   TokenAuthProvider,
 } from '@mcp-abap-adt/auth-providers';
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig, SapHttpConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+
+/** A certificate credential asked for an RFC config. */
+export const CERTIFICATE_OVER_RFC_WORDS =
+  'A client certificate logs on over HTTP: the RFC wire does not take one — SAP_AUTH_TYPE, SAP_CONNECTION_TYPE';
 
 /** Kerberos has no credential provider — see the upstream issue. */
 function refuseKerberos(): never {
@@ -63,6 +67,10 @@ export function credentialFromSapConfig(config: SapConfig): IAuthProvider {
     case 'saml':
       return new SamlAuthProvider(required(config, 'saml', 'sessionCookies'));
     case 'certificate':
+      // The RFC wire takes no TLS material: refused before anything is sent.
+      if (config.connectionType === 'rfc') {
+        throw new Error(CERTIFICATE_OVER_RFC_WORDS);
+      }
       return new CertificateAuthProvider(
         new FileCertificateMaterialLoader(),
         config,
@@ -87,7 +95,7 @@ export function credentialFromSapConfig(config: SapConfig): IAuthProvider {
  */
 export function credentialFromHeaders(
   headers: Record<string, string | string[] | undefined>,
-): { settings: SapConfig; credential: IAuthProvider } {
+): { settings: SapHttpConfig; credential: IAuthProvider } {
   const getHeader = (name: string): string | undefined => {
     const value = headers[name] ?? headers[name.toUpperCase()];
     return Array.isArray(value) ? value[0] : value;

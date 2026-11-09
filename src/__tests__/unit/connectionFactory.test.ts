@@ -11,7 +11,7 @@ import {
   CloudHttpTransport,
   OnPremHttpTransport,
   RfcTransport,
-  type SapConfig,
+  type SapHttpConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import {
@@ -23,7 +23,9 @@ import {
   resolveSystemKind,
 } from '../../lib/connectionFactory';
 
-const settings = (extra: Partial<SapConfig> = {}): SapConfig => ({
+const settings = (
+  extra: Partial<Pick<SapHttpConfig, 'authType'>> = {},
+): SapHttpConfig => ({
   url: 'https://sap.example.invalid',
   client: '000',
   authType: 'basic',
@@ -58,7 +60,14 @@ describe('createAbapConnection', () => {
   it('builds the on-premise connector on the RFC transport when the connection type is rfc', () => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     const connection = createAbapConnection(
-      settings({ connectionType: 'rfc' }),
+      {
+        authType: 'basic',
+        connectionType: 'rfc',
+        client: '000',
+        language: 'EN',
+        ashost: 'sap.example.invalid',
+        sysnr: '00',
+      },
       credential,
     ) as any;
     expect(connection).toBeInstanceOf(AdtOnPremConnector);

@@ -6,9 +6,21 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { ISapConfigBase } from '@mcp-abap-adt/interfaces-auth-sap';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
+import { withoutTrailingSlashes } from '../../../lib/adtHeaders/systemKey';
+import {
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKeyValues,
+} from '../../../lib/config/messageServer';
+import {
+  checkDestinationStatement,
+  destinationAddressWords,
+  rfcConfigOf,
+} from '../../../lib/config/rfcDestination';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
 import {
@@ -203,8 +215,12 @@ export async function loadTestEnv(): Promise<void> {
     if (cfg?.environment?.system_type) {
       process.env.SAP_SYSTEM_TYPE = cfg.environment.system_type;
     }
-    // RFC through a message server and a logon group, as configured.
+    // An RFC destination's address, client and language, as configured.
     for (const [key, name] of [
+      ['ashost', 'SAP_ASHOST'],
+      ['sysnr', 'SAP_SYSNR'],
+      ['client', 'SAP_CLIENT'],
+      ['language', 'SAP_LANGUAGE'],
       ['mshost', 'SAP_MSHOST'],
       ['msserv', 'SAP_MSSERV'],
       ['sysid', 'SAP_SYSID'],
@@ -218,8 +234,10 @@ export async function loadTestEnv(): Promise<void> {
     // ignore
   }
 
-  // Final guard: require SAP_URL
-  if (!process.env.SAP_URL) {
+  // Final guard: an HTTP destination requires SAP_URL; an RFC one states
+  // its address instead, checked by getSapConfigFromEnv.
+  const wire = process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
+  if (wire !== 'rfc' && !process.env.SAP_URL) {
     envLoadError = new Error(
       'SAP_URL is not set. Set environment.env (a sessions-store name, or a path) or auth_broker.abap.destination in test-config.yaml.',
     );
@@ -463,100 +481,117 @@ export function getTimeout(operationType: string = 'default'): number {
 /** The authentications this helper builds a config for. */
 const TEST_AUTH_TYPES = ['basic', 'jwt'] as const;
 
+/** `name` in the environment, trimmed; a blank one is absent. */
+function envValue(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
 /**
  * Build SAP config for tests from environment variables (auth-broker or .env).
  *
  * Nothing is guessed (#320): `SAP_AUTH_TYPE` must be stated and be one this
  * helper builds (`basic`, `jwt`); `basic` needs `SAP_USERNAME` and
- * `SAP_PASSWORD`, `jwt` needs `SAP_JWT_TOKEN`. Anything else is refused,
- * naming what is wrong.
+ * `SAP_PASSWORD`, `jwt` needs `SAP_JWT_TOKEN`. The wire is read first
+ * (`SAP_CONNECTION_TYPE`, `http` or `rfc`), then per wire: HTTP requires
+ * `SAP_URL`; RFC states its address (`SAP_ASHOST` + `SAP_SYSNR`, or
+ * `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` and `SAP_GROUP`), its
+ * `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL` — each refusal of the
+ * server's (`checkDestinationStatement`) in its words, keys only. Anything
+ * else is refused, naming what is wrong.
  */
 export function getSapConfigFromEnv(): SapConfig {
-  const urlRaw = process.env.SAP_URL?.trim();
-  if (!urlRaw) {
-    throw new Error(
-      'SAP_URL is not set. Ensure auth-broker or .env provided credentials.',
-    );
-  }
-
-  let url: string;
-  try {
-    const normalized = new URL(urlRaw);
-    url = normalized.href.replace(/\/$/, '');
-  } catch (err) {
-    throw new Error(`Invalid SAP_URL: ${urlRaw}`);
-  }
-
-  const stated = process.env.SAP_AUTH_TYPE?.trim();
+  const stated = envValue('SAP_AUTH_TYPE');
   if (!stated) {
     throw new Error(
       `SAP_AUTH_TYPE is not set. State one of: ${TEST_AUTH_TYPES.join(', ')}.`,
     );
   }
-  if (!(TEST_AUTH_TYPES as readonly string[]).includes(stated)) {
+  const authType = TEST_AUTH_TYPES.find((type) => type === stated);
+  if (authType === undefined) {
     throw new Error(
       `SAP_AUTH_TYPE "${stated}" is not one this test helper builds: ${TEST_AUTH_TYPES.join(', ')}.`,
     );
   }
-  const authType = stated as (typeof TEST_AUTH_TYPES)[number];
 
   // Stated, and one of the two, in any case as the launcher reads an enum: an
   // absent value or a typo is refused rather than run over HTTP.
-  const statedWire = process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
+  const statedWire = envValue('SAP_CONNECTION_TYPE')?.toLowerCase();
   if (!statedWire) {
     throw new Error('SAP_CONNECTION_TYPE is not set. State one of: http, rfc.');
   }
   if (statedWire !== 'http' && statedWire !== 'rfc') {
     throw new Error(
-      `SAP_CONNECTION_TYPE "${process.env.SAP_CONNECTION_TYPE?.trim()}" is not one of: http, rfc.`,
+      `SAP_CONNECTION_TYPE "${envValue('SAP_CONNECTION_TYPE')}" is not one of: http, rfc.`,
     );
   }
-  const connectionType: SapConfig['connectionType'] = statedWire;
 
-  const config: SapConfig = {
-    url,
-    authType,
-    connectionType,
-  };
-
+  const base: ISapConfigBase = { authType };
   if (authType === 'jwt') {
-    const token = process.env.SAP_JWT_TOKEN?.trim();
+    const token = envValue('SAP_JWT_TOKEN');
     if (!token) {
       throw new Error('SAP_AUTH_TYPE is jwt, but SAP_JWT_TOKEN is not set.');
     }
-    config.jwtToken = token;
+    base.jwtToken = token;
     if (process.env.SAP_REFRESH_TOKEN) {
-      config.refreshToken = process.env.SAP_REFRESH_TOKEN;
+      base.refreshToken = process.env.SAP_REFRESH_TOKEN;
     }
-    if (process.env.SAP_UAA_URL) {
-      config.uaaUrl = process.env.SAP_UAA_URL;
-    }
+    if (process.env.SAP_UAA_URL) base.uaaUrl = process.env.SAP_UAA_URL;
     if (process.env.SAP_UAA_CLIENT_ID) {
-      config.uaaClientId = process.env.SAP_UAA_CLIENT_ID;
+      base.uaaClientId = process.env.SAP_UAA_CLIENT_ID;
     }
     if (process.env.SAP_UAA_CLIENT_SECRET) {
-      config.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
+      base.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
     }
   } else {
-    const username = process.env.SAP_USERNAME?.trim();
+    const username = envValue('SAP_USERNAME');
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
       throw new Error(
         'SAP_AUTH_TYPE is basic, but SAP_USERNAME or SAP_PASSWORD is not set.',
       );
     }
-    config.username = username;
-    config.password = password;
+    base.username = username;
+    base.password = password;
   }
 
-  if (process.env.SAP_CLIENT) {
-    config.client = process.env.SAP_CLIENT.trim();
+  const keys: DestinationKeyValues = {};
+  for (const key of DESTINATION_KEYS) {
+    const value = envValue(DESTINATION_KEY_ENV[key]);
+    if (value !== undefined) keys[key] = value;
   }
-  if (process.env.SAP_LANGUAGE) {
-    (config as any).language = process.env.SAP_LANGUAGE.trim();
+  const systemType = envValue('SAP_SYSTEM_TYPE');
+  const checked = checkDestinationStatement({
+    connectionType: statedWire,
+    systemType:
+      systemType === 'onprem' ||
+      systemType === 'cloud' ||
+      systemType === 'legacy'
+        ? systemType
+        : undefined,
+    authType,
+    urlKey: 'SAP_URL',
+    url: envValue('SAP_URL'),
+    keys,
+  });
+  if ('fault' in checked) {
+    throw new Error(destinationAddressWords('test', checked.fault));
   }
+  if ('rfc' in checked) return rfcConfigOf(base, checked.rfc);
 
-  return config;
+  let url: string;
+  try {
+    const normalized = new URL(checked.http.url);
+    url = withoutTrailingSlashes(normalized.href);
+  } catch {
+    throw new Error('SAP_URL is not a URL.');
+  }
+  return {
+    ...base,
+    url,
+    connectionType: 'http',
+    ...(keys.client !== undefined && { client: keys.client }),
+  };
 }
 
 /**

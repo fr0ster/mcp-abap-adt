@@ -489,13 +489,12 @@ export function getManagedConnection(): IAbapConnection {
   // Debug logging - verify URL is clean before creating connection (only in debug mode)
   // NOTE: This debug logging should NOT trigger connection attempts
   // Only log if explicitly enabled via DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS
-  if (config.url) {
-    const _urlHex = Buffer.from(config.url, 'utf8').toString('hex');
+  if (config.connectionType === 'rfc') {
+    debugLog('[MCP-UTILS] Creating an RFC connection: its address as stated\n');
+  } else {
     debugLog(
       `[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length})\n`,
     );
-  } else {
-    debugLog(`[MCP-UTILS] ✗ ERROR: config.url is missing!\n`);
   }
 
   const signature = sapConfigSignature(config);
@@ -882,6 +881,8 @@ const PRESENT = 'set';
 export interface AuthDisplayConfig {
   envFile?: string;
   serviceUrl?: string;
+  /** Over RFC, where the summary shows the URL over HTTP: each address field, labelled, as stated. */
+  rfcAddress?: ReadonlyArray<readonly [string, string]>;
   sapClient?: string;
   authType?: string;
   username?: string;
@@ -925,6 +926,11 @@ export function formatAuthConfigForDisplay(
         ? config.serviceUrl.substring(0, 42) + '...'
         : config.serviceUrl;
     lines.push(`║  SAP URL:       ${url.padEnd(45)}║`);
+  }
+
+  for (const [label, value] of config.rfcAddress ?? []) {
+    const shown = value.length > 45 ? `${value.substring(0, 42)}...` : value;
+    lines.push(`║  ${`${label}:`.padEnd(15)}${shown.padEnd(45)}║`);
   }
 
   if (config.sapClient) {

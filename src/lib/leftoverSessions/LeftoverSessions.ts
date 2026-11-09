@@ -203,16 +203,15 @@ function withoutTrailingSlashes(url: string): string {
  * The identity of a session opened for `destination` with `settings`: where
  * they point, and the backend user they state (`SAP_USERNAME`, or the
  * destination's login) — `null` when none (a token credential). `undefined`
- * over RFC — an RFC session is its conversation and keeps no file — and
- * without a URL.
+ * over RFC: an RFC session is its conversation and keeps no file.
  */
 export function sessionIdentity(
   destination: string,
   settings: SapConfig,
   login?: string,
 ): SessionIdentity | undefined {
+  // Narrowed by the wire: an HTTP config states its URL.
   if (settings.connectionType === 'rfc') return undefined;
-  if (typeof settings.url !== 'string') return undefined;
   const user = (settings.username ?? login ?? '').trim().toUpperCase();
   return {
     destination,

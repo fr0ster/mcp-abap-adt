@@ -86,20 +86,11 @@ export const CREDENTIAL_DECLARATIONS: ReadonlyMap<
   string,
   ReadonlySet<string>
 > = new Map<string, ReadonlySet<string>>([
-  [
-    'ISapConfig',
-    new Set([
-      'url',
-      'client',
-      'connectionType',
-      'username',
-      'mshost',
-      'msserv',
-      'sysid',
-      'group',
-      'saprouter',
-    ]),
-  ],
+  // interfaces-auth-sap 4: `ISapConfig` is a union by connection type; its
+  // authorization is `ISapConfigBase`'s, common to both shapes. The members
+  // of `ISapHttpConfig` and the RFC shapes are all settings (the URL, the
+  // client, the wire, the RFC address and language), so none is listed.
+  ['ISapConfigBase', new Set(['username'])],
   [
     'IConnectionConfig',
     new Set(['serviceUrl', 'username', 'sapClient', 'language']),

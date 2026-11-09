@@ -90,7 +90,7 @@ describe('production and the test helpers', () => {
       );
     }
     assert.deepEqual(
-      declaredAuthorization(program, 'ISapConfig').authorization,
+      declaredAuthorization(program, 'ISapConfigBase').authorization,
       [
         'authType',
         'certKeyPath',

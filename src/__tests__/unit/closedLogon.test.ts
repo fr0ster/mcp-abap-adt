@@ -57,11 +57,14 @@ import { closeInstance } from '../../lib/instanceClose';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 const SETTINGS: SapConfig = {
-  url: 'https://system.invalid',
   authType: 'basic',
   username: 'placeholder-user',
   password: 'placeholder-password',
   connectionType: 'rfc',
+  client: '100',
+  language: 'EN',
+  ashost: 'system.invalid',
+  sysnr: '00',
 };
 const ok = async () => ({ ok: true as const });
 const credential: IAuthProvider = {

@@ -144,7 +144,7 @@ type SingleActivationApi =
  * (`SINGLE_ACTIVATION_NAMES`).
  */
 export function preauditDescription(variant: ProjectionVariant): string {
-  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type or a search name standing for one of these codes. Their family's activate() always sends preauditRequested=true.`;
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}, and so does a main type or a search name standing for one of these codes; any other call is a group activation.`;
 }
 
 /**
@@ -386,6 +386,7 @@ function activateFamily(
   client: IServerAdtClient,
   api: SingleActivationApi,
   name: string,
+  preauditRequested: boolean,
 ) {
   switch (api) {
     case 'class':
@@ -394,7 +395,7 @@ function activateFamily(
           .getClass(resultsFor(classDocuments))
           .activate(
             { className: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'program':
@@ -404,7 +405,7 @@ function activateFamily(
           .getProgram(resultsFor(programDocuments))
           .activate(
             { programName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'interface':
@@ -413,7 +414,7 @@ function activateFamily(
           .getInterface(resultsFor(interfaceDocuments))
           .activate(
             { interfaceName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'functionGroup':
@@ -422,7 +423,7 @@ function activateFamily(
           .getFunctionGroup(resultsFor(functionGroupDocuments))
           .activate(
             { functionGroupName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'table':
@@ -431,7 +432,7 @@ function activateFamily(
           .getTable(resultsFor(tableDocuments))
           .activate(
             { tableName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'structure':
@@ -440,14 +441,17 @@ function activateFamily(
           .getStructure(resultsFor(structureDocuments))
           .activate(
             { structureName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'ddl':
       return withAdtHeaders(context, 'ddl.activate', (headers) =>
         client
           .getDdl(resultsFor(ddlDocuments))
-          .activate({ ddlName: name }, { headers, analyse: analyseActivation }),
+          .activate(
+            { ddlName: name },
+            { headers, preauditRequested, analyse: analyseActivation },
+          ),
       );
     case 'domain':
       return withAdtHeaders(context, 'domain.activate', (headers) =>
@@ -455,7 +459,7 @@ function activateFamily(
           .getDomain(resultsFor(domainDocuments))
           .activate(
             { domainName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'dataElement':
@@ -464,34 +468,44 @@ function activateFamily(
           .getDataElement(resultsFor(dataElementDocuments))
           .activate(
             { dataElementName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'behaviorDefinition':
       return withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
         client
           .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-          .activate({ name }, { headers, analyse: analyseActivation }),
+          .activate(
+            { name },
+            { headers, preauditRequested, analyse: analyseActivation },
+          ),
       );
     case 'metadataExtension':
       return withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
         client
           .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-          .activate({ name }, { headers, analyse: analyseActivation }),
+          .activate(
+            { name },
+            { headers, preauditRequested, analyse: analyseActivation },
+          ),
       );
   }
 }
 
-/** One object activated through its own API's `activate()`: its verdict. */
+/**
+ * One object activated through its own API's `activate()`, `preaudit` sent as
+ * its `preauditRequested`: its verdict.
+ */
 function activateSingle(
   context: HandlerContext,
   single: { readonly api: SingleActivationApi; readonly name: string },
   detail: 'terse' | 'full' | 'raw',
+  preaudit: boolean,
 ) {
   const client = createAdtClient(context.connection, context.logger);
   return answer(
     { tool: 'ActivateObjectLow', detail },
-    () => activateFamily(context, client, single.api, single.name),
+    () => activateFamily(context, client, single.api, single.name, preaudit),
     project(detail, terseActivation),
   );
 }
@@ -553,7 +567,8 @@ export async function handleActivateObject(
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
 
-  if ('single' in plan) return activateSingle(context, plan.single, detail);
+  if ('single' in plan)
+    return activateSingle(context, plan.single, detail, preaudit);
 
   // Fallback: multiple objects, or a single object of a type this dispatcher
   // does not map to a family client. See the module doc comment: ADT's
@@ -715,8 +730,9 @@ export async function activatePlanOnce(
   plan: ActivationPlan,
   preauditRequested?: boolean,
 ) {
-  if ('single' in plan) return activateSingle(context, plan.single, 'terse');
   const preaudit = preauditRequested !== false;
+  if ('single' in plan)
+    return activateSingle(context, plan.single, 'terse', preaudit);
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
     async () => {

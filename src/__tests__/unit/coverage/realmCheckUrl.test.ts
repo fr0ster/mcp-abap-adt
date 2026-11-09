@@ -29,7 +29,10 @@ import * as path from 'node:path';
 import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/brokerFactory';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import globalSetup from '../../integration/globalSetup';
-import { realmCheckUrlMissingWords } from '../../integration/helpers/realmCheck';
+import {
+  parseRealmCheckUrls,
+  realmCheckUrlMissingWords,
+} from '../../integration/helpers/realmCheck';
 
 jest.setTimeout(60_000);
 
@@ -176,4 +179,39 @@ describe("globalSetup's realm check by the destination's wire", () => {
     });
     expect(stand.requests).toEqual([]);
   });
+});
+
+describe('MCP_LIVE_REALM_CHECK_URLS: whitespace-separated absolute http(s) URLs', () => {
+  it('a URL with a port is one entry (the path delimiter splits nothing)', () => {
+    expect(parseRealmCheckUrls('https://saphost.example:44300')).toEqual([
+      'https://saphost.example:44300',
+    ]);
+  });
+
+  it('two entries, in order; surrounding and repeated whitespace dropped', () => {
+    expect(
+      parseRealmCheckUrls(
+        '  https://one.example.test:44300 \n\t http://two.example.test:8000  ',
+      ),
+    ).toEqual([
+      'https://one.example.test:44300',
+      'http://two.example.test:8000',
+    ]);
+  });
+
+  it('none stated: no entry', () => {
+    expect(parseRealmCheckUrls(undefined)).toEqual([]);
+    expect(parseRealmCheckUrls('   ')).toEqual([]);
+  });
+
+  it.each(['saphost.example', 'https', 'ftp://saphost.example', '//saphost'])(
+    'a non-URL entry (%s) is refused by its position, never its value',
+    (entry) => {
+      expect(() =>
+        parseRealmCheckUrls(`https://one.example.test ${entry}`),
+      ).toThrow(
+        'MCP_LIVE_REALM_CHECK_URLS: entry 2 is not an absolute http(s) URL; nothing was sent',
+      );
+    },
+  );
 });

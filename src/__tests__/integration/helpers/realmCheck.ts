@@ -25,6 +25,45 @@ export interface SessionFacts {
 
 const DISCOVERY = '/sap/bc/adt/discovery';
 
+const WHITESPACE = new Set([' ', '\t', '\n', '\r']);
+
+/**
+ * `MCP_LIVE_REALM_CHECK_URLS`: the realm-check URLs of the live connection
+ * test, one per `.env` of `MCP_LIVE_ENV_PATHS`, in order, separated by
+ * whitespace — an absolute URL holds none, where the path delimiter (`:`)
+ * is in every one. Empty entries are dropped. Each must parse as an
+ * absolute `http:` or `https:` URL; anything else is refused in fixed words
+ * naming its position, never its value, before anything is sent. Plain
+ * code, no pattern.
+ */
+export function parseRealmCheckUrls(raw: string | undefined): string[] {
+  const entries: string[] = [];
+  let current = '';
+  for (const character of raw ?? '') {
+    if (WHITESPACE.has(character)) {
+      if (current !== '') entries.push(current);
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  if (current !== '') entries.push(current);
+  entries.forEach((entry, index) => {
+    let protocol: string | undefined;
+    try {
+      protocol = new URL(entry).protocol;
+    } catch {
+      protocol = undefined;
+    }
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      throw new Error(
+        `MCP_LIVE_REALM_CHECK_URLS: entry ${index + 1} is not an absolute http(s) URL; nothing was sent`,
+      );
+    }
+  });
+  return entries;
+}
+
 /** The words of an RFC run whose test configuration states no realm-check URL. */
 export function realmCheckUrlMissingWords(setting: string): string {
   return `realm check: the destination is RFC and states no URL — set ${setting} to the system's HTTP URL, against which the 401 realm is checked; nothing was sent`;

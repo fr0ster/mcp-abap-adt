@@ -20,7 +20,8 @@
  * same delimiter, one per `.env`, in order; empty refuses), on the cloud with
  * the session's JWT not expired. Against the `.env`'s `SAP_URL` over HTTP;
  * an RFC `.env` states no URL, so its check runs against its entry of
- * `MCP_LIVE_REALM_CHECK_URLS` (same delimiter, one per `.env`, in order),
+ * `MCP_LIVE_REALM_CHECK_URLS` (whitespace-separated absolute http(s) URLs,
+ * one per `.env`, in order),
  * and an RFC destination without one is refused before anything is sent.
  *
  * **How the server is started.** The way a user's tree runs it: the library and
@@ -49,7 +50,11 @@ import {
   installPackedRelease,
 } from '../../helpers/installedRelease';
 import { endTestConnection } from '../helpers/openConnections';
-import { realmCheck, realmCheckUrlOf } from '../helpers/realmCheck';
+import {
+  parseRealmCheckUrls,
+  realmCheck,
+  realmCheckUrlOf,
+} from '../helpers/realmCheck';
 import { guardedSend, guardedTestConnection } from '../helpers/refusalGuard';
 import { launchStdioScript } from '../helpers/testers/hardMode';
 
@@ -60,9 +65,9 @@ const ENV_PATHS = (process.env.MCP_LIVE_ENV_PATHS ?? '')
 const EXPECTED_REALMS = (process.env.MCP_LIVE_EXPECTED_REALMS ?? '')
   .split(delimiter)
   .map((entry) => entry.trim());
-const REALM_CHECK_URLS = (process.env.MCP_LIVE_REALM_CHECK_URLS ?? '')
-  .split(delimiter)
-  .map((entry) => entry.trim());
+const REALM_CHECK_URLS = parseRealmCheckUrls(
+  process.env.MCP_LIVE_REALM_CHECK_URLS,
+);
 const EXTRA_ARGS = (process.env.MCP_LIVE_ARGS ?? '')
   .split(/\s+/)
   .filter((arg) => arg !== '');

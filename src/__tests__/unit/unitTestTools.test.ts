@@ -8,6 +8,11 @@
  * started it, so one capture serves every Run* tool.
  */
 
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
 import { handleCreateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest';
 import { handleCreateProgramUnitTest } from '../../handlers/unit_test/high/handleCreateProgramUnitTest';
@@ -29,6 +34,7 @@ import {
 import { corpusBody } from '../helpers/adtCorpus';
 import { moduleInGroup } from '../helpers/functionModuleMetadata';
 import {
+  LOCK_SUCCESS_XML,
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
@@ -893,5 +899,113 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
   it("a function group's main program: SAPL<group>, namespace in front", () => {
     expect(functionGroupMainProgram('zfg_x')).toBe('SAPLZFG_X');
     expect(functionGroupMainProgram('/ns/group')).toBe('/NS/SAPLGROUP');
+  });
+});
+
+/**
+ * The function-group test include is activated with the group and its main
+ * program on the endpoint the system's discovery offers
+ * (fr0ster/mcp-abap-adt#351): the run where it lists
+ * `/sap/bc/adt/activation/runs`, else the one `POST /sap/bc/adt/activation`.
+ * The discoveries are the recorded ones of SAP_BASIS 7.40, the 751 partial
+ * one and S/4HANA 2025; the 751 answers to the synchronous POST are the
+ * recorded `activation-sync-activated-751` (an empty `200`: activated) and
+ * `activation-preaudit-still-inactive-751` (the objects still inactive).
+ */
+describe('CreateFunctionGroupUnitTest: the activation endpoint by discovery', () => {
+  const RUN_FINISHED =
+    '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>';
+  const RUN_ACTIVATED =
+    '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/></chkl:messages>';
+
+  /** A connection answering by request: the discovery and the activation as given, everything else `200`. */
+  function system(discovery: string, activation = '') {
+    const lines: string[] = [];
+    const connection: IAbapConnection = {
+      async connect() {},
+      async getBaseUrl() {
+        return 'https://example.com';
+      },
+      getSessionId() {
+        return null;
+      },
+      setSessionType() {},
+      async makeAdtRequest<T = unknown, D = unknown>(
+        options: IAbapRequestOptions,
+      ): Promise<IAdtWireResponse<T, D>> {
+        lines.push(`${options.method} ${options.url.split('?')[0]}`);
+        const url = options.url;
+        let data = '';
+        let headers: Record<string, string> = {};
+        let status = 200;
+        if (url === '/sap/bc/adt/discovery') data = discovery;
+        else if (url.includes('_action=LOCK')) data = LOCK_SUCCESS_XML;
+        else if (url.startsWith('/sap/bc/adt/activation/runs?')) {
+          status = 202;
+          headers = { location: '/sap/bc/adt/activation/runs/RUN-9' };
+        } else if (url.startsWith('/sap/bc/adt/activation/runs/RUN-9'))
+          data = RUN_FINISHED;
+        else if (url.startsWith('/sap/bc/adt/activation/results/RUN-9'))
+          data = RUN_ACTIVATED;
+        else if (url.startsWith('/sap/bc/adt/activation?')) data = activation;
+        // A recorded body is text; `T` is the caller's view of it, which a
+        // replay does not narrow — the assertion every fake connection makes.
+        return { data: data as T, status, statusText: 'OK', headers };
+      },
+    };
+    return { connection, lines };
+  }
+
+  const create = (connection: IAbapConnection) =>
+    handleCreateFunctionGroupUnitTest(ctx(connection) as any, {
+      function_group_name: 'zfg_x',
+      test_class_source: 'x',
+    });
+
+  it.each([
+    ['SAP_BASIS 7.40', 'system-description-basis-740--03-discovery'],
+    ['751 (partial)', 'system-description-751-partial--01-discovery'],
+  ])(
+    '%s lists no /activation/runs: the discovery, then one POST /activation',
+    async (_what, name) => {
+      const { connection, lines } = system(
+        corpusBody(name),
+        corpusBody('activation-sync-activated-751--01-activation'),
+      );
+      const result: any = await create(connection);
+      expect(result.isError).toBe(false);
+      const activation = lines.slice(
+        lines.indexOf('GET /sap/bc/adt/discovery'),
+      );
+      expect(activation).toEqual([
+        'GET /sap/bc/adt/discovery',
+        'POST /sap/bc/adt/activation',
+      ]);
+    },
+  );
+
+  it('S/4HANA 2025 lists /activation/runs: the discovery, then the run', async () => {
+    const { connection, lines } = system(
+      corpusBody('system-description-s4-2025--03-discovery'),
+    );
+    const result: any = await create(connection);
+    expect(result.isError).toBe(false);
+    expect(lines.slice(lines.indexOf('GET /sap/bc/adt/discovery'))).toEqual([
+      'GET /sap/bc/adt/discovery',
+      'POST /sap/bc/adt/activation/runs',
+      'GET /sap/bc/adt/activation/runs/RUN-9',
+      'GET /sap/bc/adt/activation/results/RUN-9',
+    ]);
+  });
+
+  it('751: the objects still inactive after the POST are an error naming them', async () => {
+    const { connection } = system(
+      corpusBody('system-description-751-partial--01-discovery'),
+      corpusBody('activation-preaudit-still-inactive-751--01-activation'),
+    );
+    const result: any = await create(connection);
+    expect(result.isError).toBe(true);
+    expect(payload(result).step).toBe('activate');
+    expect(payload(result).still_inactive?.length).toBeGreaterThan(0);
   });
 });

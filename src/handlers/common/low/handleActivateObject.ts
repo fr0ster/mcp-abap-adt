@@ -76,10 +76,8 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import {
-  ACTIVATION_RUNS_COLLECTION,
   analyseActivation,
   analyseException,
-  utilDiscoveryCollections,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   AdtUtilityCode,
@@ -117,6 +115,7 @@ import {
   variantOf,
 } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
   type ActivationRunOutcome,
   activationVerdict,
@@ -378,35 +377,6 @@ function startGroupActivation(
             analyse: analyseException,
           }),
   );
-}
-
-/** The step a discovery read and its failure arise at. */
-const DISCOVERY = 'discovery';
-
-/** A discovery SAP answered with no collection: the fixed words. */
-export const DISCOVERY_UNREADABLE =
-  'The discovery could not be read: SAP answered no collection, so whether the system offers /sap/bc/adt/activation/runs is not known, and the activation endpoint is not decided. Nothing was activated.';
-
-/**
- * Whether the system offers `/sap/bc/adt/activation/runs`, by its discovery,
- * read on every group activation (owner, fr0ster/mcp-abap-adt#351: no state
- * kept). Exact membership (`ACTIVATION_RUNS_COLLECTION`), never a prefix.
- * A discovery that fails, or answers no collection, is the call's failure at
- * step `discovery`: no endpoint is guessed and nothing is tried to find out.
- */
-async function activationRunsOffered(context: HandlerContext) {
-  const read = await createAdtClient(context.connection, context.logger)
-    .getUtils({ ...ourUtils, discovery: utilDiscoveryCollections })
-    .discovery({}, { analyse: analyseException });
-  if (!read.ok)
-    return failedWith<boolean>(withStep(read.getError(), DISCOVERY));
-  const collections = read.getResult().value;
-  if (collections.size === 0) {
-    return failedWith<boolean>(
-      withStep({ origin: 'refusal', message: DISCOVERY_UNREADABLE }, DISCOVERY),
-    );
-  }
-  return succeededWith(collections.has(ACTIVATION_RUNS_COLLECTION));
 }
 
 /**

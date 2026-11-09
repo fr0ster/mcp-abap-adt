@@ -67,8 +67,11 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
+  type ActivationMessage,
   type ActivationRunSource,
+  activationMessagesOf,
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
@@ -165,13 +168,6 @@ async function forceSaveViewSource(
   }
 }
 
-/**
- * Starts the group activation of `objects` with the client of the system type
- * the connection is declared for, and hands back that client's utils for the
- * run's wait. On ABAP cloud only a code its group activation takes
- * (`ACTIVATION_CODES.cloud`) is sent; an object of another code is refused
- * here by name, and nothing is sent.
- */
 /** The uris a run's silent results are checked against, one per object. */
 function runUris(objects: GroupObject<AdtGroupActivationCode<'onprem'>>[]) {
   return objects.map((obj) =>
@@ -179,6 +175,32 @@ function runUris(objects: GroupObject<AdtGroupActivationCode<'onprem'>>[]) {
   );
 }
 
+/**
+ * `objects` as ABAP cloud's group activation takes them: only a code it
+ * takes (`ACTIVATION_CODES.cloud`); an object of another code is refused
+ * here by name, and nothing is sent.
+ */
+function cloudReferences(
+  objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
+) {
+  const references: GroupObject<(typeof ACTIVATION_CODES.cloud)[number]>[] = [];
+  for (const obj of objects) {
+    const type = acceptedOf(obj.type, ACTIVATION_CODES.cloud);
+    if (type === undefined) {
+      throw new Error(
+        `${obj.type} ${obj.name}: ABAP cloud takes no group activation of this type`,
+      );
+    }
+    references.push({ ...obj, type });
+  }
+  return references.filter(namesItsParent);
+}
+
+/**
+ * Starts the group activation of `objects` with the client of the system type
+ * the connection is declared for, and hands back that client's utils for the
+ * run's wait.
+ */
 function startGroupActivation(
   connection: IAbapConnection,
   objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
@@ -201,16 +223,6 @@ function startGroupActivation(
       ),
     };
   }
-  const references: GroupObject<(typeof ACTIVATION_CODES.cloud)[number]>[] = [];
-  for (const obj of objects) {
-    const type = acceptedOf(obj.type, ACTIVATION_CODES.cloud);
-    if (type === undefined) {
-      throw new Error(
-        `${obj.type} ${obj.name}: ABAP cloud takes no group activation of this type`,
-      );
-    }
-    references.push({ ...obj, type });
-  }
   const utils = createAdtClient(connection).getUtils({
     ...ourUtils,
     inactive: wireItself,
@@ -218,10 +230,92 @@ function startGroupActivation(
   return {
     utils,
     started: utils.activateObjectsGroup(
-      references.filter(namesItsParent),
+      cloudReferences(objects),
       true,
       options,
     ),
+  };
+}
+
+/**
+ * The one synchronous `POST /sap/bc/adt/activation` of `objects`, where the
+ * discovery offers no activation runs (SAP_BASIS 751, 7.40), judged by
+ * `analyseActivation`. Without the pre-audit: with it, 751 answers the
+ * objects still inactive and activates nothing (measured,
+ * fr0ster/mcp-abap-adt#351).
+ */
+function activateGroupSynchronously(
+  connection: IAbapConnection,
+  objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
+) {
+  const options = {
+    headers: DEFAULT_ADT_HEADERS['utils.activateObjects'],
+    analyse: analyseActivation,
+  };
+  return variantOf(connection) === 'onprem'
+    ? createOnPremAdtClient(connection)
+        .getUtils(ourUtils)
+        .activateObjects(objects.filter(namesItsParent), false, options)
+    : createAdtClient(connection)
+        .getUtils(ourUtils)
+        .activateObjects(cloudReferences(objects), false, options);
+}
+
+/**
+ * One group activation of `objects`, on the endpoint the system's discovery
+ * offers (fr0ster/mcp-abap-adt#351), as `ActivateObjectLow` chooses it: the
+ * run — started, waited for, its results read — where the discovery lists
+ * `/sap/bc/adt/activation/runs`, else the synchronous `POST /activation`.
+ * Answers what SAP said and its messages; throws what failed.
+ */
+async function activateGroupOnce(
+  connection: IAbapConnection,
+  objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
+): Promise<{ said: string; messages: ActivationMessage[] }> {
+  const offered = await activationRunsOffered({ connection });
+  if (!offered.ok) throw new Error(offered.getError().message);
+  if (!offered.getResult().value) {
+    const answered = await activateGroupSynchronously(connection, objects);
+    if (!answered.ok) {
+      const error = answered.getError();
+      const still = error.stillInactive ?? [];
+      throw new Error(
+        still.length > 0
+          ? `${error.message} (still inactive: ${still.map((o) => o.name).join(', ')})`
+          : error.message,
+      );
+    }
+    return {
+      said: 'POST /sap/bc/adt/activation',
+      messages: activationMessagesOf(answered.getResult().value),
+    };
+  }
+  // **The messages are in the run's results, not in the POST.**
+  // `/activation/runs` answers `202` with the id in `Location` and an empty
+  // body, so asking for that body and parsing it found zero messages and
+  // read like "no errors": this script logged "Group activation completed
+  // successfully" over eleven objects that stayed inactive, with not one
+  // SAP message to say why. The run id, then `getActivationRun` until it
+  // settles, then `getActivationResults` — see
+  // `lib/strategies/activationRun.ts`.
+  const group = startGroupActivation(connection, objects);
+  const started = await group.started;
+  if (!started.ok) throw new Error(started.getError().message);
+  const outcome = await awaitActivationRun(
+    group.utils as unknown as ActivationRunSource,
+    started.getResult().value,
+    analyseException,
+    runUris(objects),
+  );
+  if (outcome.failure) throw new Error(outcome.failure.message);
+  if (outcome.stillInactive?.length) {
+    throw new Error(
+      `Activation run ${outcome.runId} activated nothing: ${outcome.stillInactive.map((o) => o.name).join(', ')} still inactive`,
+    );
+  }
+  return {
+    said: `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}`,
+    messages: outcome.messages,
   };
 }
 
@@ -1800,36 +1894,9 @@ describe('Admin: Setup shared dependencies', () => {
             `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
           );
           try {
-            // **The messages are in the run's results, not in the POST.**
-            // `/activation/runs` answers `202` with the id in `Location` and an
-            // empty body, so asking for that body and parsing it found zero
-            // messages and read like "no errors": this script logged "Group
-            // activation completed successfully" over eleven objects that stayed
-            // inactive, with not one SAP message to say why. The run id, then
-            // `getActivationRun` until it settles, then `getActivationResults`
-            // — see `lib/strategies/activationRun.ts`.
-            const group = startGroupActivation(connection, toActivate);
-            const utils = group.utils;
-            const started = await group.started;
-            if (!started.ok) {
-              throw new Error(started.getError().message);
-            }
-            const outcome = await awaitActivationRun(
-              utils as unknown as ActivationRunSource,
-              started.getResult().value,
-              analyseException,
-              runUris(toActivate),
-            );
-            if (outcome.failure) {
-              throw new Error(outcome.failure.message);
-            }
-            if (outcome.stillInactive?.length) {
-              throw new Error(
-                `Activation run ${outcome.runId} activated nothing: ${outcome.stillInactive.map((o) => o.name).join(', ')} still inactive`,
-              );
-            }
+            const outcome = await activateGroupOnce(connection, toActivate);
             testsLogger?.info?.(
-              `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}, ${outcome.messages.length} message(s)`,
+              `${outcome.said}, ${outcome.messages.length} message(s)`,
             );
 
             const errors = outcome.messages.filter(isRefusal);
@@ -1913,29 +1980,8 @@ describe('Admin: Setup shared dependencies', () => {
                 }
               };
               try {
-                // The same three requests as the bulk path above: a chunk is
-                // still an activation run, and its POST still answers only the
-                // id.
-                const group = startGroupActivation(connection, chunk);
-                const utils = group.utils;
-                const resp = await group.started;
-                if (!resp.ok) {
-                  throw new Error(resp.getError().message);
-                }
-                const chunkOutcome = await awaitActivationRun(
-                  utils as unknown as ActivationRunSource,
-                  resp.getResult().value,
-                  analyseException,
-                  runUris(chunk),
-                );
-                if (chunkOutcome.failure) {
-                  throw new Error(chunkOutcome.failure.message);
-                }
-                if (chunkOutcome.stillInactive?.length) {
-                  throw new Error(
-                    `Activation run ${chunkOutcome.runId} activated nothing: ${chunkOutcome.stillInactive.map((o) => o.name).join(', ')} still inactive`,
-                  );
-                }
+                // The same activation as the bulk path above, chunk by chunk.
+                const chunkOutcome = await activateGroupOnce(connection, chunk);
                 const errs = chunkOutcome.messages.filter(isRefusal);
                 if (errs.length > 0) {
                   recordFailure(

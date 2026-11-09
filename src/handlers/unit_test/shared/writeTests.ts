@@ -28,10 +28,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
-import {
-  type AdtHeadersContext,
-  withAdtHeaders,
-} from '../../../lib/adtHeaders/withAdtHeaders';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { asciiUpper } from '../../../lib/plainText';
@@ -39,6 +36,7 @@ import {
   abapStatementsOf,
   includeOfStatement,
 } from '../../../lib/strategies/abapIncludeStatement';
+import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
   awaitActivationRun,
   isRefusal,
@@ -356,12 +354,16 @@ export function functionGroupMainProgram(functionGroupName: string): string {
  * answered `200` with the inactive list instead of an activation — a
  * document `analyseActivation` does not read, so it passed as a success —
  * and the main program stayed inactive: ABAP Unit then found no test class
- * (measured on premise, BASIS 816, 2026-10-12). The three go in one run
- * without the pre-audit, as Eclipse activates the list it was shown; the run
- * is accepted, not done, so its results are read before answering.
+ * (measured on premise, BASIS 816, 2026-10-12). The three go in one
+ * activation without the pre-audit, as Eclipse activates the list it was
+ * shown, on the endpoint the system's discovery offers
+ * (fr0ster/mcp-abap-adt#351): the run where it lists
+ * `/sap/bc/adt/activation/runs` — accepted, not done, so its results are read
+ * before answering — else the one `POST /sap/bc/adt/activation`
+ * (SAP_BASIS 751, 7.40), judged by `analyseActivation`.
  */
 async function activateWithMainProgram(
-  context: AdtHeadersContext,
+  context: HandlerContext,
   client: IServerAdtClient,
   groupName: string,
   includeName: string,
@@ -370,6 +372,21 @@ async function activateWithMainProgram(
   // the wire as it came (`stillInactiveAmong`).
   const utils = client.getUtils({ ...ourUtils, inactive: wireItself });
   const mainProgram = functionGroupMainProgram(groupName);
+  const offered = await activationRunsOffered(context);
+  if (!offered.ok) return failedWith(offered.getError());
+  if (!offered.getResult().value) {
+    return withAdtHeaders(context, 'utils.activateObjects', (headers) =>
+      utils.activateObjects(
+        [
+          { type: 'FUGR/I', name: includeName, parentName: groupName },
+          { type: 'FUGR/F', name: groupName },
+          { type: 'FUGR/I', name: mainProgram, parentName: groupName },
+        ],
+        false,
+        { headers, analyse: analyseActivation },
+      ),
+    );
+  }
   const started = await withAdtHeaders(
     context,
     'utils.activateObjectsGroup',

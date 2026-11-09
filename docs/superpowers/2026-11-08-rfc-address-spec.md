@@ -308,8 +308,10 @@ Carries: *One shape per connection type* for every builder. Evidence: E.8.
   wherever a value becomes a config, the source's type must fit a member without a key that
   member forbids; a source whose keys cannot be established (`any`) is refused. **Not covered**
   (owner's decision; each pinned by a fixture under `limits/`): destructuring defaults,
-  `yield`, getter returns and config-constrained generics. The compiler closes the whole class
-  only with `exactOptionalPropertyTypes`, a separate task after 24.0.0.
+  `yield`, getter returns, and an intersection that merges `url?: never` with
+  `url?: undefined` (the guard reads types under `exactOptionalPropertyTypes`, where that merge
+  is `never`; the production compile would accept a value with `url: undefined`). The compiler
+  closes the whole class only with `exactOptionalPropertyTypes`, a separate task after 24.0.0.
 
 ## 10. Docs
 

@@ -382,8 +382,12 @@ their answers are kept is the host's: a strategy.
   (opaque, at least 128 random bits) or `{ refused: 'limit', limit }`; `finish(handle, answer,
   finishedAt)`, called once per started run by the library; `get(handle, caller)` → the run or
   `undefined`; `list(caller)` (no output); `discard(handle, caller)` → `'discarded'` | `'running'` |
-  `'not-available'`. The caller is `{ url, client, user }`; `get` and `discard` answer an unknown
-  handle and someone else's alike. Every method may answer a promise. The strategy decides only
+  `'not-available'`. The caller is `{ system, client, user }` (24.0.0; `url` is gone): `system` is
+  the system's key — a destination's system key (`adtSystemKey`: its wire and URL, or its RFC
+  address), an injected connection's `["http", <URL>, ""]` when `getBaseUrl()` answers a URL, else
+  the `system` its embedder states (`EmbeddableMcpServerOptions.system`); `get` and `discard`
+  answer an unknown handle and someone else's alike. Two systems with the same client and user
+  never share a run in one store. Every method may answer a promise. The strategy decides only
   where runs are kept and how a handle is found (an embedder: its store, its routing between
   replicas).
 - **lib ships no implementation.** An embedder implements `IBackgroundRuns`, or takes the
@@ -401,8 +405,12 @@ their answers are kept is the host's: a strategy.
   refused at once without a fresh connection to be had (`freshConnectionAvailable`; its fixed words);
   the caller resolved (`backgroundCaller`: the user its destination's parameters name — made with
   the connection, no lookup of its own —, else the stated responsible, else the login
-  — `SAP_USERNAME`, `x-sap-login`; an injected connection's URL from `getBaseUrl()`; none at all →
-  `system_user_unknown`);
+  — `SAP_USERNAME`, `x-sap-login`; none at all → `system_user_unknown`), and its system: a
+  destination's system key, an injected connection's URL from `getBaseUrl()`, or — when that
+  answers `undefined` (RFC) — `EmbeddableMcpServerOptions.system`; with neither, the run is
+  refused `background_runs_unavailable`, in fixed words naming `system`, before anything is kept.
+  The caller is computed from the injected connection before the run starts: a run on a fresh
+  connection keeps it, whatever the fresh connection answers;
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and
   re-owned by the **strategy** (role `background`), stateless; `strategy.start` (a limit refusal
@@ -566,9 +574,17 @@ const server = new EmbeddableMcpServer({
   systemType: 'onprem',
   // Build a new connection with its own credential; it receives no signal.
   freshConnection: async () => buildMyConnection(),
+  // A connection that answers no URL (RFC: getBaseUrl() answers undefined)
+  // names its system here, for its background runs; one with a URL needs none.
+  system: 'my-rfc-system',
 });
 await server.connect(transport);
 ```
+
+`system` is read only when `getBaseUrl()` answers `undefined`. Without it such a connection's
+background runs are refused `background_runs_unavailable` ("… the connection the host gave answers
+no URL, and the host stated no `system` …"); give two systems two keys, since runs are kept per
+system, client and user.
 
 `EmbeddableMcpServer` uses the connection it is given exactly as it is. It does not build a
 credential, wrap the connection or call `connect()` on it, and every tool call works on it. A

@@ -565,8 +565,9 @@ pairs and applies the same correction through `@mcp-abap-adt/lib/adt-headers`:
   operation. They were measured on one SAP version; what another version serves differently is
   learned by the correction below.
 - `AdtHeaderPairs` / `AdtHeaderPort` — the corrected pairs, kept per system and operation, one
-  owner per process; `adtSystemKey(settings)` — the system key the server uses (the URL without
-  trailing slashes, the client, the connection type): two destinations to one system share it.
+  owner per process; `adtSystemKey(settings)` — the system key the server uses, by the settings'
+  wire: HTTP `["http", <URL without trailing slashes>, <client>]`, RFC `["rfc", ashost, sysnr,
+  mshost, msserv, sysid, group, saprouter, client]`: two destinations to one system share it.
 - `withAdtHeaders(context, operation, call)` — the call with the system's pair, sent once more
   with the type SAP named on a `406` / `415`, the corrected pair kept for the system.
 
@@ -578,7 +579,8 @@ import {
 } from '@mcp-abap-adt/lib/adt-headers';
 
 const pairs = new AdtHeaderPairs(); // one per process
-const port = pairs.forSystem(adtSystemKey({ url, client, connectionType: 'http' }));
+// `settings`: the connection's SapConfig (an HTTP or an RFC one)
+const port = pairs.forSystem(adtSystemKey(settings));
 const answer = await withAdtHeaders({ adtHeaders: port }, 'class.check', (headers) =>
   cls.check({ className }, undefined, { headers }),
 );

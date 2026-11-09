@@ -2,8 +2,8 @@
 // it is deleted with `sncCheckRules.ts` at step 22, once the run is recorded.
 //
 // What it does, stopping at the first failure with a plain reason:
-//   1. preflight: Node, platform, HEAD; SAPNWRFC_HOME and its lib directory;
-//      the sap-rfc-lite binding loads; the SNC library, found as
+//   1. preflight: Node, platform, HEAD; SAPNWRFC_HOME (informational only);
+//      the sap-rfc-lite binding loads (the one check); the SNC library, found as
 //      SncLogonProvider's default locator finds it;
 //   2. the .env: key NAMES only, never a value; the SNC destination's keys;
 //   3. the realm check against --realm-url: an unauthenticated GET of the ADT
@@ -18,10 +18,11 @@
 // Prerequisites on the machine:
 //   - Node.js 22 or 24, and this checkout at refactor/static-types with
 //     `npm ci --ignore-scripts` run;
-//   - the SAP NW RFC SDK: SAPNWRFC_HOME set to its directory, and its lib
-//     directory on the library path — Windows: %SAPNWRFC_HOME%\lib on PATH;
-//     Linux: $SAPNWRFC_HOME/lib on LD_LIBRARY_PATH; macOS: $SAPNWRFC_HOME/lib
-//     on DYLD_LIBRARY_PATH (or SAP GUI's 64-bit sapnwrfc.dll on Windows);
+//   - the NW RFC SDK or SAP GUI's sapnwrfc.dll (Windows), loadable by the
+//     process: on Windows SAP GUI's 64-bit sapnwrfc.dll in System32 needs
+//     nothing set (SAPNWRFC_HOME is not needed); else the SDK's lib directory
+//     on the library path — Windows %SAPNWRFC_HOME%\lib on PATH, Linux on
+//     LD_LIBRARY_PATH, macOS on DYLD_LIBRARY_PATH;
 //   - the Secure Login Client installed, logged on, with a valid ticket;
 //   - the destination's .env: SAP_CONNECTION_TYPE=rfc, SAP_AUTH_TYPE=snc,
 //     SAP_SYSTEM_TYPE=onprem, SAP_ASHOST + SAP_SYSNR (or SAP_MSHOST with
@@ -128,22 +129,26 @@ say(`SNC live check — log: ${LOG}`);
   } catch (error) {
     fail(name, `git rev-parse failed: ${wordsOf(error)}`);
   }
+  // Informational: SAP GUI's sapnwrfc.dll on Windows needs no SAPNWRFC_HOME.
   const home = process.env.SAPNWRFC_HOME;
   if (home === undefined || home.trim() === '') {
-    fail(name, 'SAPNWRFC_HOME is not set: set it to the SAP NW RFC SDK directory');
+    say('SAPNWRFC_HOME not set (informational: the RFC library is found on the loader\'s search path)');
+  } else {
+    const lib = path.join(home, 'lib');
+    say(
+      `SAPNWRFC_HOME ${home} (lib directory ${fs.existsSync(lib) ? 'present' : 'absent'}; informational)`,
+    );
   }
-  const lib = path.join(home, 'lib');
-  if (!fs.existsSync(lib)) {
-    fail(name, `SAPNWRFC_HOME has no lib directory: ${lib}`);
-  }
-  say(`SAPNWRFC_HOME ${home} (lib directory present)`);
   try {
     const { binding } = requireHere('@mcp-abap-adt/sap-rfc-lite');
     say(`sap-rfc-lite binding loaded: ${JSON.stringify(binding.bindingVersions)}`);
   } catch (error) {
     fail(
       name,
-      `the sap-rfc-lite binding did not load (the SDK's lib directory on the library path?): ${wordsOf(error)}`,
+      `the sap-rfc-lite binding did not load: ${wordsOf(error)}\n` +
+        'Hint (docs/installation/RFC_SETUP.md): the SAP NW RFC library must be loadable by this process — ' +
+        "on Windows SAP GUI's 64-bit sapnwrfc.dll in System32 (where.exe sapnwrfc.dll lists it), or the SDK with %SAPNWRFC_HOME%\\lib on PATH; " +
+        'on Linux the SDK lib directory on LD_LIBRARY_PATH, on macOS on DYLD_LIBRARY_PATH; then open a new terminal',
     );
   }
   if (!fs.existsSync(envPath)) fail(name, `the .env file does not exist: ${envPath}`);

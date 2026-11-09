@@ -1,0 +1,24 @@
+{
+  "case": "activation-run-silent-results-s4-2025",
+  "step": 1,
+  "stepTag": "results",
+  "capturedAt": "2026-11-09T20:07:00.000Z",
+  "note": "S/4HANA 2025, fr0ster/mcp-abap-adt#351 plan F6 live run through the server's ActivateObjects: two classes of the run's own in a transportable package, both already active, activated again as a group. Discovery lists /sap/bc/adt/activation/runs, so the run path ran: POST /activation/runs?method=activate&preauditRequested=true (201), the run's status with long polling (200, finished), then these results \u2014 chkl:messages with checkExecuted=\"false\" activationExecuted=\"false\" generationExecuted=\"true\" and no message, the silent kind. The server then read GET /sap/bc/adt/activation/inactiveobjects once (200, neither class listed) and answered nothing_to_activate: true. The run id is the one SAP assigned.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/activation/results/0CC47A1E68C11FE1B78F23D800BEB5CB",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation/results/0CC47A1E68C11FE1B78F23D800BEB5CB",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only (adt-clients' getActivationResults). Recorded at the server's connection in a hand-run live test over HTTP; the connection added Authorization, sap-client, the session cookie and the CSRF token, none of which is recorded. No response header was kept.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {},
+    "bodyFile": "activation-run-silent-results-s4-2025--01-results.body.xml"
+  }
+}

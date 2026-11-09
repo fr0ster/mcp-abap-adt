@@ -8,7 +8,8 @@
  * no spread of the other shape.
  *
  * Each fixture under `__fixtures__/configConstruction/refused` is reported
- * under its rule; the one under `clean` is not.
+ * under its rule; those under `clean` are not. Every refused fixture is
+ * listed, and every file of the directory is.
  */
 
 import assert from 'node:assert/strict';
@@ -45,13 +46,33 @@ const REFUSED: ReadonlyArray<[string, ConstructionRule]> = [
   ['assertion.ts', 'assertion'],
   ['preNarrowing.ts', 'pre-narrowing'],
   ['commonConfig.ts', 'pre-narrowing'],
-  ['forbiddenUndefined.ts', 'forbidden-property'],
-  ['forbiddenBySpread.ts', 'forbidden-property'],
-  ['intermediateLiteral.ts', 'forbidden-property'],
-  ['intermediateChain.ts', 'forbidden-property'],
-  ['unannotatedReturn.ts', 'unannotated-return'],
-  ['annotatedReturnForbidden.ts', 'forbidden-property'],
-  ['crossSpread.ts', 'cross-spread'],
+  // forbidden-key: the type of the value that becomes a config, wherever it
+  // comes from (round 1's probe is intermediateLiteral.ts; round 3's two are
+  // the codex* files).
+  ['forbiddenUndefined.ts', 'forbidden-key'],
+  ['forbiddenBySpread.ts', 'forbidden-key'],
+  ['intermediateLiteral.ts', 'forbidden-key'],
+  ['intermediateChain.ts', 'forbidden-key'],
+  ['unannotatedReturn.ts', 'forbidden-key'],
+  ['annotatedReturnForbidden.ts', 'forbidden-key'],
+  ['crossSpread.ts', 'forbidden-key'],
+  ['codexIntermediateCall.ts', 'forbidden-key'],
+  ['codexParenCallee.ts', 'forbidden-key'],
+  ['unionSource.ts', 'forbidden-key'],
+  ['conditionalSource.ts', 'forbidden-key'],
+  ['spreadOfVariable.ts', 'forbidden-key'],
+  // One per place a value becomes a config (BECOMES).
+  ['formVariable.ts', 'forbidden-key'],
+  ['formProperty.ts', 'forbidden-key'],
+  ['formParameterDefault.ts', 'forbidden-key'],
+  ['formAssignment.ts', 'forbidden-key'],
+  ['formArgument.ts', 'forbidden-key'],
+  ['formReturn.ts', 'forbidden-key'],
+  ['formArrowBody.ts', 'forbidden-key'],
+  ['formSatisfies.ts', 'forbidden-key'],
+  ['formArrayElement.ts', 'forbidden-key'],
+  ['formObjectElement.ts', 'forbidden-key'],
+  ['formShorthand.ts', 'forbidden-key'],
 ];
 
 describe('the construction scan', () => {
@@ -74,7 +95,14 @@ describe('the construction scan', () => {
     });
   }
 
-  it('reports nothing in the clean fixture', () => {
+  it('lists every refused fixture of the directory', () => {
+    assert.deepEqual(
+      fs.readdirSync(path.join(FIXTURES, 'refused')).sort(),
+      REFUSED.map(([file]) => file).sort(),
+    );
+  });
+
+  it('reports nothing in the clean fixtures', () => {
     assert.deepEqual(
       fixtureFindings.filter((found) => found.where.includes('/clean/')),
       [],

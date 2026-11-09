@@ -9,36 +9,61 @@
  * - `pre-narrowing` — an object literal whose contextual type is the whole
  *   union (HTTP and RFC members both), or a `config` property whose value's
  *   type is the whole union: a config built before its wire is narrowed;
- * - `forbidden-property` — a property of a config literal that every member
- *   of its contextual type forbids (`?: never`), `undefined` included —
- *   written in the literal or carried by a spread into it;
- * - each rule applies as well to an intermediate: an object literal with no
- *   config type of its own, held by a variable (or a chain of them) that is
- *   then used where a config is expected — checked against that use;
- * - `unannotated-return` — a call of a function of the program, used where a
- *   config is expected, whose function declares no return type: with one,
- *   the compiler checks its return literals against it, and the scan reads
- *   them as literals of that type;
- * - `cross-spread` — a spread inside a config literal whose source's type is
- *   the other shape, or the whole union, as the checker types it.
+ * - `forbidden-key` — a value that becomes a config while its type carries
+ *   a key the target shape forbids (`url` for RFC, an RFC key for HTTP),
+ *   `undefined` included. Decided on types, not on syntax: at every place a
+ *   value becomes a config (`BECOMES`) the checker gives the target (the
+ *   place's contextual type) and the source (the expression's type); each
+ *   constituent of a union source must fit some member of the target. Where
+ *   the value comes from — a literal, a variable, a call, parentheses, a
+ *   chain, a spread — does not matter.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 
-export type ConstructionRule =
-  | 'assertion'
-  | 'pre-narrowing'
-  | 'forbidden-property'
-  | 'cross-spread'
-  | 'unannotated-return';
+export type ConstructionRule = 'assertion' | 'pre-narrowing' | 'forbidden-key';
 
 export interface ConstructionFinding {
   readonly rule: ConstructionRule;
   /** `file:line`, the file relative to `root`. */
   readonly where: string;
 }
+
+/**
+ * Where a value becomes a config: a variable initializer (a declared type),
+ * a class property initializer, a parameter's default, an assignment, a call
+ * or `new` argument, a return statement, an arrow function's expression
+ * body, `satisfies`, an array element, an object element (a property or a
+ * shorthand).
+ */
+export type BecomesForm =
+  | 'variable'
+  | 'property'
+  | 'parameter-default'
+  | 'assignment'
+  | 'argument'
+  | 'return'
+  | 'arrow-body'
+  | 'satisfies'
+  | 'array-element'
+  | 'object-element'
+  | 'shorthand';
+
+export const BECOMES: readonly BecomesForm[] = [
+  'variable',
+  'property',
+  'parameter-default',
+  'assignment',
+  'argument',
+  'return',
+  'arrow-body',
+  'satisfies',
+  'array-element',
+  'object-element',
+  'shorthand',
+];
 
 /** The contract's own declarations, by name: the HTTP member and the RFC ones. */
 const HTTP_MEMBERS = new Set(['ISapHttpConfig']);
@@ -82,24 +107,6 @@ function membersOf(type: ts.Type): ts.Type[] {
   return type.isUnion() ? [...type.types] : [type];
 }
 
-/** Whether every member of `context` forbids `name` (`?: never`). */
-function forbiddenInAll(
-  checker: ts.TypeChecker,
-  context: ts.Type,
-  name: string,
-): boolean {
-  const members = membersOf(context).filter((each) => shapesOf(each).size > 0);
-  if (members.length === 0) return false;
-  return members.every((member) => {
-    const property = member.getProperty(name);
-    if (property === undefined) return false;
-    const declared = checker.getNonNullableType(
-      checker.getTypeOfSymbol(property),
-    );
-    return (declared.flags & ts.TypeFlags.Never) !== 0;
-  });
-}
-
 /** Whether `property` is held: required, or of a type besides `undefined`. */
 function carries(checker: ts.TypeChecker, property: ts.Symbol): boolean {
   if ((property.getFlags() & ts.SymbolFlags.Optional) === 0) return true;
@@ -116,85 +123,151 @@ function propertyName(
   return undefined;
 }
 
-/** Whether `node` is read as a value (not a declaration's name, a property name or a type). */
-function isExpressionUse(node: ts.Identifier): boolean {
+/** The form in which `node` becomes the value of its place; `undefined` when none. */
+function formOf(node: ts.Node): BecomesForm | undefined {
   const parent = node.parent;
-  if (ts.isVariableDeclaration(parent) && parent.name === node) return false;
-  if (ts.isPropertyAccessExpression(parent) && parent.name === node) {
-    return false;
+  if (parent === undefined) return undefined;
+  if (ts.isVariableDeclaration(parent) && parent.initializer === node) {
+    return 'variable';
   }
-  if (ts.isPropertyAssignment(parent) && parent.name === node) return false;
-  if (ts.isShorthandPropertyAssignment(parent)) return true;
-  if (ts.isTypeReferenceNode(parent) || ts.isImportSpecifier(parent)) {
-    return false;
+  if (ts.isPropertyDeclaration(parent) && parent.initializer === node) {
+    return 'property';
   }
-  return ts.isExpression(node);
-}
-
-/**
- * The object literal a variable is initialized with, following a chain of
- * variables initialized by one another (each a `const`/`let`/`var` of this
- * program); `undefined` for anything else — a call's answer included.
- */
-function literalBehind(
-  checker: ts.TypeChecker,
-  start: ts.Identifier,
-): ts.ObjectLiteralExpression | undefined {
-  const seen = new Set<ts.Node>();
-  let current: ts.Expression = start;
-  for (;;) {
-    while (ts.isParenthesizedExpression(current)) current = current.expression;
-    if (ts.isObjectLiteralExpression(current)) return current;
-    if (!ts.isIdentifier(current)) return undefined;
-    const declaration = checker
-      .getSymbolAtLocation(current)
-      ?.getDeclarations()
-      ?.find(ts.isVariableDeclaration);
-    if (
-      declaration === undefined ||
-      declaration.initializer === undefined ||
-      declaration.type !== undefined ||
-      seen.has(declaration)
-    ) {
-      return undefined;
-    }
-    seen.add(declaration);
-    current = declaration.initializer;
+  if (ts.isParameter(parent) && parent.initializer === node) {
+    return 'parameter-default';
   }
-}
-
-/**
- * The function a call's callee names when it is one of the program's own: a
- * function declaration, or a variable initialized with a function or arrow
- * expression; `undefined` for anything else (a library's, a method).
- */
-function functionBehind(
-  checker: ts.TypeChecker,
-  callee: ts.Expression,
-): ts.SignatureDeclaration | undefined {
-  if (!ts.isIdentifier(callee)) return undefined;
-  for (const declaration of checker
-    .getSymbolAtLocation(callee)
-    ?.getDeclarations() ?? []) {
-    if (declaration.getSourceFile().isDeclarationFile) continue;
-    if (ts.isFunctionDeclaration(declaration)) return declaration;
-    if (
-      ts.isVariableDeclaration(declaration) &&
-      declaration.initializer !== undefined &&
-      (ts.isArrowFunction(declaration.initializer) ||
-        ts.isFunctionExpression(declaration.initializer))
-    ) {
-      return declaration.initializer;
-    }
+  if (
+    ts.isBinaryExpression(parent) &&
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    parent.right === node
+  ) {
+    return 'assignment';
+  }
+  if (
+    (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+    ts.isExpression(node) &&
+    (parent.arguments ?? []).some((argument) => argument === node)
+  ) {
+    return 'argument';
+  }
+  if (ts.isReturnStatement(parent) && parent.expression === node) {
+    return 'return';
+  }
+  if (ts.isArrowFunction(parent) && parent.body === node) return 'arrow-body';
+  if (ts.isSatisfiesExpression(parent) && parent.expression === node) {
+    return 'satisfies';
+  }
+  if (
+    ts.isArrayLiteralExpression(parent) &&
+    ts.isExpression(node) &&
+    parent.elements.some((element) => element === node)
+  ) {
+    return 'array-element';
+  }
+  if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
+    return 'object-element';
+  }
+  if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
+    return 'shorthand';
   }
   return undefined;
 }
 
-/** Every finding of the program's `files`. */
+/** The constituents of a source type: each member of a union, else the type. */
+function constituentsOf(type: ts.Type): ts.Type[] {
+  return type.isUnion() ? [...type.types] : [type];
+}
+
+/** Whether `member` forbids `name` (`?: never`). */
+function forbids(
+  checker: ts.TypeChecker,
+  member: ts.Type,
+  name: string,
+): boolean {
+  const property = member.getProperty(name);
+  if (property === undefined) return false;
+  const declared = checker.getNonNullableType(
+    checker.getTypeOfSymbol(property),
+  );
+  return (declared.flags & ts.TypeFlags.Never) !== 0;
+}
+
+/**
+ * Whether `source` fits `target` by its keys: each constituent of the source
+ * fits some config member of the target — carries no key that member
+ * forbids.
+ */
+function fitsByKeys(
+  checker: ts.TypeChecker,
+  source: ts.Type,
+  target: ts.Type,
+): boolean {
+  const members = membersOf(target).filter((each) => shapesOf(each).size > 0);
+  return constituentsOf(source).every((constituent) => {
+    const carried = checker
+      .getPropertiesOfType(constituent)
+      .filter((property) => carries(checker, property));
+    return members.some(
+      (member) =>
+        !carried.some((property) =>
+          forbids(checker, member, property.getName()),
+        ),
+    );
+  });
+}
+
+/** The type a place gives the value it receives; `undefined` when none. */
+function targetOf(
+  checker: ts.TypeChecker,
+  node: ts.Expression,
+  form: BecomesForm,
+): ts.Type | undefined {
+  const parent = node.parent;
+  if (form === 'satisfies' && ts.isSatisfiesExpression(parent)) {
+    return checker.getTypeFromTypeNode(parent.type);
+  }
+  if (form === 'variable' && ts.isVariableDeclaration(parent) && parent.type) {
+    return checker.getTypeFromTypeNode(parent.type);
+  }
+  return checker.getContextualType(node);
+}
+
+/**
+ * The types of the value a place receives: a conditional's branches each on
+ * its own (the checker reduces their union by subtype, which could hide the
+ * branch that carries a forbidden key), parentheses looked through,
+ * otherwise the expression's type.
+ */
+function sourcesOf(
+  checker: ts.TypeChecker,
+  node: ts.Expression,
+  form: BecomesForm,
+): ts.Type[] {
+  if (form === 'shorthand' && ts.isShorthandPropertyAssignment(node.parent)) {
+    const value = checker.getShorthandAssignmentValueSymbol(node.parent);
+    if (value !== undefined) return [checker.getTypeOfSymbol(value)];
+  }
+  const branches = (expression: ts.Expression): ts.Expression[] => {
+    if (ts.isParenthesizedExpression(expression)) {
+      return branches(expression.expression);
+    }
+    if (ts.isConditionalExpression(expression)) {
+      return [
+        ...branches(expression.whenTrue),
+        ...branches(expression.whenFalse),
+      ];
+    }
+    return [expression];
+  };
+  return branches(node).map((each) => checker.getTypeAtLocation(each));
+}
+
+/** Every finding of the program's `files`; `forms` the places checked (all by default). */
 export function scanConstruction(
   files: readonly string[],
   options: ts.CompilerOptions,
   root: string,
+  forms: readonly BecomesForm[] = BECOMES,
 ): ConstructionFinding[] {
   const program = ts.createProgram({ rootNames: files, options });
   const checker = program.getTypeChecker();
@@ -210,68 +283,6 @@ export function scanConstruction(
     const report = (rule: ConstructionRule, node: ts.Node) =>
       found.push({ rule, where: where(node) });
 
-    /** The rules of a config literal against `context`, its expected type. */
-    const checkLiteral = (
-      node: ts.ObjectLiteralExpression,
-      context: ts.Type | undefined,
-    ) => {
-      const contextShapes =
-        context === undefined ? new Set<Shape>() : shapesOf(context);
-      if (isWholeUnion(contextShapes)) report('pre-narrowing', node);
-      for (const element of node.properties) {
-        if (
-          ts.isPropertyAssignment(element) &&
-          propertyName(element) === 'config' &&
-          isWholeUnion(shapesOf(checker.getTypeAtLocation(element.initializer)))
-        ) {
-          report('pre-narrowing', element);
-        }
-        if (
-          ts.isShorthandPropertyAssignment(element) &&
-          element.name.text === 'config' &&
-          isWholeUnion(shapesOf(checker.getTypeAtLocation(element.name)))
-        ) {
-          report('pre-narrowing', element);
-        }
-        if (context === undefined || contextShapes.size === 0) continue;
-        const name = propertyName(element);
-        if (
-          name !== undefined &&
-          (ts.isPropertyAssignment(element) ||
-            ts.isShorthandPropertyAssignment(element)) &&
-          forbiddenInAll(checker, context, name)
-        ) {
-          report('forbidden-property', element);
-        }
-        if (ts.isSpreadAssignment(element)) {
-          const spreadType = checker.getTypeAtLocation(element.expression);
-          // A spread that carries a property the shape forbids: one it
-          // holds (a value, or `undefined` set), not an absent `?: never`.
-          if (
-            checker
-              .getPropertiesOfType(spreadType)
-              .some(
-                (property) =>
-                  carries(checker, property) &&
-                  forbiddenInAll(checker, context, property.getName()),
-              )
-          ) {
-            report('forbidden-property', element);
-          }
-          const spread = shapesOf(spreadType);
-          const other =
-            isWholeUnion(spread) ||
-            (contextShapes.has('rfc') &&
-              !contextShapes.has('http') &&
-              spread.has('http')) ||
-            (contextShapes.has('http') &&
-              !contextShapes.has('rfc') &&
-              spread.has('rfc'));
-          if (other) report('cross-spread', element);
-        }
-      }
-    };
-
     const visit = (node: ts.Node) => {
       if (
         (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) &&
@@ -280,31 +291,37 @@ export function scanConstruction(
         report('assertion', node);
       }
       if (ts.isObjectLiteralExpression(node)) {
-        checkLiteral(node, checker.getContextualType(node));
-      }
-      // A function's answer used as a config: its function declares the
-      // return type, so its return literals are checked against it.
-      if (ts.isCallExpression(node)) {
-        const use = checker.getContextualType(node);
-        if (use !== undefined && shapesOf(use).size > 0) {
-          const callee = functionBehind(checker, node.expression);
-          if (callee !== undefined && callee.type === undefined) {
-            report('unannotated-return', node);
+        const context = checker.getContextualType(node);
+        if (context !== undefined && isWholeUnion(shapesOf(context))) {
+          report('pre-narrowing', node);
+        }
+        for (const element of node.properties) {
+          const value = ts.isPropertyAssignment(element)
+            ? element.initializer
+            : ts.isShorthandPropertyAssignment(element)
+              ? element.name
+              : undefined;
+          if (
+            value !== undefined &&
+            propertyName(element) === 'config' &&
+            isWholeUnion(shapesOf(checker.getTypeAtLocation(value)))
+          ) {
+            report('pre-narrowing', element);
           }
         }
       }
-      // An intermediate: a variable whose initializer is an object literal
-      // with no config type of its own, used where a config is expected —
-      // its literal is checked against that use.
-      if (ts.isIdentifier(node) && isExpressionUse(node)) {
-        const use = checker.getContextualType(node);
-        if (use !== undefined && shapesOf(use).size > 0) {
-          const literal = literalBehind(checker, node);
-          if (literal !== undefined) {
-            const own = checker.getContextualType(literal);
-            if (own === undefined || shapesOf(own).size === 0) {
-              checkLiteral(literal, use);
-            }
+      if (ts.isExpression(node)) {
+        const form = formOf(node);
+        if (form !== undefined && forms.includes(form)) {
+          const target = targetOf(checker, node, form);
+          if (
+            target !== undefined &&
+            shapesOf(target).size > 0 &&
+            !sourcesOf(checker, node, form).every((each) =>
+              fitsByKeys(checker, each, target),
+            )
+          ) {
+            report('forbidden-key', node);
           }
         }
       }

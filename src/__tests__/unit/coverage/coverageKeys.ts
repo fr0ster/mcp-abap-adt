@@ -27,6 +27,7 @@ import { PART_TYPES } from '../../../handlers/common/low/handleUpdateUnderLock';
 import { COMPACT_READ } from '../../../lib/adtProjections';
 import { EMPTIED_INCLUDE_TYPES } from '../../../lib/compact/compactSchemas';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import type {
   ListedSchema,
   ServedTool,
@@ -51,7 +52,7 @@ export type Dimension = (typeof DIMENSIONS)[number];
 export const isDimension = (name: string): name is Dimension =>
   DIMENSIONS.some((dimension) => dimension === name);
 
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 export const LISTED_SCHEMAS = path.join(
   REPO,
   'tests',

@@ -28,7 +28,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/brokerFactory';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
-import globalSetup from '../../integration/globalSetup';
+import { repositoryRoot } from '../../helpers/repoRoot';
+import { setUpLiveRun } from '../../integration/globalSetup';
 import {
   parseRealmCheckUrls,
   realmCheckUrlMissingWords,
@@ -36,7 +37,7 @@ import {
 
 jest.setTimeout(60_000);
 
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const SAVED = [
   'MCP_TEST_CONFIG',
   'npm_lifecycle_event',
@@ -111,8 +112,7 @@ const RFC_SESSION = [
   'SAP_LANGUAGE=EN',
 ];
 
-const run = () =>
-  globalSetup({ rootDir: REPO, testPathPatterns: { patterns: [] } });
+const run = () => setUpLiveRun({ rootDir: REPO, named: [] });
 
 describe("globalSetup's realm check by the destination's wire", () => {
   it('RFC with environment.realm_check_url: the check runs against it', async () => {

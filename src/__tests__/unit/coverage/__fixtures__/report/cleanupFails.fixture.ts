@@ -1,14 +1,13 @@
-/** Run by `runReport.test.ts` through Jest's `runCLI`: the body passes, its afterEach cleanup fails. */
+/** Run by `runReport.test.ts`: the body passes, its afterEach cleanup fails. */
+import { afterEach, it } from 'node:test';
 import { liveCall } from '../../../../integration/helpers/live';
-import { useStubRunner } from './runner';
+import { stubSuite } from './runner';
 
-useStubRunner();
-
-afterEach(() => {
-  throw new Error('the cleanup failed');
-});
-
-it('calls and passes, its cleanup fails', async () => {
-  await liveCall('GetInterface', { interface_name: 'ZIF_CLEANUP' });
-  expect(1).toBe(1);
+stubSuite('cleanupFails', () => {
+  afterEach(() => {
+    throw new Error('the cleanup failed');
+  });
+  it('calls and passes, its cleanup fails', async () => {
+    await liveCall('GetInterface', { interface_name: 'ZIF_CLEANUP' });
+  });
 });

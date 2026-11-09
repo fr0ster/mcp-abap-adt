@@ -3,7 +3,9 @@
   // compiles the preload below and every file of the node:test list
   // (`tools/node-test-files.json`), with what they import, to `.test-build/tree/`,
   // after removing it. `paths` come from the package-name table through
-  // `extends`; this file defines none of its own. `types` is `node` alone, so a
+  // `extends`; this file defines none of its own. Beside the list it builds
+  // the runner's own modules: the preloads, the live run's setup and
+  // teardown, the live-script table and the ledger reporter. `types` is `node` alone, so a
   // file of the list that reaches a Jest global, directly or through an import,
   // fails the build; `noEmitOnError` makes a failed build emit nothing.
   "extends": ["./tsconfig.json", "./tsconfig.paths.json"],
@@ -15,7 +17,21 @@
     "declaration": false,
     "declarationMap": false
   },
-  "files": ["src/__tests__/helpers/resolvePreload.ts"],
-  // Not the base configuration's `include`: the list adds the rest.
-  "include": []
+  "files": [
+    "src/__tests__/helpers/resolvePreload.ts",
+    "src/__tests__/integration/helpers/closeConnectionsPreload.ts",
+    "src/__tests__/integration/helpers/liveScripts.ts",
+    "src/__tests__/integration/globalSetup.ts",
+    "src/__tests__/integration/globalTeardown.ts",
+    "src/__tests__/integration/coverageReport/ledgerReporter.ts"
+  ],
+  // Not the base configuration's `include`: the list adds the rest, and the
+  // fixtures the machinery's tests run through `node --test` are built too.
+  "include": [
+    "src/__tests__/unit/coverage/__fixtures__/report/*.ts",
+    "src/__tests__/unit/coverage/__fixtures__/live/*.ts"
+  ],
+  // The base configuration's `exclude` leaves out `src/__tests__`; here the
+  // fixtures above are wanted.
+  "exclude": ["node_modules"]
 }

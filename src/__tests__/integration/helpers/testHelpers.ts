@@ -3,6 +3,7 @@
  * Provides utilities for parsing responses, managing sessions, etc.
  */
 
+import assert from 'node:assert/strict';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError } from 'axios';
@@ -60,7 +61,7 @@ export function expectWriteAccepted(response: {
       `Handler returned error: ${response.content[0]?.text || 'Unknown error'}`,
     );
   }
-  expect(response.content[0]?.text).toBe('SUCCESS');
+  assert.equal(response.content[0]?.text, 'SUCCESS');
 }
 
 /**

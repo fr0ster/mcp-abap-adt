@@ -1,10 +1,12 @@
-/** Run by `runReport.test.ts` through Jest's `runCLI`: the call succeeds, the test then fails. */
+/** Run by `runReport.test.ts`: the call succeeds, the test then fails. */
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { liveCall } from '../../../../integration/helpers/live';
-import { useStubRunner } from './runner';
+import { stubSuite } from './runner';
 
-useStubRunner();
-
-it('calls and then fails', async () => {
-  await liveCall('GetClass', { class_name: 'ZFAILS' });
-  expect(1).toBe(2);
+stubSuite('failsAfterCall', () => {
+  it('calls and then fails', async () => {
+    await liveCall('GetClass', { class_name: 'ZFAILS' });
+    assert.equal(1, 2);
+  });
 });

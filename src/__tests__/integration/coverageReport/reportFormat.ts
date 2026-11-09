@@ -1,16 +1,20 @@
 /**
  * The run's files and their shape (spec §8, "Live"; plan C2): the call log a
- * live case writes, the outcomes the run's reporter writes from Jest's
- * completed results, the files that ran, the leftovers named for the owner,
- * and the credential-refusal marker.
+ * live case writes, the outcomes the run's ledger reporter writes from
+ * node:test's completed results, the files that ran, the leftovers named for
+ * the owner, and the credential-refusal marker.
  *
  * They live in one directory per run, under the OS temp directory, never in
- * the repository: the one `MCP_ABAP_ADT_COVERAGE_RUN` names (the
- * integration `globalSetup` makes it and sets the variable, so the workers,
- * the reporter and `globalTeardown` share it), else one of this process.
+ * the repository: the one `MCP_ABAP_ADT_COVERAGE_RUN` names (the runner's
+ * live setup makes it and sets the variable, so every file's process, the
+ * reporter and the teardown share it), else one of this process.
  *
- * Node's own modules only: the reporter is compiled from this directory
- * alone (`tsconfig.reporter.json`) and loaded by Node outside ts-jest.
+ * A test is named by its file — its repository source path, `….test.ts`,
+ * whether it runs from its source or from the node:test build — and its
+ * name path: the titles from the file down to the test, joined by
+ * `NAME_SEPARATOR`, which is node:test's own `t.fullName` (D27, spec §3).
+ * `liveCall` takes `t.fullName`, the reporter rebuilds it with `namePath`,
+ * and both meet in `testKey`.
  */
 
 import * as fs from 'node:fs';
@@ -26,11 +30,44 @@ export type RunSystem = 'onprem' | 'cloud';
 /** How a key fared: its test's completed result. */
 export type KeyOutcome = 'passed' | 'failed' | 'skipped';
 
+/** The separator of a name path: node:test's own in `t.fullName`. */
+export const NAME_SEPARATOR = ' > ';
+
+/** The name path of a test whose titles, from the file down, are `titles`. */
+export function namePath(titles: readonly string[]): string {
+  return titles.join(NAME_SEPARATOR);
+}
+
+/** The one key a test is joined by: its file and its name path. */
+export function testKey(file: string, path: string): string {
+  return JSON.stringify([file, path]);
+}
+
+/** The marker of the node:test build: a compiled test lives under it. */
+const BUILD_TREE = ['.test-build', 'tree'];
+
+/**
+ * The repository source path (`/` separators, `….test.ts`) of a test file,
+ * given as its source or its compiled file in the node:test build, an
+ * absolute path under `root`.
+ */
+export function sourcePathOf(file: string, root: string): string {
+  const parts = path.relative(root, file).split(path.sep);
+  const inBuild = parts[0] === BUILD_TREE[0] && parts[1] === BUILD_TREE[1];
+  const source = inBuild ? parts.slice(BUILD_TREE.length) : parts;
+  const last = source.pop() ?? '';
+  const named =
+    inBuild && last.endsWith('.js')
+      ? `${last.slice(0, -'.js'.length)}.ts`
+      : last;
+  return [...source, named].join('/');
+}
+
 /** One entry of the call log: which test (in which file) called which key, on which system. */
 export interface CallLogEntry {
-  /** The test file's absolute path, as Jest names it. */
+  /** The test file's repository source path (`sourcePathOf`). */
   file: string;
-  /** The test's full name. */
+  /** The test's name path (`t.fullName`). */
   test: string;
   key: string;
   system: RunSystem;

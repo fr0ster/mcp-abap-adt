@@ -11,9 +11,8 @@
  *   when its type may carry a `timeout` property, an object held in a
  *   variable included;
  * - `--test-force-exit` in an npm script (node:test's force exit);
- * - `--forceExit` in an npm script (Jest's), except the four pairs the live
- *   scripts carry until they move to node:test (`ALLOWED_FORCE_EXIT`; step
- *   11 of the node:test plan empties it).
+ * - `--forceExit` in an npm script (Jest's): none is allowed since the live
+ *   scripts moved to node:test (`ALLOWED_FORCE_EXIT` is empty, D27 step 11).
  *
  * The node:test files are those of the list (`tools/node-test-files.json`),
  * this one among them; the npm scripts are every package manifest's: the
@@ -58,17 +57,12 @@ const CHECKS: readonly Check[] = [
 ];
 
 /**
- * The scripts that may pass `--forceExit` until the live scripts move to
- * node:test (step 11 empties this): Appendix D's four. The list may only
- * shrink: an entry whose script no longer passes the flag fails, and so does
- * an entry outside Appendix D's four.
+ * The scripts that may pass `--forceExit`: none since the live scripts moved
+ * to node:test (D27 step 11). The list may only shrink: an entry whose script
+ * no longer passes the flag fails, and so does an entry outside Appendix D's
+ * four.
  */
-const ALLOWED_FORCE_EXIT: readonly string[] = [
-  'test:integration',
-  'test:coverage-family',
-  'test:high',
-  'test:live-connection',
-];
+const ALLOWED_FORCE_EXIT: readonly string[] = [];
 
 interface Finding {
   readonly check: Check;
@@ -477,7 +471,7 @@ describe('the scan refuses each fixture by its own check alone', () => {
   const REFUSED: ReadonlyArray<readonly [string, Check, number]> = [
     ['testTimeout.json', '--test-timeout', 4],
     ['testForceExit.json', '--test-force-exit', 3],
-    ['forceExit.json', '--forceExit', 1],
+    ['forceExit.json', '--forceExit', 2],
     ['timeoutOnTest.ts', '{ timeout }', 13],
     ['timeoutOnIt.ts', '{ timeout }', 3],
     ['timeoutOnDescribe.ts', '{ timeout }', 3],
@@ -508,11 +502,11 @@ describe('the scan refuses each fixture by its own check alone', () => {
     });
   }
 
-  it('refuses --forceExit on a script outside the allowed list, not on an allowed one', () => {
+  it('refuses --forceExit on every script: the allowed list is empty', () => {
     const found = scanFixture(fixture('refused', 'forceExit.json'));
     assert.deepEqual(
       found.map((one) => one.at),
-      ['shared:setup'],
+      ['test:integration', 'shared:setup'],
     );
   });
 

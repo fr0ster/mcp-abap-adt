@@ -9,6 +9,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { testConfigPathFromEnv } from './testConfigPath';
 
 export function loadRunConfig(): unknown {
@@ -18,7 +19,7 @@ export function loadRunConfig(): unknown {
   }
   for (const candidate of [
     path.resolve(process.cwd(), 'tests', 'test-config.yaml'),
-    path.resolve(__dirname, '../../../../tests/test-config.yaml'),
+    path.join(repositoryRoot(__dirname), 'tests', 'test-config.yaml'),
   ]) {
     if (fs.existsSync(candidate)) {
       return yaml.load(fs.readFileSync(candidate, 'utf8'));

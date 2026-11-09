@@ -74,6 +74,7 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { McpResult } from '../../../../lib/answer';
+import { repositoryRoot } from '../../../helpers/repoRoot';
 import { getTestDestination } from '../authHelpers';
 import { loadTestConfig, testAuthBrokerPath } from '../configHelpers';
 import {
@@ -93,7 +94,7 @@ import { guardedTestConnection, refuseAfterMarker } from '../refusalGuard';
 import { createTestConnectionAndSession } from '../sessionHelpers';
 
 /** The repository root. */
-const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 
 export interface HardModeConfig {
   enabled: boolean;

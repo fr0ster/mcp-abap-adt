@@ -1,11 +1,12 @@
-/** Run by `runReport.test.ts` through Jest's `runCLI`: a suite that skips, its call never made. */
+/** Run by `runReport.test.ts`: a suite that skips, its call never made. */
+import { describe, it } from 'node:test';
 import { liveCall } from '../../../../integration/helpers/live';
-import { useStubRunner } from './runner';
+import { stubSuite } from './runner';
 
-useStubRunner();
-
-describe.skip('a skipped suite', () => {
-  it('would call', async () => {
-    await liveCall('GetDataElement', { data_element_name: 'ZDTEL_SKIPPED' });
+stubSuite('skipped', () => {
+  describe('a skipped suite', { skip: true }, () => {
+    it('would call', async () => {
+      await liveCall('GetDataElement', { data_element_name: 'ZDTEL_SKIPPED' });
+    });
   });
 });

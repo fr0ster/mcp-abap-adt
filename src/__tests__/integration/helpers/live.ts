@@ -1,10 +1,13 @@
 /**
- * Live coverage cases (spec §8, "Live"; plan C1): a permanent Jest test
+ * Live coverage cases (spec §8, "Live"; plan C1): a permanent node:test case
  * calls a tool by name on the on-premise system or the BTP trial and asserts
  * the operation itself.
  *
  * - `liveSuite(systems, title, body)` states where its cases run; without a
  *   config, or on a system it does not name, it skips and logs the reason.
+ *   Its `beforeEach` sets the current test — the file and `t.fullName` —
+ *   and its `afterEach` clears it (D27, spec §3): a file's cases run one at
+ *   a time, so one variable holds it.
  * - `livePrepare(tool, args)` makes a case's prerequisite through a tool,
  *   its key not recorded;
  * - `liveCall(tool, args)` calls the tool — soft mode: the registered
@@ -36,6 +39,14 @@
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  type TestContext,
+} from 'node:test';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -52,6 +63,7 @@ import {
   type PinServer,
   type ServerSource,
 } from '../../helpers/pinServer';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { servedEntries } from '../../helpers/servedEntries';
 import type { SystemKind } from '../../helpers/servedTools';
 import { toolAnswer } from '../../helpers/toolAnswer';
@@ -62,6 +74,7 @@ import {
   type CallLogEntry,
   readCallLog,
   readLeftovers,
+  sourcePathOf,
 } from '../coverageReport/reportFormat';
 import { getTestDestination } from './authHelpers';
 import { configuredSystemKind } from './configHelpers';
@@ -285,7 +298,7 @@ function hasTestConfig(): boolean {
   return (
     testConfigPathFromEnv() !== undefined ||
     fs.existsSync(
-      path.join(__dirname, '..', '..', '..', '..', 'tests', 'test-config.yaml'),
+      path.join(repositoryRoot(__dirname), 'tests', 'test-config.yaml'),
     )
   );
 }
@@ -340,7 +353,7 @@ export function liveSuite(
         : undefined);
   if (skipped !== undefined || kind === undefined) {
     console.log(`[liveSuite] ${title}: skipped — ${skipped}`);
-    describe.skip(title, body);
+    describe(title, { skip: skipped ?? true }, body);
     return;
   }
   liveDescribe(
@@ -354,12 +367,46 @@ export function liveSuite(
   );
 }
 
+/** The test running now: its file (repository source path) and name path. */
+export interface CurrentTest {
+  readonly file: string;
+  readonly test: string;
+}
+
+let currentTest: CurrentTest | undefined;
+
+/** The test running now; `undefined` outside one. */
+export function runningTest(): CurrentTest | undefined {
+  return currentTest;
+}
+
+/**
+ * Sets the test running now; `liveDescribe`'s hooks set it around each
+ * case, and a machinery test sets it around its own.
+ */
+export function useCurrentTest(next: CurrentTest | undefined): void {
+  currentTest = next;
+}
+
+/** The current test of node:test's context `t` (`t.filePath`, `t.fullName`). */
+export function currentTestOf(
+  t: Pick<TestContext, 'filePath' | 'fullName'>,
+): CurrentTest {
+  const file = t.filePath;
+  if (file === undefined) throw new Error('the test names no file');
+  return {
+    file: sourcePathOf(file, repositoryRoot(__dirname)),
+    test: t.fullName,
+  };
+}
+
 /**
  * The describe a live suite runs in: the runner opened before its cases and
- * closed after them. `body` runs in a describe of its own inside it, so a
- * hook the body declares — a cleanup `afterAll` above all — runs while the
- * runner is still there, and only then is it dropped and closed. A case's
- * full name is `<title> cases <case>`.
+ * closed after them, and the current test set around each case. `body` runs
+ * in a describe of its own inside it, so a hook the body declares — a
+ * cleanup `after` above all — runs while the runner is still there, and only
+ * then is it dropped and closed. A case's name path is
+ * `<title> > cases > <case>`.
  */
 export function liveDescribe(
   title: string,
@@ -368,13 +415,20 @@ export function liveDescribe(
   body: () => void,
 ): void {
   describe(title, () => {
-    beforeAll(async () => {
+    before(async () => {
       useLiveRunner(await open());
     });
-    afterAll(async () => {
+    after(async () => {
       const ending = runner;
       useLiveRunner(undefined);
       if (ending !== undefined) await close(ending);
+    });
+    beforeEach((t) => {
+      // A hook of a suite's case gets the case's context.
+      if ('fullName' in t) useCurrentTest(currentTestOf(t));
+    });
+    afterEach(() => {
+      useCurrentTest(undefined);
     });
     describe('cases', body);
   });
@@ -397,12 +451,17 @@ export async function liveCall(
   args: ToolArgs,
 ): Promise<LiveAnswer> {
   refuseAfterMarker(tool);
-  const { currentTestName: test, testPath: file } = expect.getState();
-  if (test === undefined || file === undefined) {
-    throw new Error('liveCall runs inside a test');
+  const running = currentTest;
+  if (running === undefined) {
+    throw new Error('liveCall runs inside a liveSuite case');
   }
   const run = current();
-  appendCall({ file, test, key: keyOf(tool, args), system: run.system });
+  appendCall({
+    file: running.file,
+    test: running.test,
+    key: keyOf(tool, args),
+    system: run.system,
+  });
   const answer = await run.call(tool, args);
   if (isCredentialRefusal(answer)) markCredentialRefused();
   return answer;

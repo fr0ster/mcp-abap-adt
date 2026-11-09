@@ -5,12 +5,14 @@
  * of a refused transport request create.
  */
 
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import { runCLI } from 'jest';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import {
   resetSystemContextCache,
@@ -22,10 +24,12 @@ import {
   adtStandIn,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { stateSystemKind } from '../../helpers/systemKind';
 import {
   callLog,
   credentialRefused,
+  currentTestOf,
   deleteRecorded,
   deleteRecordedRequests,
   expectNameFree,
@@ -46,13 +50,14 @@ import {
   rememberConfiguredRequest,
   resetLiveRecords,
   softRunner,
+  useCurrentTest,
   useLiveRunner,
 } from '../../integration/helpers/live';
+import { assertEquals } from '../../integration/helpers/liveAssert';
 import { endTestConnection } from '../../integration/helpers/openConnections';
+import { environment } from '../runner/toolRuns';
 
-jest.setTimeout(120_000);
-
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const USER = 'LIVE_USER';
 
 let stand: AdtStandIn;
@@ -67,7 +72,10 @@ const settingsOf = (url: string): SapConfig => ({
   username: USER,
 });
 
-beforeEach(async () => {
+beforeEach(async (t) => {
+  // These cases call the helpers as a liveSuite case does: the current test
+  // set around each, as liveSuite's own hooks set it.
+  if ('fullName' in t) useCurrentTest(currentTestOf(t));
   resetLiveRecords();
   // A communication batch builds its connection for the kind the
   // environment states, as a launcher's does.
@@ -100,6 +108,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  useCurrentTest(undefined);
   useLiveRunner(undefined);
   await runner.close();
   await endTestConnection(runner.connection());
@@ -122,21 +131,30 @@ describe('liveCall and the refusal stop', () => {
   it('liveCall sends nothing after the refusal marker', async () => {
     await liveCall('GetProgram', { program_name: 'ZLIVE_ONE' });
     const before = stand.requests.length;
-    expect(before).toBeGreaterThan(0);
+    assert.ok(before > 0);
     markCredentialRefused();
-    await expect(
+    await assert.rejects(
       liveCall('GetProgram', { program_name: 'ZLIVE_TWO' }),
-    ).rejects.toThrow('a credential was refused earlier in this run');
-    await expect(deleteRecorded()).resolves.toBeUndefined();
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('a credential was refused earlier in this run'),
+    );
+    assert.equal(await deleteRecorded(), undefined);
     recordCreated('DeleteProgram', { program_name: 'ZLIVE_ONE' });
-    await expect(deleteRecorded()).rejects.toThrow(
-      'a credential was refused earlier in this run',
+    await assert.rejects(
+      deleteRecorded(),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('a credential was refused earlier in this run'),
     );
     // Kept, not dropped: a second cleanup still has it, and the report names it.
-    await expect(deleteRecorded()).rejects.toThrow(
-      'a credential was refused earlier in this run',
+    await assert.rejects(
+      deleteRecorded(),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('a credential was refused earlier in this run'),
     );
-    expect(leftovers()).toEqual([
+    assertEquals(leftovers(), [
       'object DeleteProgram {"program_name":"ZLIVE_ONE"}',
     ]);
     recordCreatedRequest('K900090');
@@ -145,85 +163,164 @@ describe('liveCall and the refusal stop', () => {
       task: 'K900092',
       object: { name: 'ZLIVE_ONE', type: 'PROG' },
     });
-    await expect(deleteRecordedRequests()).rejects.toThrow(
-      'a credential was refused earlier in this run',
+    await assert.rejects(
+      deleteRecordedRequests(),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('a credential was refused earlier in this run'),
     );
-    expect(leftovers()).toEqual([
+    assertEquals(leftovers(), [
       'object DeleteProgram {"program_name":"ZLIVE_ONE"}',
       'request K900090',
       'entry K900091/K900092 PROG ZLIVE_ONE',
     ]);
-    expect(stand.requests.length).toBe(before);
+    assert.equal(stand.requests.length, before);
   });
 
   it('livePrepare sends the call, records no key, and sends nothing after the marker', async () => {
     const from = stand.requests.length;
     await livePrepare('GetProgram', { program_name: 'ZLIVE_ONE' });
-    expect(sentSince(from).some(isGet('/sap/bc/adt/programs/programs/'))).toBe(
+    assert.equal(
+      sentSince(from).some(isGet('/sap/bc/adt/programs/programs/')),
       true,
     );
-    expect(callLog()).toEqual([]);
+    assertEquals(callLog(), []);
     markCredentialRefused();
     const before = stand.requests.length;
-    await expect(
+    await assert.rejects(
       livePrepare('GetProgram', { program_name: 'ZLIVE_TWO' }),
-    ).rejects.toThrow('a credential was refused earlier in this run');
-    expect(stand.requests.length).toBe(before);
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('a credential was refused earlier in this run'),
+    );
+    assert.equal(stand.requests.length, before);
   });
 
   it('a credential refusal answered latches the marker', async () => {
     stand.refuse(true);
     const answer = await liveCall('GetProgram', { program_name: 'ZLIVE_ONE' });
-    expect(answer.isError).toBe(true);
-    expect(credentialRefused()).toBe(true);
+    assert.equal(answer.isError, true);
+    assert.equal(credentialRefused(), true);
   });
 
-  it('a call is logged with its file and test, whatever the test then does', async () => {
-    // Jest's configuration as `jest.config.js` builds it (an untyped module).
-    const rootJest: unknown = require(path.join(REPO, 'jest.config.js'));
-    const fixtures = path.join(__dirname, '__fixtures__', 'live');
-    const { results } = await runCLI(
+  it('liveCall outside a liveSuite case is refused, and sends nothing', async () => {
+    useCurrentTest(undefined);
+    const before = stand.requests.length;
+    await assert.rejects(
+      liveCall('GetProgram', { program_name: 'ZLIVE_ONE' }),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('liveCall runs inside a liveSuite case'),
+    );
+    assert.equal(stand.requests.length, before);
+    assertEquals(callLog(), []);
+  });
+
+  it('liveCall inside a case records its file and name path, whatever the test then does', () => {
+    // The fixture runs in a node:test process of its own, on a stub runner.
+    const build = path.join(REPO, '.test-build', 'tree');
+    const run = spawnSync(
+      process.execPath,
+      [
+        '--require',
+        path.join(build, 'src', '__tests__', 'helpers', 'resolvePreload.js'),
+        '--test',
+        path.join(
+          build,
+          'src',
+          '__tests__',
+          'unit',
+          'coverage',
+          '__fixtures__',
+          'live',
+          'keyOutcome.fixture.js',
+        ),
+      ],
       {
-        _: [],
-        $0: 'jest',
-        silent: true,
-        watchman: false,
-        // In a worker of its own, never in this process: a run in band
-        // here would tear down the module scope of this very test.
-        maxWorkers: 1,
-        workerIdleMemoryLimit: '1GB',
-        config: JSON.stringify({
-          ...(typeof rootJest === 'object' && rootJest !== null
-            ? rootJest
-            : {}),
-          rootDir: REPO,
-          roots: [fixtures],
-          testMatch: ['**/*.fixture.ts'],
-          testPathIgnorePatterns: [],
-          globalSetup: undefined,
-          reporters: [],
-          globals: { COVERAGE_RUN: runDir },
-        }),
+        cwd: REPO,
+        encoding: 'utf8',
+        env: environment({ MCP_ABAP_ADT_COVERAGE_RUN: runDir }),
       },
-      [REPO],
     );
-    const tests = results.testResults.flatMap((file) =>
-      file.testResults.map((test) => ({
-        fullName: test.fullName,
-        status: test.status,
-      })),
-    );
-    expect(tests).toEqual([
-      { fullName: 'calls and passes', status: 'passed' },
-      { fullName: 'calls and then fails', status: 'failed' },
+    if (run.error !== undefined) throw run.error;
+    // One case passed, one failed after its call.
+    assert.equal(run.status, 1, run.stdout);
+    // The call log names each call's file (its repository source path) and
+    // its name path; the run's reporter joins it with the completed
+    // results (runReport.test.ts).
+    const file =
+      'src/__tests__/unit/coverage/__fixtures__/live/keyOutcome.fixture.ts';
+    assertEquals(callLog(), [
+      {
+        file,
+        test: 'keyOutcome > cases > calls and passes',
+        key: 'GetProgram',
+        system: 'onprem',
+      },
+      {
+        file,
+        test: 'keyOutcome > cases > calls and then fails',
+        key: 'GetClass',
+        system: 'onprem',
+      },
     ]);
-    // The call log names each call's file and test; the run's reporter
-    // joins it with the completed results (runReport.test.ts).
-    const file = path.join(fixtures, 'keyOutcome.fixture.ts');
-    expect(callLog()).toEqual([
-      { file, test: 'calls and passes', key: 'GetProgram', system: 'onprem' },
-      { file, test: 'calls and then fails', key: 'GetClass', system: 'onprem' },
-    ]);
+  });
+
+  it('a liveSuite skips with its reason: no system kind stated, or a system it does not name', () => {
+    const build = path.join(REPO, '.test-build', 'tree');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'live-suite-skip-'));
+    try {
+      const reasons = [
+        ['{}\n', 'no system kind stated'],
+        [
+          'environment:\n  system_type: cloud\n',
+          'the configured system is cloud; this suite runs on onprem',
+        ],
+      ];
+      for (const [config, reason] of reasons) {
+        const configFile = path.join(dir, 'test-config.yaml');
+        fs.writeFileSync(configFile, config ?? '');
+        const env = environment(
+          { MCP_TEST_CONFIG: configFile, MCP_ABAP_ADT_COVERAGE_RUN: runDir },
+          ['SAP_SYSTEM_TYPE'],
+        );
+        const run = spawnSync(
+          process.execPath,
+          [
+            '--require',
+            path.join(
+              build,
+              'src',
+              '__tests__',
+              'helpers',
+              'resolvePreload.js',
+            ),
+            '--test',
+            '--test-reporter=tap',
+            path.join(
+              build,
+              'src',
+              '__tests__',
+              'unit',
+              'coverage',
+              '__fixtures__',
+              'live',
+              'suiteSkips.fixture.js',
+            ),
+          ],
+          { cwd: REPO, encoding: 'utf8', env },
+        );
+        if (run.error !== undefined) throw run.error;
+        assert.equal(run.status, 0, run.stdout);
+        assert.ok(run.stdout.includes('# SKIP'), run.stdout);
+        assert.ok(run.stdout.includes(reason ?? ''), run.stdout);
+        // Skipped before its case: no call, nothing sent.
+        assert.equal(run.stdout.includes('the case ran'), false);
+      }
+      assertEquals(callLog(), []);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -250,36 +347,41 @@ describe('cleanup', () => {
       (last, url, index) => (url.includes('zlive_child') ? index : last),
       -1,
     );
-    expect(firstParent).toBeGreaterThan(lastChild);
-    expect(lastChild).toBeGreaterThanOrEqual(0);
-    expect(
+    assert.ok(firstParent > lastChild);
+    assert.ok(lastChild >= 0);
+    assertEquals(
       named.filter(
         (url) => !url.includes('zlive_parent') && !url.includes('zlive_child'),
       ),
-    ).toEqual([]);
+      [],
+    );
     const again = stand.requests.length;
     await deleteRecorded();
-    expect(stand.requests.length).toBe(again);
+    assert.equal(stand.requests.length, again);
   });
 
   it('expectNameFree fails on an existing name and deletes nothing', async () => {
     const from = stand.requests.length;
-    await expect(
+    await assert.rejects(
       expectNameFree({
         tool: 'GetProgram',
         args: { program_name: 'ZLIVE_TAKEN' },
       }),
-    ).rejects.toThrow('is taken');
-    expect(
+      (error: unknown) =>
+        error instanceof Error && error.message.includes('is taken'),
+    );
+    assertEquals(
       sentSince(from).filter((request) => request.method !== 'GET'),
-    ).toEqual([]);
+      [],
+    );
     stand.answer(isGet('/sap/bc/adt/programs/programs/zlive_free'), 404);
-    await expect(
-      expectNameFree({
+    assert.equal(
+      await expectNameFree({
         tool: 'GetProgram',
         args: { program_name: 'ZLIVE_FREE' },
       }),
-    ).resolves.toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -438,12 +540,15 @@ describe('a refused transport request create is reconciled', () => {
     const answer = await liveCall('CreateTransport', {
       description: plan.description,
     });
-    expect(answer.isError).toBe(true);
-    await expect(reconcileRequestCreate(plan, answer)).rejects.toThrow(
-      'its leftover is journalled',
+    assert.equal(answer.isError, true);
+    await assert.rejects(
+      reconcileRequestCreate(plan, answer),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('its leftover is journalled'),
     );
-    expect(recordedRequests()).toContain('K900002');
-    expect(recordedRequests()).not.toContain('K900001');
+    assert.ok(recordedRequests().includes('K900002'));
+    assert.ok(!recordedRequests().includes('K900001'));
   });
 
   it('a new request with another description is never journalled', async () => {
@@ -460,10 +565,13 @@ describe('a refused transport request create is reconciled', () => {
     const answer = await liveCall('CreateTransport', {
       description: plan.description,
     });
-    await expect(reconcileRequestCreate(plan, answer)).rejects.toThrow(
-      'left nothing identifiable',
+    await assert.rejects(
+      reconcileRequestCreate(plan, answer),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('left nothing identifiable'),
     );
-    expect(recordedRequests()).not.toContain('K900003');
+    assert.ok(!recordedRequests().includes('K900003'));
   });
 
   it("a pre-existing request whose description merely looks like the run's is never journalled", async () => {
@@ -481,10 +589,13 @@ describe('a refused transport request create is reconciled', () => {
     const answer = await liveCall('CreateTransport', {
       description: plan.description,
     });
-    await expect(reconcileRequestCreate(replanned, answer)).rejects.toThrow(
-      'left nothing identifiable',
+    await assert.rejects(
+      reconcileRequestCreate(replanned, answer),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('left nothing identifiable'),
     );
-    expect(recordedRequests()).not.toContain('K900004');
+    assert.ok(!recordedRequests().includes('K900004'));
   });
 
   it("a refused task create's leftover task is found by the parent's task delta and journalled", async () => {
@@ -500,12 +611,15 @@ describe('a refused transport request create is reconciled', () => {
       transport_number: parent.number,
       target_user: USER,
     });
-    expect(answer.isError).toBe(true);
-    await expect(reconcileTaskCreate(plan, answer)).rejects.toThrow(
-      'its leftover is journalled',
+    assert.equal(answer.isError, true);
+    await assert.rejects(
+      reconcileTaskCreate(plan, answer),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('its leftover is journalled'),
     );
-    expect(recordedRequests()).toContain('K900007');
-    expect(recordedRequests()).not.toContain('K900006');
+    assert.ok(recordedRequests().includes('K900007'));
+    assert.ok(!recordedRequests().includes('K900006'));
   });
 
   it('an unidentifiable leftover fails the case and reports the description', async () => {
@@ -515,10 +629,12 @@ describe('a refused transport request create is reconciled', () => {
     const answer = await liveCall('CreateTransport', {
       description: plan.description,
     });
-    await expect(reconcileRequestCreate(plan, answer)).rejects.toThrow(
-      plan.description,
+    await assert.rejects(
+      reconcileRequestCreate(plan, answer),
+      (error: unknown) =>
+        error instanceof Error && error.message.includes(plan.description),
     );
-    expect(leftovers()).toEqual([plan.description]);
+    assertEquals(leftovers(), [plan.description]);
   });
 
   it('a leftover the listing does not describe is found by its own document', async () => {
@@ -536,10 +652,13 @@ describe('a refused transport request create is reconciled', () => {
     const answer = await liveCall('CreateTransport', {
       description: plan.description,
     });
-    await expect(reconcileRequestCreate(plan, answer)).rejects.toThrow(
-      'its leftover is journalled',
+    await assert.rejects(
+      reconcileRequestCreate(plan, answer),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('its leftover is journalled'),
     );
-    expect(recordedRequests()).toContain('K900008');
+    assert.ok(recordedRequests().includes('K900008'));
   });
 
   it('after a credential refusal nothing is listed and the description is reported', async () => {
@@ -550,11 +669,13 @@ describe('a refused transport request create is reconciled', () => {
       description: plan.description,
     });
     const from = stand.requests.length;
-    await expect(reconcileRequestCreate(plan, answer)).rejects.toThrow(
-      plan.description,
+    await assert.rejects(
+      reconcileRequestCreate(plan, answer),
+      (error: unknown) =>
+        error instanceof Error && error.message.includes(plan.description),
     );
-    expect(sentSince(from)).toEqual([]);
-    expect(leftovers()).toEqual([plan.description]);
+    assertEquals(sentSince(from), []);
+    assertEquals(leftovers(), [plan.description]);
   });
 });
 
@@ -582,12 +703,12 @@ describe('the transport cleanup', () => {
     await rememberConfiguredRequest(configured.number);
     recordCreatedRequest(own.number);
     await deleteRecordedRequests();
-    expect(requests.map((request) => request.number)).toEqual([
-      configured.number,
-      other.number,
-    ]);
-    expect(recordedRequests()).toEqual([]);
-    expect(leftovers()).toEqual([]);
+    assertEquals(
+      requests.map((request) => request.number),
+      [configured.number, other.number],
+    );
+    assertEquals(recordedRequests(), []);
+    assertEquals(leftovers(), []);
   });
 
   it('a configured request not back as it was fails, and every record is reported', async () => {
@@ -608,10 +729,13 @@ describe('the transport cleanup', () => {
       task: 'K900021',
       object: { name: 'ZLIVE_OURS', type: 'PROG' },
     });
-    await expect(deleteRecordedRequests()).rejects.toThrow(
-      'request K900020 is not back as it was',
+    await assert.rejects(
+      deleteRecordedRequests(),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('request K900020 is not back as it was'),
     );
-    expect(leftovers()).toEqual(['entry K900020/K900021 PROG ZLIVE_OURS']);
+    assertEquals(leftovers(), ['entry K900020/K900021 PROG ZLIVE_OURS']);
   });
 
   it('a configured request holding the same entry twice on one task counts it twice, and reads back as it was', async () => {
@@ -631,7 +755,7 @@ describe('the transport cleanup', () => {
     organizer(requests);
     await rememberConfiguredRequest(configured.number);
     await deleteRecordedRequests();
-    expect(leftovers()).toEqual([]);
+    assertEquals(leftovers(), []);
   });
 
   // Pins the task in the entry's key: one object on two tasks is two entries.
@@ -648,10 +772,11 @@ describe('the transport cleanup', () => {
     organizer(requests);
     await rememberConfiguredRequest(configured.number);
     await deleteRecordedRequests();
-    expect(requests.map((request) => request.number)).toEqual([
-      configured.number,
-    ]);
-    expect(leftovers()).toEqual([]);
+    assertEquals(
+      requests.map((request) => request.number),
+      [configured.number],
+    );
+    assertEquals(leftovers(), []);
   });
 
   it('a number forgotten after its own delete is not asked for again', async () => {
@@ -671,14 +796,15 @@ describe('the transport cleanup', () => {
     recordCreatedRequest(own.number);
     recordCreatedRequest(deleted.number);
     forgetRecordedRequest(deleted.number);
-    expect(recordedRequests()).toEqual([own.number]);
+    assertEquals(recordedRequests(), [own.number]);
     const from = stand.requests.length;
     await deleteRecordedRequests();
-    expect(
+    assert.equal(
       sentSince(from).some((request) => request.url.includes(deleted.number)),
-    ).toBe(false);
-    expect(requests).toEqual([]);
-    expect(leftovers()).toEqual([]);
+      false,
+    );
+    assertEquals(requests, []);
+    assertEquals(leftovers(), []);
   });
 
   it('an entry on a request never remembered fails before anything is removed', async () => {
@@ -689,9 +815,12 @@ describe('the transport cleanup', () => {
       object: { name: 'ZLIVE_OURS', type: 'PROG' },
     });
     const from = stand.requests.length;
-    await expect(deleteRecordedRequests()).rejects.toThrow(
-      'request K900030 was not remembered',
+    await assert.rejects(
+      deleteRecordedRequests(),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('request K900030 was not remembered'),
     );
-    expect(sentSince(from)).toEqual([]);
+    assertEquals(sentSince(from), []);
   });
 });

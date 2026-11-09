@@ -1,10 +1,10 @@
-/** Run by `runReport.test.ts` through Jest's `runCLI`: a call whose test passes. */
+/** Run by `runReport.test.ts` through `node --test` with the ledger reporter: a call whose test passes. */
+import { it } from 'node:test';
 import { liveCall } from '../../../../integration/helpers/live';
-import { useStubRunner } from './runner';
+import { stubSuite } from './runner';
 
-useStubRunner();
-
-it('calls and passes', async () => {
-  await liveCall('GetProgram', { program_name: 'ZPASSES' });
-  expect(1).toBe(1);
+stubSuite('passes', () => {
+  it('calls and passes', async () => {
+    await liveCall('GetProgram', { program_name: 'ZPASSES' });
+  });
 });

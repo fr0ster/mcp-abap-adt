@@ -22,6 +22,7 @@ import {
   rfcConfigOf,
 } from '../../../lib/config/rfcDestination';
 import { invalidateConnectionCache } from '../../../lib/utils';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { setupAuthBrokerForTests } from './authHelpers';
 import {
   type ConfiguredSystemKind,
@@ -291,13 +292,15 @@ export function loadTestConfig(): any {
   }
 
   // Load from mcp-abap-adt/tests/test-config.yaml
-  const configPath = path.resolve(
-    __dirname,
-    '../../../../tests/test-config.yaml',
+  const configPath = path.join(
+    repositoryRoot(__dirname),
+    'tests',
+    'test-config.yaml',
   );
-  const templatePath = path.resolve(
-    __dirname,
-    '../../../../tests/test-config.yaml.template',
+  const templatePath = path.join(
+    repositoryRoot(__dirname),
+    'tests',
+    'test-config.yaml.template',
   );
 
   if (fs.existsSync(configPath)) {

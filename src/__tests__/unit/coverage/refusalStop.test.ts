@@ -5,9 +5,11 @@
  * that renews (a `401`, renewed, resent, a `200`) latches nothing.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
@@ -23,10 +25,12 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { stateSystemKind } from '../../helpers/systemKind';
-import globalSetup from '../../integration/globalSetup';
+import { setUpLiveRun } from '../../integration/globalSetup';
 import { logOffLeft } from '../../integration/helpers/debuggerCleanup';
 import {
+  currentTestOf,
   deleteRecorded,
   expectAbsent,
   expectCleared,
@@ -35,8 +39,10 @@ import {
   recordCreated,
   resetLiveRecords,
   softRunner,
+  useCurrentTest,
   useLiveRunner,
 } from '../../integration/helpers/live';
+import { assertEquals } from '../../integration/helpers/liveAssert';
 import {
   credentialRefused,
   type GuardedConnection,
@@ -46,9 +52,7 @@ import {
 } from '../../integration/helpers/refusalGuard';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
 
-jest.setTimeout(120_000);
-
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const USER = 'STOP_USER';
 const PASSWORD = 'stop-password';
 const REALM = 'STAND IN REALM';
@@ -64,7 +68,9 @@ const settingsOf = (url: string): SapConfig => ({
   username: USER,
 });
 
-beforeEach(async () => {
+beforeEach(async (t) => {
+  // The helpers are called as a liveSuite case calls them.
+  if ('fullName' in t) useCurrentTest(currentTestOf(t));
   resetLiveRecords();
   savedKind = process.env.SAP_SYSTEM_TYPE;
   stateSystemKind();
@@ -75,6 +81,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  useCurrentTest(undefined);
   useLiveRunner(undefined);
   await stand.close();
   delete process.env.MCP_ABAP_ADT_COVERAGE_RUN;
@@ -180,13 +187,16 @@ describe('the refusal stop at the connection', () => {
       );
       process.env.MCP_TEST_CONFIG = config;
       process.env.npm_lifecycle_event = 'test:integration';
-      await expect(
-        globalSetup({ rootDir: REPO, testPathPatterns: { patterns: [] } }),
-      ).rejects.toThrow('was refused');
-      expect(credentialRefused()).toBe(true);
+      await assert.rejects(
+        setUpLiveRun({ rootDir: REPO, named: [] }),
+        (error: unknown) =>
+          error instanceof Error && error.message.includes('was refused'),
+      );
+      assert.equal(credentialRefused(), true);
       // The realm check without a credential, then the refused logon.
-      expect(stand.requests[0]?.authorization).toBeUndefined();
-      expect(stand.requests.some((r) => r.authorization !== undefined)).toBe(
+      assert.equal(stand.requests[0]?.authorization, undefined);
+      assert.equal(
+        stand.requests.some((r) => r.authorization !== undefined),
         true,
       );
     } finally {
@@ -200,17 +210,17 @@ describe('the refusal stop at the connection', () => {
 
   it('a logon refused latches the marker, and no connection is created after it', async () => {
     stand.refuse(true);
-    await expect(guarded().connect()).rejects.toThrow();
-    expect(credentialRefused()).toBe(true);
+    await assert.rejects(guarded().connect());
+    assert.equal(credentialRefused(), true);
     const sent = stand.requests.length;
-    expect(() => guarded()).toThrow(REFUSED_AFTER_MARKER);
-    expect(stand.requests.length).toBe(sent);
+    assert.throws(() => guarded(), REFUSED_AFTER_MARKER);
+    assert.equal(stand.requests.length, sent);
   });
 
   it('no connection is created after the marker', async () => {
     markCredentialRefused();
-    expect(() => guarded()).toThrow(REFUSED_AFTER_MARKER);
-    expect(stand.requests).toEqual([]);
+    assert.throws(() => guarded(), REFUSED_AFTER_MARKER);
+    assertEquals(stand.requests, []);
   });
 
   it('cleanup, name-free reads and the debugger and session helpers send nothing after the marker', async () => {
@@ -220,18 +230,20 @@ describe('the refusal stop at the connection', () => {
     markCredentialRefused();
     const sent = stand.requests.length;
     const read = { tool: 'GetProgram', args: { program_name: 'ZSTOP_PROG' } };
-    await expect(expectNameFree(read)).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(expectAbsent(read)).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(expectCleared(read)).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(deleteRecorded()).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(logOffLeft(new Set(), 'the case')).rejects.toThrow(
+    await assert.rejects(expectNameFree(read), REFUSED_AFTER_MARKER);
+    await assert.rejects(expectAbsent(read), REFUSED_AFTER_MARKER);
+    await assert.rejects(expectCleared(read), REFUSED_AFTER_MARKER);
+    await assert.rejects(deleteRecorded(), REFUSED_AFTER_MARKER);
+    await assert.rejects(
+      logOffLeft(new Set(), 'the case'),
       REFUSED_AFTER_MARKER,
     );
-    await expect(createTestConnectionAndSession()).rejects.toThrow(
+    await assert.rejects(
+      createTestConnectionAndSession(),
       REFUSED_AFTER_MARKER,
     );
-    await expect(connection.disconnect()).rejects.toThrow(REFUSED_AFTER_MARKER);
-    expect(stand.requests.length).toBe(sent);
+    await assert.rejects(connection.disconnect(), REFUSED_AFTER_MARKER);
+    assert.equal(stand.requests.length, sent);
   });
 
   it('a refusal on a connected path latches before the next send', async () => {
@@ -240,23 +252,26 @@ describe('the refusal stop at the connection', () => {
     recordCreated('DeleteProgram', { program_name: 'ZSTOP_PROG' });
     stand.refuse(true);
     const answer = await liveCall('GetProgram', { program_name: 'ZSTOP_PROG' });
-    expect(answer.isError).toBe(true);
-    expect(credentialRefused()).toBe(true);
+    assert.equal(answer.isError, true);
+    assert.equal(credentialRefused(), true);
     const sent = stand.requests.length;
     const read = { tool: 'GetProgram', args: { program_name: 'ZSTOP_PROG' } };
-    await expect(
+    await assert.rejects(
       liveCall('GetProgram', { program_name: 'ZSTOP_PROG' }),
-    ).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(expectAbsent(read)).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(deleteRecorded()).rejects.toThrow(REFUSED_AFTER_MARKER);
-    await expect(logOffLeft(new Set(), 'the case')).rejects.toThrow(
+      REFUSED_AFTER_MARKER,
+    );
+    await assert.rejects(expectAbsent(read), REFUSED_AFTER_MARKER);
+    await assert.rejects(deleteRecorded(), REFUSED_AFTER_MARKER);
+    await assert.rejects(
+      logOffLeft(new Set(), 'the case'),
       REFUSED_AFTER_MARKER,
     );
     // Below the helpers, the connection itself refuses.
-    await expect(connection.makeAdtRequest(DISCOVERY)).rejects.toThrow(
+    await assert.rejects(
+      connection.makeAdtRequest(DISCOVERY),
       REFUSED_AFTER_MARKER,
     );
-    expect(stand.requests.length).toBe(sent);
+    assert.equal(stand.requests.length, sent);
   });
 
   it('within one tool call nothing follows a refused request', async () => {
@@ -268,13 +283,16 @@ describe('the refusal stop at the connection', () => {
       program_name: 'ZSTOP_PROG',
       source_code: "REPORT zstop_prog.\nWRITE 'x'.",
     });
-    expect(answer.isError).toBe(true);
-    expect(credentialRefused()).toBe(true);
-    expect(sentSince(from)).toEqual([
+    assert.equal(answer.isError, true);
+    assert.equal(credentialRefused(), true);
+    assertEquals(sentSince(from), [
       'POST /sap/bc/adt/programs/programs/zstop_prog',
       'PUT /sap/bc/adt/programs/programs/zstop_prog/source/main',
     ]);
-    expect(stand.requests.some((r) => isLogoff(r.url))).toBe(false);
+    assert.equal(
+      stand.requests.some((r) => isLogoff(r.url)),
+      false,
+    );
   });
 
   it('a terminal refusal on a sibling connection stops every connection', async () => {
@@ -287,16 +305,15 @@ describe('the refusal stop at the connection', () => {
       (request) => request.session === own,
       () => ({ status: 401 }),
     );
-    await expect(sibling.makeAdtRequest(DISCOVERY)).rejects.toThrow();
-    expect(credentialRefused()).toBe(true);
+    await assert.rejects(sibling.makeAdtRequest(DISCOVERY));
+    assert.equal(credentialRefused(), true);
     const sent = stand.requests.length;
-    await expect(sibling.makeAdtRequest(DISCOVERY)).rejects.toThrow(
+    await assert.rejects(
+      sibling.makeAdtRequest(DISCOVERY),
       REFUSED_AFTER_MARKER,
     );
-    await expect(first.makeAdtRequest(DISCOVERY)).rejects.toThrow(
-      REFUSED_AFTER_MARKER,
-    );
-    expect(stand.requests.length).toBe(sent);
+    await assert.rejects(first.makeAdtRequest(DISCOVERY), REFUSED_AFTER_MARKER);
+    assert.equal(stand.requests.length, sent);
   });
 
   it('a sibling of a guarded connection is guarded', async () => {
@@ -304,16 +321,18 @@ describe('the refusal stop at the connection', () => {
     await first.connect();
     const sibling = await openFreshConnection(first, silent);
     const ownSession = stand.requests[stand.requests.length - 1]?.session;
-    expect(ownSession).not.toBe(stand.requests[0]?.session);
+    assert.notEqual(ownSession, stand.requests[0]?.session);
     markCredentialRefused();
     const sent = stand.requests.length;
-    await expect(sibling.makeAdtRequest(DISCOVERY)).rejects.toThrow(
+    await assert.rejects(
+      sibling.makeAdtRequest(DISCOVERY),
       REFUSED_AFTER_MARKER,
     );
-    await expect(openFreshConnection(first, silent)).rejects.toThrow(
+    await assert.rejects(
+      openFreshConnection(first, silent),
       REFUSED_AFTER_MARKER,
     );
-    expect(stand.requests.length).toBe(sent);
+    assert.equal(stand.requests.length, sent);
   });
 
   it('a failure that is not the credential latches nothing', async () => {
@@ -323,15 +342,15 @@ describe('the refusal stop at the connection', () => {
       (request) => request.url.startsWith('/sap/bc/adt/discovery'),
       403,
     );
-    await expect(connection.makeAdtRequest(DISCOVERY)).rejects.toThrow();
+    await assert.rejects(connection.makeAdtRequest(DISCOVERY));
     stand.answer(
       (request) => request.url.startsWith('/sap/bc/adt/probe/'),
       500,
     );
-    await expect(
+    await assert.rejects(
       connection.makeAdtRequest({ ...DISCOVERY, url: '/sap/bc/adt/probe/x' }),
-    ).rejects.toThrow();
-    expect(credentialRefused()).toBe(false);
+    );
+    assert.equal(credentialRefused(), false);
   });
 
   it('a renewed credential latches nothing', async () => {
@@ -344,14 +363,15 @@ describe('the refusal stop at the connection', () => {
       program_name: 'ZSTOP_PROG',
       source_code: "REPORT zstop_prog.\nWRITE 'x'.",
     });
-    expect(answer.isError).toBe(false);
-    expect(credential.renewed()).toBe(1);
-    expect(credentialRefused()).toBe(false);
+    assert.equal(answer.isError, false);
+    assert.equal(credential.renewed(), 1);
+    assert.equal(credentialRefused(), false);
     const sent = sentSince(from);
-    expect(sent.filter((line) => line.startsWith('PUT '))).toHaveLength(2);
-    expect(
+    assert.equal(sent.filter((line) => line.startsWith('PUT ')).length, 2);
+    assert.equal(
       stand.requests.slice(from).some((r) => r.url.includes('_action=UNLOCK')),
-    ).toBe(true);
+      true,
+    );
   });
 
   it('a renewed credential on a read latches nothing', async () => {
@@ -359,9 +379,9 @@ describe('the refusal stop at the connection', () => {
     await liveOn(guarded(credential));
     stand.answerOnce(isProgramRead, 401);
     const answer = await liveCall('GetProgram', { program_name: 'ZSTOP_PROG' });
-    expect(answer.isError).toBe(false);
-    expect(credential.renewed()).toBe(1);
-    expect(credentialRefused()).toBe(false);
+    assert.equal(answer.isError, false);
+    assert.equal(credential.renewed(), 1);
+    assert.equal(credentialRefused(), false);
   });
 
   it('a renewed credential on a cleanup request latches nothing', async () => {
@@ -381,9 +401,9 @@ describe('the refusal stop at the connection', () => {
       (request) => request.url.startsWith('/sap/bc/adt/deletion/delete'),
       401,
     );
-    await expect(deleteRecorded()).resolves.toBeUndefined();
-    expect(credential.renewed()).toBe(1);
-    expect(credentialRefused()).toBe(false);
+    assert.equal(await deleteRecorded(), undefined);
+    assert.equal(credential.renewed(), 1);
+    assert.equal(credentialRefused(), false);
   });
 });
 

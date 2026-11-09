@@ -127,11 +127,6 @@ function jestConfig(listFile) {
     testPathIgnorePatterns: [...LIVE_IGNORES, ...listedIgnores(listFile)],
     maxWorkers: 1,
     testTimeout: 600000,
-    globalSetup: '<rootDir>/src/__tests__/integration/globalSetup.ts',
-    globalTeardown: '<rootDir>/src/__tests__/integration/globalTeardown.ts',
-    setupFilesAfterEnv: [
-      '<rootDir>/src/__tests__/integration/helpers/closeConnectionsAfterAll.ts',
-    ],
   };
 }
 

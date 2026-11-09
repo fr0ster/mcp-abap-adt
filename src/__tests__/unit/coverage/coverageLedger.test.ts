@@ -13,7 +13,8 @@
  * The served list is read as a client reads it (`servedTools()`), and is
  * first compared with `listed-schemas.json`: an empty or partial list cannot
  * make the guard pass. The unit files `npm test` runs come from Jest's own
- * discovery of the root configuration (`runCLI` with `listTests`): no
+ * discovery of the root configuration (`jest --listTests --json`, a child
+ * process) and the runner's list but its live suites: no
  * pattern of ours is evaluated. Files are read with the TypeScript compiler
  * API (`ledgerScan.ts`).
  *
@@ -23,16 +24,20 @@
  * `equal` refused by none.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { runCLI } from 'jest';
+import { after, before, describe, it, mock } from 'node:test';
 import { compactModifyEntries } from '../../../../compact-modify/src/group';
 import { PART_TYPES } from '../../../handlers/common/low/handleUpdateUnderLock';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { recordingConnection } from '../../helpers/recordingConnection';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { type ServedTool, servedTools } from '../../helpers/servedTools';
 import { toolAnswer } from '../../helpers/toolAnswer';
+import { assertEquals } from '../../integration/helpers/liveAssert';
+import { JEST, runNode } from '../runner/toolRuns';
 import {
   INCLUDE_PARTS,
   LISTED_SCHEMAS,
@@ -48,9 +53,7 @@ import {
   repoReader,
 } from './ledgerScan';
 
-jest.setTimeout(300_000);
-
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const LEDGER = path.join(
   REPO,
   'tests',
@@ -58,9 +61,11 @@ const LEDGER = path.join(
   'tools',
   'coverage-ledger.json',
 );
-const DEBT = path.join(__dirname, 'coverage-debt.json');
-const FIXTURES = path.join(__dirname, '__fixtures__', 'coverage');
-const DEBT_FIXTURES = path.join(__dirname, '__fixtures__', 'coverage-debt');
+/** This directory in the repository: its data is read from there, never from the build. */
+const HERE = path.join(REPO, 'src', '__tests__', 'unit', 'coverage');
+const DEBT = path.join(HERE, 'coverage-debt.json');
+const FIXTURES = path.join(HERE, '__fixtures__', 'coverage');
+const DEBT_FIXTURES = path.join(HERE, '__fixtures__', 'coverage-debt');
 const INTEGRATION = path.join(REPO, 'src', '__tests__', 'integration');
 
 const readJson = (file: string): unknown =>
@@ -76,33 +81,41 @@ function member(value: unknown, key: string): unknown {
 const repoPath = (full: string): string =>
   path.relative(REPO, full).split(path.sep).join('/');
 
-/** The test files `npm test` runs: Jest's own discovery of the root configuration. */
-async function jestDiscovery(): Promise<Set<string>> {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coverage-discovery-'));
-  const outputFile = path.join(dir, 'tests.json');
-  try {
-    await runCLI(
-      {
-        _: [],
-        $0: 'jest',
-        listTests: true,
-        json: true,
-        outputFile,
-        watchman: false,
-        silent: true,
-      },
-      [REPO],
-    );
-    const listed = readJson(outputFile);
-    if (!Array.isArray(listed)) throw new Error('Jest listed no test paths');
-    return new Set(
-      listed
-        .filter((each): each is string => typeof each === 'string')
-        .map(repoPath),
-    );
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+/** The repository source paths of the runner's list (`tools/node-test-files.json`). */
+function runnerList(): string[] {
+  const listed = readJson(path.join(REPO, 'tools', 'node-test-files.json'));
+  if (
+    !Array.isArray(listed) ||
+    !listed.every((each): each is string => typeof each === 'string')
+  ) {
+    throw new Error('tools/node-test-files.json: not a list of strings');
   }
+  return listed;
+}
+
+/** The live suites' directories, which the unit run leaves out. */
+const isLive = (file: string): boolean =>
+  file.startsWith('src/__tests__/integration/') ||
+  file.startsWith('src/__tests__/admin/');
+
+/**
+ * The test files `npm test` runs: Jest's own discovery of the root
+ * configuration (`jest --listTests --json` in a child process; D27, P5) and
+ * the runner's list but its live suites.
+ */
+function unitDiscovery(): Set<string> {
+  const run = runNode(JEST, ['--listTests', '--json']);
+  if (run.status !== 0) {
+    throw new Error(`jest --listTests exited ${run.status}: ${run.stderr}`);
+  }
+  const listed: unknown = JSON.parse(run.stdout);
+  if (!Array.isArray(listed)) throw new Error('Jest listed no test paths');
+  return new Set([
+    ...listed
+      .filter((each): each is string => typeof each === 'string')
+      .map(repoPath),
+    ...runnerList().filter((file) => !isLive(file)),
+  ]);
 }
 
 /** Every `*.test.ts` under `dir`, as repository paths. */
@@ -130,10 +143,10 @@ describe('the coverage ledger guard', () => {
   let findings: Finding[] = [];
   let debtFindings: Finding[] = [];
 
-  beforeAll(async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+  before(async () => {
+    mock.method(console, 'error', () => {});
     served = await servedTools();
-    discovered = await jestDiscovery();
+    discovered = unitDiscovery();
     const input: CheckInput = {
       served,
       listed: member(readJson(LISTED_SCHEMAS), 'schemas'),
@@ -146,34 +159,36 @@ describe('the coverage ledger guard', () => {
     debtFindings = checkDebt(input, readJson(DEBT));
   });
 
-  afterAll(() => {
-    jest.restoreAllMocks();
+  after(() => {
+    mock.restoreAll();
   });
 
   it('the served list is the listed-schema fixture', () => {
-    expect(new Set(served.map((tool) => tool.name)).size).toBe(313);
-    expect(of(findings, 'served-mismatch')).toEqual([]);
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 313);
+    assertEquals(of(findings, 'served-mismatch'), []);
   });
 
-  it('Jest discovery lists the unit files npm test runs, and no integration or admin file', () => {
-    expect(
+  it("the unit run's files: Jest's discovery and the runner's list, no integration or admin file", () => {
+    assert.equal(
       discovered.has('src/__tests__/unit/coverage/coverageLedger.test.ts'),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assertEquals(
       [...discovered].filter(
         (file) =>
           file.startsWith('src/__tests__/integration/') ||
           file.startsWith('src/__tests__/admin/'),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('the ledger is a map of key to { unit, live }', () => {
-    expect(of(findings, 'ledger-shape')).toEqual([]);
+    assertEquals(of(findings, 'ledger-shape'), []);
   });
 
   it('the required keys without a ledger row are exactly coverage-debt.json: add the tests, or delete the listed keys from it', () => {
-    expect(
+    assertEquals(
       of(
         debtFindings,
         'debt-shape',
@@ -181,19 +196,20 @@ describe('the coverage ledger guard', () => {
         'debt-covered',
         'debt-removed',
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('every ledger row is a required key', () => {
-    expect(of(findings, 'extra-row')).toEqual([]);
+    assertEquals(of(findings, 'extra-row'), []);
   });
 
   it('each row names exactly the systems its key requires', () => {
-    expect(of(findings, 'missing-system', 'extra-system')).toEqual([]);
+    assertEquals(of(findings, 'missing-system', 'extra-system'), []);
   });
 
   it('each unit reference is a pinCases row of that key', () => {
-    expect(
+    assertEquals(
       of(
         findings,
         'unit-no-pin',
@@ -212,15 +228,16 @@ describe('the coverage ledger guard', () => {
         'url-not-literal',
         'nothing-sent-without-refusal',
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('each unit reference is a test file the default unit command runs', () => {
-    expect(of(findings, 'unit-not-discovered')).toEqual([]);
+    assertEquals(of(findings, 'unit-not-discovered'), []);
   });
 
   it('each live reference is an awaited liveCall of that key in an it, inside a liveSuite naming the system', () => {
-    expect(
+    assertEquals(
       of(
         findings,
         'live-not-integration',
@@ -232,11 +249,12 @@ describe('the coverage ledger guard', () => {
         'live-outside-suite',
         'suite-systems-not-literal',
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it("a delete key's live case awaits expectAbsent or expectCleared on the deleted object", () => {
-    expect(
+    assertEquals(
       of(
         findings,
         'delete-no-check',
@@ -245,19 +263,20 @@ describe('the coverage ledger guard', () => {
         'delete-check-wrong-tool',
         'delete-check-wrong-tool',
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('a none row is a tool the spec names as sending nothing', () => {
-    expect(of(findings, 'none-not-allowed')).toEqual([]);
+    assertEquals(of(findings, 'none-not-allowed'), []);
   });
 
   it('no pinCases row or liveCall in a scanned file lacks a ledger row', () => {
-    expect(of(findings, 'orphan')).toEqual([]);
+    assertEquals(of(findings, 'orphan'), []);
   });
 
   it('no registration is skipped', () => {
-    expect(
+    assertEquals(
       of(
         findings,
         'not-executable',
@@ -266,7 +285,8 @@ describe('the coverage ledger guard', () => {
         'failing',
         'concurrent',
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('every finding is one of the checks above', () => {
@@ -312,7 +332,10 @@ describe('the coverage ledger guard', () => {
       'failing',
       'concurrent',
     ]);
-    expect(codes(findings).filter((check) => !named.has(check))).toEqual([]);
+    assertEquals(
+      codes(findings).filter((check) => !named.has(check)),
+      [],
+    );
   });
 });
 
@@ -438,19 +461,24 @@ const CASES = fs
 
 describe('each refusal fixture is refused by its own check alone', () => {
   it('there is a clean fixture and a refused one per check named in the spec', () => {
-    expect(CASES).toContain('clean');
-    expect(CASES.length).toBeGreaterThan(40);
+    assert.ok(CASES.includes('clean'));
+    assert.ok(CASES.length > 40);
   });
 
-  it.each(CASES)('%s', (name) => {
-    const { input, expect: expected } = fixtureInput(name);
-    const found = checkLedger(input);
-    expect({ name, checks: [...new Set(codes(found))] }).toEqual({
-      name,
-      checks: expected,
+  for (const name of CASES) {
+    it(name, () => {
+      const { input, expect: expected } = fixtureInput(name);
+      const found = checkLedger(input);
+      assertEquals(
+        { name, checks: [...new Set(codes(found))] },
+        {
+          name,
+          checks: expected,
+        },
+      );
+      if (expected.length > 0) assert.ok(found.length > 0);
     });
-    if (expected.length > 0) expect(found.length).toBeGreaterThan(0);
-  });
+  }
 });
 
 const DEBT_CASES = fs
@@ -461,7 +489,7 @@ const DEBT_CASES = fs
 
 describe('each ratchet fixture is refused by its own check alone', () => {
   it('there is an equal fixture and one per way the debt can drift', () => {
-    expect(DEBT_CASES).toEqual([
+    assertEquals(DEBT_CASES, [
       'covered-listed',
       'equal',
       'new-missing',
@@ -470,18 +498,28 @@ describe('each ratchet fixture is refused by its own check alone', () => {
     ]);
   });
 
-  it.each(DEBT_CASES)('%s', (name) => {
-    const { input, expect: expected, spec } = fixtureInput(name, DEBT_FIXTURES);
-    // The ledger checks find nothing but the keys without a row.
-    expect(
-      codes(checkLedger(input)).filter((check) => check !== 'missing-row'),
-    ).toEqual([]);
-    const found = checkDebt(input, member(spec, 'debt'));
-    expect({ name, checks: [...new Set(codes(found))] }).toEqual({
-      name,
-      checks: expected,
+  for (const name of DEBT_CASES) {
+    it(name, () => {
+      const {
+        input,
+        expect: expected,
+        spec,
+      } = fixtureInput(name, DEBT_FIXTURES);
+      // The ledger checks find nothing but the keys without a row.
+      assertEquals(
+        codes(checkLedger(input)).filter((check) => check !== 'missing-row'),
+        [],
+      );
+      const found = checkDebt(input, member(spec, 'debt'));
+      assertEquals(
+        { name, checks: [...new Set(codes(found))] },
+        {
+          name,
+          checks: expected,
+        },
+      );
     });
-  });
+  }
 });
 
 describe('the declared key tables', () => {
@@ -507,8 +545,8 @@ describe('the declared key tables', () => {
     const enums = onpremEnums('HandlerUpdate');
     const types = enums.get('object_type') ?? [];
     const parts = enums.get('part') ?? [];
-    expect(types.length).toBeGreaterThan(10);
-    expect(parts).toEqual([...INCLUDE_PARTS]);
+    assert.ok(types.length > 10);
+    assertEquals(parts, [...INCLUDE_PARTS]);
     const keys = requiredKeys([
       {
         name: 'HandlerUpdate',
@@ -532,23 +570,28 @@ describe('the declared key tables', () => {
             { object_type: type, part, lock_handle: 'LOCK_HANDLE' },
           ),
         );
-        expect({
-          type,
-          part,
-          isError: answer.isError,
-          requests: connection.requests,
-        }).toEqual({
-          type,
-          part,
-          isError: true,
-          requests: [],
-        });
-        expect(answer.content[0]?.text).toContain(
-          `part is taken only by ${PART_TYPES.join(', ')} (${INCLUDE_PARTS.join(' or ')}); leave it out for ${type}`,
+        assertEquals(
+          {
+            type,
+            part,
+            isError: answer.isError,
+            requests: connection.requests,
+          },
+          {
+            type,
+            part,
+            isError: true,
+            requests: [],
+          },
+        );
+        assert.ok(
+          answer.content[0]?.text.includes(
+            `part is taken only by ${PART_TYPES.join(', ')} (${INCLUDE_PARTS.join(' or ')}); leave it out for ${type}`,
+          ),
         );
         refused += 1;
       }
     }
-    expect(refused).toBe((types.length - PART_TYPES.length) * parts.length);
+    assert.equal(refused, (types.length - PART_TYPES.length) * parts.length);
   });
 });

@@ -31,11 +31,27 @@
 //   own tests use fixture repositories); the preload is always this
 //   repository's.
 //
+// - The live suites (`src/__tests__/integration/`, `src/__tests__/admin/`)
+//   run only under a live npm script (`npm_lifecycle_event` in
+//   `LIVE_SCRIPTS`, `src/__tests__/integration/helpers/liveScripts.ts`): a
+//   run with no root and no named file leaves them out, and a root or a
+//   named file reaching them outside a live script is refused, so `npm test`
+//   never reaches a system.
+// - Under a live script the runner calls the live run's setup in its own
+//   process before `node --test` starts (`setUpLiveRun`, with the files
+//   named), and its teardown after it ends, whatever its outcome
+//   (`tearDownLiveRun`); the run fails when either the run or the teardown
+//   fails.
+//
 // Every file's process preloads the compiled resolve hook
 // (`src/__tests__/helpers/resolvePreload.ts`), which answers this
-// repository's package names with their compiled files.
+// repository's package names with their compiled files, and the per-file
+// close (`src/__tests__/integration/helpers/closeConnectionsPreload.ts`): a
+// root `after` that closes the connections the file opened through the
+// helpers, after every hook of the file.
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   buildDir,
@@ -121,11 +137,43 @@ function inRoots(dirs, file) {
   return dirs.length === 0 || dirs.some((dir) => isUnder(dir, file));
 }
 
-/** The sources of the list under the roots asked for, or all of them. */
+/** The directories of the live suites, by their repository paths. */
+const LIVE_ROOTS = ['src/__tests__/integration/', 'src/__tests__/admin/'];
+
+/** Whether `source` (a repository source path) is a live suite's file. */
+function isLiveSource(source) {
+  return LIVE_ROOTS.some((root) => source.startsWith(root));
+}
+
+/** The compiled module `parts` of this repository's build, required. */
+function ownCompiled(...parts) {
+  const file = join(buildDir(OWN_REPO), ...parts);
+  if (!existsSync(file)) {
+    fail(`${file} does not exist — run the test build first`);
+  }
+  return file;
+}
+
+const ownRequire = createRequire(import.meta.url);
+
+/** Whether the running npm script is a live one (`LIVE_SCRIPTS`). */
+function liveScriptRunning() {
+  const { isLiveScript } = ownRequire(
+    ownCompiled('src', '__tests__', 'integration', 'helpers', 'liveScripts.js'),
+  );
+  return isLiveScript(env.npm_lifecycle_event);
+}
+
+/**
+ * The sources of the list under the roots asked for, or all of them but the
+ * live suites' when no root is asked for.
+ */
 function selectedSources() {
   const dirs = rootDirs();
-  return readList(repo).filter((source) =>
-    inRoots(dirs, sourceFile(repo, source)),
+  return readList(repo).filter(
+    (source) =>
+      inRoots(dirs, sourceFile(repo, source)) &&
+      (dirs.length > 0 || !isLiveSource(source)),
   );
 }
 
@@ -174,13 +222,23 @@ if (
   fail(`concurrency "${concurrency}" is not a positive integer`);
 }
 
+/** A repository source path of `file`, when it is one of `repo`'s. */
+function repoSource(file) {
+  const absolute = resolve(file);
+  return isUnder(repo, absolute)
+    ? relative(repo, absolute).split(sep).join('/')
+    : undefined;
+}
+
 let files;
+let sourcesRun;
 if (named.length > 0) {
   const chosen = selectedNamed();
   if (chosen.length === 0) {
     fail(`no named file under ${roots.join(', ')}: no test file to run`);
   }
   files = chosen.map(namedFile);
+  sourcesRun = chosen.map((arg) => repoSource(arg) ?? arg);
 } else {
   const sources = selectedSources();
   if (sources.length === 0) {
@@ -200,17 +258,51 @@ if (named.length > 0) {
     }
     return compiled;
   });
+  sourcesRun = sources;
 }
 
-const preload = join(
-  buildDir(OWN_REPO),
+const live = sourcesRun.some(isLiveSource);
+const liveScript = liveScriptRunning();
+if (live && !liveScript) {
+  fail(
+    `a live suite runs only under a live npm script (${LIVE_ROOTS.join(', ')}): ${sourcesRun
+      .filter(isLiveSource)
+      .join(', ')}`,
+  );
+}
+
+const preload = ownCompiled('src', '__tests__', 'helpers', 'resolvePreload.js');
+const closePreload = ownCompiled(
   'src',
   '__tests__',
+  'integration',
   'helpers',
-  'resolvePreload.js',
+  'closeConnectionsPreload.js',
 );
-if (!existsSync(preload)) {
-  fail(`${preload} does not exist — run the test build first`);
+
+/** The live run's setup or teardown module, compiled, its siblings resolved. */
+function liveRunModule(name) {
+  // The setup's sibling packages resolve as in every file's process.
+  ownRequire(preload);
+  return ownRequire(
+    ownCompiled('src', '__tests__', 'integration', `${name}.js`),
+  );
+}
+
+if (liveScript) {
+  // The setup and the teardown run in this process and read its
+  // environment: the run's own (`--env` included) is set here first, and
+  // what the setup sets (the run's directory above all) reaches the files.
+  Object.assign(process.env, env);
+  const { setUpLiveRun } = liveRunModule('globalSetup');
+  try {
+    await setUpLiveRun({ rootDir: OWN_REPO, named });
+  } catch (error) {
+    fail(
+      `the live setup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  Object.assign(env, process.env);
 }
 
 const run = spawnSync(
@@ -218,6 +310,8 @@ const run = spawnSync(
   [
     '--require',
     preload,
+    '--require',
+    closePreload,
     '--test',
     `--test-concurrency=${concurrency}`,
     ...options,
@@ -225,5 +319,20 @@ const run = spawnSync(
   ],
   { stdio: 'inherit', env },
 );
-if (run.error !== undefined) fail(`node --test did not start: ${run.error}`);
-process.exit(run.status ?? 1);
+let status = run.status ?? 1;
+if (run.error !== undefined) {
+  console.error(`run-tests: node --test did not start: ${run.error}`);
+  status = 1;
+}
+if (liveScript) {
+  const { tearDownLiveRun } = liveRunModule('globalTeardown');
+  try {
+    await tearDownLiveRun({ rootDir: OWN_REPO });
+  } catch (error) {
+    console.error(
+      `run-tests: the live teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    status = 1;
+  }
+}
+process.exit(status);

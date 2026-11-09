@@ -1,10 +1,10 @@
 /**
- * Jest Global Setup for Integration Tests
- *
- * Runs ONCE before all test suites to ensure a valid session exists — in a
- * live run only. The running npm script decides (`npm_lifecycle_event`
- * against `LIVE_SCRIPTS`): a unit run (`npm test`) returns at once, with no
- * realm check, no logon and no run directory.
+ * The live run's setup, called by the node:test runner (`tools/run-tests.mjs`)
+ * in its own process before `node --test` starts (D27, spec §2): ONCE, to
+ * ensure a valid session exists — in a live run only. The running npm script
+ * decides (`npm_lifecycle_event` against `LIVE_SCRIPTS`): a unit run
+ * (`npm test`) returns at once, with no realm check, no logon and no run
+ * directory. The sibling packages resolve through the runner's resolve hook.
  *
  * 1. A family run (`npm run test:coverage-family -- <files>`) is refused
  *    unless every selected path is the exact repository path of an existing
@@ -28,8 +28,6 @@
  * Requires: auth_broker.unsafe: true in test-config.yaml
  */
 
-// First, for its effect: the sibling packages below resolve to their sources.
-import './helpers/packageSources';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -50,7 +48,6 @@ import {
 } from './helpers/configuredSystemKind';
 import { isLiveScript } from './helpers/liveScripts';
 import { endTestConnection } from './helpers/openConnections';
-import { restoreResolution } from './helpers/packageSources';
 import { realmCheck, realmCheckUrlOf } from './helpers/realmCheck';
 import {
   credentialRefused,
@@ -60,10 +57,12 @@ import {
 import { loadRunConfig } from './helpers/runConfig';
 import { runScriptOf } from './helpers/runReport';
 
-/** What the setup reads of Jest's global configuration. */
+/** What the setup is given by the runner. */
 export interface SetupConfig {
+  /** The repository root. */
   rootDir: string;
-  testPathPatterns: { patterns: readonly string[] };
+  /** The files named on the command line (a family run's selection). */
+  named: readonly string[];
 }
 
 const INTEGRATION_ROOT = 'src/__tests__/integration/';
@@ -96,14 +95,9 @@ export function refuseSelection(
   }
 }
 
-export default async function globalSetup(
-  globalConfig: SetupConfig,
-): Promise<void> {
-  try {
-    await setUp(globalConfig);
-  } finally {
-    restoreResolution();
-  }
+/** The live run's setup: what the runner calls before `node --test`. */
+export async function setUpLiveRun(config: SetupConfig): Promise<void> {
+  await setUp(config);
 }
 
 /** A parsed document's string member, trimmed, or `''`. */
@@ -118,10 +112,7 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
   if (!isLiveScript(process.env.npm_lifecycle_event)) return;
   const script = runScriptOf(process.env.npm_lifecycle_event);
   if (script === 'family') {
-    refuseSelection(
-      globalConfig.testPathPatterns.patterns,
-      globalConfig.rootDir,
-    );
+    refuseSelection(globalConfig.named, globalConfig.rootDir);
   }
   if ((process.env[RUN_VARIABLE] ?? '') === '') startRunDirectory();
 

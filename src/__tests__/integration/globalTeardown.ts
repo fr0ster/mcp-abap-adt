@@ -1,6 +1,7 @@
 /**
- * Jest Global Teardown: the run report against the ledger (spec §8,
- * acceptance 3; plan C2).
+ * The live run's teardown, called by the node:test runner after `node --test`
+ * ends, whatever its outcome (D27, spec §2): the run report against the
+ * ledger (spec §8, acceptance 3; plan C2).
  *
  * The running npm script decides the scope (`npm_lifecycle_event`):
  * - `test:integration` — the full run: every key the ledger requires on the
@@ -36,12 +37,14 @@ import {
   runScriptOf,
 } from './helpers/runReport';
 
-/** What the teardown reads of Jest's global configuration. */
+/** What the teardown is given by the runner. */
 export interface TeardownConfig {
+  /** The repository root. */
   rootDir: string;
 }
 
-export default async function globalTeardown(
+/** The live run's teardown: what the runner calls after `node --test`. */
+export async function tearDownLiveRun(
   globalConfig: TeardownConfig,
 ): Promise<void> {
   if (!isLiveScript(process.env.npm_lifecycle_event)) return;

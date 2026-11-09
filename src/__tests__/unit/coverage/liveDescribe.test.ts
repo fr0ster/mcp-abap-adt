@@ -6,7 +6,10 @@
  * first and the cleanup found no runner (measured in a live run, 2026-11-04:
  * five classes left behind).
  */
+import assert from 'node:assert/strict';
+import { after, describe, it } from 'node:test';
 import { type LiveRunner, liveDescribe } from '../../integration/helpers/live';
+import { assertEquals } from '../../integration/helpers/liveAssert';
 
 /** What the body's cleanup saw, in order: read by the case after the suite. */
 const seen: string[] = [];
@@ -31,18 +34,18 @@ liveDescribe(
     seen.push('teardown');
   },
   () => {
-    afterAll(() => {
+    after(() => {
       seen.push(closed ? 'cleanup after teardown' : 'cleanup');
     });
     it('runs a case', () => {
-      expect(closed).toBe(false);
+      assert.equal(closed, false);
     });
   },
 );
 
-// Jest runs this after the suite above, its hooks included.
+// node:test runs this after the suite above, its hooks included.
 describe('after the suite', () => {
   it("the body's cleanup ran before the teardown closed the runner", () => {
-    expect(seen).toEqual(['cleanup', 'teardown']);
+    assertEquals(seen, ['cleanup', 'teardown']);
   });
 });

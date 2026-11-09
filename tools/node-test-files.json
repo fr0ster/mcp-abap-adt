@@ -1,6 +1,13 @@
 [
+  "src/__tests__/unit/coverage/coverageLedger.test.ts",
+  "src/__tests__/unit/coverage/live.test.ts",
+  "src/__tests__/unit/coverage/liveDescribe.test.ts",
+  "src/__tests__/unit/coverage/liveScripts.test.ts",
+  "src/__tests__/unit/coverage/refusalStop.test.ts",
+  "src/__tests__/unit/coverage/runReport.test.ts",
   "src/__tests__/unit/coverage/servedEntries.test.ts",
   "src/__tests__/unit/runner/build.test.ts",
+  "src/__tests__/unit/runner/liveRun.test.ts",
   "src/__tests__/unit/runner/npmTest.test.ts",
   "src/__tests__/unit/runner/partition.test.ts",
   "src/__tests__/unit/runner/placedFiles.test.ts",

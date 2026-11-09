@@ -41,6 +41,15 @@ export const LOCK_SUCCESS_XML =
   '<MODIFICATION_SUPPORT>NoModification</MODIFICATION_SUPPORT><LINK_UP_MODE/>' +
   '<CORR_LOCKS/><CORR_CONTENTS/><SCOPE_MESSAGES/></DATA></asx:values></asx:abap>';
 
+/** A discovery listing the activation collections, `/activation/runs` among them. */
+export const RUNS_DISCOVERY =
+  '<?xml version="1.0" encoding="utf-8"?><app:service xmlns:app="http://www.w3.org/2007/app"><app:workspace>' +
+  '<app:collection href="/sap/bc/adt/activation/inactiveobjects"/>' +
+  '<app:collection href="/sap/bc/adt/activation"/>' +
+  '<app:collection href="/sap/bc/adt/activation/runs"/>' +
+  '<app:collection href="/sap/bc/adt/activation/results"/>' +
+  '</app:workspace></app:service>';
+
 /**
  * `answers[i]` is what the i-th `makeAdtRequest` call receives back (partial
  * — `status: 200, statusText: 'OK', headers: {}` fill in whatever a case
@@ -72,6 +81,22 @@ export function recordingConnection(
     async makeAdtRequest<T = unknown, D = unknown>(
       options: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
+      // The discovery a group activation reads first answers by default, and
+      // takes no place in the queue nor in `requests`: the activation
+      // collections of a system that offers runs (S/4HANA 2025), so a case
+      // written for the run sequence keeps its answers and its request list
+      // as they were (fr0ster/mcp-abap-adt#351) — the read carries a random
+      // request id, which no two calls share. A case about the discovery
+      // (`activationEndpointByDiscovery.test.ts`) answers and records it with
+      // a connection of its own.
+      if (options.url === '/sap/bc/adt/discovery') {
+        return {
+          data: RUNS_DISCOVERY,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+        } as IAdtWireResponse<T, D>;
+      }
       requests.push({
         method: options.method,
         url: options.url,

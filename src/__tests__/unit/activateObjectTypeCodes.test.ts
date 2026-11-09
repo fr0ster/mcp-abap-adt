@@ -29,6 +29,14 @@ jest.mock('../../lib/clients', () => {
   const client = () => ({
     ...families(),
     getUtils: () => ({
+      // The discovery a group activation reads first: runs are offered.
+      discovery: () =>
+        Promise.resolve({
+          ok: true,
+          getResult: () => ({
+            value: new Set(['/sap/bc/adt/activation/runs']),
+          }),
+        }),
       activateObjectsGroup: (objects: unknown) => {
         groupObjects = objects;
         return Promise.resolve({

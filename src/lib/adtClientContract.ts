@@ -35,6 +35,7 @@ import type {
   IAdtCreatable,
   IAdtDataPreview,
   IAdtDeletable,
+  IAdtDiscovery,
   IAdtEnhancementHost,
   IAdtError,
   IAdtGroupLifecycle,
@@ -44,6 +45,7 @@ import type {
   IAdtMainProgramsReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
+  IAdtObjectActivation,
   IAdtObjectProperties,
   IAdtOperationOptions,
   IAdtRepositoryStructure,
@@ -1311,6 +1313,11 @@ export type UtilsApi<
     ReturnType<R['deletion']>,
     V
   > &
+  // The synchronous group activation, for a system whose discovery lists no
+  // `/activation/runs` (adt-clients 45, fr0ster/mcp-abap-adt#351), and the
+  // discovery that says which one the system offers.
+  IAdtObjectActivation<ReturnType<R['objectActivation']>, V> &
+  IAdtDiscovery<ReturnType<R['discovery']>> &
   IAdtDataPreview<
     ReturnType<R['query']>,
     ReturnType<R['columns']>,

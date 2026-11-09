@@ -376,8 +376,11 @@ describe('ActivateObjectLow', () => {
     // `Location` and an empty body, so the verdict is in the run's results.
     // `getActivationRun` repeats while the run has not ended; the recording
     // double answers it finished — only the sequence is pinned here.
+    // The discovery is read first: which endpoint the system offers
+    // (fr0ster/mcp-abap-adt#351); the recording double offers the runs.
     const members = seen.calls.map((c) => c.member);
-    expect(members[0]).toBe('activateObjectsGroup');
+    expect(members[0]).toBe('discovery');
+    expect(members[1]).toBe('activateObjectsGroup');
     expect(members).toContain('getActivationRun');
     expect(members.at(-1)).toBe('getActivationResults');
     for (const call of seen.calls) {
@@ -391,7 +394,10 @@ describe('ActivateObjectLow', () => {
     await handleActivateObject(context as any, {
       objects: [{ name: 'zsb', type: 'SRVB/SVB' }],
     });
-    expect(seen.calls[0].member).toBe('activateObjectsGroup');
+    expect(seen.calls.map((c) => c.member).slice(0, 2)).toEqual([
+      'discovery',
+      'activateObjectsGroup',
+    ]);
   });
 
   it('the group path reads acceptance from the run id, not a hardcoded true', async () => {

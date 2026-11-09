@@ -743,6 +743,7 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/vnd.sap.adt.deletion.request.v1+xml',
   ),
   'transformation.update': pair('text/plain', 'text/plain; charset=utf-8'),
+  'utils.activateObjects': pair('application/xml', 'application/xml'),
   'utils.activateObjectsGroup': pair('application/xml', 'application/xml'),
   'utils.checkDeletionGroup': pair(
     'application/vnd.sap.adt.deletion.check.response.v1+xml',

@@ -74,8 +74,10 @@ import {
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
+  ACTIVATION_RUNS_COLLECTION,
   analyseActivation,
   analyseException,
+  utilDiscoveryCollections,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   AdtUtilityCode,
@@ -122,6 +124,7 @@ import {
 import { detailOf } from '../../../lib/strategies/detail';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseActivation } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { withStep } from '../../../lib/strategies/step';
@@ -195,7 +198,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
       .default('terse')
       .optional()
       .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.',
+        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored when a group activation (more than one object, or a type this tool cannot map to a single family) runs in the background: that path answers a run and its messages, with no single document behind them.',
       ),
   });
 }
@@ -374,6 +377,70 @@ function startGroupActivation(
           }),
   );
 }
+
+/** The step a discovery read and its failure arise at. */
+const DISCOVERY = 'discovery';
+
+/** A discovery SAP answered with no collection: the fixed words. */
+export const DISCOVERY_UNREADABLE =
+  'The discovery could not be read: SAP answered no collection, so whether the system offers /sap/bc/adt/activation/runs is not known, and the activation endpoint is not decided. Nothing was activated.';
+
+/**
+ * Whether the system offers `/sap/bc/adt/activation/runs`, by its discovery,
+ * read on every group activation (owner, fr0ster/mcp-abap-adt#351: no state
+ * kept). Exact membership (`ACTIVATION_RUNS_COLLECTION`), never a prefix.
+ * A discovery that fails, or answers no collection, is the call's failure at
+ * step `discovery`: no endpoint is guessed and nothing is tried to find out.
+ */
+async function activationRunsOffered(context: HandlerContext) {
+  const read = await createAdtClient(context.connection, context.logger)
+    .getUtils({ ...ourUtils, discovery: utilDiscoveryCollections })
+    .discovery({}, { analyse: analyseException });
+  if (!read.ok)
+    return failedWith<boolean>(withStep(read.getError(), DISCOVERY));
+  const collections = read.getResult().value;
+  if (collections.size === 0) {
+    return failedWith<boolean>(
+      withStep({ origin: 'refusal', message: DISCOVERY_UNREADABLE }, DISCOVERY),
+    );
+  }
+  return succeededWith(collections.has(ACTIVATION_RUNS_COLLECTION));
+}
+
+/**
+ * A group activation on a system whose discovery lists no
+ * `/activation/runs` (SAP_BASIS 751 and 7.40): the one synchronous
+ * `POST /sap/bc/adt/activation` of the same references (`activateObjects`),
+ * judged by `analyseActivation` — the answer is in its body, as a single
+ * object's is.
+ */
+function activateSynchronously(
+  context: HandlerContext,
+  group: GroupActivation,
+  preaudit: boolean,
+) {
+  const { connection, logger } = context;
+  return withAdtHeaders(context, 'utils.activateObjects', (headers) =>
+    group.variant === 'onprem'
+      ? createOnPremAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .activateObjects(group.references, preaudit, {
+            headers,
+            analyse: analyseActivation,
+          })
+      : createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .activateObjects(group.references, preaudit, {
+            headers,
+            analyse: analyseActivation,
+          }),
+  );
+}
+
+/** What a group activation answered: a run, or the synchronous document. */
+type GroupAnswer =
+  | { readonly runs: ActivationRunOutcome }
+  | { readonly synchronous: AdtReading<unknown> };
 
 interface ActivateObjectArgs {
   objects: ActivationObject[];
@@ -570,11 +637,13 @@ export async function handleActivateObject(
   if ('single' in plan)
     return activateSingle(context, plan.single, detail, preaudit);
 
-  // Fallback: multiple objects, or a single object of a type this dispatcher
-  // does not map to a family client. See the module doc comment: ADT's
-  // answer here is acceptance, not completion, and this path is honest about
-  // that rather than inventing a verdict it does not have.
-  // **Three requests, because only the third says what happened.** The POST
+  // Group activation: multiple objects, or a single object of a type this
+  // dispatcher does not map to a family client. The endpoint is the system's
+  // to offer: its discovery, read first, lists `/activation/runs` or not. A
+  // system without runs (SAP_BASIS 751 and 7.40) is answered by the one
+  // synchronous `POST /activation`, whose document says what happened.
+  // Where runs are offered — **three requests, because only the third says
+  // what happened.** The POST
   // answers `202` with the run id in `Location` and a body that carries
   // nothing, so a handler that stopped there had acceptance and no verdict —
   // and the empty body parses to zero messages, which reads exactly like "no
@@ -583,7 +652,7 @@ export async function handleActivateObject(
   // endpoint answers inline. See `lib/strategies/activationRun.ts`.
   const utils = client.getUtils(ourUtils);
   return answer(
-    { tool: 'ActivateObjectLow', detail: 'terse' },
+    { tool: 'ActivateObjectLow', detail },
     async () => {
       // SAP ignores the group of a module's address (#2): each module
       // reference's group is checked before the run starts.
@@ -592,77 +661,94 @@ export async function handleActivateObject(
         plan.group.references,
       );
       if (refused !== undefined) return refused;
+      // Which endpoint the system offers is in its discovery, read on every
+      // group activation; a failed read sends nothing more.
+      const offered = await activationRunsOffered(context);
+      if (!offered.ok) return failedWith<GroupAnswer>(offered.getError());
+      if (!offered.getResult().value) {
+        const done = await activateSynchronously(context, plan.group, preaudit);
+        if (!done.ok) return failedWith<GroupAnswer>(done.getError());
+        return succeededWith<GroupAnswer>({
+          synchronous: done.getResult().value,
+        });
+      }
       const started = await startGroupActivation(context, plan.group, preaudit);
-      if (!started.ok) return started;
+      if (!started.ok) return failedWith<GroupAnswer>(started.getError());
       const runId = started.getResult().value;
       const outcome = await awaitActivationRun(utils, runId, analyseException);
       // Reading the run failed: the method's error as it is, with its step.
       if (outcome.failure !== undefined)
-        return failedWith<ActivationRunOutcome>(outcome.failure);
-      return succeededWith(outcome);
+        return failedWith<GroupAnswer>(outcome.failure);
+      return succeededWith<GroupAnswer>({ runs: outcome });
     },
-    (outcome: ActivationRunOutcome) => {
-      // A run id is the only evidence that anything was accepted —
-      // `utilActivationRunId` answers `''` when no `Location` header carried
-      // one. `accepted` says so rather than being hardcoded true.
-      const accepted = outcome.runId !== '';
-      const refusals = outcome.messages.filter(isRefusal);
-      // `activated` is a verdict, and `null` only where there genuinely is
-      // none: no run id came back, so no run was read. A run is waited for
-      // until it ends, and its verdict is SAP's own: its results'
-      // `activationExecuted` (false for a run SAP cancelled, "Activation was
-      // cancelled.", whatever the messages' severity) and no error-severity
-      // message; where the results state no `activationExecuted`, the
-      // messages alone decide — the errata is explicit that only such a
-      // message is a failure.
-      const activated = !accepted
-        ? null
-        : outcome.status !== 'failed' &&
-          activationVerdict(outcome.executed, outcome.messages);
-      // As the single-object answer says it: SAP ran no activation and gave
-      // no message to explain it — nothing to activate.
-      const nothingToActivate =
-        outcome.executed === false && outcome.messages.length === 0;
-      return {
-        accepted,
-        run_id: accepted ? outcome.runId : null,
-        run_status: outcome.status || null,
-        activated,
-        messages: outcome.messages,
-        ...(nothingToActivate ? { nothing_to_activate: true } : {}),
-        objects_count: activationObjects.length,
-        objects: activationObjects,
-        message: !accepted
-          ? `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
-            'object(s) — no run id came back, so there is no evidence a run was ' +
-            'queued at all.'
-          : activated
-            ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
-              'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
-              'now": an object can stay listed for scope rather than for failure — activating a ' +
-              "function group clears the regenerated include, not the group's own entry."
-            : refusals.length > 0
-              ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
-                `${activationObjects.length} object(s): ` +
-                refusals
+    (answered: GroupAnswer) =>
+      'synchronous' in answered
+        ? project(detail, terseActivation)(answered.synchronous)
+        : runAnswer(answered.runs, activationObjects),
+  );
+}
+
+/** A finished run, as `ActivateObjectLow` answers it. */
+function runAnswer(
+  outcome: ActivationRunOutcome,
+  activationObjects: readonly ActivationObject[],
+) {
+  // A run id is the only evidence that anything was accepted —
+  // `utilActivationRunId` answers `''` when no `Location` header carried
+  // one. `accepted` says so rather than being hardcoded true.
+  const accepted = outcome.runId !== '';
+  const refusals = outcome.messages.filter(isRefusal);
+  // `activated` is a verdict, and `null` only where there genuinely is
+  // none: no run id came back, so no run was read. A run is waited for
+  // until it ends, and its verdict is SAP's own: its results'
+  // `activationExecuted` (false for a run SAP cancelled, "Activation was
+  // cancelled.", whatever the messages' severity) and no error-severity
+  // message; where the results state no `activationExecuted`, the
+  // messages alone decide — the errata is explicit that only such a
+  // message is a failure.
+  const activated = !accepted
+    ? null
+    : outcome.status !== 'failed' &&
+      activationVerdict(outcome.executed, outcome.messages);
+  // As the single-object answer says it: SAP ran no activation and gave
+  // no message to explain it — nothing to activate.
+  const nothingToActivate =
+    outcome.executed === false && outcome.messages.length === 0;
+  return {
+    accepted,
+    run_id: accepted ? outcome.runId : null,
+    run_status: outcome.status || null,
+    activated,
+    messages: outcome.messages,
+    ...(nothingToActivate ? { nothing_to_activate: true } : {}),
+    objects_count: activationObjects.length,
+    objects: activationObjects,
+    message: !accepted
+      ? `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
+        'object(s) — no run id came back, so there is no evidence a run was ' +
+        'queued at all.'
+      : activated
+        ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
+          'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
+          'now": an object can stay listed for scope rather than for failure — activating a ' +
+          "function group clears the regenerated include, not the group's own entry."
+        : refusals.length > 0
+          ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
+            `${activationObjects.length} object(s): ` +
+            refusals
+              .map((m) => `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`)
+              .join('; ')
+          : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
+            'object(s): its results say activationExecuted="false"' +
+            (outcome.messages.length === 0
+              ? ', with no message: nothing to activate.'
+              : `: ${outcome.messages
                   .map(
                     (m) =>
-                      `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                      `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
                   )
-                  .join('; ')
-              : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
-                'object(s): its results say activationExecuted="false"' +
-                (outcome.messages.length === 0
-                  ? ', with no message: nothing to activate.'
-                  : `: ${outcome.messages
-                      .map(
-                        (m) =>
-                          `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                      )
-                      .join('; ')}`),
-      };
-    },
-  );
+                  .join('; ')}`),
+  };
 }
 
 /**

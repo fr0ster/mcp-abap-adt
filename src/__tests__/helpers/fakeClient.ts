@@ -25,6 +25,28 @@ export function refusedResponse(
   } as unknown as IAdtResponse<never, IAdtError>;
 }
 
+/**
+ * What a member a test names no answer for resolves to: an empty reading —
+ * except `discovery`, whose default is the set `utilDiscoveryCollections`
+ * reads from a system that offers background activation runs (S/4HANA 2025,
+ * ABAP cloud), so a group activation takes the run sequence it took before
+ * the discovery was read (fr0ster/mcp-abap-adt#351). A test about the
+ * discovery itself answers it.
+ */
+function defaultAnswer(member: string): IAdtResponse<unknown, IAdtError> {
+  return member === 'discovery'
+    ? okResponse(RUNS_OFFERED)
+    : okResponse(reading(undefined, '', 200));
+}
+
+/** The activation collections of a system that offers runs. */
+export const RUNS_OFFERED: ReadonlySet<string> = new Set([
+  '/sap/bc/adt/activation',
+  '/sap/bc/adt/activation/inactiveobjects',
+  '/sap/bc/adt/activation/runs',
+  '/sap/bc/adt/activation/results',
+]);
+
 /** A reading, mirroring what invoking one of the result strategies produces. */
 export const reading = <T>(
   value: T,
@@ -55,7 +77,7 @@ type Members = Record<string, (...args: never[]) => unknown>;
 export function fakeClientOf(members: Members) {
   const object = new Proxy(members, {
     get: (target, name: string) =>
-      target[name] ?? (async () => okResponse(reading(undefined, '', 200))),
+      target[name] ?? (async () => defaultAnswer(name)),
   });
   return new Proxy({} as Record<string, unknown>, {
     get: () => () => object,
@@ -82,7 +104,7 @@ export function fakeClientOfWithFactory(members: Members) {
   let factory: string | undefined;
   const object = new Proxy(members, {
     get: (target, name: string) =>
-      target[name] ?? (async () => okResponse(reading(undefined, '', 200))),
+      target[name] ?? (async () => defaultAnswer(name)),
   });
   const client = new Proxy({} as Record<string, unknown>, {
     get: (_target, name: string) => () => {
@@ -200,9 +222,7 @@ export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
               args: ownArguments(args, carriedAnalyse),
             });
             const supplied = answers[`${factory}.${member}`] ?? answers[member];
-            return okResponse(
-              supplied ? supplied() : reading(undefined, '', 200),
-            );
+            return supplied ? okResponse(supplied()) : defaultAnswer(member);
           },
       }),
   });

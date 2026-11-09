@@ -122,7 +122,10 @@ describe('a group activation waits for its run on long polling alone', () => {
     );
     expect(answered.isError).toBe(false);
     expect(connection.requests).toHaveLength(6);
-    expect(pendingAtReads).toEqual([0, 0, 0, 0, 0, 0]);
+    // Seven calls reach the connection: the discovery read first (answered
+    // by the recording connection without a place among its requests,
+    // fr0ster/mcp-abap-adt#351), then the six the run takes.
+    expect(pendingAtReads).toEqual([0, 0, 0, 0, 0, 0, 0]);
     expect(jest.getTimerCount()).toBe(0);
   });
 

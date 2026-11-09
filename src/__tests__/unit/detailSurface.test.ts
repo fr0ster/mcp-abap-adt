@@ -428,8 +428,9 @@ it('accepts a debug tool that hands its arguments to the adapters', () => {
  * document behind it at all — row three, the same "no reading, no detail"
  * case the two runtime-profiling tools are. One handler, one tool, two
  * genuinely different answers depending on which branch runs; the schema's
- * own `detail` description says so ("Ignored on the group-activation
- * fallback ... there is nothing for 'full' or 'raw' to add"). `detailWiring`
+ * own `detail` description says so ("Ignored when a group activation ...
+ * runs in the background"). Since #351 a system without background runs is
+ * answered by the synchronous activation's document, which honours `detail`. `detailWiring`
  * checks per `answer()` call site, not per tool, so this second, honest
  * `detail: 'terse'` reads as a mismatch against the tool's `declares: true` —
  * a false positive from a checker that (correctly, for every other

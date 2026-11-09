@@ -61,6 +61,8 @@ const REFUSED: ReadonlyArray<[string, ConstructionRule]> = [
   ['unionSource.ts', 'forbidden-key'],
   ['conditionalSource.ts', 'forbidden-key'],
   ['spreadOfVariable.ts', 'forbidden-key'],
+  ['optionalUndefined.ts', 'forbidden-key'],
+  ['anySource.ts', 'unknown-keys'],
   // One per place a value becomes a config (BECOMES).
   ['formVariable.ts', 'forbidden-key'],
   ['formProperty.ts', 'forbidden-key'],
@@ -108,6 +110,42 @@ describe('the construction scan', () => {
       [],
     );
   });
+});
+
+/**
+ * The guard's known limits (its header's "Not covered"): each fixture is NOT
+ * found today. A fixture that starts being found — the guard grew — or a
+ * limit added or dropped without its fixture fails here, so the list cannot
+ * drift silently.
+ */
+const KNOWN_LIMITS: readonly string[] = [
+  'constrainedGeneric.ts',
+  'destructuringDefault.ts',
+  'getterReturn.ts',
+  'yieldValue.ts',
+];
+
+describe('the known limits of the construction scan', () => {
+  const dir = path.join(FIXTURES, 'limits');
+  const names = fs.readdirSync(dir).sort();
+
+  it('every limit has its fixture, and every fixture is a listed limit', () => {
+    assert.deepEqual(names, [...KNOWN_LIMITS]);
+  });
+
+  const found = scanConstruction(
+    names.map((file) => path.join(dir, file)),
+    OPTIONS,
+    REPO,
+  );
+  for (const file of KNOWN_LIMITS) {
+    it(`known limit, not found: ${file}`, () => {
+      assert.deepEqual(
+        found.filter((each) => each.where.includes(`/limits/${file}:`)),
+        [],
+      );
+    });
+  }
 });
 
 describe('production builds the union per branch, without casts', () => {

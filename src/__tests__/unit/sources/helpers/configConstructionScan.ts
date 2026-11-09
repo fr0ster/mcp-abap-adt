@@ -16,14 +16,35 @@
  *   place's contextual type) and the source (the expression's type); each
  *   constituent of a union source must fit some member of the target. Where
  *   the value comes from — a literal, a variable, a call, parentheses, a
- *   chain, a spread — does not matter.
+ *   chain, a spread — does not matter. A key the source declares, optional
+ *   or not, with any type but `never` is carried (`url?: undefined` too);
+ *   only an absent key, or one typed `never`, is omitted;
+ * - `unknown-keys` — a value that becomes a config while its keys cannot be
+ *   established: `any`, `unknown`, or a type with no property that is no
+ *   config (`undefined` and `null` are no value and pass).
+ *
+ * Not covered (known limits, pinned by `__fixtures__/configConstruction/limits`):
+ * - destructuring defaults (`const { config = bad }: { config?: ISapRfcConfig } = {}`):
+ *   a binding element's initializer is not one of the places in `BECOMES`;
+ * - `yield` in a generator typed `Generator<ISapRfcConfig>`: a yielded value
+ *   is not one of the places either;
+ * - a getter's return (`get config() { return bad; }` under a config-typed
+ *   property): the getter declares no return type, so its return has no
+ *   config target;
+ * - a config-constrained generic (`<T extends ISapRfcConfig>(value: T)`):
+ *   the source is the type parameter, whose properties are its
+ *   constraint's — the caller's own type, carrying the key, is not seen.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 
-export type ConstructionRule = 'assertion' | 'pre-narrowing' | 'forbidden-key';
+export type ConstructionRule =
+  | 'assertion'
+  | 'pre-narrowing'
+  | 'forbidden-key'
+  | 'unknown-keys';
 
 export interface ConstructionFinding {
   readonly rule: ConstructionRule;
@@ -107,11 +128,31 @@ function membersOf(type: ts.Type): ts.Type[] {
   return type.isUnion() ? [...type.types] : [type];
 }
 
-/** Whether `property` is held: required, or of a type besides `undefined`. */
+/**
+ * The type a property is declared with: its written type where it has one
+ * (`url?: never` is `never`, `url?: undefined` is `undefined` — the optional
+ * mark adds nothing), else the checker's type of the symbol.
+ */
+function declaredTypeOf(checker: ts.TypeChecker, property: ts.Symbol): ts.Type {
+  for (const declaration of property.getDeclarations() ?? []) {
+    if (
+      (ts.isPropertySignature(declaration) ||
+        ts.isPropertyDeclaration(declaration)) &&
+      declaration.type !== undefined
+    ) {
+      return checker.getTypeFromTypeNode(declaration.type);
+    }
+  }
+  return checker.getTypeOfSymbol(property);
+}
+
+/**
+ * Whether the source carries `property`: it declares it — optional or not —
+ * with any type but `never`. Only a key absent from the source, or typed
+ * `never`, counts as omitted.
+ */
 function carries(checker: ts.TypeChecker, property: ts.Symbol): boolean {
-  if ((property.getFlags() & ts.SymbolFlags.Optional) === 0) return true;
-  const type = checker.getNonNullableType(checker.getTypeOfSymbol(property));
-  return (type.flags & ts.TypeFlags.Never) === 0;
+  return (declaredTypeOf(checker, property).flags & ts.TypeFlags.Never) === 0;
 }
 
 function propertyName(
@@ -187,33 +228,54 @@ function forbids(
   const property = member.getProperty(name);
   if (property === undefined) return false;
   const declared = checker.getNonNullableType(
-    checker.getTypeOfSymbol(property),
+    declaredTypeOf(checker, property),
   );
   return (declared.flags & ts.TypeFlags.Never) !== 0;
 }
 
+/** What a source constituent's keys say against the target. */
+type KeysVerdict = 'fits' | 'forbidden-key' | 'unknown-keys';
+
+/** No value at all: nothing becomes a config. */
+const NO_VALUE =
+  ts.TypeFlags.Undefined |
+  ts.TypeFlags.Null |
+  ts.TypeFlags.Void |
+  ts.TypeFlags.Never;
+
 /**
- * Whether `source` fits `target` by its keys: each constituent of the source
- * fits some config member of the target — carries no key that member
- * forbids.
+ * The verdict on `source` against `target`, constituent by constituent:
+ * `unknown-keys` when a constituent's keys cannot be established (`any`,
+ * `unknown`, or a type with no property that is no config), else
+ * `forbidden-key` when a constituent fits no config member of the target —
+ * it carries a key every member forbids —, else `fits`.
  */
-function fitsByKeys(
+function keysVerdict(
   checker: ts.TypeChecker,
   source: ts.Type,
   target: ts.Type,
-): boolean {
+): KeysVerdict {
   const members = membersOf(target).filter((each) => shapesOf(each).size > 0);
-  return constituentsOf(source).every((constituent) => {
-    const carried = checker
-      .getPropertiesOfType(constituent)
-      .filter((property) => carries(checker, property));
-    return members.some(
+  let verdict: KeysVerdict = 'fits';
+  for (const constituent of constituentsOf(source)) {
+    if ((constituent.flags & NO_VALUE) !== 0) continue;
+    const properties = checker.getPropertiesOfType(constituent);
+    if (
+      (constituent.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0 ||
+      (properties.length === 0 && shapesOf(constituent).size === 0)
+    ) {
+      return 'unknown-keys';
+    }
+    const carried = properties.filter((property) => carries(checker, property));
+    const fits = members.some(
       (member) =>
         !carried.some((property) =>
           forbids(checker, member, property.getName()),
         ),
     );
-  });
+    if (!fits) verdict = 'forbidden-key';
+  }
+  return verdict;
 }
 
 /** The type a place gives the value it receives; `undefined` when none. */
@@ -314,14 +376,14 @@ export function scanConstruction(
         const form = formOf(node);
         if (form !== undefined && forms.includes(form)) {
           const target = targetOf(checker, node, form);
-          if (
-            target !== undefined &&
-            shapesOf(target).size > 0 &&
-            !sourcesOf(checker, node, form).every((each) =>
-              fitsByKeys(checker, each, target),
-            )
-          ) {
-            report('forbidden-key', node);
+          if (target !== undefined && shapesOf(target).size > 0) {
+            const verdicts = sourcesOf(checker, node, form).map((each) =>
+              keysVerdict(checker, each, target),
+            );
+            if (verdicts.includes('unknown-keys')) report('unknown-keys', node);
+            else if (verdicts.includes('forbidden-key')) {
+              report('forbidden-key', node);
+            }
           }
         }
       }

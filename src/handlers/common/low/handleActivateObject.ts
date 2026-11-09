@@ -72,7 +72,9 @@ import {
   programDocuments,
   structureDocuments,
   tableDocuments,
+  wireItself,
 } from '@mcp-abap-adt/adt-clients';
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import {
   ACTIVATION_RUNS_COLLECTION,
   analyseActivation,
@@ -650,7 +652,9 @@ export async function handleActivateObject(
   // errors". `getActivationRun` then says whether the run is still going, and
   // `getActivationResults` carries the `chkl:messages` the single-object
   // endpoint answers inline. See `lib/strategies/activationRun.ts`.
-  const utils = client.getUtils(ourUtils);
+  // The inactive list read after a silent results checklist is judged on
+  // the wire as it came (`stillInactiveAmong`).
+  const utils = client.getUtils({ ...ourUtils, inactive: wireItself });
   return answer(
     { tool: 'ActivateObjectLow', detail },
     async () => {
@@ -675,10 +679,24 @@ export async function handleActivateObject(
       const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) return failedWith<GroupAnswer>(started.getError());
       const runId = started.getResult().value;
-      const outcome = await awaitActivationRun(utils, runId, analyseException);
+      const outcome = await awaitActivationRun(
+        utils,
+        runId,
+        analyseException,
+        plan.group.references.map((reference) =>
+          buildObjectUri(reference.name, reference.type, reference.parentName),
+        ),
+      );
       // Reading the run failed: the method's error as it is, with its step.
       if (outcome.failure !== undefined)
         return failedWith<GroupAnswer>(outcome.failure);
+      // A silent results checklist with run references still listed: not
+      // activated, those entries named.
+      if (
+        outcome.stillInactive !== undefined &&
+        outcome.stillInactive.length > 0
+      )
+        return failedWith<GroupAnswer>(notActivatedRun(outcome));
       return succeededWith<GroupAnswer>({ runs: outcome });
     },
     (answered: GroupAnswer) =>
@@ -686,6 +704,20 @@ export async function handleActivateObject(
         ? project(detail, terseActivation)(answered.synchronous)
         : runAnswer(answered.runs, activationObjects),
   );
+}
+
+/**
+ * A run whose results said no activation ran, with no message, and whose
+ * references the inactive list still names: a failure carrying them, rendered
+ * as `still_inactive`.
+ */
+function notActivatedRun(outcome: ActivationRunOutcome) {
+  const stillInactive = outcome.stillInactive ?? [];
+  return {
+    origin: 'refusal' as const,
+    message: `Activation run ${outcome.runId} finished without activating: its results say no activation ran and give no message, and the inactive list still names ${stillInactive.length} object(s) of the run.`,
+    stillInactive,
+  };
 }
 
 /** A finished run, as `ActivateObjectLow` answers it. */

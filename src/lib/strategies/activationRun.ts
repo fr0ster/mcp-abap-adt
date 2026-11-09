@@ -26,7 +26,12 @@
  * not activate" cannot be "activate them separately"; it has to be read out of
  * the run.
  */
+import {
+  type IAdtStillInactive,
+  stillInactiveAmong,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { asciiLower, asciiUpper } from '../plainText';
 import { child, entries, listOf, text } from '../xml/tree';
 import {
@@ -57,6 +62,13 @@ export interface ActivationRunOutcome {
   /** The results document, for a caller that wants it verbatim. */
   results?: string;
   /**
+   * What the inactive list, read once after a silent results checklist
+   * (`activationExecuted="false"`, no message), still names of the run's
+   * references (`stillInactiveAmong`, fr0ster/mcp-abap-adt#351). Absent where
+   * no list was read; empty where none is listed — nothing to activate.
+   */
+  stillInactive?: ReadonlyArray<IAdtStillInactive>;
+  /**
    * Reading the run or its results failed: the method's error as it is, with
    * its step (`read activation run`, `read activation results`). The run's
    * outcome is then unknown, not "no messages".
@@ -80,7 +92,18 @@ export interface ActivationRunSource {
     runId: string,
     options: { analyse?: unknown },
   ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
+  /** Read with `wireItself` in the `inactive` slot: the list as it came. */
+  getInactiveObjects(options: {
+    analyse?: unknown;
+  }): Promise<IAdtResponse<IAdtWireResponse, IAdtError>>;
 }
+
+/** The step the read after a silent results checklist arises at. */
+export const INACTIVE_OBJECTS = 'inactiveObjects';
+
+/** The words of an outcome the read after a silent checklist could not decide. */
+const UNDECIDED =
+  "The activation's outcome could not be decided: the run's results say no activation ran and give no message, and";
 
 /** A status that ends the wait. */
 const SETTLED = new Set(['finished', 'error', 'failed']);
@@ -263,11 +286,20 @@ export function isRefusal(message: ActivationMessage): boolean {
  * `getActivationResults` comes back as the outcome's `failure` — the method's
  * error as it is, with its step — never folded into `messages`, which are
  * SAP's messages about the run.
+ *
+ * **One read more, after a silent results checklist alone**
+ * (`activationExecuted="false"`, no message): `getInactiveObjects`, judged by
+ * `stillInactiveAmong(named, …)` with `named` the uris of the references the
+ * run was started with — the run's references still listed are its
+ * `stillInactive`, none is nothing to activate. A read that fails, or answers
+ * no list, is the outcome's `failure` at step `inactiveObjects`: the outcome
+ * could not be decided. Every other results document is read as it came.
  */
 export async function awaitActivationRun(
   utils: ActivationRunSource,
   runId: string,
   analyse: unknown,
+  named: readonly string[],
 ): Promise<ActivationRunOutcome> {
   if (runId === '') {
     return {
@@ -313,11 +345,47 @@ export async function awaitActivationRun(
   }
   const value = produced.getResult().value;
   const executed = activationExecutedOf(value);
-  return {
+  const messages = activationMessagesOf(value);
+  const outcome: ActivationRunOutcome = {
     runId,
     status,
-    messages: activationMessagesOf(value),
+    messages,
     ...(executed === undefined ? {} : { executed }),
     results: readingOf(value).raw || undefined,
   };
+  if (executed !== false || messages.length > 0) return outcome;
+
+  // The silent checklist: it answered an activation that had nothing to do
+  // and one that left objects inactive (S/4HANA 2025), so the inactive list
+  // is read once, and the run's references still on it decide
+  // (fr0ster/mcp-abap-adt#351, Q8). The judgement is adt-strategies' own,
+  // the one analyseActivation makes on the synchronous paths.
+  const listed = await utils.getInactiveObjects({ analyse });
+  if (!listed.ok) {
+    const error = listed.getError();
+    return {
+      ...outcome,
+      failure: withStep(
+        {
+          ...error,
+          message: `${UNDECIDED} reading the inactive objects failed: ${error.message}`,
+        },
+        INACTIVE_OBJECTS,
+      ),
+    };
+  }
+  const still = stillInactiveAmong(named, listed.getResult().value);
+  if (still === null) {
+    return {
+      ...outcome,
+      failure: withStep(
+        {
+          origin: 'refusal',
+          message: `${UNDECIDED} the inactive list SAP answered is no list of inactive objects.`,
+        },
+        INACTIVE_OBJECTS,
+      ),
+    };
+  }
+  return { ...outcome, stillInactive: still };
 }

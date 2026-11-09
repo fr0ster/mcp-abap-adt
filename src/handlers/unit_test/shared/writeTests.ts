@@ -19,7 +19,9 @@ import {
   functionIncludeDocuments,
   includeDocuments,
   programDocuments,
+  wireItself,
 } from '@mcp-abap-adt/adt-clients';
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import {
   analyseActivation,
   analyseException,
@@ -364,7 +366,10 @@ async function activateWithMainProgram(
   groupName: string,
   includeName: string,
 ): Promise<Answer> {
-  const utils = client.getUtils(ourUtils);
+  // The inactive list read after a silent results checklist is judged on
+  // the wire as it came (`stillInactiveAmong`).
+  const utils = client.getUtils({ ...ourUtils, inactive: wireItself });
+  const mainProgram = functionGroupMainProgram(groupName);
   const started = await withAdtHeaders(
     context,
     'utils.activateObjectsGroup',
@@ -373,11 +378,7 @@ async function activateWithMainProgram(
         [
           { type: 'FUGR/I', name: includeName, parentName: groupName },
           { type: 'FUGR/F', name: groupName },
-          {
-            type: 'FUGR/I',
-            name: functionGroupMainProgram(groupName),
-            parentName: groupName,
-          },
+          { type: 'FUGR/I', name: mainProgram, parentName: groupName },
         ],
         false,
         { headers, analyse: analyseException },
@@ -390,6 +391,11 @@ async function activateWithMainProgram(
     utils,
     started.getResult().value,
     analyseException,
+    [
+      buildObjectUri(includeName, 'FUGR/I', groupName),
+      buildObjectUri(groupName, 'FUGR/F'),
+      buildObjectUri(mainProgram, 'FUGR/I', groupName),
+    ],
   );
   // Reading the run failed: the method's error as it is, with its step.
   if (outcome.failure !== undefined) return failedWith(outcome.failure);
@@ -399,6 +405,14 @@ async function activateWithMainProgram(
     // as SAP's answer.
     throw new Error(outcome.messages.map((m) => m.text).join('; '));
   }
+  // A silent results checklist with the run's references still listed: not
+  // activated, those entries named.
+  if (outcome.stillInactive !== undefined && outcome.stillInactive.length > 0)
+    return failedWith({
+      origin: 'refusal',
+      message: `Activation run ${outcome.runId} finished without activating: the inactive list still names ${outcome.stillInactive.map((o) => o.name).join(', ')}`,
+      stillInactive: outcome.stillInactive,
+    });
   const refusals = outcome.messages.filter(isRefusal);
   if (
     refusals.length > 0 ||

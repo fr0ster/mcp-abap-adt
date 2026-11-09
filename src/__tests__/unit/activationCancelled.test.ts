@@ -56,7 +56,11 @@ const ACTIVATED =
 
 const RUN_ID = 'RUN0001';
 
-/** The three answers of a finished run: its start, its status, its results. */
+/**
+ * The answers of a finished run: its start, its status, its results — and,
+ * read only after results that say no activation ran and give no message,
+ * the inactive list (S/4HANA 2025's, empty: nothing left inactive).
+ */
 function finishedRun(results: string) {
   return recordingConnection([
     {
@@ -67,6 +71,11 @@ function finishedRun(results: string) {
       data: `<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>`,
     },
     { data: results },
+    {
+      data: corpusBody(
+        'activation-reactivate-active-s4-2025--04-inactiveobjects',
+      ),
+    },
   ]);
 }
 
@@ -135,7 +144,14 @@ describe('activation answers follow SAP’s verdict', () => {
     const answered = await activate({ connection });
     const urls = connection.requests.map((request) => request.url);
     expect(urls.some((url) => url.includes('/activation/runs'))).toBe(true);
-    expect(urls.at(-1)).toContain(`/activation/results/${RUN_ID}`);
+    expect(urls).toContain(`/sap/bc/adt/activation/results/${RUN_ID}`);
+    // The inactive list follows only results that say no activation ran
+    // and give no message.
+    expect(urls.at(-1)).toContain(
+      results === NOTHING
+        ? '/sap/bc/adt/activation/inactiveobjects'
+        : `/activation/results/${RUN_ID}`,
+    );
     return payloadOf(answered);
   }
 

@@ -9,6 +9,8 @@
  * Every field added is optional, so an adt-clients answer is a
  * `StepResponse` as it is, and a `StepResponse` is an `IAdtResponse`.
  */
+
+import type { IAdtStillInactive } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtFailure,
@@ -24,6 +26,12 @@ export interface StepError extends IAdtError {
   /** A lock left held, or what a handler left behind after the failure. */
   readonly cleanup?: Cleanup | LeftBehind;
   readonly operation?: 'succeeded';
+  /**
+   * What an activation left inactive: SAP's own list
+   * (`IAdtActivationFailure.stillInactive`), or the run's references the
+   * inactive list still names after a silent results checklist.
+   */
+  readonly stillInactive?: ReadonlyArray<IAdtStillInactive>;
 }
 
 /** A success, with the note of a lock its write left held. */

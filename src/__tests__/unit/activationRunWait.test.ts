@@ -10,13 +10,22 @@
  * connection — real adt-clients code, no SAP: the run start (`202`, the run
  * id in `Location`), the run's status reads, its results.
  */
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
-import { recordingConnection } from '../helpers/recordingConnection';
+import { corpusBody } from '../helpers/adtCorpus';
+import {
+  RUNS_DISCOVERY,
+  recordingConnection,
+} from '../helpers/recordingConnection';
 
 const RUN_ID = 'RUN0001';
 const RUNS = 'xmlns:runs="http://www.sap.com/adt/activation/runs"';
@@ -213,5 +222,192 @@ describe('a group activation waits for its run on long polling alone', () => {
       STATUS_URL,
       RESULTS_URL,
     ]);
+  });
+});
+
+/**
+ * A run's results that are a silent checklist — `activationExecuted="false"`
+ * and no message — are judged by the inactive list read once after them
+ * (fr0ster/mcp-abap-adt#351): a run reference still listed is not activated;
+ * none listed is nothing to activate; a read that fails decides nothing.
+ * The silent results document is not recorded on the runs path: it is the
+ * results document above with `activationExecuted="false"` (it carries no
+ * message). The lists are the recorded S/4HANA 2025 ones — 05 names the
+ * group `ZACT751P9325` and its main program, 04 is empty.
+ */
+describe('the read after a run whose results are silent', () => {
+  // The silent results document is not recorded on the runs path: it is
+  // built here from the results fixture, `activationExecuted="false"` and no
+  // message (the fixture carries none).
+  const SILENT_RESULTS = RESULTS.data.replace(
+    'activationExecuted="true"',
+    'activationExecuted="false"',
+  );
+  const REFUSED_RESULTS =
+    '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">' +
+    '<chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/>' +
+    '<msg type="E" objName="ZMCPA"><shortText><txt>Syntax error</txt></shortText></msg>' +
+    '</chkl:messages>';
+  const LISTED = corpusBody(
+    'activation-group-alone-s4-2025--05-inactiveobjects',
+  );
+  const EMPTY = corpusBody(
+    'activation-reactivate-active-s4-2025--04-inactiveobjects',
+  );
+  const GROUP_AND_PROGRAM = [
+    { name: 'ZACT751P9325', type: 'FUGR/F' },
+    { name: 'ZMCPB', type: 'PROG/P' },
+  ];
+
+  /**
+   * A connection answering a finished run with `results`, and the inactive
+   * list with `list` — or throwing a `500` for it — recording each request.
+   */
+  function run(results: string, list: string | 'refused') {
+    const requests: string[] = [];
+    const connection: IAbapConnection = {
+      async connect() {},
+      async getBaseUrl() {
+        return 'https://example.com';
+      },
+      getSessionId() {
+        return null;
+      },
+      setSessionType() {},
+      async makeAdtRequest<T = unknown, D = unknown>(
+        options: IAbapRequestOptions,
+      ): Promise<IAdtWireResponse<T, D>> {
+        requests.push(`${options.method} ${options.url.split('?')[0]}`);
+        const url = options.url;
+        let answer: {
+          status: number;
+          data: string;
+          headers?: Record<string, string>;
+        };
+        if (url.startsWith('/sap/bc/adt/discovery'))
+          answer = { status: 200, data: RUNS_DISCOVERY };
+        else if (url.startsWith('/sap/bc/adt/activation/runs?'))
+          answer = { status: 202, data: '', headers: STARTED.headers };
+        else if (url.startsWith(`/sap/bc/adt/activation/runs/${RUN_ID}`))
+          answer = { status: 200, data: FINISHED.data };
+        else if (url.startsWith(`/sap/bc/adt/activation/results/${RUN_ID}`))
+          answer = { status: 200, data: results };
+        else if (url.startsWith('/sap/bc/adt/activation/inactiveobjects')) {
+          if (list === 'refused') {
+            throw Object.assign(
+              new Error('Request failed with status code 500'),
+              {
+                response: {
+                  status: 500,
+                  statusText: '',
+                  headers: {},
+                  data: '',
+                },
+              },
+            );
+          }
+          answer = { status: 200, data: list };
+        } else answer = { status: 200, data: '' };
+        // A recorded body is text; `T` is the caller's view of it, which a
+        // replay does not narrow — the assertion every fake connection makes.
+        return {
+          data: answer.data as T,
+          status: answer.status,
+          statusText: 'OK',
+          headers: answer.headers ?? {},
+        };
+      },
+    };
+    declareSystemKind(connection, 'onprem');
+    return { connection, requests };
+  }
+
+  const READ = 'GET /sap/bc/adt/activation/inactiveobjects';
+
+  beforeEach(() => {
+    setSystemContext({ masterSystem: 'SID', responsible: 'SAPUSER01' });
+  });
+  afterEach(() => resetSystemContextCache());
+
+  it('a run reference still listed: an error naming it in still_inactive', async () => {
+    const { connection, requests } = run(SILENT_RESULTS, LISTED);
+    const answered = await handleActivateObject(
+      { connection },
+      { objects: GROUP_AND_PROGRAM },
+    );
+    expect(answered.isError).toBe(true);
+    const payload = payloadOf(answered);
+    expect(payload.still_inactive).toEqual([
+      {
+        name: 'ZACT751P9325',
+        type: 'FUGR/F',
+        uri: '/sap/bc/adt/functions/groups/zact751p9325',
+      },
+      {
+        name: 'SAPLZACT751P9325',
+        type: 'FUGR/I',
+        uri: '/sap/bc/adt/functions/groups/zact751p9325/source/main',
+        parent_uri: '/sap/bc/adt/functions/groups/zact751p9325',
+      },
+    ]);
+    expect(requests.filter((r) => r === READ)).toHaveLength(1);
+  });
+
+  it('an empty list: nothing to activate, no error', async () => {
+    const { connection } = run(SILENT_RESULTS, EMPTY);
+    const answered = await handleActivateObject(
+      { connection },
+      { objects: GROUP_AND_PROGRAM },
+    );
+    expect(answered.isError).toBe(false);
+    expect(payloadOf(answered).nothing_to_activate).toBe(true);
+  });
+
+  it('a listed object that is no run reference is not counted', async () => {
+    const { connection } = run(SILENT_RESULTS, LISTED);
+    const answered = await handleActivateObject(
+      { connection },
+      { objects: OBJECTS },
+    );
+    expect(answered.isError).toBe(false);
+    expect(payloadOf(answered).nothing_to_activate).toBe(true);
+  });
+
+  it('a read that fails: an error at step inactiveObjects, the outcome not decided', async () => {
+    const { connection } = run(SILENT_RESULTS, 'refused');
+    const answered = await handleActivateObject(
+      { connection },
+      { objects: GROUP_AND_PROGRAM },
+    );
+    expect(answered.isError).toBe(true);
+    const payload = payloadOf(answered);
+    expect(payload.step).toBe('inactiveObjects');
+    expect(payload.message).toContain(
+      "activation's outcome could not be decided",
+    );
+  });
+
+  it('a 200 that is no inactive list: an error at step inactiveObjects, the outcome not decided', async () => {
+    const { connection } = run(
+      SILENT_RESULTS,
+      '<html><body>Logon</body></html>',
+    );
+    const answered = await handleActivateObject(
+      { connection },
+      { objects: GROUP_AND_PROGRAM },
+    );
+    expect(answered.isError).toBe(true);
+    const payload = payloadOf(answered);
+    expect(payload.step).toBe('inactiveObjects');
+    expect(payload.message).toContain('is no list of inactive objects');
+  });
+
+  it.each([
+    ['activationExecuted="true"', RESULTS.data],
+    ['an E', REFUSED_RESULTS],
+  ])('results with %s: no read', async (_what, results) => {
+    const { connection, requests } = run(results, LISTED);
+    await handleActivateObject({ connection }, { objects: GROUP_AND_PROGRAM });
+    expect(requests).not.toContain(READ);
   });
 });

@@ -8,7 +8,9 @@ import {
   serviceDefinitionDocuments,
   structureDocuments,
   tableDocuments,
+  wireItself,
 } from '@mcp-abap-adt/adt-clients';
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 
 /**
  * Admin script: Setup ALL shared dependencies on a SAP system.
@@ -170,6 +172,13 @@ async function forceSaveViewSource(
  * (`ACTIVATION_CODES.cloud`) is sent; an object of another code is refused
  * here by name, and nothing is sent.
  */
+/** The uris a run's silent results are checked against, one per object. */
+function runUris(objects: GroupObject<AdtGroupActivationCode<'onprem'>>[]) {
+  return objects.map((obj) =>
+    buildObjectUri(obj.name, obj.type, obj.parentName),
+  );
+}
+
 function startGroupActivation(
   connection: IAbapConnection,
   objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
@@ -179,7 +188,10 @@ function startGroupActivation(
     analyse: analyseException,
   };
   if (variantOf(connection) === 'onprem') {
-    const utils = createOnPremAdtClient(connection).getUtils(ourUtils);
+    const utils = createOnPremAdtClient(connection).getUtils({
+      ...ourUtils,
+      inactive: wireItself,
+    });
     return {
       utils,
       started: utils.activateObjectsGroup(
@@ -199,7 +211,10 @@ function startGroupActivation(
     }
     references.push({ ...obj, type });
   }
-  const utils = createAdtClient(connection).getUtils(ourUtils);
+  const utils = createAdtClient(connection).getUtils({
+    ...ourUtils,
+    inactive: wireItself,
+  });
   return {
     utils,
     started: utils.activateObjectsGroup(
@@ -1803,9 +1818,15 @@ describe('Admin: Setup shared dependencies', () => {
               utils as unknown as ActivationRunSource,
               started.getResult().value,
               analyseException,
+              runUris(toActivate),
             );
             if (outcome.failure) {
               throw new Error(outcome.failure.message);
+            }
+            if (outcome.stillInactive?.length) {
+              throw new Error(
+                `Activation run ${outcome.runId} activated nothing: ${outcome.stillInactive.map((o) => o.name).join(', ')} still inactive`,
+              );
             }
             testsLogger?.info?.(
               `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}, ${outcome.messages.length} message(s)`,
@@ -1905,9 +1926,15 @@ describe('Admin: Setup shared dependencies', () => {
                   utils as unknown as ActivationRunSource,
                   resp.getResult().value,
                   analyseException,
+                  runUris(chunk),
                 );
                 if (chunkOutcome.failure) {
                   throw new Error(chunkOutcome.failure.message);
+                }
+                if (chunkOutcome.stillInactive?.length) {
+                  throw new Error(
+                    `Activation run ${chunkOutcome.runId} activated nothing: ${chunkOutcome.stillInactive.map((o) => o.name).join(', ')} still inactive`,
+                  );
                 }
                 const errs = chunkOutcome.messages.filter(isRefusal);
                 if (errs.length > 0) {

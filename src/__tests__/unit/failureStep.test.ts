@@ -709,6 +709,7 @@ describe('an activation run whose reading was refused', () => {
       source(async () => forbidden()),
       'RUN-1',
       undefined,
+      [],
     );
     expect(outcome.messages).toEqual([]);
     expect(outcome.status).toBe('');
@@ -752,6 +753,7 @@ describe('an activation run whose reading was refused', () => {
       ),
       'RUN-1',
       undefined,
+      [],
     );
     expect(outcome.messages).toEqual([]);
     expect((outcome.failure as { step?: string }).step).toBe(

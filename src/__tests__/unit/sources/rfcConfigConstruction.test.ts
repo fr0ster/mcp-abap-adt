@@ -49,6 +49,8 @@ const REFUSED: ReadonlyArray<[string, ConstructionRule]> = [
   ['forbiddenBySpread.ts', 'forbidden-property'],
   ['intermediateLiteral.ts', 'forbidden-property'],
   ['intermediateChain.ts', 'forbidden-property'],
+  ['unannotatedReturn.ts', 'unannotated-return'],
+  ['annotatedReturnForbidden.ts', 'forbidden-property'],
   ['crossSpread.ts', 'cross-spread'],
 ];
 

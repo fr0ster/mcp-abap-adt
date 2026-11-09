@@ -15,6 +15,10 @@
  * - each rule applies as well to an intermediate: an object literal with no
  *   config type of its own, held by a variable (or a chain of them) that is
  *   then used where a config is expected — checked against that use;
+ * - `unannotated-return` — a call of a function of the program, used where a
+ *   config is expected, whose function declares no return type: with one,
+ *   the compiler checks its return literals against it, and the scan reads
+ *   them as literals of that type;
  * - `cross-spread` — a spread inside a config literal whose source's type is
  *   the other shape, or the whole union, as the checker types it.
  */
@@ -27,7 +31,8 @@ export type ConstructionRule =
   | 'assertion'
   | 'pre-narrowing'
   | 'forbidden-property'
-  | 'cross-spread';
+  | 'cross-spread'
+  | 'unannotated-return';
 
 export interface ConstructionFinding {
   readonly rule: ConstructionRule;
@@ -158,6 +163,33 @@ function literalBehind(
   }
 }
 
+/**
+ * The function a call's callee names when it is one of the program's own: a
+ * function declaration, or a variable initialized with a function or arrow
+ * expression; `undefined` for anything else (a library's, a method).
+ */
+function functionBehind(
+  checker: ts.TypeChecker,
+  callee: ts.Expression,
+): ts.SignatureDeclaration | undefined {
+  if (!ts.isIdentifier(callee)) return undefined;
+  for (const declaration of checker
+    .getSymbolAtLocation(callee)
+    ?.getDeclarations() ?? []) {
+    if (declaration.getSourceFile().isDeclarationFile) continue;
+    if (ts.isFunctionDeclaration(declaration)) return declaration;
+    if (
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer !== undefined &&
+      (ts.isArrowFunction(declaration.initializer) ||
+        ts.isFunctionExpression(declaration.initializer))
+    ) {
+      return declaration.initializer;
+    }
+  }
+  return undefined;
+}
+
 /** Every finding of the program's `files`. */
 export function scanConstruction(
   files: readonly string[],
@@ -249,6 +281,17 @@ export function scanConstruction(
       }
       if (ts.isObjectLiteralExpression(node)) {
         checkLiteral(node, checker.getContextualType(node));
+      }
+      // A function's answer used as a config: its function declares the
+      // return type, so its return literals are checked against it.
+      if (ts.isCallExpression(node)) {
+        const use = checker.getContextualType(node);
+        if (use !== undefined && shapesOf(use).size > 0) {
+          const callee = functionBehind(checker, node.expression);
+          if (callee !== undefined && callee.type === undefined) {
+            report('unannotated-return', node);
+          }
+        }
       }
       // An intermediate: a variable whose initializer is an object literal
       // with no config type of its own, used where a config is expected —

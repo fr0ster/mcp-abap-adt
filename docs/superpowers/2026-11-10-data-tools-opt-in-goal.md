@@ -38,6 +38,8 @@ make the decision for the customer.
 - **Nothing else changes.** With the flag on, every set serves exactly what it serves
   today. With the flag off, it serves that minus the data tools. The tools' names, schemas,
   descriptions and answers stay as they are.
+- **Off for embedders too.** An embedder of the library serves the data tools only when it
+  states so; nothing it builds by default carries them.
 - **The reason is stated where the choice is made.** The flag's help, the README and the
   migration note cite FAQ Q33 and say that enabling the tools is the customer's decision.
   They give no legal reading of their own.
@@ -51,6 +53,7 @@ make the decision for the customer.
 
 - Any other tool that can reach business data: the debugger's variable and AMDP table
   reads, memory snapshots, dumps, the gateway error log, traces, and the class and program
-  runs. They are named for the owner to decide on and are not changed here.
+  runs. They are a separate, later task; the README names them, and they are not changed
+  here.
 - Changing what the data tools read or how they answer.
 - A per-user or per-destination policy. The flag is per process.

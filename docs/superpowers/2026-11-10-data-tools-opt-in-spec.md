@@ -86,11 +86,11 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
 
   A group that does not hand out an entry is therefore absent on all three (Inference from
   that code).
-- **The owner's earlier decision written into the code.** The comments say: "The binary
+- **The fixed-set rule written into the code.** The comments say: "The binary
   fixes the tool set … never by a flag" (Code, `toolSet.ts:10`, `toolSet.ts:101`,
   `server-runtime/src/stdio/launcher.ts:291, 859`). The help says: "serves one fixed tool
-  set; the binary chooses it, not a flag" (Code, `toolSet.ts:234`). The owner's decision for
-  this change makes the data tools the one exception. The words change with it (§5).
+  set; the binary chooses it, not a flag" (Code, `toolSet.ts:234`). This change makes the
+  data tools the one exception. The words change with it (§5).
 
 ### How the binaries take configuration
 
@@ -143,8 +143,7 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
 
 ## 2. The flag
 
-- **Name** (proposed; the owner decides, §10): `--enable-data-tools`, `MCP_ENABLE_DATA_TOOLS`,
-  YAML `enable-data-tools`. The `--enable-…` form follows `--http-enable-dns-protection` /
+- **Name:** `--enable-data-tools`, `MCP_ENABLE_DATA_TOOLS`, YAML `enable-data-tools`. The `--enable-…` form follows `--http-enable-dns-protection` /
   `MCP_HTTP_ENABLE_DNS_PROTECTION` (Code, `httpParameters.ts:98-106`).
 - **The row.** One shared `Parameter` in `src/lib/config/authParameters.ts`, beside
   `BATCH_KEEP_RAW_PARTS_ROW` (`:683-704`), with constants for its three names in the same
@@ -152,7 +151,7 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
   that row is (`:22`).
   - `kind: 'flag'`, `default: false`.
   - A section of its own: `DATA TOOLS`.
-  - Help words, to be finalised in review: "Serves the tools that read business data:
+  - Help words: "Serves the tools that read business data:
     GetSqlQuery and GetTableContents (compact: HandlerGetData). Off by default. SAP API
     Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading
     application tables, exporting business data or running SQL against SAP systems.
@@ -207,7 +206,7 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
   pass it on.
 - **Why not a third reason in `listedTool`.** That would thread the flag through three
   registration paths and the docs generator. It would also run beside the group choice the
-  sets already make, a parallel mechanism the task rules out. The group choice reaches all
+  sets already make, a parallel mechanism the goal rules out. The group choice reaches all
   three paths through `getHandlers()` (§1).
 - **What else follows unchanged.** The long-tool, batch and tool-search tables keep their
   three rows (`src/lib/longTools.ts:34-46`, `tools/batch-handlers.json:343-351, 601`,
@@ -222,8 +221,7 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
 
 ## 4. The embeddable API
 
-The binaries are the owner's stated scope. Embedders build groups themselves, so what they
-get by default is a decision of its own (§10, open point 2). The recommended form:
+The data tools are off for embedders too: an embedder serves them only by stating so.
 
 - `EmbeddableMcpServer`'s `exposition` (`src/embeddable/EmbeddableMcpServer.ts:153`)
   gains `'data'`, which is not in the default `['readonly', 'high']` (`:323`).
@@ -236,7 +234,9 @@ get by default is a decision of its own (§10, open point 2). The recommended fo
   comment says why.
 - An embedder that constructs `ReadOnlyHandlersGroup` or `SystemHandlersGroup` directly
   loses the tool its group carried and adds `DataHandlersGroup`. This is breaking for
-  embedders, and the MIGRATION note says so.
+  embedders, and the MIGRATION note tells them what to state: `exposition: [..., 'data']`,
+  `includeData: true`, or `DataHandlersGroup` / `compactDataEntries` with the new
+  `groups` / `registryOf` argument.
 
 ## 5. Words, help and docs
 
@@ -253,6 +253,8 @@ get by default is a decision of its own (§10, open point 2). The recommended fo
   - "Command-Line Options" (`:496`) gets a paragraph: off by default in every binary; the
     flag in its three forms; FAQ Q33 quoted with its URL; "whether to enable it is the
     customer's decision".
+  - The same paragraph names the other tools that can reach business data (§7). They are
+    served as before; their review is a separate task.
 - **User docs.**
   - `docs/user-guide/CLI_OPTIONS.md` gets a row in the shared table (near `:50`).
   - `docs/configuration/YAML_CONFIG.md` gets the key (near `:41`).
@@ -308,9 +310,10 @@ Each is Code (grep at `d5a29d08`) unless marked.
     (`coverage/coverageKeys.ts:61`, `coverageLedger.test.ts`, `hardModeBinaries.test.ts`):
     their fixtures (`tests/fixtures/tools/surface.json`, `variant-surface.json`,
     `http-surface.json`, `stdio-sse-surface.json`, `listed-schemas.json`,
-    `coverage-ledger.json`) were captured with the tools served. Keep them as the flag-on
-    surface, and add the off surface as "on minus the three names" (§8). Only the order and
-    the group a tool sits in change; the review checks the regenerated fixtures for that
+    `coverage-ledger.json`) were captured with the tools served. They stay one set of
+    fixtures, the flag-on surface; no flag-off fixture is captured. The off surface is
+    asserted as the on surface minus exactly the three names (§8). Only the order and the
+    group a tool sits in change; the review checks the regenerated fixtures for that
     alone;
   - `scripts/list-tools.ts:9-41, 98-103`: builds groups and sets directly.
 - **Through the groups directly**, so each adds `DataHandlersGroup` or `compactDataEntries`:
@@ -327,7 +330,7 @@ Each is Code (grep at `d5a29d08`) unless marked.
 - **Name tables**, unaffected: `unit/sources/batchHandlers.test.ts:86-94`,
   `unit/detailSurface.test.ts:226-227`, `readVersion/readsStateTheirVersion.test.ts:240-269`,
   `coverage/coverage-debt.json`, `descriptions/heldOutQueries.json`.
-- **Live cases, to keep running with the flag on**, run later on the owner's go:
+- **Live cases, to keep running with the flag on**, run later, when the live run is approved:
   - `integration/readOnly/system/SqlQueryHandlers.test.ts` and `TableContentsHandlers.test.ts`.
     In soft mode they call the handler through `LambdaTester` (Code,
     `SqlQueryHandlers.test.ts:16-20`).
@@ -346,9 +349,10 @@ Each is Code (grep at `d5a29d08`) unless marked.
   `docs/MIGRATION-24.0.md:464` (the long tools). `docs/MIGRATION-19.0.md:186-188` is
   released and stays as it is.
 
-## 7. Other tools that can reach business data (not in scope; for the owner)
+## 7. Other tools that can reach business data (not in scope)
 
-Each is labelled. None is changed by this spec.
+These stay as they are in 24.0.0; deciding on them is a separate, later task. The README
+names them (§5). Each is labelled.
 
 | Tool (compact form) | File | What it reads |
 |---|---|---|
@@ -390,7 +394,9 @@ places new tests at the time of the code (Jest or node:test, `tools/node-test-fi
     `{ dataTools: false }`, are exactly `GetSqlQuery` and `GetTableContents` (full sets) or
     `HandlerGetData` (compact);
   - with `false`, none of the three appears;
-  - with `true`, the names equal today's fixture.
+  - with `true`, the names equal the one fixture set (flag on); the flag-off surface is
+    asserted against that fixture minus exactly the three names, not against a fixture of
+    its own.
 
   Mutations: always add the data group; never add it; leave one tool in its old group.
 - **All three registration paths.** For one set with the flag off:
@@ -421,27 +427,23 @@ places new tests at the time of the code (Jest or node:test, `tools/node-test-fi
   flag-off surface is the flag-on one minus the three names.
 - The README, the CLI and YAML docs, the tool pages, the CHANGELOG `[24.0.0]` items and the
   MIGRATION-24.0 section are written as in §5.
-- The live cases in §6 run with the flag on, on the owner's go, and pass.
+- The live cases in §6 run with the flag on, when the live run is approved, and pass.
 
 ## 10. Decisions
 
-**The owner's decisions** (binding): off by default in every set and transport; one flag
-from the CLI, the environment and the config file, in that precedence; the FAQ cited and
-the decision left to the customer in the flag's help and the README; a MIGRATION note and
-a CHANGELOG entry under `[24.0.0]`.
-
-**This spec's own decisions**, for the review to check:
-
-- The gate is a data group chosen by a required `served` argument of `ToolSet.groups`
-  and `registryOf` (§3), not a filter in `listedTool`.
-- On HTTP and SSE the flag is a start parameter, a shared row like
-  `--batch-keep-raw-parts`, with no header form (§1, §2).
+- Off by default in every tool set (full, read-only, compact, compact read-only) and on
+  every transport (stdio, Streamable HTTP, SSE).
+- One flag, `--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / YAML `enable-data-tools`,
+  read CLI over environment over YAML (§2). On HTTP and SSE it is a start parameter, a
+  shared row like `--batch-keep-raw-parts`, with no header form (§1, §2).
+- The flag's help and the README cite FAQ Q33 and leave the decision to the customer; a
+  MIGRATION-24.0 section and CHANGELOG `[24.0.0]` items carry the change (§5).
+- The gate is a data group chosen by a required `served` argument of `ToolSet.groups` and
+  `registryOf` (§3), not a filter in `listedTool`.
+- Off for embedders too: `exposition: 'data'` and `includeData: true` (read as `=== true`)
+  turn it on, and the MIGRATION note tells embedders (§4).
+- Only `GetSqlQuery`, `GetTableContents` and `HandlerGetData` are gated. The other tools that
+  can reach business data (§7) are a separate, later task; the README names them.
+- One set of fixtures, captured with the flag on; the off surface is asserted as the on
+  surface minus exactly the three names (§6, §8).
 - The tool pages list the data tools marked opt-in (§5).
-
-**Open for the owner** (the report gives the options):
-
-1. The flag's name.
-2. The embeddable API's default (§4).
-3. The other data-reaching tools (§7).
-4. Whether the test fixtures stay flag-on, with the off surface derived from them, or
-   whether both surfaces are captured.

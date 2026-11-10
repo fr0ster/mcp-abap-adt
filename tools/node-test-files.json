@@ -74,6 +74,7 @@
   "src/__tests__/unit/installMatrix.test.ts",
   "src/__tests__/unit/runner/build.test.ts",
   "src/__tests__/unit/runner/interrupt.test.ts",
+  "src/__tests__/unit/runner/jestWorkers.test.ts",
   "src/__tests__/unit/runner/liveRun.test.ts",
   "src/__tests__/unit/runner/npmTest.test.ts",
   "src/__tests__/unit/runner/partition.test.ts",

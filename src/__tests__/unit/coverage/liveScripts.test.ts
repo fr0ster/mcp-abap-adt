@@ -15,9 +15,11 @@ import { repositoryRoot } from '../../helpers/repoRoot';
 import { setUpLiveRun } from '../../integration/globalSetup';
 import { assertEquals } from '../../integration/helpers/liveAssert';
 import {
+  isLiveScript,
   LIVE_SCRIPTS,
   runnerConcurrency,
   selectsLiveSuites,
+  sharesLiveLogon,
 } from '../../integration/helpers/liveScripts';
 
 const REPO = repositoryRoot(__dirname);
@@ -148,6 +150,55 @@ describe('the live scripts', () => {
       else process.env.MCP_TEST_CONFIG = configFile;
       await stand.close();
       fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('test:live-deferred-logon does no realm check and no logon, even with a config', async () => {
+    // Its cases need no system, or name their own (their variables): the
+    // shared setup never logs on for it, whatever test config is around.
+    const stand = await adtStandIn();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deferred-run-'));
+    const event = process.env.npm_lifecycle_event;
+    const configFile = process.env.MCP_TEST_CONFIG;
+    try {
+      fs.mkdirSync(path.join(dir, 'sessions'));
+      fs.writeFileSync(
+        path.join(dir, 'sessions', 'STAND.env'),
+        `SAP_URL=${stand.url}\nSAP_AUTH_TYPE=basic\n`,
+      );
+      const config = path.join(dir, 'test-config.yaml');
+      fs.writeFileSync(
+        config,
+        [
+          'auth_broker:',
+          `  paths: { service_keys_dir: ${JSON.stringify(dir)} }`,
+          '  abap: { destination: STAND }',
+          'environment:',
+          '  system_type: onprem',
+          '  expected_realm: STAND',
+          '',
+        ].join('\n'),
+      );
+      process.env.MCP_TEST_CONFIG = config;
+      process.env.npm_lifecycle_event = 'test:live-deferred-logon';
+      assert.equal(isLiveScript('test:live-deferred-logon'), true);
+      assert.equal(sharesLiveLogon('test:live-deferred-logon'), false);
+      assert.equal(await setUpLiveRun({ rootDir: REPO, named: [] }), undefined);
+      assertEquals(stand.requests, []);
+    } finally {
+      if (event === undefined) delete process.env.npm_lifecycle_event;
+      else process.env.npm_lifecycle_event = event;
+      if (configFile === undefined) delete process.env.MCP_TEST_CONFIG;
+      else process.env.MCP_TEST_CONFIG = configFile;
+      await stand.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('every other live script shares the logon of the setup', () => {
+    for (const name of LIVE_SCRIPTS) {
+      if (name === 'test:live-deferred-logon') continue;
+      assert.equal(sharesLiveLogon(name), true, name);
     }
   });
 

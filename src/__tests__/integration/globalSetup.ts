@@ -12,7 +12,10 @@
  * 2. A live run gets its
  *    run directory under the OS temp directory (`MCP_ABAP_ADT_COVERAGE_RUN`):
  *    the call log, the run report and the refusal marker live there.
- * 3. Without a test config (tests/test-config.yaml, or MCP_TEST_CONFIG) it
+ * 3. A live script whose suites use no shared logon
+ *    (`test:live-deferred-logon`, `sharesLiveLogon`) returns here: no realm
+ *    check and no logon, whatever test config is present.
+ *    Without a test config (tests/test-config.yaml, or MCP_TEST_CONFIG) it
  *    returns at once: nothing is built, nothing logs on, no browser opens.
  * 4. With one, the realm check (`realmCheck`) runs before the factory is
  *    built: an unauthenticated discovery `GET` must answer `401` with the
@@ -46,7 +49,7 @@ import {
   memberOf,
   sessionVariables,
 } from './helpers/configuredSystemKind';
-import { isLiveScript } from './helpers/liveScripts';
+import { isLiveScript, sharesLiveLogon } from './helpers/liveScripts';
 import { endTestConnection } from './helpers/openConnections';
 import { realmCheck, realmCheckUrlOf } from './helpers/realmCheck';
 import {
@@ -115,6 +118,9 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
     refuseSelection(globalConfig.named, globalConfig.rootDir);
   }
   if ((process.env[RUN_VARIABLE] ?? '') === '') startRunDirectory();
+  // A script whose suites need no shared logon (`sharesLiveLogon`): no
+  // realm check and no logon, whatever test config is present.
+  if (!sharesLiveLogon(process.env.npm_lifecycle_event)) return;
 
   const config = loadRunConfig();
   if (config === undefined || config === null) {

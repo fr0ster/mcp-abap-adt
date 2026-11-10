@@ -112,8 +112,8 @@ DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ## The deferred logon's live suite
 
 `npm run test:live-deferred-logon` runs `src/__tests__/integration/live/deferredLogon.test.ts`
-(one file at a time). Run it with no test config (no `tests/test-config.yaml`, `MCP_TEST_CONFIG`
-unset): the live run's setup then checks no realm and logs on nowhere.
+(one file at a time). For this script the live run's setup checks no realm and logs on nowhere,
+whatever test config is present: the real-system cases log on only through their own variables.
 
 - **The closed-port case** needs no SAP system: the packed release, installed, started with
   `--deferred-logon` against a loopback port the case bound and closed. It lists its tools,

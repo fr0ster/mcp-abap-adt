@@ -3,10 +3,11 @@
  *
  * **Where it runs.** Only under its live script,
  * `npm run test:live-deferred-logon` (one file at a time; never in
- * `npm test`). Run with no test config (no `tests/test-config.yaml`,
- * `MCP_TEST_CONFIG` unset), the live run's setup checks no realm and logs on
- * nowhere: nothing here needs a system but the real-system cases, which run
- * only where their variable names one and skip with the reason elsewhere.
+ * `npm test`). For this script the live run's setup checks no realm and
+ * logs on nowhere, whatever test config is present (`sharesLiveLogon`,
+ * `liveScripts.ts`; pinned by `liveScripts.test.ts`): nothing here needs a
+ * system but the real-system cases, which log on only through their own
+ * variables and skip with the reason elsewhere.
  *
  * **The closed-port case** reaches no system: the installed bin, started
  * with `--deferred-logon` against a loopback port the case bound and closed,

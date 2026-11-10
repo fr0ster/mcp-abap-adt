@@ -256,9 +256,10 @@ The mutations and what turned red are named in the commit message.
 - This worktree holds no `tests/test-config.yaml` (Measured, `ls`).
 
 Decision: the suite runs under its own script `test:live-deferred-logon`, listed in
-`LIVE_SCRIPTS`, `--concurrency 1`. The closed-port run (step 14) runs with no test config:
-in this worktree as it is, `MCP_TEST_CONFIG` unset — so the setup neither checks a realm
-nor logs on. No change to the live machinery is needed.
+`LIVE_SCRIPTS`, `--concurrency 1`. After review, the guarantee is enforced rather than left to
+the absence of a config: for this script `setUp` returns before the realm check and the logon
+whatever test config is present (`sharesLiveLogon`, `liveScripts.ts`), pinned by
+`liveScripts.test.ts`.
 
 ### Step 2: an RFC tool call against an unreachable system
 

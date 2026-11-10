@@ -23,6 +23,22 @@ export const LIVE_SCRIPTS: ReadonlySet<string> = new Set([
   'shared:check',
 ]);
 
+/**
+ * The live scripts whose suites never use the setup's shared logon:
+ * `test:live-deferred-logon` — its closed-port and RFC cases reach no
+ * system, and its real-system cases log on only through their own
+ * variables. For these the setup checks no realm and logs on nowhere,
+ * whatever test config is present (`globalSetup.ts`).
+ */
+const SYSTEMLESS_SCRIPTS: ReadonlySet<string> = new Set([
+  'test:live-deferred-logon',
+]);
+
+/** Whether the running live script takes the setup's realm check and logon. */
+export function sharesLiveLogon(event: string | undefined): boolean {
+  return event !== undefined && !SYSTEMLESS_SCRIPTS.has(event);
+}
+
 /** Whether the running npm script is a live one. */
 export function isLiveScript(event: string | undefined): boolean {
   return event !== undefined && LIVE_SCRIPTS.has(event);

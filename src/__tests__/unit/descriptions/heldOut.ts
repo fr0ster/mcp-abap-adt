@@ -11,16 +11,26 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import type { Query } from './queries';
 import { describeFailure, type Outcome } from './retrieval';
 
+/** Where the two JSON files are: their source directory, wherever this file was compiled to. */
+const HERE = path.join(
+  repositoryRoot(__dirname),
+  'src',
+  '__tests__',
+  'unit',
+  'descriptions',
+);
+
 export const HELD_OUT: readonly Query[] = JSON.parse(
-  fs.readFileSync(path.join(__dirname, 'heldOutQueries.json'), 'utf8'),
+  fs.readFileSync(path.join(HERE, 'heldOutQueries.json'), 'utf8'),
 ) as Query[];
 
 /** Per mode ("bm25", "cosine <model>", "hybrid <model>"): the pairs that failed, "[role] query". */
 const BASELINE = JSON.parse(
-  fs.readFileSync(path.join(__dirname, 'heldOutBaseline.json'), 'utf8'),
+  fs.readFileSync(path.join(HERE, 'heldOutBaseline.json'), 'utf8'),
 ) as Record<string, readonly string[]>;
 
 /** The key of an outcome's query-role pair. */

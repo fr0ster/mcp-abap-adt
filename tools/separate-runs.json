@@ -2,5 +2,8 @@
   "test:install": [
     "src/__tests__/unit/binSmoke.test.ts",
     "src/__tests__/unit/installMatrix.test.ts"
+  ],
+  "test:retrieval": [
+    "src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts"
   ]
 }

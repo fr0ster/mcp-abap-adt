@@ -148,6 +148,7 @@
     "test": "node tools/npm-test.mjs --concurrency 2",
     "test:build": "node tools/build-node-tests.mjs",
     "test:install": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/unit/installMatrix.test.ts src/__tests__/unit/binSmoke.test.ts",
+    "test:retrieval": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts",
     "test:integration": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./.test-build/tree/src/__tests__/integration/coverageReport/ledgerReporter.js --test-reporter-destination=stdout",
     "test:coverage-family": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./.test-build/tree/src/__tests__/integration/coverageReport/ledgerReporter.js --test-reporter-destination=stdout",
     "test:live-connection": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/integration/live/liveConnection.test.ts",

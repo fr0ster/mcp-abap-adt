@@ -722,3 +722,56 @@ it('the start words of a refusal for an unknown session user name what to set', 
   ).toBe(startSystemUserUnknownWords('default'));
   expect(startSystemUserUnknownWords('default')).toContain('SAP_USERNAME');
 });
+
+/**
+ * The start line names the network or TLS cause of a failed connection
+ * (fr0ster/mcp-abap-adt#353): the thrown value's `code`, read safely, when it
+ * is one of the fixed list — never its message, the URL or a host.
+ */
+describe('the start line names the network cause', () => {
+  const words = (thrown: unknown) =>
+    startConnectionWords(
+      thrown,
+      'default',
+      { sentenceFor: () => undefined },
+      'linux',
+    );
+  const failure = (code: unknown) =>
+    Object.assign(new Error('connect ECONNREFUSED sap.example:443'), { code });
+
+  it.each([
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'ETIMEDOUT',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'CERT_HAS_EXPIRED',
+    'SELF_SIGNED_CERT_IN_CHAIN',
+  ])('a listed code is named: %s', (code) => {
+    expect(words(failure(code))).toBe(
+      `Destination "default" could not be connected at start: Error (${code})`,
+    );
+  });
+
+  it('a code not on the list adds nothing, and the message never shows', () => {
+    const line = words(failure('ERR_SOMETHING_ELSE'));
+    expect(line).toBe(
+      'Destination "default" could not be connected at start: Error',
+    );
+    expect(line).not.toContain('sap.example');
+  });
+
+  it('a throwing code getter adds nothing and throws nothing', () => {
+    const thrown = new Error('x');
+    Object.defineProperty(thrown, 'code', {
+      get() {
+        throw new Error('the getter threw');
+      },
+    });
+    expect(words(thrown)).toBe(
+      'Destination "default" could not be connected at start: Error',
+    );
+  });
+});

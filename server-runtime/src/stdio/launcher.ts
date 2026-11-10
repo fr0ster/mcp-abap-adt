@@ -2,7 +2,10 @@ import * as path from 'node:path';
 import { classify, logFields } from '@mcp-abap-adt/auth-errors';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
+import {
+  type IBrowser,
+  TLS_FAILURE_CODES,
+} from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
@@ -40,6 +43,7 @@ import {
 } from '@mcp-abap-adt/lib/tool-set';
 import {
   type AuthDisplayConfig,
+  child,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -616,10 +620,51 @@ export function startSystemUserUnknownWords(destination: string): string {
 }
 
 /**
+ * Node's network codes a connection at start may fail with
+ * (fr0ster/mcp-abap-adt#353): the system is not there, refused or cut the
+ * connection, its name does not resolve, or no route reaches it.
+ */
+const START_NETWORK_CODES: readonly string[] = [
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+];
+
+/** The codes the start line names: the network's and the TLS failures (interfaces-auth's allowlist). */
+const START_CAUSE_CODES: readonly string[] = [
+  ...START_NETWORK_CODES,
+  ...TLS_FAILURE_CODES,
+];
+
+/**
+ * The thrown value's `code` when it is one of {@link START_CAUSE_CODES}; any
+ * other code, none, or a `code` that cannot be read (a throwing getter) is
+ * `undefined`. The value is from outside the type system: it is read
+ * guarded and compared as a string.
+ */
+function startCauseCodeOf(thrown: unknown): string | undefined {
+  let code: unknown;
+  try {
+    code = child(thrown, 'code');
+  } catch {
+    return undefined;
+  }
+  return typeof code === 'string' && START_CAUSE_CODES.includes(code)
+    ? code
+    : undefined;
+}
+
+/**
  * The words the connection at start failed in: what the failure reader
  * makes of it (a chain failure, the server's own refusal — a system lookup
  * that failed — or the destination layer's), else the destination, the
- * error's class and the status SAP answered — never its message.
+ * error's class, its network or TLS code when it is a listed one
+ * ({@link startCauseCodeOf}) and the status SAP answered — never its
+ * message.
  */
 export function startConnectionWords(
   error: unknown,
@@ -646,7 +691,8 @@ export function startConnectionWords(
     return destinationFailureWords(error, destination, options);
   }
   const sap = sapAnswerOf(error);
-  return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;
+  const cause = startCauseCodeOf(error);
+  return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${cause === undefined ? '' : ` (${cause})`}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;
 }
 
 /** Where the summary says the settings point: the URL over HTTP, the address over RFC. */

@@ -1217,6 +1217,7 @@ export abstract class BaseMcpServer extends McpServer {
     birth: (born: ResolvedConnection) => Promise<IAbapConnection>,
     failed: (connection: IAbapConnection) => Promise<void> = (connection) =>
       endConnection(connection),
+    kept: (connection: IAbapConnection) => void = () => {},
   ): BuiltConnection {
     const credential = resolved.credential;
     const destination: Destination = {
@@ -1250,6 +1251,8 @@ export abstract class BaseMcpServer extends McpServer {
         await failed(connection);
         throw error;
       }
+      // Born whole, its parameters made: the instance's from here on.
+      kept(connection);
       return connection;
     })();
     const entry: BuiltConnection = {
@@ -1328,9 +1331,11 @@ export abstract class BaseMcpServer extends McpServer {
    * Alive: picked up. SAP answering it is gone (`sessionGone`): that
    * instance is spent and logged nothing on — connection's "a new session is
    * a new instance" — so a new one is built with the normal logon, with the
-   * process's settings and credential, and starts a new session. Either way
-   * the file is this process's under the same handle (`adopt`), rewritten
-   * with the connection's cookies; `outcome.session` says which. The system
+   * process's settings and credential, and starts a new session;
+   * `outcome.session` says which. Either way the file becomes this
+   * process's under the same handle (`adopt`, rewritten with the
+   * connection's cookies) only once the birth is whole, its parameters made
+   * (`birthEntry`); a birth that fails after this gives the file back. The system
    * information the file carries is the connection's (same destination, same
    * system): nothing is looked up. Any other failure — the old session's
    * answer or the new logon's — is the start's, as SAP gave it, and gives
@@ -1386,7 +1391,6 @@ export abstract class BaseMcpServer extends McpServer {
         owner.release(claimed);
         throw logonError;
       }
-      owner.adopt(claimed, fresh, identity);
       if (claimed.system !== undefined)
         this.bornSystems.set(fresh, claimed.system);
       outcome.session = 'new';
@@ -1401,7 +1405,6 @@ export abstract class BaseMcpServer extends McpServer {
       owner.release(claimed);
       throw error;
     }
-    owner.adopt(claimed, connection, identity);
     if (claimed.system !== undefined)
       this.bornSystems.set(connection, claimed.system);
     outcome.session = 'picked_up';
@@ -1478,12 +1481,27 @@ export abstract class BaseMcpServer extends McpServer {
             resolved,
             (born) =>
               this.resumedSession(born, owner, claimed, identity, outcome),
-            // A picked-up session is left as it is: its file is a leftover
-            // again once the process ended.
+            // A birth that failed after the take-up (its parameters). The
+            // session taken up is left as it is and its file given back — a
+            // leftover again at once, for the next birth and the leftover
+            // tools, whether or not the process goes on (#353: a deferred
+            // server does). A fresh session (the old one was gone) is this
+            // process's under the handle until its logoff completed, which
+            // deletes the record, as before.
             async (connection) => {
-              if (outcome.session !== 'picked_up') {
-                await endConnection(connection);
+              if (outcome.session === 'picked_up') {
+                owner.release(claimed);
+                return;
               }
+              owner.adopt(claimed, connection, identity);
+              await endConnection(connection);
+            },
+            // Born whole: the file is this process's under the same handle,
+            // written with the information its parameters were made from.
+            (connection) => {
+              owner.adopt(claimed, connection, identity);
+              const known = this.systems.get(connection)?.information;
+              if (known !== undefined) owner.describeSystem(connection, known);
             },
           )
         : this.buildConnection(resolved, (born) => this.logOn(born));

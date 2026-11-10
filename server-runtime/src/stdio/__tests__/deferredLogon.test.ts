@@ -165,11 +165,14 @@ afterEach(async () => {
 });
 
 /** Launches `mcp-abap-adt` over an in-memory transport, with `flags`. */
-async function start(flags: readonly string[] = ['--deferred-logon']) {
+async function start(
+  flags: readonly string[] = ['--deferred-logon'],
+  kind: 'onprem' | 'cloud' = 'onprem',
+) {
   const args = [
     `--env-path=${envFile}`,
     `--auth-broker-path=${root}`,
-    '--system-type=onprem',
+    `--system-type=${kind}`,
     ...flags,
   ];
   const config = readCoreConfig(args, process.env, null);
@@ -633,7 +636,10 @@ function writerOf(handle: string): unknown {
 }
 
 /** A session a killed process left for this destination, through the gate. */
-async function leftover(): Promise<{ handle: string; session: string }> {
+async function leftover(
+  kind: 'onprem' | 'cloud' = 'onprem',
+): Promise<{ handle: string; session: string }> {
+  process.env.SAP_SYSTEM_TYPE = kind;
   await gate.forward(standIn.url);
   const handle = await killedProcessSession(gate.url, runtimeDirectory(root), {
     user: USER,
@@ -746,6 +752,37 @@ describe('the leftover session and the deferred logon', () => {
       assert.equal(used.has(two.session), false);
       assert.equal(writerOf(one.handle), 111);
       assert.equal(writerOf(two.handle), 111);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('both flags, the take-up made but its system information refused: the file is given back, a leftover again', async () => {
+    const { handle, session } = await leftover('cloud');
+    // ABAP Cloud without systeminformation: the birth's parameters fail
+    // after the session was taken up.
+    standIn.systemInformation(null);
+    const s = await start(['--deferred-logon', '--restore-session'], 'cloud');
+    try {
+      const refused = await s.call('GetAdtTypes');
+      assert.equal(refused.isError, true);
+      assert.equal(
+        payloadOf(refused.text).error,
+        'cloud_without_systeminformation',
+      );
+      // The session is a leftover again: its file, named by its handle,
+      // written by the dead process, listed for the tools.
+      assert.deepEqual(runtimeFiles(runtimeDirectory(root)), [handle]);
+      assert.equal(writerOf(handle), 111);
+      const listed = await s.call('ListLeftoverSessions');
+      assert.equal(listed.text.includes(handle), true, listed.text);
+      // The system answering again, the next call takes it up.
+      standIn.systemInformation(USER, 'SYS');
+      const from = standIn.requests.length;
+      const read = await s.call('GetAdtTypes');
+      assert.equal(read.isError, false, read.text);
+      assert.equal(sessionsSince(from).has(session), true);
+      assert.equal(writerOf(handle), process.pid);
     } finally {
       await s.stop();
     }

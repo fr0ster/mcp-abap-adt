@@ -21,13 +21,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/brokerFactory';
 import { readCoreConfig } from '../../../../server-runtime/src/stdio/config/coreParameters';
 import { factoryConfigFrom } from '../../../../server-runtime/src/stdio/launcher';
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import { fullToolSet, registryOf } from '../../../lib/toolSet';
+import { McpSession } from '../helpers/testers/hardMode';
 
 /** The reserved name that never resolves (RFC 2606): no system is behind it. */
 const UNREACHABLE_HOST = 'unreachable.invalid';
@@ -50,25 +50,6 @@ function rfcUnavailable(): string | undefined {
   } catch {
     return '@mcp-abap-adt/sap-rfc-lite or the SAP NW RFC library did not load (SAPNWRFC_HOME, the library search path)';
   }
-}
-
-/** The one text of a tool answer. */
-function textOf(result: unknown): string {
-  const content =
-    typeof result === 'object' && result !== null && 'content' in result
-      ? result.content
-      : undefined;
-  if (!Array.isArray(content)) return '';
-  return content
-    .map((part: unknown) =>
-      typeof part === 'object' &&
-      part !== null &&
-      'text' in part &&
-      typeof part.text === 'string'
-        ? part.text
-        : '',
-    )
-    .join('');
 }
 
 const rfcSkip = rfcUnavailable();
@@ -132,14 +113,12 @@ describe('an RFC tool call against an unreachable system', () => {
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     // The first tool call makes the connection (no connectAtStart).
     await server.start(destination, serverSide);
-    const client = new Client({ name: 'deferred-rfc', version: '0.0.0' });
-    await client.connect(clientSide);
+    // A session with no timer of its own (launchSites.test.ts).
+    const session = new McpSession(clientSide);
+    await session.initialize();
     try {
-      const answer = await client.callTool({
-        name: 'GetAdtTypes',
-        arguments: {},
-      });
-      const text = textOf(answer);
+      const answer = await session.callTool('GetAdtTypes', {});
+      const text = answer.content.map((part) => part.text).join('');
       assert.equal(answer.isError, true);
       assert.equal(
         text.includes('RFC_COMMUNICATION_FAILURE'),
@@ -152,7 +131,7 @@ describe('an RFC tool call against an unreachable system', () => {
         'the answer names no host',
       );
     } finally {
-      await client.close();
+      await session.close();
       await server.close();
     }
   });

@@ -19,14 +19,14 @@ npm run shared:check     # verify they exist
 
 **Important**: Shared object setup and SAP environment verification require collaboration with the user. Don't try to automate everything — run `shared:setup` once, show the result, and ask the user to verify activation in ADT. If activation fails, ask the user what they see rather than retrying blindly.
 
-**Running integration tests**: Always save full output to a log file — do NOT truncate with `tail`. Tests take 15-25 minutes; use `timeout 1800` (30 min) or `run_in_background` with no timeout truncation. This avoids re-running long tests just to see errors.
+**Running integration tests**: Save the full output to a log file; never truncate it with `tail`. Live files run one at a time on node:test; a first Ctrl-C lets the running files finish their cleanup, a second ends them. One file, one case and why one at a time: `src/__tests__/integration/README.md`, "Running".
 
 ```bash
-# Soft mode (mass run) — save full log
-npm run test:integration 2>&1 | tee /tmp/integration-test.log
+# Soft mode (mass run) — save the full log
+npm run test:integration 2>&1 | tee <log>
 
-# Hard mode (targeted, in test-config.yaml set integration_hard_mode.enabled: true)
-npm test -- --testPathPatterns=<specific-test>
+# One file (hard mode: integration_hard_mode.enabled: true in test-config.yaml), by its source path
+npm run test:integration -- src/__tests__/integration/<path>.test.ts
 ```
 
 ### Test Configuration
@@ -247,8 +247,8 @@ We took the fix and skipped the check.
 `src/__tests__/unit/installMatrix.test.ts` installs the binaries by name, as a
 user does, in every layout and proves one `@mcp-abap-adt/lib` per process (19.1.0
 loaded two when a wrapper and its base were installed in one command: a binary
-depended on another binary; none may now). Before a release, make sure both ran
-(CI runs the matrix on ubuntu + Node 22 only), and after publishing run
+depended on another binary; none may now). Before a release, make sure `npm run test:install` ran
+(it runs both; CI runs it as its own step), and after publishing run
 `docs/deployment/RELEASE.md` step 9; when adding a bin, add it to both. And treat
 any `__dirname`-relative path in `server-runtime/` and in the binary packages'
 version modules as suspect: count the levels for both layouts.

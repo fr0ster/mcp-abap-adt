@@ -111,6 +111,7 @@ ENVIRONMENT VARIABLES:
   MCP Server Configuration:
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
+    MCP_DEFERRED_LOGON             Start without contacting SAP; the first tool call logs on (true|false)
     MCP_BROWSER                    Browser for a login: system|auto|chrome|edge|firefox|none|headless
     MCP_BROWSER_PROGRAM            The program that opens the login URL (excludes MCP_BROWSER)
     MCP_RENEWAL                    refresh-then-login (default) | refresh-only (never a login)

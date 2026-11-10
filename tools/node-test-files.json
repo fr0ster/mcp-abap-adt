@@ -1,5 +1,6 @@
 [
   "server-runtime/src/stdio/__tests__/cancel/loginBound.test.ts",
+  "server-runtime/src/stdio/__tests__/config/deferredLogonParameters.test.ts",
   "src/__tests__/admin/shared-deps/check.test.ts",
   "src/__tests__/admin/shared-deps/setup.test.ts",
   "src/__tests__/admin/shared-deps/teardown.test.ts",

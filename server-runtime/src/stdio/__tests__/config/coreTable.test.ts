@@ -87,6 +87,7 @@ describe('the table', () => {
       '--browser-program',
       '--renewal',
       '--browser-auth-port',
+      '--deferred-logon',
       '--connection-type',
       '--system-type',
     ]);
@@ -103,6 +104,7 @@ describe('the table', () => {
       ['--browser-program', 'MCP_BROWSER_PROGRAM', 'browser-program'],
       ['--renewal', 'MCP_RENEWAL', 'renewal'],
       ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
+      ['--deferred-logon', 'MCP_DEFERRED_LOGON', 'deferred-logon'],
       ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],
       ['--system-type', 'SAP_SYSTEM_TYPE', 'system-type'],
     ]);
@@ -237,7 +239,10 @@ describe('the generated template', () => {
   it('is valid YAML config and sets nothing', () => {
     const config = load(template()) as never;
     expect(validateYamlConfig(config).errors).toEqual([]);
-    expect(readAuthParameters([], {}, config)).toEqual({ unsafe: false });
+    expect(readAuthParameters([], {}, config)).toEqual({
+      unsafe: false,
+      deferredLogon: false,
+    });
   });
 });
 

@@ -128,6 +128,15 @@ export const CORE_ROWS: readonly Parameter[] = [
     help: 'Login callback port, 1-65535 (default: 61001)',
   },
   {
+    key: 'deferredLogon',
+    cli: '--deferred-logon',
+    env: 'MCP_DEFERRED_LOGON',
+    yaml: 'deferred-logon',
+    kind: 'flag',
+    section: DESTINATION,
+    help: 'Start without contacting the SAP system: the tools are listed at once and the first tool call logs on. Default: off — the start logs on and exits 1 when it fails',
+  },
+  {
     key: 'connectionType',
     cli: '--connection-type',
     env: 'SAP_CONNECTION_TYPE',
@@ -374,6 +383,11 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** Write named sessions to disk (`--unsafe`) */
   unsafe?: boolean;
   /**
+   * `--deferred-logon`: the start contacts no SAP system and the first tool
+   * call logs on (#353); off, the start logs on and exits 1 when it fails.
+   */
+  deferredLogon?: boolean;
+  /**
    * The browser of a login (`--browser`): system (default), auto, chrome,
    * edge, firefox, none, headless — mapped by the platform to one of
    * auth-providers' browsers.
@@ -482,6 +496,7 @@ export function readCoreConfig(
           : source('envDestination'),
     authBrokerPath,
     unsafe: flagValue(values.unsafe) ?? false,
+    deferredLogon: flagValue(values.deferredLogon) ?? false,
     browser: str(values.browser),
     browserProgram: str(values.browserProgram),
     renewal: wordValue(values.renewal, RENEWALS),

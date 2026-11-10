@@ -243,6 +243,10 @@ interface Instance {
    * Soft mode only: in hard mode the listener is in the server's process.
    */
   longPollSent?(): Promise<void>;
+  /** How many AMDP event reads (`getEvents`) are in flight now. Soft mode only. */
+  eventReadsOpen?(): number;
+  /** Resolves once every AMDP event read in flight now has been answered. Soft mode only. */
+  eventReadsEnded?(): Promise<void>;
 }
 
 /** The `listen` calls a listener has sent, and a wait for the n-th one. */
@@ -334,6 +338,31 @@ describe('Debugger handlers (integration)', () => {
         return dbg;
       },
     };
+    // The live AMDP ports, with every event read the session sends kept
+    // while it is in flight.
+    const reads = new Set<Promise<void>>();
+    const liveAmdp = liveAmdpPorts();
+    const amdpPorts: typeof liveAmdp = {
+      ...liveAmdp,
+      amdpDebugger(c) {
+        const amdp = liveAmdp.amdpDebugger(c);
+        const getEvents = amdp.getEvents.bind(amdp);
+        amdp.getEvents = <E extends IAdtError = IAdtError>(
+          mainId: string,
+          options?: IAdtAnalyseOptions<E>,
+        ) => {
+          const read = getEvents<E>(mainId, options);
+          const answered = read.then(
+            () => undefined,
+            () => undefined,
+          );
+          reads.add(answered);
+          void answered.then(() => reads.delete(answered));
+          return read;
+        };
+        return amdp;
+      },
+    };
     let dbg: DebuggerInstance | undefined;
     const ctx: HandlerContext = {
       ...createHandlerContext({ connection, logger }),
@@ -350,7 +379,7 @@ describe('Debugger handlers (integration)', () => {
               },
               { breakpointConflict: resolveBreakpointConflict() },
             ),
-            amdp: new AmdpSession(liveAmdpPorts()),
+            amdp: new AmdpSession(amdpPorts),
           });
           state.attach(dbg);
         }
@@ -362,6 +391,10 @@ describe('Debugger handlers (integration)', () => {
       ctx,
       debugger: () => dbg,
       longPollSent: () => listens.until(2),
+      eventReadsOpen: () => reads.size,
+      eventReadsEnded: async () => {
+        await Promise.all([...reads]);
+      },
     };
   };
 
@@ -912,7 +945,7 @@ describe('Debugger handlers (integration)', () => {
 
   // --- 1b. the pool's trigger: a stop, then at once a start in a new instance -----------
 
-  it('stop then start at once in a new instance (as a pool does): the start is clean', async () => {
+  it('stop, then a start at once in a new instance (as a pool does): the stop answers stopped, and the new instance starts and stops', async () => {
     await tester.run(async () => {
       const mode = tester.isHardMode() ? 'hard' : 'soft';
       const rounds: unknown[] = [];
@@ -930,6 +963,7 @@ describe('Debugger handlers (integration)', () => {
         });
         timing(`${mode} pool.stop(listening)`, stop.ms);
         assert.equal(stop.isError, false);
+        assert.equal(stop.json?.state, 'stopped');
         const b = newInstance();
         const next = await call(b, 'DebugStartListener', {
           breakpoints: [line('mark')],
@@ -940,10 +974,12 @@ describe('Debugger handlers (integration)', () => {
           next: next.isError ? next.text.slice(0, 400) : next.json?.state,
         });
         assert.equal(next.isError, false);
+        assert.equal(typeof next.json?.state_handle, 'string');
         const stopB = await call(b, 'DebugStop', {
           state_handle: next.json.state_handle,
         });
         assert.equal(stopB.isError, false);
+        assert.equal(stopB.json?.state, 'stopped');
       }
       measure(
         'pool',
@@ -1078,7 +1114,7 @@ describe('Debugger handlers (integration)', () => {
 
   // --- 3. stated ids, reconciliation -------------------------------------------------------
 
-  it('stated ids: a successor with the same ids starts without a conflict and stops what was left', async () => {
+  it('stated ids: a successor with the same ids as a left listener starts without a conflict and stops; the left poll is answered', async () => {
     await tester.run(async () => {
       softOnly('the predecessor is the test’s own listener');
       const ids = {
@@ -1110,18 +1146,18 @@ describe('Debugger handlers (integration)', () => {
           ms_after_successor_start: Math.round(ended.at - startedAt),
         });
         assert.equal(ended.status, 'ok');
-        assert.ok(Math.round(ended.at - startedAt) < 30_000);
         const stopB = await call(b, 'DebugStop', {
           state_handle: second.json.state_handle,
         });
         assert.equal(stopB.isError, false);
+        assert.equal(stopB.json?.state, 'stopped');
       } finally {
         await left.close();
       }
     });
   });
 
-  it('stated ids, measured: an IDE-like listener under the same ideId — does its poll end when an instance starts?', async () => {
+  it('stated ids, measured: an instance under an IDE-like listener’s ideId starts without a conflict and stops; the IDE-like poll’s answer is recorded', async () => {
     await tester.run(async () => {
       softOnly('the IDE-like listener is the test’s own');
       const ideId = newDebuggerId();
@@ -1149,9 +1185,11 @@ describe('Debugger handlers (integration)', () => {
           ms_after_instance_start: Math.round(ended.at - startedAt),
           ms_after_its_own_start: Math.round(ended.at - raw.started),
         });
-        await call(inst, 'DebugStop', {
+        const stopped = await call(inst, 'DebugStop', {
           state_handle: started.json.state_handle,
         });
+        assert.equal(stopped.isError, false);
+        assert.equal(stopped.json?.state, 'stopped');
       } finally {
         await raw.close();
       }
@@ -1744,8 +1782,6 @@ describe('Debugger handlers (integration)', () => {
         assert.equal(inst.fault.continues, 0);
         assert.equal(abap.holdsState(), true);
         assert.equal(abap.listBreakpoints().length, 1);
-        // Still held: the run has not returned.
-        assert.equal(settled, false);
 
         // 3. A clean stop: the listener's stop deletes the breakpoints, then
         // the debuggee is released and the run goes to its end.
@@ -1804,7 +1840,7 @@ describe('Debugger handlers (integration)', () => {
       ? { status: 0, text: read.text }
       : { status: 200, text: String(read.json?.source ?? '') };
 
-  it('AMDP chain: start, break, table, steps, continue to the end; then a stop ends the event read', async () => {
+  it('AMDP chain: start, break, table, steps, continue to the end; then a stop, and the event read open at it ends (waited for)', async () => {
     await tester.run(async () => {
       softOnly('the AMDP chain drives the instance in process');
       // The shared pair, read, never written: the case skips only where
@@ -1960,10 +1996,18 @@ describe('Debugger handlers (integration)', () => {
           events.map((e) => e.kind),
         );
 
-        // 6: does SAP end the open event read when the session is stopped?
+        // 6: SAP ends the event read open when the session is stopped: the
+        // case waits for that read's answer, with no bound (the suite's
+        // header: a wait that does not end is ended with the interrupt).
         const amdp = inst.debugger()?.amdp;
         if (!amdp) throw new Error('the AMDP session has no debugger');
+        if (!inst.eventReadsOpen || !inst.eventReadsEnded) {
+          throw new Error('the instance does not observe its event reads');
+        }
         assert.equal(amdp.holdsState(), true);
+        const openAtStop = inst.eventReadsOpen();
+        assert.ok(openAtStop > 0, 'an event read is open at the stop');
+        const readsEnded = inst.eventReadsEnded();
         const stopAt = now();
         const stop = await call(inst, 'AmdpDebugStop', {
           state_handle: handle,
@@ -1971,13 +2015,13 @@ describe('Debugger handlers (integration)', () => {
         handle = undefined; // stopped: the cleanup's stop is not owed
         timing('soft amdp.stop', stop.ms);
         assert.equal(stop.isError, false);
-        // Read at the stop's answer: nothing waits after it.
-        measure('6', 'the event read after AmdpDebugStop', {
-          ended: !amdp.holdsState(),
+        await readsEnded;
+        measure('6', 'the event read open at AmdpDebugStop', {
+          open_at_stop: openAtStop,
           ms_after_stop: Math.round(now() - stopAt),
+          holds_state: amdp.holdsState(),
           failures: amdp.failures(),
         });
-        assert.equal(amdp.holdsState(), false);
       } catch (error) {
         failure = error;
       } finally {

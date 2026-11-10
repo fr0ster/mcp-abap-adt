@@ -74,6 +74,7 @@
   "src/__tests__/unit/coverage/refusalStop.test.ts",
   "src/__tests__/unit/coverage/runReport.test.ts",
   "src/__tests__/unit/coverage/servedEntries.test.ts",
+  "src/__tests__/unit/coverage/takeUpCase.test.ts",
   "src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts",
   "src/__tests__/unit/installMatrix.test.ts",
   "src/__tests__/unit/runner/build.test.ts",

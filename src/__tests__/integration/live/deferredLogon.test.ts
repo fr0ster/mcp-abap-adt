@@ -47,6 +47,7 @@ import {
   installedFile,
   installPackedRelease,
 } from '../../helpers/installedRelease';
+import { type TakeUpServer, takeUpCase } from '../helpers/takeUpCase';
 import { launchStdioScript, McpSession } from '../helpers/testers/hardMode';
 
 /** The reserved name that never resolves (RFC 2606): no system is behind it. */
@@ -459,71 +460,40 @@ describe('the installed bin with --deferred-logon', () => {
         `--auth-broker-path=${dir}`,
         '--deferred-logon',
       ];
-      const first = await launchStdioScript({
-        argv: args,
-        env: childEnvironment(),
-        cwd: dir,
-        logOn: async () => {},
-      });
-      let lockHandle = '';
-      try {
-        const locked = await first.call('LockObjectLow', {
-          object_name: LOCK_CLASS,
-          object_type: 'class',
+      // The flow and its cleanup are takeUpCase's (pinned by
+      // unit/coverage/takeUpCase.test.ts): once the first process may have
+      // written its session, every path that did not unlock logs off the
+      // destination's leftover sessions.
+      const launch = async (
+        argv: readonly [string, ...string[]],
+      ): Promise<TakeUpServer> => {
+        const server = await launchStdioScript({
+          argv,
+          env: childEnvironment(),
+          cwd: dir,
+          logOn: async () => {},
         });
-        assert.equal(locked.isError, false);
-        const handle = payloadOf(
-          locked.content.map((p) => p.text).join(''),
-        ).lock_handle;
-        lockHandle = typeof handle === 'string' ? handle : '';
-        assert.notEqual(lockHandle, '');
-      } finally {
-        // Killed: its session and its lock are left behind.
-        first.child?.process.kill('SIGKILL');
-        await first.close().catch(() => undefined);
-      }
-      const second = await launchStdioScript({
-        argv: [args[0], ...args.slice(1), '--restore-session'],
-        env: childEnvironment(),
-        cwd: dir,
-        logOn: async () => {},
-      });
-      let unlocked = false;
-      try {
-        assert.equal(second.toolNames.size > 0, true);
-        const answer = await second.call('UnlockObjectLow', {
-          object_name: LOCK_CLASS,
-          object_type: 'class',
-          lock_handle: lockHandle,
-        });
-        unlocked = answer.isError === false;
-        assert.equal(unlocked, true);
-      } finally {
-        if (!unlocked) {
-          // The case's own cleanup: the leftover session logged off.
-          const listed = await second.call('ListLeftoverSessions', {});
-          const sessions = payloadOf(
-            listed.content.map((p) => p.text).join(''),
-          ).sessions;
-          if (Array.isArray(sessions)) {
-            for (const session of sessions) {
-              const handle =
-                typeof session === 'object' &&
-                session !== null &&
-                'handle' in session
-                  ? session.handle
-                  : undefined;
-              if (typeof handle === 'string') {
-                await second.call('LogoffLeftoverSession', { handle });
-              }
-            }
-          }
-        }
-        const code =
-          second.child === undefined ? null : await second.child.stop();
-        await second.close();
-        assert.equal(code, 0);
-      }
+        return {
+          call: (tool, toolArgs) => server.call(tool, toolArgs),
+          close: () => server.close(),
+          kill: () => {
+            server.child?.process.kill('SIGKILL');
+          },
+          stop: async () =>
+            server.child === undefined ? null : server.child.stop(),
+        };
+      };
+      const result = await takeUpCase(
+        {
+          first: () => launch(args),
+          second: () =>
+            launch([args[0], ...args.slice(1), '--restore-session']),
+          cleaner: () => launch(args),
+        },
+        LOCK_CLASS,
+      );
+      assert.equal(result.unlocked, true);
+      assert.equal(result.secondExit, 0);
     });
   });
 });

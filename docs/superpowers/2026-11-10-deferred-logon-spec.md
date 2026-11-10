@@ -305,25 +305,25 @@ in the commit.
   shutdown trigger ends the process with exit `0`; every stdout byte is a JSON-RPC frame. It
   reports no path, no `.env` value and no answer text. The plan checks what the live run's
   global setup does for a script that needs no system, and states where the suite runs.
-- **The system becomes reachable mid-session (E19).** In the same suite, a case that runs
+- **The system becomes reachable mid-session (a real on-premise system, which the owner names at the go).** In the same suite, a case that runs
   only where a variable names one HTTP `.env` of a real system, and skips with its reason
   elsewhere. The server's `.env` copy points at a local port the test owns; the port is
   closed first (a call answers `no_connection`), then the test opens a plain TCP forwarder
   on it to the system's address, and the next call answers from the system; the shutdown
   logs off. HTTP only (a forwarder over TLS would break the host name check). It is run on
-  E19 only on the owner's go; this task does not run it.
-- **The first call takes up a leftover session (E19).** In the same suite, under the same
+  that system only on the owner's go; this task does not run it.
+- **The first call takes up a leftover session (the same real on-premise system).** In the same suite, under the same
   variable, skipped with its reason elsewhere. A first server process, started with
   `--deferred-logon`, makes one call that logs on and takes a lock on a test object, and is
   killed (`SIGKILL`), leaving its runtime file. A second process, started with
   `--deferred-logon --restore-session`, lists the tools before any request, then its first
   call takes the session up and unlocks with the lock handle the first process took; its
   shutdown logs off. The case's own cleanup logs off the leftover session if the second
-  process did not take it up. Run on E19 only on the owner's go; this task does not run it.
+  process did not take it up. Run on that system only on the owner's go; this task does not run it.
 
 ## 7. Documentation
 
-- `CHANGELOG.md`: a new minor entry (after 24.0.0): the flag, its three forms and
+- `CHANGELOG.md`: the entry under `## [24.0.0]` (#353 ships in 24.0.0): the flags, their forms and
   precedence, `no_connection`, the restore flag and its refusal without the deferred logon.
 - `docs/user-guide/CLI_OPTIONS.md`, "Destination and login" table (`:89-111`): both rows,
   the refusal in "What `mcp-abap-adt` refuses", and a short section on the deferred logon.
@@ -349,4 +349,4 @@ in the commit.
 - The CHANGELOG entries since 19.0.0 that describe the start logon stay as they are
   (`CHANGELOG.md:578`, `:584`, `:594`, `:660`, and 24.0.0's `:145`): history is not
   rewritten.
-- No migration note: the default does not change. This is a minor release.
+- No migration note: the default does not change.

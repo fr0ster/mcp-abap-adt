@@ -14,7 +14,8 @@ HTTP and SSE, each `-ro` binary a package of its own:
 | compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, the background runs of the long reads, `HandlerBatch`; on stdio the leftover-session list |
 
 No `-ro` binary carries a debugger or a run of code (each serves the background runs of its long reads, which only read), no binary a resume of a leftover session
-(a stdio server takes up the one leftover session of its destination at its start), and no http or
+(a stdio server takes up the one leftover session of its destination at its start, or, with
+`--deferred-logon --restore-session`, at its first tool call), and no http or
 sse binary any leftover-session tool: one such server holds the sessions of many users,
 so it writes no runtime session file. A
 write binary keeps every readonly tool: writing needs reading (a `Get<Type>` both groups serve is
@@ -152,7 +153,8 @@ in the compact ones — and declares an optional `state_handle` argument on ever
      `mcp-abap-adt-compact` only
    - The SAP sessions a killed server process left open, listed or logged off by the user; they
      act only on the caller's own sessions. No tool resumes one: a stdio server takes up the one
-     leftover session of its destination at its start
+     leftover session of its destination at its start (with `--deferred-logon`, only with
+     `--restore-session`, at its first tool call)
    - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
 
 ## Usage

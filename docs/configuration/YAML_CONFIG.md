@@ -78,6 +78,8 @@ browser: system                # system | auto | chrome | edge | firefox | none 
 # browser-program: /opt/browsers/my-browser   (excludes browser)
 renewal: refresh-then-login    # refresh-then-login | refresh-only
 browser-auth-port: 61001
+# deferred-logon: true         # start without contacting SAP; the first tool call logs on
+# restore-session: true        # with deferred-logon: the first call takes up the leftover session
 # login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
 # auth-debug: true             # providers' debug lines on stderr, secrets' first and last four characters; no environment form
 # shutdown-timeout: 25         # seconds, 1-86400; no default (a shutdown waits)
@@ -106,6 +108,8 @@ Each of these ranks below the CLI, the process environment and the destination's
 | `browser-program` | string | — | The program that opens the login URL (excludes `browser`) |
 | `renewal` | string | `refresh-then-login` | `refresh-then-login` or `refresh-only` (never a login) |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
+| `deferred-logon` | boolean | `false` | Start without contacting the SAP system; the first tool call logs on. Below `--deferred-logon` and `MCP_DEFERRED_LOGON` |
+| `restore-session` | boolean | — | With `deferred-logon`: the first tool call takes up the destination's one leftover session. Stated (any value) without `deferred-logon`, the start is refused; the generated template leaves it unstated |
 | `login-timeout` | number | — | Seconds after which a browser login is ended, 1-86400; no default (no bound) |
 | `auth-debug` | boolean | `false` | The token providers' debug lines on stderr; a refused token request's line names the first and last four characters of each secret it sent. YAML and `--auth-debug` only: no environment variable |
 

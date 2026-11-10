@@ -149,6 +149,17 @@ Destinations are served only by `mcp-abap-adt` (stdio); `mcp-abap-adt-http` and 
 `--mcp`, `--env` and `--env-path` at start, naming `mcp-abap-adt`. Without any of them, stdio starts in
 inspection-only mode (the tool list of the stated system type answers — inspection needs `--system-type` too; a tool call needs a connection).
 
+**Two systems that are never up at the same time** (one server each, as an MCP client starts
+them): `--deferred-logon` starts each without contacting its system, so neither fails at the
+start; a call to the one that is down answers `no_connection` with its cause code, and once the
+system is started the next call logs on — no reconnect by hand
+([--deferred-logon](CLI_OPTIONS.md#--deferred-logon)).
+
+```bash
+mcp-abap-adt --env=system-a --system-type=onprem --deferred-logon
+mcp-abap-adt --env=system-b --system-type=onprem --deferred-logon
+```
+
 ### How It Works
 
 1. **One destination per process.** For another destination, start another process (`--mcp=<other>`).

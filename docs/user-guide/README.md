@@ -143,7 +143,10 @@ normally and starts a new session instead; its locks are gone. The record stays 
 either way. With several records, none is picked: the server logs on normally and leaves them for
 the tools below. A debugger's session is never taken up. After a start on a leftover session the
 server checks and repairs nothing: if the session ended or its locks are gone, SAP's answers say
-so, and you redo your requests. Two tools act on the leftover sessions of the destination the
+so, and you redo your requests. With `--deferred-logon` (the start contacts no system) the record
+is not taken up on its own: the first tool call logs on and the record stays for the tools below;
+with `--restore-session` as well, the first tool call takes it up as a start does (see
+[CLI options](CLI_OPTIONS.md#--deferred-logon)). Two tools act on the leftover sessions of the destination the
 server serves:
 
 - `ListLeftoverSessions` (compact `HandlerLeftoverSessionList`) — the handle, role, destination,

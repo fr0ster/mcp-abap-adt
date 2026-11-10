@@ -18,7 +18,7 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built at the process's start, before the MCP transport opens (the destination's one leftover session taken up, or a logon; a failure ends the process), and kept for the instance's life: only a session SAP already lost replaces it. On stdio the user is fixed for the process: the session is renewed (refresh token, or a new login when the refresh fails) and written back by the same provider — the same user — so the leftover-session tools' caller is the destination the instance serves (matched from the process's own settings and credential, with no request to SAP), and the background-run tools' caller is the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built at the process's start, before the MCP transport opens (the destination's one leftover session taken up, or a logon; a failure ends the process) — with `--deferred-logon` by the first tool call that needs it instead (a logon, or with `--restore-session` the leftover session taken up; a failure is that call's answer, `no_connection` when the system cannot be reached, and the next call builds again) — and kept for the instance's life: only a session SAP already lost replaces it. On stdio the user is fixed for the process: the session is renewed (refresh token, or a new login when the refresh fails) and written back by the same provider — the same user — so the leftover-session tools' caller is the destination the instance serves (matched from the process's own settings and credential, with no request to SAP), and the background-run tools' caller is the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
 - **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
 - **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 
@@ -73,7 +73,8 @@ tool on its own connection does not. Once in the flow, a queued call checks its
 connection again: when the call ahead found the session lost, it takes the replacement before its
 tool runs, so only the call that met the loss fails (it is not replayed). Taking up a
 leftover session is the stdio connector's birth at the process's start, before the transport
-opens, not a change of a connector: there is no resume tool, so it takes no turn in the flow and
+opens (with `--deferred-logon --restore-session`, its birth at the first tool call), not a change
+of a connector: there is no resume tool, so it takes no turn in the flow and
 replaces nothing. Over Streamable HTTP the held connection takes each request's credential
 (a renewed token, a new basic pair: the same user) and keeps its SAP session; it is replaced only
 when SAP ended that session.

@@ -97,6 +97,8 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--browser-program=<program>` | `MCP_BROWSER_PROGRAM` | `browser-program` | a program | The program that opens the login URL; excludes `--browser` |
 | `--renewal=<mode>` | `MCP_RENEWAL` | `renewal` | `refresh-then-login`, `refresh-only` | How an expired session is renewed (default `refresh-then-login`); `refresh-only` never logs in |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
+| `--deferred-logon` | `MCP_DEFERRED_LOGON` | `deferred-logon` | flag | Start without contacting the SAP system: the tools are listed at once, the first tool call logs on (default: off — the start logs on and exits `1` when it fails). See [--deferred-logon](#--deferred-logon) |
+| `--restore-session` | `MCP_RESTORE_SESSION` | `restore-session` | flag | With `--deferred-logon`: the first tool call takes up the destination's one leftover session instead of logging on. Refused without `--deferred-logon` |
 | `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
 | `--auth-debug` | — | `auth-debug` | flag | Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent (default: off). **No environment variable** |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type, required for a destination: no default. With `--mcp=<name>` the destination's `.env` may state it; a service key does not |
@@ -123,6 +125,7 @@ The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--m
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 | `--tls-*` | ``<form>: TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse` `` |
 | `--allow-destination-header`, YAML `allow-destination-header` | ``<form> is gone: `mcp-abap-adt` serves the destination it is started with (--mcp, --env, --env-path); the HTTP and SSE binaries take credentials only from `x-sap-*` headers`` |
+| `--restore-session`, `MCP_RESTORE_SESSION`, YAML `restore-session` (any value) without `--deferred-logon` | ``<form> needs --deferred-logon: a start without it takes up the destination's leftover session on its own`` |
 
 `MCP_SSE_*`, `MCP_HTTP_*` and `MCP_TLS_*` are not read by `mcp-abap-adt`.
 | `--auth-broker`, `MCP_USE_AUTH_BROKER`, YAML `auth-broker` (16.0.0) | `<form> was removed in 16.0.0 — remove it from the configuration` |
@@ -253,6 +256,44 @@ is registered elsewhere.
 
 ```bash
 mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
+```
+
+### --deferred-logon
+
+By default `mcp-abap-adt` logs on at its start, before the MCP transport opens, and a start
+that cannot reach the system ends with exit `1` (since 19.0.0). With `--deferred-logon`
+(`MCP_DEFERRED_LOGON=true`, YAML `deferred-logon: true`) the start contacts no SAP system: the
+configuration is still checked as before — the connection type and the system type are still
+required — and the tools of the declared system type are listed at once. The first tool call
+that needs the connection logs on (a browser login included).
+
+While the system cannot be reached, such a call answers
+
+```json
+{ "error": "no_connection",
+  "message": "no connection to the SAP system: the connection failed (ECONNREFUSED); the next tool call tries again" }
+```
+
+naming the cause by the same code the start line names (`ECONNREFUSED`, `ECONNRESET`,
+`ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENETUNREACH`, or a TLS failure code) —
+never the URL, the host, the port or a credential. The next call tries once more: there is no
+retry, no polling and no timer. A refused credential, an answer of SAP and an RFC logon that
+fails (named by its RFC key) are answered as before. A request on a connection already made
+that fails is answered as before, for now.
+
+The parameter beats the variable, and the variable beats the configuration file; the
+destination's `.env` is not read for it.
+
+**Leftover sessions.** With `--deferred-logon` the destination's leftover session (see the user
+guide) is not taken up on its own: the first call logs on, and the leftover stays for
+`ListLeftoverSessions` / `LogoffLeftoverSession`. With `--restore-session` as well, the first
+tool call takes it up, as a start without the flag does. `--restore-session` (any value) without
+`--deferred-logon` stops the start.
+
+```bash
+# Two systems, one server each, never up at the same time: neither fails at the start.
+mcp-abap-adt --env=system-a --system-type=onprem --deferred-logon
+mcp-abap-adt --env=system-b --system-type=onprem --deferred-logon
 ```
 
 ### Shutdown

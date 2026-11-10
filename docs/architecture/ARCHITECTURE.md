@@ -345,7 +345,8 @@ responsible and master system a create fills, which also name the debugger's req
 background run's caller — are made once, together with the connection, per destination (the
 resolved credential and its target system — URL, client, wire —, not the session): on stdio at the
 start (`bornAtStart`, or the leftover session's file), a failure ending the process before the
-transport opens; on SSE once per stream, on Streamable HTTP when the pooled instance's connection is
+transport opens — with `--deferred-logon` at the first tool call that builds the connection
+(`getConnection`, `birthEntry` with `--restore-session`), a failure that call's answer; on SSE once per stream, on Streamable HTTP when the pooled instance's connection is
 created (`buildConnection` → `requireSystem`), a failure that call's answer — the connection ends
 and nothing is kept, so the next call that creates one asks again. Never after a tool: **no tool
 runs twice**. The lookup (`systeminformation`, through the resolver the host passes; none by
@@ -632,7 +633,7 @@ The system has three distinct IoC boundaries:
 2. Reads configuration (CLI, YAML, env)
 3. Chooses the stores of a destination (`server-runtime/src/stdio/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 4. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
-5. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`
+5. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`. With `--deferred-logon` nothing is sent at the start: the transport opens, and the first tool call that needs the connection makes it (a failure is its answer — `no_connection`, naming the cause code only, when the system cannot be reached)
 6. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
 7. Starts `StdioServer` with `destinationSource`
 

@@ -24,8 +24,12 @@ import {
   adtStandIn,
 } from '../../../../src/__tests__/helpers/adtStandIn';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
+import { ServerRefusal } from '../../../../src/lib/auth/serverRefusal';
+import { registryOf } from '../../../../src/lib/toolSet';
+import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import { readCoreConfig } from '../config/coreParameters';
 import { launch } from '../launcher.js';
+import { StdioServer } from '../StdioServer.js';
 
 const USER = 'DEFERRED_USER';
 const PASSWORD = 'deferred-password';
@@ -348,5 +352,266 @@ describe('the deferred start', () => {
       stderr.some((line) => line.includes('the SAP system type is required')),
       true,
     );
+  });
+});
+
+/** The failure answer's fields; `{}` for a text that is not one. */
+function payloadOf(text: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The answer holds nothing of the address or the credentials. */
+function assertNoAddress(text: string): void {
+  for (const secret of [
+    gate.url,
+    '127.0.0.1',
+    String(gate.port),
+    USER,
+    PASSWORD,
+  ]) {
+    assert.equal(text.includes(secret), false, `the answer names ${secret}`);
+  }
+}
+
+describe('no connection: every failed build answers no_connection', () => {
+  it('nothing listening: the call answers no_connection with ECONNREFUSED, and no address', async () => {
+    const s = await start();
+    try {
+      const answer = await s.call('GetAdtTypes');
+      assert.equal(answer.isError, true);
+      const payload = payloadOf(answer.text);
+      assert.equal(payload.error, 'no_connection');
+      assert.equal(
+        payload.message,
+        'no connection to the SAP system: the connection failed (ECONNREFUSED); the next tool call tries again',
+      );
+      assertNoAddress(answer.text);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('two consecutive failing first calls: each answers no_connection, each one new attempt', async () => {
+    await gate.reset();
+    const s = await start();
+    try {
+      const first = await s.call('GetAdtTypes');
+      assert.equal(payloadOf(first.text).error, 'no_connection');
+      assert.equal(
+        String(payloadOf(first.text).message).includes('(ECONNRESET)'),
+        true,
+      );
+      const afterFirst = gate.resets;
+      assert.equal(afterFirst > 0, true);
+      const second = await s.call('GetAdtTypes');
+      assert.equal(payloadOf(second.text).error, 'no_connection');
+      assert.equal(gate.resets, afterFirst * 2);
+      assertNoAddress(first.text);
+      assertNoAddress(second.text);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('two calls at once while there is no connection share one attempt', async () => {
+    await gate.reset();
+    const s = await start();
+    try {
+      const single = await s.call('GetAdtTypes');
+      assert.equal(payloadOf(single.text).error, 'no_connection');
+      const one = gate.resets;
+      const [a, b] = await Promise.all([
+        s.call('GetAdtTypes'),
+        s.call('GetAdtTypes'),
+      ]);
+      assert.equal(payloadOf(a.text).error, 'no_connection');
+      assert.equal(payloadOf(b.text).error, 'no_connection');
+      assert.equal(gate.resets, one * 2);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('the system listens later: the next call logs on and answers; the one after logs on no more', async () => {
+    const s = await start();
+    try {
+      const refused = await s.call('GetAdtTypes');
+      assert.equal(payloadOf(refused.text).error, 'no_connection');
+      await gate.forward(standIn.url);
+      const from = standIn.requests.length;
+      const answered = await s.call('GetAdtTypes');
+      assert.equal(answered.isError, false, answered.text);
+      const sessions = new Set(
+        standIn.requests.slice(from).map((request) => request.session),
+      );
+      assert.equal(sessions.size, 1);
+      const next = standIn.requests.length;
+      const again = await s.call('GetAdtTypes');
+      assert.equal(again.isError, false, again.text);
+      const later = standIn.requests.slice(next);
+      assert.equal(later.length > 0, true);
+      for (const request of later) {
+        assert.equal(sessions.has(request.session), true);
+      }
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('a refused credential (401) is answered as today, not as no_connection', async () => {
+    await gate.forward(standIn.url);
+    standIn.refuse(true);
+    const s = await start();
+    try {
+      const answer = await s.call('GetAdtTypes');
+      assert.equal(answer.isError, true);
+      assert.notEqual(payloadOf(answer.text).error, 'no_connection');
+    } finally {
+      await s.stop();
+    }
+  });
+});
+
+/**
+ * A `StdioServer` on its own, its destination a stub whose provider throws
+ * `thrown`: what a failed build answers, condition by condition.
+ */
+async function serverOn(
+  destinations: IDestinations,
+  deferredLogon: boolean,
+): Promise<{
+  call: () => Promise<{ text: string; isError: boolean }>;
+  close: () => Promise<void>;
+}> {
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
+  const server = new StdioServer(
+    registryOf(fullToolSet, 'stdio'),
+    destinations,
+    {
+      version: '0.0.0-test',
+      deferredLogon,
+    },
+  );
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await server.start('dest', serverSide);
+  const client = new Client({ name: 'deferred-unit', version: '1.0.0' });
+  await client.connect(clientSide);
+  return {
+    call: async () => {
+      const answer = await client.callTool({
+        name: 'GetAdtTypes',
+        arguments: {},
+      });
+      const content = Array.isArray(answer.content) ? answer.content : [];
+      const text = content
+        .map((part: unknown) =>
+          typeof part === 'object' &&
+          part !== null &&
+          'text' in part &&
+          typeof part.text === 'string'
+            ? part.text
+            : '',
+        )
+        .join('');
+      return { text, isError: answer.isError === true };
+    },
+    close: async () => {
+      await client.close();
+      await server.close();
+    },
+  };
+}
+
+/** A destination whose provider throws `thrown`. */
+function throwingDestination(thrown: unknown): IDestinations {
+  return {
+    settingsFor: async () => ({
+      url: gate.url,
+      client: '100',
+      authType: 'basic',
+      connectionType: 'http',
+      username: USER,
+    }),
+    getProvider: async () => {
+      throw thrown;
+    },
+  };
+}
+
+describe('no_connection: one condition at a time', () => {
+  it('a listed code with no SAP answer, unread by the reader: no_connection', async () => {
+    const thrown = Object.assign(
+      new Error(`connect ECONNREFUSED ${gate.url}`),
+      {
+        code: 'ECONNREFUSED',
+      },
+    );
+    const s = await serverOn(throwingDestination(thrown), true);
+    try {
+      const answer = await s.call();
+      assert.equal(payloadOf(answer.text).error, 'no_connection');
+      assertNoAddress(answer.text);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('without the flag, the same throw is answered as today', async () => {
+    const thrown = Object.assign(
+      new Error(`connect ECONNREFUSED ${gate.url}`),
+      {
+        code: 'ECONNREFUSED',
+      },
+    );
+    const s = await serverOn(throwingDestination(thrown), false);
+    try {
+      const answer = await s.call();
+      assert.equal(answer.isError, true);
+      assert.notEqual(payloadOf(answer.text).error, 'no_connection');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('a value the reader reads, though its code is listed: answered as the reader reads it', async () => {
+    const thrown = Object.assign(new ServerRefusal('inspection_only'), {
+      code: 'ECONNREFUSED',
+    });
+    const s = await serverOn(throwingDestination(thrown), true);
+    try {
+      assert.equal(payloadOf((await s.call()).text).error, 'inspection_only');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('a value carrying the answer of SAP and a listed code: not no_connection', async () => {
+    const thrown = Object.assign(new Error('the system answered'), {
+      code: 'ECONNRESET',
+      response: { status: 503, data: '' },
+    });
+    const s = await serverOn(throwingDestination(thrown), true);
+    try {
+      assert.notEqual(payloadOf((await s.call()).text).error, 'no_connection');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('an unlisted code: not no_connection', async () => {
+    const thrown = Object.assign(new Error('something else'), {
+      code: 'ERR_SOMETHING_ELSE',
+    });
+    const s = await serverOn(throwingDestination(thrown), true);
+    try {
+      assert.notEqual(payloadOf((await s.call()).text).error, 'no_connection');
+    } finally {
+      await s.close();
+    }
   });
 });

@@ -1,6 +1,11 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
-import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
+import {
+  connectionCauseOf,
+  type ReadFailure,
+  readGuarded,
+  ServerRefusal,
+} from '@mcp-abap-adt/lib/auth';
 import {
   BaseMcpServer,
   type IBackgroundRuns,
@@ -10,6 +15,7 @@ import {
   type ResolvedConnection,
   type SapAnswerStrategy,
   type StartedConnection,
+  sapAnswerOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -94,6 +100,8 @@ export class StdioServer extends BaseMcpServer {
     | undefined;
   /** The destination served, named by a refusal whose error does not carry it. */
   private destination: string | undefined;
+  /** `--deferred-logon`: a failed build answers `no_connection` (#353). */
+  private readonly deferredLogon: boolean;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -131,6 +139,7 @@ export class StdioServer extends BaseMcpServer {
       systemContextRules: responsibleRules,
     });
     this.sentenceFor = opts?.sentenceFor;
+    this.deferredLogon = opts?.deferredLogon === true;
   }
 
   /** The destination layer's failures first, then lib's reader. */
@@ -206,7 +215,30 @@ export class StdioServer extends BaseMcpServer {
     signal: AbortSignal,
   ): Promise<IAbapConnection> {
     if (!this.destinations) throw new ServerRefusal('inspection_only');
-    return super.getConnection(signal);
+    if (!this.deferredLogon) return super.getConnection(signal);
+    try {
+      return await super.getConnection(signal);
+    } catch (thrown) {
+      throw this.noConnectionOf(thrown) ?? thrown;
+    }
+  }
+
+  /**
+   * `--deferred-logon`: a build of the instance's connection that failed
+   * because the system cannot be reached — no failure the reader reads, no
+   * answer from SAP, and a listed cause code (`connectionCauseOf`) — is
+   * `no_connection`, naming the code alone. Anything else is answered as
+   * it came. The value is from outside the type system: read guarded.
+   */
+  private noConnectionOf(thrown: unknown): ServerRefusal | undefined {
+    if (readGuarded((t) => this.readFailure(t), thrown) !== undefined) {
+      return undefined;
+    }
+    if (sapAnswerOf(thrown) !== undefined) return undefined;
+    const cause = connectionCauseOf(thrown);
+    return cause === undefined
+      ? undefined
+      : new ServerRefusal('no_connection', cause);
   }
 
   /** Inspection-only mode refuses the leftover-session tools too, before anything is read. */

@@ -38,6 +38,7 @@ export {
   INSPECTION_ONLY_WORDS,
   LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
   LEFTOVER_SESSIONS_UNAVAILABLE_WORDS,
+  noConnectionWords,
   ServerRefusal,
   type ServerRefusalCode,
   serverRefusalOf,

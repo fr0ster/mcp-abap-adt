@@ -9,6 +9,8 @@
  * with the same fields is not one.
  */
 
+import type { ConnectionCauseCode } from './connectionCause';
+
 /** The codes of the server's own refusals, as the answer's `error` names them. */
 export type ServerRefusalCode =
   | 'inspection_only'
@@ -38,7 +40,8 @@ export type ServerRefusalCode =
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
   | 'long_session_unavailable'
-  | 'connection_provider_failed';
+  | 'connection_provider_failed'
+  | 'no_connection';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -285,7 +288,21 @@ type WordedCode =
   | 'batch_parts_mismatch';
 
 /** The refusals whose words are fixed. */
-type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
+type FixedCode = Exclude<ServerRefusalCode, WordedCode | 'no_connection'>;
+
+/** `no_connection`'s words, built from `cause` alone. */
+function noConnectionText(cause: string): string {
+  return `no connection to the SAP system: the connection failed (${cause}); the next tool call tries again`;
+}
+
+/**
+ * stdio with `--deferred-logon` (#353): the instance's connection could not
+ * be built because the system cannot be reached. The words name the cause
+ * code only — never the address, the error's message or a credential.
+ */
+export function noConnectionWords(cause: ConnectionCauseCode): string {
+  return noConnectionText(cause);
+}
 
 const WORDS: Readonly<Record<FixedCode, string>> = {
   inspection_only: INSPECTION_ONLY_WORDS,
@@ -340,16 +357,20 @@ export class ServerRefusal extends Error {
     code: 'background_runs_unavailable',
     words: typeof BACKGROUND_RUNS_NO_SYSTEM_WORDS,
   );
+  /** `no_connection`, its words built from the listed `cause` (`noConnectionWords`). */
+  constructor(code: 'no_connection', cause: ConnectionCauseCode);
   constructor(code: ServerRefusalCode, words?: string) {
     const text =
-      (code === 'background_runs_unavailable' && words !== undefined) ||
-      code === 'destination_refused' ||
-      code === 'background_run_limit' ||
-      code === 'batch_not_recordable' ||
-      code === 'batch_other_kind' ||
-      code === 'batch_parts_mismatch'
-        ? (words ?? '')
-        : WORDS[code];
+      code === 'no_connection'
+        ? noConnectionText(words ?? '')
+        : (code === 'background_runs_unavailable' && words !== undefined) ||
+            code === 'destination_refused' ||
+            code === 'background_run_limit' ||
+            code === 'batch_not_recordable' ||
+            code === 'batch_other_kind' ||
+            code === 'batch_parts_mismatch'
+          ? (words ?? '')
+          : WORDS[code];
     super(text);
     this.name = 'ServerRefusal';
     this.serverRefusal = code;

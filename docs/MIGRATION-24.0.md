@@ -842,8 +842,10 @@ What a consumer that used one of them does now:
 
 - **Start the binary with the flag**, in any form: `--enable-data-tools`,
   `MCP_ENABLE_DATA_TOOLS=true`, or `enable-data-tools: true` in the `--conf` file. The CLI wins over
-  the environment, which wins over the file; `false` in a higher form turns them off again, and any
-  value but `true` or `false` stops the start. A destination's `.env` does not turn it on.
+  the environment, which wins over the file; `false` in a higher form turns them off again. A value
+  other than empty, null, `true` or `false` stops the start; an empty value or YAML null counts as
+  not given, as for every parameter, and the next form decides. A destination's `.env` does not
+  turn it on.
 - **On Streamable HTTP and SSE** it is a start parameter of the server: set it where the server is
   started (a container's `-e MCP_ENABLE_DATA_TOOLS=true`, for instance). No request header turns it
   on.

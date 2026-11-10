@@ -710,8 +710,9 @@ export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';
  * `--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / YAML `enable-data-tools`:
  * whether the binary serves the tools that read business data —
  * `GetSqlQuery` and `GetTableContents`, compact `HandlerGetData`. `true` or
- * `false`, default `false`; anything else is refused at startup. In every
- * binary's table: on Streamable HTTP and SSE it is a start parameter of the
+ * `false`, default `false`; an empty value or YAML null is not given (the
+ * next form decides, as for every row), and any other value is refused at
+ * startup. In every binary's table: on Streamable HTTP and SSE it is a start parameter of the
  * server, never a request header. SAP API Policy FAQ v1.3 (June 2026), Q33,
  * is the reason for the default; whether to turn it on is the customer's.
  */
@@ -723,7 +724,7 @@ export const ENABLE_DATA_TOOLS_ROW: Parameter = {
   kind: 'flag',
   default: false,
   section: 'DATA TOOLS',
-  help: "Serves the tools that read business data: GetSqlQuery and GetTableContents (compact: HandlerGetData). Off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems. Whether to turn this on is the customer's decision.",
+  help: "Serves the tools that read business data: GetSqlQuery and GetTableContents (compact: HandlerGetData). true or false; off by default (an empty value counts as not given). SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems. Whether to turn this on is the customer's decision.",
 };
 
 /** The longest `--shutdown-timeout`: a day. */

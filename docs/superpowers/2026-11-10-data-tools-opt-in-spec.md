@@ -98,7 +98,9 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
   beats YAML; a row set nowhere takes its default" (Code,
   `src/lib/config/authParameters.ts:373-395`; `readRow`, `:353-371`).
   - A `flag` row reads `true` or `false` from any form. `--x` alone is `true`, and
-    `--x=false` is `false`. Anything else is refused with `Invalid <form> … Must be true or
+    `--x=false` is `false`. An empty value (`--x=`, an empty variable) or YAML null counts
+    as not given, as for every row, and the next form decides (Code, `authParameters.ts`
+    `convert`, `readRow`). Any other value is refused with `Invalid <form> … Must be true or
     false` (Code, `authParameters.ts:280-293, 325-345`).
   - The model the task names is the `--unsafe` row (Code,
     `server-runtime/src/stdio/config/coreParameters.ts:84-92`), read as
@@ -404,8 +406,9 @@ places new tests at the time of the code (Jest or node:test, `tools/node-test-fi
   - CLI `--enable-data-tools=false` with `MCP_ENABLE_DATA_TOOLS=true` → `false`;
   - environment `false` with YAML `true` → `false`;
   - CLI `true` with environment `false` → `true`;
-  - a value that is not a flag (`yes`, a YAML list) in each form → refused with the form's
-    name;
+  - an empty environment value falls through to YAML (not given, as for every row);
+  - a value other than empty, null, `true` or `false` (`yes`, a YAML list) in each form →
+    refused with the form's name;
   - the row is in every binary's `--help` and YAML template.
 
   Mutations: drop the row from one table; reorder `readRow`'s sources; default the row to

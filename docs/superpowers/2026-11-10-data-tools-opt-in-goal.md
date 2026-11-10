@@ -27,8 +27,9 @@ make the decision for the customer.
   sees any other tool a set does not serve.
 - **One flag, one precedence.** The flag is one parameter row, read like every other row:
   the CLI over the environment over the configuration file. It is off when no form gives it,
-  and a value that is not `true` or `false` stops the start. An explicit `false` in a
-  higher-ranked form beats a `true` in a lower one.
+  and a value other than empty, null, `true` or `false` stops the start. An empty value or
+  YAML null counts as not given, as for every row, and the next form decides. An explicit
+  `false` in a higher-ranked form beats a `true` in a lower one.
 - **The operator decides, not the client.** Only the configuration of the process turns
   the flag on. No request, header, tool argument or session state can turn it on. On
   Streamable HTTP and SSE the flag is a start parameter of the binary, like the system type.

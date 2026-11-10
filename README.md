@@ -523,6 +523,10 @@ wins over the environment, which wins over the configuration file):
 - `MCP_ENABLE_DATA_TOOLS=true`,
 - `enable-data-tools: true` in the `--conf` YAML file.
 
+`false` in a higher form turns them off again. A value other than empty, null, `true` or `false`
+stops the start; an empty value or YAML null counts as not given, as for every parameter, and the
+next form decides.
+
 On Streamable HTTP and SSE it is a start parameter of the server; no request header turns it on.
 Without it the tools are not listed, and a call of one is answered that the tool is not found.
 An embedder states it too: `exposition: [..., 'data']` (`EmbeddableMcpServer`),

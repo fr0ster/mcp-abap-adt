@@ -313,4 +313,88 @@ before the merge.
 
 ## Appendix A — the open check
 
-Filled in by step 1.
+Read at `dc1db054` with `git grep` over every tracked `.ts` and `.js` file, for
+`.groups(`, `registryOf(`, `streamableHttpSurface(`, `compactToolSetOf(`,
+`compactReadOnlyToolSetOf(`, `new ReadOnlyHandlersGroup`, `new SystemHandlersGroup`,
+`compactReadOnlyEntries`, `new CompactReadOnlyHandlersGroup`, `expositionGroups(` and
+`registryForExposition(` (Measured). "Data" means the file names one of the three tools
+(Measured, `grep -c`).
+
+### `batchEntryCases.ts`, the spec's one Inference
+
+The file holds case data only and imports nothing but `adtCorpus` (Code,
+`src/__tests__/helpers/batchEntryCases.ts:13`). It reaches its tools through
+`batchHarness.servedTools` (Code, `src/__tests__/helpers/batchHarness.ts:208-220`). That
+helper builds `ReadOnlyHandlersGroup`, `SystemHandlersGroup` and
+`CompactReadOnlyHandlersGroup` directly, so it needs the data groups to keep the three
+cases (`batchEntryCases.ts:200-201, 416-417`).
+
+### Callers the spec names
+
+- The three runtime launchers.
+- The six compact launchers.
+- `scripts/list-tools.ts` and `tools/generate-tools-docs.js`.
+- `EmbeddableMcpServer.ts`, `HandlerExporter.ts` and `expositionRegistry.ts`.
+- `servedEntries.ts`, `descriptions/catalog.ts` and `variantSearchMeta.test.ts`.
+- `backgroundRuns/surface.test.ts` (data) and `toolSurface.test.ts`.
+- `toolSet/compactSurface`, `transportSurface`, `variantSurface` and `listedSchemas`.
+- The coverage keys.
+- `longTools/harness.ts` (data), `backgroundRuns/longReads.test.ts` and
+  `pins/backgroundRuns.pins.test.ts`.
+- `backgroundRuns.live.test.ts` (data; the spec names it as a live case only).
+
+### Callers the spec does not name: the step stops here
+
+- **Production code and its tools:**
+  - `compact/tools/generate-docs.js:259-306` builds the compact tool page from
+    `compactReadOnlyEntries`, `compactToolSetOf`, `compactReadOnlyToolSetOf` and
+    `streamableHttpSurface`. It would lose `HandlerGetData`, and its `streamableHttpSurface`
+    call would lack the new argument.
+  - `src/lib/handlers/examples/usage-example.ts:29-125` builds `ReadOnlyHandlersGroup` and
+    `SystemHandlersGroup`. It is compiled with `src` (Code, `tsconfig.json:27-34`).
+- **A class the spec does not name.** `CompactReadOnlyHandlersGroup`
+  (`compact-readonly-entries/src/group.ts:131-137`) serves `compactReadOnlyEntries()`. With
+  `HandlerGetData` moved out, the class loses it as well. The spec does not say whether
+  embedders get a compact data group class beside `compactDataEntries`. Direct users of the
+  class:
+  - `batchHarness.ts:217`, `batchStand.ts:138`, `longTools/harness.ts:114`,
+    `stateful/harness.ts:64`, `backgroundRuns/harness.ts:104`;
+  - `noSessionParameters.test.ts:95`, `sources/longHandlers.test.ts:65, 97`,
+    `sources/batchHandlers.test.ts:65` (data), `embeddable/exporterRegisterOnServer.test.ts:389, 421`,
+    `backgroundRuns/surface.test.ts:345, 551`, `toolSet.test.ts:141, 174`.
+- **Docs that describe the API:**
+  - `src/embeddable/docs/ARCHITECTURE.md:323, 667-670` names `ToolSet.groups(context,
+    transport)`, `compactReadOnlyToolSetOf(readOnly)` and `registryOf(toolSet, transport)`;
+  - `src/lib/handlers/README.md:17-114` builds the groups.
+- **Test helpers:** `batchHarness.ts`, `batchStand.ts`, `pinServer.ts:159-166`,
+  `servedTools.ts:140-187`, `backgroundRuns/harness.ts:100`, `stateful/harness.ts:59-64`,
+  and `integration/helpers/live.ts:253` (hard mode's set choice).
+- **Tests** that call `groups`, `registryOf`, `streamableHttpSurface` or the compact set
+  builders, so each needs the new argument at least. None names a data tool unless marked.
+  Many compare whole name lists (Measured, `toEqual` counts):
+  - the nine binary packages' `launcher.test.ts` (`compact`, `compact-http`, `compact-sse`,
+    `compact-ro`, `compact-http-ro`, `compact-sse-ro`, `core-ro`, `http-ro`, `sse-ro`);
+  - in `compact-readonly-entries`: `compactTransportRead.test.ts` and
+    `deletionCheck.test.ts`;
+  - `compact/src/__tests__/compactProgramIsOnprem.test.ts` and
+    `server-runtime/src/sse/__tests__/backgroundRunCut.test.ts`;
+  - `integration/high/include/IncludeHighHandlers.test.ts:667`;
+  - under `src/__tests__/unit/`:
+    - batch: `batch/recording`, `batch/surface`;
+    - cancel: `cancel/startedToolRunsOn`, `cancel/substitutionSites`;
+    - `compactCoversLow`;
+    - debugger: `debugger/compactFourTools`, `debugger/debugBatch`,
+      `debugger/exposition`;
+    - embeddable: `embeddable/plainRegistration`;
+    - `freshConnection`, `fullUpdatesLockThemselves`;
+    - `leftoverSessions/expositions`;
+    - `lowToCompact`, `packageHigh`;
+    - `readonlyHighSameNameDedup`, `readOnlyToolsPage`, `readTools/getPart`;
+    - state: `state/longSession`, `state/stateHandleWords`;
+    - `toolDocsGenerator`;
+    - toolSet: `toolSet/compactGroupContext`, `toolSet/httpToolDocs`, `toolSet.test`,
+      `toolSet/variantDescriptions`, `toolSet/variantNeeds`,
+      `toolSet/variantProperties`.
+
+Most of these need a mechanical change only (Inference). The two production callers, the
+unnamed class and the docs are decisions the spec leaves open.

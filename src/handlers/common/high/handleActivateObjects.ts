@@ -53,5 +53,5 @@ export async function handleActivateObjects(
   context: HandlerContext,
   args: z.output<ReturnType<typeof activateObjectsSchema>>,
 ) {
-  return handleActivateObject(context, args);
+  return handleActivateObject(context, args, TOOL_DEFINITION.name);
 }

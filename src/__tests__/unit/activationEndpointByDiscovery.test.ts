@@ -16,6 +16,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
+import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
@@ -80,8 +81,12 @@ function answering(route: (options: IAbapRequestOptions) => Answer) {
   return { connection, requests };
 }
 
-/** What the system answers, the discovery given. */
-function system(discovery: Answer, runs: Answer = { status: 202 }) {
+/** What the system answers, the discovery given (and, optionally, what `/activation` answers). */
+function system(
+  discovery: Answer,
+  runs: Answer = { status: 202 },
+  activation: Answer = { status: 200, data: ACTIVATED },
+) {
   return (options: IAbapRequestOptions): Answer => {
     const url = options.url;
     if (url.startsWith('/sap/bc/adt/discovery')) return discovery;
@@ -99,8 +104,7 @@ function system(discovery: Answer, runs: Answer = { status: 202 }) {
       };
     if (url.startsWith(`/sap/bc/adt/activation/results/${RUN_ID}`))
       return { status: 200, data: ACTIVATED };
-    if (url.startsWith('/sap/bc/adt/activation?'))
-      return { status: 200, data: ACTIVATED };
+    if (url.startsWith('/sap/bc/adt/activation?')) return activation;
     return { status: 200 };
   };
 }
@@ -212,4 +216,86 @@ describe('the group endpoint, from discovery', () => {
       'POST /sap/bc/adt/activation/runs',
     ]);
   });
+});
+
+/**
+ * An empty `200` from `/activation` is an activation (fr0ster/mcp-abap-adt#351,
+ * the owner's Q1 (a)), and it is answered as one at every detail and on both
+ * paths — measured on E77 (SAP_BASIS 7.40, RFC): `ActivateObjects` on two
+ * programs answered `projection_failed` though both had activated. The
+ * answer replayed is the recorded `activation-sync-activated-751` (an empty
+ * `200`, activated).
+ */
+describe('an empty 200 from /activation: activated, at every detail', () => {
+  const EMPTY_200: Answer = {
+    status: 200,
+    data: corpusBody('activation-sync-activated-751--01-activation'),
+  };
+  const SEVEN_40 = discoveryOf('system-description-basis-740--03-discovery');
+
+  async function activate(
+    objects: ReadonlyArray<{ name: string; type: string }>,
+    detail: 'terse' | 'full' | 'raw',
+  ) {
+    const { connection, requests } = answering(
+      system(SEVEN_40, { status: 202 }, EMPTY_200),
+    );
+    declareSystemKind(connection, 'onprem');
+    const context: HandlerContext = { connection, logger: undefined };
+    const result = await handleActivateObject(context, {
+      objects: [...objects],
+      detail,
+    });
+    return { result, requests };
+  }
+
+  it('ActivateObjects, two programs (the group path, as on E77): activated', async () => {
+    const { connection, requests } = answering(
+      system(SEVEN_40, { status: 202 }, EMPTY_200),
+    );
+    declareSystemKind(connection, 'onprem');
+    const result = await handleActivateObjects(
+      { connection, logger: undefined },
+      {
+        objects: [
+          { name: 'ZA', type: 'PROG/P' },
+          { name: 'ZB', type: 'PROG/P' },
+        ],
+      },
+    );
+    expect(read(result)).toEqual({
+      isError: false,
+      payload: { activated: true },
+    });
+    expect(requests).toEqual([
+      'GET /sap/bc/adt/discovery',
+      'POST /sap/bc/adt/activation',
+    ]);
+  });
+
+  it.each(['terse', 'full', 'raw'] as const)(
+    'the group path at detail %s: a success',
+    async (detail) => {
+      const { result } = await activate(OBJECTS, detail);
+      expect('isError' in result && result.isError === true).toBe(false);
+      if (detail !== 'raw') {
+        expect(read(result).payload).toEqual({ activated: true });
+      }
+    },
+  );
+
+  it.each(['terse', 'full', 'raw'] as const)(
+    'the single-object path at detail %s: a success',
+    async (detail) => {
+      const { result, requests } = await activate(
+        [{ name: 'ZP', type: 'PROG/P' }],
+        detail,
+      );
+      expect(requests.at(-1)).toBe('POST /sap/bc/adt/activation');
+      expect('isError' in result && result.isError === true).toBe(false);
+      if (detail !== 'raw') {
+        expect(read(result).payload).toEqual({ activated: true });
+      }
+    },
+  );
 });

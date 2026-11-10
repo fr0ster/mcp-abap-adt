@@ -178,7 +178,9 @@ const CASES: readonly GroupCase[] = [
     args: { function_group_name: 'ZPIN_FG', function_module_name: 'ZPIN_FM' },
     matched: [inGroup('ZPIN_FM', 'ZPIN_FG')],
     mismatched: [inGroup('ZPIN_FM', 'ZPIN_OTHER')],
-    matchRefused: true,
+    // The activation's answer is empty: an empty `200` is activated
+    // (fr0ster/mcp-abap-adt#351), so the matched path answers no failure.
+    matchRefused: false,
     checks: [META('ZPIN_FM', 'workingArea')],
     after: [
       {

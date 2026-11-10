@@ -13,7 +13,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -55,6 +55,6 @@ export async function handleActivateClass(
           .getClass(resultsFor(classDocuments))
           .activate({ className }, { headers, analyse: analyseActivation }),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

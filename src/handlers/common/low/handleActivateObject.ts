@@ -124,7 +124,7 @@ import {
 } from '../../../lib/strategies/activationRun';
 import { detailOf } from '../../../lib/strategies/detail';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { projectActivation } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
@@ -540,18 +540,25 @@ function activateSingle(
   single: { readonly api: SingleActivationApi; readonly name: string },
   detail: 'terse' | 'full' | 'raw',
   preaudit: boolean,
+  tool: string,
 ) {
   const client = createAdtClient(context.connection, context.logger);
   return answer(
-    { tool: 'ActivateObjectLow', detail },
+    { tool, detail },
     () => activateFamily(context, client, single.api, single.name, preaudit),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }
 
+/**
+ * `tool`: the name of the tool that was called, which every answer names —
+ * this handler serves `ActivateObjectLow` (its own definition) and
+ * `ActivateObjects` (`handleActivateObjects`).
+ */
 export async function handleActivateObject(
   context: HandlerContext,
   params: ActivateObjectArgs,
+  tool: string = TOOL_DEFINITION.name,
 ) {
   const { connection, logger } = context;
   const args = params;
@@ -607,7 +614,7 @@ export async function handleActivateObject(
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
 
   if ('single' in plan)
-    return activateSingle(context, plan.single, detail, preaudit);
+    return activateSingle(context, plan.single, detail, preaudit, tool);
 
   // Group activation: multiple objects, or a single object of a type this
   // dispatcher does not map to a family client. The endpoint is the system's
@@ -626,7 +633,7 @@ export async function handleActivateObject(
   // the wire as it came (`stillInactiveAmong`).
   const utils = client.getUtils({ ...ourUtils, inactive: wireItself });
   return answer(
-    { tool: 'ActivateObjectLow', detail },
+    { tool, detail },
     async () => {
       // SAP ignores the group of a module's address (#2): each module
       // reference's group is checked before the run starts.
@@ -671,7 +678,7 @@ export async function handleActivateObject(
     },
     (answered: GroupAnswer) =>
       'synchronous' in answered
-        ? project(detail, terseActivation)(answered.synchronous)
+        ? projectActivation(detail)(answered.synchronous)
         : runAnswer(answered.runs, activationObjects),
   );
 }
@@ -820,7 +827,13 @@ export async function activatePlanOnce(
 ) {
   const preaudit = preauditRequested !== false;
   if ('single' in plan)
-    return activateSingle(context, plan.single, 'terse', preaudit);
+    return activateSingle(
+      context,
+      plan.single,
+      'terse',
+      preaudit,
+      'HandlerActivate',
+    );
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
     async () => {

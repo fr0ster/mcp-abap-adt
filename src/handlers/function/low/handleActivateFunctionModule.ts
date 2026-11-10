@@ -14,7 +14,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -67,6 +67,6 @@ export async function handleActivateFunctionModule(
             ),
         ),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

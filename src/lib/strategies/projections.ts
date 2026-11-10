@@ -90,31 +90,88 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  * whether the answer is a failure, and this decides how a caller reads a
  * success that says nothing was done.
  */
-export const terseActivation: Terse<unknown> = (value) => {
-  const root = child(value, 'chkl:messages');
-  if (root) {
-    const messages = listOf(child(root, 'msg')).map((m) => ({
-      type: attrOf(m, 'type'),
-      text: textOf(childAt(m, 'shortText', 'txt')) || attrOf(m, 'objDescr'),
-    }));
-    const properties = child(root, 'chkl:properties');
-    const activated = attrOf(properties, 'activationExecuted') === 'true';
-    return {
-      activated,
-      generated: attrOf(properties, 'generationExecuted') === 'true',
-      ...(!activated && messages.length === 0
-        ? { nothing_to_activate: true }
-        : {}),
-      ...(messages.length ? { messages } : {}),
-    };
-  }
+/**
+ * What a successful activation answered, by its form: `analyseActivation`
+ * has refused every failure before a projection runs. Two forms succeed — the
+ * checklist (`chkl:messages`), and an empty `200` (SAP_BASIS 7.40 and 751
+ * activate this way: the objects are gone from the inactive list,
+ * fr0ster/mcp-abap-adt#351). A form this union does not name has no
+ * projection; adding one without its branch in {@link terseActivationAnswer}
+ * fails the type check.
+ */
+export type ActivationAnswer =
+  | { readonly form: 'checklist'; readonly checklist: unknown }
+  | { readonly form: 'empty' };
 
-  // `ioc:inactiveObjects` is no success: `analyseActivation` (adt-strategies
-  // 0.22.0) answers it as not activated, with the objects in `stillInactive`,
-  // before any projection runs (fr0ster/mcp-abap-adt#351). Any other document
-  // has no checklist to project.
-  return undefined;
+/** The activation's answer form, read from the reading: the body is text from outside, read here. */
+export function activationAnswerOf(
+  reading: AdtReading<unknown>,
+): ActivationAnswer | undefined {
+  if (reading.raw.trim() === '') return { form: 'empty' };
+  const checklist = child(reading.value, 'chkl:messages');
+  return checklist ? { form: 'checklist', checklist } : undefined;
+}
+
+/** The terse answer of each form; every form has one. */
+export function terseActivationAnswer(
+  answer: ActivationAnswer,
+): Record<string, unknown> {
+  switch (answer.form) {
+    case 'checklist': {
+      const root = answer.checklist;
+      const messages = listOf(child(root, 'msg')).map((m) => ({
+        type: attrOf(m, 'type'),
+        text: textOf(childAt(m, 'shortText', 'txt')) || attrOf(m, 'objDescr'),
+      }));
+      const properties = child(root, 'chkl:properties');
+      const activated = attrOf(properties, 'activationExecuted') === 'true';
+      return {
+        activated,
+        generated: attrOf(properties, 'generationExecuted') === 'true',
+        ...(!activated && messages.length === 0
+          ? { nothing_to_activate: true }
+          : {}),
+        ...(messages.length ? { messages } : {}),
+      };
+    }
+    // An empty `200`: activated, and nothing more was said.
+    case 'empty':
+      return { activated: true };
+  }
+}
+
+/**
+ * `chkl:messages` — the checklist's terse answer; any other document has none
+ * (`ioc:inactiveObjects` is no success: `analyseActivation` answers it as not
+ * activated before any projection runs). An activation's answer is projected
+ * by {@link projectActivation}, which reads the empty `200` too.
+ */
+export const terseActivation: Terse<unknown> = (value) => {
+  const checklist = child(value, 'chkl:messages');
+  return checklist
+    ? terseActivationAnswer({ form: 'checklist', checklist })
+    : undefined;
 };
+
+/**
+ * An activation's answer at `detail`: `raw` the document as it came (empty
+ * for an empty `200`), `full` the parse (for an empty `200`, which has none,
+ * its terse answer), `terse` {@link terseActivationAnswer} of its form.
+ */
+export function projectActivation(
+  detail: AnswerDetail,
+): (reading: AdtReading<unknown>) => unknown {
+  return (reading) => {
+    if (detail === 'raw') return reading.raw;
+    const answer = activationAnswerOf(reading);
+    if (detail === 'full') {
+      return answer?.form === 'empty'
+        ? terseActivationAnswer(answer)
+        : (reading.value ?? reading.raw);
+    }
+    return answer === undefined ? undefined : terseActivationAnswer(answer);
+  };
+}
 
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */
 export const terseCheck: Terse<unknown> = (value) => {

@@ -53,6 +53,17 @@ const CALLS: Record<
   },
 };
 
+/**
+ * The data tools, which a binary serves only with `--enable-data-tools`:
+ * hard mode does not pass it yet, so the children list the fixture without
+ * them.
+ */
+const DATA_TOOLS: ReadonlySet<string> = new Set([
+  'GetSqlQuery',
+  'GetTableContents',
+  'HandlerGetData',
+]);
+
 /** `listed-schemas.json`'s tools for one binary on one kind: name → schema. */
 function projection(command: string, kind: SystemKind): Map<string, unknown> {
   const listed: unknown = JSON.parse(
@@ -71,7 +82,11 @@ function projection(command: string, kind: SystemKind): Map<string, unknown> {
     if (!Array.isArray(variants)) continue;
     for (const variant of variants) {
       const by: unknown = Reflect.get(variant, 'listedBy');
-      if (Array.isArray(by) && by.includes(`${kind} ${command}`)) {
+      if (
+        Array.isArray(by) &&
+        by.includes(`${kind} ${command}`) &&
+        !DATA_TOOLS.has(tool)
+      ) {
         out.set(tool, Reflect.get(variant, 'value'));
       }
     }

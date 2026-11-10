@@ -250,7 +250,7 @@ function setOf(tool: string): HardModeSet {
   fullNames ??= new Set(
     (['stdio', 'http'] as const).flatMap((transport) =>
       fullToolSet
-        .groups(noConnectionContext(), transport)
+        .groups(noConnectionContext(), transport, { dataTools: true })
         .flatMap((group) =>
           group.getHandlers().map((entry) => entry.toolDefinition.name),
         ),

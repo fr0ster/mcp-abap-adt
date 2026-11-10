@@ -7,9 +7,13 @@
  * Type-checked by `npm run test:check`.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import * as z from 'zod';
 import {
+  DataHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -36,6 +40,8 @@ const groups = {
   readonly: new ReadOnlyHandlersGroup(ctx),
   high: new HighLevelHandlersGroup(ctx),
   system: new SystemHandlersGroup(ctx),
+  // The data tools, opt-in: listed here, served only when asked for.
+  data: new DataHandlersGroup(ctx),
   runtime: new RuntimeRunHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
   debug: new DebugHandlersGroup(ctx),
@@ -97,22 +103,32 @@ const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
     'compact',
     compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     }),
   ],
-  ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
+  [
+    'compact-ro',
+    compactReadOnlyToolSetOf({
+      readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
+    }),
+  ],
 ];
 
 const visibilityBySet: Record<string, { group: string; name: string }[]> = {};
 // Per transport: the leftover-session tools are stdio's only.
 for (const transport of ['stdio', 'http', 'sse'] as const) {
   for (const [kind, set] of SETS) {
-    const visible = set.groups(ctx, transport).flatMap((group) =>
-      group.getHandlers().map((entry) => ({
-        group: group.getName(),
-        name: entry.toolDefinition.name,
-      })),
-    );
+    // With the data tools served: what a binary lists with --enable-data-tools.
+    const visible = set
+      .groups(ctx, transport, { dataTools: true })
+      .flatMap((group) =>
+        group.getHandlers().map((entry) => ({
+          group: group.getName(),
+          name: entry.toolDefinition.name,
+        })),
+      );
     const key = transport === 'stdio' ? kind : `${kind} (${transport})`;
     console.error(key, visible.length);
     visibilityBySet[key] = visible;

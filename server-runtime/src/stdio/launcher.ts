@@ -857,7 +857,9 @@ async function launchStdio(
   config = { ...config, connectionType, systemType };
 
   // The command's tool set: fixed by the command, never by a flag.
-  const handlersRegistry = registryOf(options.toolSet, 'stdio');
+  const handlersRegistry = registryOf(options.toolSet, 'stdio', {
+    dataTools: false,
+  });
 
   // The browser of a login, mapped by the platform; a choice that
   // cannot be served stops the start before anything is read.

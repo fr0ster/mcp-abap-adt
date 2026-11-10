@@ -17,7 +17,10 @@
  * the half that changes nothing.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { packageManifestOf, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
@@ -28,6 +31,7 @@ import {
 /** The compact tool set: both halves, the debugger, the leftover sessions and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
   modify: compactModifyEntries,
 });
 

@@ -49,10 +49,6 @@ import {
   handleGetServiceBindingPreviewUrl,
 } from '../../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import {
-  TOOL_DEFINITION as GetSqlQuery_Tool,
-  handleGetSqlQuery,
-} from '../../../handlers/system/readonly/handleGetSqlQuery';
-import {
   TOOL_DEFINITION as GetTransaction_Tool,
   handleGetTransaction,
 } from '../../../handlers/system/readonly/handleGetTransaction';
@@ -155,7 +151,8 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         RuntimeGetGatewayErrorLog_Tool,
         handleRuntimeGetGatewayErrorLog,
       ),
-      defineTool(GetSqlQuery_Tool, handleGetSqlQuery),
+      // GetSqlQuery is a data tool: DataHandlersGroup's, served only when
+      // asked for.
       defineTool(GetWhereUsed_Tool, handleGetWhereUsed),
       defineTool(GetObjectInfo_Tool, handleGetObjectInfo),
       defineTool(GetInactiveObjects_Tool, handleGetInactiveObjects),

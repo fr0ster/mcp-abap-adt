@@ -144,7 +144,7 @@ async function stdioSurface(
 ): Promise<Record<string, Schema>> {
   // As the launcher builds it: every set keeps background runs.
   const server = new StdioServer(
-    registryOf(toolSets.stdio[kind], 'stdio'),
+    registryOf(toolSets.stdio[kind], 'stdio', { dataTools: true }),
     undefined,
     { backgroundRuns: new InMemoryBackgroundRuns() },
   );
@@ -157,11 +157,14 @@ async function sseSurface(
   kind: ToolSetKind,
   standIn: AdtStandIn,
 ): Promise<Record<string, Schema>> {
-  const sse = new SseServer(registryOf(toolSets.sse[kind], 'sse'), {
-    host: '127.0.0.1',
-    port: 0,
-    backgroundRuns: new InMemoryBackgroundRuns(),
-  });
+  const sse = new SseServer(
+    registryOf(toolSets.sse[kind], 'sse', { dataTools: true }),
+    {
+      host: '127.0.0.1',
+      port: 0,
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   await sse.start();
   const listener = (sse as unknown as { standaloneServer: Server })
     .standaloneServer;
@@ -196,7 +199,7 @@ async function httpSurface(
   standIn: AdtStandIn,
 ): Promise<Record<string, Schema>> {
   const mcp = new StreamableHttpServer(
-    registryOf(toolSets.http[kind], 'http'),
+    registryOf(toolSets.http[kind], 'http', { dataTools: true }),
     {
       host: '127.0.0.1',
       port: 0,

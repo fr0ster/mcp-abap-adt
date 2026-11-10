@@ -10,13 +10,19 @@ import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import {
@@ -28,6 +34,7 @@ import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
@@ -343,6 +350,7 @@ describe('where the background-run tools are served: beside the run tools and th
       () =>
         new CompositeHandlersRegistry([
           new CompactReadOnlyHandlersGroup(noConnectionContext()),
+          new CompactDataHandlersGroup(noConnectionContext()),
         ]),
       COMPACT,
     ],
@@ -380,7 +388,9 @@ describe('where the background-run tools are served: beside the run tools and th
   it('with a strategy, the same supplied registry lists them and its long tools list background', async () => {
     const server = new EmbeddableMcpServer({
       connection: unconnected(),
-      handlersRegistry: registryForExposition(['readonly']),
+      // With the data tools (opt-in), so GetTableContents is among the
+      // long reads listed.
+      handlersRegistry: registryForExposition(['readonly', 'data']),
       systemType: 'onprem',
       logger: silent,
       backgroundRuns: new InMemoryBackgroundRuns(),
@@ -449,18 +459,28 @@ describe('where the background-run tools are served: beside the run tools and th
     ['core-ro', fullReadOnlyToolSet, true],
   ])('%s: served %s', (_kind, set, served) => {
     for (const transport of ['stdio', 'http', 'sse'] as const) {
-      const tools = namesOf(registryOf(set, transport).getHandlerGroups());
+      const tools = namesOf(
+        registryOf(set, transport, { dataTools: false }).getHandlerGroups(),
+      );
       for (const name of FULL) expect(tools.includes(name)).toBe(served);
     }
     expect(set.backgroundRuns).toBe(served);
   });
 
   it.each<[string, ToolSet, boolean]>([
-    ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries), false],
+    [
+      'compact-ro',
+      compactReadOnlyToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
+      }),
+      false,
+    ],
     [
       'compact',
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: compactModifyEntries,
       }),
       true,
@@ -468,7 +488,9 @@ describe('where the background-run tools are served: beside the run tools and th
   ])('%s: served, HandlerProfileRun %s', (_kind, set, runs) => {
     expect(set.backgroundRuns).toBe(true);
     for (const transport of ['stdio', 'http', 'sse'] as const) {
-      const tools = namesOf(registryOf(set, transport).getHandlerGroups());
+      const tools = namesOf(
+        registryOf(set, transport, { dataTools: false }).getHandlerGroups(),
+      );
       expect(tools.includes('HandlerProfileRun')).toBe(runs);
       for (const name of COMPACT) expect(tools.includes(name)).toBe(true);
     }
@@ -542,6 +564,7 @@ describe('which tools take background', () => {
     ...[
       new ReadOnlyHandlersGroup(noConnectionContext()),
       new SystemHandlersGroup(noConnectionContext()),
+      new DataHandlersGroup(noConnectionContext()),
       new SearchHandlersGroup(noConnectionContext()),
       new HighLevelHandlersGroup(noConnectionContext()),
       new RuntimeRunHandlersGroup(noConnectionContext()),
@@ -549,6 +572,9 @@ describe('which tools take background', () => {
       new DebugHandlersGroup(noConnectionContext()),
     ].flatMap((group) => group.getHandlers().map((e) => e.toolDefinition)),
     ...new CompactReadOnlyHandlersGroup(placeholder)
+      .getHandlers()
+      .map((e) => e.toolDefinition),
+    ...new CompactDataHandlersGroup(placeholder)
       .getHandlers()
       .map((e) => e.toolDefinition),
     ...new CompactModifyHandlersGroup(placeholder)

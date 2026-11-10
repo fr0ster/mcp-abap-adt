@@ -39,9 +39,13 @@ async function listed(
 ): Promise<readonly Listed[]> {
   process.env.SAP_SYSTEM_TYPE = variant;
   // As the launcher builds it: every set keeps background runs.
-  const server = new StdioServer(registryOf(set, 'stdio'), undefined, {
-    backgroundRuns: new InMemoryBackgroundRuns(),
-  });
+  const server = new StdioServer(
+    registryOf(set, 'stdio', { dataTools: true }),
+    undefined,
+    {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-descriptions', version: '1' });
@@ -57,7 +61,9 @@ async function listed(
 /** Every definition of `set`, by name. */
 function definitionsOf(set: ToolSet): ReadonlyMap<string, ToolDefinition> {
   const byName = new Map<string, ToolDefinition>();
-  for (const group of registryOf(set, 'stdio').getHandlerGroups()) {
+  for (const group of registryOf(set, 'stdio', {
+    dataTools: true,
+  }).getHandlerGroups()) {
     for (const entry of group.getHandlers()) {
       byName.set(entry.toolDefinition.name, entry.toolDefinition);
     }

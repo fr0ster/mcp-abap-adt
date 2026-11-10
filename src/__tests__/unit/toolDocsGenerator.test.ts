@@ -63,7 +63,8 @@ describe('the tool-docs generator lists the built schema', () => {
   it('lists every tool the full stdio binary serves, and no other', () => {
     const { fullToolSet } = require('../../../dist/lib/toolSet.js');
     const served: string[] = fullToolSet
-      .groups({ connection: null }, 'stdio')
+      // The pages document every set with the data tools served.
+      .groups({ connection: null }, 'stdio', { dataTools: true })
       .flatMap(
         (group: { getHandlers(): { toolDefinition: { name: string } }[] }) =>
           group.getHandlers().map((entry) => entry.toolDefinition.name),

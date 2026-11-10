@@ -9,7 +9,10 @@
  * background-runs-memory, responsible-rules and the two halves, never on another binary package.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import {
   type LauncherEdges,
   packageManifestOf,
@@ -21,6 +24,7 @@ import { main as httpMain } from '@mcp-abap-adt/server-runtime/http';
 /** The compact tool set: both halves, the debugger and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
   modify: compactModifyEntries,
 });
 

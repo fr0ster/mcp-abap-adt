@@ -17,7 +17,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { compactBatchEntries } from '../../../lib/compact/batch/group';
 import {
   compactDebugBatchEntries,
@@ -53,6 +56,8 @@ describe('the compact tool surface', () => {
 
   const current = [
     ...compactReadOnlyEntries(),
+    // The data tool, opt-in: on the surface, served only when asked for.
+    ...compactDataEntries(),
     ...compactModifyEntries(),
     ...compactDebugEntries(),
     ...compactDebugBatchEntries(),

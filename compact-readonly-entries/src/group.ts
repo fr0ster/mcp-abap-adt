@@ -1,5 +1,7 @@
 /**
- * The compact tools that change nothing — seventeen of the twenty-nine.
+ * The compact tools that change nothing — seventeen of the twenty-nine: the
+ * sixteen of `compactReadOnlyEntries`, and the data tool `HandlerGetData`,
+ * opt-in, of `compactDataEntries`.
  *
  * **Why a group of its own, and why it matters what it imports.** Compact is a
  * different decomposition of the same surface: the operation is the tool and the
@@ -105,7 +107,6 @@ export function compactReadOnlyEntries(): HandlerEntry[] {
     defineTool(HandlerGet_Tool, handleHandlerGet),
     defineTool(HandlerSearch_Tool, handleHandlerSearch),
     defineTool(HandlerWhereUsed_Tool, handleHandlerWhereUsed),
-    defineTool(HandlerGetData_Tool, handleHandlerGetData),
     defineTool(HandlerValidate_Tool, handleHandlerValidate),
     defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),
     defineTool(HandlerDeletionCheck_Tool, handleHandlerDeletionCheck),
@@ -133,5 +134,31 @@ export class CompactReadOnlyHandlersGroup extends BaseHandlerGroup {
 
   getHandlers(): HandlerEntry[] {
     return compactReadOnlyEntries();
+  }
+}
+
+/**
+ * The compact data tool, `HandlerGetData`: the rows of a table or CDS view,
+ * or of a freestyle `SELECT`, through ADT's data preview — the compact form
+ * of `GetTableContents` and `GetSqlQuery`.
+ *
+ * **Opt-in**, and so not among {@link compactReadOnlyEntries}: a compact
+ * binary serves it only with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`,
+ * `enable-data-tools`), handed in as the set's `data` builder; an embedder
+ * only by using this builder or {@link CompactDataHandlersGroup}. SAP API
+ * Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for
+ * reading application tables, exporting business data or running SQL against
+ * SAP systems; whether to serve it is the customer's decision.
+ */
+export function compactDataEntries(): HandlerEntry[] {
+  return [defineTool(HandlerGetData_Tool, handleHandlerGetData)];
+}
+
+/** {@link compactDataEntries} as a group: the compact data tool, opt-in. */
+export class CompactDataHandlersGroup extends BaseHandlerGroup {
+  protected groupName = 'CompactDataHandlers';
+
+  getHandlers(): HandlerEntry[] {
+    return compactDataEntries();
   }
 }

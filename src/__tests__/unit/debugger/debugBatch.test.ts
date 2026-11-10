@@ -12,7 +12,10 @@
  */
 import { AbapDebugger, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -792,6 +795,7 @@ describe('the debugger batch, compact step to line', () => {
 describe('which sets serve the debugger batch tools', () => {
   const halves = {
     readOnly: compactReadOnlyEntries,
+    data: compactDataEntries,
     modify: compactModifyEntries,
   };
   const namesOf = (groups: IHandlerGroup[]) =>
@@ -801,13 +805,21 @@ describe('which sets serve the debugger batch tools', () => {
   const context = { connection: undefined as never };
   it('DebugBatch* only in full, HandlerDebugBatch only in compact', () => {
     for (const transport of ['stdio', 'http', 'sse'] as const) {
-      const full = namesOf(fullToolSet.groups(context, transport));
-      const fullRo = namesOf(fullReadOnlyToolSet.groups(context, transport));
+      const full = namesOf(
+        fullToolSet.groups(context, transport, { dataTools: false }),
+      );
+      const fullRo = namesOf(
+        fullReadOnlyToolSet.groups(context, transport, { dataTools: false }),
+      );
       const compact = namesOf(
-        compactToolSetOf(halves).groups(context, transport),
+        compactToolSetOf(halves).groups(context, transport, {
+          dataTools: false,
+        }),
       );
       const compactRo = namesOf(
-        compactReadOnlyToolSetOf(halves.readOnly).groups(context, transport),
+        compactReadOnlyToolSetOf(halves).groups(context, transport, {
+          dataTools: false,
+        }),
       );
       expect(full.has('DebugBatchBegin')).toBe(true);
       expect(full.has('DebugBatchEnd')).toBe(true);

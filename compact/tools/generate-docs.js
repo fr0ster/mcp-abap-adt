@@ -259,6 +259,11 @@ function main() {
     ...readOnly
       .compactReadOnlyEntries(context)
       .map((entry) => ({ half: 'readonly', entry })),
+    // The data tool (HandlerGetData), opt-in: documented, served only with
+    // --enable-data-tools.
+    ...readOnly
+      .compactDataEntries()
+      .map((entry) => ({ half: 'readonly', entry })),
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
@@ -294,15 +299,23 @@ function main() {
   // the HTTP server uses (lib's `streamableHttpSurface`).
   const { compactToolSetOf, compactReadOnlyToolSetOf, streamableHttpSurface } =
     requireFresh('.', path.join('lib', 'toolSet.js'));
+  // Documented with the data tool served, as the pages list it.
+  const documented = { dataTools: true };
   const surfaces = [
     streamableHttpSurface(
       compactToolSetOf({
         readOnly: readOnly.compactReadOnlyEntries,
+        data: readOnly.compactDataEntries,
         modify: modify.compactModifyEntries,
       }),
+      documented,
     ),
     streamableHttpSurface(
-      compactReadOnlyToolSetOf(readOnly.compactReadOnlyEntries),
+      compactReadOnlyToolSetOf({
+        readOnly: readOnly.compactReadOnlyEntries,
+        data: readOnly.compactDataEntries,
+      }),
+      documented,
     ),
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

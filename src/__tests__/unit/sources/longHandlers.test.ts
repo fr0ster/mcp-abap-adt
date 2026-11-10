@@ -13,10 +13,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as z from 'zod';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { isBackgroundTool } from '../../../lib/backgroundRuns/tools';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
@@ -55,6 +59,7 @@ function groupDefinitions(): ToolDefinition[] {
     new ReadOnlyHandlersGroup(noConnectionContext()),
     new HighLevelHandlersGroup(noConnectionContext()),
     new SystemHandlersGroup(noConnectionContext()),
+    new DataHandlersGroup(noConnectionContext()),
     new SearchHandlersGroup(noConnectionContext()),
     new RuntimeRunHandlersGroup(noConnectionContext()),
     new BackgroundRunHandlersGroup(noConnectionContext()),
@@ -63,6 +68,9 @@ function groupDefinitions(): ToolDefinition[] {
     .flatMap((group) => group.getHandlers().map((e) => e.toolDefinition))
     .concat(
       new CompactReadOnlyHandlersGroup(noConnectionContext())
+        .getHandlers()
+        .map((e) => e.toolDefinition),
+      new CompactDataHandlersGroup(noConnectionContext())
         .getHandlers()
         .map((e) => e.toolDefinition),
       new CompactModifyHandlersGroup(noConnectionContext())
@@ -88,13 +96,18 @@ function shippedDefinitions(): ToolDefinition[] {
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
-    // What the exporter leaves out (no store, no debugger): the groups' own.
+    // What the exporter leaves out (no store, no debugger, the data tools
+    // unless asked for): the groups' own.
     ...[
+      new DataHandlersGroup(noConnectionContext()),
       new RuntimeRunHandlersGroup(noConnectionContext()),
       new BackgroundRunHandlersGroup(noConnectionContext()),
       new DebugHandlersGroup(noConnectionContext()),
     ].flatMap((group) => group.getHandlers().map((e) => e.toolDefinition)),
     ...new CompactReadOnlyHandlersGroup(placeholder)
+      .getHandlers()
+      .map((e) => e.toolDefinition),
+    ...new CompactDataHandlersGroup(placeholder)
       .getHandlers()
       .map((e) => e.toolDefinition),
     ...new CompactModifyHandlersGroup(placeholder)

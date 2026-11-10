@@ -137,10 +137,14 @@ const backgroundRunsOf = (toolSet: ToolSet) =>
 
 async function stdioTools(kind: ToolSetKind): Promise<ListedTool[]> {
   const toolSet = toolSets.stdio[kind];
-  const server = new StdioServer(registryOf(toolSet, 'stdio'), undefined, {
-    batch: new InstanceBatch({ keepRawParts: false }),
-    ...backgroundRunsOf(toolSet),
-  });
+  const server = new StdioServer(
+    registryOf(toolSet, 'stdio', { dataTools: true }),
+    undefined,
+    {
+      batch: new InstanceBatch({ keepRawParts: false }),
+      ...backgroundRunsOf(toolSet),
+    },
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   return listOver(clientSide);
@@ -152,7 +156,7 @@ async function sseTools(
 ): Promise<ListedTool[]> {
   const toolSet = toolSets.sse[kind];
   const port = await freePort();
-  const sse = new SseServer(registryOf(toolSet, 'sse'), {
+  const sse = new SseServer(registryOf(toolSet, 'sse', { dataTools: true }), {
     host: '127.0.0.1',
     port,
     batch: { keepRawParts: false },
@@ -184,12 +188,15 @@ async function httpTools(
 ): Promise<ListedTool[]> {
   const toolSet = toolSets.http[kind];
   const port = await freePort();
-  const mcp = new StreamableHttpServer(registryOf(toolSet, 'http'), {
-    host: '127.0.0.1',
-    port,
-    batch: { keepRawParts: false },
-    ...backgroundRunsOf(toolSet),
-  });
+  const mcp = new StreamableHttpServer(
+    registryOf(toolSet, 'http', { dataTools: true }),
+    {
+      host: '127.0.0.1',
+      port,
+      batch: { keepRawParts: false },
+      ...backgroundRunsOf(toolSet),
+    },
+  );
   await mcp.start();
   try {
     return await listOver(

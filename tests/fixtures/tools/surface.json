@@ -1,6 +1,6 @@
 [
   {
-    "group": "readonly",
+    "group": "data",
     "name": "GetTableContents",
     "inputs": "table_name*, max_rows, detail",
     "available_in": "cloud, onprem"
@@ -1416,7 +1416,7 @@
     "available_in": "onprem"
   },
   {
-    "group": "system",
+    "group": "data",
     "name": "GetSqlQuery",
     "inputs": "sql_query*, row_number, detail",
     "available_in": "cloud, onprem"

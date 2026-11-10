@@ -30,7 +30,9 @@ export function servedEntries(
   const entries = new Map<string, HandlerEntry>();
   for (const toolSet of [fullToolSet, compactToolSet]) {
     for (const transport of ['stdio', 'http'] as const) {
-      for (const group of toolSet.groups(noConnectionContext(), transport)) {
+      for (const group of toolSet.groups(noConnectionContext(), transport, {
+        dataTools: true,
+      })) {
         for (const entry of group.getHandlers()) {
           const name = entry.toolDefinition.name;
           if (entries.has(name)) continue;

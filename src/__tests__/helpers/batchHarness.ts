@@ -13,9 +13,13 @@ import type {
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CompactModifyHandlersGroup } from '../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../compact-readonly-entries/src/group';
 import { requestKind, type SessionKind } from '../../lib/batch/sessionKind';
 import {
+  DataHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   RuntimeRunHandlersGroup,
@@ -212,9 +216,11 @@ export function servedTools(
     new ReadOnlyHandlersGroup(context),
     new SearchHandlersGroup(context),
     new SystemHandlersGroup(context),
+    new DataHandlersGroup(context),
     new RuntimeRunHandlersGroup(context),
     new HighLevelHandlersGroup(context),
     new CompactReadOnlyHandlersGroup(context),
+    new CompactDataHandlersGroup(context),
     new CompactModifyHandlersGroup(context),
   ].flatMap((group) => group.getHandlers());
   return new Map(entries.map((e) => [e.toolDefinition.name, e]));

@@ -23,7 +23,10 @@ jest.mock('../../../lib/connectionFactory', () => ({
 
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as z from 'zod';
@@ -59,13 +62,17 @@ const SETS: ReadonlyArray<readonly [string, ToolSet, string]> = [
     'compact',
     compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     }),
     'HandlerSession',
   ],
   [
     'compact-ro',
-    compactReadOnlyToolSetOf(compactReadOnlyEntries),
+    compactReadOnlyToolSetOf({
+      readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
+    }),
     'HandlerSession',
   ],
 ];
@@ -73,7 +80,7 @@ const SESSION_TOOLS = ['SessionOpen', 'SessionClose', 'HandlerSession'];
 
 const namesOf = (set: ToolSet, transport: ServedTransport) =>
   set
-    .groups({ connection: undefined as never }, transport)
+    .groups({ connection: undefined as never }, transport, { dataTools: false })
     .flatMap((group) => group.getHandlers())
     .map((entry) => entry.toolDefinition);
 
@@ -182,7 +189,7 @@ describe('where the session tools are served', () => {
 });
 
 describe('open on an instance', () => {
-  const registry = () => registryOf(fullToolSet, 'http');
+  const registry = () => registryOf(fullToolSet, 'http', { dataTools: false });
 
   it('answers the instance state_handle and the instance then holds state', async () => {
     const longSession = new LongSession();
@@ -219,6 +226,7 @@ describe('open while a batch is open', () => {
       'compact',
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: compactModifyEntries,
       }),
       'HandlerSession',
@@ -230,10 +238,13 @@ describe('open while a batch is open', () => {
     '%s: in a communication batch it runs at once, is not recorded, and the batch stays open',
     async (_label, set, tool, args) => {
       const batch = new InstanceBatch({ keepRawParts: false });
-      const { server, client } = await served(registryOf(set, 'http'), {
-        batch,
-        longSession: new LongSession(),
-      });
+      const { server, client } = await served(
+        registryOf(set, 'http', { dataTools: false }),
+        {
+          batch,
+          longSession: new LongSession(),
+        },
+      );
       batch.begin('communication', openRecord());
       const answer = answerOf(
         await client.callTool({ name: tool, arguments: args }),
@@ -250,10 +261,13 @@ describe('open while a batch is open', () => {
     '%s: in a debugger batch it runs at once, is not recorded, and the batch stays open',
     async (_label, set, tool, args) => {
       const batch = new InstanceBatch({ keepRawParts: false });
-      const { server, client } = await served(registryOf(set, 'http'), {
-        batch,
-        longSession: new LongSession(),
-      });
+      const { server, client } = await served(
+        registryOf(set, 'http', { dataTools: false }),
+        {
+          batch,
+          longSession: new LongSession(),
+        },
+      );
       batch.begin('debugger', openRecord());
       const answer = answerOf(
         await client.callTool({ name: tool, arguments: args }),
@@ -351,7 +365,7 @@ describe('close on an instance', () => {
 
   const sessionGroups = () =>
     fullToolSet
-      .groups({ connection: undefined as never }, 'http')
+      .groups({ connection: undefined as never }, 'http', { dataTools: false })
       .filter((group) =>
         group
           .getHandlers()
@@ -394,13 +408,17 @@ describe('close on an instance', () => {
           ? fullToolSet
           : compactToolSetOf({
               readOnly: compactReadOnlyEntries,
+              data: compactDataEntries,
               modify: compactModifyEntries,
             });
       const batch = new InstanceBatch({ keepRawParts: false });
-      const { server, client } = await served(registryOf(set, 'http'), {
-        batch,
-        longSession: new LongSession(),
-      });
+      const { server, client } = await served(
+        registryOf(set, 'http', { dataTools: false }),
+        {
+          batch,
+          longSession: new LongSession(),
+        },
+      );
       batch.begin('debugger', openRecord());
       const answer = answerOf(
         await client.callTool({ name: tool, arguments: { ...args } }),

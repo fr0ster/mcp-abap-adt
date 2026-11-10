@@ -15,12 +15,16 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
@@ -109,9 +113,11 @@ function shippedEntry(tool: string): {
     new ReadOnlyHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new DataHandlersGroup(placeholder),
     new RuntimeRunHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new CompactReadOnlyHandlersGroup(placeholder),
+    new CompactDataHandlersGroup(placeholder),
     new CompactModifyHandlersGroup(placeholder),
   ];
   for (const group of groups) {

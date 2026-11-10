@@ -30,6 +30,7 @@ import {
 } from '@mcp-abap-adt/compact-modify';
 import {
   CompactReadOnlyHandlersGroup,
+  compactDataEntries,
   compactReadOnlyEntries,
 } from '@mcp-abap-adt/compact-readonly-entries';
 import { compactBackgroundRunEntries } from '../../lib/compact/backgroundRuns/group';
@@ -86,13 +87,17 @@ const namesOf = (groups: readonly IHandlerGroup[]) =>
   groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
 const toolsOf = (set: ToolSet, transport: ServedTransport = 'stdio') =>
-  namesOf(set.groups(context, transport));
+  namesOf(set.groups(context, transport, { dataTools: false }));
 
 const compact = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
   modify: compactModifyEntries,
 });
-const compactRo = compactReadOnlyToolSetOf(compactReadOnlyEntries);
+const compactRo = compactReadOnlyToolSetOf({
+  readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
+});
 
 /** The four sets, by the kind of binary that serves them. */
 const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
@@ -108,7 +113,9 @@ describe('the four tool sets', () => {
       new HighLevelHandlersGroup(context),
       new DebugHandlersGroup(context),
     ];
-    expect(shape(fullToolSet.groups(context, 'stdio'))).toEqual(
+    expect(
+      shape(fullToolSet.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual(
       shape([
         new ReadOnlyHandlersGroup(context, new Set(namesOf(overriding))),
         new SystemHandlersGroup(context),
@@ -124,7 +131,9 @@ describe('the four tool sets', () => {
   });
 
   it('core-ro: readonly (with system), search, background runs, the leftover-session list, batch mode', () => {
-    expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
+    expect(
+      shape(fullReadOnlyToolSet.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual(
       shape([
         new ReadOnlyHandlersGroup(context),
         new SystemHandlersGroup(context),
@@ -141,8 +150,11 @@ describe('the four tool sets', () => {
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
     ]);
-    expect(both).toHaveLength(29);
-    expect(shape(compact.groups(context, 'stdio'))).toEqual([
+    // The 29 compact tools but the data tool (HandlerGetData, opt-in).
+    expect(both).toHaveLength(28);
+    expect(
+      shape(compact.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual([
       { group: 'CompactHandlers', tools: both },
       {
         group: 'CompactDebugHandlers',
@@ -172,8 +184,11 @@ describe('the four tool sets', () => {
 
   it('compact-ro: the 17 that change nothing, background runs, the leftover-session list, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
-    expect(half).toHaveLength(17);
-    expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
+    // The 17 that change nothing but the data tool (HandlerGetData, opt-in).
+    expect(half).toHaveLength(16);
+    expect(
+      shape(compactRo.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual([
       { group: 'CompactReadOnlyHandlers', tools: half },
       {
         group: 'CompactBackgroundRunHandlers',
@@ -194,9 +209,11 @@ describe('the four tool sets', () => {
   it('a registry of a set lists the same tools', () => {
     for (const [, set] of SETS) {
       for (const transport of ['stdio', 'http', 'sse'] as const) {
-        expect(namesOf(registryOf(set, transport).getHandlerGroups())).toEqual(
-          toolsOf(set, transport),
-        );
+        expect(
+          namesOf(
+            registryOf(set, transport, { dataTools: false }).getHandlerGroups(),
+          ),
+        ).toEqual(toolsOf(set, transport));
       }
     }
   });
@@ -457,7 +474,7 @@ describe('the run tools are the full set’s alone', () => {
   ];
   const runTools = (set: ToolSet) =>
     set
-      .groups(context, 'stdio')
+      .groups(context, 'stdio', { dataTools: false })
       .flatMap((g) => g.getHandlers())
       .filter((e) => RUN_TOOLS.includes(e.toolDefinition.name))
       .map((e) => ({

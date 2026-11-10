@@ -141,6 +141,7 @@ const GROUP_LEVELS = {
   ReadOnlyHandlersGroup: 'readonly',
   SearchHandlersGroup: 'readonly',
   SystemHandlersGroup: 'readonly',
+  DataHandlersGroup: 'readonly',
   BackgroundRunHandlersGroup: 'readonly',
   HighLevelHandlersGroup: 'high',
   RuntimeRunHandlersGroup: 'high',
@@ -296,10 +297,16 @@ function documentedTool(definition, groupName, moduleOf) {
   };
 }
 
+/**
+ * What the pages document: every set with the data tools served, so the
+ * opt-in tools are on the pages (and marked there as opt-in).
+ */
+const DOCUMENTED = { dataTools: true };
+
 /** The served definitions of a tool set on stdio, each with its group's name. */
 function servedEntries(toolSet) {
   return toolSet
-    .groups({ connection: null }, 'stdio')
+    .groups({ connection: null }, 'stdio', DOCUMENTED)
     .flatMap((group) =>
       group
         .getHandlers()
@@ -479,8 +486,8 @@ function httpSurfaces() {
   const { fullToolSet, fullReadOnlyToolSet, streamableHttpSurface } =
     builtToolSets();
   return {
-    all: streamableHttpSurface(fullToolSet),
-    readonly: streamableHttpSurface(fullReadOnlyToolSet),
+    all: streamableHttpSurface(fullToolSet, DOCUMENTED),
+    readonly: streamableHttpSurface(fullReadOnlyToolSet, DOCUMENTED),
   };
 }
 

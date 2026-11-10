@@ -88,6 +88,9 @@ describe('the MCP tool surface', () => {
     expect(current.length).toBe(frozen.length);
   });
 
+  // 24.0.0: GetSqlQuery (from system) and GetTableContents (from readonly)
+  // moved to the data group, DataHandlersGroup, which a set serves only with
+  // --enable-data-tools. Their rows changed group, nothing else.
   it('has the same tools in the same groups', () => {
     expect([...read(current).keys()].sort()).toEqual(
       [...read(frozen).keys()].sort(),

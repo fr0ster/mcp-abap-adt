@@ -10,7 +10,10 @@
  */
 
 import { compactModifyEntries } from '../../../../compact-modify/src';
-import { compactReadOnlyEntries } from '../../../../compact-readonly-entries/src';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '../../../../compact-readonly-entries/src';
 import { TOOL_DEFINITION as GET_INCLUDE } from '../../../handlers/include/readonly/handleGetInclude';
 import type {
   HandlerContext,
@@ -321,7 +324,7 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
   const entriesOf = (set: ToolSet): Map<string, HandlerEntry> =>
     new Map(
       set
-        .groups(context, 'stdio')
+        .groups(context, 'stdio', { dataTools: false })
         .flatMap((g: IHandlerGroup) => g.getHandlers())
         .map((e) => [e.toolDefinition.name, e]),
     );
@@ -347,9 +350,13 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
       fullReadOnlyToolSet,
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: compactModifyEntries,
       }),
-      compactReadOnlyToolSetOf(compactReadOnlyEntries),
+      compactReadOnlyToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
+      }),
     ];
     // The transport request reads (objects, action log) are not object
     // reads and have no Get<Type>.

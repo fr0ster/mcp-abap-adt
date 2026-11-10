@@ -12,7 +12,10 @@
  * decision), and a user installs only what they need. The modify
  * half, the debugger, background runs and the resume are `mcp-abap-adt-compact`'s.
  */
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { packageManifestOf, processEdges } from '@mcp-abap-adt/lib/config';
 import {
   compactReadOnlyToolSetOf,
@@ -28,9 +31,10 @@ import {
  * leftover-session list and logoff. No modify half, no debugger, no
  * background run, no resume.
  */
-export const readOnlyToolSet: ToolSet = compactReadOnlyToolSetOf(
-  compactReadOnlyEntries,
-);
+export const readOnlyToolSet: ToolSet = compactReadOnlyToolSetOf({
+  readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
+});
 
 /**
  * THIS package's manifest, read by its shape (`packageManifestOf`). `require`,

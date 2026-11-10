@@ -6,7 +6,8 @@
  * (`--system-type=onprem`, `--system-type=cloud`): the child is ready by its
  * own answer, its complete `tools/list` — every tool's name and listed
  * schema — equals the projection of `listed-schemas.json` for that binary
- * and kind, and a tool call reaches the stand carrying the destination's
+ * and kind (the data tools among them: hard mode starts every child with
+ * `--enable-data-tools`), and a tool call reaches the stand carrying the destination's
  * credential (stdio: its session file; HTTP: the request's headers). Each
  * child is stopped by `SIGTERM` and its exit awaited.
  */
@@ -53,17 +54,6 @@ const CALLS: Record<
   },
 };
 
-/**
- * The data tools, which a binary serves only with `--enable-data-tools`:
- * hard mode does not pass it yet, so the children list the fixture without
- * them.
- */
-const DATA_TOOLS: ReadonlySet<string> = new Set([
-  'GetSqlQuery',
-  'GetTableContents',
-  'HandlerGetData',
-]);
-
 /** `listed-schemas.json`'s tools for one binary on one kind: name → schema. */
 function projection(command: string, kind: SystemKind): Map<string, unknown> {
   const listed: unknown = JSON.parse(
@@ -82,11 +72,7 @@ function projection(command: string, kind: SystemKind): Map<string, unknown> {
     if (!Array.isArray(variants)) continue;
     for (const variant of variants) {
       const by: unknown = Reflect.get(variant, 'listedBy');
-      if (
-        Array.isArray(by) &&
-        by.includes(`${kind} ${command}`) &&
-        !DATA_TOOLS.has(tool)
-      ) {
+      if (Array.isArray(by) && by.includes(`${kind} ${command}`)) {
         out.set(tool, Reflect.get(variant, 'value'));
       }
     }

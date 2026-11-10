@@ -22,6 +22,7 @@
  *
  * **Arguments**, as each binary's `--help` and its launcher's option parser
  * accept them (no `--transport`: a binary is its transport):
+ * - every child: `--enable-data-tools`, so the data tools are served;
  * - every child: `--system-type=<onprem|cloud|legacy>`, from
  *   `configuredSystemKind()` — never a default; with no kind stated, nothing
  *   is launched;
@@ -638,6 +639,13 @@ async function served(
   };
 }
 
+/**
+ * Every child serves the data tools: the live cases of `GetSqlQuery`,
+ * `GetTableContents` and `HandlerGetData` call them, and a binary serves
+ * them only with this flag.
+ */
+const DATA_TOOLS_FLAG = '--enable-data-tools';
+
 /** What a stdio child is started with besides its kind: its destination arguments. */
 export interface StdioLaunch {
   set: HardModeSet;
@@ -652,7 +660,7 @@ export interface StdioLaunch {
 async function startStdio(spec: StdioLaunch): Promise<LaunchedServer> {
   const child = startChild(
     binaryPath('stdio', spec.set),
-    [`--system-type=${spec.kind}`, ...spec.args],
+    [`--system-type=${spec.kind}`, DATA_TOOLS_FLAG, ...spec.args],
     childEnvironment(),
   );
   try {
@@ -682,7 +690,12 @@ async function startHttp(spec: HttpLaunch): Promise<LaunchedServer> {
   const port = await freePort();
   const child = startChild(
     binaryPath('http', spec.set),
-    [`--system-type=${spec.kind}`, '--host=127.0.0.1', `--port=${port}`],
+    [
+      `--system-type=${spec.kind}`,
+      DATA_TOOLS_FLAG,
+      '--host=127.0.0.1',
+      `--port=${port}`,
+    ],
     childEnvironment(),
   );
   try {

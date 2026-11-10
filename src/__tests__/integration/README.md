@@ -33,6 +33,13 @@ test names the tool the full binary serves (`ActivateClass`, `DeleteClass`, …)
 compact serves (a package delete, `HandlerDelete` PACKAGE) is not served by a full-binary hard
 mode; such a call is reported as not found.
 
+Hard mode starts every binary with `--enable-data-tools`, so the data tools (`GetSqlQuery`,
+`GetTableContents`, compact `HandlerGetData`) are served. A hard-mode run against a Streamable HTTP
+server that is already running (`integration_hard_mode.http_url`, not `launch_http`) serves them
+only if that server was started with the flag (or `MCP_ENABLE_DATA_TOOLS=true`, or
+`enable-data-tools: true` in its configuration file); otherwise their cases answer that the tool
+is not found.
+
 ## Running
 
 The live suites run on `node:test`, through the repository's runner (`tools/run-tests.mjs`), and

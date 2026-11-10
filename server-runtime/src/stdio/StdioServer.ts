@@ -65,6 +65,16 @@ export interface StdioServerOptions {
    * `batch_mode_unavailable`.
    */
   batch?: InstanceBatch;
+  /**
+   * `--deferred-logon`: the launcher calls no `connectAtStart`; the first
+   * tool call that needs the connection makes it. Absent: `false`.
+   */
+  deferredLogon?: boolean;
+  /**
+   * `--deferred-logon` with `--restore-session`: the instance's first birth
+   * takes up the destination's one leftover session. Absent: `false`.
+   */
+  restoreAtFirstBirth?: boolean;
 }
 
 /**

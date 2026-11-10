@@ -967,6 +967,11 @@ async function launchStdio(
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
       sentenceFor: (error) => factory.sentenceFor(error),
+      // --deferred-logon: the first tool call makes the connection
+      // (--restore-session: on the destination's one leftover session).
+      deferredLogon: config.deferredLogon === true,
+      restoreAtFirstBirth:
+        config.deferredLogon === true && config.restoreSession === true,
     },
   );
   activeServer = server;
@@ -974,7 +979,13 @@ async function launchStdio(
   // the process ends with what failed. A shutdown during the birth (stdin
   // closed, a signal) ends it, and its exit — 1, the start failed — is the
   // process's one exit.
-  if (destination) {
+  if (destination && config.deferredLogon === true) {
+    // Nothing is sent to the system before the first tool call that needs
+    // the connection: it is born there.
+    deps.stderr(
+      `[MCP] Destination "${destination}": the logon is deferred to the first tool call (deferred logon)`,
+    );
+  } else if (destination) {
     try {
       await birth.joining(server.connectAtStart(destination));
     } catch (error) {

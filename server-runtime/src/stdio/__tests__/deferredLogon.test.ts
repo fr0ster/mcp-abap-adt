@@ -1,0 +1,352 @@
+/**
+ * stdio with `--deferred-logon` (#353): the start contacts no SAP system,
+ * lists the declared type's tools and opens the transport; the first tool
+ * call that needs a connection logs on.
+ *
+ * The whole launcher over an in-memory transport. The destination's URL is
+ * a loopback port this file owns (`PortGate`): closed (nothing listens), a
+ * listener that counts and resets every connection, or a forwarder to the
+ * ADT stand-in — so the system is unreachable, then reachable, on one URL.
+ */
+
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as net from 'node:net';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import {
+  type AdtStandIn,
+  adtStandIn,
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
+import { readCoreConfig } from '../config/coreParameters';
+import { launch } from '../launcher.js';
+
+const USER = 'DEFERRED_USER';
+const PASSWORD = 'deferred-password';
+
+/** A loopback port of this file's: closed, resetting, or forwarding. */
+class PortGate {
+  private server: net.Server | undefined;
+  private readonly sockets = new Set<net.Socket>();
+  /** Connections the resetting listener accepted (each one reset). */
+  resets = 0;
+
+  private constructor(readonly port: number) {}
+
+  /** A port free now, nothing listening on it. */
+  static async closed(): Promise<PortGate> {
+    const probe = net.createServer();
+    const port = await new Promise<number>((resolve, reject) => {
+      probe.once('error', reject);
+      probe.listen(0, '127.0.0.1', () => {
+        const address = probe.address();
+        if (address !== null && typeof address === 'object') {
+          resolve(address.port);
+        } else {
+          reject(new Error('the probe has no port'));
+        }
+      });
+    });
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+    return new PortGate(port);
+  }
+
+  get url(): string {
+    return `http://127.0.0.1:${this.port}`;
+  }
+
+  /** Every connection accepted and reset at once. */
+  async reset(): Promise<void> {
+    await this.listen((socket) => {
+      this.resets += 1;
+      socket.resetAndDestroy();
+    });
+  }
+
+  /** Every connection forwarded to `target`'s port on loopback. */
+  async forward(target: string): Promise<void> {
+    const port = Number(new URL(target).port);
+    await this.listen((socket) => {
+      const upstream = net.connect(port, '127.0.0.1');
+      this.sockets.add(upstream);
+      upstream.on('close', () => this.sockets.delete(upstream));
+      upstream.on('error', () => socket.destroy());
+      socket.on('error', () => upstream.destroy());
+      socket.pipe(upstream).pipe(socket);
+    });
+  }
+
+  /** Nothing listens any more; every open connection is ended. */
+  async close(): Promise<void> {
+    const server = this.server;
+    this.server = undefined;
+    for (const socket of this.sockets) socket.destroy();
+    this.sockets.clear();
+    if (server === undefined) return;
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+
+  private async listen(onSocket: (socket: net.Socket) => void): Promise<void> {
+    await this.close();
+    const server = net.createServer((socket) => {
+      this.sockets.add(socket);
+      socket.on('close', () => this.sockets.delete(socket));
+      onSocket(socket);
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(this.port, '127.0.0.1', () => resolve());
+    });
+    this.server = server;
+  }
+}
+
+/** What the exit stub throws: execution stops at the first exit. */
+const EXITED = Symbol('exited');
+
+let root: string;
+let envFile: string;
+let standIn: AdtStandIn;
+let gate: PortGate;
+const savedEnv = { ...process.env };
+
+beforeEach(async () => {
+  resetProcessLatchForTests();
+  root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'deferred-')));
+  standIn = await adtStandIn();
+  gate = await PortGate.closed();
+  envFile = path.join(root, 'deferred.env');
+  fs.writeFileSync(
+    envFile,
+    [
+      `SAP_URL=${gate.url}`,
+      'SAP_CLIENT=100',
+      'SAP_AUTH_TYPE=basic',
+      'SAP_CONNECTION_TYPE=http',
+      `SAP_USERNAME=${USER}`,
+      `SAP_PASSWORD=${PASSWORD}`,
+      '',
+    ].join('\n'),
+  );
+  for (const name of [
+    'SAP_SYSTEM_TYPE',
+    'SAP_CONNECTION_TYPE',
+    'MCP_ENV_PATH',
+    'MCP_DEFERRED_LOGON',
+    'MCP_RESTORE_SESSION',
+  ]) {
+    delete process.env[name];
+  }
+  mock.method(process.stderr, 'write', () => true);
+});
+
+afterEach(async () => {
+  mock.restoreAll();
+  await gate.close();
+  await standIn.close();
+  fs.rmSync(root, { recursive: true, force: true });
+  process.env = { ...savedEnv };
+});
+
+/** Launches `mcp-abap-adt` over an in-memory transport, with `flags`. */
+async function start(flags: readonly string[] = ['--deferred-logon']) {
+  const args = [
+    `--env-path=${envFile}`,
+    `--auth-broker-path=${root}`,
+    '--system-type=onprem',
+    ...flags,
+  ];
+  const config = readCoreConfig(args, process.env, null);
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  let opened = 0;
+  let seenAtOpen = -1;
+  let resetsAtOpen = -1;
+  const open = serverSide.start.bind(serverSide);
+  serverSide.start = async () => {
+    opened += 1;
+    seenAtOpen = standIn.requests.length;
+    resetsAtOpen = gate.resets;
+    return open();
+  };
+  const stderr: string[] = [];
+  const exits: number[] = [];
+  // Settles at the process's first exit: what `stop()` waits for.
+  let exitedOnce: () => void = () => {};
+  const exited = new Promise<void>((resolve) => {
+    exitedOnce = resolve;
+  });
+  const processLike = Object.assign(new EventEmitter(), {
+    stdin: new EventEmitter(),
+  });
+  // A real exit ends the process at its first call: while the start runs,
+  // the stub stops the launcher there too. Once the transport is open, an
+  // exit (the shutdown's) is only recorded.
+  let starting = true;
+  await launch(
+    config,
+    {
+      toolSet: fullToolSet,
+      program: 'mcp-abap-adt',
+      version: '0.0.0-test',
+      packageName: '@mcp-abap-adt/core',
+    },
+    {
+      browserStrategy: () => {
+        throw new Error('no login in this test');
+      },
+      stderr: (line) => stderr.push(line),
+      exit: (code) => {
+        exits.push(code);
+        exitedOnce();
+        if (starting) throw EXITED;
+      },
+      processLike,
+      platform: 'linux',
+      transport: serverSide,
+    },
+  ).catch((error: unknown) => {
+    if (error !== EXITED) throw error;
+  });
+  starting = false;
+  const client = new Client({ name: 'deferred', version: '1.0.0' });
+  const connected = opened > 0;
+  if (connected) await client.connect(clientSide);
+  return {
+    stderr,
+    exits,
+    opened: () => opened,
+    seenAtOpen: () => seenAtOpen,
+    resetsAtOpen: () => resetsAtOpen,
+    tools: async () =>
+      (await client.listTools()).tools.map((tool) => tool.name).sort(),
+    call: async (name: string, args: Record<string, unknown> = {}) => {
+      const answer = await client.callTool({ name, arguments: args });
+      const content = Array.isArray(answer.content) ? answer.content : [];
+      const text = content
+        .map((part: unknown) =>
+          typeof part === 'object' &&
+          part !== null &&
+          'text' in part &&
+          typeof part.text === 'string'
+            ? part.text
+            : '',
+        )
+        .join('');
+      return { text, isError: answer.isError === true };
+    },
+    /** The shutdown, as the end of stdin starts it; resolves once it exited. */
+    stop: async () => {
+      if (connected) await client.close().catch(() => undefined);
+      processLike.stdin.emit('end');
+      await exited;
+    },
+  };
+}
+
+describe('the deferred start', () => {
+  it('nothing listening: the transport opens, nothing exits, the deferred line is written', async () => {
+    const s = await start();
+    try {
+      assert.deepEqual(s.exits, []);
+      assert.equal(s.opened(), 1);
+      // Fixed words and the destination's name: no URL, no port. (The
+      // summary before it shows the settings, as every start does.)
+      assert.equal(
+        s.stderr.at(-1),
+        '[MCP] Destination "default": the logon is deferred to the first tool call (deferred logon)',
+      );
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('nothing reaches the address during the start', async () => {
+    await gate.reset();
+    const s = await start();
+    try {
+      assert.equal(s.opened(), 1);
+      assert.equal(s.resetsAtOpen(), 0);
+      assert.equal(gate.resets, 0);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('the tools listed are those a start without the flag lists for the same type', async () => {
+    await gate.forward(standIn.url);
+    const logged = await start([]);
+    let withoutFlag: string[];
+    try {
+      assert.deepEqual(logged.exits, [], logged.stderr.join('\n'));
+      assert.equal(logged.opened(), 1, logged.stderr.join('\n'));
+      withoutFlag = await logged.tools();
+    } finally {
+      await logged.stop();
+    }
+    resetProcessLatchForTests();
+    await gate.close();
+    const deferred = await start();
+    try {
+      assert.deepEqual(await deferred.tools(), withoutFlag);
+      assert.equal(withoutFlag.length > 0, true);
+    } finally {
+      await deferred.stop();
+    }
+  });
+
+  it('without the flag, an unreachable system still ends the start with exit 1', async () => {
+    const s = await start([]);
+    assert.deepEqual(s.exits, [1]);
+    assert.equal(s.opened(), 0);
+  });
+
+  it('with the flag, a missing system type still stops the start', async () => {
+    const config = readCoreConfig(
+      [
+        `--env-path=${envFile}`,
+        `--auth-broker-path=${root}`,
+        '--deferred-logon',
+      ],
+      process.env,
+      null,
+    );
+    const exits: number[] = [];
+    const stderr: string[] = [];
+    await launch(
+      config,
+      {
+        toolSet: fullToolSet,
+        program: 'mcp-abap-adt',
+        version: '0.0.0-test',
+        packageName: '@mcp-abap-adt/core',
+      },
+      {
+        browserStrategy: () => {
+          throw new Error('no login in this test');
+        },
+        stderr: (line) => stderr.push(line),
+        exit: (code) => {
+          exits.push(code);
+          throw EXITED;
+        },
+        processLike: Object.assign(new EventEmitter(), {
+          stdin: new EventEmitter(),
+        }),
+        platform: 'linux',
+      },
+    ).catch((error: unknown) => {
+      if (error !== EXITED) throw error;
+    });
+    assert.deepEqual(exits, [1]);
+    assert.equal(
+      stderr.some((line) => line.includes('the SAP system type is required')),
+      true,
+    );
+  });
+});

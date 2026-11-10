@@ -6,6 +6,7 @@ import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
+import { DataHandlersGroup } from '../lib/handlers/groups/DataHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
 import { RuntimeRunHandlersGroup } from '../lib/handlers/groups/RuntimeRunHandlersGroup.js';
@@ -147,10 +148,22 @@ export interface EmbeddableMcpServerOptions {
   handlersRegistry?: IHandlersRegistry;
 
   /**
-   * Exposition levels to include when creating default registry
+   * Exposition levels to include when creating default registry.
+   * `data` adds the data tools (`GetSqlQuery`, `GetTableContents`), which
+   * are opt-in: no default names it. SAP API Policy FAQ v1.3 (June 2026),
+   * Q33, says ADT APIs are not intended for reading application tables,
+   * exporting business data or running SQL against SAP systems; whether to
+   * serve them is the customer's decision.
    * @default ['readonly', 'high']
    */
-  exposition?: ('readonly' | 'high' | 'compact' | 'system' | 'search')[];
+  exposition?: (
+    | 'readonly'
+    | 'high'
+    | 'compact'
+    | 'system'
+    | 'search'
+    | 'data'
+  )[];
 
   /**
    * Server version
@@ -332,7 +345,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
    * Creates default handlers registry based on exposition levels
    */
   private createDefaultRegistry(
-    exposition: ('readonly' | 'high' | 'compact' | 'system' | 'search')[],
+    exposition: NonNullable<EmbeddableMcpServerOptions['exposition']>,
     logger?: Logger,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
@@ -377,6 +390,10 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
     if (exposition.includes('search')) {
       groups.push(new SearchHandlersGroup(dummyContext));
+    }
+    // The data tools, opt-in: only when the exposition names `data`.
+    if (exposition.includes('data')) {
+      groups.push(new DataHandlersGroup(dummyContext));
     }
 
     return new CompositeHandlersRegistry(groups);

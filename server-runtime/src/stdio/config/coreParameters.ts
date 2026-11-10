@@ -45,6 +45,10 @@ const RENEWALS = ['refresh-then-login', 'refresh-only'] as const;
 /** The connection types (`--connection-type`). */
 const CONNECTION_TYPES = ['http', 'rfc'] as const;
 
+/** `--deferred-logon`'s and `--restore-session`'s CLI forms, as the refusal names them. */
+const DEFERRED_LOGON_CLI = '--deferred-logon';
+const RESTORE_SESSION_CLI = '--restore-session';
+
 /** The destination, browser and login rows: core's own. */
 export const CORE_ROWS: readonly Parameter[] = [
   {
@@ -129,12 +133,24 @@ export const CORE_ROWS: readonly Parameter[] = [
   },
   {
     key: 'deferredLogon',
-    cli: '--deferred-logon',
+    cli: DEFERRED_LOGON_CLI,
     env: 'MCP_DEFERRED_LOGON',
     yaml: 'deferred-logon',
     kind: 'flag',
     section: DESTINATION,
     help: 'Start without contacting the SAP system: the tools are listed at once and the first tool call logs on. Default: off — the start logs on and exits 1 when it fails',
+  },
+  {
+    key: 'restoreSession',
+    cli: RESTORE_SESSION_CLI,
+    env: 'MCP_RESTORE_SESSION',
+    yaml: 'restore-session',
+    kind: 'flag',
+    section: DESTINATION,
+    help: "With --deferred-logon: the first tool call takes up the destination's one leftover session instead of logging on. Refused without --deferred-logon",
+    // A template used as it is states nothing a start without
+    // --deferred-logon refuses.
+    unstatedInTemplate: true,
   },
   {
     key: 'connectionType',
@@ -388,6 +404,17 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
    */
   deferredLogon?: boolean;
   /**
+   * `--restore-session`: with `deferredLogon`, the first tool call takes up
+   * the destination's one leftover session. `undefined` when no form states
+   * it; stated without `deferredLogon` it is refused (`readCoreConfig`).
+   */
+  restoreSession?: boolean;
+  /**
+   * The form `restoreSession` came from: `--restore-session`,
+   * `MCP_RESTORE_SESSION`, or `restore-session (config file)`.
+   */
+  restoreSessionSource?: string;
+  /**
    * The browser of a login (`--browser`): system (default), auto, chrome,
    * edge, firefox, none, headless — mapped by the platform to one of
    * auth-providers' browsers.
@@ -461,6 +488,18 @@ export function readCoreConfig(
   const values = readParameters(table, argv, env, yaml);
   const source = (key: string) => parameterSource(table, key, argv, env, yaml);
 
+  const deferredLogon = flagValue(values.deferredLogon) ?? false;
+  const restoreSession = flagValue(values.restoreSession);
+  const restoreSessionSource = source('restoreSession');
+  // Without the deferred logon the start takes up the destination's
+  // leftover session on its own: a restore flag stated there, `true` or
+  // `false`, would be ignored in silence, so it stops the start.
+  if (restoreSession !== undefined && !deferredLogon) {
+    throw new ParameterRefusal(
+      `${restoreSessionSource ?? RESTORE_SESSION_CLI} needs ${DEFERRED_LOGON_CLI}: a start without it takes up the destination's leftover session on its own`,
+    );
+  }
+
   const envDestination = str(values.envDestination);
   const envPath = str(values.envPath);
   const authBrokerPath = str(values.authBrokerPath);
@@ -496,7 +535,9 @@ export function readCoreConfig(
           : source('envDestination'),
     authBrokerPath,
     unsafe: flagValue(values.unsafe) ?? false,
-    deferredLogon: flagValue(values.deferredLogon) ?? false,
+    deferredLogon,
+    restoreSession,
+    restoreSessionSource,
     browser: str(values.browser),
     browserProgram: str(values.browserProgram),
     renewal: wordValue(values.renewal, RENEWALS),

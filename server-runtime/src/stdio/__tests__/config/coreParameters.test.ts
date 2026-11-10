@@ -409,6 +409,7 @@ describe('the YAML template and validation come from the table', () => {
         'msserv',
         'mshost',
         'renewal',
+        'restore-session',
         'saprouter',
         'shutdown-timeout',
         'sysid',

@@ -77,6 +77,13 @@ export interface Parameter {
   readonly parse?: (raw: unknown, name: string) => ParameterValue;
   /** The value when no form gives one; also the template's value. */
   readonly default?: ParameterValue;
+  /**
+   * A flag the `--conf` template leaves unstated (an empty value) instead of
+   * writing `false`: one whose stated `false` is refused in some starts
+   * (`--restore-session` without `--deferred-logon`), so a template written
+   * and used as it is never states it.
+   */
+  readonly unstatedInTemplate?: true;
   /** The value placeholder of the help (`=<minutes>`); default by kind. */
   readonly valueHint?: string;
   /** The help section the row is listed under. */
@@ -589,7 +596,7 @@ function renderNode(node: TemplateNode, depth: number): string {
     if (!p) continue;
     const values = p.values ? ` (${p.values.join(' | ')})` : '';
     const value =
-      p.kind === 'flag'
+      p.kind === 'flag' && p.unstatedInTemplate !== true
         ? templateValue(p.default ?? false)
         : templateValue(p.default);
     const forms = [p.cli, ...(p.cliAliases ?? []), ...(p.env ? [p.env] : [])];

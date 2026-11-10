@@ -88,6 +88,7 @@ describe('the table', () => {
       '--renewal',
       '--browser-auth-port',
       '--deferred-logon',
+      '--restore-session',
       '--connection-type',
       '--system-type',
     ]);
@@ -105,6 +106,7 @@ describe('the table', () => {
       ['--renewal', 'MCP_RENEWAL', 'renewal'],
       ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
       ['--deferred-logon', 'MCP_DEFERRED_LOGON', 'deferred-logon'],
+      ['--restore-session', 'MCP_RESTORE_SESSION', 'restore-session'],
       ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],
       ['--system-type', 'SAP_SYSTEM_TYPE', 'system-type'],
     ]);

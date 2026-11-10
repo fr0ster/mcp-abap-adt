@@ -188,9 +188,23 @@ today (§1, A tool call's connection). What changes:
   answer, a system lookup that failed, an unlisted code. The failure reader then answers
   `no_connection` through `answerRead` (`src/lib/auth/answerFailure.ts:53-56`): the answer's
   `error` is `no_connection`, and the stderr line `[MCP] no_connection`.
-- **Every call, not only the first.** With the flag, the refusal applies while the process
-  runs: a call after the system went away, whose connection must be built again, answers
-  `no_connection` the same way. Without the flag nothing changes.
+- **Every failed build, not only the first.** With the flag, the refusal applies to every
+  build of the instance's connection while the process runs: the first call, every call
+  while there is still none, and every rebuild after SAP ended the session. Without the
+  flag nothing changes.
+- **A connection already made.** A request on a held connection that fails does not
+  throw to the server: adt-clients turns the throw into an `IAdtError` (`origin:
+  connection`, the thrown value's message, its response and request) and drops its `code`
+  (Code, `node_modules/@mcp-abap-adt/adt-clients/dist/utils/adtResponse.js:143-155`), and
+  the handler renders that failure itself (`answer()`, `src/lib/answer.ts:590-611`).
+  Today such an answer names the address: `connect ECONNREFUSED <ip>:<port>` (Measured,
+  a unit case closing the port after a first call). The cause is taken from the contract,
+  never from the message: interfaces-adt's `IAdtError` gains an optional allowlisted
+  cause code, which adt-clients keeps (two minors, released first, by their own task).
+  Once this server depends on those releases, with the flag, a failure whose `IAdtError`
+  carries a listed cause code and no response is answered `no_connection` with that code,
+  whether or not the connection was already made. Until then the held connection's answer
+  stays as today. Without the flag nothing changes.
 - **What the answer never holds.** No URL, host, port, user, password, token or error
   message: the words are fixed and the code is a listed one.
 - **RFC.** An RFC connection that cannot reach its system fails as a chain failure carrying

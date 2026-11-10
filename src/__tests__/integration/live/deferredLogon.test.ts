@@ -230,296 +230,299 @@ function installedBin(): string {
   return installed.bin;
 }
 
-after(() => {
-  if (installed !== undefined) {
-    // Retried: on Windows a just-exited child can hold a file for a moment.
-    rmSync(installed.workdir, {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 500,
-    });
-  }
-});
-
-describe('an unreachable system (a closed loopback port; no SAP system)', () => {
-  let dir: string;
-
-  before(() => {
-    dir = mkdtempSync(join(tmpdir(), 'deferred-closed-'));
-  });
-
+describe('the installed bin with --deferred-logon', () => {
   after(() => {
-    rmSync(dir, { recursive: true, force: true });
+    if (installed !== undefined) {
+      // Retried: on Windows a just-exited child can hold a file for a moment.
+      rmSync(installed.workdir, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 500,
+      });
+    }
   });
 
-  it('--deferred-logon: the server stays up, lists its tools, and each call answers no_connection (ECONNREFUSED)', async () => {
-    const bin = installedBin();
-    const port = await closedLoopbackPort();
-    const envFile = join(dir, 'closed.env');
-    writeFileSync(
-      envFile,
-      [
-        `SAP_URL=http://127.0.0.1:${port}`,
-        'SAP_CLIENT=001',
-        'SAP_AUTH_TYPE=basic',
-        'SAP_CONNECTION_TYPE=http',
-        'SAP_USERNAME=NOBODY',
-        'SAP_PASSWORD=nothing-anywhere',
-        '',
-      ].join('\n'),
-    );
-    const server = await launchStdioScript({
-      argv: [
-        bin,
-        `--env-path=${envFile}`,
-        `--auth-broker-path=${dir}`,
-        '--system-type=onprem',
-        '--deferred-logon',
-      ],
-      env: childEnvironment(),
-      cwd: dir,
-      // Nothing to log on to: the port is closed.
-      logOn: async () => {},
+  describe('an unreachable system (a closed loopback port; no SAP system)', () => {
+    let dir: string;
+
+    before(() => {
+      dir = mkdtempSync(join(tmpdir(), 'deferred-closed-'));
     });
-    const child = server.child;
-    if (child === undefined) throw new Error('the server did not start');
-    let code: number | null;
-    const answers: Array<Record<string, unknown>> = [];
-    let tools = 0;
-    try {
-      tools = (await server.listTools()).length;
-      for (let call = 0; call < 2; call += 1) {
-        const answer = await server.call('GetAdtTypes', {});
-        assert.equal(answer.isError, true);
-        const text = answer.content.map((part) => part.text).join('');
-        assert.equal(text.includes(String(port)), false);
-        assert.equal(text.includes('127.0.0.1'), false);
-        answers.push(payloadOf(text));
+
+    after(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('--deferred-logon: the server stays up, lists its tools, and each call answers no_connection (ECONNREFUSED)', async () => {
+      const bin = installedBin();
+      const port = await closedLoopbackPort();
+      const envFile = join(dir, 'closed.env');
+      writeFileSync(
+        envFile,
+        [
+          `SAP_URL=http://127.0.0.1:${port}`,
+          'SAP_CLIENT=001',
+          'SAP_AUTH_TYPE=basic',
+          'SAP_CONNECTION_TYPE=http',
+          'SAP_USERNAME=NOBODY',
+          'SAP_PASSWORD=nothing-anywhere',
+          '',
+        ].join('\n'),
+      );
+      const server = await launchStdioScript({
+        argv: [
+          bin,
+          `--env-path=${envFile}`,
+          `--auth-broker-path=${dir}`,
+          '--system-type=onprem',
+          '--deferred-logon',
+        ],
+        env: childEnvironment(),
+        cwd: dir,
+        // Nothing to log on to: the port is closed.
+        logOn: async () => {},
+      });
+      const child = server.child;
+      if (child === undefined) throw new Error('the server did not start');
+      let code: number | null;
+      const answers: Array<Record<string, unknown>> = [];
+      let tools = 0;
+      try {
+        tools = (await server.listTools()).length;
+        for (let call = 0; call < 2; call += 1) {
+          const answer = await server.call('GetAdtTypes', {});
+          assert.equal(answer.isError, true);
+          const text = answer.content.map((part) => part.text).join('');
+          assert.equal(text.includes(String(port)), false);
+          assert.equal(text.includes('127.0.0.1'), false);
+          answers.push(payloadOf(text));
+        }
+      } finally {
+        code =
+          process.platform === 'win32' ? await child.end() : await child.stop();
+        await server.close();
       }
-    } finally {
-      code =
-        process.platform === 'win32' ? await child.end() : await child.stop();
-      await server.close();
-    }
-    assert.equal(tools > 0, true);
-    for (const payload of answers) {
-      assert.equal(payload.error, 'no_connection');
-      assert.equal(String(payload.message).includes('(ECONNREFUSED)'), true);
-    }
-    assert.equal(code, 0);
-    assert.equal(strayLines(child.stdout()), 0);
+      assert.equal(tools > 0, true);
+      for (const payload of answers) {
+        assert.equal(payload.error, 'no_connection');
+        assert.equal(String(payload.message).includes('(ECONNREFUSED)'), true);
+      }
+      assert.equal(code, 0);
+      assert.equal(strayLines(child.stdout()), 0);
+    });
   });
-});
 
-/**
- * The real-system cases: run only where `MCP_LIVE_DEFERRED_ENV_PATH` names
- * one HTTP `.env` of a real on-premise system (basic authentication), and,
- * for the take-up case, `MCP_LIVE_DEFERRED_LOCK_CLASS` names a class of the
- * test user's own to lock and unlock. The system is named by nothing in
- * this file; the file's values are never printed.
- */
-const REAL_ENV = (process.env.MCP_LIVE_DEFERRED_ENV_PATH ?? '').trim();
-const LOCK_CLASS = (process.env.MCP_LIVE_DEFERRED_LOCK_CLASS ?? '').trim();
-const realSkip =
-  REAL_ENV === ''
-    ? 'MCP_LIVE_DEFERRED_ENV_PATH is not set: it names one HTTP .env of a real on-premise system'
-    : undefined;
-if (realSkip !== undefined) {
-  console.log(`[deferred-logon] real-system cases skipped: ${realSkip}`);
-}
+  /**
+   * The real-system cases: run only where `MCP_LIVE_DEFERRED_ENV_PATH` names
+   * one HTTP `.env` of a real on-premise system (basic authentication), and,
+   * for the take-up case, `MCP_LIVE_DEFERRED_LOCK_CLASS` names a class of the
+   * test user's own to lock and unlock. The system is named by nothing in
+   * this file; the file's values are never printed.
+   */
+  const REAL_ENV = (process.env.MCP_LIVE_DEFERRED_ENV_PATH ?? '').trim();
+  const LOCK_CLASS = (process.env.MCP_LIVE_DEFERRED_LOCK_CLASS ?? '').trim();
+  const realSkip =
+    REAL_ENV === ''
+      ? 'MCP_LIVE_DEFERRED_ENV_PATH is not set: it names one HTTP .env of a real on-premise system'
+      : undefined;
 
-/** A TCP forwarder on a loopback port of this file's, to `host:port`, opened and closed at will. */
-class Forwarder {
-  private server: Server | undefined;
-  private readonly sockets = new Set<Socket>();
-  constructor(
-    readonly port: number,
-    private readonly host: string,
-    private readonly targetPort: number,
-  ) {}
+  /** A TCP forwarder on a loopback port of this file's, to `host:port`, opened and closed at will. */
+  class Forwarder {
+    private server: Server | undefined;
+    private readonly sockets = new Set<Socket>();
+    constructor(
+      readonly port: number,
+      private readonly host: string,
+      private readonly targetPort: number,
+    ) {}
 
-  async open(): Promise<void> {
-    const server = createServer((socket) => {
-      const upstream = connect(this.targetPort, this.host);
-      for (const one of [socket, upstream]) {
-        this.sockets.add(one);
-        one.on('close', () => this.sockets.delete(one));
-        one.on('error', () => {
-          socket.destroy();
-          upstream.destroy();
-        });
+    async open(): Promise<void> {
+      const server = createServer((socket) => {
+        const upstream = connect(this.targetPort, this.host);
+        for (const one of [socket, upstream]) {
+          this.sockets.add(one);
+          one.on('close', () => this.sockets.delete(one));
+          one.on('error', () => {
+            socket.destroy();
+            upstream.destroy();
+          });
+        }
+        socket.pipe(upstream).pipe(socket);
+      });
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(this.port, '127.0.0.1', () => resolve());
+      });
+      this.server = server;
+    }
+
+    async close(): Promise<void> {
+      const server = this.server;
+      this.server = undefined;
+      for (const socket of this.sockets) socket.destroy();
+      if (server !== undefined) {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
       }
-      socket.pipe(upstream).pipe(socket);
-    });
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(this.port, '127.0.0.1', () => resolve());
-    });
-    this.server = server;
+    }
   }
 
-  async close(): Promise<void> {
-    const server = this.server;
-    this.server = undefined;
-    for (const socket of this.sockets) socket.destroy();
-    if (server !== undefined) {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
-  }
-}
-
-/** The real `.env` copied into `dir`, its `SAP_URL` pointed at `url`. */
-function realEnvTo(dir: string, url: string): string {
-  const stated = dotenv.parse(readFileSync(REAL_ENV, 'utf8'));
-  const lines = Object.entries({ ...stated, SAP_URL: url }).map(
-    ([key, value]) => `${key}=${value}`,
-  );
-  const file = join(dir, 'real.env');
-  writeFileSync(file, `${lines.join('\n')}\n`, { mode: 0o600 });
-  return file;
-}
-
-describe('a real on-premise system (named only by its variable)', () => {
-  let dir: string;
-
-  before(() => {
-    dir = mkdtempSync(join(tmpdir(), 'deferred-real-'));
-  });
-
-  after(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it('the system becomes reachable mid-session: no_connection first, then the next call answers from the system', {
-    skip: realSkip ?? false,
-  }, async () => {
+  /** The real `.env` copied into `dir`, its `SAP_URL` pointed at `url`. */
+  function realEnvTo(dir: string, url: string): string {
     const stated = dotenv.parse(readFileSync(REAL_ENV, 'utf8'));
-    const target = new URL(stated.SAP_URL ?? '');
-    assert.equal(
-      target.protocol,
-      'http:',
-      'HTTP only: a forwarder breaks a TLS host name check',
+    const lines = Object.entries({ ...stated, SAP_URL: url }).map(
+      ([key, value]) => `${key}=${value}`,
     );
-    const forwarder = new Forwarder(
-      await closedLoopbackPort(),
-      target.hostname,
-      Number(target.port || '80'),
-    );
-    const envFile = realEnvTo(dir, `http://127.0.0.1:${forwarder.port}`);
-    const server = await launchStdioScript({
-      argv: [
+    const file = join(dir, 'real.env');
+    writeFileSync(file, `${lines.join('\n')}\n`, { mode: 0o600 });
+    return file;
+  }
+
+  describe('a real on-premise system (named only by its variable)', () => {
+    let dir: string;
+    if (realSkip !== undefined) {
+      // Printed in every run, so a skip never reads as a pass.
+      console.log(`[deferred-logon] real-system cases skipped: ${realSkip}`);
+    }
+
+    before(() => {
+      dir = mkdtempSync(join(tmpdir(), 'deferred-real-'));
+    });
+
+    after(() => {
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('the system becomes reachable mid-session: no_connection first, then the next call answers from the system', {
+      skip: realSkip ?? false,
+    }, async () => {
+      const stated = dotenv.parse(readFileSync(REAL_ENV, 'utf8'));
+      const target = new URL(stated.SAP_URL ?? '');
+      assert.equal(
+        target.protocol,
+        'http:',
+        'HTTP only: a forwarder breaks a TLS host name check',
+      );
+      const forwarder = new Forwarder(
+        await closedLoopbackPort(),
+        target.hostname,
+        Number(target.port || '80'),
+      );
+      const envFile = realEnvTo(dir, `http://127.0.0.1:${forwarder.port}`);
+      const server = await launchStdioScript({
+        argv: [
+          installedBin(),
+          `--env-path=${envFile}`,
+          `--auth-broker-path=${dir}`,
+          '--deferred-logon',
+        ],
+        env: childEnvironment(),
+        cwd: dir,
+        logOn: async () => {},
+      });
+      const child = server.child;
+      if (child === undefined) throw new Error('the server did not start');
+      let code: number | null;
+      try {
+        const refused = await server.call('GetAdtTypes', {});
+        assert.equal(
+          payloadOf(refused.content.map((p) => p.text).join('')).error,
+          'no_connection',
+        );
+        await forwarder.open();
+        const answered = await server.call('GetAdtTypes', {});
+        assert.equal(answered.isError, false);
+      } finally {
+        code =
+          process.platform === 'win32' ? await child.end() : await child.stop();
+        await server.close();
+        await forwarder.close();
+      }
+      assert.equal(code, 0);
+    });
+
+    it('the first call takes up a leftover session: a killed process locked, the next process unlocks with its handle', {
+      skip:
+        realSkip ??
+        (LOCK_CLASS === ''
+          ? 'MCP_LIVE_DEFERRED_LOCK_CLASS is not set: it names a class of the test user to lock'
+          : false),
+    }, async () => {
+      const envFile = realEnvTo(
+        dir,
+        dotenv.parse(readFileSync(REAL_ENV, 'utf8')).SAP_URL ?? '',
+      );
+      const args: [string, ...string[]] = [
         installedBin(),
         `--env-path=${envFile}`,
         `--auth-broker-path=${dir}`,
         '--deferred-logon',
-      ],
-      env: childEnvironment(),
-      cwd: dir,
-      logOn: async () => {},
-    });
-    const child = server.child;
-    if (child === undefined) throw new Error('the server did not start');
-    let code: number | null;
-    try {
-      const refused = await server.call('GetAdtTypes', {});
-      assert.equal(
-        payloadOf(refused.content.map((p) => p.text).join('')).error,
-        'no_connection',
-      );
-      await forwarder.open();
-      const answered = await server.call('GetAdtTypes', {});
-      assert.equal(answered.isError, false);
-    } finally {
-      code =
-        process.platform === 'win32' ? await child.end() : await child.stop();
-      await server.close();
-      await forwarder.close();
-    }
-    assert.equal(code, 0);
-  });
-
-  it('the first call takes up a leftover session: a killed process locked, the next process unlocks with its handle', {
-    skip:
-      realSkip ??
-      (LOCK_CLASS === ''
-        ? 'MCP_LIVE_DEFERRED_LOCK_CLASS is not set: it names a class of the test user to lock'
-        : false),
-  }, async () => {
-    const envFile = realEnvTo(
-      dir,
-      dotenv.parse(readFileSync(REAL_ENV, 'utf8')).SAP_URL ?? '',
-    );
-    const args: [string, ...string[]] = [
-      installedBin(),
-      `--env-path=${envFile}`,
-      `--auth-broker-path=${dir}`,
-      '--deferred-logon',
-    ];
-    const first = await launchStdioScript({
-      argv: args,
-      env: childEnvironment(),
-      cwd: dir,
-      logOn: async () => {},
-    });
-    let lockHandle = '';
-    try {
-      const locked = await first.call('LockObjectLow', {
-        object_name: LOCK_CLASS,
-        object_type: 'class',
+      ];
+      const first = await launchStdioScript({
+        argv: args,
+        env: childEnvironment(),
+        cwd: dir,
+        logOn: async () => {},
       });
-      assert.equal(locked.isError, false);
-      const handle = payloadOf(
-        locked.content.map((p) => p.text).join(''),
-      ).lock_handle;
-      lockHandle = typeof handle === 'string' ? handle : '';
-      assert.notEqual(lockHandle, '');
-    } finally {
-      // Killed: its session and its lock are left behind.
-      first.child?.process.kill('SIGKILL');
-      await first.close().catch(() => undefined);
-    }
-    const second = await launchStdioScript({
-      argv: [args[0], ...args.slice(1), '--restore-session'],
-      env: childEnvironment(),
-      cwd: dir,
-      logOn: async () => {},
-    });
-    let unlocked = false;
-    try {
-      assert.equal(second.toolNames.size > 0, true);
-      const answer = await second.call('UnlockObjectLow', {
-        object_name: LOCK_CLASS,
-        object_type: 'class',
-        lock_handle: lockHandle,
+      let lockHandle = '';
+      try {
+        const locked = await first.call('LockObjectLow', {
+          object_name: LOCK_CLASS,
+          object_type: 'class',
+        });
+        assert.equal(locked.isError, false);
+        const handle = payloadOf(
+          locked.content.map((p) => p.text).join(''),
+        ).lock_handle;
+        lockHandle = typeof handle === 'string' ? handle : '';
+        assert.notEqual(lockHandle, '');
+      } finally {
+        // Killed: its session and its lock are left behind.
+        first.child?.process.kill('SIGKILL');
+        await first.close().catch(() => undefined);
+      }
+      const second = await launchStdioScript({
+        argv: [args[0], ...args.slice(1), '--restore-session'],
+        env: childEnvironment(),
+        cwd: dir,
+        logOn: async () => {},
       });
-      unlocked = answer.isError === false;
-      assert.equal(unlocked, true);
-    } finally {
-      if (!unlocked) {
-        // The case's own cleanup: the leftover session logged off.
-        const listed = await second.call('ListLeftoverSessions', {});
-        const sessions = payloadOf(
-          listed.content.map((p) => p.text).join(''),
-        ).sessions;
-        if (Array.isArray(sessions)) {
-          for (const session of sessions) {
-            const handle =
-              typeof session === 'object' &&
-              session !== null &&
-              'handle' in session
-                ? session.handle
-                : undefined;
-            if (typeof handle === 'string') {
-              await second.call('LogoffLeftoverSession', { handle });
+      let unlocked = false;
+      try {
+        assert.equal(second.toolNames.size > 0, true);
+        const answer = await second.call('UnlockObjectLow', {
+          object_name: LOCK_CLASS,
+          object_type: 'class',
+          lock_handle: lockHandle,
+        });
+        unlocked = answer.isError === false;
+        assert.equal(unlocked, true);
+      } finally {
+        if (!unlocked) {
+          // The case's own cleanup: the leftover session logged off.
+          const listed = await second.call('ListLeftoverSessions', {});
+          const sessions = payloadOf(
+            listed.content.map((p) => p.text).join(''),
+          ).sessions;
+          if (Array.isArray(sessions)) {
+            for (const session of sessions) {
+              const handle =
+                typeof session === 'object' &&
+                session !== null &&
+                'handle' in session
+                  ? session.handle
+                  : undefined;
+              if (typeof handle === 'string') {
+                await second.call('LogoffLeftoverSession', { handle });
+              }
             }
           }
         }
+        const code =
+          second.child === undefined ? null : await second.child.stop();
+        await second.close();
+        assert.equal(code, 0);
       }
-      const code =
-        second.child === undefined ? null : await second.child.stop();
-      await second.close();
-      assert.equal(code, 0);
-    }
+    });
   });
 });

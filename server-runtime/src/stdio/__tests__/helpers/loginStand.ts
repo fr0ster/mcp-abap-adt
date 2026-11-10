@@ -474,13 +474,14 @@ export async function stand(options: StandOptions): Promise<Stand> {
     },
   );
 
+  // stderr captured by a plain replacement of its write, the same under
+  // Jest and node:test; `close()` puts the original back.
   const stderr: string[] = [];
-  const spy = jest
-    .spyOn(process.stderr, 'write')
-    .mockImplementation((chunk: unknown) => {
-      stderr.push(String(chunk));
-      return true;
-    });
+  const writeStderr = process.stderr.write;
+  process.stderr.write = (chunk: unknown): boolean => {
+    stderr.push(String(chunk));
+    return true;
+  };
 
   resetProcessLatchForTests();
   const processLike = Object.assign(new EventEmitter(), {
@@ -568,7 +569,7 @@ export async function stand(options: StandOptions): Promise<Stand> {
       await factory
         .settle({ signal: AbortSignal.abort() })
         .catch(() => undefined);
-      spy.mockRestore();
+      process.stderr.write = writeStderr;
       await adt.close();
       await tokens.close();
       // A given env file lives elsewhere: only this stand's own directory goes.

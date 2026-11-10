@@ -11,12 +11,16 @@
  * child is stopped by `SIGTERM` and its exit awaited.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { type AdtStandIn, adtStandIn, basicOf } from '../../helpers/adtStandIn';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import type { SystemKind } from '../../helpers/servedTools';
+import { assertEquals } from '../../integration/helpers/liveAssert';
 import { endTestConnection } from '../../integration/helpers/openConnections';
 import { guardedTestConnection } from '../../integration/helpers/refusalGuard';
 import {
@@ -27,9 +31,7 @@ import {
   launchStdio,
 } from '../../integration/helpers/testers/hardMode';
 
-jest.setTimeout(180_000);
-
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const USER = 'HARD_USER';
 const PASSWORD = 'hard-password';
 
@@ -93,7 +95,7 @@ const logOn = async (): Promise<void> => {
   await endTestConnection(own);
 };
 
-beforeAll(async () => {
+before(async () => {
   runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hard-mode-run-'));
   process.env.MCP_ABAP_ADT_COVERAGE_RUN = runDir;
   stand = await adtStandIn();
@@ -113,7 +115,7 @@ beforeAll(async () => {
   );
 });
 
-afterAll(async () => {
+after(async () => {
   await stand.close();
   delete process.env.MCP_ABAP_ADT_COVERAGE_RUN;
   fs.rmSync(runDir, { recursive: true, force: true });
@@ -133,86 +135,93 @@ async function check(
       listing.map((tool) => [tool.name, tool.inputSchema]),
     );
     const expected = projection(command, kind);
-    expect(expected.size).toBeGreaterThan(0);
-    expect([...served.keys()].sort()).toEqual([...expected.keys()].sort());
+    assert.ok(expected.size > 0);
+    assertEquals([...served.keys()].sort(), [...expected.keys()].sort());
     for (const [name, schema] of expected) {
-      expect({ name, schema: served.get(name) }).toEqual({ name, schema });
+      assertEquals({ name, schema: served.get(name) }, { name, schema });
     }
     const from = stand.requests.length;
     await launched.call(CALLS[set].name, CALLS[set].args);
     const sent = stand.requests.slice(from);
-    expect(sent.length).toBeGreaterThan(0);
-    expect(
-      sent.filter((r) => r.authorization === basicOf(USER, PASSWORD)).length,
-    ).toBeGreaterThan(0);
+    assert.ok(sent.length > 0);
+    assert.ok(
+      sent.filter((r) => r.authorization === basicOf(USER, PASSWORD)).length >
+        0,
+    );
   } finally {
     await launched.close();
     const child = launched.child;
-    expect(child?.process.exitCode ?? child?.process.signalCode).toEqual(
-      expect.anything(),
-    );
+    // The child has ended: an exit code or the signal that ended it.
+    const ended = child?.process.exitCode ?? child?.process.signalCode;
+    assert.ok(ended !== null && ended !== undefined);
   }
 }
 
 const KINDS: readonly SystemKind[] = ['onprem', 'cloud'];
 
-describe.each(KINDS)('--system-type=%s', (kind) => {
-  it('the stdio binary answers initialize and a tool call reaches the stand', async () => {
-    const launched = await launchStdio({
-      set: 'full',
-      kind,
-      args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
-      logOn,
+for (const kind of KINDS) {
+  describe(`--system-type=${kind}`, () => {
+    it('the stdio binary answers initialize and a tool call reaches the stand', async () => {
+      const launched = await launchStdio({
+        set: 'full',
+        kind,
+        args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
+        logOn,
+      });
+      await check(launched, COMMANDS.stdio.full, kind, 'full');
     });
-    await check(launched, COMMANDS.stdio.full, kind, 'full');
-  });
 
-  it('the HTTP binary prints its listening line and an authenticated request reaches the stand', async () => {
-    const launched = await launchHttp({
-      set: 'full',
-      kind,
-      headers: {
-        'x-sap-url': stand.url,
-        'x-sap-client': '100',
-        'x-sap-login': USER,
-        'x-sap-password': PASSWORD,
-      },
-      logOn,
+    it('the HTTP binary prints its listening line and an authenticated request reaches the stand', async () => {
+      const launched = await launchHttp({
+        set: 'full',
+        kind,
+        headers: {
+          'x-sap-url': stand.url,
+          'x-sap-client': '100',
+          'x-sap-login': USER,
+          'x-sap-password': PASSWORD,
+        },
+        logOn,
+      });
+      assert.ok(
+        launched.child
+          ?.stderr()
+          .includes('[StreamableHttpServer] Server started on 127.0.0.1:'),
+      );
+      await check(launched, COMMANDS.http.full, kind, 'full');
     });
-    expect(launched.child?.stderr()).toContain(
-      '[StreamableHttpServer] Server started on 127.0.0.1:',
-    );
-    await check(launched, COMMANDS.http.full, kind, 'full');
-  });
 
-  it('the compact stdio binary answers initialize and a HandlerGet call reaches the stand', async () => {
-    const launched = await launchStdio({
-      set: 'compact',
-      kind,
-      args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
-      logOn,
+    it('the compact stdio binary answers initialize and a HandlerGet call reaches the stand', async () => {
+      const launched = await launchStdio({
+        set: 'compact',
+        kind,
+        args: [`--env-path=${envFile}`, `--auth-broker-path=${base}`],
+        logOn,
+      });
+      await check(launched, COMMANDS.stdio.compact, kind, 'compact');
     });
-    await check(launched, COMMANDS.stdio.compact, kind, 'compact');
-  });
 
-  it('the compact HTTP binary prints its listening line and a header-authenticated HandlerGet call reaches the stand', async () => {
-    const launched = await launchHttp({
-      set: 'compact',
-      kind,
-      headers: {
-        'x-sap-url': stand.url,
-        'x-sap-client': '100',
-        'x-sap-login': USER,
-        'x-sap-password': PASSWORD,
-      },
-      logOn,
+    it('the compact HTTP binary prints its listening line and a header-authenticated HandlerGet call reaches the stand', async () => {
+      const launched = await launchHttp({
+        set: 'compact',
+        kind,
+        headers: {
+          'x-sap-url': stand.url,
+          'x-sap-client': '100',
+          'x-sap-login': USER,
+          'x-sap-password': PASSWORD,
+        },
+        logOn,
+      });
+      assert.ok(
+        launched.child
+          ?.stderr()
+          .includes('[StreamableHttpServer] Server started on 127.0.0.1:'),
+      );
+      await check(launched, COMMANDS.http.compact, kind, 'compact');
     });
-    expect(launched.child?.stderr()).toContain(
-      '[StreamableHttpServer] Server started on 127.0.0.1:',
-    );
-    await check(launched, COMMANDS.http.compact, kind, 'compact');
   });
-});
+}
 
 it('an HTTP child without a system kind is not started by hard mode', async () => {
   fs.mkdirSync(path.join(base, 'sessions'), { recursive: true });
@@ -233,11 +242,16 @@ it('an HTTP child without a system kind is not started by hard mode', async () =
   delete process.env.SAP_SYSTEM_TYPE;
   const from = stand.requests.length;
   try {
-    await expect(createHardModeClient('full', config)).rejects.toThrow(
-      'hard mode launches nothing: no system kind stated',
+    await assert.rejects(
+      createHardModeClient('full', config),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes(
+          'hard mode launches nothing: no system kind stated',
+        ),
     );
   } finally {
     if (saved !== undefined) process.env.SAP_SYSTEM_TYPE = saved;
   }
-  expect(stand.requests.length).toBe(from);
+  assert.equal(stand.requests.length, from);
 });

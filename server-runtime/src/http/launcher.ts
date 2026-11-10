@@ -169,7 +169,11 @@ export async function launch(
   // environment (`resolveSystemKind`).
   process.env.SAP_SYSTEM_TYPE = config.systemType;
   const server = new StreamableHttpServer(
-    registryOf(options.toolSet, 'http', { dataTools: false }),
+    registryOf(options.toolSet, 'http', {
+      // The data tools only when the start parameters turn them on; no
+      // request header does.
+      dataTools: config.enableDataTools === true,
+    }),
     {
       version: options.version,
       stateIdleMinutes: config.stateIdleMinutes,

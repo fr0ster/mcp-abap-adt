@@ -167,7 +167,11 @@ export async function launch(
   // environment (`resolveSystemKind`).
   process.env.SAP_SYSTEM_TYPE = config.systemType;
   const server = new SseServer(
-    registryOf(options.toolSet, 'sse', { dataTools: false }),
+    registryOf(options.toolSet, 'sse', {
+      // The data tools only when the start parameters turn them on; no
+      // request header does.
+      dataTools: config.enableDataTools === true,
+    }),
     {
       version: options.version,
       stateIdleMinutes: config.stateIdleMinutes,

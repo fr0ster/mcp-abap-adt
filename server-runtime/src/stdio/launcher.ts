@@ -857,8 +857,9 @@ async function launchStdio(
   config = { ...config, connectionType, systemType };
 
   // The command's tool set: fixed by the command, never by a flag.
+  // The data tools only when the configuration turns them on.
   const handlersRegistry = registryOf(options.toolSet, 'stdio', {
-    dataTools: false,
+    dataTools: config.enableDataTools === true,
   });
 
   // The browser of a login, mapped by the platform; a choice that

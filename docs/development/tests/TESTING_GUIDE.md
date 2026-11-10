@@ -204,7 +204,13 @@ On the developer machine at C=1, the TypeScript-program scans each take 0.3–1.
 The figures belong to this list: when files are added to it, measure again and update the
 setting.
 
-### The install matrix (`SKIP_INSTALL_MATRIX`)
+### The install suites: `npm run test:install` (`SKIP_INSTALL_MATRIX`)
+
+The suites that pack and install the release — `installMatrix.test.ts` and `binSmoke.test.ts` —
+are a run of their own, not part of `npm test`: `npm run test:install` runs them, one file at a
+time. `tools/separate-runs.json` names them, and `unit/runner/separateRuns.test.ts` holds both
+runners' unit sets to it, so the unit run reaches no outside service.
+
 
 `src/__tests__/unit/installMatrix.test.ts` proves that every server process loads one copy of
 `@mcp-abap-adt/lib` in every install layout: global (a wrapper with its former base, in one command
@@ -215,20 +221,21 @@ eighteen packages once and serves the tarballs from a loopback registry
 registry.npmjs.org — so it **needs the network**, as `binSmoke.test.ts` does, and never fetches a
 package of the release from the registry.
 
-It is the slowest suite of the root `npm test`: **about 100 s** on Linux (measured), about
-**20 npm installs** (four at a time). It is part of the full gate list. To leave it out of a local
-run, set `SKIP_INSTALL_MATRIX=true`, and the suite prints that it was skipped:
+It takes **about 100 s** on Linux (measured), about **20 npm installs** (four at a time). To
+leave it out of a local `test:install` run, set `SKIP_INSTALL_MATRIX=true`; its cases are reported
+skipped with that reason (`binSmoke.test.ts` likewise with `SKIP_BIN_SMOKE=true`):
 
 ```bash
-SKIP_INSTALL_MATRIX=true npm test
+SKIP_INSTALL_MATRIX=true npm run test:install
 ```
 
 **Where it runs in CI.** In one cell only: **ubuntu-latest with Node 22**, in `ci.yml` and in
 `release.yml`. Every other cell (`ci.yml`: Node 24 on Linux, both macOS cells, both Windows cells;
-`release.yml`: Node 24) sets `SKIP_INSTALL_MATRIX: 'true'` on its `npm test` step
-(`workflowInventory.test.ts` holds both workflows to that). **Windows is not covered by CI:** with
-the suite on, both windows-latest cells hung in `npm test` for over 40 minutes, where the Linux and
-macOS cells finished the whole step in 9–11 minutes; the cause is not established. A Windows run
+`release.yml`: Node 24) sets `SKIP_INSTALL_MATRIX: 'true'` on its install step, `Run install
+tests` (`npm run test:install`, after `npm test`; `workflowInventory.test.ts` holds both workflows
+to that). **Windows is not covered by CI:** with the suite on, both windows-latest cells hung in
+the test step for over 40 minutes, where the Linux and macOS cells finished the whole step in 9–11
+minutes; the cause is not established. A Windows run
 of the install matrix is a local run on a Windows machine.
 
 ## Test Modes

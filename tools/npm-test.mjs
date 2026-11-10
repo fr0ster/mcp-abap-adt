@@ -216,7 +216,14 @@ if (listOnly) {
     if (run.status !== 0) process.exit(1);
     jest = JSON.parse(run.stdout);
   }
-  console.log(JSON.stringify({ jest, nodeTest: runnerSelection }));
+  // Flushed before the exit: a pipe's write is asynchronous on macOS and
+  // Windows, and an exit right after it can cut the list.
+  await new Promise((done) =>
+    process.stdout.write(
+      `${JSON.stringify({ jest, nodeTest: runnerSelection })}\n`,
+      done,
+    ),
+  );
   process.exit(0);
 }
 

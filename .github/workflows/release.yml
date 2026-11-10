@@ -117,6 +117,11 @@ jobs:
       # one wins.
       - name: Run tests
         run: npm test -- --concurrency 2
+
+      # The suites that pack and install the release (`npm run test:install`:
+      # installMatrix, binSmoke) are a run of their own (D27, step 15).
+      - name: Run install tests
+        run: npm run test:install
         env:
           # The install matrix (installMatrix.test.ts: ~100 s and ~20 npm
           # installs on Linux) runs on one cell only, Node 22 (this job is

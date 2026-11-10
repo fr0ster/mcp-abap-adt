@@ -76,6 +76,7 @@ import {
   compiledFile,
   OWN_REPO,
   readList,
+  separateSources,
   sourceFile,
 } from './node-test-list.mjs';
 
@@ -188,10 +189,12 @@ function liveScriptRunning() {
  */
 function selectedSources() {
   const dirs = rootDirs();
+  const separate = separateSources(repo);
   return readList(repo).filter(
     (source) =>
       inRoots(dirs, sourceFile(repo, source)) &&
-      (dirs.length > 0 || !isLiveSource(source)),
+      (dirs.length > 0 || !isLiveSource(source)) &&
+      !separate.has(source),
   );
 }
 
@@ -219,9 +222,12 @@ function namedFile(arg) {
 }
 
 if (listOnly) {
-  for (const source of named.length > 0 ? selectedNamed() : selectedSources()) {
-    console.log(source);
-  }
+  const listed = named.length > 0 ? selectedNamed() : selectedSources();
+  // Flushed before the exit: a pipe's write is asynchronous on macOS and
+  // Windows, and an exit right after it can cut the list.
+  await new Promise((done) =>
+    process.stdout.write(listed.map((source) => `${source}\n`).join(''), done),
+  );
   process.exit(0);
 }
 

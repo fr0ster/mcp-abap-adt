@@ -113,9 +113,10 @@ describe.each(WORKFLOWS)('%s names every package of the release', (file) => {
 });
 
 /**
- * The install matrix runs in one CI cell: ubuntu-latest + Node 22. Every
- * other cell's `npm test` step sets `SKIP_INSTALL_MATRIX` to `'true'` (on
- * windows-latest both cells hung in that step with it).
+ * The install matrix runs in one CI cell: ubuntu-latest + Node 22. It runs
+ * in a step of its own, `npm run test:install` (D27, step 15), which sets
+ * `SKIP_INSTALL_MATRIX` to `'true'` in every other cell (on windows-latest
+ * both cells hung in the test step with it); the `npm test` step sets none.
  */
 /** A GitHub Actions expression, `$` + `{{ inner }}`, built so no literal looks like a JS template. */
 const expression = (inner: string): string =>
@@ -148,12 +149,17 @@ function step(lines: string[], name: string): string[] {
 describe.each(WORKFLOWS)('%s runs the install matrix in one cell', (file) => {
   const lines = read(file);
 
-  it("the npm test step's SKIP_INSTALL_MATRIX: 'false' only on ubuntu-latest + Node 22", () => {
+  it("the install step's SKIP_INSTALL_MATRIX: 'false' only on ubuntu-latest + Node 22; the npm test step sets none", () => {
     const run = step(lines, 'Run tests').map((line) => line.trim());
     expect(run).toContain(TEST_RUN[file]);
-    expect(run).toContain('env:');
     expect(
       run.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
+    ).toEqual([]);
+    const install = step(lines, 'Run install tests').map((line) => line.trim());
+    expect(install).toContain('run: npm run test:install');
+    expect(install).toContain('env:');
+    expect(
+      install.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
     ).toEqual([INSTALL_MATRIX_GATE[file]]);
   });
 

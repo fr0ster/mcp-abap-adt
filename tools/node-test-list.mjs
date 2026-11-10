@@ -65,6 +65,43 @@ export function readList(repo) {
 }
 
 /**
+ * The runs of their own (spec §4): `tools/separate-runs.json`, each npm
+ * script's name with the files of the list it alone runs — the suites that
+ * reach a service outside the repository (`test:install`: the npm
+ * registry and installs; `test:retrieval`: Ollama). The runner leaves them
+ * out of every selection that does not name them, so the unit run never
+ * reaches one; the guard (`unit/runner/separateRuns.test.ts`) holds both
+ * runners' unit sets to it. A repository without the file has none.
+ */
+export function readSeparateRuns(repo) {
+  const file = join(repo, 'tools', 'separate-runs.json');
+  if (!existsSync(file)) return {};
+  const runs = JSON.parse(readFileSync(file, 'utf8'));
+  if (typeof runs !== 'object' || runs === null || Array.isArray(runs)) {
+    throw new Error(`${file}: not an object of npm scripts`);
+  }
+  const listed = new Set(readList(repo));
+  for (const [script, sources] of Object.entries(runs)) {
+    if (!Array.isArray(sources)) {
+      throw new Error(`${file}: ${script} names no list of files`);
+    }
+    for (const source of sources) {
+      if (typeof source !== 'string' || !listed.has(source)) {
+        throw new Error(
+          `${file}: ${script} names a file the node:test list does not hold: ${source}`,
+        );
+      }
+    }
+  }
+  return runs;
+}
+
+/** Every file of a run of its own (`readSeparateRuns`). */
+export function separateSources(repo) {
+  return new Set(Object.values(readSeparateRuns(repo)).flat());
+}
+
+/**
  * The placement list (spec §2, "Files production code reads beside itself"):
  * `tools/node-test-placed.json`, the repository paths (files or directories,
  * written with `/`) that production code reads by its own location. The

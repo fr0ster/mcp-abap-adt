@@ -140,11 +140,17 @@ jobs:
       # (the matrix above); after the script's own value, the last one wins.
       - name: Run tests
         run: npm test -- --concurrency ${{ matrix.test-concurrency }}
+
+      # The suites that pack and install the release (`npm run test:install`:
+      # installMatrix, binSmoke) are a run of their own (D27, step 15): the
+      # unit run reaches no outside service.
+      - name: Run install tests
+        run: npm run test:install
         env:
           # The install matrix (installMatrix.test.ts: ~100 s and ~20 npm
           # installs on Linux) runs on one cell only, ubuntu-latest + Node 22;
           # every other cell skips it, and the suite says so. On windows-latest
-          # both cells hung for 40+ minutes in this step with it (cause not
+          # both cells hung for 40+ minutes in the test step with it (cause not
           # established), so Windows is not covered by it in CI.
           SKIP_INSTALL_MATRIX: ${{ (matrix.os == 'ubuntu-latest' && matrix.node-version == 22) && 'false' || 'true' }}
 

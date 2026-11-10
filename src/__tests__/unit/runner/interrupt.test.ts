@@ -15,6 +15,7 @@
 import assert from 'node:assert/strict';
 import { type ChildProcess, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as net from 'node:net';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import {
@@ -73,7 +74,12 @@ function seen(file: string, word: string): Promise<void> {
 function startRunner(
   repo: string,
   env: Readonly<Record<string, string>>,
-): { child: ChildProcess; ended: Promise<number>; output: () => string } {
+): {
+  child: ChildProcess;
+  ended: Promise<number>;
+  exited: Promise<number>;
+  output: () => string;
+} {
   let output = '';
   const child = spawn(
     process.execPath,
@@ -101,7 +107,11 @@ function startRunner(
   const ended = new Promise<number>((resolve) => {
     child.on('close', (code) => resolve(code ?? 1));
   });
-  return { child, ended, output: () => output };
+  // The runner's own end, whatever still holds its output pipes.
+  const exited = new Promise<number>((resolve) => {
+    child.on('exit', (code) => resolve(code ?? 1));
+  });
+  return { child, ended, exited, output: () => output };
 }
 
 /** An interrupt to the runner's process group, as a terminal sends it. */
@@ -164,12 +174,34 @@ describe('the first interrupt', {
   });
 
   it("a second interrupt ends every running file's process tree", async () => {
+    // The cleanup holds a connection to this test and echoes what it is
+    // sent. Once the run has ended, a line sent to it is echoed only by a
+    // process still running; a killed one (SIGKILL is delivered before it
+    // runs again) closes the connection instead.
+    const server = net.createServer();
+    const held = new Promise<net.Socket>((resolve) => {
+      server.once('connection', resolve);
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address();
+    assert.ok(typeof address === 'object' && address !== null);
     const file = 'src/__tests__/stuck.test.ts';
     const repo = built('stuck', {
       [file]: [
         ...PRELUDE,
+        "import { connect } from 'node:net';",
         "import { after, it } from 'node:test';",
-        "after(async () => { record(`pid ${process.pid}`); record('cleanup started'); await until(GO); record('cleanup finished'); });",
+        'after(async () => {',
+        "  const socket = connect(Number(process.env.HOLD_PORT), '127.0.0.1');",
+        "  socket.on('data', (data) => socket.write(data));",
+        "  await new Promise((resolve) => socket.once('connect', resolve));",
+        '  record(`pid ${process.pid}`);',
+        "  record('cleanup started');",
+        '  await until(GO);',
+        "  record('cleanup finished');",
+        '});',
         "it('runs', () => record('case'));",
         '',
       ].join('\n'),
@@ -177,7 +209,16 @@ describe('the first interrupt', {
     const record = path.join(scratch.dir, 'stuck.record');
     // Never written: the cleanup waits until it is stopped.
     const go = path.join(scratch.dir, 'stuck.never');
-    const run = startRunner(repo, { RECORD: record, GO: go });
+    const run = startRunner(repo, {
+      RECORD: record,
+      GO: go,
+      HOLD_PORT: String(address.port),
+    });
+    const socket = await held;
+    socket.on('error', () => undefined);
+    const closed = new Promise<string>((resolve) => {
+      socket.once('close', () => resolve('closed'));
+    });
     await seen(record, 'cleanup started');
     interrupt(run.child);
     await new Promise<void>((resolve) => {
@@ -188,14 +229,27 @@ describe('the first interrupt', {
       });
     });
     interrupt(run.child);
-    const code = await run.ended;
+    // The runner's exit, not its pipes' close: a cleanup that survived would
+    // hold them open.
+    const code = await run.exited;
+    const echoed = new Promise<string>((resolve) => {
+      socket.once('data', () => resolve('echoed: the cleanup still runs'));
+    });
+    if (!socket.destroyed) socket.write('alive?');
+    const answer = await Promise.race([closed, echoed]);
+    server.close();
+    if (answer !== 'closed') {
+      // A survivor would outlive the case: end it before failing.
+      const pid = Number(
+        (recorded(record).find((line) => line.startsWith('pid ')) ?? '').slice(
+          4,
+        ),
+      );
+      if (pid > 0) process.kill(pid, 'SIGKILL');
+    }
+    assert.equal(answer, 'closed');
     assert.equal(code, 1);
     assert.equal(recorded(record).includes('cleanup finished'), false);
-    const pid = Number(
-      (recorded(record).find((line) => line.startsWith('pid ')) ?? '').slice(4),
-    );
-    assert.ok(pid > 0);
-    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
   });
 
   it('a live suite interrupted during its first case finishes it and its cleanup, skips the rest, and no further file starts', async () => {

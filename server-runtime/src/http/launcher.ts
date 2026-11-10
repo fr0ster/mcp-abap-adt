@@ -46,7 +46,7 @@ import { StreamableHttpServer } from './StreamableHttpServer.js';
  * `mcp-abap-adt-compact-http-ro` the compact sets.
  */
 export interface HttpLauncherOptions {
-  /** The tools served: fixed by the command, never by a flag. */
+  /** The tools served: fixed by the command, but for the data tools (`--enable-data-tools`). */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;

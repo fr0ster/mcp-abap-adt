@@ -7,9 +7,13 @@
  * options, credentials, cancellation, failures, shutdown — is its transport's,
  * the same for any set.
  *
- * **The binary fixes the tool set** (the owner's decision). There are
- * four sets, one per kind of binary, each served on stdio, Streamable HTTP
- * and SSE:
+ * **The binary fixes the tool set** (the owner's decision), with one
+ * exception: the data tools (`GetSqlQuery`, `GetTableContents`, compact
+ * `HandlerGetData`) are served only when the binary is started with
+ * `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`), off by
+ * default (SAP API Policy FAQ v1.3, Q33; the customer decides), handed to
+ * `groups` as {@link ServedTools}. There are four sets, one per kind of
+ * binary, each served on stdio, Streamable HTTP and SSE:
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
@@ -99,7 +103,10 @@ export {
   type ToolSetKind,
 } from './config/binaries';
 
-/** The tools a binary serves: fixed by the binary, never by a flag. */
+/**
+ * The tools a binary serves: fixed by the binary, but for the data tools,
+ * which `--enable-data-tools` adds ({@link ServedTools}).
+ */
 export interface ToolSet {
   /** Which of the four kinds of binary serves this set. */
   readonly kind: ToolSetKind;
@@ -256,8 +263,9 @@ function toolsSection(
   const { bin } = BINARIES[transport][kind];
   return `
 TOOLS:
-  ${bin} serves one fixed tool set; the binary chooses it, not a flag
-  (--exposition is gone in 19.0.0, and passing it stops the start):
+  ${bin} serves one fixed tool set; the binary chooses it
+  (--exposition is gone in 19.0.0, and passing it stops the start), and one
+  flag adds the data tools:
 ${served.map((line) => `    - ${line}`).join('\n')}
 
 ${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).join('\n')}
@@ -265,6 +273,15 @@ ${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).jo
   For details: docs/user-guide/HANDLERS_MANAGEMENT.md
 `;
 }
+
+/**
+ * The data-tools line of a set's TOOLS help: what they are and the flag that
+ * serves them; the DATA TOOLS section gives the reason.
+ */
+const dataToolsLine = (tools: string): string =>
+  `the data tools, ${tools}: off by default; served only with --enable-data-tools (see DATA TOOLS: SAP API Policy FAQ Q33)`;
+const DATA_LINE = dataToolsLine('GetSqlQuery and GetTableContents');
+const COMPACT_DATA_LINE = dataToolsLine('HandlerGetData');
 
 const READONLY_LINE =
   'readonly: Get*, List*, ReadTransport* (read operations), with search and system';
@@ -306,6 +323,7 @@ export const fullToolSet: ToolSet = {
         ),
         'background runs of the long reads, RuntimeRunClass and RuntimeRunProgram: read, list, cancel or discard',
         BATCH_LINE,
+        DATA_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
@@ -362,6 +380,7 @@ export const fullReadOnlyToolSet: ToolSet = {
         ),
         'background runs of the long reads: read, list, cancel',
         BATCH_LINE,
+        DATA_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
@@ -439,6 +458,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
           ),
           'background runs of the long reads and HandlerProfileRun: read, list, cancel or discard',
           COMPACT_BATCH_LINE,
+          COMPACT_DATA_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [
@@ -493,6 +513,7 @@ export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
           ),
           'background runs of the long reads: read, list, cancel',
           COMPACT_BATCH_LINE,
+          COMPACT_DATA_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [

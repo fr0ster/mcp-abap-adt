@@ -10,6 +10,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
+import { compactToolSet } from '../../../../compact/src/launcher';
+import { readOnlyToolSet as compactRoSet } from '../../../../compact-ro/src/launcher';
+import { readOnlyToolSet as coreRoSet } from '../../../../core-ro/src/launcher';
 import {
   HTTP_PARAMETERS,
   readHttpConfig,
@@ -33,7 +36,12 @@ import {
   ParameterRefusal,
   type ParameterTable,
 } from '../../../lib/config';
+import {
+  BINARIES as BINARY_NAMES,
+  type ToolSetKind,
+} from '../../../lib/config/binaries';
 import { generateYamlConfigTemplate } from '../../../lib/config/yamlConfig';
+import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
 
 const CLI = '--enable-data-tools';
 const ENV = 'MCP_ENABLE_DATA_TOOLS';
@@ -172,4 +180,59 @@ describe("the data-tools flag and a destination's .env", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+/** How many times `part` occurs in `text`. Plain code. */
+function occurrences(text: string, part: string): number {
+  let count = 0;
+  let at = text.indexOf(part);
+  while (at >= 0) {
+    count += 1;
+    at = text.indexOf(part, at + part.length);
+  }
+  return count;
+}
+
+const CITATION = 'SAP API Policy FAQ v1.3 (June 2026), Q33';
+const DECISION = "Whether to turn this on is the customer's decision.";
+
+const SETS: ReadonlyArray<readonly [ToolSetKind, ToolSet, readonly string[]]> =
+  [
+    ['core', fullToolSet, ['GetSqlQuery', 'GetTableContents']],
+    ['core-ro', coreRoSet, ['GetSqlQuery', 'GetTableContents']],
+    ['compact', compactToolSet, ['HandlerGetData']],
+    ['compact-ro', compactRoSet, ['HandlerGetData']],
+  ];
+
+const HELPS = {
+  stdio: coreHelp,
+  http: httpHelp,
+  sse: sseHelp,
+} as const;
+
+describe('every binary help states the data tools once, and why', () => {
+  for (const [kind, toolSet, data] of SETS) {
+    for (const transport of ['stdio', 'http', 'sse'] as const) {
+      const program = BINARY_NAMES[transport][kind].bin;
+      it(`${program}`, () => {
+        const help = HELPS[transport]({ toolSet, program });
+        // The help wraps its sentences: read them with the line breaks and
+        // the indentation as single spaces.
+        const flat = help.split(/\s+/).join(' ');
+        assert.equal(occurrences(flat, CITATION), 1, 'the FAQ citation');
+        assert.equal(occurrences(flat, DECISION), 1, "the customer's decision");
+        const tools = help.slice(help.indexOf('\nTOOLS:\n'));
+        assert.ok(tools.startsWith('\nTOOLS:\n'), 'no TOOLS section');
+        const section = tools.slice(0, tools.indexOf('For details:'));
+        assert.ok(section.includes(CLI), 'the TOOLS section names the flag');
+        for (const name of data) {
+          assert.ok(section.includes(name), `the TOOLS section names ${name}`);
+        }
+        assert.ok(
+          !help.includes('the binary chooses it, not a flag'),
+          'the help still says no flag changes the set',
+        );
+      });
+    }
+  }
 });

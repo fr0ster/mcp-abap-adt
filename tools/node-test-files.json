@@ -44,6 +44,7 @@
   "src/__tests__/integration/high/unitTest/ClassUnitTestHighHandlers.test.ts",
   "src/__tests__/integration/high/unitTest/FunctionGroupUnitTestHighHandlers.test.ts",
   "src/__tests__/integration/high/unitTest/ProgramUnitTestHighHandlers.test.ts",
+  "src/__tests__/integration/live/deferredLogon.test.ts",
   "src/__tests__/integration/live/liveConnection.test.ts",
   "src/__tests__/integration/readOnly/atc/AtcHandlers.test.ts",
   "src/__tests__/integration/readOnly/function/FunctionIncludeReadOnlyHandlers.test.ts",

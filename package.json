@@ -152,6 +152,7 @@
     "test:integration": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./.test-build/tree/src/__tests__/integration/coverageReport/ledgerReporter.js --test-reporter-destination=stdout",
     "test:coverage-family": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./.test-build/tree/src/__tests__/integration/coverageReport/ledgerReporter.js --test-reporter-destination=stdout",
     "test:live-connection": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/integration/live/liveConnection.test.ts",
+    "test:live-deferred-logon": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/integration/live/deferredLogon.test.ts",
     "test:high": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration/high",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/setup.test.ts",

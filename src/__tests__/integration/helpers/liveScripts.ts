@@ -17,6 +17,7 @@ export const LIVE_SCRIPTS: ReadonlySet<string> = new Set([
   'test:coverage-family',
   'test:high',
   'test:live-connection',
+  'test:live-deferred-logon',
   'shared:setup',
   'shared:teardown',
   'shared:check',

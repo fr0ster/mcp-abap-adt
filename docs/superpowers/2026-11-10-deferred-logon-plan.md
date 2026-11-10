@@ -245,3 +245,17 @@ Decision: the suite runs under its own script `test:live-deferred-logon`, listed
 `LIVE_SCRIPTS`, `--concurrency 1`. The closed-port run (step 14) runs with no test config:
 in this worktree as it is, `MCP_TEST_CONFIG` unset — so the setup neither checks a realm
 nor logs on. No change to the live machinery is needed.
+
+### Step 2: an RFC tool call against an unreachable system
+
+Measured, on this machine (Linux x64, Node 26.7.0, `@mcp-abap-adt/sap-rfc-lite` 0.3.2, the
+SAP NW RFC SDK 7500 PL18 with `SAPNWRFC_HOME` and the library path set), with the case
+`an RFC tool call against an unreachable system` of
+`src/__tests__/integration/live/deferredLogon.test.ts` under
+`npm run test:live-deferred-logon`, no test config: a `StdioServer` for an RFC destination
+on `unreachable.invalid`, opened without `connectAtStart`, answered its first tool call
+`isError` through the failure reader, `error: authentication_failed`, kind
+`system-refused`, words `the RFC logon failed (RFC_COMMUNICATION_FAILURE), not as a
+credential refusal`; the answer names no host. So the RFC answer is the start line's key,
+as the spec expects; it is not turned into `no_connection`. The case stays and pins it.
+

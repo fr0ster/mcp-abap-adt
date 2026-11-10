@@ -101,21 +101,6 @@ per request.
 - `function_group_name` — Function group of the function module (FUNCTION_MODULE).
 - `max_results` — Maximum number of referencing objects returned.
 
-### HandlerGetData
-
-**Half:** `@mcp-abap-adt/compact-readonly-entries`
-
-**Description:** [read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
-
-**Available in:** cloud, onprem
-
-**Parameters:**
-
-- `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
-- `object_name` — Table or CDS view whose rows are read, all columns. Used when sql_query is absent.
-- `sql_query` — ABAP SQL SELECT naming the columns, conditions and order to read.
-- `max_rows` — Maximum number of rows returned.
-
 ### HandlerValidate
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
@@ -314,6 +299,21 @@ per request.
 - `service_binding_version` — Service binding version.
 - `package_name` (required) — The binding's package, which the validation checks.
 - `description` — Binding description.
+
+### HandlerGetData
+
+**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.
+
+**Description:** [read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
+- `object_name` — Table or CDS view whose rows are read, all columns. Used when sql_query is absent.
+- `sql_query` — ABAP SQL SELECT naming the columns, conditions and order to read.
+- `max_rows` — Maximum number of rows returned.
 
 ### HandlerCreate
 

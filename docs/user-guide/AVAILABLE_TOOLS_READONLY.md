@@ -92,7 +92,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
     - [RuntimeGetGatewayErrorLog](#runtimegetgatewayerrorlog-read-only-system)
-    - [GetSqlQuery](#getsqlquery-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
     - [GetObjectInfo](#getobjectinfo-read-only-system)
     - [GetInactiveObjects](#getinactiveobjects-read-only-system)
@@ -102,10 +101,11 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
     - [DescribeByList](#describebylist-read-only-system)
     - [GetPackageTree](#getpackagetree-read-only-system)
+    - [GetSqlQuery](#getsqlquery-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
-    - [GetTableContents](#gettablecontents-read-only-table)
     - [GetTable](#gettable-read-only-table)
+    - [GetTableContents](#gettablecontents-read-only-table)
   - [Table Type](#read-only-table-type)
     - [GetTableType](#gettabletype-read-only-table-type)
   - [Transport](#read-only-transport)
@@ -965,20 +965,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-<a id="getsqlquery-read-only-system"></a>
-#### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
-
-**Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
-
-**Parameters:**
-- `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-- `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
-- `sql_query` (string, required) - SQL query to execute
-
----
-
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
 **Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
@@ -1105,6 +1091,22 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
+<a id="getsqlquery-read-only-system"></a>
+#### GetSqlQuery (Read-Only / System)
+**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+
+**Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
+
+**Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.
+
+**Parameters:**
+- `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
+- `sql_query` (string, required) - SQL query to execute
+
+---
+
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
 **Description:** [read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `snippets` (the default) with line and snippet, `lines` with the line only, `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
@@ -1131,20 +1133,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 <a id="read-only-table"></a>
 ### Read-Only / Table
 
-<a id="gettablecontents-read-only-table"></a>
-#### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
-
-**Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
-
-**Parameters:**
-- `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-- `max_rows` (number, optional) - Maximum number of rows to retrieve
-- `table_name` (string, required) - Name of the ABAP table
-
----
-
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
 **Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
@@ -1157,6 +1145,22 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `start_line` (integer, optional) - First line of the source to answer, from 1. Without it, from the first line.
 - `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="gettablecontents-read-only-table"></a>
+#### GetTableContents (Read-Only / Table)
+**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+
+**Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
+
+**Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.
+
+**Parameters:**
+- `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `max_rows` (number, optional) - Maximum number of rows to retrieve
+- `table_name` (string, required) - Name of the ABAP table
 
 ---
 
@@ -1272,4 +1276,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-09*
+*Last updated: 2026-11-10*

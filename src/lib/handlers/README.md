@@ -14,7 +14,12 @@ This module provides a flexible system for registering MCP tool handlers through
 ### Handler Groups
 
 Handlers are organized into logical groups:
-- **`ReadOnlyHandlersGroup`** - All read-only handlers (get operations)
+- **`ReadOnlyHandlersGroup`** - All read-only handlers (get operations), but the data tools
+- **`DataHandlersGroup`** - The data tools, `GetSqlQuery` and `GetTableContents`: opt-in. No other
+  group serves them; add this group only when serving them is the customer's decision (SAP API
+  Policy FAQ v1.3, June 2026, Q33, says ADT APIs are not intended for reading application tables,
+  exporting business data or running SQL against SAP systems). The compact form, `HandlerGetData`,
+  is `CompactDataHandlersGroup`'s (`@mcp-abap-adt/compact-readonly-entries`)
 - Additional groups can be created (HighLevel, LowLevel, System, Search, etc.)
 
 ## Usage Examples

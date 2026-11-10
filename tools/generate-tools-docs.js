@@ -303,6 +303,12 @@ function documentedTool(definition, groupName, moduleOf) {
  */
 const DOCUMENTED = { dataTools: true };
 
+/** The data tools: on the pages, marked opt-in. */
+const DATA_TOOLS = new Set(['GetSqlQuery', 'GetTableContents']);
+const OPT_IN_LINE =
+  "**Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n";
+const optIn = (tool) => (DATA_TOOLS.has(tool.name) ? OPT_IN_LINE : '');
+
 /** The served definitions of a tool set on stdio, each with its group's name. */
 function servedEntries(toolSet) {
   return toolSet
@@ -571,6 +577,7 @@ function generateMarkdown(tools, surface) {
         md += `#### ${toolHeading}\n`;
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
+        md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
         md += `\n---\n\n`;
@@ -631,6 +638,7 @@ function generateLevelMarkdown(
       md += `#### ${toolHeading}\n`;
       md += `**Description:** ${tool.description || 'No description'}\n\n`;
       md += `**Source:** \`${tool.filePath}\`\n\n`;
+      md += optIn(tool);
       md += `**Parameters:**\n`;
       md += renderParams(tool);
       md += `\n---\n\n`;
@@ -702,6 +710,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
         md += `**Available in:** \`${tool.availableIn.join('`, `')}\`\n\n`;
+        md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
         md += `\n---\n\n`;

@@ -221,4 +221,27 @@ The mutations and what turned red are named in the commit message.
 
 ## Appendix A — the open checks
 
-Filled in by steps 1 and 2.
+### Step 1: the live global setup for a suite that needs no system
+
+- A script whose runner command names a file under `src/__tests__/integration/` must be in
+  `LIVE_SCRIPTS`: `liveScripts.test.ts` asserts the declared set equals the scripts that
+  select live suites (Code, `src/__tests__/unit/coverage/liveScripts.test.ts:44-52`), and
+  every listed script runs `--concurrency 1` (`:54-62`).
+- Under a live script, `setUp` starts the run directory, then reads the test config
+  (`loadRunConfig`): none (no `tests/test-config.yaml`, `MCP_TEST_CONFIG` unset) returns at
+  once — no realm check, no factory, no logon (Code,
+  `src/__tests__/integration/globalSetup.ts:110-121`; `helpers/runConfig.ts:15-29`). A
+  config whose YAML is empty loads as `undefined` and returns the same way (Code,
+  `loadRunConfig` returns `yaml.load` of the file). `MCP_TEST_CONFIG` set to a blank value
+  or a missing file is refused (Code, `helpers/testConfigPath.ts:20-34`).
+- With a config holding a destination, the setup runs the realm check and logs on once
+  (Code, `globalSetup.ts:123-180`).
+- The teardown of a live script other than `test:integration` and
+  `test:coverage-family` checks only the refusal marker (Code,
+  `src/__tests__/integration/globalTeardown.ts:6-12`).
+- This worktree holds no `tests/test-config.yaml` (Measured, `ls`).
+
+Decision: the suite runs under its own script `test:live-deferred-logon`, listed in
+`LIVE_SCRIPTS`, `--concurrency 1`. The closed-port run (step 14) runs with no test config:
+in this worktree as it is, `MCP_TEST_CONFIG` unset — so the setup neither checks a realm
+nor logs on. No change to the live machinery is needed.

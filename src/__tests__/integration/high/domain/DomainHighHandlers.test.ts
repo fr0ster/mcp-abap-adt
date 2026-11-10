@@ -18,7 +18,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateDomain } from '../../../../handlers/domain/high/handleCreateDomain';
 import { handleDeleteDomain } from '../../../../handlers/domain/high/handleDeleteDomain';
 import { handleUpdateDomain } from '../../../../handlers/domain/high/handleUpdateDomain';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Domain High-Level Handlers Integration', () => {

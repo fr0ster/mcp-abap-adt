@@ -472,15 +472,6 @@ export function getTestCaseDefinition(
   return handlerTests.find((tc: any) => tc.name === testCaseName) || null;
 }
 
-/**
- * Get timeout for operation type
- */
-export function getTimeout(operationType: string = 'default'): number {
-  const config = loadTestConfig();
-  const timeouts = config.test_settings?.timeouts || {};
-  return timeouts[operationType] || timeouts.default || 60000;
-}
-
 /** The authentications this helper builds a config for. */
 const TEST_AUTH_TYPES = ['basic', 'jwt'] as const;
 
@@ -615,21 +606,6 @@ export function resolveTestSystemContext(): {
       process.env.SAP_RESPONSIBLE ||
       process.env.SAP_USERNAME,
   };
-}
-
-/**
- * Get operation delay
- */
-export function getOperationDelay(operation: string, testCase?: any): number {
-  // Check test case specific delay first
-  if (testCase?.params?.operation_delays?.[operation]) {
-    return testCase.params.operation_delays[operation];
-  }
-
-  // Check global config
-  const config = loadTestConfig();
-  const delays = config.test_settings?.operation_delays || {};
-  return delays[operation] || delays.default || 3000;
 }
 
 /**

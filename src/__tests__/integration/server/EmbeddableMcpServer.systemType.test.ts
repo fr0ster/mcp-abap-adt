@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, before, describe, test } from 'node:test';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
-import { getTimeout, loadTestEnv } from '../helpers/configHelpers';
+import { loadTestEnv } from '../helpers/configHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
 type RegisteredToolsMap = Record<string, unknown>;

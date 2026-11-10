@@ -76,14 +76,13 @@ import {
 import {
   getSharedDependenciesConfig,
   getSystemType,
-  getTimeout,
   resolveTransportRequest,
 } from '../../helpers/configHelpers';
 import { assertEquals, assertMatches } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import { createHandlerContext, delay } from '../../helpers/testHelpers';
+import { createHandlerContext } from '../../helpers/testHelpers';
 
 /** A tool's answer as the model reads it: the error flag and the first text. */
 type Answer = { isError: boolean; text: string };
@@ -321,7 +320,6 @@ describe('TableType High-Level Handlers Integration', () => {
       if (!rowTypeName || !updateAccess) {
         throw new Error('row_type_name and update_access_type are required');
       }
-      const settle = () => delay(ctx.getOperationDelay('create'));
 
       /** A step that must succeed: its answer, or the test ends with it. */
       const must = async (label: string, call: () => Promise<unknown>) => {
@@ -543,7 +541,6 @@ describe('TableType High-Level Handlers Integration', () => {
         }),
       );
       created.push({ kind: 'table_type', name: COMPACT_TABLE_TYPE });
-      await settle();
       const bare = await must(
         `HandlerGet TABLE_TYPE ${COMPACT_TABLE_TYPE} metadata`,
         () =>
@@ -649,7 +646,6 @@ describe('TableType High-Level Handlers Integration', () => {
       const RUN_ENDS = ['finished', 'error', 'failed'];
       let runStatus: unknown;
       for (let read = 1; !RUN_ENDS.includes(String(runStatus)); read++) {
-        if (read > 1) await settle();
         const status = await must(
           `HandlerGet activation_status ${runId} (read ${read})`,
           () =>

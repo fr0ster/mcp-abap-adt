@@ -55,7 +55,6 @@ import {
 import {
   getEnabledTestCase,
   getStatedDatabaseSystem,
-  getTimeout,
   loadTestConfig,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';

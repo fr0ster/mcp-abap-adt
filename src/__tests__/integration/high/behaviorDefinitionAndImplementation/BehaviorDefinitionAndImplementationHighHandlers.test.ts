@@ -25,7 +25,7 @@ import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteC
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
 import { handleValidateObject } from '../../../../handlers/common/low/handleValidateObject';
-import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
+import { getEnabledTestCase } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
   activateAndConfirm,
@@ -39,7 +39,6 @@ import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
-  delay,
   extractErrorMessage,
 } from '../../helpers/testHelpers';
 
@@ -283,8 +282,6 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
       );
       testLogger?.info?.(`   + BDEF updated (not activated)`);
 
-      await delay(context.getOperationDelay('update'));
-
       // ── Step 3: Load BIMPL config
       const bimplTestCase = getEnabledTestCase(
         'create_behavior_implementation',
@@ -314,8 +311,6 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         }),
       );
       testLogger?.info?.(`   + BIMPL created`);
-
-      await delay(context.getOperationDelay('create'));
 
       // ── Step 4b: the class's main source, which binds it to the BDEF.
       // CreateBehaviorImplementation makes the class shell only (its own
@@ -364,8 +359,6 @@ ENDCLASS.
         }),
       );
       testLogger?.info?.(`   + BIMPL updated`);
-
-      await delay(context.getOperationDelay('update'));
 
       // ── Step 6: Group-activate BDEF + BIMPL class together
       testLogger?.info?.(

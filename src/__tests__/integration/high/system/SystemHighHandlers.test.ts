@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { handleGetPackageTree } from '../../../../handlers/system/high/handleGetPackageTree';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';

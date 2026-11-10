@@ -14,7 +14,7 @@ import { handleCreateServiceBinding } from '../../../../handlers/service_binding
 import { handleDeleteServiceBinding } from '../../../../handlers/service_binding/high/handleDeleteServiceBinding';
 import { handleActivateServiceBinding } from '../../../../handlers/service_binding/low/handleActivateServiceBinding';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
 

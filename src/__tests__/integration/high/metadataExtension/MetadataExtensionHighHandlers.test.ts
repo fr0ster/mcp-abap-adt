@@ -19,7 +19,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/high/handleCreateMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/high/handleUpdateMetadataExtension';
 import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -202,13 +202,6 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
       // across every write tool"; see projections.ts `terseWrite`).
       assert.equal(createResponse.content[0]?.text, 'SUCCESS');
       logger?.success(`✅ create: ${ddlxName} completed successfully`);
-
-      // Wait after creation
-      const createDelay = context.getOperationDelay('create');
-      logger?.info(
-        `   • waiting ${createDelay}ms after creation before update...`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, createDelay));
 
       // Step 2: Update
       logger?.info(`   • update: ${ddlxName}`);

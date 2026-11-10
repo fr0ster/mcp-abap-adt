@@ -17,7 +17,7 @@ import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createOnPremAdtClient } from '../../../../lib/clients';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';

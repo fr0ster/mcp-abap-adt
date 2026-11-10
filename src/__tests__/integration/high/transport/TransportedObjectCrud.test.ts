@@ -26,8 +26,6 @@ import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import {
   configuredSystemKind,
-  getOperationDelay,
-  getTimeout,
   loadTestConfig,
   loadTestEnv,
 } from '../../helpers/configHelpers';
@@ -39,7 +37,6 @@ import {
 } from '../../helpers/sessionHelpers';
 import {
   createHandlerContext,
-  delay,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -139,8 +136,6 @@ describe('Transported Object CRUD (GitHub #11)', () => {
     // projections.ts `terseWrite`).
     assert.equal(createResponse.content[0]?.text, 'SUCCESS');
     logger?.success(`Step 1: Class ${className} created`);
-
-    await delay(getOperationDelay('create'));
 
     // Step 2: Update the class source code (the critical operation — GitHub #11).
     // Before the reads, as adt-clients' class suite does: a class just

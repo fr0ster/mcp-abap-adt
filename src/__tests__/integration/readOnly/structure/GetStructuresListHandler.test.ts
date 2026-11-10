@@ -23,7 +23,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetStructuresList } from '../../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   getEnabledTestCase,
-  getTimeout,
   isTestAvailableForSystem,
   statedKindWords,
 } from '../../helpers/configHelpers';

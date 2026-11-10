@@ -29,7 +29,6 @@ import { createAdtClient } from '../../../lib/clients';
 import { getSystemContext } from '../../../lib/systemContext';
 import {
   getSharedDependenciesConfig,
-  getTimeout,
   loadTestConfig,
 } from '../../integration/helpers/configHelpers';
 import { createTestLogger } from '../../integration/helpers/loggerHelpers';

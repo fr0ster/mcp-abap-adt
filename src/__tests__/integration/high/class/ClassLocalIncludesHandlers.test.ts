@@ -34,7 +34,6 @@ import { handleUpdateLocalTestClass } from '../../../../handlers/class/high/hand
 import { handleUpdateLocalTypes } from '../../../../handlers/class/high/handleUpdateLocalTypes';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
 import {
-  getTimeout,
   isTestAvailableForSystem,
   statedKindWords,
 } from '../../helpers/configHelpers';
@@ -164,10 +163,6 @@ describe('Class Local Includes High-Level Handlers Integration', () => {
 
       logger?.success(`✅ create parent class: ${objectName} completed`);
 
-      // Wait a bit after creation
-      const delay = context.getOperationDelay('create');
-      await new Promise((resolve) => setTimeout(resolve, delay));
-
       // Step 2: Test LocalTestClass handlers
       logger?.info(`   • testing LocalTestClass handlers`);
       const testClassCode = `CLASS lcl_test DEFINITION FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
@@ -205,10 +200,6 @@ ENDCLASS.`;
         },
       );
       assert.equal(setTestClassResponse.isError, false);
-
-      // Wait after update
-      const createDelay = context.getOperationDelay('create');
-      await new Promise((resolve) => setTimeout(resolve, createDelay));
 
       logger?.success(`✅ LocalTestClass set completed`);
 
@@ -250,9 +241,6 @@ ENDCLASS.`;
       );
       assert.equal(setLocalTypesResponse.isError, false);
 
-      // Wait after update
-      await new Promise((resolve) => setTimeout(resolve, createDelay));
-
       logger?.success(`✅ LocalTypes set completed`);
 
       // Step 4: Test LocalDefinitions handlers
@@ -286,9 +274,6 @@ ENDCLASS.`;
         },
       );
       assert.equal(setLocalDefsResponse.isError, false);
-
-      // Wait after update
-      await new Promise((resolve) => setTimeout(resolve, createDelay));
 
       logger?.success(`✅ LocalDefinitions set completed`);
 
@@ -336,8 +321,6 @@ END-OF-DEFINITION.`;
           );
 
           if (!setLocalMacrosResponse.isError) {
-            // Wait after update
-            await new Promise((resolve) => setTimeout(resolve, createDelay));
             logger?.success(`✅ LocalMacros set completed`);
           } else {
             logger?.warn(
@@ -406,9 +389,6 @@ END-OF-DEFINITION.`;
       );
       assert.equal(updateLocalTypesResponse.isError, false);
 
-      // Wait after update before reading (like in ClassHighHandlers.test.ts)
-      await new Promise((resolve) => setTimeout(resolve, createDelay));
-
       // Activate class after updates to match adt-clients flow
       const activateResponse = await invoke(
         'ActivateClass',
@@ -423,9 +403,6 @@ END-OF-DEFINITION.`;
         const errorMsg = extractErrorMessage(activateResponse);
         throw new Error(`ActivateClass failed: ${errorMsg}`);
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, context.getOperationDelay('activate')),
-      );
 
       // Step 7: Test Get (read) operations - after Update
       logger?.info(`   • testing Get (read) operations`);

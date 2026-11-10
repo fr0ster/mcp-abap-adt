@@ -23,6 +23,13 @@
  * that drive SAP or the instance directly skip there.
  *
  * Nothing else may debug for the same SAP user while this runs.
+ *
+ * No case pauses and no wait is bounded (D27): each step goes on the answer
+ * of the one before it — a listener's long poll is awaited as the `listen`
+ * it sends, a raw poll as SAP's answer to it (held 60 s at most), an
+ * instance's shutdown as its end. A wait that does not end is ended by the
+ * person running the suite, with the runner's interrupt
+ * (`src/__tests__/integration/README.md`, "Interrupting a run").
  */
 
 import assert from 'node:assert/strict';
@@ -35,6 +42,11 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type {
+  IAdtAnalyseOptions,
+  IAdtError,
+  IDebuggerIdentity,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
@@ -64,10 +76,7 @@ import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handl
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
-import {
-  createDebuggerInstance,
-  DebuggerInstance,
-} from '../../../lib/debugger/DebuggerInstance';
+import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import {
   DEBUGGEE_KEPT_WORDS,
   type Debugger,
@@ -108,7 +117,6 @@ import {
   getSharedDependenciesConfig,
   getStatedDatabaseSystem,
   getSystemType,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
   testAuthBrokerPath,
@@ -190,7 +198,6 @@ const measure = (kase: string, asked: string, answered: unknown) =>
 const timing = (step: string, ms: number) =>
   say(`TIMING ${step} ${Math.round(ms)}`);
 const now = () => performance.now();
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Answer {
   isError: boolean;
@@ -230,6 +237,35 @@ interface Instance {
   state?: InstanceState;
   ctx: HandlerContext;
   debugger(): DebuggerInstance | undefined;
+  /**
+   * Resolves once the instance's listener has sent its long poll — the
+   * second `listen`, after the short first one (`FIRST_POLL_HOLD_SECONDS`).
+   * Soft mode only: in hard mode the listener is in the server's process.
+   */
+  longPollSent?(): Promise<void>;
+}
+
+/** The `listen` calls a listener has sent, and a wait for the n-th one. */
+function listenCounter(): {
+  sent(): void;
+  until(count: number): Promise<void>;
+} {
+  let sent = 0;
+  let waiting: Array<{ count: number; resolve: () => void }> = [];
+  return {
+    sent() {
+      sent += 1;
+      const due = waiting.filter((w) => sent >= w.count);
+      waiting = waiting.filter((w) => sent < w.count);
+      for (const w of due) w.resolve();
+    },
+    until(count: number) {
+      if (sent >= count) return Promise.resolve();
+      return new Promise((resolve) => {
+        waiting.push({ count, resolve });
+      });
+    },
+  };
 }
 
 describe('Debugger handlers (integration)', () => {
@@ -279,25 +315,54 @@ describe('Debugger handlers (integration)', () => {
     }
     const state = new InstanceState({ logger: stderrStateLogger });
     instances.push(state);
+    // The live ports, with every `listen` the listener sends counted: what
+    // createDebuggerInstance builds, observed.
+    const listens = listenCounter();
+    const live = liveDebugPorts();
+    const ports: typeof live = {
+      ...live,
+      abapDebugger(c, onConflict) {
+        const dbg = live.abapDebugger(c, onConflict);
+        const listen = dbg.listen.bind(dbg);
+        dbg.listen = <E extends IAdtError = IAdtError>(
+          identity: IDebuggerIdentity,
+          options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
+        ) => {
+          listens.sent();
+          return listen<E>(identity, options);
+        };
+        return dbg;
+      },
+    };
     let dbg: DebuggerInstance | undefined;
     const ctx: HandlerContext = {
       ...createHandlerContext({ connection, logger }),
       state,
       debugger: () => {
         if (!dbg) {
-          dbg = createDebuggerInstance(
-            ids ?? {
-              terminalId: newDebuggerId(),
-              ideId: newDebuggerId(),
-              stated: false,
-            },
-          );
+          dbg = new DebuggerInstance({
+            abap: new DebugSession(
+              ports,
+              ids ?? {
+                terminalId: newDebuggerId(),
+                ideId: newDebuggerId(),
+                stated: false,
+              },
+              { breakpointConflict: resolveBreakpointConflict() },
+            ),
+            amdp: new AmdpSession(liveAmdpPorts()),
+          });
           state.attach(dbg);
         }
         return dbg;
       },
     };
-    return { state, ctx, debugger: () => dbg };
+    return {
+      state,
+      ctx,
+      debugger: () => dbg,
+      longPollSent: () => listens.until(2),
+    };
   };
 
   /**
@@ -671,14 +736,9 @@ describe('Debugger handlers (integration)', () => {
     // Every instance a case made is let go the way a host lets one go.
     const states = instances.splice(0);
     for (const state of states) {
-      const left = await Promise.race([
-        state.shutdown(),
-        pause(300_000).then(() => ['still settling after 300 s']),
-      ]);
+      const left = await state.shutdown();
       if (left.length) measure('cleanup', 'instance shutdown', left);
     }
-    // A pause between cases: what one case left at the system settles before the next starts.
-    await pause(5000);
   });
 
   after(async () => {
@@ -862,8 +922,9 @@ describe('Debugger handlers (integration)', () => {
           breakpoints: [line('mark')],
         });
         assert.equal(first.isError, false);
-        // Past the short first poll: the long poll is open when the stop comes.
-        await pause(4000);
+        // Past the short first poll: the long poll is sent when the stop
+        // comes (soft mode; hard mode cannot see the server's listener).
+        await a.longPollSent?.();
         const stop = await call(a, 'DebugStop', {
           state_handle: first.json.state_handle,
         });
@@ -989,8 +1050,8 @@ describe('Debugger handlers (integration)', () => {
       });
       assert.equal(first.isError, false);
       const handleA = first.json.state_handle;
-      // Past the first instance's short first poll: its long poll is open.
-      await pause(5000);
+      // Past the first instance's short first poll: its long poll is sent.
+      await a.longPollSent?.();
       const t0 = now();
       const taken = await call(b, 'DebugTakeOverListener', {
         breakpoints: [line('mark')],
@@ -1031,7 +1092,6 @@ describe('Debugger handlers (integration)', () => {
       // stop reaches — measured on the first run of this suite).
       const left = await rawListener(ids);
       try {
-        await pause(5000);
         const b = newInstance(ids);
         const startedAt = now();
         const second = await call(b, 'DebugStartListener', {
@@ -1042,20 +1102,15 @@ describe('Debugger handlers (integration)', () => {
           answer: second.json ?? second.text.slice(0, 600),
         });
         assert.equal(second.isError, false);
-        const ended = await Promise.race([
-          left.poll,
-          pause(70_000).then(() => undefined),
-        ]);
+        // SAP holds the poll 60 s at most (holdSeconds), so it ends.
+        const ended = await left.poll;
         measure('3', 'the predecessor’s poll', {
-          ended: ended !== undefined,
-          status: ended?.status,
-          body: ended?.body.slice(0, 400),
-          ms_after_successor_start: ended
-            ? Math.round(ended.at - startedAt)
-            : undefined,
+          status: ended.status,
+          body: ended.body.slice(0, 400),
+          ms_after_successor_start: Math.round(ended.at - startedAt),
         });
-        assert.equal(ended?.status, 'ok');
-        assert.ok(Math.round((ended?.at ?? Infinity) - startedAt) < 30_000);
+        assert.equal(ended.status, 'ok');
+        assert.ok(Math.round(ended.at - startedAt) < 30_000);
         const stopB = await call(b, 'DebugStop', {
           state_handle: second.json.state_handle,
         });
@@ -1072,7 +1127,6 @@ describe('Debugger handlers (integration)', () => {
       const ideId = newDebuggerId();
       const raw = await rawListener({ terminalId: newDebuggerId(), ideId });
       try {
-        await pause(5000);
         const inst = newInstance({
           terminalId: newDebuggerId(),
           ideId,
@@ -1087,20 +1141,13 @@ describe('Debugger handlers (integration)', () => {
           answer: started.json ?? started.text.slice(0, 600),
         });
         assert.equal(started.isError, false);
-        const ended = await Promise.race([
-          raw.poll,
-          pause(70_000).then(() => undefined),
-        ]);
+        // SAP holds the poll 60 s at most (holdSeconds), so it ends.
+        const ended = await raw.poll;
         measure('3-ide', 'the IDE-like poll', {
-          ended: ended !== undefined,
-          status: ended?.status,
-          body: ended?.body.slice(0, 400),
-          ms_after_instance_start: ended
-            ? Math.round(ended.at - startedAt)
-            : undefined,
-          ms_after_its_own_start: ended
-            ? Math.round(ended.at - raw.started)
-            : undefined,
+          status: ended.status,
+          body: ended.body.slice(0, 400),
+          ms_after_instance_start: Math.round(ended.at - startedAt),
+          ms_after_its_own_start: Math.round(ended.at - raw.started),
         });
         await call(inst, 'DebugStop', {
           state_handle: started.json.state_handle,
@@ -1698,7 +1745,6 @@ describe('Debugger handlers (integration)', () => {
         assert.equal(abap.holdsState(), true);
         assert.equal(abap.listBreakpoints().length, 1);
         // Still held: the run has not returned.
-        await pause(3000);
         assert.equal(settled, false);
 
         // 3. A clean stop: the listener's stop deletes the breakpoints, then
@@ -1925,8 +1971,7 @@ describe('Debugger handlers (integration)', () => {
         handle = undefined; // stopped: the cleanup's stop is not owed
         timing('soft amdp.stop', stop.ms);
         assert.equal(stop.isError, false);
-        const bound = getTimeout('long') - 60_000;
-        while (amdp.holdsState() && now() - stopAt < bound) await pause(250);
+        // Read at the stop's answer: nothing waits after it.
         measure('6', 'the event read after AmdpDebugStop', {
           ended: !amdp.holdsState(),
           ms_after_stop: Math.round(now() - stopAt),

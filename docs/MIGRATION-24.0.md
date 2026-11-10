@@ -827,3 +827,19 @@ ADT requests, except where a row names an accepted difference.
 | `ValidateStructureLow` | `HandlerValidate` (object_type: STRUCTURE, object_name, package_name, description) | the same requests |
 | `ValidateTableLow` | `HandlerValidate` (object_type: TABLE, object_name, package_name, description) | the same requests |
 <!-- end of the low-to-compact table -->
+
+## Contributors: `test-config.yaml` carries no time key
+
+The live tests no longer read a bound, a delay or a poll limit from `tests/test-config.yaml`.
+Delete these keys from your copy; nothing reads them, and the template no longer lists them:
+
+- `test_settings.timeout`, `test_settings.timeouts.*` (`default`, `long`, `create`, `test`,
+  `delay`), `test_settings.retry_on_failure`, `test_settings.max_retries`;
+- `test_settings.operation_delays.*` and every case's `params.operation_delays.*`;
+- the `run_atc` case's `poll_interval_ms` and `poll_timeout_ms`;
+- the runtime case's `trace_read_retries` and `trace_read_retry_delay_ms`.
+
+A test helper of your own that called `getTimeout` or `getOperationDelay`
+(`src/__tests__/integration/helpers/configHelpers.ts`) goes on the answer it waits for instead. A
+live run that waits for ever is ended with Ctrl-C: once lets the running case and its cleanup
+finish, twice stops the run (`src/__tests__/integration/README.md`, "Interrupting a run").

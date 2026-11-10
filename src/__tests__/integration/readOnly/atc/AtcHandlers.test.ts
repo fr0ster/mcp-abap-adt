@@ -19,14 +19,13 @@ import { handleGetATCResult } from '../../../../handlers/atc/high/handleGetATCRe
 import { handleGetATCRunStatus } from '../../../../handlers/atc/high/handleGetATCRunStatus';
 import { handleListATCResults } from '../../../../handlers/atc/high/handleListATCResults';
 import { handleRunATC } from '../../../../handlers/atc/high/handleRunATC';
-import { getTimeout } from '../../helpers/configHelpers';
+import { pollUntilFinished } from '../../helpers/atcRun';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
-  delay,
   extractErrorMessage,
 } from '../../helpers/testHelpers';
 
@@ -142,9 +141,8 @@ describe('ATC Handlers Integration', () => {
       assert.equal(typeof run.worklist_id, 'string');
       assert.equal(typeof run.run_id, 'string');
 
-      const deadline = Date.now() + (params.poll_timeout_ms ?? 120000);
-      let finished = false;
-      while (!finished) {
+      // Polled until the run's status says finished: no pause, no limit.
+      await pollUntilFinished(async () => {
         const polled = await tester.invokeToolOrHandler(
           'GetATCRunStatus',
           { run_id: run.run_id },
@@ -161,16 +159,8 @@ describe('ATC Handlers Integration', () => {
         }
         const status = payload(polled);
         assert.equal(typeof status.is_finished, 'boolean');
-        finished = status.is_finished;
-        if (!finished) {
-          if (Date.now() > deadline) {
-            throw new Error(
-              `ATC run ${run.run_id} still "${status.status}" after ${params.poll_timeout_ms ?? 120000} ms`,
-            );
-          }
-          await delay(params.poll_interval_ms ?? 3000);
-        }
-      }
+        return status.is_finished;
+      });
 
       await readFindings(connection, run.worklist_id, params);
     });

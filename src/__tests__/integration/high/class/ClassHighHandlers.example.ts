@@ -13,7 +13,6 @@
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -67,76 +66,72 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
     await tester.afterEach();
   });
 
-  it(
-    'should test all Class high-level handlers',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const {
-          connection,
-          session,
-          objectName,
-          params,
-          packageName,
-          transportRequest,
-        } = context;
+  it('should test all Class high-level handlers', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const {
+        connection,
+        session,
+        objectName,
+        params,
+        packageName,
+        transportRequest,
+      } = context;
 
-        // Create
-        logger?.info(`   • create: ${objectName}`);
-        const handlerContext = createHandlerContext({ connection, logger });
-        const createResponse = await handleCreateClass(handlerContext, {
-          class_name: objectName!,
-          package_name: packageName,
-          ...(transportRequest && { transport_request: transportRequest }),
-          ...(params.description && { description: params.description }),
-          ...(params.superclass && { superclass: params.superclass }),
-        });
-
-        if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          if (
-            errorMsg.includes('already exists') ||
-            errorMsg.includes('ExceptionResourceAlreadyExists')
-          ) {
-            logger?.info(`⏭️  SKIP: Object already exists: ${errorMsg}`);
-            throw new Error(`SKIP: ${errorMsg}`);
-          }
-          throw new Error(`Create failed: ${errorMsg}`);
-        }
-
-        const createData = parseHandlerResponse(createResponse);
-        if (!createData.success) {
-          throw new Error(`Create failed: ${JSON.stringify(createData)}`);
-        }
-
-        logger?.success(`✅ create: ${objectName} completed successfully`);
-        updateSessionFromResponse(session, createData);
-
-        // Update
-        logger?.info(`   • update: ${objectName}`);
-        const updatedSourceCode = params.update_source_code;
-        if (!updatedSourceCode) {
-          throw new Error('update_source_code is required');
-        }
-
-        const updateResponse = await handleUpdateClass(handlerContext, {
-          class_name: objectName!,
-          source_code: updatedSourceCode,
-          activate: true,
-        });
-
-        if (updateResponse.isError) {
-          const errorMsg = extractErrorMessage(updateResponse);
-          throw new Error(`Update failed: ${errorMsg}`);
-        }
-
-        const updateData = parseHandlerResponse(updateResponse);
-        if (!updateData.success) {
-          throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
-        }
-
-        logger?.success(`✅ update: ${objectName} completed successfully`);
+      // Create
+      logger?.info(`   • create: ${objectName}`);
+      const handlerContext = createHandlerContext({ connection, logger });
+      const createResponse = await handleCreateClass(handlerContext, {
+        class_name: objectName!,
+        package_name: packageName,
+        ...(transportRequest && { transport_request: transportRequest }),
+        ...(params.description && { description: params.description }),
+        ...(params.superclass && { superclass: params.superclass }),
       });
-    },
-    getTimeout('long'),
-  );
+
+      if (createResponse.isError) {
+        const errorMsg = extractErrorMessage(createResponse);
+        if (
+          errorMsg.includes('already exists') ||
+          errorMsg.includes('ExceptionResourceAlreadyExists')
+        ) {
+          logger?.info(`⏭️  SKIP: Object already exists: ${errorMsg}`);
+          throw new Error(`SKIP: ${errorMsg}`);
+        }
+        throw new Error(`Create failed: ${errorMsg}`);
+      }
+
+      const createData = parseHandlerResponse(createResponse);
+      if (!createData.success) {
+        throw new Error(`Create failed: ${JSON.stringify(createData)}`);
+      }
+
+      logger?.success(`✅ create: ${objectName} completed successfully`);
+      updateSessionFromResponse(session, createData);
+
+      // Update
+      logger?.info(`   • update: ${objectName}`);
+      const updatedSourceCode = params.update_source_code;
+      if (!updatedSourceCode) {
+        throw new Error('update_source_code is required');
+      }
+
+      const updateResponse = await handleUpdateClass(handlerContext, {
+        class_name: objectName!,
+        source_code: updatedSourceCode,
+        activate: true,
+      });
+
+      if (updateResponse.isError) {
+        const errorMsg = extractErrorMessage(updateResponse);
+        throw new Error(`Update failed: ${errorMsg}`);
+      }
+
+      const updateData = parseHandlerResponse(updateResponse);
+      if (!updateData.success) {
+        throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
+      }
+
+      logger?.success(`✅ update: ${objectName} completed successfully`);
+    });
+  });
 });

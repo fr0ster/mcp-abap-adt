@@ -61,7 +61,6 @@ import { isRfcConnection } from '../../../lib/connectionKind';
 import {
   configuredSystemKind,
   getSharedDependenciesConfig,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
   resolvePackageName,

@@ -22,7 +22,6 @@ import { handleListFunctionGroupIncludes } from '../../../../handlers/function_i
 import { handleListFunctionModules } from '../../../../handlers/function_include/readonly/handleListFunctionModules';
 import {
   getEnabledTestCase,
-  getTimeout,
   isTestAvailableForSystem,
   statedKindWords,
 } from '../../helpers/configHelpers';

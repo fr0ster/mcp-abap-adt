@@ -16,7 +16,7 @@ import { handleCreateFunctionGroupUnitTest } from '../../../../handlers/unit_tes
 import { handleRunFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
 import { handleRunFunctionModuleUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { handleUpdateFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleUpdateFunctionGroupUnitTest';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';

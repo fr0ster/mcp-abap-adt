@@ -33,6 +33,10 @@
 # - Views: ZMCP_BLD_VIEW01, ZMCP_BLD_VIEW_H1, etc.
 # - Packages: ZMCP_BLD_PKG01, ZMCP_BLD_PKG02, etc.
 #
+# No time keys: a live test has no bound, delay or poll limit; each step goes
+# on the answer of the one before it. A step that waits for ever is ended with
+# Ctrl-C (src/__tests__/integration/README.md, "Interrupting a run").
+#
 # Test settings
 
 # ============================================================================
@@ -42,29 +46,10 @@
 test_settings:
   fail_fast: false
   verbose: true
-  timeout: 120000  # Global test timeout (120 seconds)
-  retry_on_failure: false
-  max_retries: 1
   cleanup_after_test: false
   # A failed test keeps the objects it created, so their state can say why it
   # failed; locks are released either way. true deletes them regardless.
   cleanup_on_failure: false
-  # Timeouts for different operations (in milliseconds)
-  timeouts:
-    default: 120000
-    long: 600000  # Long timeout for complex operations (group activation, shared setup, etc.)
-    create: 120000
-    test: 120000
-    delay: 3000  # Delay after delete/create operations
-  # Operation delays (milliseconds) - time to wait for SAP to commit operations
-  # These delays ensure SAP has time to persist state changes between operations
-  operation_delays:
-    lock: 3000      # Delay after lock operation (default: 3 seconds)
-    unlock: 3000    # Delay after unlock operation (default: 3 seconds)
-    update: 3000    # Delay after update operation (default: 3 seconds)
-    create: 3000    # Delay after create operation (default: 3 seconds)
-    cleanup: 3000   # Delay after pre-test cleanup (delete) before test starts
-    default: 3000   # Default delay for any operation (default: 3 seconds)
 
 # Session persistence configuration
 
@@ -1140,13 +1125,6 @@ create_class_low:
         description: "Class low-level handler test"
         # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        # Extra delays to give backend time to persist between steps (especially in async env)
-        operation_delays:
-          create: 5000
-          lock: 5000
-          update: 5000
-          unlock: 5000
-          default: 5000
         source_code: |
           CLASS ZMCP_BLD_CLS_L1 DEFINITION
             PUBLIC
@@ -1202,8 +1180,6 @@ create_data_element:
         medium_label: "Builder Data"
         long_label: "Builder Data Element"
         heading_label: "Builder Data Element"
-      operation_delays:
-        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
 
 # Create Interface
 
@@ -1227,10 +1203,6 @@ create_domain:
         decimals: 0
         lowercase: false
         sign_exists: false
-      operation_delays:
-        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
-        create: 5000
-        update: 3000
 
 # Create Data Element
 
@@ -1324,11 +1296,6 @@ create_interface:
             PUBLIC .
             METHODS: test_method.
           ENDINTERFACE.
-      operation_delays:
-        create: 5000  # Increased delay for interface creation
-        lock: 3000
-        update: 3000
-        unlock: 3000
 
 # Create Program
 
@@ -1380,12 +1347,6 @@ create_package:
         updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
         software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
-        operation_delays:
-          create: 5000
-          update: 3000
-          unlock: 5000
-          delete: 20000
-          delete_retry: 20000
 
 # Create Domain
 
@@ -1922,9 +1883,6 @@ runtime_readonly_handlers:
         # Increase for slow systems (e.g. SAP trial cloud) — default in client is 5×2000ms.
         profiled_run_max_trace_attempts: 15
         profiled_run_trace_retry_delay_ms: 2000
-        # Retries for reading profiler trace data (trace can appear with delay)
-        trace_read_retries: 6
-        trace_read_retry_delay_ms: 1500
         # Optional user filter for dumps list (empty = all users)
         dumps_user: ""
         # Number of dump IDs to read from feed
@@ -2145,8 +2103,6 @@ run_atc:
         # At least this many findings, so the per-finding checks run. What a
         # variant finds is the system's: set 0 where DEFAULT finds nothing.
         min_findings: 1
-        poll_interval_ms: 3000
-        poll_timeout_ms: 120000
 
 get_sql_query:
   test_cases:

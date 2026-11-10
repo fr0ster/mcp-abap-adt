@@ -18,7 +18,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateStructure } from '../../../../handlers/structure/high/handleCreateStructure';
 import { handleDeleteStructure } from '../../../../handlers/structure/high/handleDeleteStructure';
 import { handleUpdateStructure } from '../../../../handlers/structure/high/handleUpdateStructure';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Structure High-Level Handlers Integration', () => {

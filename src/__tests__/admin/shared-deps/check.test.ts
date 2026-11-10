@@ -26,7 +26,6 @@ import { createAdtClient } from '../../../lib/clients';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   getSharedDependenciesConfig,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
   testConfigPathFromEnv,

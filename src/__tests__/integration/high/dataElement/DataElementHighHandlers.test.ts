@@ -18,7 +18,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateDataElement } from '../../../../handlers/data_element/high/handleCreateDataElement';
 import { handleDeleteDataElement } from '../../../../handlers/data_element/high/handleDeleteDataElement';
 import { handleUpdateDataElement } from '../../../../handlers/data_element/high/handleUpdateDataElement';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('DataElement High-Level Handlers Integration', () => {

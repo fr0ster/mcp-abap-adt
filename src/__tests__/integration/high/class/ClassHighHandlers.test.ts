@@ -22,7 +22,7 @@ import { handleCreateClass } from '../../../../handlers/class/high/handleCreateC
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -182,12 +182,6 @@ describe('Class High-Level Handlers Integration', () => {
       // a fallback to the current session, kept for parity with the other
       // handler-test files that call it after a write.
       updateSessionFromResponse(session, {});
-
-      // Wait a bit after creation before update to ensure object is ready
-      // Use delay from YAML config (operation_delays.create or default) via context
-      const delay = context.getOperationDelay('create');
-      logger?.info(`   • waiting ${delay}ms after creation before update...`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
 
       // Step 2: Update
       logger?.info(`   • update: ${objectName}`);

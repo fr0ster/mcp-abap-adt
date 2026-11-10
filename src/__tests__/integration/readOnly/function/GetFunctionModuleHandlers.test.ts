@@ -12,7 +12,6 @@ import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetFunctionModule } from '../../../../handlers/function_module/high/handleGetFunctionModule';
 import {
-  getTimeout,
   isTestAvailableForSystem,
   resolveSharedDependency,
   statedKindWords,

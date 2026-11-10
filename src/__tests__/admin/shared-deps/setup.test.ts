@@ -82,7 +82,6 @@ import { withLock } from '../../../lib/strategies/withLock';
 import { getSystemContext } from '../../../lib/systemContext';
 import {
   getSharedDependenciesConfig,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
 } from '../../integration/helpers/configHelpers';

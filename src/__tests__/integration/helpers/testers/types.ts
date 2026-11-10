@@ -28,7 +28,6 @@ export interface LambdaTesterContext {
   lockSession?: SessionInfo | null;
   cleanupAfter: () => Promise<void>;
   // Common configuration parameters shared across all tests
-  getOperationDelay: (operation: string) => number;
   defaultPackage?: string;
   testCase: any; // Test case definition from YAML
 }

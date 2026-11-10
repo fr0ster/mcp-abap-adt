@@ -18,7 +18,7 @@ import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/h
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
 import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
-import { getTimeout, sharedDependencyKind } from '../../helpers/configHelpers';
+import { sharedDependencyKind } from '../../helpers/configHelpers';
 import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';

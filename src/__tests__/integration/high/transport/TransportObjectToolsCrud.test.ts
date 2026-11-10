@@ -136,12 +136,7 @@ import { handleReadTransportActionLog } from '../../../../handlers/transport/rea
 import { handleReadTransportObjects } from '../../../../handlers/transport/readonly/handleReadTransportObjects';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
-import {
-  getOperationDelay,
-  getTimeout,
-  loadTestConfig,
-  loadTestEnv,
-} from '../../helpers/configHelpers';
+import { loadTestConfig, loadTestEnv } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
   lockHolderOf,
@@ -154,7 +149,6 @@ import {
 } from '../../helpers/sessionHelpers';
 import {
   createHandlerContext,
-  delay,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -546,8 +540,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       taskNumber = taskData.task_number;
       logger?.success(`Step 1: task ${taskNumber} created`);
 
-      await delay(getOperationDelay('create'));
-
       // Step 2: create a program on the REQUEST, not the task.
       //
       // A plain create/edit always takes the REQUEST as its corrNr — the
@@ -572,8 +564,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         `Step 2: program ${programName} created on ${parentTransport}`,
       );
 
-      await delay(getOperationDelay('create'));
-
       // Step 2a: set source via UpdateProgram, same request. Its
       // lock/write/unlock cycle is what closes out the ENQUEUE lock
       // CreateProgram leaves behind (see the file header). Skipping this
@@ -588,8 +578,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
       expectOk(updateResponse, 'Step 2a UpdateProgram', logger);
       logger?.success('Step 2a: UpdateProgram succeeded, lock closed out');
-
-      await delay(getOperationDelay('update'));
 
       // Step 2b: AddTransportObject — move the entry onto the task. This
       // is the tool's own documented purpose: "attach an EXISTING object
@@ -609,8 +597,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       const firstAddData = parseHandlerResponse(firstAddResponse);
       assert.equal(firstAddData.accepted, true);
       logger?.success('Step 2b: AddTransportObject accepted');
-
-      await delay(getOperationDelay('update'));
 
       // Step 3: ReadTransportObjects — find the entry, capture its position
       logger?.info('Step 3: ReadTransportObjects — locating the entry');
@@ -645,8 +631,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       assert.equal(removeData.accepted, true);
       logger?.success('Step 4: RemoveTransportObject accepted');
 
-      await delay(getOperationDelay('update'));
-
       // Step 5: re-read — the tool's own doc says a 200 above is not proof
       logger?.info('Step 5: ReadTransportObjects — confirming removal');
       const readCtx2 = createHandlerContext({ connection, logger });
@@ -675,8 +659,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       const addData = parseHandlerResponse(addResponse);
       assert.equal(addData.accepted, true);
       logger?.success('Step 6: AddTransportObject accepted');
-
-      await delay(getOperationDelay('update'));
 
       // Step 7: re-read — confirm it is back
       logger?.info('Step 7: ReadTransportObjects — confirming re-attachment');
@@ -721,8 +703,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       const sortData = parseHandlerResponse(sortResponse);
       assert.equal(sortData.accepted, true);
       assert.equal('success' in sortData, false);
-
-      await delay(getOperationDelay('update'));
 
       const sortedData = parseHandlerResponse(
         await handleReadTransportObjects(
@@ -783,8 +763,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       assert.ok(secondRequestNumber);
       logger?.success(`Step 10: request ${secondRequestNumber} created`);
 
-      await delay(getOperationDelay('create'));
-
       logger?.info(
         `Step 10: CreateTransportTask — a task under ${secondRequestNumber}`,
       );
@@ -796,8 +774,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       secondTaskNumber = parseHandlerResponse(secondTaskResponse).task_number;
       assert.ok(secondTaskNumber);
       logger?.success(`Step 10: task ${secondTaskNumber} created`);
-
-      await delay(getOperationDelay('create'));
 
       // Step 10a: the program sits on one task only. SAP put it on a task of
       // its own in the pinned request at creation (step 2), and step 2b
@@ -840,8 +816,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       assert.equal(moveData.accepted, true);
       assert.equal('success' in moveData, false);
 
-      await delay(getOperationDelay('update'));
-
       // The echo is not proof: re-read both tasks.
       const holds = async (task: string) =>
         parseHandlerResponse(
@@ -879,8 +853,6 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       );
       expectOk(backResponse, 'Step 12 MoveTransportObjects', logger);
       entryTask = taskNumber;
-
-      await delay(getOperationDelay('update'));
 
       assert.equal((await holds(secondTaskNumber)).length, 0);
       assert.equal((await holds(taskNumber)).length, 1);

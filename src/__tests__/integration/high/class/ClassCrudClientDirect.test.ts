@@ -31,10 +31,8 @@ import {
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
-  getOperationDelay,
   getSapConfigFromEnv,
   getSystemType,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestEnv,
   preCheckTestParameters,
@@ -49,7 +47,7 @@ import {
   type GuardedConnection,
   guardedTestConnection,
 } from '../../helpers/refusalGuard';
-import { DEBUG_TESTS, debugLog, delay } from '../../helpers/testHelpers';
+import { DEBUG_TESTS, debugLog } from '../../helpers/testHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -391,10 +389,6 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         throw createError;
       }
 
-      // Add delay after create exactly as in adt-clients
-      const createDelay = getOperationDelay('create', testCase);
-      await new Promise((resolve) => setTimeout(resolve, createDelay));
-
       if (!client) {
         throw new Error('Client not initialized');
       }
@@ -417,7 +411,6 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       classCreated = true;
 
       // Allow backend to persist before check
-      await delay(getOperationDelay('create_verify', testCase) || 500);
 
       // Step 3: Check (exactly as in adt-clients)
       debugLog('CHECK', `Starting check for ${className}`);

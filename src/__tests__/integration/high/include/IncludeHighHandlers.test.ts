@@ -63,13 +63,13 @@ import { CompactHandlersGroup } from '../../../../lib/compact/group';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { patchXmlAttribute } from '../../../../lib/strategies/xmlPatch';
-import { getSystemType, getTimeout } from '../../helpers/configHelpers';
+import { getSystemType } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import { createHandlerContext, delay } from '../../helpers/testHelpers';
+import { createHandlerContext } from '../../helpers/testHelpers';
 
 /** A tool's answer as the model reads it: the error flag and the first text. */
 type Answer = { isError: boolean; text: string };
@@ -245,7 +245,6 @@ describe('Include High-Level Handlers Integration', () => {
         params.description || 'Include for the include high-level tests';
       const source: string = params.update_source_code;
       if (!source) throw new Error('update_source_code is required');
-      const settle = () => delay(ctx.getOperationDelay('create'));
 
       /** A step that must succeed: its answer, or the test ends with it. */
       const must = async (label: string, call: () => Promise<unknown>) => {
@@ -278,7 +277,6 @@ describe('Include High-Level Handlers Integration', () => {
         }),
       );
       created.push({ kind: 'include', name: INCLUDE });
-      await settle();
 
       // GetInclude, both parts: a source of no code, the document. SAP
       // writes a comment header naming the include into the new one
@@ -521,7 +519,6 @@ describe('Include High-Level Handlers Integration', () => {
       );
       if (!recreated.isError) {
         created.push({ kind: 'include', name: INCLUDE });
-        await settle();
         await must(`DeleteInclude ${INCLUDE} (the re-created one)`, () =>
           handleDeleteInclude(context, { include_name: INCLUDE }),
         );
@@ -542,7 +539,6 @@ describe('Include High-Level Handlers Integration', () => {
         }),
       );
       created.push({ kind: 'include', name: COMPACT_INCLUDE });
-      await settle();
       await must(`HandlerDelete INCLUDE ${COMPACT_INCLUDE}`, () =>
         handleHandlerDelete(context, {
           object_type: 'INCLUDE',

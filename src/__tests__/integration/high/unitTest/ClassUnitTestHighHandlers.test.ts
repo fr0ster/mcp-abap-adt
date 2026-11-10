@@ -13,7 +13,7 @@ import { handleCreateUnitTest } from '../../../../handlers/unit_test/high/handle
 import { handleDeleteUnitTest } from '../../../../handlers/unit_test/high/handleDeleteUnitTest';
 import { handleRunUnitTest } from '../../../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateUnitTest } from '../../../../handlers/unit_test/high/handleUpdateUnitTest';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';

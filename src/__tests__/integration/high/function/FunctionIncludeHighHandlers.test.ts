@@ -39,8 +39,6 @@ import {
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
-  getOperationDelay,
-  getTimeout,
   isTestAvailableForSystem,
   resolvePackageName,
   resolveTransportRequest,
@@ -57,7 +55,7 @@ import {
   type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
-import { delay, parseHandlerResponse } from '../../helpers/testHelpers';
+import { parseHandlerResponse } from '../../helpers/testHelpers';
 
 const testLogger = createTestLogger('function-include-high');
 
@@ -188,7 +186,6 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       testLogger?.info(
         `✅ High Create: Created function group ${functionGroupName}`,
       );
-      await delay(getOperationDelay('create', testCase));
 
       // Step 1: CreateFunctionInclude
       testLogger?.info(
@@ -238,8 +235,6 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       assert.equal(createResponse.content[0]?.text, 'SUCCESS');
       testLogger?.info(`✅ High Create: Created include ${includeName}`);
 
-      await delay(getOperationDelay('create', testCase));
-
       // Step 2: UpdateFunctionInclude
       testLogger?.info(`📝 High Update: Updating include ${includeName}...`);
       const updateResponse = await invoke(
@@ -274,8 +269,6 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       // `terseWrite`).
       assert.equal(updateResponse.content[0]?.text, 'SUCCESS');
       testLogger?.info(`✅ High Update: Updated include ${includeName}`);
-
-      await delay(getOperationDelay('update', testCase));
 
       // Step 3: GetFunctionInclude — verify source round-trips
       testLogger?.info(`📖 Read-back: Reading include ${includeName}...`);
@@ -319,7 +312,6 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       const shouldCleanup = getCleanupAfterRun(testCase, !passed);
       if (created && shouldCleanup) {
         try {
-          await delay(2000);
           const deleteResponse = await invoke(
             'DeleteFunctionInclude',
             {

@@ -35,7 +35,7 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../../../lib/batch/availability';
-import { getTimeout, resolvePackageName } from '../helpers/configHelpers';
+import { resolvePackageName } from '../helpers/configHelpers';
 import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';

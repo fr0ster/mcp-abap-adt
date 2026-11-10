@@ -62,7 +62,6 @@ import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   assertNotSharedDependency,
   getEnabledTestCase,
-  getTimeout,
   loadTestConfig,
   resolvePackageName,
   resolveTransportRequest,

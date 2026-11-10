@@ -103,7 +103,6 @@ import { readSystemInformation } from '../../../lib/systemInformation';
 import {
   getEnabledTestCase,
   getSapConfigFromEnv,
-  getTimeout,
   loadTestConfig,
   loadTestEnv,
 } from '../helpers/configHelpers';
@@ -162,8 +161,6 @@ const say = (kind: Kind, what: string, answered: unknown): void => {
     `refusal-follow-ups-live\t${kind}\t${what}\t${withoutHandles(String(text)).slice(0, 2000)}\n`,
   );
 };
-
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Content = Array<{ type: string; text?: string }>;
 
@@ -441,6 +438,7 @@ class Observer {
   private readonly held: Array<() => void> = [];
   openPolls = 0;
   private opened = 0;
+  private pollWaiters: Array<() => void> = [];
   onStop?: (
     connection: IAbapConnection,
     send: () => Promise<unknown>,
@@ -460,6 +458,7 @@ class Observer {
         }
         if (listeners && method === 'POST') {
           this.openPolls++;
+          for (const resolve of this.pollWaiters.splice(0)) resolve();
           try {
             return await original(options as any);
           } finally {
@@ -471,6 +470,14 @@ class Observer {
         return original(options as any);
       };
     return connection;
+  }
+
+  /** Resolves once a listener's poll is open (at once when one is). */
+  pollOpen(): Promise<void> {
+    if (this.openPolls > 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.pollWaiters.push(resolve);
+    });
   }
 
   release(): void {
@@ -557,7 +564,7 @@ async function secondStopListenerOn(kind: Kind, testCase: any): Promise<void> {
     assert.ok(isUpperHex(handle, 32));
 
     // The listener's poll is open on the system.
-    for (let i = 0; i < 100 && observer.openPolls === 0; i++) await pause(100);
+    await observer.pollOpen();
     assert.ok(observer.openPolls > 0);
 
     // The stop: the first stopListener answers, then the password is wrong

@@ -28,8 +28,6 @@ import {
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
-  getOperationDelay,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestEnv,
   resolvePackageName,
@@ -48,11 +46,7 @@ import {
   type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
-import {
-  debugLog,
-  delay,
-  expectWriteAccepted,
-} from '../../helpers/testHelpers';
+import { debugLog, expectWriteAccepted } from '../../helpers/testHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -215,8 +209,6 @@ describe('Function High-Level Handlers Integration', () => {
         `✅ High Create: Created function group ${functionGroupName} successfully`,
       );
 
-      await delay(getOperationDelay('create', testCase));
-
       // Step 2: UpdateFunctionGroup (High-Level)
       if (updateFunctionGroupDescription) {
         testLogger?.info(
@@ -250,7 +242,6 @@ describe('Function High-Level Handlers Integration', () => {
         testLogger?.info(
           `✅ High Update: Updated function group ${functionGroupName} successfully`,
         );
-        await delay(getOperationDelay('update', testCase));
       }
 
       // Step 3: CreateFunctionModule (High-Level) — creates in initial state
@@ -299,8 +290,6 @@ describe('Function High-Level Handlers Integration', () => {
         `✅ High Create: Created function module ${functionModuleName} successfully`,
       );
 
-      await delay(getOperationDelay('create', testCase));
-
       // Step 4: UpdateFunctionModule (High-Level)
       testLogger?.info(
         `📝 High Update: Updating function module ${functionModuleName}...`,
@@ -338,7 +327,6 @@ describe('Function High-Level Handlers Integration', () => {
         `✅ High Update: Updated function module ${functionModuleName} successfully`,
       );
 
-      await delay(getOperationDelay('update', testCase));
       passed = true;
     } finally {
       // Cleanup: Optionally delete test function module first, then function group
@@ -349,7 +337,6 @@ describe('Function High-Level Handlers Integration', () => {
         try {
           // Delete function module only if cleanup_after is true
           if (shouldCleanup) {
-            await delay(2000); // Ensure function module is ready for deletion
             const deleteFMResponse = await invoke(
               'DeleteFunctionModule',
               {
@@ -395,7 +382,6 @@ describe('Function High-Level Handlers Integration', () => {
         try {
           // Delete function group only if cleanup_after is true
           if (shouldCleanup) {
-            await delay(2000); // Ensure function group is ready for deletion
             const deleteFGResponse = await invoke(
               'DeleteFunctionGroup',
               {

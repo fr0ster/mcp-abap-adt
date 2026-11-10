@@ -166,15 +166,6 @@ export class HighTester extends LambdaTester {
           8000,
         );
         logger?.info(`   ✅ create completed`);
-
-        // Wait for SAP to propagate creation before update
-        const createDelay = this.context.getOperationDelay('create');
-        if (createDelay > 0) {
-          logger?.debug?.(
-            `⏳ Waiting ${createDelay}ms for SAP to propagate create...`,
-          );
-          await delay(createDelay);
-        }
       }
 
       // Execute update workflow

@@ -13,10 +13,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { handleSearchSource } from '../../../../handlers/system/readonly/handleSearchSource';
-import {
-  getSharedDependenciesConfig,
-  getTimeout,
-} from '../../helpers/configHelpers';
+import { getSharedDependenciesConfig } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';

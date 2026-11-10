@@ -26,10 +26,7 @@ import { handleCheckPackage } from '../../../../handlers/package/high/handleChec
 import { handleCheckProgram } from '../../../../handlers/program/high/handleCheckProgram';
 import { handleCheckStructure } from '../../../../handlers/structure/high/handleCheckStructure';
 import { handleCheckTable } from '../../../../handlers/table/high/handleCheckTable';
-import {
-  getSharedDependenciesConfig,
-  getTimeout,
-} from '../../helpers/configHelpers';
+import { getSharedDependenciesConfig } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';

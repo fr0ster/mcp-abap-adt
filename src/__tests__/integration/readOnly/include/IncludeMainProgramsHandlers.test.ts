@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { handleHandlerGet } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleGetMainPrograms } from '../../../../handlers/include/readonly/handleGetMainPrograms';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';

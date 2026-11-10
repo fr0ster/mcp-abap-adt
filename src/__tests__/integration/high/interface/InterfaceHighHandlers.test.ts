@@ -18,7 +18,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateInterface } from '../../../../handlers/interface/high/handleCreateInterface';
 import { handleDeleteInterface } from '../../../../handlers/interface/high/handleDeleteInterface';
 import { handleUpdateInterface } from '../../../../handlers/interface/high/handleUpdateInterface';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Interface High-Level Handlers Integration', () => {

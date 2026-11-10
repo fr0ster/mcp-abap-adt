@@ -11,7 +11,7 @@ import { handleCreateCdsUnitTest } from '../../../../handlers/unit_test/high/han
 import { handleDeleteCdsUnitTest } from '../../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleRunCdsUnitTest } from '../../../../handlers/unit_test/high/handleRunCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';

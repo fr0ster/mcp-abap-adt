@@ -22,7 +22,7 @@ import { handleUpdateServiceDefinition } from '../../../../handlers/service_defi
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
 

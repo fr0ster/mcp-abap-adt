@@ -14,9 +14,7 @@ import {
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
-  getOperationDelay,
   getSystemType,
-  getTimeout,
   loadTestConfig,
   loadTestEnv,
   resolvePackageName,
@@ -34,7 +32,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
-import { delay } from '../testHelpers';
+
 import {
   createHardModeClient,
   type HardModeClient,
@@ -265,9 +263,6 @@ export class LambdaTester {
         packageName = resolvePackageName(testCaseWithParams);
         transportRequest = resolveTransportRequest(testCaseWithParams);
         const defaultPackage = config.environment?.default_package;
-        const getOperationDelayForContext = (operation: string): number =>
-          getOperationDelay(operation, testCase);
-
         this.context = {
           hasConfig: true,
           connection: {} as IAbapConnection,
@@ -281,7 +276,6 @@ export class LambdaTester {
           packageName,
           transportRequest,
           cleanupAfter: this.cleanupAfter.bind(this),
-          getOperationDelay: getOperationDelayForContext,
           defaultPackage,
           testCase,
         };
@@ -340,11 +334,6 @@ export class LambdaTester {
       // Get default package from config
       const defaultPackage = config.environment?.default_package;
 
-      // Create getOperationDelay function bound to this testCase
-      const getOperationDelayForContext = (operation: string): number => {
-        return getOperationDelay(operation, testCase);
-      };
-
       // Create context with cleanupAfter method and common config parameters
       this.context = {
         hasConfig,
@@ -359,7 +348,6 @@ export class LambdaTester {
         packageName,
         transportRequest,
         cleanupAfter: this.cleanupAfter.bind(this),
-        getOperationDelay: getOperationDelayForContext,
         defaultPackage,
         testCase,
       };
@@ -372,11 +360,6 @@ export class LambdaTester {
       errorLogger?.warn(
         `⚠️ Failed to initialize tester: ${error?.message || String(error)}`,
       );
-
-      // Create minimal getOperationDelay function for error case (returns default)
-      const getOperationDelayForContext = (operation: string): number => {
-        return getOperationDelay(operation, null);
-      };
 
       this.context = {
         hasConfig: false,
@@ -391,7 +374,6 @@ export class LambdaTester {
         packageName: '',
         transportRequest: undefined,
         cleanupAfter: async () => {},
-        getOperationDelay: getOperationDelayForContext,
         defaultPackage: undefined,
         testCase: null,
       };

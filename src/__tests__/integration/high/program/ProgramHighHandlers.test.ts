@@ -18,7 +18,7 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Program High-Level Handlers Integration', () => {

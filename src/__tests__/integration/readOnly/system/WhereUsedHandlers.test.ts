@@ -16,7 +16,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleGetWhereUsed';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';

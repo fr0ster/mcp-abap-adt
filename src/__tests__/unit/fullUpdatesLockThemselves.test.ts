@@ -17,7 +17,7 @@ const HANDLE = 'B92E65858E83454C783181344F429D4BFD8E395D';
 /** The shipped full set's entry `name` on `transport`. */
 function fullEntry(name: string, transport: 'stdio' | 'http'): HandlerEntry {
   const entry = fullToolSet
-    .groups(noConnectionContext(), transport)
+    .groups(noConnectionContext(), transport, { dataTools: false })
     .flatMap((group) => group.getHandlers())
     .find((each) => each.toolDefinition.name === name);
   if (entry === undefined) throw new Error(`the full set serves no ${name}`);

@@ -113,6 +113,7 @@ ENVIRONMENT VARIABLES:
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
     MCP_DEFERRED_LOGON             Start without contacting SAP; the first tool call logs on (true|false)
     MCP_RESTORE_SESSION            With MCP_DEFERRED_LOGON: the first tool call takes up the leftover session (true|false)
+    MCP_ENABLE_DATA_TOOLS          Serve the data tools: GetSqlQuery, GetTableContents (true|false)
     MCP_BROWSER                    Browser for a login: system|auto|chrome|edge|firefox|none|headless
     MCP_BROWSER_PROGRAM            The program that opens the login URL (excludes MCP_BROWSER)
     MCP_RENEWAL                    refresh-then-login (default) | refresh-only (never a login)
@@ -287,7 +288,7 @@ export function coreHelp(
  * `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` the compact sets.
  */
 export interface LauncherOptions {
-  /** The tools served: fixed by the command, never by a flag. */
+  /** The tools served: fixed by the command, but for the data tools (`--enable-data-tools`). */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -816,8 +817,12 @@ async function launchStdio(
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
   config = { ...config, connectionType, systemType };
 
-  // The command's tool set: fixed by the command, never by a flag.
-  const handlersRegistry = registryOf(options.toolSet, 'stdio');
+  // The command's tool set: fixed by the command, but for the data tools,
+  // which --enable-data-tools adds.
+  // The data tools only when the configuration turns them on.
+  const handlersRegistry = registryOf(options.toolSet, 'stdio', {
+    dataTools: config.enableDataTools === true,
+  });
 
   // The browser of a login, mapped by the platform; a choice that
   // cannot be served stops the start before anything is read.

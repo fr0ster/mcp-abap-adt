@@ -209,6 +209,52 @@ On the developer machine at C=1, the TypeScript-program scans each take 0.3–1.
 The figures belong to this list: when files are added to it, measure again and update the
 setting.
 
+### Jest's workers (measured)
+
+The files still on Jest run with **4 workers, each restarted once it is idle above 512 MB**
+(`jest.config.js`: `maxWorkers: 4`, `workerIdleMemoryLimit: '512MB'`). It is one setting for a
+developer machine and every CI runner kind: no npm script and no workflow overrides it
+(`unit/runner/jestWorkers.test.ts` holds both settings and the absence of an override).
+
+**Measured 2026-11-10** (D27), over that day's Jest set (542 suites, 14049 tests; every run
+passed). Measured with a hand-run probe as above: every node process of the run sampled its RSS
+every 20 ms, a worker that Jest restarted included; the whole-run peak is the highest sum of the
+live processes' RSS, the probe's own cost per process (about 20 MB) subtracted. One run each,
+Jest's own time (`npm test -- --maxWorkers=W [--workerIdleMemoryLimit=L] .`, the runner left
+out); in each cell Jest's seconds, then the whole-run peak.
+
+A developer machine (16 CPUs, 31 GB, Node 26.7.0):
+
+| Workers | Idle limit | Jest, s | Peak |
+|---|---|---|---|
+| 1 | none | 160 | 4.1 GB |
+| 2 | 512 MB | 86 | 1.7 GB |
+| 4 | 512 MB | 64 | 3.1 GB |
+| 4 | none | 62–72 | 7.6–7.9 GB |
+
+The whole `npm test` on the setting (Jest, then the node:test build and run; 542 suites and
+521 node:test tests passed): **169 s, a whole-run peak of 3.0 GB** — Jest 51 s with a peak of
+2.9 GB (26 worker processes, the restarts included), the node:test runner 109 s with 2.4 GB.
+
+Every CI runner kind (GitHub Actions run 42804707071, a throwaway probe branch removed after it;
+ubuntu-latest and windows-latest 4 CPUs, 16 GB; macos-latest 3 CPUs, 7 GB):
+
+| Runner, Node | 1 | 2 | 2, 512 MB | 2, 1 GB | 4 | 4, 512 MB | 4, 1 GB |
+|---|---|---|---|---|---|---|---|
+| ubuntu-latest, 22 | 262 s, 1.9 GB | 114 s, 2.9 GB | 91 s, 1.6 GB | 99 s, 2.5 GB | 84 s, 4.5 GB | 79 s, 2.9 GB | 86 s, 4.4 GB |
+| ubuntu-latest, 24 | 211 s, 4.2 GB | 121 s, 7.0 GB | 131 s, 1.9 GB | 116 s, 2.8 GB | 99 s, 7.5 GB | 108 s, 2.9 GB | 100 s, 4.7 GB |
+| windows-latest, 22 | 486 s, 1.6 GB | 203 s, 2.6 GB | 177 s, 1.3 GB | 202 s, 2.4 GB | 142 s, 4.2 GB | 138 s, 2.5 GB | 141 s, 3.8 GB |
+| windows-latest, 24 | 220 s, 4.0 GB | 132 s, 6.7 GB | 140 s, 1.7 GB | 124 s, 2.5 GB | 102 s, 8.9 GB | 110 s, 2.8 GB | 101 s, 4.6 GB |
+| macos-latest, 22 | 487 s, 1.9 GB | 275 s, 2.5 GB | 189 s, 2.2 GB | 260 s, 2.5 GB | 270 s, 3.1 GB | 111 s, 2.9 GB | 183 s, 3.2 GB |
+| macos-latest, 24 | 366 s, 2.3 GB | 272 s, 3.5 GB | 152 s, 2.0 GB | 157 s, 2.8 GB | 345 s, 3.9 GB | 152 s, 3.5 GB | 160 s, 4.1 GB |
+
+The order Jest runs the files in (the largest first, or the slowest first from its cache)
+changed the figures little; the slowest-first ones are shown. Without a limit a worker grows to
+2–3.5 GB on Node 24, and 2 or 4 such workers reach 6.7–8.9 GB on the 16 GB runners; with the
+512 MB limit every runner kind stays at or under 3.5 GB, and 4 workers are the fastest or within
+about 10% of it. The figures belong to this Jest set: when files move to node:test, measure again
+and update the setting.
+
 ### The install suites: `npm run test:install` (`SKIP_INSTALL_MATRIX`)
 
 The suites that pack and install the release — `installMatrix.test.ts` and `binSmoke.test.ts` —

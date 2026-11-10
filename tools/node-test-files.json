@@ -66,6 +66,7 @@
   "src/__tests__/unit/atc/atcPoll.test.ts",
   "src/__tests__/unit/auth/connectionCause.test.ts",
   "src/__tests__/unit/binSmoke.test.ts",
+  "src/__tests__/unit/config/enableDataTools.test.ts",
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/hardModeBinaries.test.ts",
   "src/__tests__/unit/coverage/live.test.ts",
@@ -76,9 +77,12 @@
   "src/__tests__/unit/coverage/servedEntries.test.ts",
   "src/__tests__/unit/coverage/takeUpCase.test.ts",
   "src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts",
+  "src/__tests__/unit/embeddable/dataTools.test.ts",
   "src/__tests__/unit/installMatrix.test.ts",
+  "src/__tests__/unit/launchers/dataToolsAtStart.test.ts",
   "src/__tests__/unit/runner/build.test.ts",
   "src/__tests__/unit/runner/interrupt.test.ts",
+  "src/__tests__/unit/runner/jestWorkers.test.ts",
   "src/__tests__/unit/runner/liveRun.test.ts",
   "src/__tests__/unit/runner/npmTest.test.ts",
   "src/__tests__/unit/runner/partition.test.ts",
@@ -96,5 +100,6 @@
   "src/__tests__/unit/sources/rfcConfigConstruction.test.ts",
   "src/__tests__/unit/sources/staticTypes.test.ts",
   "src/__tests__/unit/sources/typeCodeLiterals.test.ts",
-  "src/__tests__/unit/sources/typeCodeScan.test.ts"
+  "src/__tests__/unit/sources/typeCodeScan.test.ts",
+  "src/__tests__/unit/toolSet/dataTools.test.ts"
 ]

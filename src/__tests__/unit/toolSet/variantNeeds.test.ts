@@ -20,6 +20,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import {
+  DataHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -43,6 +44,7 @@ const objectOrientedTools = [
   new ReadOnlyHandlersGroup(context),
   new HighLevelHandlersGroup(context),
   new SystemHandlersGroup(context),
+  new DataHandlersGroup(context),
   new RuntimeRunHandlersGroup(context),
   new SearchHandlersGroup(context),
   new DebugHandlersGroup(context),

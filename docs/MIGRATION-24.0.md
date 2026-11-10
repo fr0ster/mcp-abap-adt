@@ -2,7 +2,8 @@
 
 24.0.0 lets the compiler check what it can ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)):
 a tool's arguments are a zod schema — their type and the one check of a call — and an entry carries
-its call, typed by that schema. A client over MCP sees the tools as in 23.1.0, except the two
+its call, typed by that schema. A client over MCP sees the tools as in 23.1.0, except the data tools, off unless enabled
+("Callers of `GetSqlQuery`, `GetTableContents` and `HandlerGetData`", below), the two
 arguments that become required (below) and the arguments some tools now declare because their
 handlers read them. An embedder that defines, registers or calls tools in TypeScript changes its
 code. Go through the section that fits how you use the server; the [CHANGELOG](../CHANGELOG.md) has
@@ -827,6 +828,41 @@ ADT requests, except where a row names an accepted difference.
 | `ValidateStructureLow` | `HandlerValidate` (object_type: STRUCTURE, object_name, package_name, description) | the same requests |
 | `ValidateTableLow` | `HandlerValidate` (object_type: TABLE, object_name, package_name, description) | the same requests |
 <!-- end of the low-to-compact table -->
+
+## Callers of `GetSqlQuery`, `GetTableContents` and `HandlerGetData`: off unless enabled
+
+The data tools — `GetSqlQuery`, `GetTableContents` and the compact `HandlerGetData` — are off by
+default in every binary (full, `-ro`, compact, compact `-ro`; stdio, Streamable HTTP and SSE) and
+for embedders. SAP's API Policy FAQ v1.3 (June 2026), Q33 — informational and non-binding
+([PDF](https://d.dam.sap.com/x/UL9AiqH/SAP_API_Policy_FAQ_v1.3_June.pdf)) — says ADT APIs are not intended for reading application tables, exporting
+business data or running SQL against SAP systems. Whether to enable them is the customer's
+decision.
+
+What a consumer that used one of them does now:
+
+- **Start the binary with the flag**, in any form: `--enable-data-tools`,
+  `MCP_ENABLE_DATA_TOOLS=true`, or `enable-data-tools: true` in the `--conf` file. The CLI wins over
+  the environment, which wins over the file; `false` in a higher form turns them off again. A value
+  other than empty, null, `true` or `false` stops the start; an empty value or YAML null counts as
+  not given, as for every parameter, and the next form decides. A destination's `.env` does not
+  turn it on.
+- **On Streamable HTTP and SSE** it is a start parameter of the server: set it where the server is
+  started (a container's `-e MCP_ENABLE_DATA_TOOLS=true`, for instance). No request header turns it
+  on.
+- **A client of a server started without it** does not see the tools in `tools/list`, and a call of
+  one is answered as an unknown tool (`Tool GetSqlQuery not found`, an `isError` answer).
+- **Embedders:** `EmbeddableMcpServer` lists them only with `exposition: [..., 'data']` (the default
+  `['readonly', 'high']` leaves them out); `HandlerExporter` hands them out only with
+  `includeData: true`. `ReadOnlyHandlersGroup` no longer serves `GetTableContents`,
+  `SystemHandlersGroup` no longer serves `GetSqlQuery`: both are `DataHandlersGroup`'s.
+  `CompactReadOnlyHandlersGroup` and `compactReadOnlyEntries` no longer serve `HandlerGetData`: it is
+  `CompactDataHandlersGroup`'s and `compactDataEntries`'s (`@mcp-abap-adt/compact-readonly-entries`).
+  `ToolSet.groups(context, transport, served)`, `registryOf(toolSet, transport, served)` and
+  `streamableHttpSurface(toolSet, served)` take a required `ServedTools` (`{ dataTools: boolean }`);
+  `CompactHalves` gains `data` and `compactReadOnlyToolSetOf` takes `{ readOnly, data }`.
+
+The handlers themselves (`handleGetSqlQuery`, `handleGetTableContents`) and their definitions
+(`READ_DEFINITIONS`) are exported as before.
 
 ## Contributors: `test-config.yaml` carries no time key
 

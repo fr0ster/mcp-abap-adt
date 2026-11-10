@@ -7,9 +7,13 @@
  * options, credentials, cancellation, failures, shutdown — is its transport's,
  * the same for any set.
  *
- * **The binary fixes the tool set** (the owner's decision). There are
- * four sets, one per kind of binary, each served on stdio, Streamable HTTP
- * and SSE:
+ * **The binary fixes the tool set** (the owner's decision), with one
+ * exception: the data tools (`GetSqlQuery`, `GetTableContents`, compact
+ * `HandlerGetData`) are served only when the binary is started with
+ * `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`), off by
+ * default (SAP API Policy FAQ v1.3, Q33; the customer decides), handed to
+ * `groups` as {@link ServedTools}. There are four sets, one per kind of
+ * binary, each served on stdio, Streamable HTTP and SSE:
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
@@ -65,6 +69,7 @@ import {
 } from './config/binaries';
 import { BackgroundRunHandlersGroup } from './handlers/groups/BackgroundRunHandlersGroup.js';
 import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
+import { DataHandlersGroup } from './handlers/groups/DataHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
 import {
   LeftoverSessionHandlersGroup,
@@ -98,7 +103,10 @@ export {
   type ToolSetKind,
 } from './config/binaries';
 
-/** The tools a binary serves: fixed by the binary, never by a flag. */
+/**
+ * The tools a binary serves: fixed by the binary, but for the data tools,
+ * which `--enable-data-tools` adds ({@link ServedTools}).
+ */
 export interface ToolSet {
   /** Which of the four kinds of binary serves this set. */
   readonly kind: ToolSetKind;
@@ -117,21 +125,38 @@ export interface ToolSet {
   expositionRemoved(transport: ServedTransport): RemovedParameter;
   /**
    * The groups of a binary serving `transport`, built against `context`, in
-   * registration order: the leftover-session group on stdio only.
+   * registration order: the leftover-session group on stdio only, the data
+   * tools only when `served.dataTools` is `true`.
    */
-  groups(context: HandlerContext, transport: ServedTransport): IHandlerGroup[];
+  groups(
+    context: HandlerContext,
+    transport: ServedTransport,
+    served: ServedTools,
+  ): IHandlerGroup[];
+}
+
+/**
+ * What a binary's configuration adds to its set: the data tools —
+ * `GetSqlQuery` and `GetTableContents`, compact `HandlerGetData` — only when
+ * `dataTools` is `true` (`--enable-data-tools`, `MCP_ENABLE_DATA_TOOLS`,
+ * `enable-data-tools`; off by default). Required wherever a set is built, so
+ * every caller states it.
+ */
+export interface ServedTools {
+  readonly dataTools: boolean;
 }
 
 /**
  * The registry a launcher serving `transport` serves: `toolSet`'s groups
- * against a context with no connection yet.
+ * against a context with no connection yet, with what `served` adds.
  */
 export function registryOf(
   toolSet: ToolSet,
   transport: ServedTransport,
+  served: ServedTools,
 ): CompositeHandlersRegistry {
   return new CompositeHandlersRegistry(
-    toolSet.groups(noConnectionContext(), transport),
+    toolSet.groups(noConnectionContext(), transport, served),
   );
 }
 
@@ -153,9 +178,13 @@ export interface StreamableHttpSurface {
   readonly stateHandleWords: string;
 }
 
-const namesOf = (toolSet: ToolSet, transport: ServedTransport): string[] =>
+const namesOf = (
+  toolSet: ToolSet,
+  transport: ServedTransport,
+  served: ServedTools,
+): string[] =>
   toolSet
-    .groups(noConnectionContext(), transport)
+    .groups(noConnectionContext(), transport, served)
     .flatMap((group) => group.getHandlers())
     .map((entry) => entry.toolDefinition.name);
 
@@ -165,10 +194,13 @@ const namesOf = (toolSet: ToolSet, transport: ServedTransport): string[] =>
  * `state_handle` declaration the server adds to every tool. What the tool
  * pages render as their Streamable HTTP section.
  */
-export function streamableHttpSurface(toolSet: ToolSet): StreamableHttpSurface {
-  const stdio = new Set(namesOf(toolSet, 'stdio'));
+export function streamableHttpSurface(
+  toolSet: ToolSet,
+  served: ServedTools,
+): StreamableHttpSurface {
+  const stdio = new Set(namesOf(toolSet, 'stdio', served));
   const http = toolSet
-    .groups(noConnectionContext(), 'http')
+    .groups(noConnectionContext(), 'http', served)
     .flatMap((group) => group.getHandlers());
   const httpNames = new Set(http.map((entry) => entry.toolDefinition.name));
   const binaryOf = (transport: ServedTransport) =>
@@ -231,8 +263,9 @@ function toolsSection(
   const { bin } = BINARIES[transport][kind];
   return `
 TOOLS:
-  ${bin} serves one fixed tool set; the binary chooses it, not a flag
-  (--exposition is gone in 19.0.0, and passing it stops the start):
+  ${bin} serves one fixed tool set; the binary chooses it
+  (--exposition is gone in 19.0.0, and passing it stops the start), and one
+  flag adds the data tools:
 ${served.map((line) => `    - ${line}`).join('\n')}
 
 ${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).join('\n')}
@@ -240,6 +273,15 @@ ${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).jo
   For details: docs/user-guide/HANDLERS_MANAGEMENT.md
 `;
 }
+
+/**
+ * The data-tools line of a set's TOOLS help: what they are and the flag that
+ * serves them; the DATA TOOLS section gives the reason.
+ */
+const dataToolsLine = (tools: string): string =>
+  `the data tools, ${tools}: off by default; served only with --enable-data-tools (see DATA TOOLS: SAP API Policy FAQ Q33)`;
+const DATA_LINE = dataToolsLine('GetSqlQuery and GetTableContents');
+const COMPACT_DATA_LINE = dataToolsLine('HandlerGetData');
 
 const READONLY_LINE =
   'readonly: Get*, List*, ReadTransport* (read operations), with search and system';
@@ -281,6 +323,7 @@ export const fullToolSet: ToolSet = {
         ),
         'background runs of the long reads, RuntimeRunClass and RuntimeRunProgram: read, list, cancel or discard',
         BATCH_LINE,
+        DATA_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
@@ -295,8 +338,11 @@ export const fullToolSet: ToolSet = {
   // The writing groups first, so their names feed the readonly dedup; the
   // background-run tools beside the run tools; every leftover-session tool
   // on stdio.
-  groups: (context, transport) => [
-    ...expositionGroups(['readonly', 'high', 'debug'], context).filter(
+  groups: (context, transport, served) => [
+    ...expositionGroups(
+      ['readonly', 'high', 'debug', ...(served.dataTools ? ['data'] : [])],
+      context,
+    ).filter(
       (group) =>
         servesLeftoverSessions(transport) ||
         !(group instanceof LeftoverSessionHandlersGroup),
@@ -334,6 +380,7 @@ export const fullReadOnlyToolSet: ToolSet = {
         ),
         'background runs of the long reads: read, list, cancel',
         BATCH_LINE,
+        DATA_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
       [
@@ -345,9 +392,11 @@ export const fullReadOnlyToolSet: ToolSet = {
       ],
     ),
   expositionRemoved: (transport) => expositionRemoved('core', transport),
-  groups: (context, transport) => [
+  groups: (context, transport, served) => [
     new ReadOnlyHandlersGroup(context),
     new SystemHandlersGroup(context),
+    // The data tools, opt-in.
+    ...(served.dataTools ? [new DataHandlersGroup(context)] : []),
     new SearchHandlersGroup(context),
     // The background runs of the long reads: read, listed and cancelled.
     new BackgroundRunHandlersGroup(context),
@@ -365,9 +414,17 @@ export const fullReadOnlyToolSet: ToolSet = {
 export interface CompactHalves {
   /** `compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly-entries`. */
   readonly readOnly: CompactEntryBuilder;
+  /**
+   * `compactDataEntries` of `@mcp-abap-adt/compact-readonly-entries`: the
+   * data tool, served only when `served.dataTools` is `true`.
+   */
+  readonly data: CompactEntryBuilder;
   /** `compactModifyEntries` of `@mcp-abap-adt/compact-modify`. */
   readonly modify: CompactEntryBuilder;
 }
+
+/** The read-only half of the compact facade, as its package builds it. */
+export type CompactReadOnlyHalf = Pick<CompactHalves, 'readOnly' | 'data'>;
 
 /**
  * The compact tool set of `mcp-abap-adt-compact`, `-compact-http` and
@@ -401,6 +458,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
           ),
           'background runs of the long reads and HandlerProfileRun: read, list, cancel or discard',
           COMPACT_BATCH_LINE,
+          COMPACT_DATA_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [
@@ -409,8 +467,13 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
         ],
       ),
     expositionRemoved: (transport) => expositionRemoved('compact', transport),
-    groups: (context, transport) => [
-      new CompactHandlersGroup(context, [halves.readOnly, halves.modify]),
+    groups: (context, transport, served) => [
+      new CompactHandlersGroup(context, [
+        halves.readOnly,
+        // The data tool, opt-in.
+        ...(served.dataTools ? [halves.data] : []),
+        halves.modify,
+      ]),
       new CompactDebugHandlersGroup(context),
       new CompactDebugBatchHandlersGroup(context),
       // Beside the run tool (HandlerProfileRun): its background runs, read,
@@ -434,9 +497,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
  * stdio the leftover-session list; the background runs of its long reads.
  * No modify half, no debugger, no leftover-session logoff, no run of code.
  */
-export function compactReadOnlyToolSetOf(
-  readOnly: CompactEntryBuilder,
-): ToolSet {
+export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
   return {
     kind: 'compact-ro',
     backgroundRuns: true,
@@ -452,6 +513,7 @@ export function compactReadOnlyToolSetOf(
           ),
           'background runs of the long reads: read, list, cancel',
           COMPACT_BATCH_LINE,
+          COMPACT_DATA_LINE,
           ...longSessionLine(transport, COMPACT_LONG_SESSION_LINE),
         ],
         [
@@ -460,8 +522,13 @@ export function compactReadOnlyToolSetOf(
         ],
       ),
     expositionRemoved: (transport) => expositionRemoved('compact', transport),
-    groups: (context, transport) => [
-      new CompactHandlersGroup(context, [readOnly], 'CompactReadOnlyHandlers'),
+    groups: (context, transport, served) => [
+      new CompactHandlersGroup(
+        context,
+        // The data tool, opt-in.
+        [half.readOnly, ...(served.dataTools ? [half.data] : [])],
+        'CompactReadOnlyHandlers',
+      ),
       // The background runs of the long reads: read, listed and cancelled.
       new CompactBackgroundRunHandlersGroup(context),
       ...(servesLeftoverSessions(transport)

@@ -100,9 +100,13 @@ async function surfaceOf(
 ): Promise<KindSurface> {
   process.env.SAP_SYSTEM_TYPE = environment;
   // As the launcher builds it: every set keeps background runs.
-  const server = new StdioServer(registryOf(SETS[kind], 'stdio'), undefined, {
-    backgroundRuns: new InMemoryBackgroundRuns(),
-  });
+  const server = new StdioServer(
+    registryOf(SETS[kind], 'stdio', { dataTools: true }),
+    undefined,
+    {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-surface', version: '1' });

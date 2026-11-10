@@ -11,6 +11,7 @@ import {
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
+  ENABLE_DATA_TOOLS_ROW,
   flagValue,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
@@ -123,6 +124,7 @@ export function sseParameters(
       ...tlsRows('sse'),
       STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
@@ -174,6 +176,7 @@ export function readSseConfig(
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
+    enableDataTools: values.enableDataTools === true,
     shutdownTimeout: numberValue(values.shutdownTimeout),
     host: textValue(values.host),
     port: numberValue(values.port),

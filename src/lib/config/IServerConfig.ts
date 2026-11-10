@@ -24,9 +24,10 @@ export interface TlsConfig {
  * The object-oriented handler sets an embedder may combine
  * (`registryForExposition`, `expositionGroups`). The binaries take no set: each
  * fixes its own. `compact` is not served by these groups: the facade is
- * the compact binaries'.
+ * the compact binaries'. `data` is the data tools (`DataHandlersGroup`),
+ * opt-in: served only when named.
  */
-export type HandlerSet = 'readonly' | 'high' | 'compact' | 'debug';
+export type HandlerSet = 'readonly' | 'high' | 'compact' | 'debug' | 'data';
 
 export interface IServerConfig {
   /** Path to YAML config file (`--conf`). */
@@ -67,4 +68,10 @@ export interface IServerConfig {
    * `batch.keepRawParts`). Default `false`.
    */
   batchKeepRawParts?: boolean;
+
+  /**
+   * Whether the binary serves the data tools (`--enable-data-tools`,
+   * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
+   */
+  enableDataTools?: boolean;
 }

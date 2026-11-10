@@ -9,7 +9,8 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 ## The tools
 
 - the **17 compact tools that change nothing**, one per operation with the object in
-  `object_type`: `HandlerGet`, `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`,
+  `object_type`: `HandlerGet`, `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData` (a data
+  tool: served only with `--enable-data-tools`, off by default),
   `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));

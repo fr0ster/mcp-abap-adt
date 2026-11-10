@@ -229,6 +229,8 @@ function page(entries, surfaces) {
               ? '**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary\n\n'
             : half === 'readonly'
               ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
+            : half === 'data'
+              ? "**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n"
               : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
@@ -259,6 +261,11 @@ function main() {
     ...readOnly
       .compactReadOnlyEntries(context)
       .map((entry) => ({ half: 'readonly', entry })),
+    // The data tool (HandlerGetData), opt-in: documented, served only with
+    // --enable-data-tools.
+    ...readOnly
+      .compactDataEntries()
+      .map((entry) => ({ half: 'data', entry })),
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
@@ -294,15 +301,23 @@ function main() {
   // the HTTP server uses (lib's `streamableHttpSurface`).
   const { compactToolSetOf, compactReadOnlyToolSetOf, streamableHttpSurface } =
     requireFresh('.', path.join('lib', 'toolSet.js'));
+  // Documented with the data tool served, as the pages list it.
+  const documented = { dataTools: true };
   const surfaces = [
     streamableHttpSurface(
       compactToolSetOf({
         readOnly: readOnly.compactReadOnlyEntries,
+        data: readOnly.compactDataEntries,
         modify: modify.compactModifyEntries,
       }),
+      documented,
     ),
     streamableHttpSurface(
-      compactReadOnlyToolSetOf(readOnly.compactReadOnlyEntries),
+      compactReadOnlyToolSetOf({
+        readOnly: readOnly.compactReadOnlyEntries,
+        data: readOnly.compactDataEntries,
+      }),
+      documented,
     ),
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

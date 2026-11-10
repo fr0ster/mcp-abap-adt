@@ -21,13 +21,17 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { DestinationSystemContext } from '../../../lib/auth/destinationSystemContext';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
 import type { BackgroundRunOwner } from '../../../lib/backgroundRuns/owner';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -98,10 +102,12 @@ const placeholderContext = {
 export function shippedGroups(): CompositeHandlersRegistry {
   return new CompositeHandlersRegistry([
     new SystemHandlersGroup(placeholderContext),
+    new DataHandlersGroup(placeholderContext),
     new RuntimeRunHandlersGroup(placeholderContext),
     new BackgroundRunHandlersGroup(placeholderContext),
     new CompactModifyHandlersGroup(placeholderContext),
     new CompactReadOnlyHandlersGroup(placeholderContext),
+    new CompactDataHandlersGroup(placeholderContext),
     new CompactBackgroundRunHandlersGroup(placeholderContext),
   ]);
 }

@@ -59,6 +59,12 @@
           ]
         },
         {
+          "name": "MCP_ENABLE_DATA_TOOLS",
+          "description": "Serve the data tools (GetSqlQuery, GetTableContents; compact HandlerGetData). Off by default: SAP API Policy FAQ v1.3, Q33; the customer decides.",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
           "name": "MCP_SSE_HOST",
           "description": "Host to listen on: 127.0.0.1 (this machine only) or 0.0.0.0 (every interface).",
           "format": "string",

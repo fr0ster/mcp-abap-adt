@@ -17,9 +17,13 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
@@ -59,9 +63,11 @@ function shippedGroups(): Array<
     new ReadOnlyHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new DataHandlersGroup(placeholder),
     new RuntimeRunHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new CompactReadOnlyHandlersGroup(placeholder),
+    new CompactDataHandlersGroup(placeholder),
     new CompactModifyHandlersGroup(placeholder),
   ] as never;
 }

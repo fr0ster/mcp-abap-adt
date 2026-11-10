@@ -83,7 +83,7 @@ in the compact ones — and declares an optional `state_handle` argument on ever
    - `HandlerTransportCreate`, `HandlerTransportSortAndCompress`, `HandlerTransportMoveObjects`
    - `HandlerCreate`
    - `HandlerGet`
-   - `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`
+   - `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData` (a data tool: served only with `--enable-data-tools`)
    - `HandlerUpdate`
    - `HandlerDelete`
    - Contract:

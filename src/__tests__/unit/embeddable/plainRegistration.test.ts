@@ -118,6 +118,7 @@ const REGISTRIES: Readonly<
         ...(systemType !== undefined && { systemType }),
       },
       'stdio',
+      { dataTools: false },
     );
     return {
       registry: new CompositeHandlersRegistry(groups),
@@ -440,7 +441,7 @@ describe('a call on the plain path', () => {
  */
 describe('a plain registration calls each entry with the call’s context', () => {
   const groupsOn = (context: HandlerContext): IHandlerGroup[] => [
-    ...compactToolSet.groups(context, 'stdio'),
+    ...compactToolSet.groups(context, 'stdio', { dataTools: false }),
     new ReadOnlyHandlersGroup(context),
     new BackgroundRunHandlersGroup(context),
   ];

@@ -405,6 +405,9 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 ## Which calls are recorded
 
+The data tools (`GetSqlQuery`, `GetTableContents`, compact `HandlerGetData`) are recorded as listed
+below where they are served: only by a binary started with `--enable-data-tools`.
+
 <!-- batch-handlers:start -->
 
 179 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.

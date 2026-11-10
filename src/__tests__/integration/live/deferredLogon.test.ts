@@ -128,9 +128,13 @@ describe('an RFC tool call against an unreachable system', () => {
     );
     const destination = factory.defaultDestination;
     assert.equal(destination, 'default');
-    const server = new StdioServer(registryOf(fullToolSet, 'stdio'), factory, {
-      version: '0.0.0-test',
-    });
+    const server = new StdioServer(
+      registryOf(fullToolSet, 'stdio', { dataTools: false }),
+      factory,
+      {
+        version: '0.0.0-test',
+      },
+    );
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     // The first tool call makes the connection (no connectAtStart).
     await server.start(destination, serverSide);

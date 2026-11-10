@@ -10,7 +10,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import {
   BATCH_HANDLERS_FILE,
   type BatchEntry,
@@ -18,6 +21,7 @@ import {
   whenHolds,
 } from '../../../lib/batch/eligibility';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -52,10 +56,12 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
   })
     .getHandlerEntries()
     .map((e) => e.toolDefinition.name)
-    // What the exporter leaves out (no store, no debugger): the groups' own.
+    // What the exporter leaves out (no store, no debugger, the data tools
+    // unless asked for): the groups' own.
     .concat(
       [
         new BackgroundRunHandlersGroup(noConnectionContext()),
+        new DataHandlersGroup(noConnectionContext()),
         new DebugHandlersGroup(noConnectionContext()),
       ].flatMap((group) =>
         group.getHandlers().map((e) => e.toolDefinition.name),
@@ -63,6 +69,7 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
     );
   const compact = [
     ...new CompactReadOnlyHandlersGroup(placeholder).getHandlers(),
+    ...new CompactDataHandlersGroup(placeholder).getHandlers(),
     ...new CompactModifyHandlersGroup(placeholder).getHandlers(),
   ].map((e) => e.toolDefinition.name);
   return { full: new Set(full), compact: new Set(compact) };

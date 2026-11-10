@@ -127,10 +127,6 @@ import {
   handleGetTable,
 } from '../../../handlers/table/high/handleGetTable';
 import {
-  TOOL_DEFINITION as GetTableContents_Tool,
-  handleGetTableContents,
-} from '../../../handlers/table/readonly/handleGetTableContents';
-import {
   TOOL_DEFINITION as GetTableType_Tool,
   handleGetTableType,
 } from '../../../handlers/table_type/high/handleGetTableType';
@@ -205,8 +201,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
 
   private getAllEntries(): HandlerEntry[] {
     return [
-      // Existing readonly handlers
-      defineTool(GetTableContents_Tool, handleGetTableContents),
+      // Existing readonly handlers. GetTableContents is a data tool:
+      // DataHandlersGroup's, served only when asked for.
       defineTool(GetPackageContents_Tool, handleGetPackageContents),
       defineTool(GetInclude_Tool, handleGetInclude),
       defineTool(GetIncludesList_Tool, handleGetIncludesList),

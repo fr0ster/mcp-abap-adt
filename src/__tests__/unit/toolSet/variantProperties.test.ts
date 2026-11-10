@@ -98,9 +98,13 @@ async function listed(
 ): Promise<readonly Listed[]> {
   process.env.SAP_SYSTEM_TYPE = variant;
   // As the launcher builds it: every set keeps background runs.
-  const server = new StdioServer(registryOf(set, 'stdio'), undefined, {
-    backgroundRuns: new InMemoryBackgroundRuns(),
-  });
+  const server = new StdioServer(
+    registryOf(set, 'stdio', { dataTools: true }),
+    undefined,
+    {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-properties', version: '1' });

@@ -320,7 +320,7 @@ two explicit tools; with several the server picks none.
   to write it (`sessionOf` → `sessionIdentity(destination, settings, login)`).
 - **The tools** (`ListLeftoverSessions` / `LogoffLeftoverSession`; compact
   `HandlerLeftoverSession{List,Logoff}`) — in every stdio binary, none in an http or sse binary
-  (`ToolSet.groups(context, transport)`), and no resume tool anywhere — are
+  (`ToolSet.groups(context, transport, served)`), and no resume tool anywhere — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a list or a
   logoff must not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
   resolves the caller from the instance's source (`resolveCaller`) and destination
@@ -661,16 +661,21 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
   `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `SystemHandlersGroup`,
   `SearchHandlersGroup` and `DebugHandlersGroup` (`LowLevelHandlersGroup` is gone since 19.0.0).
 - **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`), fixed by the
-  binary (there is no `--exposition`): its groups, the TOOLS section of its help, its removed
+  binary (there is no `--exposition`) but for the data tools: its groups, the TOOLS section of its help, its removed
   `--exposition` and whether it serves background runs. `fullToolSet` covers readonly, high, debug,
   search, background runs and, on stdio, the leftover sessions; `fullReadOnlyToolSet` readonly,
-  search and, on stdio, the leftover-session list and logoff; `compactToolSetOf({ readOnly, modify })`
-  is the compact facade's, `compactReadOnlyToolSetOf(readOnly)` its read-only half's. The
-  transport is a set's one other dimension: `groups(context, transport)` builds the
-  leftover-session group for `'stdio'` only, and `registryOf(toolSet, transport)` builds the
-  registry.
+  search and, on stdio, the leftover-session list and logoff; `compactToolSetOf({ readOnly, data, modify })`
+  is the compact facade's, `compactReadOnlyToolSetOf({ readOnly, data })` its read-only half's. The
+  transport is a set's other dimension: `groups(context, transport, served)` builds the
+  leftover-session group for `'stdio'` only, and `registryOf(toolSet, transport, served)` builds the
+  registry. `served` (`ServedTools`, `{ dataTools }`, required) adds the data tools —
+  `DataHandlersGroup` (`GetSqlQuery`, `GetTableContents`), compact `compactDataEntries`
+  (`HandlerGetData`) — only when the binary was started with `--enable-data-tools`; off by default
+  (SAP API Policy FAQ v1.3, Q33; whether to enable them is the customer's decision).
 - **Embedders.** `EmbeddableMcpServer` builds its registry from `exposition` (`readonly`, `high`,
-  `compact`, `system`, `search`), or takes `handlersRegistry`.
+  `compact`, `system`, `search`, and `data` for the data tools, which no default names), or takes
+  `handlersRegistry`. `HandlerExporter` hands the data tools out only with `includeData: true`;
+  `CompactReadOnlyHandlersGroup` serves no `HandlerGetData`, `CompactDataHandlersGroup` does.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's
   system type: the `systemType` option, else `SAP_SYSTEM_TYPE` — not required by lib (an
   embedder or `HandlerExporter` constructs without one); the binaries require it

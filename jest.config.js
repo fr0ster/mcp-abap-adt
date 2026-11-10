@@ -116,7 +116,11 @@ function jestConfig(listFile) {
       '!src/**/index.ts',
     ],
     testPathIgnorePatterns: listedIgnores(listFile),
-    maxWorkers: 1,
+    // 4 workers, each restarted once idle above 512MB: measured on a
+    // developer machine and every CI runner kind, one setting for all of
+    // them (docs/development/tests/TESTING_GUIDE.md, "Jest's workers").
+    maxWorkers: 4,
+    workerIdleMemoryLimit: '512MB',
     testTimeout: 600000,
   };
 }

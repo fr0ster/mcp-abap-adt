@@ -12,6 +12,7 @@ import {
   DESTINATION_KEY_ENV,
   DESTINATION_KEYS,
   type DestinationKey,
+  ENABLE_DATA_TOOLS_ROW,
   flagValue,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
@@ -355,6 +356,7 @@ export function coreParameters(
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
@@ -520,6 +522,7 @@ export function readCoreConfig(
     // (effectiveSystemType), as for the connection type.
     systemTypeSource: source('systemType'),
     batchKeepRawParts: values.batchKeepRawParts === true,
+    enableDataTools: values.enableDataTools === true,
     shutdownTimeout: numberValue(values.shutdownTimeout),
     mcpDestination: str(values.mcpDestination),
     envDestination,

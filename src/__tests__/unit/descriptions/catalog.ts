@@ -5,7 +5,10 @@
  */
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
@@ -40,10 +43,17 @@ export const SETS: ReadonlyArray<readonly [ToolSetKind, ToolSet]> = [
     'compact',
     compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     }),
   ],
-  ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
+  [
+    'compact-ro',
+    compactReadOnlyToolSetOf({
+      readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
+    }),
+  ],
 ];
 
 /** The set of `kind`. */
@@ -82,7 +92,10 @@ export async function servedCatalog(
   transport: ServedTransport = 'stdio',
   systemType: SystemType = 'onprem',
 ): Promise<ServedTool[]> {
-  const server = new CatalogServer(registryOf(set, transport), systemType);
+  const server = new CatalogServer(
+    registryOf(set, transport, { dataTools: true }),
+    systemType,
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'tool-catalog', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);

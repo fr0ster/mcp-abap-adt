@@ -1,7 +1,7 @@
 /**
  * Background runs of the long reads, live (plan D24, Step 8): a long read
  * through the server's own dispatch — the binary's registration
- * (`registryOf(toolSet, 'stdio')`) on an in-process server holding the
+ * (`registryOf(toolSet, 'stdio', { dataTools: true })`) on an in-process server holding the
  * launchers' background-run store — on both systems:
  *
  * - called without `background`, it answers a `run_handle` at once; its
@@ -248,7 +248,7 @@ class LiveRunServer extends BaseMcpServer {
     });
   }
   register(toolSet: ToolSet): void {
-    this.registerHandlers(registryOf(toolSet, 'stdio'));
+    this.registerHandlers(registryOf(toolSet, 'stdio', { dataTools: true }));
   }
 }
 

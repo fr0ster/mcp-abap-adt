@@ -903,8 +903,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       );
       // core: the debugger, high, background runs, the three batch tools
       // and the two debugger batch tools, always; on http SessionOpen and
-      // SessionClose.
-      expect(full.tools).toHaveLength(onStdio ? 270 : onHttp ? 270 : 268);
+      // SessionClose. Started without --enable-data-tools: the data tools
+      // (GetSqlQuery, GetTableContents) are off, two fewer than with it.
+      expect(full.tools).toHaveLength(onStdio ? 268 : onHttp ? 268 : 266);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -922,7 +923,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // tools, the three background-run tools of the long reads (and, on
       // stdio, the leftover-session list; on http SessionOpen and
       // SessionClose); no write, run, debugger, logoff or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 75 : onHttp ? 76 : 74);
+      expect(fullRo.tools).toHaveLength(onStdio ? 73 : onHttp ? 74 : 72);
       for (const name of [
         'GetBackgroundRun',
         'ListBackgroundRuns',
@@ -970,9 +971,10 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       }
       // compact: the 29, the four debugger tools, HandlerDebugBatch, the
       // three background-run tools beside the run tool, HandlerBatch, and on
-      // stdio the leftover-session list and logoff (no set serves a resume).
+      // stdio the leftover-session list and logoff (no set serves a resume);
+      // without --enable-data-tools, not HandlerGetData: 28 of the 29.
       expect(compact.tools).toHaveLength(
-        29 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+        28 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
       );
       expect(compact.tools).toEqual(
         expect.arrayContaining([
@@ -984,9 +986,10 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       );
       // compact-ro: the 17 that change nothing, the three background-run
       // tools of the long reads, HandlerBatch, and on stdio the
-      // leftover-session list.
+      // leftover-session list; without --enable-data-tools, not
+      // HandlerGetData: 16 of the 17.
       expect(compactRo.tools).toHaveLength(
-        17 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
+        16 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
       );
       expect(compactRo.tools).toContain('HandlerBackgroundRunGet');
       expect(compactRo.tools).toContain('HandlerGet');

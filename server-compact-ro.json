@@ -76,6 +76,12 @@
           ]
         },
         {
+          "name": "MCP_ENABLE_DATA_TOOLS",
+          "description": "Serve the data tools (GetSqlQuery, GetTableContents; compact HandlerGetData). Off by default: SAP API Policy FAQ v1.3, Q33; the customer decides.",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
           "name": "SAP_LANGUAGE",
           "description": "Logon language (ISO code, e.g. 'en', 'de').",
           "format": "string",

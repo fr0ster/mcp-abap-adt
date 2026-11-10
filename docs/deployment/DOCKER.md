@@ -155,6 +155,7 @@ The process environment of the container is the server's process environment; se
 | `SAP_SYSTEM_TYPE` | all | `onprem`, `cloud` or `legacy`. Required; no image sets it. |
 | `MCP_HTTP_HOST`, `MCP_HTTP_PORT` | Streamable HTTP | Listen address and port. The images set `0.0.0.0` and `3000`; the binary's own default host, `127.0.0.1`, is unreachable from outside a container. |
 | `MCP_SSE_HOST`, `MCP_SSE_PORT` | SSE | The same for SSE: `0.0.0.0` and `3001`. |
+| `MCP_ENABLE_DATA_TOOLS` | all | `true` serves the data tools (`GetSqlQuery`, `GetTableContents`, compact `HandlerGetData`); no image sets it, so they are off. Whether to turn it on is the customer's decision (SAP API Policy FAQ v1.3, Q33: see the [README](../../README.md#the-data-tools-off-unless-enabled)). |
 | `AUTH_BROKER_PATH` | stdio | Base directory of `service-keys/` and `sessions/` (one directory). The images set `/app`. |
 | `NODE_EXTRA_CA_CERTS`, `TLS_REJECT_UNAUTHORIZED` | all | See [TLS](#tls). |
 | `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` | writing variants | Responsible person and master system of created objects, when no header (HTTP, SSE) or destination states them. |

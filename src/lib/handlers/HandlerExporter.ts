@@ -17,6 +17,7 @@ import {
 import type { LineMatchStrategy } from '../search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../search-source/readFailure.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
+import { DataHandlersGroup } from './groups/DataHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
 import { RuntimeRunHandlersGroup } from './groups/RuntimeRunHandlersGroup.js';
@@ -107,6 +108,17 @@ export interface HandlerExporterOptions {
    * @default true
    */
   includeSearch?: boolean;
+
+  /**
+   * Include the data tools (`GetSqlQuery`, `GetTableContents`). Unlike the
+   * other `include…` options, off unless stated: `true` turns them on, and
+   * nothing else does. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT
+   * APIs are not intended for reading application tables, exporting
+   * business data or running SQL against SAP systems; whether to serve them
+   * is the customer's decision.
+   * @default false
+   */
+  includeData?: boolean;
 
   /**
    * The SAP system kind the handlers serve, for a connection the factory
@@ -238,6 +250,10 @@ export class HandlerExporter {
     }
     if (options?.includeSearch !== false) {
       this.handlerGroups.push(new SearchHandlersGroup(dummyContext));
+    }
+    // The data tools, opt-in: only when stated.
+    if (options?.includeData === true) {
+      this.handlerGroups.push(new DataHandlersGroup(dummyContext));
     }
   }
 

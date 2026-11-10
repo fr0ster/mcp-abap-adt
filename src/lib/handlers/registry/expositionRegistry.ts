@@ -7,6 +7,7 @@
 
 import type { HandlerSet } from '../../config/IServerConfig.js';
 import { BackgroundRunHandlersGroup } from '../groups/BackgroundRunHandlersGroup.js';
+import { DataHandlersGroup } from '../groups/DataHandlersGroup.js';
 import { DebugHandlersGroup } from '../groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
 import {
@@ -34,7 +35,9 @@ export function noConnectionContext(): HandlerContext {
  * groups first, so their tool names feed the readonly dedup (a readonly
  * copy of a tool they serve under the same name is withheld), then the readonly and system groups (with the
  * background-run tools beside the run tools; a server instance with a strategy adds them beside any long read), the others, search, and the
- * leftover-session tools — in registration order.
+ * leftover-session tools — in registration order. The data tools
+ * (`DataHandlersGroup`) follow the system group only when `exposition` names
+ * `data`: they are opt-in.
  */
 export function expositionGroups(
   exposition: readonly string[],
@@ -61,6 +64,10 @@ export function expositionGroups(
       new ReadOnlyHandlersGroup(baseContext, overridingToolNames),
     );
     handlerGroups.push(new SystemHandlersGroup(baseContext));
+  }
+  // The data tools, opt-in: only when the exposition names `data`.
+  if (exposition.includes('data')) {
+    handlerGroups.push(new DataHandlersGroup(baseContext));
   }
   if (exposition.includes('high')) {
     // The run tools (RuntimeRunClass, RuntimeRunProgram) and the trace

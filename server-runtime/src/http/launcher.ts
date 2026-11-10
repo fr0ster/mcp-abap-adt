@@ -46,7 +46,7 @@ import { StreamableHttpServer } from './StreamableHttpServer.js';
  * `mcp-abap-adt-compact-http-ro` the compact sets.
  */
 export interface HttpLauncherOptions {
-  /** The tools served: fixed by the command, never by a flag. */
+  /** The tools served: fixed by the command, but for the data tools (`--enable-data-tools`). */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -168,34 +168,41 @@ export async function launch(
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
   process.env.SAP_SYSTEM_TYPE = config.systemType;
-  const server = new StreamableHttpServer(registryOf(options.toolSet, 'http'), {
-    version: options.version,
-    stateIdleMinutes: config.stateIdleMinutes,
-    // Batch mode: one InstanceBatch per pooled instance.
-    batch: { keepRawParts: config.batchKeepRawParts === true },
-    // The state's lines go to stderr whatever the transport logger says.
-    stateLogger: stderrStateLogger,
-    host: config.host,
-    port: config.port,
-    enableJsonResponse: config.httpJsonResponse || undefined,
-    path: config.httpPath,
-    logger: noopLogger,
-    tls: config.tls,
-    allowedHosts: config.allowedHosts,
-    allowedOrigins: config.allowedOrigins,
-    enableDnsRebindingProtection: config.enableDnsRebindingProtection,
-    // No runtime session file and no leftover-session tool: one server holds
-    // the sessions of many users, so they are stdio's only.
-    // Background runs of the long reads (and, in the write sets, of the
-    // run tools), kept in this process's memory and handed to every
-    // instance; they end with the process. Every set serves them.
-    ...(options.toolSet.backgroundRuns && {
-      backgroundRuns: new InMemoryBackgroundRuns(),
+  const server = new StreamableHttpServer(
+    registryOf(options.toolSet, 'http', {
+      // The data tools only when the start parameters turn them on; no
+      // request header does.
+      dataTools: config.enableDataTools === true,
     }),
-    // SearchSource's strategies: the shipped ones (DO22, DO24).
-    sapAnswerStrategy: skipSapAnswers,
-    lineMatchStrategy: substringLineMatch,
-  });
+    {
+      version: options.version,
+      stateIdleMinutes: config.stateIdleMinutes,
+      // Batch mode: one InstanceBatch per pooled instance.
+      batch: { keepRawParts: config.batchKeepRawParts === true },
+      // The state's lines go to stderr whatever the transport logger says.
+      stateLogger: stderrStateLogger,
+      host: config.host,
+      port: config.port,
+      enableJsonResponse: config.httpJsonResponse || undefined,
+      path: config.httpPath,
+      logger: noopLogger,
+      tls: config.tls,
+      allowedHosts: config.allowedHosts,
+      allowedOrigins: config.allowedOrigins,
+      enableDnsRebindingProtection: config.enableDnsRebindingProtection,
+      // No runtime session file and no leftover-session tool: one server holds
+      // the sessions of many users, so they are stdio's only.
+      // Background runs of the long reads (and, in the write sets, of the
+      // run tools), kept in this process's memory and handed to every
+      // instance; they end with the process. Every set serves them.
+      ...(options.toolSet.backgroundRuns && {
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      }),
+      // SearchSource's strategies: the shipped ones (DO22, DO24).
+      sapAnswerStrategy: skipSapAnswers,
+      lineMatchStrategy: substringLineMatch,
+    },
+  );
   installTransportShutdown({
     begin: () => server.beginShutdown(),
     stopListening: () => server.stopListening(),

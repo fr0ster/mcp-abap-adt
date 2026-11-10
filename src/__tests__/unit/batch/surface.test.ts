@@ -14,7 +14,10 @@ jest.mock('../../../lib/connectionFactory', () => ({
 
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
@@ -44,10 +47,17 @@ const SETS: ReadonlyArray<readonly [ToolSetKind, ToolSet]> = [
     'compact',
     compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     }),
   ],
-  ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
+  [
+    'compact-ro',
+    compactReadOnlyToolSetOf({
+      readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
+    }),
+  ],
 ];
 const TRANSPORTS: readonly ServedTransport[] = ['stdio', 'http', 'sse'];
 const FULL_BATCH = ['BatchBegin', 'BatchEnd', 'BatchAnswers'];
@@ -123,7 +133,9 @@ describe('the batch tools on the surface', () => {
     for (const [kind, set] of SETS) {
       for (const transport of TRANSPORTS) {
         const names = set
-          .groups({ connection: undefined as never }, transport)
+          .groups({ connection: undefined as never }, transport, {
+            dataTools: false,
+          })
           .flatMap((group) =>
             group.getHandlers().map((entry) => entry.toolDefinition.name),
           );
@@ -144,6 +156,7 @@ describe('the batch tools on the surface', () => {
       for (const group of set.groups(
         { connection: undefined as never },
         'http',
+        { dataTools: false },
       )) {
         for (const entry of group.getHandlers()) {
           const name = entry.toolDefinition.name;
@@ -160,10 +173,13 @@ describe('the batch tools on the surface', () => {
     "every tool's description in %s ends with its sentence (recordable, recordable for some arguments, outside batch mode)",
     async (kind, set) => {
       // As the launchers: every set keeps background runs.
-      const { client } = await served(registryOf(set, 'stdio'), {
-        batch: new InstanceBatch({ keepRawParts: false }),
-        backgroundRuns: true,
-      });
+      const { client } = await served(
+        registryOf(set, 'stdio', { dataTools: false }),
+        {
+          batch: new InstanceBatch({ keepRawParts: false }),
+          backgroundRuns: true,
+        },
+      );
       const { tools } = await client.listTools();
       expect(tools.length).toBeGreaterThan(10);
       for (const tool of tools) {
@@ -231,9 +247,12 @@ describe('the batch tools on the surface', () => {
   );
 
   it("BatchBegin's, BatchEnd's and BatchAnswers' descriptions are the spec's words", async () => {
-    const { client } = await served(registryOf(fullToolSet, 'http'), {
-      batch: new InstanceBatch({ keepRawParts: false }),
-    });
+    const { client } = await served(
+      registryOf(fullToolSet, 'http', { dataTools: false }),
+      {
+        batch: new InstanceBatch({ keepRawParts: false }),
+      },
+    );
     const { tools } = await client.listTools();
     const byName = new Map(tools.map((t) => [t.name, t.description]));
     expect(byName.get('BatchBegin')).toBe(`[read-only] ${BEGIN_WORDS}`);
@@ -243,7 +262,9 @@ describe('the batch tools on the surface', () => {
 
   it('without a batch owner no description gets a sentence', async () => {
     for (const [, set] of SETS) {
-      const { client } = await served(registryOf(set, 'stdio'));
+      const { client } = await served(
+        registryOf(set, 'stdio', { dataTools: false }),
+      );
       const { tools } = await client.listTools();
       expect(
         tools
@@ -291,6 +312,7 @@ describe('the batch tools on the surface', () => {
 describe('the batch tools at work', () => {
   const compact = compactToolSetOf({
     readOnly: compactReadOnlyEntries,
+    data: compactDataEntries,
     modify: compactModifyEntries,
   });
 
@@ -309,10 +331,13 @@ describe('the batch tools at work', () => {
   it('HandlerBatch begin/answers build no connection; number with another action refused', async () => {
     const owner = new InstanceBatch({ keepRawParts: false });
     const { source, resolve } = countingSource();
-    const { server, client } = await served(registryOf(compact, 'http'), {
-      batch: owner,
-      source,
-    });
+    const { server, client } = await served(
+      registryOf(compact, 'http', { dataTools: false }),
+      {
+        batch: owner,
+        source,
+      },
+    );
     const begun = await client.callTool({
       name: 'HandlerBatch',
       arguments: { action: 'begin' },
@@ -354,10 +379,13 @@ describe('the batch tools at work', () => {
   it('BatchBegin answers the instance handle; a second is refused batch_mode_on; nothing logs on', async () => {
     const owner = new InstanceBatch({ keepRawParts: false });
     const { source, resolve } = countingSource();
-    const { server, client } = await served(registryOf(fullToolSet, 'http'), {
-      batch: owner,
-      source,
-    });
+    const { server, client } = await served(
+      registryOf(fullToolSet, 'http', { dataTools: false }),
+      {
+        batch: owner,
+        source,
+      },
+    );
     const begun = await client.callTool({ name: 'BatchBegin', arguments: {} });
     expect(JSON.parse(textOf(begun))).toEqual({
       batch: 'on',
@@ -376,10 +404,13 @@ describe('the batch tools at work', () => {
       [compact, 'HandlerBatch', { action: 'end' }],
     ] as const) {
       const { source, resolve } = countingSource();
-      const { client } = await served(registryOf(set, 'http'), {
-        batch: new InstanceBatch({ keepRawParts: false }),
-        source,
-      });
+      const { client } = await served(
+        registryOf(set, 'http', { dataTools: false }),
+        {
+          batch: new InstanceBatch({ keepRawParts: false }),
+          source,
+        },
+      );
       const ended = await client.callTool({ name, arguments: args });
       expect(ended.isError).toBe(true);
       expect(textOf(ended)).toContain('batch_mode_off');
@@ -389,9 +420,12 @@ describe('the batch tools at work', () => {
 
   it('without an owner every batch tool answers batch_mode_unavailable, before any connection', async () => {
     const { source, resolve } = countingSource();
-    const { client } = await served(registryOf(fullToolSet, 'http'), {
-      source,
-    });
+    const { client } = await served(
+      registryOf(fullToolSet, 'http', { dataTools: false }),
+      {
+        source,
+      },
+    );
     for (const [name, args] of [
       ['BatchBegin', {}],
       ['BatchEnd', {}],
@@ -408,9 +442,12 @@ describe('the batch tools at work', () => {
   });
 
   it('BatchAnswers refuses a number below 1 by its schema', async () => {
-    const { client } = await served(registryOf(fullReadOnlyToolSet, 'sse'), {
-      batch: new InstanceBatch({ keepRawParts: false }),
-    });
+    const { client } = await served(
+      registryOf(fullReadOnlyToolSet, 'sse', { dataTools: false }),
+      {
+        batch: new InstanceBatch({ keepRawParts: false }),
+      },
+    );
     const refused = await client.callTool({
       name: 'BatchAnswers',
       arguments: { number: 0 },

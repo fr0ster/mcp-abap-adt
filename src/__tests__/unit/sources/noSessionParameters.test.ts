@@ -10,8 +10,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { LeftoverSessionHandlersGroup } from '../../../lib/handlers/groups/LeftoverSessionHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
@@ -88,11 +92,13 @@ describe('no tool takes session_id or session_state', () => {
     new ReadOnlyHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new DataHandlersGroup(placeholder),
     new RuntimeRunHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new BackgroundRunHandlersGroup(placeholder),
     new LeftoverSessionHandlersGroup(placeholder),
     new CompactReadOnlyHandlersGroup(placeholder),
+    new CompactDataHandlersGroup(placeholder),
     new CompactModifyHandlersGroup(placeholder),
   ] as unknown as Array<{ getHandlers(): HandlerEntry[] }>;
   const tools = groups.flatMap((g) => g.getHandlers());

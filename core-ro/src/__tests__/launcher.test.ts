@@ -34,7 +34,9 @@ async function stopped(argv: string[]) {
 
 const shape = (set: typeof readOnlyToolSet) =>
   set
-    .groups({ connection: undefined as never, logger: undefined }, 'stdio')
+    .groups({ connection: undefined as never, logger: undefined }, 'stdio', {
+      dataTools: false,
+    })
     .map((group) => ({
       group: group.getName(),
       tools: group.getHandlers().map((entry) => entry.toolDefinition.name),
@@ -66,9 +68,9 @@ describe('mcp-abap-adt-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 75 tools (the three batch tools among them), the background-run tools, none of a run or a leftover-session logoff', () => {
+  it('serves the read-only set without the data tools: 73 tools (the three batch tools among them), the background-run tools, none of a run or a leftover-session logoff', () => {
     expect(shape(readOnlyToolSet)).toEqual(shape(fullReadOnlyToolSet));
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(75);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(73);
     expect(readOnlyToolSet.backgroundRuns).toBe(true);
   });
 

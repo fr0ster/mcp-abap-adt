@@ -400,6 +400,7 @@ describe('the YAML template and validation come from the table', () => {
         'client',
         'connection-type',
         'deferred-logon',
+        'enable-data-tools',
         'env',
         'env-path',
         'group',

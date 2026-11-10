@@ -11,7 +11,10 @@
  */
 import { AbapDebugger, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -523,10 +526,11 @@ describe('the compact debugger is four tools', () => {
   it('HandlerDebugStart, HandlerDebugView and HandlerDebugWait are not served', () => {
     const compact = compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     });
     const served = compact
-      .groups({ connection: undefined } as never, 'stdio')
+      .groups({ connection: undefined } as never, 'stdio', { dataTools: false })
       .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
     for (const name of [
       'HandlerDebugStart',
@@ -543,8 +547,11 @@ describe('the compact debugger is four tools', () => {
       expect(served).toContain(e.toolDefinition.name);
       expect(DEBUGGER_OWN_CONNECTION_TOOLS).toContain(e.toolDefinition.name);
     }
-    const ro = compactReadOnlyToolSetOf(compactReadOnlyEntries)
-      .groups({ connection: undefined } as never, 'stdio')
+    const ro = compactReadOnlyToolSetOf({
+      readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
+    })
+      .groups({ connection: undefined } as never, 'stdio', { dataTools: false })
       .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
     expect(ro.filter((n) => n.startsWith('HandlerDebug'))).toEqual([]);
   });

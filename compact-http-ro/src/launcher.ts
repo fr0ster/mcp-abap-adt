@@ -12,7 +12,10 @@
  * decision), and a user installs only what they need. The modify
  * half, the debugger, background runs and the resume are `mcp-abap-adt-compact-http`'s.
  */
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import {
   type LauncherEdges,
   packageManifestOf,
@@ -28,9 +31,10 @@ import { main as httpMain } from '@mcp-abap-adt/server-runtime/http';
  * The read-only compact tool set: the half that changes nothing. No modify half, no debugger, no
  * background run, no resume.
  */
-export const readOnlyToolSet: ToolSet = compactReadOnlyToolSetOf(
-  compactReadOnlyEntries,
-);
+export const readOnlyToolSet: ToolSet = compactReadOnlyToolSetOf({
+  readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
+});
 
 /**
  * THIS package's manifest, read by its shape (`packageManifestOf`). `require`,

@@ -271,7 +271,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 
 - **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains
 - **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
-- **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
+- **📦 Table Management**: `GetTable`, `CreateTable` - Create and retrieve ABAP database tables; `GetTableContents` (the data preview) is a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
 - **🧾 Table Type Management**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType`, `GetTableTypeVersions` - Create, read, change, check, activate and delete ABAP table types (on premise and cloud); the create and the update take the definition (row type, access, key) and answer the definition SAP stored
 - **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
@@ -291,7 +291,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🔗 Long session over Streamable HTTP** (`mcp-abap-adt-http`, `-compact-http` and their `-ro`): every tool takes an optional `state_handle` argument that routes the call to the instance holding that state (a lock, a batch, a debug session); `SessionOpen` / `SessionClose` (compact: `HandlerSession`) keep one instance and its SAP session for a run of calls and log it off at the close, or at the idle bound. See [`@mcp-abap-adt/http`](http/README.md#held-state-and-the-long-session)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
-- **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
+- **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API; a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
 
@@ -510,6 +510,38 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
+
+#### The data tools: off unless enabled
+
+`GetSqlQuery` (a freestyle ABAP SQL `SELECT`) and `GetTableContents` (the rows of a table or CDS
+view), and their compact form `HandlerGetData`, read business data through ADT's data preview.
+From 24.0.0 every binary — full, `-ro`, compact and compact `-ro`, over stdio, Streamable HTTP
+and SSE — leaves them out unless it is started with the flag, in any of its three forms (the CLI
+wins over the environment, which wins over the configuration file):
+
+- `--enable-data-tools` (or `--enable-data-tools=false`),
+- `MCP_ENABLE_DATA_TOOLS=true`,
+- `enable-data-tools: true` in the `--conf` YAML file.
+
+`false` in a higher form turns them off again. A value other than empty, null, `true` or `false`
+stops the start; an empty value or YAML null counts as not given, as for every parameter, and the
+next form decides.
+
+On Streamable HTTP and SSE it is a start parameter of the server; no request header turns it on.
+Without it the tools are not listed, and a call of one is answered that the tool is not found.
+An embedder states it too: `exposition: [..., 'data']` (`EmbeddableMcpServer`),
+`includeData: true` (`HandlerExporter`), or `DataHandlersGroup` / `CompactDataHandlersGroup`.
+
+The reason is SAP's API Policy FAQ, version 1.3 (June 2026), question 33, which SAP marks as
+informational and non-binding ([PDF](https://d.dam.sap.com/x/UL9AiqH/SAP_API_Policy_FAQ_v1.3_June.pdf)): "ADT APIs are not intended for programmatic reading of application tables or export of business data, SQL execution against SAP backend systems, business data integration or runtime orchestration, agentic AI workflows operating on business data, or substitution for business APIs."
+**Whether to enable the data tools is the customer's decision**; the server leaves them off
+until the customer makes it.
+
+Other tools can reach business data too and are served as before; reviewing them is a separate,
+later task: the debugger's variable reads and its AMDP table preview (`DebugGetVariables`,
+`AmdpDebugGetTable`, compact `HandlerDebugMaintain` `getVariables` / `getDataPreview`), memory
+snapshots, short dumps (`RuntimeGetDumpById`, `HandlerDumpView`), the gateway error log, profiler
+traces, and the runs of a class or a program (not in any `-ro` binary).
 
 **Examples:**
 ```bash

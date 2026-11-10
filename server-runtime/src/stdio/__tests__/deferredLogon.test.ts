@@ -499,7 +499,7 @@ async function serverOn(
 }> {
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   const server = new StdioServer(
-    registryOf(fullToolSet, 'stdio'),
+    registryOf(fullToolSet, 'stdio', { dataTools: false }),
     destinations,
     {
       version: '0.0.0-test',

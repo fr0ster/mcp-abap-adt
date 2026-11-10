@@ -156,14 +156,14 @@ class PinMcpServer extends BaseMcpServer {
 /** A set's stdio groups, and the groups only its Streamable HTTP binary adds. */
 function groupsOf(toolSet: ToolSet) {
   const context = noConnectionContext();
-  const stdio = toolSet.groups(context, 'stdio');
+  const stdio = toolSet.groups(context, 'stdio', { dataTools: true });
   const names = new Set(
     stdio.flatMap((group) =>
       group.getHandlers().map((entry) => entry.toolDefinition.name),
     ),
   );
   const httpOnly = toolSet
-    .groups(context, 'http')
+    .groups(context, 'http', { dataTools: true })
     .filter((group) =>
       group
         .getHandlers()

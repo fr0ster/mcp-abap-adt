@@ -16,7 +16,7 @@ import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,
 } from '../../../src/lib/toolSet';
-import { compactReadOnlyEntries } from '../group';
+import { compactDataEntries, compactReadOnlyEntries } from '../group';
 import {
   handleHandlerDeletionCheck,
   TOOL_DEFINITION,
@@ -282,13 +282,20 @@ describe('HandlerDeletionCheck is served by compact and compact-ro', () => {
       // half is what serves the check in both sets.
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: () => [],
       }),
     ],
-    ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
+    [
+      'compact-ro',
+      compactReadOnlyToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
+      }),
+    ],
   ])('%s serves it', (_kind, set) => {
-    expect(namesOf(set.groups(context, 'stdio') as never)).toContain(
-      'HandlerDeletionCheck',
-    );
+    expect(
+      namesOf(set.groups(context, 'stdio', { dataTools: false }) as never),
+    ).toContain('HandlerDeletionCheck');
   });
 });

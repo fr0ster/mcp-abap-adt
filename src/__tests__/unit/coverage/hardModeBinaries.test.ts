@@ -6,7 +6,8 @@
  * (`--system-type=onprem`, `--system-type=cloud`): the child is ready by its
  * own answer, its complete `tools/list` — every tool's name and listed
  * schema — equals the projection of `listed-schemas.json` for that binary
- * and kind, and a tool call reaches the stand carrying the destination's
+ * and kind (the data tools among them: hard mode starts every child with
+ * `--enable-data-tools`), and a tool call reaches the stand carrying the destination's
  * credential (stdio: its session file; HTTP: the request's headers). Each
  * child is stopped by `SIGTERM` and its exit awaited.
  */

@@ -99,11 +99,11 @@ Line numbers are those of this branch at its base.
   and no row of core's table names a restore or a resume (Code, `coreParameters.ts:49-345`).
   `ResumeLeftoverSession` does not exist (CHANGELOG 19.0.0, `CHANGELOG.md:584`). (Code)
 
-## 2. The flag
+## 2. The deferred-logon flag
 
 - **A new row in `CORE_ROWS`**, kind `flag`, in the section `DESTINATION AND LOGIN`:
-  - CLI `--deferred-logon`, environment `MCP_DEFERRED_LOGON`, YAML `deferred-logon`
-    (names: open point B, §8);
+  - CLI `--deferred-logon`, environment `MCP_DEFERRED_LOGON`, YAML `deferred-logon`; a
+    bare `--deferred-logon` is `true`;
   - help: "Start without contacting the SAP system: the tools are listed at once and the
     first tool call logs on. Default: off — the start logs on and exits 1 when it fails".
 - **`CoreConfig.deferredLogon: boolean`**, read in `readCoreConfig` as `--unsafe` is:
@@ -146,9 +146,11 @@ today (§1, A tool call's connection). What changes:
 - **`StdioServerOptions.deferredLogon?: boolean`** (`StdioServer.ts:32-68`), set by the
   launcher from the flag; absent is `false`.
 - **The leftover take-up moves with the birth when restoring is stated.** With the flag
-  and the restore setting (§5), the instance's first birth claims and takes up the
-  destination's one leftover session as `bornAtStart` does; without the restore setting it
-  logs on (`logOn`) and leaves leftovers alone. To do this without a second path,
+  and `restoreSession: true` (§5), the instance's first birth claims and takes up the
+  destination's one leftover session as `bornAtStart` does; with the restore flag `false`
+  or absent it logs on (`logOn`) and leaves leftovers alone. The launcher hands the choice
+  to the server as `StdioServerOptions.restoreAtFirstBirth?: boolean` (absent is `false`),
+  and `StdioServer` hands it to `BaseMcpServer` through its constructor options. To do this without a second path,
   `bornAtStart`'s choice between `resumedSession` and `logOn` (`BaseMcpServer.ts:1409-1430`)
   moves into one private method used by both `bornAtStart` and `getConnection`'s first
   build. `getConnection` uses the take-up only while the instance has never had a
@@ -201,22 +203,34 @@ today (§1, A tool call's connection). What changes:
   `ListLeftoverSessions` and `LogoffLeftoverSession` work without a connection
   (`BaseMcpServer.ts:1523-1538`) and work before the first call as after it.
 
-## 5. The restore setting
+## 5. The restore flag
 
-No restore setting exists (§1). The goal requires one before a leftover session is taken up
-with the flag; until the owner decides (open point A, §8), **nothing of this section is
-built**, and with the flag no leftover session is taken up: the first call logs on, and
-the leftovers stay for `ListLeftoverSessions` / `LogoffLeftoverSession`.
+No restore setting exists today (§1). A new one is built:
 
-The proposal, if the owner takes it:
-
-- a flag row `--restore-session` / `MCP_RESTORE_SESSION` / `restore-session`, read by the
-  same table and so with the same precedence;
-- with `--deferred-logon`: `true` makes the first birth take up the destination's one
-  leftover session (§4); `false` or absent does not;
-- without `--deferred-logon`: refused at the start in fixed words naming the form used and
-  `--deferred-logon`, exit `1` — the start takes up the leftover session on its own then, and
-  a stated `false` must not be ignored in silence.
+- **A new row in `CORE_ROWS`**, kind `flag`, beside `--deferred-logon`: CLI
+  `--restore-session`, environment `MCP_RESTORE_SESSION`, YAML `restore-session`; a bare
+  `--restore-session` is `true`. Help: "With --deferred-logon: the first tool call takes up
+  the destination's one leftover session instead of logging on. Refused without
+  --deferred-logon". The same table, so the same precedence (§2); the destination's `.env`
+  is not a source.
+- **`CoreConfig.restoreSession?: boolean`**, read as `flagValue(values.restoreSession)`
+  with no default, so `undefined` means not stated, and
+  `CoreConfig.restoreSessionSource?: string` from `parameterSource` (as
+  `connectionTypeSource`, `coreParameters.ts:494`).
+- **With `--deferred-logon`:** `true` makes the first birth take up the destination's one
+  leftover session (§4); `false` or not stated logs on and leaves the leftovers for
+  `ListLeftoverSessions` / `LogoffLeftoverSession`.
+- **Without `--deferred-logon`:** a stated restore flag, `true` or `false`, is refused in
+  `readCoreConfig` with a `ParameterRefusal` naming the form used and `--deferred-logon`:
+  `<form> needs --deferred-logon: a start without it takes up the destination's leftover
+  session on its own`. `readStartupConfig` reports it and exits `1`
+  (`src/lib/config/startup.ts:19-46`), before anything is read or sent. A stated `false` is
+  not ignored in silence.
+- **Without either flag:** the start takes up the leftover session as it does today
+  (`bornAtStart`); nothing changes.
+- **Inspection mode:** both flags accepted with no destination; nothing is connected
+  (`launcher.ts:974-982`).
+- **Help:** `MCP_RESTORE_SESSION` joins `V2_HELP_SECTIONS` beside `MCP_DEFERRED_LOGON`.
 
 ## 6. Tests
 
@@ -232,7 +246,13 @@ in the commit.
   `false`; an empty env value falls through to YAML; an invalid word is refused naming
   `MCP_DEFERRED_LOGON` (and `--deferred-logon=…`, `deferred-logon (config file)`); a
   `MCP_DEFERRED_LOGON` in the destination's `.env` is not read. The same cases for
-  `--restore-session` only if open point A is decided for it.
+  `--restore-session` / `MCP_RESTORE_SESSION` / `restore-session`, plus: not stated is
+  `undefined`, and its source names the form it came from.
+- **The restore flag without the deferred logon** (same file, and through `main` for the
+  exit): `--restore-session`, `--restore-session=false`, `MCP_RESTORE_SESSION=true` and
+  YAML `restore-session: false`, each without `--deferred-logon`, are refused naming the
+  form used and `--deferred-logon`, exit `1`, nothing read or sent; with `--deferred-logon`
+  (in any of its forms) each is accepted; neither flag starts as today.
 - **The deferred start** (beside `server-runtime/src/stdio/__tests__/startConnector.test.ts`,
   the whole launcher over an `InMemoryTransport`, the ADT stand-in
   `src/__tests__/helpers/adtStandIn.ts`):
@@ -251,11 +271,22 @@ in the commit.
   - a refused credential (`401`) is answered as today, not as `no_connection`;
   - without the flag, today's cases of `startConnector.test.ts` keep passing unchanged;
   - with the flag, a leftover session of a killed process
-    (`src/__tests__/helpers/leftoverSession.ts`) is not taken up: the first call logs on,
-    and `ListLeftoverSessions` still lists it;
-  - only after open point A: with the restore setting, the first call takes it up (the
-    stand-in sees no logon), a failed take-up gives the file back and the next call takes
-    it up; the setting without the flag is refused at start, exit `1`.
+    (`src/__tests__/helpers/leftoverSession.ts`) is not taken up, with `--restore-session`
+    absent and with `--restore-session=false`: the start claims nothing, the first call
+    logs on, and `ListLeftoverSessions` still lists it;
+  - with both flags: the start claims nothing (the runtime file is still unclaimed when the
+    transport opens); the first call takes the session up — the stand-in sees the session's
+    cookies and no logon, and the file is this process's under the same handle; a second
+    call sends no logon either;
+  - with both flags and the system unreachable: the first call answers `no_connection` and
+    the file is given back (listed again); the stand-in then listens, and the next call
+    takes the session up;
+  - with both flags and SAP answering that the old session has ended: the first call logs
+    on fresh and adopts the file under the same handle (`new`), as the start does today;
+  - with both flags and several leftover sessions: none is taken up, the first call logs on,
+    and all stay listed;
+  - after a successful take-up, a session SAP lost is replaced by a logon, not by another
+    take-up.
 - **The cause list** (`src/__tests__/unit/…/connectionCause.test.ts`): the moved reader keeps
   part 1's cases (`startConnector.test.ts`, "the start line names the network cause"):
   each listed code, an unlisted one, a throwing getter.
@@ -281,16 +312,25 @@ in the commit.
   on it to the system's address, and the next call answers from the system; the shutdown
   logs off. HTTP only (a forwarder over TLS would break the host name check). It is run on
   E19 only on the owner's go; this task does not run it.
+- **The first call takes up a leftover session (E19).** In the same suite, under the same
+  variable, skipped with its reason elsewhere. A first server process, started with
+  `--deferred-logon`, makes one call that logs on and takes a lock on a test object, and is
+  killed (`SIGKILL`), leaving its runtime file. A second process, started with
+  `--deferred-logon --restore-session`, lists the tools before any request, then its first
+  call takes the session up and unlocks with the lock handle the first process took; its
+  shutdown logs off. The case's own cleanup logs off the leftover session if the second
+  process did not take it up. Run on E19 only on the owner's go; this task does not run it.
 
 ## 7. Documentation
 
 - `CHANGELOG.md`: a new minor entry (after 24.0.0): the flag, its three forms and
-  precedence, `no_connection`, the leftover rule; and the restore setting if built.
-- `docs/user-guide/CLI_OPTIONS.md`, "Destination and login" table (`:89-111`): the row (and
-  the restore row if built), and a short section on the deferred logon.
-- `docs/configuration/YAML_CONFIG.md`: the YAML key.
-- `docs/user-guide/README.md:130-150` ("Leftover SAP sessions of a killed process"): with the
-  flag, a leftover is not taken up unless restoring is stated.
+  precedence, `no_connection`, the restore flag and its refusal without the deferred logon.
+- `docs/user-guide/CLI_OPTIONS.md`, "Destination and login" table (`:89-111`): both rows,
+  the refusal in "What `mcp-abap-adt` refuses", and a short section on the deferred logon.
+- `docs/configuration/YAML_CONFIG.md`: both YAML keys.
+- `docs/user-guide/README.md:130-150` ("Leftover SAP sessions of a killed process"): with
+  the deferred logon, a leftover is taken up by the first call only with
+  `--restore-session`.
 - `docs/user-guide/HANDLERS_MANAGEMENT.md:16-17`, `:148-155`: "takes up … at its start"
   qualified by the flag.
 - `docs/architecture/CONNECTION_ISOLATION.md:21`, `:75` and
@@ -304,27 +344,9 @@ in the commit.
   true by default; one clause that the smoke check runs without the flag.
 - `docs/user-guide/CLIENT_CONFIGURATION.md`: an example for two systems that are never up
   at once (the issue's case).
-- The `--help` text (`launcher.ts:111-228`): `MCP_DEFERRED_LOGON` (and the restore variable
-  if built).
+- The `--help` text (`launcher.ts:111-228`): `MCP_DEFERRED_LOGON` and
+  `MCP_RESTORE_SESSION`.
 - The CHANGELOG entries since 19.0.0 that describe the start logon stay as they are
   (`CHANGELOG.md:578`, `:584`, `:594`, `:660`, and 24.0.0's `:145`): history is not
   rewritten.
 - No migration note: the default does not change. This is a minor release.
-
-## 8. Open points for the owner
-
-- **A. The restore setting.** None exists. Options:
-  1. a flag `--restore-session` / `MCP_RESTORE_SESSION` / `restore-session` as in §5: with
-     the deferred flag it makes the first call take up the one leftover session; without
-     the deferred flag it is refused at start;
-  2. the same flag, also read without the deferred flag, so `false` stops today's take-up
-     at the start (default `true` without the deferred flag, `false` with it);
-  3. no setting: with the deferred flag a leftover is never taken up; the list and logoff
-     tools handle it.
-
-  Recommendation: 1. It is the smallest change that states restoring explicitly, keeps
-  today's default untouched, and refuses a statement that would otherwise be ignored.
-- **B. The names.** `--deferred-logon` / `MCP_DEFERRED_LOGON` / `deferred-logon`; or the
-  issue's `--connect-at-start=false` (a flag whose default is `true`, so the opt-in is a
-  `false`). Recommendation: `--deferred-logon`: an opt-in reads as on when present, and a
-  bare flag turns it on.

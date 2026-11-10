@@ -12,7 +12,8 @@ later in the client's session is used without a reconnect by hand
 
 ## Invariants
 
-- **Opt-in, explicit.** One flag turns the deferred logon on. Without it, the start is what
+- **Opt-in, explicit.** One flag, `--deferred-logon` / `MCP_DEFERRED_LOGON` /
+  `deferred-logon`, turns the deferred logon on; a bare `--deferred-logon` is on. Without it, the start is what
   it has been since 19.0.0: the logon at the start, before the MCP transport opens, and
   exit `1` when it fails.
 - **Three forms, one precedence.** The flag is a CLI parameter, an environment variable
@@ -34,16 +35,21 @@ later in the client's session is used without a reconnect by hand
   sequential tool calls. The deferred logon is the same birth the start makes today, moved
   to the first call; it is not a second connection path.
 - **A leftover session is taken up only on an explicit statement.** With the flag, the
-  destination's leftover session is not taken up on its own. It is taken up only when the
-  owner's explicit restore setting says so. Leftover sessions not taken up stay for the
-  list and the logoff tools.
+  destination's leftover session is not taken up on its own. It is taken up, by the first
+  tool call, only when the restore flag says so: `--restore-session` /
+  `MCP_RESTORE_SESSION` / `restore-session`, with the same precedence. The restore flag
+  stated without the deferred logon is refused at the start, exit `1`; a start without
+  either flag takes up the leftover session as it does today. Leftover sessions not taken
+  up stay for the list and the logoff tools.
 - **Static first.** No cast, no `any`, no `@ts-ignore`, no regular expression in
   production code. A runtime check stays only where the value comes from outside the type
   system: the parameters, the thrown value of a failed connect.
-- **Proved, not assumed.** Unit tests pin the precedence and the deferred path, each shown
-  load-bearing by a mutation. A live case against an unreachable system (a closed local
-  port) needs no SAP system; a live case where the system becomes reachable mid-session
-  runs against a real system on the owner's go.
+- **Proved, not assumed.** Unit tests pin the precedence of both flags, the refusal of the
+  restore flag without the deferred logon, the deferred path and the take-up at the first
+  call, each shown load-bearing by a mutation. A live case against an unreachable system (a
+  closed local port) needs no SAP system; the live cases where the system becomes
+  reachable mid-session and where the first call takes up a leftover session run against a
+  real system on the owner's go.
 
 ## Out of scope
 

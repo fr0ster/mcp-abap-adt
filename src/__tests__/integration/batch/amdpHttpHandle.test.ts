@@ -341,22 +341,29 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
       handle = payloadOf(started)?.state_handle;
       assert.ok(isUpperHex(handle, 32));
       held = await clientWith({ 'x-mcp-state-handle': handle as string });
-      const eventOf = async (kinds: string[], rounds: number) => {
-        for (let i = 0; i < rounds; i++) {
-          const waited = payloadOf(
-            await call(held as HardModeClient, 'AmdpDebugWait', {
-              state_handle: handle,
-              hold_seconds: 30,
-            }),
-          );
+      // AmdpDebugWait until an event of `kinds`, with no count; an error,
+      // the end or `idle` (answered at once each time) means none comes.
+      const eventOf = async (kinds: string[]) => {
+        for (;;) {
+          const answer = await call(held as HardModeClient, 'AmdpDebugWait', {
+            state_handle: handle,
+            hold_seconds: 30,
+          });
+          const waited = payloadOf(answer);
+          if (
+            answer.isError === true ||
+            waited?.state === 'ended' ||
+            waited?.state === 'idle'
+          ) {
+            return undefined;
+          }
           const hit = (waited?.events ?? []).find((e: any) =>
             kinds.includes(e?.kind),
           );
           if (hit) return hit;
         }
-        return undefined;
       };
-      const onBreak = await eventOf(['ON_BREAK'], 8);
+      const onBreak = await eventOf(['ON_BREAK']);
       assert.equal(onBreak?.line, verdict.breakpointLine);
 
       const begun = await call(held, 'DebugBatchBegin', {});
@@ -393,7 +400,7 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
       );
       assert.equal(Array.isArray(payloadOf(entries[0])), true);
       assert.equal(payloadOf(entries[1])?.state, 'moving');
-      const next = await eventOf(['ON_BREAK', 'ON_EXECUTION_END'], 4);
+      const next = await eventOf(['ON_BREAK', 'ON_EXECUTION_END']);
       assert.ok(['ON_BREAK', 'ON_EXECUTION_END'].includes(next?.kind));
 
       const stopped = await call(held, 'AmdpDebugStop', {

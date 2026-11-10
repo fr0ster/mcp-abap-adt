@@ -359,13 +359,19 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
     assert.ok(isUpperHex(handle, 32));
 
     let stopped: any;
-    for (let round = 0; round < 4 && stopped === undefined; round++) {
+    // Until the debuggee is stopped, with no count; an error, the end or
+    // `idle` (answered at once each time) is no stop.
+    while (stopped === undefined) {
       const waited = await served.call('DebugWait', {
         state_handle: handle,
         hold_seconds: 30,
       });
       const state = payloadOf(waited);
-      if (waited.isError === true || state?.state === 'ended') {
+      if (
+        waited.isError === true ||
+        state?.state === 'ended' ||
+        state?.state === 'idle'
+      ) {
         throw new Error(
           `the debuggee was not stopped: ${withoutHandles(textOf(waited)).slice(0, 600)}`,
         );
@@ -601,15 +607,19 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
   let handle: string | undefined;
   let batchOpen = false;
   let failure: unknown;
-  /** AmdpDebugWait until an event of `kinds`; the event, or why there is none. */
-  const eventOf = async (kinds: string[], rounds: number): Promise<any> => {
-    for (let round = 0; round < rounds; round++) {
+  /** AmdpDebugWait until an event of `kinds`, with no count; an error, the end or `idle` is why there is none. */
+  const eventOf = async (kinds: string[]): Promise<any> => {
+    for (;;) {
       const waited = await served.call('AmdpDebugWait', {
         state_handle: handle,
         hold_seconds: 30,
       });
       const state = payloadOf(waited);
-      if (waited.isError === true || state?.state === 'ended') {
+      if (
+        waited.isError === true ||
+        state?.state === 'ended' ||
+        state?.state === 'idle'
+      ) {
         throw new Error(
           `no AMDP event of ${kinds.join(', ')}: ${withoutHandles(textOf(waited)).slice(0, 600)}`,
         );
@@ -619,7 +629,6 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       );
       if (hit !== undefined) return hit;
     }
-    return undefined;
   };
   try {
     const started = await served.call('AmdpDebugStart', {
@@ -639,7 +648,7 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
     assert.notEqual(started.isError, true);
     assert.ok(isUpperHex(handle, 32));
 
-    const onBreak = await eventOf(['ON_BREAK'], 8);
+    const onBreak = await eventOf(['ON_BREAK']);
     say(kind, 'amdp break', { line: onBreak?.line });
     assert.equal(onBreak?.line, tfLine);
 
@@ -709,7 +718,7 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
     assert.equal(payloadOf(entries[1])?.state, 'moving');
 
     // The step took effect: the debuggee moved on to its next event.
-    const next = await eventOf(['ON_BREAK', 'ON_EXECUTION_END'], 4);
+    const next = await eventOf(['ON_BREAK', 'ON_EXECUTION_END']);
     say(kind, 'amdp after the envelope', {
       kind: next?.kind,
       line: next?.line,

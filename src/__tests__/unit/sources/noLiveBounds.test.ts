@@ -170,6 +170,86 @@ function siteOf(node: ts.Node): string {
   return '';
 }
 
+/**
+ * Counted repetitions that are no poll, each by its site and its loop's
+ * condition: the AMDP chain steps over `repeats` times — a count of steps
+ * it measures — and leaves early when the run leaves its breaks.
+ */
+const REPETITIONS = new Set([
+  'src/__tests__/integration/debugger/DebuggerHandlers.test.ts#AMDP chain: start, break, table, steps, continue to the end; then a stop, and the event read open at it ends (waited for)#i < repeats',
+]);
+
+/** The comparisons a counted loop's condition bounds its counter with. */
+const COUNT_COMPARISONS = [
+  ts.SyntaxKind.LessThanToken,
+  ts.SyntaxKind.LessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanToken,
+  ts.SyntaxKind.GreaterThanEqualsToken,
+];
+
+/** Whether `node` holds a counter comparison (`i < rounds`), through `&&`. */
+function comparesCount(node: ts.Expression): boolean {
+  if (!ts.isBinaryExpression(node)) return false;
+  if (node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    return comparesCount(node.left) || comparesCount(node.right);
+  }
+  return COUNT_COMPARISONS.includes(node.operatorToken.kind);
+}
+
+/** Whether the loop's body leaves it early: a `break` or `return` of its own (not a nested function's or loop's). */
+function leavesEarly(body: ts.Node): boolean {
+  let leaves = false;
+  const visit = (node: ts.Node): void => {
+    if (leaves || ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node)) leaves = true;
+    if (ts.isBreakStatement(node) && node.label === undefined) {
+      leaves = !isInnerLoopOrSwitch(node, body);
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
+  return leaves;
+}
+
+/** Whether the loop's body awaits (not inside a nested function): a poll waits. */
+function awaits(body: ts.Node): boolean {
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found || ts.isFunctionLike(node)) return;
+    if (ts.isAwaitExpression(node)) found = true;
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
+  return found;
+}
+
+/** Whether `node` sits in a loop or `switch` nested inside `body`. */
+function isInnerLoopOrSwitch(node: ts.Node, body: ts.Node): boolean {
+  for (let at = node.parent; at !== undefined && at !== body; at = at.parent) {
+    if (ts.isIterationStatement(at, false) || ts.isSwitchStatement(at)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * A polling loop with a counted cap: a `for` whose condition bounds a
+ * counter (`i < rounds`), whose body awaits, and which ends early on what
+ * it waits for — a second condition beside the count (`&& !caught`), or a
+ * `break` or `return` of its own. A loop that repeats a step a fixed number
+ * of times, leaving only at its count, is no poll; nor is a search that
+ * awaits nothing.
+ */
+function isCappedPoll(node: ts.Node): boolean {
+  if (!ts.isForStatement(node) || node.condition === undefined) return false;
+  if (!comparesCount(node.condition) || !awaits(node.statement)) return false;
+  const secondCondition =
+    ts.isBinaryExpression(node.condition) &&
+    node.condition.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken;
+  return secondCondition || leavesEarly(node.statement);
+}
+
 /** What a live source reads or calls that this scan refuses, by site. */
 function liveSourceFindings(file: string, text: string): string[] {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
@@ -204,6 +284,15 @@ function liveSourceFindings(file: string, text: string): string[] {
       PAUSES.includes(node.expression.text)
     ) {
       report(node, `calls ${node.expression.text}`, true);
+    }
+    if (
+      isCappedPoll(node) &&
+      ts.isForStatement(node) &&
+      !REPETITIONS.has(
+        `${file}#${siteOf(node)}#${node.condition?.getText(source) ?? ''}`,
+      )
+    ) {
+      report(node, 'a poll with a counted cap', true);
     }
     ts.forEachChild(node, visit);
   };
@@ -277,6 +366,34 @@ describe('no bound, delay or poll limit in a live test', () => {
         ].join('\n'),
       ).length,
       5,
+    );
+  });
+
+  it('refuses a poll with a counted cap, not a counted repetition or a search', () => {
+    const file = 'src/__tests__/integration/x.test.ts';
+    const findings = (body: string) =>
+      liveSourceFindings(file, `it('a', async () => {\n${body}\n});`);
+    // Capped polls: a second condition beside the count, or an early return.
+    assert.equal(
+      findings('for (let i = 0; i < 4 && !done; i++) { done = await poll(); }')
+        .length,
+      1,
+    );
+    assert.equal(
+      findings('for (let i = 0; i < 4; i++) { if (await poll()) return; }')
+        .length,
+      1,
+    );
+    // A repetition leaves only at its count; a search awaits nothing.
+    assert.deepEqual(
+      findings('for (let i = 0; i < 3; i++) { await step(); }'),
+      [],
+    );
+    assert.deepEqual(
+      findings(
+        'for (let i = 0; i < xs.length; i++) { if (xs[i] === 1) return i; }',
+      ),
+      [],
     );
   });
 });

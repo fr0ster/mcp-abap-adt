@@ -499,25 +499,35 @@ describe('Debugger handlers (integration)', () => {
     ...extra,
   });
 
-  /** DebugWait until the state matches; every answer on the way is returned. */
+  /**
+   * DebugWait until the state matches; every answer on the way is returned.
+   * No count: it goes on while the session listens (each wait SAP's long
+   * poll, `hold_seconds`) or reports a one-time notice not asked for, and
+   * ends on the state asked for, an error, or a state DebugWait answers at
+   * once each time (`stopped`, `idle`) — waiting again cannot change it.
+   */
   const waitFor = async (
     inst: Instance,
     handle: string,
     states: string[],
-    rounds = 4,
   ): Promise<{ last: Answer; ms: number; seen: Answer[] }> => {
     const t0 = now();
     const seen: Answer[] = [];
-    for (let i = 0; i < rounds; i++) {
+    for (;;) {
       const a = await call(inst, 'DebugWait', {
         state_handle: handle,
         hold_seconds: 30,
       });
       seen.push(a);
-      if (a.isError || states.includes(a.json?.state))
+      const state = a.json?.state;
+      if (
+        a.isError ||
+        states.includes(state) ||
+        state === 'stopped' ||
+        state === 'idle'
+      )
         return { last: a, ms: now() - t0, seen };
     }
-    return { last: seen[seen.length - 1], ms: now() - t0, seen };
   };
 
   /** Runs the probe on a connection of its own, with no debugger of ours. */
@@ -587,7 +597,7 @@ describe('Debugger handlers (integration)', () => {
   /** DebugWait until the background run reports its end; an error answer is no end. */
   const untilRunFinished = async (inst: Instance, handle: string) => {
     const seen: unknown[] = [];
-    for (let i = 0; i < 8; i++) {
+    for (;;) {
       const a = await call(inst, 'DebugWait', {
         state_handle: handle,
         hold_seconds: 30,
@@ -598,10 +608,13 @@ describe('Debugger handlers (integration)', () => {
         );
       seen.push(a.json);
       if (a.json?.reason === 'run_finished') return a;
+      // Answered at once each time: waiting again cannot bring the end.
+      if (a.json?.state === 'stopped' || a.json?.state === 'idle') {
+        throw new Error(
+          `the run did not report its end: ${withoutHandles(JSON.stringify(seen))}`,
+        );
+      }
     }
-    throw new Error(
-      `the run did not report its end: ${withoutHandles(JSON.stringify(seen))}`,
-    );
   };
 
   /** A connection as the user a session .env names (basic authentication). */
@@ -1097,7 +1110,7 @@ describe('Debugger handlers (integration)', () => {
         answer: taken.json ?? taken.text.slice(0, 600),
       });
       assert.equal(taken.isError, false);
-      const displaced = await waitFor(a, handleA, ['idle', 'ended'], 3);
+      const displaced = await waitFor(a, handleA, ['idle', 'ended']);
       measure('2-takeover', 'the first instance after the take-over', {
         isError: displaced.last.isError,
         text: displaced.last.text.slice(0, 600),
@@ -1225,8 +1238,9 @@ describe('Debugger handlers (integration)', () => {
         });
         let caught = false;
         let lastWait: Answer | undefined;
-        // Short waits, so the run's own end is seen as soon as it comes.
-        for (let i = 0; i < 12 && !settled && !caught; i++) {
+        // Short waits, so the run's own end is seen as soon as it comes:
+        // until the run is caught or ends, with no count.
+        while (!settled && !caught) {
           lastWait = await call(inst, 'DebugWait', {
             state_handle: handle,
             hold_seconds: 5,
@@ -1869,9 +1883,11 @@ describe('Debugger handlers (integration)', () => {
       let handle: string | undefined;
       let failure: unknown;
       const problems: string[] = [];
-      const until = async (kinds: string[], rounds = 8) => {
+      // AmdpDebugWait until an event of `kinds`, the end, an error, or
+      // `idle` (answered at once each time); no count.
+      const until = async (kinds: string[]) => {
         const t0 = now();
-        for (let i = 0; i < rounds; i++) {
+        for (;;) {
           const a = await call(inst, 'AmdpDebugWait', {
             state_handle: handle,
             hold_seconds: 30,
@@ -1879,12 +1895,12 @@ describe('Debugger handlers (integration)', () => {
           if (a.isError) return { error: a.text, ms: now() - t0 };
           if (a.json?.state === 'ended')
             return { ended: a.json, ms: now() - t0 };
+          if (a.json?.state === 'idle') return { idle: a.json, ms: now() - t0 };
           const batch: any[] = a.json?.events ?? [];
           events.push(...batch);
           const hit = batch.find((e) => kinds.includes(e.kind));
           if (hit) return { hit, ms: now() - t0 };
         }
-        return { ms: now() - t0 };
       };
 
       try {
@@ -1945,7 +1961,7 @@ describe('Debugger handlers (integration)', () => {
         // Continue from break to break until the run reports its end.
         let finished: any;
         let executionEnds = 0;
-        for (let i = 0; i < 24 && !finished; i++) {
+        while (finished === undefined) {
           let goMs = 0;
           if (atBreak) {
             const go = await call(inst, 'AmdpDebugStep', {
@@ -1971,6 +1987,10 @@ describe('Debugger handlers (integration)', () => {
           if (a.json?.state === 'ended') {
             finished = a.json;
             timing('soft amdp.wait(run_finished)', goMs + now() - t0);
+            break;
+          }
+          if (a.json?.state === 'idle') {
+            measure('7', 'the session went idle', a.json);
             break;
           }
           const batch: any[] = a.json?.events ?? [];

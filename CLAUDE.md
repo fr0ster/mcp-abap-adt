@@ -61,6 +61,8 @@ available_in: ['onprem', 'legacy'] as const,  // not available on cloud
 
 Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available everywhere. Test-level `available_in` is controlled separately in `test-config.yaml.template`.
 
+**Data tools (24.0.0).** `GetSqlQuery`, `GetTableContents` and compact `HandlerGetData` are served only with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, YAML `enable-data-tools`; off by default, SAP API Policy FAQ v1.3 Q33; the customer decides). They live in `DataHandlersGroup` / `compactDataEntries` / `CompactDataHandlersGroup`, added by a set's `groups(context, transport, { dataTools })`; a new tool that reads business data goes there.
+
 ### Cloud vs On-Prem
 
 - Programs on ABAP Cloud: read, source, versions, check and the unit run are served (SAP programs; `ADT_TYPES_CLOUD`); create, update, delete, activate, lock and validate are on premise only

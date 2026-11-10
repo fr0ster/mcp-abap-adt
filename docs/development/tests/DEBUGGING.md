@@ -12,7 +12,7 @@ Enables detailed logging in test files. Shows:
 
 **Usage:**
 ```bash
-DEBUG_TESTS=true npm test -- integration/domain
+DEBUG_TESTS=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 ```
 
 **Example output:**
@@ -44,7 +44,7 @@ Enables detailed logging in handler functions. Shows:
 
 **Usage:**
 ```bash
-DEBUG_HANDLERS=true npm test -- integration/domain
+DEBUG_HANDLERS=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 ```
 
 **Example output:**
@@ -72,7 +72,7 @@ Enables logging from `@mcp-abap-adt/connection` library. Shows:
 
 **Usage:**
 ```bash
-DEBUG_CONNECTORS=true npm test -- integration/domain
+DEBUG_CONNECTORS=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 ```
 
 ### DEBUG_CONNECTION_MANAGER=true
@@ -85,7 +85,7 @@ Enables logging for connection manager (`getManagedConnection`). Shows:
 
 **Usage:**
 ```bash
-DEBUG_CONNECTION_MANAGER=true npm test -- integration/domain
+DEBUG_CONNECTION_MANAGER=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 ```
 
 **Example output:**
@@ -117,20 +117,20 @@ DEBUG_CONNECTION_MANAGER=true npm test -- integration/domain
 Enable all debug flags for maximum visibility:
 
 ```bash
-DEBUG_TESTS=true DEBUG_HANDLERS=true DEBUG_ADT_LIBS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm test -- integration/domain
+DEBUG_TESTS=true DEBUG_HANDLERS=true DEBUG_ADT_LIBS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 ```
 
 **Common combinations:**
 
 ```bash
 # Connection-level debugging (HTTP, sessions, connection management)
-DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm test -- integration/domain
+DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 
 # Test execution debugging
-DEBUG_TESTS=true DEBUG_HANDLERS=true npm test -- integration/domain
+DEBUG_TESTS=true DEBUG_HANDLERS=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 
 # Full visibility (everything)
-DEBUG_TESTS=true DEBUG_HANDLERS=true DEBUG_ADT_LIBS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm test -- integration/domain
+DEBUG_TESTS=true DEBUG_HANDLERS=true DEBUG_ADT_LIBS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
 ```
 
 ## Lock, update, unlock: what carries the lock
@@ -177,7 +177,7 @@ the session between the calls.
 
 1. **Enable debug flags:**
    ```bash
-   DEBUG_TESTS=true DEBUG_HANDLERS=true npm test -- integration/domain
+   DEBUG_TESTS=true DEBUG_HANDLERS=true npm run test:integration -- src/__tests__/integration/high/domain/DomainHighHandlers.test.ts
    ```
 
 2. **Check Lock operation:** verify `lock_handle` is returned.

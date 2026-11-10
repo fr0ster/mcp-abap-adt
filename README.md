@@ -538,8 +538,13 @@ See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete
 
 ### Testing
 ```bash
-npm test
+npm test                  # the unit run: Jest, then node:test — no SAP system, no outside service
+npm run test:install      # packs and installs the release (the npm registry): the install suites
+npm run test:retrieval    # vector tool retrieval through a local Ollama
+npm run test:integration  # the live suites, against the system tests/test-config.yaml names
 ```
+
+How each run selects, skips and is interrupted: [the testing guide](docs/development/tests/TESTING_GUIDE.md) and [the integration tests' README](src/__tests__/integration/README.md).
 
 #### Test logging switches
 - `TEST_LOG_LEVEL=error|warn|info|debug` — controls test logger verbosity (DEBUG_TESTS/DEBUG_ADT_TESTS/DEBUG_CONNECTORS force `debug`).

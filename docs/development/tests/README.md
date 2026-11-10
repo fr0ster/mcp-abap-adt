@@ -62,7 +62,7 @@ Template for test configuration:
    ```bash
    npm run build
    npm run test:integration              # All tests
-   npm test -- --testPathPatterns=class   # Specific object
+   npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts   # One file
    ```
 
 ## 📁 Related Files

@@ -843,3 +843,24 @@ A test helper of your own that called `getTimeout` or `getOperationDelay`
 (`src/__tests__/integration/helpers/configHelpers.ts`) goes on the answer it waits for instead. A
 live run that waits for ever is ended with Ctrl-C: once lets the running case and its cleanup
 finish, twice stops the run (`src/__tests__/integration/README.md`, "Interrupting a run").
+
+## Contributors: the test scripts
+
+The tests are moving from Jest to `node:test` (a first wave in 24.0.0; the rest stay on Jest
+for now). What a contributor on 23.x runs differently:
+
+- `npm test` runs both runners, Jest then `node:test`, and reaches no SAP system and no outside
+  service. It passes the runner's concurrency itself (`2`); another value is
+  `npm test -- --concurrency <N>`.
+- A live suite runs only under a live script, one file at a time, a file named by its source
+  path: `npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts`
+  instead of `npm test -- --testPathPatterns=integration/high/class`. `test:high`,
+  `test:coverage-family`, `test:live-connection` and `shared:setup` / `shared:teardown` /
+  `shared:check` keep their names; their Jest flags (`--runInBand`, `--forceExit`,
+  `--testPathPatterns`, the coverage reporter) are gone.
+- The install suites (`installMatrix`, `binSmoke`) run with `npm run test:install`, the vector
+  retrieval suite with `npm run test:retrieval`; `SKIP_INSTALL_MATRIX` belongs to the former.
+- `build:test-reporter` and `check:test-reporter` are removed: the coverage ledger reads
+  `node:test`'s outcomes through its own reporter.
+- A variable for a run, on every platform: `npm run <script> -- --env NAME=VALUE <file>`.
+

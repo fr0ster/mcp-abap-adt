@@ -1,6 +1,6 @@
 # Integration Testing Guide
 
-Integration tests run against a real SAP system using Jest. All test parameters are configured via `tests/test-config.yaml`.
+Integration tests run against a real SAP system on `node:test`, through the repository's runner (`tools/run-tests.mjs`), under the live npm scripts. All test parameters are configured via `tests/test-config.yaml`.
 
 ## Quick Start
 
@@ -45,7 +45,7 @@ Optional (cloud/BTP, JWT token refresh):
 |---|---|
 | `auth_broker.abap.destination` | Auth broker destination (`TRIAL`, `mcp`) |
 
-All other values (object names, timeouts, CDS sources, unit test code) have working defaults.
+All other values (object names, CDS sources, unit test code) have working defaults. The configuration holds no time key: a live test has no bound, delay or poll limit.
 
 ### 3. Create shared objects (first run only)
 
@@ -66,12 +66,17 @@ npm run build
 # Run all integration tests (soft mode)
 npm run test:integration
 
-# Run specific object type
-npm test -- --testPathPatterns=class
+# Run one file, by its source path
+npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts
 
-# Run selective tests (e.g. class + unit test + CDS)
-npm test -- --testPathPatterns="class|unitTest|cds"
+# Run several files (e.g. class + unit test + CDS)
+npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts \
+  src/__tests__/integration/high/unitTest/ClassUnitTestHighHandlers.test.ts \
+  src/__tests__/integration/high/unitTest/CdsUnitTestHighHandlers.test.ts
 ```
+
+The live scripts run one file at a time; `npm test` never runs a live suite. How a run is
+interrupted, and what the live scripts check: `src/__tests__/integration/README.md`.
 
 ### One Jest configuration for every package
 

@@ -181,14 +181,19 @@ Goal: `2026-11-10-data-tools-opt-in-goal.md`. This spec says what is built and w
     `index.ts:14` beside `compactReadOnlyEntries`) builds `HandlerGetData`, which leaves
     `group.ts:108`. It stays in the read-only half's package, so the compact module-graph
     split is unchanged (Inference; `compactCapabilitySplit.test.ts` checks it).
+  - `CompactReadOnlyHandlersGroup` (`compact-readonly-entries/src/group.ts:131-137`) serves
+    `compactReadOnlyEntries()` and so loses `HandlerGetData` with it. A new exported class
+    `CompactDataHandlersGroup`, beside it and exported from the same `index.ts`, serves
+    `compactDataEntries()`.
   - The definitions and handlers stay where they are. `READ_DEFINITIONS` and the exports of
     `@mcp-abap-adt/lib/handlers/read` keep both (Code, `src/lib/handlers/readDefinitions.ts:77-78`;
     `read.ts:69, 80`).
 - **The choice is a typed input of the set.** `ToolSet.groups(context, transport, served)`
   and `registryOf(toolSet, transport, served)` take a required `served:
   ServedTools`, defined in `toolSet.ts` as `{ readonly dataTools: boolean }`.
-  - Required, so the compiler finds every caller: the three launchers, the docs
-    generator, `scripts/list-tools.ts` and the tests.
+  - Required, so the compiler finds every caller: the three launchers, both docs
+    generators (`tools/generate-tools-docs.js` and `compact/tools/generate-docs.js`),
+    `scripts/list-tools.ts` and the tests.
   - Each set adds its data group only when `served.dataTools` is `true`, in the
     `servesLeftoverSessions` form:
     - `fullToolSet` and `fullReadOnlyToolSet` place `DataHandlersGroup` right after
@@ -232,8 +237,9 @@ The data tools are off for embedders too: an embedder serves them only by statin
   `includeData?: boolean`, read as `=== true` (off unless stated). This differs from its
   `include…` siblings, which are read as `!== false` (Code, `:220, 230`), and the doc
   comment says why.
-- An embedder that constructs `ReadOnlyHandlersGroup` or `SystemHandlersGroup` directly
-  loses the tool its group carried and adds `DataHandlersGroup`. This is breaking for
+- An embedder that constructs `ReadOnlyHandlersGroup`, `SystemHandlersGroup` or
+  `CompactReadOnlyHandlersGroup` directly loses the tool its group carried and adds
+  `DataHandlersGroup` or `CompactDataHandlersGroup`. This is breaking for
   embedders, and the MIGRATION note tells them what to state: `exposition: [..., 'data']`,
   `includeData: true`, or `DataHandlersGroup` / `compactDataEntries` with the new
   `groups` / `registryOf` argument.
@@ -265,7 +271,15 @@ The data tools are off for embedders too: an embedder serves them only by statin
 - **Tool pages.** `tools/generate-tools-docs.js` builds `AVAILABLE_TOOLS*.md` from the
   built sets (`:300-305, 479-483`). It builds them with `{ dataTools: true }` and marks the
   three tools "opt-in: `--enable-data-tools`". Pages that silently lose them would hide the
-  flag (Inference).
+  flag (Inference). The compact page's generator, `compact/tools/generate-docs.js:259-306`,
+  does the same for `HandlerGetData`: it reads `compactDataEntries` beside the read-only
+  half, builds its surfaces with `{ dataTools: true }`, and marks the tool opt-in.
+- **The example and the embedder docs.**
+  - `src/lib/handlers/examples/usage-example.ts:29-125` adds `DataHandlersGroup`, with a
+    comment that the data tools are opt-in and why.
+  - `src/embeddable/docs/ARCHITECTURE.md:323, 667-670` and `src/lib/handlers/README.md:17-114`
+    describe the new `groups` / `registryOf` argument, `DataHandlersGroup`,
+    `CompactDataHandlersGroup` and `compactDataEntries`.
 - **Registry manifests.** The twelve `server*.json` files list environment variables (Code,
   `server.json:20-52`; `server-http.json:62-68`). Each gains `MCP_ENABLE_DATA_TOOLS`. Whether
   a manifest must list every variable is not checked here (Inference).
@@ -275,8 +289,9 @@ The data tools are off for embedders too: an embedder serves them only by statin
     decision.
   - "Changed — breaking for an embedder of the handler groups". It covers `ToolSet.groups`
     and `registryOf`, `ServedTools`, `DataHandlersGroup`, `compactDataEntries`, the
-    `CompactHalves.data` and `compactReadOnlyToolSetOf` signature, `exposition: 'data'` and
-    `includeData`.
+    `CompactHalves.data` and `compactReadOnlyToolSetOf` signature, `exposition: 'data'`,
+    `includeData`, and `CompactReadOnlyHandlersGroup` without `HandlerGetData` beside the
+    new `CompactDataHandlersGroup`.
 - **MIGRATION.** `docs/MIGRATION-24.0.md` is the 24.0.0 note and is not released (Measured:
   no `v24*` tag; the CHANGELOG dates `[24.0.0]` 2026-11-10). It gains a section "Callers of
   `GetSqlQuery`, `GetTableContents` and `HandlerGetData`: off unless enabled". The section
@@ -284,8 +299,9 @@ The data tools are off for embedders too: an embedder serves them only by statin
   - start every binary that must serve them with the flag in any of its three forms;
   - on HTTP and SSE it is a start parameter of the server, not a header;
   - a client of a server started without it gets "Tool … not found";
-  - embedders: `exposition: [..., 'data']`, `includeData: true`, or `DataHandlersGroup`
-    and the new `groups`/`registryOf` argument;
+  - embedders: `exposition: [..., 'data']`, `includeData: true`, or `DataHandlersGroup` /
+    `CompactDataHandlersGroup` / `compactDataEntries` and the new `groups`/`registryOf`
+    argument; `CompactReadOnlyHandlersGroup` no longer serves `HandlerGetData`;
   - FAQ Q33 and the customer's decision.
 
   No released MIGRATION file is touched.
@@ -321,6 +337,13 @@ Each is Code (grep at `d5a29d08`) unless marked.
   - `unit/backgroundRuns/longReads.test.ts`, `unit/pins/backgroundRuns.pins.test.ts`;
   - `helpers/batchEntryCases.ts:200-201, 416-417` (Inference: through the served entries;
     to be confirmed when the code is written).
+- **Every other caller** of `groups`, `registryOf`, `streamableHttpSurface`, the compact
+  set builders, or the read-only, system and compact read-only groups, as the plan's
+  appendix A lists them (about 45 test files and helpers):
+  - a caller that reaches a data tool passes `{ dataTools: true }` or adds the data group;
+    every other caller passes `{ dataTools: false }`;
+  - each whole-list comparison among them is re-checked as either unchanged, or the on list
+    minus exactly the three names.
 - **Through the handler directly**, unaffected:
   - `unit/readonlySingleCall.test.ts:58-60, 150-151, 314-330`;
   - `unit/sqlPreview.test.ts`;

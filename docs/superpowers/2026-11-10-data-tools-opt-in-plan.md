@@ -141,7 +141,9 @@ before the merge.
    - **Compact:**
      - a new `compactDataEntries` in `compact-readonly-entries/src/group.ts` builds
        `HandlerGetData`, exported from that package's `index.ts`;
-     - the entry leaves `compactReadOnlyEntries`.
+     - the entry leaves `compactReadOnlyEntries`, so `CompactReadOnlyHandlersGroup` no
+       longer serves it;
+     - a new exported `CompactDataHandlersGroup` beside it serves `compactDataEntries()`.
    - **The typed choice:**
      - `ServedTools` in `src/lib/toolSet.ts`;
      - a required third argument for `ToolSet.groups`, `registryOf` and
@@ -154,11 +156,20 @@ before the merge.
    - **Callers** from appendix A:
      - the three runtime launchers pass `{ dataTools: false }` for now; step 4 wires the
        config;
-     - `scripts/list-tools.ts` and `tools/generate-tools-docs.js` pass `{ dataTools: true }`,
-       so the pages keep the tools until step 9 marks them;
+     - `scripts/list-tools.ts`, `tools/generate-tools-docs.js` and
+       `compact/tools/generate-docs.js` pass `{ dataTools: true }`, and the compact
+       generator reads `compactDataEntries` beside the read-only half, so the pages keep
+       the tools until step 9 marks them;
+     - `src/lib/handlers/examples/usage-example.ts` adds `DataHandlersGroup`, with a comment
+       that the data tools are opt-in;
      - every test helper and test the appendix found passes what it needs: `servedEntries`
        and the descriptions catalog pass `{ dataTools: true }`, and the group-direct tests
-       add the new group.
+       add the new group;
+     - the about 45 further tests and helpers of appendix A: each one that reaches a data
+       tool passes `{ dataTools: true }` or adds `DataHandlersGroup` /
+       `CompactDataHandlersGroup`, and every other one passes `{ dataTools: false }`. Each
+       whole-list comparison among them is re-checked as either unchanged, or the on list
+       minus exactly the three names, and the commit message says which.
    - **Fixtures.** The one fixture set stays the flag-on surface. It is regenerated where
      the order or the group of a tool changed, and the diff shows nothing else. That is
      checked in the commit by comparing sorted names and schemas before and after.
@@ -183,6 +194,8 @@ before the merge.
      - `GetTableContents` left in `ReadOnlyHandlersGroup`: the difference and the
        registration-path cases fail for the full sets;
      - `HandlerGetData` left in `compactReadOnlyEntries`: the compact cases fail;
+     - `CompactDataHandlersGroup` serving nothing: its own case fails (it serves exactly
+       `HandlerGetData`, and `CompactReadOnlyHandlersGroup` does not);
      - the data builder left out of `compactReadOnlyToolSetOf` alone: only the
        compact read-only cases fail.
    - **Commit:** by path.
@@ -199,6 +212,7 @@ before the merge.
    - **Commit:** by path.
 5. **The embeddable API** (spec §4).
    - **Code:**
+     - `CompactDataHandlersGroup` (step 3) is the compact embedder's way to the tool;
      - `HandlerSet` gains `'data'`;
      - `expositionGroups` adds `DataHandlersGroup` for it;
      - `EmbeddableMcpServer`'s `exposition` type gains `'data'`, and `createDefaultRegistry`
@@ -212,7 +226,9 @@ before the merge.
      - `HandlerExporter` without `includeData`, and with `includeData: false`, hands out
        none;
      - with `includeData: true`, it hands out both, through `getHandlerEntries()` and
-       `createRegistry()`.
+       `createRegistry()`;
+     - a registry of `CompactReadOnlyHandlersGroup` alone lists no `HandlerGetData`, and
+       with `CompactDataHandlersGroup` it does.
    - **Mutations, one per condition:**
      - `includeData` read as `!== false`: the absent case fails;
      - `'data'` put into the default exposition: the default case fails;
@@ -280,8 +296,11 @@ before the merge.
      - `docs/user-guide/BATCH_MODE.md:514, 520, 577` (the note);
      - `docs/deployment/DOCKER.md` (the variable).
    - **Tool pages:** `tools/generate-tools-docs.js` marks the three tools "opt-in:
-     `--enable-data-tools`". The pages are regenerated with `npm run docs:tools` and
-     committed.
+     `--enable-data-tools`", and `compact/tools/generate-docs.js` marks `HandlerGetData`
+     the same way. The pages are regenerated with `npm run docs:tools`, here and in
+     `compact`, and committed.
+   - **Embedder docs:** `src/embeddable/docs/ARCHITECTURE.md:323, 667-670` and
+     `src/lib/handlers/README.md:17-114` describe the new argument and the data groups.
    - **Registry manifests:** the twelve `server*.json` files gain `MCP_ENABLE_DATA_TOOLS`.
    - Every claim is checked against the code as built.
    - **Commit:** by path.
@@ -397,4 +416,4 @@ cases (`batchEntryCases.ts:200-201, 416-417`).
       `toolSet/variantProperties`.
 
 Most of these need a mechanical change only (Inference). The two production callers, the
-unnamed class and the docs are decisions the spec leaves open.
+class and the docs are now in the spec (§3–§6) and in steps 3, 5 and 9.

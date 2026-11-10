@@ -131,6 +131,9 @@ export class StdioServer extends BaseMcpServer {
         lineMatchStrategy: opts.lineMatchStrategy,
       }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
+      // --deferred-logon --restore-session: the first call's birth takes up
+      // the destination's leftover session.
+      restoreAtFirstBirth: opts?.restoreAtFirstBirth === true,
       // The locks the instance took: a write, a delete or an unlock under a
       // lock_handle is sent only under one it holds.
       heldLocks: new HeldLocks(),

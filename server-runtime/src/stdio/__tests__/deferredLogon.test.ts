@@ -16,13 +16,19 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { runtimeDirectory } from '@mcp-abap-adt/lib/embeddable';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   type AdtStandIn,
   adtStandIn,
+  isLogoff,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import {
+  killedProcessSession,
+  runtimeFiles,
+} from '../../../../src/__tests__/helpers/leftoverSession';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
 import { ServerRefusal } from '../../../../src/lib/auth/serverRefusal';
 import { registryOf } from '../../../../src/lib/toolSet';
@@ -612,6 +618,158 @@ describe('no_connection: one condition at a time', () => {
       assert.notEqual(payloadOf((await s.call()).text).error, 'no_connection');
     } finally {
       await s.close();
+    }
+  });
+});
+
+/** The pid a runtime file was written by. */
+function writerOf(handle: string): unknown {
+  const file: unknown = JSON.parse(
+    fs.readFileSync(path.join(runtimeDirectory(root), handle), 'utf8'),
+  );
+  return typeof file === 'object' && file !== null && 'pid' in file
+    ? file.pid
+    : undefined;
+}
+
+/** A session a killed process left for this destination, through the gate. */
+async function leftover(): Promise<{ handle: string; session: string }> {
+  await gate.forward(standIn.url);
+  const handle = await killedProcessSession(gate.url, runtimeDirectory(root), {
+    user: USER,
+    destination: 'default',
+  });
+  return { handle, session: standIn.requests.at(-1)?.session ?? '' };
+}
+
+/** The sessions the requests since `from` ran in, logoffs left out. */
+const sessionsSince = (from: number): Set<string> =>
+  new Set(
+    standIn.requests
+      .slice(from)
+      .filter((request) => !isLogoff(request.url))
+      .map((request) => request.session),
+  );
+
+describe('the leftover session and the deferred logon', () => {
+  for (const flags of [
+    ['--deferred-logon'],
+    ['--deferred-logon', '--restore-session=false'],
+  ]) {
+    it(`${flags.join(' ')}: the start claims nothing, the first call logs on, the leftover stays listed`, async () => {
+      const { handle, session } = await leftover();
+      const s = await start(flags);
+      try {
+        assert.equal(writerOf(handle), 111);
+        const from = standIn.requests.length;
+        const read = await s.call('GetAdtTypes');
+        assert.equal(read.isError, false, read.text);
+        const used = sessionsSince(from);
+        assert.equal(used.has(session), false);
+        assert.equal(used.size, 1);
+        assert.equal(writerOf(handle), 111);
+        const listed = await s.call('ListLeftoverSessions');
+        assert.equal(listed.text.includes(handle), true, listed.text);
+      } finally {
+        await s.stop();
+      }
+    });
+  }
+
+  it('both flags: the start claims nothing; the first call takes the session up, no logon; the next call neither', async () => {
+    const { handle, session } = await leftover();
+    const s = await start(['--deferred-logon', '--restore-session']);
+    try {
+      assert.equal(writerOf(handle), 111);
+      const from = standIn.requests.length;
+      const read = await s.call('GetAdtTypes');
+      assert.equal(read.isError, false, read.text);
+      assert.deepEqual([...sessionsSince(from)], [session]);
+      assert.equal(standIn.requests[from]?.authorization, undefined);
+      assert.deepEqual(runtimeFiles(runtimeDirectory(root)), [handle]);
+      assert.equal(writerOf(handle), process.pid);
+      const next = standIn.requests.length;
+      const again = await s.call('GetAdtTypes');
+      assert.equal(again.isError, false, again.text);
+      assert.deepEqual([...sessionsSince(next)], [session]);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('both flags, the system unreachable: no_connection, the file given back; reachable again, the next call takes it up', async () => {
+    const { handle, session } = await leftover();
+    await gate.close();
+    const s = await start(['--deferred-logon', '--restore-session']);
+    try {
+      const refused = await s.call('GetAdtTypes');
+      assert.equal(payloadOf(refused.text).error, 'no_connection');
+      assert.equal(writerOf(handle), 111);
+      await gate.forward(standIn.url);
+      const from = standIn.requests.length;
+      const read = await s.call('GetAdtTypes');
+      assert.equal(read.isError, false, read.text);
+      assert.deepEqual([...sessionsSince(from)], [session]);
+      assert.equal(writerOf(handle), process.pid);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('both flags, SAP answering the old session ended: the first call logs on, the file adopted under the same handle', async () => {
+    const { handle, session } = await leftover();
+    standIn.answer((request) => request.session === session, 401);
+    const s = await start(['--deferred-logon', '--restore-session']);
+    try {
+      const from = standIn.requests.length;
+      const read = await s.call('GetAdtTypes');
+      assert.equal(read.isError, false, read.text);
+      const fresh = [...sessionsSince(from)].filter((one) => one !== session);
+      assert.equal(fresh.length, 1);
+      assert.deepEqual(runtimeFiles(runtimeDirectory(root)), [handle]);
+      assert.equal(writerOf(handle), process.pid);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('both flags, two leftovers: none taken up, the first call logs on, both stay', async () => {
+    const one = await leftover();
+    const two = await leftover();
+    const s = await start(['--deferred-logon', '--restore-session']);
+    try {
+      const from = standIn.requests.length;
+      const read = await s.call('GetAdtTypes');
+      assert.equal(read.isError, false, read.text);
+      const used = sessionsSince(from);
+      assert.equal(used.has(one.session), false);
+      assert.equal(used.has(two.session), false);
+      assert.equal(writerOf(one.handle), 111);
+      assert.equal(writerOf(two.handle), 111);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('after a take-up, a session SAP replaced is followed by a logon, not by another take-up', async () => {
+    const { session } = await leftover();
+    const s = await start(['--deferred-logon', '--restore-session']);
+    try {
+      const read = await s.call('GetAdtTypes');
+      assert.equal(read.isError, false, read.text);
+      // Another process's session left since: a take-up would claim it.
+      const later = await leftover();
+      standIn.endSession(session);
+      // The call that meets the replaced session answers it; the next one
+      // builds the connection again.
+      await s.call('GetAdtTypes');
+      const from = standIn.requests.length;
+      const rebuilt = await s.call('GetAdtTypes');
+      assert.equal(rebuilt.isError, false, rebuilt.text);
+      assert.equal(sessionsSince(from).has(later.session), false);
+      assert.equal(writerOf(later.handle), 111);
+    } finally {
+      await s.stop();
     }
   });
 });

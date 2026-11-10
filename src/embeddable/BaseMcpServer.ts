@@ -327,6 +327,17 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly leftoverSessions: LeftoverSessions | undefined;
 
   /**
+   * stdio with `--deferred-logon --restore-session` (#353): the instance's
+   * first birth, made by a tool call, takes up the destination's one
+   * leftover session, as `bornAtStart` does at a start. False: a call's
+   * birth is a logon.
+   */
+  private readonly restoreAtFirstBirth: boolean;
+
+  /** A birth succeeded: from then on a new connection is a logon. */
+  private bornOnce = false;
+
+  /**
    * Where background runs and their answers are kept — the host's strategy
    * (`backgroundRuns` option); absent, `background: true` and the
    * background-run tools answer "not available here".
@@ -501,10 +512,17 @@ export abstract class BaseMcpServer extends McpServer {
      * schemas as the tools declare them.
      */
     stateHandleArgument?: boolean;
+    /**
+     * The first birth a tool call makes takes up the destination's one
+     * leftover session (stdio's `--deferred-logon --restore-session`).
+     * Default `false`: such a birth is a logon.
+     */
+    restoreAtFirstBirth?: boolean;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
     this.leftoverSessions = options.leftoverSessions;
+    this.restoreAtFirstBirth = options.restoreAtFirstBirth === true;
     this.backgroundRuns = options.backgroundRuns;
     this.searchSapAnswers = options.sapAnswerStrategy;
     this.searchLineMatch = options.lineMatchStrategy;
@@ -764,7 +782,13 @@ export abstract class BaseMcpServer extends McpServer {
       // replacement for the same ones has them at birth (`buildConnection`)
       // and asks nothing.
       if (held) this.retire(held);
-      held = this.buildConnection(resolved, (born) => this.logOn(born));
+      // The first birth, when it is to take up the destination's leftover
+      // session (`restoreAtFirstBirth`), chooses as a start does; any
+      // other is a logon.
+      held =
+        this.restoreAtFirstBirth && !this.bornOnce
+          ? this.birthEntry(resolved).entry
+          : this.buildConnection(resolved, (born) => this.logOn(born));
     } else {
       // The held connection takes the source's credential (http: the
       // request's): the next sends carry it, in the same SAP session.
@@ -785,6 +809,7 @@ export abstract class BaseMcpServer extends McpServer {
       this.release(held);
       throw error;
     }
+    this.bornOnce = true;
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
@@ -1406,6 +1431,40 @@ export abstract class BaseMcpServer extends McpServer {
     }
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
+    const { entry, claimed, outcome } = this.birthEntry(resolved);
+    // Its parameters are made with it (`buildConnection`): a refusal of the
+    // rules ends the start.
+    const connection = await entry.connection;
+    try {
+      // Closed meanwhile (during the birth): the start is refused —
+      // the launcher never opens the transport — and the close's sweep has
+      // the connection's logoff.
+      refuseWhenClosed(connection);
+    } catch (error) {
+      if (this.built === entry) this.built = undefined;
+      if (outcome.session !== 'picked_up') await endConnection(connection);
+      throw error;
+    }
+    this.bornOnce = true;
+    return claimed === undefined
+      ? { session: 'logged_on' }
+      : { session: outcome.session ?? 'picked_up', handle: claimed.handle };
+  }
+
+  /**
+   * A birth that may take up a leftover session — a stdio start's, or the
+   * first one a call makes with `restoreAtFirstBirth`: the destination's one
+   * leftover session (`claimTheOne`: a dead process's, role `built`) is
+   * taken up (`resumedSession`); none, or more than one, is a logon. A
+   * failed take-up gives the claimed file back (`resumedSession`), so the
+   * next birth claims it again. Answers the entry, the claim and its
+   * outcome.
+   */
+  private birthEntry(resolved: ResolvedConnection): {
+    entry: BuiltConnection;
+    claimed: ClaimedSession | undefined;
+    outcome: { session?: 'picked_up' | 'new' };
+  } {
     const owner = this.leftoverSessions;
     const identity = this.sessionOf(resolved);
     const claimed =
@@ -1428,22 +1487,7 @@ export abstract class BaseMcpServer extends McpServer {
             },
           )
         : this.buildConnection(resolved, (born) => this.logOn(born));
-    // Its parameters are made with it (`buildConnection`): a refusal of the
-    // rules ends the start.
-    const connection = await entry.connection;
-    try {
-      // Closed meanwhile (during the birth): the start is refused —
-      // the launcher never opens the transport — and the close's sweep has
-      // the connection's logoff.
-      refuseWhenClosed(connection);
-    } catch (error) {
-      if (this.built === entry) this.built = undefined;
-      if (outcome.session !== 'picked_up') await endConnection(connection);
-      throw error;
-    }
-    return claimed === undefined
-      ? { session: 'logged_on' }
-      : { session: outcome.session ?? 'picked_up', handle: claimed.handle };
+    return { entry, claimed, outcome };
   }
 
   /**

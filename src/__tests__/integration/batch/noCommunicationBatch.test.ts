@@ -38,6 +38,7 @@ import {
 import { resolvePackageName } from '../helpers/configHelpers';
 import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
 const testLogger = createTestLogger('no-communication-batch');
@@ -113,8 +114,8 @@ describe('the communication batch on the system the test config names', () => {
 
   it("the first envelope's outer status decides; the read equals the sequential one", async () => {
     if (connection === null) {
-      testLogger?.info(
-        '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml); no configuration, connection or session here',
+      skipRunningTest(
+        'runs only on the system the test config names (tests/test-config.yaml); no configuration, connection or session here',
       );
       return;
     }

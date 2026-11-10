@@ -28,11 +28,11 @@ import {
 } from '../configuredSystemKind';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
 import { primeSystemContext } from '../primeSystemContext';
+import { skipRunningTest } from '../runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
-
 import {
   createHardModeClient,
   type HardModeClient,
@@ -578,8 +578,8 @@ export class LambdaTester {
     if (availableIn.includes(systemType)) {
       return false;
     }
-    this.context?.logger?.testSkip(
-      `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
+    skipRunningTest(
+      `not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
     );
     // Nothing was created, so the cleanup deletes nothing: a delete here
     // could only reach an object of that name made by someone else.
@@ -593,12 +593,12 @@ export class LambdaTester {
     }
 
     if (this.kindSkip !== undefined) {
-      this.context.logger?.testSkip(`Skipping test: ${this.kindSkip}`);
+      skipRunningTest(`${this.kindSkip}`);
       return;
     }
 
     if (!this.context.hasConfig) {
-      this.context.logger?.testSkip(`Skipping test: No configuration found`);
+      skipRunningTest(`No configuration found`);
       return;
     }
 
@@ -628,7 +628,7 @@ export class LambdaTester {
       // Check if error is a skip condition
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        skipRunningTest(`${skipReason}`);
         this.testSkipped = true;
         return; // Don't throw, just skip the test
       }

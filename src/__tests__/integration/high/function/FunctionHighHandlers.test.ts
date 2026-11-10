@@ -35,6 +35,7 @@ import {
   statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -78,7 +79,7 @@ describe('Function High-Level Handlers Integration', () => {
         process.env.FULL_LOG_LEVEL === 'true'
       ) {
         testLogger?.warn(
-          '⚠️ Skipping tests: No .env file or SAP configuration found',
+          '⚠️ No .env file or SAP configuration found: each case skips',
         );
       }
       hasConfig = false;
@@ -94,9 +95,7 @@ describe('Function High-Level Handlers Integration', () => {
 
   it('should test all Function high-level handlers', async () => {
     if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
-      testLogger?.info(
-        '⏭️  Skipping test: No configuration, connection or session',
-      );
+      skipRunningTest('No configuration, connection or session');
       return;
     }
 
@@ -107,14 +106,14 @@ describe('Function High-Level Handlers Integration', () => {
     );
 
     if (!testCase) {
-      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      skipRunningTest('No test case configuration');
       return;
     }
 
     // Check available_in from test case config
     if (!isTestAvailableForSystem(testCase.available_in)) {
-      testLogger?.info(
-        `⏭️  Skipping test: not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
+      skipRunningTest(
+        `not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
       );
       return;
     }
@@ -277,8 +276,8 @@ describe('Function High-Level Handlers Integration', () => {
           errorLower.includes('authorization') ||
           errorLower.includes('s_abplngvs')
         ) {
-          testLogger?.warn(
-            `⚠️  Skipping test: No authorization to create function module: ${errorMsg}`,
+          skipRunningTest(
+            `No authorization to create function module: ${errorMsg}`,
           );
           return;
         }

@@ -22,6 +22,7 @@ import { sharedDependencyKind } from '../../helpers/configHelpers';
 import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -609,11 +610,10 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           // **A skip, said as one.** There is nothing to read on a system
           // with no dumps, and that is not a defect of the tools — but
           // `RuntimeGetDumpById` was not exercised either, and a bare
-          // `return` reports that as a pass. `testSkip` is the channel this
-          // repository has for exactly this: it prints `⏭️`, so the run says
-          // what it did not do instead of implying it did.
-          logger?.testSkip?.(
-            'Skipping test: no runtime dumps on this system — RuntimeListFeeds answered with no entries, so RuntimeGetDumpById was not exercised',
+          // `return` reports that as a pass. `skipRunningTest` marks the case
+          // skipped with the reason, so the run counts what it did not do.
+          skipRunningTest(
+            'no runtime dumps on this system — RuntimeListFeeds answered with no entries, so RuntimeGetDumpById was not exercised',
           );
           return;
         }
@@ -955,8 +955,8 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
       }
 
       if (data.count <= 100) {
-        logger?.testSkip?.(
-          `only ${data.count} dumps on this system — paging past 100 was not exercised`,
+        logger?.info(
+          `Not exercised: only ${data.count} dumps on this system — paging past 100`,
         );
       }
     });

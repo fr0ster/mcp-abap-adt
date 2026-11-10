@@ -31,6 +31,7 @@ import {
 } from '../../helpers/configHelpers';
 import { NO_KIND_STATED } from '../../helpers/configuredSystemKind';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -55,7 +56,7 @@ describe('Transported Object CRUD (GitHub #11)', () => {
 
     const systemType = configuredSystemKind();
     if (systemType === undefined) {
-      logger?.warn(`Skipping: ${NO_KIND_STATED}`);
+      logger?.warn(`No system kind stated, the case skips: ${NO_KIND_STATED}`);
       return;
     }
     logger?.info(`System type: ${systemType}`);
@@ -112,7 +113,7 @@ describe('Transported Object CRUD (GitHub #11)', () => {
 
   it('should CRUD a class in a transportable package', async () => {
     if (!testEnabled) {
-      logger?.warn('Skipping — test not enabled or missing config');
+      skipRunningTest('test not enabled or missing config');
       return;
     }
 

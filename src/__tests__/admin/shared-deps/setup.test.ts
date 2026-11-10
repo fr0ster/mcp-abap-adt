@@ -567,7 +567,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of tables) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -689,7 +689,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of structures) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping structure ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out structure ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -811,7 +811,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of views) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -938,7 +938,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of bdefs) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -1060,7 +1060,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of classes) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -1194,7 +1194,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of functionGroups) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping function group ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out function group ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -1286,7 +1286,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of functionModules) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping function module ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out function module ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -1486,7 +1486,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of serviceDefinitions) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping service definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out service definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }
@@ -1793,7 +1793,7 @@ describe('Admin: Setup shared dependencies', () => {
       for (const item of items) {
         if (!isTestAvailableForSystem(item.available_in)) {
           testsLogger?.info?.(
-            `Skipping ${kind.label} ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            `Leaving out ${kind.label} ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
           );
           continue;
         }

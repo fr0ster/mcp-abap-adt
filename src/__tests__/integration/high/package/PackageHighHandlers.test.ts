@@ -20,6 +20,7 @@ import { handleCreatePackage } from '../../../../handlers/package/high/handleCre
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -168,9 +169,7 @@ describe('Package High-Level Handlers Integration', () => {
           errorMsgLower.includes('exceptionresourcealreadyexists') ||
           errorMsg.includes('InvalidObjName')
         ) {
-          logger?.info(
-            `⏭️  Package ${objectName} already exists, skipping test`,
-          );
+          skipRunningTest(`package ${objectName} already exists`);
           return;
         }
         throw new Error(`Create failed: ${errorMsg}`);

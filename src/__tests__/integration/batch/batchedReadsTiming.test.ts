@@ -68,6 +68,7 @@ import {
 import { NO_KIND_STATED } from '../helpers/configuredSystemKind';
 import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
 const testLogger = createTestLogger('batched-reads-timing');
@@ -475,23 +476,23 @@ describe('batched reads timed against the sequential path on the system the test
     for (const scope of ['the package', 'a larger package']) {
       it(`${tool.tool} on ${scope}: the same answer, timed on both paths`, async () => {
         if (!served) {
-          testLogger?.info(
+          skipRunningTest(
             stated === undefined
-              ? `⏭️  Skipping: ${NO_KIND_STATED}`
-              : '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+              ? NO_KIND_STATED
+              : 'the test config names a legacy system, which the server does not serve',
           );
           return;
         }
         if (connection === null) {
-          testLogger?.info(
-            '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
+          skipRunningTest(
+            'runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
           );
           return;
         }
         const target = packages.find((p) => p.label === scope);
         if (target === undefined) {
-          testLogger?.info(
-            `⏭️  Skipping ${tool.tool} on ${scope}: the config names no shared_dependencies.super_package`,
+          skipRunningTest(
+            `${tool.tool} on ${scope}: the config names no shared_dependencies.super_package`,
           );
           return;
         }
@@ -505,20 +506,20 @@ describe('batched reads timed against the sequential path on the system the test
   for (const shared of SHARED_CASES) {
     it(`${shared.tool} on the shared objects: the same answer, timed on both paths`, async () => {
       if (!served) {
-        testLogger?.info(
-          '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+        skipRunningTest(
+          'the test config names a legacy system, which the server does not serve',
         );
         return;
       }
       if (connection === null) {
-        testLogger?.info(
-          '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
+        skipRunningTest(
+          'runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
         );
         return;
       }
       const read = shared.prepare();
       if (typeof read === 'string') {
-        testLogger?.info(`⏭️  Skipping ${shared.tool}: ${read}`);
+        skipRunningTest(`${shared.tool}: ${read}`);
         return;
       }
       await timeBothPaths(connection, shared.tool, 'the shared objects', read);

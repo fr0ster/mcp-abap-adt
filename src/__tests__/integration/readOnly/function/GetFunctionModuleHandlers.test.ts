@@ -17,6 +17,7 @@ import {
   statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -53,7 +54,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
       hasConfig = true;
     } catch (error) {
       testLogger?.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
+        '⚠️ No .env file or SAP configuration found: each case skips',
       );
       hasConfig = false;
     }
@@ -68,9 +69,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
 
   it('should read shared function module', async () => {
     if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
-      testLogger?.info(
-        '⏭️  Skipping test: No configuration, connection or session',
-      );
+      skipRunningTest('No configuration, connection or session');
       return;
     }
 
@@ -80,16 +79,12 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
       'Z_MCP_BLD_SHR_FM',
     );
     if (!sharedFM) {
-      testLogger?.info(
-        '⏭️  Skipping test: No shared function module configured',
-      );
+      skipRunningTest('No shared function module configured');
       return;
     }
 
     if (!isTestAvailableForSystem(sharedFM.available_in)) {
-      testLogger?.info(
-        `⏭️  Skipping test: not available on ${statedKindWords()}`,
-      );
+      skipRunningTest(`not available on ${statedKindWords()}`);
       return;
     }
 
@@ -149,8 +144,8 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
         errorMsg.includes('404') ||
         errorMsg.includes('500')
       ) {
-        testLogger?.info(
-          `⏭️  Skipping test: Shared FM not found on system (run shared:setup first): ${errorMsg}`,
+        skipRunningTest(
+          `Shared FM not found on system (run shared:setup first): ${errorMsg}`,
         );
         return;
       }

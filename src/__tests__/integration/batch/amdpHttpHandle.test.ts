@@ -60,6 +60,7 @@ import {
 } from '../helpers/configHelpers';
 import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 import {
   readSessionTrace,
@@ -280,7 +281,7 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
   it('AmdpDebugStart, the break, DebugBatchBegin, the recorded AMDP calls, DebugBatchEnd and BatchAnswers over one x-mcp-state-handle; AmdpDebugStop, the state ended, a graceful shutdown; every session logged off', async () => {
     const where = whereItRuns();
     if ('reason' in where) {
-      testLogger?.info(`⏭️  Skipping: ${where.reason}`);
+      skipRunningTest(`${where.reason}`);
       return;
     }
     const params = where.testCase.params ?? {};
@@ -302,7 +303,7 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
       ddlRead: await sourceRead(handleGetDdl, plainCtx, { ddl_name: ddl }),
     });
     if ('skip' in verdict) {
-      testLogger?.info(`⏭️  Skipping: ${verdict.skip}`);
+      skipRunningTest(`${verdict.skip}`);
       return;
     }
     if ('fail' in verdict) throw new Error(verdict.fail);

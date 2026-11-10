@@ -20,6 +20,7 @@
   "files": [
     "src/__tests__/helpers/resolvePreload.ts",
     "src/__tests__/integration/helpers/closeConnectionsPreload.ts",
+    "src/__tests__/integration/helpers/runningTestPreload.ts",
     "src/__tests__/integration/helpers/liveScripts.ts",
     "src/__tests__/integration/globalSetup.ts",
     "src/__tests__/integration/globalTeardown.ts",

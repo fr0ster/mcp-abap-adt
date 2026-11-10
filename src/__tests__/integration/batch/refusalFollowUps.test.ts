@@ -109,6 +109,7 @@ import {
 import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { primeSystemContext } from '../helpers/primeSystemContext';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createHandlerContext } from '../helpers/testHelpers';
 
 const testLogger = createTestLogger('refusal-follow-ups');
@@ -737,7 +738,7 @@ describe('after a credential refusal, on the system the test config names', () =
     it(`${KIND_WORDS[kind]}: the logoff after a credential refusal asks nothing of the provider`, async () => {
       const where = whereItRuns(kind);
       if ('reason' in where) {
-        testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
+        skipRunningTest(`${KIND_WORDS[kind]}: ${where.reason}`);
         return;
       }
       await logoffAfterRefusalOn(kind);
@@ -747,7 +748,7 @@ describe('after a credential refusal, on the system the test config names', () =
     it(`${KIND_WORDS[kind]}: the debugger stop's second stopListener after a refusal`, async () => {
       const where = whereItRuns(kind);
       if ('reason' in where) {
-        testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
+        skipRunningTest(`${KIND_WORDS[kind]}: ${where.reason}`);
         return;
       }
       await secondStopListenerOn(kind, where.testCase);

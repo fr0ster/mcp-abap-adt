@@ -69,6 +69,7 @@ import {
 } from '../helpers/configHelpers';
 import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import {
   launchStdioScript,
   testConnectionLogOn,
@@ -675,21 +676,19 @@ describe('the communication batch through the served compact tools, on the syste
     it(`${KIND_WORDS[kind]}: reads, create, lock, write, unlock, activate, each a batch; answers per number; every object deleted`, async () => {
       const configured = configuredKind();
       if (typeof configured !== 'string') {
-        testLogger?.info(
-          `⏭️  Skipping ${KIND_WORDS[kind]}: ${configured.reason}`,
-        );
+        skipRunningTest(`${KIND_WORDS[kind]}: ${configured.reason}`);
         return;
       }
       if (configured !== kind) {
-        testLogger?.info(
-          `⏭️  Skipping ${KIND_WORDS[kind]}: the test config names ${KIND_WORDS[configured]}; this case runs only there`,
+        skipRunningTest(
+          `${KIND_WORDS[kind]}: the test config names ${KIND_WORDS[configured]}; this case runs only there`,
         );
         return;
       }
       const testCase = getEnabledTestCase('batch', 'communication');
       if (!testCase) {
-        testLogger?.info(
-          `⏭️  Skipping ${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
+        skipRunningTest(
+          `${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
         );
         return;
       }

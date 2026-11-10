@@ -143,6 +143,7 @@ import {
   sapIsConfigured,
   systemUserName,
 } from '../../helpers/objectLocks';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -274,12 +275,11 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     //     server resolves an empty owner and refuses, and quietly skipping
     //     would hide a real gap behind the same green as case 1.
     //
-    // Every skip is logged with ⏭️ and its reason, because the run says
-    // `passed` either way and the log is the only place the difference
-    // survives.
+    // A skip's reason is kept here; the case marks itself skipped with it
+    // (`skipRunningTest`), so the run counts it skipped.
     if (!sapIsConfigured()) {
       skipReason = 'no SAP_URL — there is no system to run against';
-      logger?.warn(`⏭️ SKIPPED — ${skipReason}`);
+      logger?.warn(`No system to run against: ${skipReason}`);
       return;
     }
 
@@ -288,7 +288,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         `this system keeps no transport for the suite to work in ` +
         `(default_transport="${parentTransport}", default_package="${packageName}") ` +
         "— a local-package setup, where a request's object list has nothing to hold";
-      logger?.warn(`⏭️ SKIPPED — ${skipReason}`);
+      logger?.warn(`No system to run against: ${skipReason}`);
       return;
     }
 
@@ -506,7 +506,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       // The only reason to be here is the one `beforeAll` allows: no SAP.
       // Everything else threw there, which is why this needs no second
       // list of conditions.
-      logger?.warn(`⏭️ SKIPPED — ${skipReason || 'no system'}`);
+      skipRunningTest(skipReason || 'no system');
       return;
     }
 

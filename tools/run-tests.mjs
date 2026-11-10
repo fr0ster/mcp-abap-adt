@@ -303,6 +303,14 @@ const closePreload = ownCompiled(
   'helpers',
   'closeConnectionsPreload.js',
 );
+// The running case, for a live helper's skip (`runningTestPreload.ts`).
+const runningPreload = ownCompiled(
+  'src',
+  '__tests__',
+  'integration',
+  'helpers',
+  'runningTestPreload.js',
+);
 
 /** The live run's setup or teardown module, compiled, its siblings resolved. */
 function liveRunModule(name) {
@@ -378,6 +386,8 @@ function runFile(file) {
         preload,
         '--require',
         closePreload,
+        '--require',
+        runningPreload,
         '--test',
         '--test-concurrency=1',
         ...options,

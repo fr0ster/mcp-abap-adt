@@ -81,6 +81,7 @@ import {
 } from '../helpers/configHelpers';
 import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 import {
   readSessionTrace,
@@ -596,7 +597,7 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
     ddlRead: fixtureRead(await local(handleGetDdl, plain, { ddl_name: ddl })),
   });
   if ('skip' in verdict) {
-    testLogger?.info(`⏭️  Skipping the AMDP debugger batch: ${verdict.skip}`);
+    skipRunningTest(`the AMDP debugger batch: ${verdict.skip}`);
     say(kind, 'amdp skipped', verdict.skip);
     return;
   }
@@ -815,7 +816,7 @@ describe('the debugger batch at a live stop, on the system the test config names
     it(`${KIND_WORDS[kind]}: step, stack and variables in one DebugBatchEnd; answers per number; debugger state removed`, async () => {
       const where = whereItRuns(kind, 'this case');
       if ('reason' in where) {
-        testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
+        skipRunningTest(`${KIND_WORDS[kind]}: ${where.reason}`);
         return;
       }
       await debuggerBatchOn(kind, where.testCase);
@@ -825,15 +826,15 @@ describe('the debugger batch at a live stop, on the system the test config names
   for (const kind of kinds) {
     it(`${KIND_WORDS[kind]}: the AMDP debugger batch — DebugBatchBegin at an AMDP break, the data preview and a step recorded, one DebugBatchEnd, answers per number (on premise on HANA)`, async () => {
       if (kind === 'cloud') {
-        testLogger?.info(
-          '⏭️  Skipping the AMDP debugger batch on ABAP Cloud: it runs on premise on HANA',
+        skipRunningTest(
+          'the AMDP debugger batch on ABAP Cloud: it runs on premise on HANA',
         );
         return;
       }
       const where = whereItRuns(kind, 'the AMDP debugger batch');
       if ('reason' in where) {
-        testLogger?.info(
-          `⏭️  Skipping the AMDP debugger batch ${KIND_WORDS[kind]}: ${where.reason}`,
+        skipRunningTest(
+          `the AMDP debugger batch ${KIND_WORDS[kind]}: ${where.reason}`,
         );
         return;
       }

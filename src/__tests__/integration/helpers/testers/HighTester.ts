@@ -10,6 +10,7 @@
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter, getSystemType } from '../configHelpers';
 import type { LoggerWithExtras } from '../loggerHelpers';
+import { skipRunningTest } from '../runningTest';
 import { createHandlerContext, delay } from '../testHelpers';
 import {
   callTool,
@@ -129,7 +130,7 @@ export class HighTester extends LambdaTester {
     }
 
     if (!this.context.hasConfig) {
-      this.context.logger?.testSkip(`Skipping test: No configuration found`);
+      skipRunningTest(`No configuration found`);
       return;
     }
 
@@ -183,7 +184,7 @@ export class HighTester extends LambdaTester {
       // Check if error is a skip condition
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        skipRunningTest(`${skipReason}`);
         return;
       }
 
@@ -241,7 +242,7 @@ export class HighTester extends LambdaTester {
     } catch (error: any) {
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        skipRunningTest(`${skipReason}`);
         return;
       }
 

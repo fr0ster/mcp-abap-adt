@@ -21,6 +21,7 @@ import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/high/ha
 import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -187,9 +188,12 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
             );
           } catch (deleteError: any) {
             logger?.info(
-              `⏭️  High Create failed for ${ddlxName}: couldn't cleanup existing object`,
+              `High Create failed for ${ddlxName}: couldn't clean up the existing object`,
             );
           }
+          skipRunningTest(
+            `${ddlxName} existed before the create; the case did not create it`,
+          );
           return;
         }
         throw new Error(`Create failed: ${errorMsg}`);

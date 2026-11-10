@@ -47,6 +47,7 @@ import {
   type GuardedConnection,
   guardedTestConnection,
 } from '../../helpers/refusalGuard';
+import { skipRunningTest } from '../../helpers/runningTest';
 import { DEBUG_TESTS, debugLog } from '../../helpers/testHelpers';
 
 // Load environment variables
@@ -66,20 +67,18 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
 
   it('should create class using AdtClient directly (reference implementation)', async () => {
     if (!hasConfig) {
-      testLogger?.info('⏭️  Skipping test: No SAP configuration');
+      skipRunningTest('No SAP configuration');
       return;
     }
 
     const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
     if (!testCase) {
-      testLogger?.info('⏭️  Skipping test: Test case not enabled');
+      skipRunningTest('Test case not enabled');
       return;
     }
 
     if (!isTestAvailableForSystem(testCase.available_in)) {
-      testLogger?.info(
-        '⏭️  Skipping test: not available on current system type',
-      );
+      skipRunningTest('not available on current system type');
       return;
     }
 
@@ -163,10 +162,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      testLogger?.warn(
-        '⚠️ Skipping test: Failed to create connection',
-        errorMessage,
-      );
+      skipRunningTest(`failed to create the connection: ${errorMessage}`);
       return;
     }
 
@@ -178,7 +174,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
     // But our helper takes testCase, so we pass testCase
     const packageName = resolvePackageName(testCase);
     if (!packageName) {
-      testLogger?.info('⏭️  Skipping test: package_name not configured');
+      skipRunningTest('package_name not configured');
       if (connection) {
         // reset() is not part of IAbapConnection interface, use type assertion
         const connectionAny = connection as any;
@@ -217,7 +213,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
 
     // Pre-check: Verify test parameters
     if (!client) {
-      testLogger?.info('⏭️  Skipping test: Client not initialized');
+      skipRunningTest('Client not initialized');
       if (connection) {
         // reset() is not part of IAbapConnection interface, use type assertion
         const connectionAny = connection as any;
@@ -236,7 +232,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       'AdtClient direct test',
     );
     if (!preCheckResult.success) {
-      testLogger?.info(`⏭️  Skipping test: ${preCheckResult.reason}`);
+      skipRunningTest(`${preCheckResult.reason}`);
       if (connection) {
         // reset() is not part of IAbapConnection interface, use type assertion
         const connectionAny = connection as any;
@@ -495,7 +491,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           } else if (shouldCleanup) {
             debugLog(
               'CLEANUP',
-              `Skipping deletion because class was not created during test`,
+              `Not deleting: the class was not created during the test`,
               {
                 class_name: className,
                 class_created: classCreated,

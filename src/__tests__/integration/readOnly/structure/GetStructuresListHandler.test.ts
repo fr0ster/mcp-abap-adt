@@ -27,6 +27,7 @@ import {
   statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -71,7 +72,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       hasConfig = true;
     } catch (_error) {
       testLogger?.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
+        '⚠️ No .env file or SAP configuration found: each case skips',
       );
       hasConfig = false;
     }
@@ -115,7 +116,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
   it('should recursively list the structures embedded in the base structure', async () => {
     const reason = skipReason();
     if (reason) {
-      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      skipRunningTest(`${reason}`);
       return;
     }
 
@@ -124,13 +125,11 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       'list_embedded_structures',
     );
     if (!testCase) {
-      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      skipRunningTest('No test case configuration');
       return;
     }
     if (!isTestAvailableForSystem(testCase.available_in)) {
-      testLogger?.info(
-        `⏭️  Skipping test: not available on ${statedKindWords()}`,
-      );
+      skipRunningTest(`not available on ${statedKindWords()}`);
       return;
     }
 
@@ -162,9 +161,7 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
         errorMsg.includes('404') ||
         errorMsg.includes('500')
       ) {
-        testLogger?.info(
-          `⏭️  Skipping test: Shared structure not found: ${errorMsg}`,
-        );
+        skipRunningTest(`Shared structure not found: ${errorMsg}`);
         return;
       }
       throw new Error(`GetStructuresList failed: ${errorMsg}`);
@@ -215,8 +212,8 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
           { structure_name: expectedAppend },
         );
         if (probe.isError) {
-          testLogger?.info(
-            `⏭️  Skipping the append assertion: ${expectedAppend} does not exist on this system — ${probe.content[0]?.text?.slice(0, 200)}`,
+          skipRunningTest(
+            `the append assertion: ${expectedAppend} does not exist on this system — ${probe.content[0]?.text?.slice(0, 200)}`,
           );
           return;
         }

@@ -64,7 +64,9 @@ A file is named by its source path; Jest's `--testPathPatterns` is not read. A s
 `liveSuite` (`helpers/live.ts`): it states where it runs and skips with the reason elsewhere (a
 skipped `describe`, the reason its skip message); its cases call the system through `liveCall`,
 which records each call for the coverage ledger under the running case's name path (`t.fullName`)
-and refuses outside a case. No live test carries a bound, a delay or a poll limit: each step
+and refuses outside a case. A case that cannot run here (a system kind it is not available on, a
+configuration it lacks) calls `skipRunningTest(reason)` (`helpers/runningTest.ts`): node:test
+reports it skipped with the reason, never a pass. No live test carries a bound, a delay or a poll limit: each step
 goes on the answer of the one before it, and a wait that does not end is ended with Ctrl-C
 (below).
 

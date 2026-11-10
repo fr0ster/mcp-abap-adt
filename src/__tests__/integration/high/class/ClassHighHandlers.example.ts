@@ -94,7 +94,6 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
           errorMsg.includes('already exists') ||
           errorMsg.includes('ExceptionResourceAlreadyExists')
         ) {
-          logger?.info(`⏭️  SKIP: Object already exists: ${errorMsg}`);
           throw new Error(`SKIP: ${errorMsg}`);
         }
         throw new Error(`Create failed: ${errorMsg}`);

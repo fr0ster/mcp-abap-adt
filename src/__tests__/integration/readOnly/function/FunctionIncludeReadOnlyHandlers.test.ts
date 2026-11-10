@@ -26,6 +26,7 @@ import {
   statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -62,7 +63,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       hasConfig = true;
     } catch (_error) {
       testLogger?.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
+        '⚠️ No .env file or SAP configuration found: each case skips',
       );
       hasConfig = false;
     }
@@ -106,7 +107,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
   it('should read the TOP include of the shared function group', async () => {
     const reason = skipReason();
     if (reason) {
-      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      skipRunningTest(`${reason}`);
       return;
     }
 
@@ -115,13 +116,11 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       'read_top_include',
     );
     if (!testCase) {
-      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      skipRunningTest('No test case configuration');
       return;
     }
     if (!isTestAvailableForSystem(testCase.available_in)) {
-      testLogger?.info(
-        `⏭️  Skipping test: not available on ${statedKindWords()}`,
-      );
+      skipRunningTest(`not available on ${statedKindWords()}`);
       return;
     }
 
@@ -160,8 +159,8 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
         errorMsg.includes('404') ||
         errorMsg.includes('500')
       ) {
-        testLogger?.info(
-          `⏭️  Skipping test: Shared FUGR/include not found (run shared:setup first): ${errorMsg}`,
+        skipRunningTest(
+          `Shared FUGR/include not found (run shared:setup first): ${errorMsg}`,
         );
         return;
       }
@@ -179,7 +178,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
   it('should list the includes of the shared function group', async () => {
     const reason = skipReason();
     if (reason) {
-      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      skipRunningTest(`${reason}`);
       return;
     }
 
@@ -188,13 +187,11 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       'list_includes',
     );
     if (!testCase) {
-      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      skipRunningTest('No test case configuration');
       return;
     }
     if (!isTestAvailableForSystem(testCase.available_in)) {
-      testLogger?.info(
-        `⏭️  Skipping test: not available on ${statedKindWords()}`,
-      );
+      skipRunningTest(`not available on ${statedKindWords()}`);
       return;
     }
 
@@ -222,8 +219,8 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
         errorMsg.includes('404') ||
         errorMsg.includes('500')
       ) {
-        testLogger?.info(
-          `⏭️  Skipping test: Shared FUGR not found (run shared:setup first): ${errorMsg}`,
+        skipRunningTest(
+          `Shared FUGR not found (run shared:setup first): ${errorMsg}`,
         );
         return;
       }
@@ -253,7 +250,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
   it('should list the function modules of the shared function group', async () => {
     const reason = skipReason();
     if (reason) {
-      testLogger?.info(`⏭️  Skipping test: ${reason}`);
+      skipRunningTest(`${reason}`);
       return;
     }
 
@@ -262,13 +259,11 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       'list_modules',
     );
     if (!testCase) {
-      testLogger?.info('⏭️  Skipping test: No test case configuration');
+      skipRunningTest('No test case configuration');
       return;
     }
     if (!isTestAvailableForSystem(testCase.available_in)) {
-      testLogger?.info(
-        `⏭️  Skipping test: not available on ${statedKindWords()}`,
-      );
+      skipRunningTest(`not available on ${statedKindWords()}`);
       return;
     }
 
@@ -300,8 +295,8 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
         errorMsg.includes('404') ||
         errorMsg.includes('500')
       ) {
-        testLogger?.info(
-          `⏭️  Skipping test: Shared FUGR not found (run shared:setup first): ${errorMsg}`,
+        skipRunningTest(
+          `Shared FUGR not found (run shared:setup first): ${errorMsg}`,
         );
         return;
       }

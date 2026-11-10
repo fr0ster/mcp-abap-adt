@@ -356,7 +356,7 @@ export function getEnabledTestCase(
     }
     if (testCase.enabled !== true) {
       configLogger?.info(
-        `⏭️  Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`,
+        `Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`,
       );
       return null;
     }
@@ -369,7 +369,7 @@ export function getEnabledTestCase(
       );
       if (disabledTests.length > 0) {
         configLogger?.info(
-          `⏭️  All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`,
+          `All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`,
         );
       } else {
         configLogger?.debug(
@@ -893,7 +893,7 @@ export async function preCheckTestParameters(
   } else if (packageName && superPackage) {
     // For package creation tests with superPackage, we skip checking packageName
     configLogger?.debug(
-      `[PRE_CHECK] Skipping package ${packageName} check (will be created as child of ${superPackage})`,
+      `[PRE_CHECK] Not checking package ${packageName} (will be created as child of ${superPackage})`,
     );
   }
 

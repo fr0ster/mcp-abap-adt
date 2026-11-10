@@ -16,6 +16,7 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { HttpTransport } from '@mcp-abap-adt/connection';
 import { runtimeDirectory } from '@mcp-abap-adt/lib/embeddable';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -621,6 +622,117 @@ describe('no_connection: one condition at a time', () => {
       assert.notEqual(payloadOf((await s.call()).text).error, 'no_connection');
     } finally {
       await s.close();
+    }
+  });
+});
+
+/**
+ * Connection attempts from this process while `run` runs: every
+ * `net.Socket` connect, counted where Node's HTTP agent opens a socket.
+ */
+async function connectsDuring<T>(
+  run: () => Promise<T>,
+): Promise<{ result: T; connects: number }> {
+  const connect = mock.method(net.Socket.prototype, 'connect');
+  try {
+    const result = await run();
+    return { result, connects: connect.mock.callCount() };
+  } finally {
+    connect.mock.restore();
+  }
+}
+
+/**
+ * A started server whose first call made the connection through the gate;
+ * the gate is still forwarding.
+ */
+async function withHeldConnection(flags: readonly string[]) {
+  await gate.forward(standIn.url);
+  const s = await start(flags);
+  const first = await s.call('GetAdtTypes');
+  assert.equal(first.isError, false, first.text);
+  return s;
+}
+
+describe('a connection already made: a request that reaches no answer', () => {
+  it('with the flag, ECONNREFUSED on the held connection answers no_connection with the code, no address, in one attempt', async () => {
+    const s = await withHeldConnection(['--deferred-logon']);
+    try {
+      await gate.close();
+      const from = standIn.requests.length;
+      const { result: answer, connects } = await connectsDuring(() =>
+        s.call('GetAdtTypes'),
+      );
+      assert.equal(answer.isError, true);
+      const payload = payloadOf(answer.text);
+      assert.equal(payload.error, 'no_connection', answer.text);
+      assert.equal(
+        payload.message,
+        'no connection to the SAP system: the connection failed (ECONNREFUSED); the next tool call tries again',
+      );
+      assertNoAddress(answer.text);
+      // Exactly one attempt: one socket opened, nothing reached SAP.
+      assert.equal(connects, 1);
+      assert.equal(standIn.requests.length, from);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('without the flag, the same failure is answered as today', async () => {
+    const s = await withHeldConnection([]);
+    try {
+      await gate.close();
+      const { result: answer, connects } = await connectsDuring(() =>
+        s.call('GetAdtTypes'),
+      );
+      assert.equal(answer.isError, true);
+      const payload = payloadOf(answer.text);
+      assert.equal(payload.error, undefined, answer.text);
+      assert.equal(payload.origin, 'connection');
+      assert.equal(String(payload.message).includes('ECONNREFUSED'), true);
+      assert.equal(connects, 1);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('with the flag, a listed code that came with a response is answered as today', async () => {
+    const s = await withHeldConnection(['--deferred-logon']);
+    try {
+      mock.method(HttpTransport.prototype, 'send', async () => {
+        throw Object.assign(new Error('the system answered'), {
+          code: 'ECONNRESET',
+          response: { status: 503, statusText: '', headers: {}, data: '' },
+        });
+      });
+      const answer = await s.call('GetAdtTypes');
+      assert.equal(answer.isError, true, answer.text);
+      const payload = payloadOf(answer.text);
+      assert.notEqual(payload.error, 'no_connection', answer.text);
+      assert.equal(payload.origin, 'connection');
+      assert.equal(payload.status, 503);
+    } finally {
+      await s.stop();
+    }
+  });
+
+  it('with the flag, an unlisted code with no response is answered as today', async () => {
+    const s = await withHeldConnection(['--deferred-logon']);
+    try {
+      mock.method(HttpTransport.prototype, 'send', async () => {
+        throw Object.assign(new Error('something else'), {
+          code: 'ERR_SOMETHING_ELSE',
+        });
+      });
+      const answer = await s.call('GetAdtTypes');
+      assert.equal(answer.isError, true);
+      const payload = payloadOf(answer.text);
+      assert.notEqual(payload.error, 'no_connection', answer.text);
+      assert.equal(payload.origin, 'connection');
+      assert.equal(payload.message, 'something else');
+    } finally {
+      await s.stop();
     }
   });
 });

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
@@ -9,6 +10,7 @@ import {
   registerActiveTool,
   shutdownRefusalAnswer,
 } from '../lib/activeTools.js';
+import { runWithAdtFailureReader } from '../lib/adtFailureReading.js';
 import {
   AdtHeaderPairs,
   type AdtHeaderPort,
@@ -723,6 +725,17 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readFailure(thrown: unknown): ReadFailure | undefined {
     return failureOf(thrown);
+  }
+
+  /**
+   * A handler's failure on the instance's connection (a call in the main
+   * flow), read before the handler renders it (`answerFailure`): the
+   * instance's own answer, or `undefined` for the failure as it came. The
+   * base reads none; stdio's `--deferred-logon` answers a request that
+   * reached no answer as `no_connection` (#353).
+   */
+  protected readAdtFailure(_failed: IAdtError): ReadFailure | undefined {
+    return undefined;
   }
 
   /** The tail of the instance's main flow (`enterMainFlow`). */
@@ -1812,8 +1825,15 @@ export abstract class BaseMcpServer extends McpServer {
                   }),
                 );
               } else {
+                // On the instance's connection, a handler's failure is read
+                // by the instance first (`readAdtFailure`).
                 handlerPromise = resolved(() =>
-                  entry.call(context, handlerArgs),
+                  holdsFlow
+                    ? runWithAdtFailureReader(
+                        (failed) => this.readAdtFailure(failed),
+                        () => entry.call(context, handlerArgs),
+                      )
+                    : entry.call(context, handlerArgs),
                 );
               }
 

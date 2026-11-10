@@ -12,6 +12,7 @@ import {
   type IAdtError,
   type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { readAdtFailureInCall } from './adtFailureReading';
 import {
   answerRead,
   failurePayload as chainFailurePayload,
@@ -373,6 +374,11 @@ export function answerFailure(
   // made it, never rebuilt from the error's message.
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
+  // The instance's own reading of the failure, when the call runs inside one
+  // (`runWithAdtFailureReader`): stdio's `--deferred-logon` answers a request
+  // that reached no answer as `no_connection`.
+  const own = readAdtFailureInCall(failed);
+  if (own !== undefined) return answerRead(own);
   // Refused here, before any request: not a claim about the server.
   if (ctx !== undefined && isSystemContextRefusal(error.message)) {
     return local('system_context_missing', ctx, error.message);

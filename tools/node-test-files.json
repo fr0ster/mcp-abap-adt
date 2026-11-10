@@ -1,5 +1,4 @@
 [
-  "server-runtime/src/__tests__/dataToolsAtStart.test.ts",
   "server-runtime/src/stdio/__tests__/cancel/loginBound.test.ts",
   "src/__tests__/admin/shared-deps/check.test.ts",
   "src/__tests__/admin/shared-deps/setup.test.ts",
@@ -75,6 +74,7 @@
   "src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts",
   "src/__tests__/unit/embeddable/dataTools.test.ts",
   "src/__tests__/unit/installMatrix.test.ts",
+  "src/__tests__/unit/launchers/dataToolsAtStart.test.ts",
   "src/__tests__/unit/runner/build.test.ts",
   "src/__tests__/unit/runner/interrupt.test.ts",
   "src/__tests__/unit/runner/jestWorkers.test.ts",

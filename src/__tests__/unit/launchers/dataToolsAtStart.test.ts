@@ -22,19 +22,16 @@ import {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { compactToolSet } from '../../../compact/src/launcher';
-import {
-  type AdtStandIn,
-  adtStandIn,
-} from '../../../src/__tests__/helpers/adtStandIn';
-import { resetProcessLatchForTests } from '../../../src/lib/activeTools';
-import { fullToolSet, type ToolSet } from '../../../src/lib/toolSet';
-import { readHttpConfig } from '../http/config/httpParameters';
-import { launch as launchHttp } from '../http/launcher';
-import { readSseConfig } from '../sse/config/sseParameters';
-import { launch as launchSse } from '../sse/launcher';
-import { readCoreConfig } from '../stdio/config/coreParameters';
-import { launch as launchStdio } from '../stdio/launcher';
+import { compactToolSet } from '../../../../compact/src/launcher';
+import { readHttpConfig } from '../../../../server-runtime/src/http/config/httpParameters';
+import { launch as launchHttp } from '../../../../server-runtime/src/http/launcher';
+import { readSseConfig } from '../../../../server-runtime/src/sse/config/sseParameters';
+import { launch as launchSse } from '../../../../server-runtime/src/sse/launcher';
+import { readCoreConfig } from '../../../../server-runtime/src/stdio/config/coreParameters';
+import { launch as launchStdio } from '../../../../server-runtime/src/stdio/launcher';
+import { resetProcessLatchForTests } from '../../../lib/activeTools';
+import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
+import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 
 const FULL_DATA = ['GetSqlQuery', 'GetTableContents'];
 const COMPACT_DATA = ['HandlerGetData'];

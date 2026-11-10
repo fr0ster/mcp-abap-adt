@@ -62,6 +62,7 @@
   "src/__tests__/unit/adtHeaders/headerCallSites.test.ts",
   "src/__tests__/unit/analyseOmissions.test.ts",
   "src/__tests__/unit/atc/atcPoll.test.ts",
+  "src/__tests__/unit/auth/connectionCause.test.ts",
   "src/__tests__/unit/binSmoke.test.ts",
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/hardModeBinaries.test.ts",

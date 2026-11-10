@@ -14,6 +14,11 @@ export {
   failureLogLine,
   failurePayload,
 } from './answerFailure';
+export {
+  CONNECTION_CAUSE_CODES,
+  type ConnectionCauseCode,
+  connectionCauseOf,
+} from './connectionCause';
 export { assertDestinationName } from './destinationName';
 export type { DestinationSystemContext } from './destinationSystemContext';
 export { errorClassOf, SettingsError } from './errors';

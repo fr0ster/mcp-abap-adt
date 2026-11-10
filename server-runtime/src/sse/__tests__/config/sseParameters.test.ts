@@ -436,6 +436,7 @@ describe('the YAML template and validation come from the table', () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
         'batch',
+        'enable-data-tools',
         'sse',
         'shutdown-timeout',
         'state-idle-minutes',

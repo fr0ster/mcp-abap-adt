@@ -399,6 +399,7 @@ describe('the YAML template and validation come from the table', () => {
         'browser-program',
         'client',
         'connection-type',
+        'enable-data-tools',
         'env',
         'env-path',
         'group',

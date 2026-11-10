@@ -62,6 +62,7 @@
   "src/__tests__/unit/analyseOmissions.test.ts",
   "src/__tests__/unit/atc/atcPoll.test.ts",
   "src/__tests__/unit/binSmoke.test.ts",
+  "src/__tests__/unit/config/enableDataTools.test.ts",
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/hardModeBinaries.test.ts",
   "src/__tests__/unit/coverage/live.test.ts",

@@ -67,4 +67,10 @@ export interface IServerConfig {
    * `batch.keepRawParts`). Default `false`.
    */
   batchKeepRawParts?: boolean;
+
+  /**
+   * Whether the binary serves the data tools (`--enable-data-tools`,
+   * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
+   */
+  enableDataTools?: boolean;
 }

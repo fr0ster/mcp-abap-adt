@@ -177,9 +177,9 @@ describe('the refusal stop at the connection', () => {
         [
           'auth_broker:',
           `  paths: { service_keys_dir: ${JSON.stringify(dir)} }`,
-          '  abap: { destination: STAND }',
           '  browser: none',
           'environment:',
+          '  env: STAND.env',
           '  system_type: onprem',
           `  expected_realm: ${JSON.stringify(REALM)}`,
           '',

@@ -122,9 +122,9 @@ describe('setupAuthBrokerForTests over RFC', () => {
         [
           'auth_broker:',
           `  paths: { service_keys_dir: ${JSON.stringify(dir)} }`,
-          '  abap: { destination: STAND }',
           '  browser: none',
           'environment:',
+          '  env: STAND.env',
           '  system_type: onprem',
           '',
         ].join('\n'),
@@ -159,11 +159,7 @@ describe('the test factory takes the wire from the test config', () => {
       );
       const factory = createTestFactory(
         {
-          auth_broker: {
-            paths: { service_keys_dir: dir },
-            abap: { destination: 'STAND' },
-            browser: 'none',
-          },
+          auth_broker: { paths: { service_keys_dir: dir }, browser: 'none' },
           environment: { system_type: 'onprem', connection_type: 'http' },
         },
         'STAND',

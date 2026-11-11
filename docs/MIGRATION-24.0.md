@@ -14,12 +14,16 @@ ADT dependencies move to `@mcp-abap-adt/adt-clients` 45, `@mcp-abap-adt/adt-stra
 `@mcp-abap-adt/interfaces-adt` 27 (`@mcp-abap-adt/compact-modify` too): what that changes for a
 caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" and
 "Callers of the activation tools: an activation SAP did not carry out is an error" below (44
-adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 20,
+adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 21,
 `@mcp-abap-adt/interfaces-auth-sap` 4 and `@mcp-abap-adt/interfaces-adt-connection` 4, the
 destination path to `@mcp-abap-adt/auth-broker` 5.1, `@mcp-abap-adt/auth-stores` 5.1 and
 `@mcp-abap-adt/interfaces-auth-broker` 1.4: what that changes is under "RFC destinations: the
 address is stated" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
 `@mcp-abap-adt/server-runtime` now.
+Connection 21 asks for the CSRF token once per endpoint, with no retry and no delay, so a
+logon against a closed port fails at once; an embedder that calls `createConnection`, a
+connector or `makeAdtRequest` changes nothing (a wire or subclass of its own: connection's
+MIGRATION-21.0).
 
 ## RFC destinations: the address is stated
 
@@ -879,6 +883,20 @@ A test helper of your own that called `getTimeout` or `getOperationDelay`
 (`src/__tests__/integration/helpers/configHelpers.ts`) goes on the answer it waits for instead. A
 live run that waits for ever is ended with Ctrl-C: once lets the running case and its cleanup
 finish, twice stops the run (`src/__tests__/integration/README.md`, "Interrupting a run").
+
+## Contributors: the test destination is `environment.env`'s name
+
+`auth_broker.abap.destination` in `tests/test-config.yaml` is no longer read, and the template
+no longer lists it. The test destination — the auth broker's, which the live coverage suites
+and the live run's setup log on with, on premise and on the cloud alike — is the name of the
+session file `environment.env` names, without `.env`: `env: "your-system.env"` is the
+destination `your-system`, read from `sessions/your-system.env` (and, for a cloud destination,
+`service-keys/your-system.json`) under `auth_broker.paths.service_keys_dir`. A copy whose
+`environment.env` and `auth_broker.abap.destination` named the same session (`"your-system.env"`
+and `"your-system"`) changes nothing; delete the field. A copy that named a destination there and no
+`environment.env` sets `environment.env` to that destination's session file name instead. An
+`environment.env` that is a path outside that sessions folder names no destination: the suites
+that need one are refused, naming it.
 
 ## Contributors: the test scripts
 

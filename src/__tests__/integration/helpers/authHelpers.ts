@@ -24,6 +24,7 @@ import {
 import * as dotenv from 'dotenv';
 import { getPlatformPaths } from '../../../../server-runtime/src/stdio/config/platformPaths';
 import { loadTestConfig } from './configHelpers';
+import { testDestinationName } from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
 import { guardedSend } from './refusalGuard';
 
@@ -164,7 +165,6 @@ export interface TestDestination {
   credential: IAuthProvider;
 }
 
-/** The destination the test config names, or undefined. */
 /**
  * `key` as the destination's own `sessions/<destination>.env` states it (the
  * file the launcher joins to the environment for the wire), when readable.
@@ -191,15 +191,6 @@ export function connectionTypeOf(stated: string | undefined): {
 } {
   const word = stated?.trim().toLowerCase();
   return word === 'http' || word === 'rfc' ? { connectionType: word } : {};
-}
-
-function configuredDestination(config: any): string | undefined {
-  return (
-    config?.auth_broker?.abap?.destination ||
-    config?.abap?.destination ||
-    config?.environment?.destination ||
-    undefined
-  );
 }
 
 /**
@@ -260,15 +251,17 @@ export function createTestFactory(
 let testDestinationPromise: Promise<TestDestination | null> | undefined;
 
 /**
- * The test config's destination — one factory per process, so every test
- * suite in it shares the destination's one provider. `null` when the config
- * names no destination.
+ * The test config's destination — the session `environment.env` names
+ * (`testDestinationName`) — with one factory per process, so every test
+ * suite in it shares the destination's one provider. `null` when
+ * `environment.env` names no session of the stores.
  */
 export function getTestDestination(): Promise<TestDestination | null> {
   if (!testDestinationPromise) {
     testDestinationPromise = (async () => {
       const config = loadTestConfig();
-      const destination = configuredDestination(config);
+      // The destination is the session environment.env names (testDestinationName).
+      const destination = testDestinationName(config);
       if (!destination) return null;
       const factory = createTestFactory(config, destination);
       const settings = await factory.settingsFor(destination);

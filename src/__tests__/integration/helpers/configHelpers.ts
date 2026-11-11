@@ -28,6 +28,7 @@ import {
   type ConfiguredSystemKind,
   configuredSystemKindOf,
   NO_KIND_STATED,
+  testDestinationName,
 } from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
 import { testConfigPathFromEnv } from './testConfigPath';
@@ -46,13 +47,8 @@ let brokerSucceeded = false;
 function resolveUseAuthBrokerFlag(): boolean {
   try {
     const cfg = loadTestConfig();
-    // If destination is specified, always use auth-broker (ignore .env)
-    const hasDestination =
-      !!cfg?.auth_broker?.abap?.destination ||
-      !!cfg?.abap?.destination ||
-      !!cfg?.environment?.destination ||
-      !!cfg?.abap?.service_keys?.destination ||
-      !!cfg?.abap?.sessions?.destination;
+    // A destination (the session environment.env names) uses auth-broker.
+    const hasDestination = testDestinationName(cfg) !== undefined;
 
     // test-config.yaml alone decides. MCP_USE_AUTH_BROKER is not read: the
     // server refuses it since 16.0.0, so the harness neither reads nor sets it.
@@ -98,7 +94,8 @@ function resolveUnsafeFlag(): boolean {
  *    `<name>.env`, exactly as `--env=<name>` (under
  *    `auth_broker.paths.service_keys_dir` when set, else the platform
  *    directory); a path is that file;
- * 2. the auth-broker destination (`auth_broker.abap.destination`);
+ * 2. the auth-broker destination — the session `environment.env` names
+ *    (`testDestinationName`) — when that file is not there yet;
  * 3. `MCP_ENV_PATH`, a file named explicitly.
  *
  * Nothing is looked up in the working directory or the repository root: the
@@ -203,7 +200,7 @@ export async function loadTestEnv(): Promise<void> {
     }
   } else {
     configLogger?.warn(
-      '⚠️ No destination: set environment.env (a sessions-store name) or auth_broker.abap.destination in test-config.yaml.',
+      '⚠️ No destination: set environment.env (a sessions-store name, or a path) in test-config.yaml.',
     );
   }
 
@@ -240,7 +237,7 @@ export async function loadTestEnv(): Promise<void> {
   const wire = process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
   if (wire !== 'rfc' && !process.env.SAP_URL) {
     envLoadError = new Error(
-      'SAP_URL is not set. Set environment.env (a sessions-store name, or a path) or auth_broker.abap.destination in test-config.yaml.',
+      'SAP_URL is not set. Set environment.env (a sessions-store name, or a path) in test-config.yaml.',
     );
     throw envLoadError;
   }

@@ -228,11 +228,8 @@ it('an HTTP child without a system kind is not started by hard mode', async () =
   fs.mkdirSync(path.join(base, 'sessions'), { recursive: true });
   fs.copyFileSync(envFile, path.join(base, 'sessions', 'STAND.env'));
   const config = {
-    auth_broker: {
-      paths: { service_keys_dir: base },
-      abap: { destination: 'STAND' },
-    },
-    environment: {},
+    auth_broker: { paths: { service_keys_dir: base } },
+    environment: { env: 'STAND.env' },
     integration_hard_mode: {
       enabled: true,
       transport: 'http',

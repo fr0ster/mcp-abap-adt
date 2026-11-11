@@ -280,7 +280,9 @@ naming the cause by the same code the start line names (`ECONNREFUSED`, `ECONNRE
 never the URL, the host, the port or a credential. The next call tries once more: there is no
 retry, no polling and no timer. A refused credential, an answer of SAP and an RFC logon that
 fails (named by its RFC key) are answered as before. A request on a connection already made
-that fails is answered as before, for now.
+that reaches no answer — the system stopped after the logon — answers `no_connection` too, with
+the network code adt-clients names on its failure (one of the seven above; a TLS failure on a
+connection already made is answered as before): one attempt, the next call sends again.
 
 The parameter beats the variable, and the variable beats the configuration file; the
 destination's `.env` is not read for it.

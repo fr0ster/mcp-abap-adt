@@ -1,7 +1,9 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
 import {
   connectionCauseOf,
+  noConnectionWords,
   type ReadFailure,
   readGuarded,
   ServerRefusal,
@@ -242,6 +244,23 @@ export class StdioServer extends BaseMcpServer {
     return cause === undefined
       ? undefined
       : new ServerRefusal('no_connection', cause);
+  }
+
+  /**
+   * `--deferred-logon`: a request on the connection already made that
+   * reached no answer — no response, and a cause code adt-clients names from
+   * its listed codes (`IAdtError.connectionCause`) — is `no_connection`,
+   * naming the code alone. Its message, request and anything else of the
+   * failure are not read. Anything else is answered as it came.
+   */
+  protected override readAdtFailure(
+    failed: IAdtError,
+  ): ReadFailure | undefined {
+    if (!this.deferredLogon) return undefined;
+    if (failed.response !== undefined) return undefined;
+    const cause = failed.connectionCause;
+    if (cause === undefined) return undefined;
+    return { error: 'no_connection', message: noConnectionWords(cause) };
   }
 
   /** Inspection-only mode refuses the leftover-session tools too, before anything is read. */

@@ -88,9 +88,9 @@ function configure(sessionLines: string[], environment: string[]): void {
     [
       'auth_broker:',
       `  paths: { service_keys_dir: ${JSON.stringify(dir)} }`,
-      '  abap: { destination: STAND }',
       '  browser: none',
       'environment:',
+      '  env: STAND.env',
       '  system_type: onprem',
       // A realm the stand-in does not answer: the check stops the run once it ran.
       '  expected_realm: "NOT THE STAND REALM"',

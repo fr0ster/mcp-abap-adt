@@ -57,9 +57,9 @@ beforeAll(async () => {
     [
       'auth_broker:',
       `  paths: { service_keys_dir: ${JSON.stringify(dir)} }`,
-      '  abap: { destination: STAND }',
       '  browser: none',
       'environment:',
+      '  env: STAND.env',
       '  system_type: onprem',
       '',
     ].join('\n'),
@@ -83,7 +83,7 @@ describe('createTestConnectionAndSession', () => {
   it('an HTTP connection that logged on answers its session: the cookies it holds', async () => {
     const { connection, session, connectionSource } =
       await createTestConnectionAndSession();
-    expect(connectionSource).toBe('auth_broker');
+    expect(connectionSource).toBe('env');
     expect(connection.getSessionId()).not.toBeNull();
     // Presence only: the cookies are a secret and never printed.
     expect(session.session_state.cookies.length > 0).toBe(true);

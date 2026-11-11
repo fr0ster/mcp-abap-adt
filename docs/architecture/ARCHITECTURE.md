@@ -609,7 +609,7 @@ graph TD
    ├── Handler creates AdtClient(connection, logger)
    ├── Calls typed operation (e.g., client.getProgram().read(...))
    ├── AdtClient delegates to IAbapConnection.makeAdtRequest()
-   └── Connection handles auth, CSRF, retries, session
+   └── Connection handles auth, CSRF (one fetch, no retry), its named resends, session
 
 6. Response
    └── Handler returns MCP-formatted response (text content)
@@ -780,7 +780,7 @@ For troubleshooting:
 
 - Enable debug logging: `AUTH_LOG_LEVEL=debug` or `DEBUG_AUTH_LOG=true`
 - Token flow diagnostics: `AuthBroker` logs every step of the acquisition flow
-- Connection diagnostics: `AbstractAbapConnection` logs CSRF operations, retries, and session state
+- Connection diagnostics: `AbstractAbapConnection` logs CSRF operations, its named resends, and session state
 - Handler diagnostics: Each handler logs operation parameters and error details
 - All sensitive data (tokens, passwords, secrets) is redacted in log output
 

@@ -4,7 +4,7 @@
  * skipped with its reason — node:test reports it `# SKIP` and counts it
  * skipped, and the coverage ledger reads it as not run — and writes the
  * reason to the test log. A helper that only logged a skip and returned left
- * the case reported as passed (measured on E77, SAP_BASIS 7.40: 175 skipped
+ * the case reported as passed (measured on the legacy system, SAP_BASIS 7.40: 175 skipped
  * cases counted as passes).
  *
  * The running case is set by `runningTestPreload.ts`, a root `beforeEach` the

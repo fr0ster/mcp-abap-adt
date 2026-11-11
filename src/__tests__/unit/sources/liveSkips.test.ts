@@ -1,5 +1,5 @@
 /**
- * A live case that skips is reported skipped (D27; measured on E77, SAP_BASIS
+ * A live case that skips is reported skipped (D27; measured on the legacy system, SAP_BASIS
  * 7.40: 175 cases that logged a skip and returned were counted as passes).
  * The one way a live helper or suite skips the case it runs in is
  * `skipRunningTest(reason)` (`integration/helpers/runningTest.ts`), which

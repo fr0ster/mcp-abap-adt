@@ -5,7 +5,7 @@
  * a connection double that answers by URL: the requests on the wire are the
  * members', a `404` is the kind's absence, any other refusal is the call's.
  *
- * The documents are E19's own (2026-10-24, SAP-delivered objects), trimmed to
+ * The documents are the on-premise system's own (2026-10-24, SAP-delivered objects), trimmed to
  * the fields read and without their author attributes, except the table
  * type's: SAP's whole answer, from the corpus.
  */

@@ -6,7 +6,7 @@ import * as z from 'zod';
  * the name is read as each: a data element, a domain, a structure (unless
  * switched off) and a table type, each through its adt-clients member (#235),
  * and the call answers every kind that exists, in alphabetical order of kind.
- * Measured on E19 (2026-10-24): each read answers `404` for a kind the name is
+ * Measured on premise (2026-10-24): each read answers `404` for a kind the name is
  * not, and `200` with its own document for one it is (`blue:wbobj` /
  * `dtel:dataElement`, `doma:domain`, `blue:blueSource`, `ttyp:tableType`), so
  * nothing is tried in an order and nothing is guessed.

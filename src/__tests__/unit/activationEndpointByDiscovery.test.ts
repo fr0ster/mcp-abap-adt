@@ -221,7 +221,7 @@ describe('the group endpoint, from discovery', () => {
 /**
  * An empty `200` from `/activation` is an activation (fr0ster/mcp-abap-adt#351,
  * the owner's Q1 (a)), and it is answered as one at every detail and on both
- * paths — measured on E77 (SAP_BASIS 7.40, RFC): `ActivateObjects` on two
+ * paths — measured on the legacy system (SAP_BASIS 7.40, RFC): `ActivateObjects` on two
  * programs answered `projection_failed` though both had activated. The
  * answer replayed is the recorded `activation-sync-activated-751` (an empty
  * `200`, activated).
@@ -249,7 +249,7 @@ describe('an empty 200 from /activation: activated, at every detail', () => {
     return { result, requests };
   }
 
-  it('ActivateObjects, two programs (the group path, as on E77): activated', async () => {
+  it('ActivateObjects, two programs (the group path, as on legacy): activated', async () => {
     const { connection, requests } = answering(
       system(SEVEN_40, { status: 202 }, EMPTY_200),
     );

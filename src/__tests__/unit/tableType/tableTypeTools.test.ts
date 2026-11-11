@@ -547,7 +547,7 @@ describe('UpdateTableType', () => {
 
 /**
  * What SAP stores when it takes other values than those sent (measured on
- * E19, 2026-11-01: `hashed` forces a unique key): STRING_TABLE with a hashed
+ * on premise, 2026-11-01: `hashed` forces a unique key): STRING_TABLE with a hashed
  * access and a unique key, answered by the wait's read after the unlock.
  */
 const STORED_HASHED = STRING_TABLE.replace(

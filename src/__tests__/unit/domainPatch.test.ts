@@ -71,6 +71,43 @@ describe('patching a domain changes what was asked and nothing else', () => {
   });
 });
 
+/**
+ * The read-back of a freshly created domain on ABAP Cloud, its structure as
+ * measured (2026-11-11): the root `doma:domain` carries **no**
+ * `adtcore:description`, while the `adtcore:packageRef` beside it carries the
+ * package's. Values here are neutral.
+ */
+const CLOUD_READ_BACK = `<?xml version="1.0" encoding="utf-8"?>
+<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:masterLanguage="EN" adtcore:abapLanguageVersion="cloudDevelopment" adtcore:name="ZMCP_D_TEST" adtcore:type="DOMA/DD" adtcore:version="new" adtcore:language="EN">
+  <atom:link xmlns:atom="http://www.w3.org/2005/Atom" href="versions" rel="http://www.sap.com/adt/relations/versions"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zmcp_p_test" adtcore:type="DEVC/K" adtcore:name="ZMCP_P_TEST" adtcore:description="the package"/>
+  <doma:content>
+    <doma:typeInformation>
+      <doma:datatype/>
+      <doma:length>000000</doma:length>
+      <doma:decimals>000000</doma:decimals>
+    </doma:typeInformation>
+  </doma:content>
+</doma:domain>`;
+
+describe('the description goes on the domain, never on the package beside it', () => {
+  it('adds it to a root that arrived without one, leaving the package reference alone', () => {
+    const out = patchDomainXml(CLOUD_READ_BACK, {
+      description: 'the domain',
+      datatype: 'CHAR',
+      length: 10,
+    });
+    expect(out).toContain(
+      'adtcore:language="EN" adtcore:description="the domain">',
+    );
+    expect(out).toContain(
+      'adtcore:name="ZMCP_P_TEST" adtcore:description="the package"/>',
+    );
+    expect(out).toContain('<doma:datatype>CHAR</doma:datatype>');
+    expect(out).toContain('<doma:length>10</doma:length>');
+  });
+});
+
 describe('a read that came back empty is refused, not written back', () => {
   it('throws rather than sending a document with nothing patched into it', () => {
     // ADT answers a read of a not-yet-ready object with 200 and no body, so
@@ -81,8 +118,14 @@ describe('a read that came back empty is refused, not written back', () => {
 
   it('throws when the field to patch is not in the document', () => {
     expect(() =>
-      patchDomainXml('<doma:domain/>', { description: 'x' }),
+      patchDomainXml('<doma:domain/>', { datatype: 'CHAR' }),
     ).toThrow(XmlPatchError);
+  });
+
+  it('throws when the document holds no domain to describe', () => {
+    expect(() => patchDomainXml('<doma:other/>', { description: 'x' })).toThrow(
+      /doma:domain/,
+    );
   });
 
   it('names what it could not patch', () => {

@@ -7,7 +7,6 @@ import {
 import type { Element } from '../xml/tree';
 import {
   patchIf,
-  patchXmlAttribute,
   patchXmlBlock,
   patchXmlElement,
   patchXmlElementAttribute,
@@ -76,9 +75,16 @@ export function patchDomainXml(
 ): string {
   let xml = currentXml;
 
+  // Scoped to the root, added when it is missing: ABAP Cloud answers the
+  // read-back of a fresh domain with no `adtcore:description` on
+  // `doma:domain` (measured 2026-11-11) while `adtcore:packageRef` carries the
+  // package's, so the first attribute so named is the package's — the defect
+  // `dataElementPatch.ts` describes for data elements (#211), and SAP's PUT
+  // answered SWB_TOOL 019, "The description is missing".
   if (changes.description) {
-    xml = patchXmlAttribute(
+    xml = patchXmlElementAttribute(
       xml,
+      'doma:domain',
       'adtcore:description',
       limitDescription(changes.description),
     );

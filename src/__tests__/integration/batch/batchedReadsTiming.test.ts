@@ -165,6 +165,14 @@ const median = (values: number[]): number => {
 const isError = (answer: unknown): boolean =>
   (answer as { isError?: boolean } | null)?.isError === true;
 
+/** An answer's first text, for the log of a failing case: SAP's answer as the tool answered it. */
+const answerText = (answer: unknown): string => {
+  const content = (answer as { content?: unknown } | null)?.content;
+  const first: unknown = Array.isArray(content) ? content[0] : undefined;
+  const text = (first as { text?: unknown } | undefined)?.text;
+  return typeof text === 'string' ? text : JSON.stringify(answer);
+};
+
 type Case = {
   tool: string;
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
@@ -412,7 +420,11 @@ async function timeBothPaths(
   read: (context: HandlerContext) => Promise<unknown>,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
-  assert.equal(isError(reference.answer), false);
+  assert.equal(
+    isError(reference.answer),
+    false,
+    `${tool} answered an error: ${answerText(reference.answer)}`,
+  );
   assertEquals(itemErrors(reference.answer), []);
   assert.equal(reference.measure.envelopes, 0);
 

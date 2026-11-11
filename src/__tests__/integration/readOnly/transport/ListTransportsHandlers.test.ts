@@ -66,7 +66,11 @@ describe('ListTransports Handler Integration', () => {
         },
       );
 
-      assert.equal(result.isError, false);
+      assert.equal(
+        result.isError,
+        false,
+        `ListTransports answered an error: ${JSON.stringify(result.content)}`,
+      );
       assert.ok(result.content !== undefined);
 
       const data = extractResultData(result);
@@ -98,7 +102,11 @@ describe('ListTransports Handler Integration', () => {
         },
       );
 
-      assert.equal(result.isError, false);
+      assert.equal(
+        result.isError,
+        false,
+        `ListTransports answered an error: ${JSON.stringify(result.content)}`,
+      );
 
       const data = extractResultData(result);
       assert.equal(data.success, true);

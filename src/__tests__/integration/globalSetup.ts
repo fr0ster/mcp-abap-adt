@@ -48,6 +48,7 @@ import {
   configuredSystemKindOf,
   memberOf,
   sessionVariables,
+  testDestinationName,
 } from './helpers/configuredSystemKind';
 import { isLiveScript, sharesLiveLogon } from './helpers/liveScripts';
 import { endTestConnection } from './helpers/openConnections';
@@ -127,12 +128,9 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
     return;
   }
 
-  const destination =
-    textAt(config, 'auth_broker', 'abap', 'destination') ||
-    textAt(config, 'abap', 'destination') ||
-    textAt(config, 'environment', 'destination');
-
-  if (!destination) {
+  // The destination is the session environment.env names.
+  const destination = testDestinationName(config);
+  if (destination === undefined) {
     return;
   }
 

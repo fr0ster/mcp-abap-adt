@@ -13,9 +13,6 @@
 # │  4. environment.default_transport  — transport request or ""     │
 # │  5. shared_dependencies.package    — package for shared objects  │
 # │  6. shared_dependencies.software_component — "ZLOCAL"/"HOME"    │
-# │                                                                  │
-# │  OPTIONAL (cloud/BTP, JWT token refresh):                        │
-# │  7. auth_broker.abap.destination   — auth broker destination     │
 # └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
@@ -78,6 +75,11 @@ environment:
   # HTTP: SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
   # RFC: no SAP_URL; SAP_ASHOST + SAP_SYSNR (or SAP_MSHOST with SAP_MSSERV or
   # SAP_SYSID and SAP_GROUP), SAP_CLIENT, SAP_LANGUAGE, SAP_AUTH_TYPE, etc.
+  # The test destination is this file's name without ".env" (on premise and
+  # cloud alike): the auth broker reads sessions/<destination>.env (and, for
+  # a cloud destination, service-keys/<destination>.json) under
+  # auth_broker.paths.service_keys_dir. A path outside that sessions folder
+  # names no destination: the suites that need one are refused.
   env: ""                                    # ← CHANGE: session file name (e.g., "your-system.env", "another-system.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
@@ -750,13 +752,8 @@ auth_broker:
     #   - ~/.config/mcp-abap-adt/sessions/<destination>.env
     service_keys_dir: "~/.config/mcp-abap-adt"  # Base path for service keys and sessions
 
-  # ABAP destination configuration (for on-premise or cloud ABAP systems)
-  abap:
-    # ABAP destination name (used for service key file: <destination>.json and session file: <destination>.env)
-    # Example: "TRIAL" -> looks for TRIAL.json in service-keys directory and TRIAL.env in sessions directory
-    # This destination is used by refreshTokensForTests() to automatically refresh tokens before integration tests
-    # If not specified, token refresh will be skipped and tests will use tokens from .env file
-    destination: ""                    # Auth broker destination (cloud/BTP only, e.g. "TRIAL", "mcp")
+  # The destination is not stated here: it is environment.env's session file
+  # name without ".env" (see environment.env).
 
 # ============================================================================
 # OBJECT TESTS (High-Level, then Low-Level for each object)

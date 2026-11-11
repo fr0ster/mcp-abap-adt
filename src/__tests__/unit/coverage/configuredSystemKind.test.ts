@@ -10,7 +10,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { getSystemType } from '../../integration/helpers/configHelpers';
-import { configuredSystemKindOf } from '../../integration/helpers/configuredSystemKind';
+import {
+  configuredSystemKindOf,
+  testDestinationName,
+} from '../../integration/helpers/configuredSystemKind';
 import { createHardModeClient } from '../../integration/helpers/testers/hardMode';
 import { testerSystemKind } from '../../integration/helpers/testers/LambdaTester';
 
@@ -25,7 +28,7 @@ afterEach(() => {
   fs.rmSync(base, { recursive: true, force: true });
 });
 
-/** A config naming the destination `DEST`, whose session file holds `lines`. */
+/** A config naming the session `DEST.env` (the destination `DEST`), which holds `lines`. */
 function configWithSession(
   lines: string[],
   environment: Record<string, string> = {},
@@ -35,11 +38,8 @@ function configWithSession(
     `${lines.join('\n')}\n`,
   );
   return {
-    auth_broker: {
-      paths: { service_keys_dir: base },
-      abap: { destination: 'DEST' },
-    },
-    environment,
+    auth_broker: { paths: { service_keys_dir: base } },
+    environment: { env: 'DEST.env', ...environment },
   };
 }
 
@@ -98,6 +98,46 @@ describe('configuredSystemKind', () => {
           SAP_SYSTEM_TYPE: '',
         },
       ),
+    ).toBeUndefined();
+  });
+});
+
+describe('testDestinationName', () => {
+  /** A config whose `environment.env` is `env`, its stores under `base`. */
+  const named = (env: string): Record<string, unknown> => ({
+    auth_broker: { paths: { service_keys_dir: base } },
+    environment: { env },
+  });
+
+  it('is the name of the session file environment.env names, without .env', () => {
+    expect(testDestinationName(named('your-system.env'))).toBe('your-system');
+    expect(testDestinationName(named('other-system'))).toBe('other-system');
+  });
+
+  it("a path into the stores' sessions directory names its file's destination", () => {
+    expect(
+      testDestinationName(named(path.join(base, 'sessions', 'DEST.env'))),
+    ).toBe('DEST');
+  });
+
+  it('a path elsewhere, or a file not named .env, names no destination', () => {
+    expect(
+      testDestinationName(named(path.join(base, 'elsewhere', 'DEST.env'))),
+    ).toBeUndefined();
+    expect(
+      testDestinationName(named(path.join(base, 'sessions', 'DEST.ENV'))),
+    ).toBeUndefined();
+  });
+
+  it('auth_broker.abap.destination is not read: without environment.env there is none', () => {
+    expect(
+      testDestinationName({
+        auth_broker: {
+          paths: { service_keys_dir: base },
+          abap: { destination: 'DEST' },
+        },
+        environment: {},
+      }),
     ).toBeUndefined();
   });
 });

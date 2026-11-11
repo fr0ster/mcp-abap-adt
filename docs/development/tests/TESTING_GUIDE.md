@@ -29,7 +29,7 @@ The template works out of the box with sensible defaults. Edit **only** the line
 
 | Parameter | Description | Example |
 |---|---|---|
-| `environment.env` | Session .env file name from sessions folder | `"your-system.env"`, `"another-system.env"` |
+| `environment.env` | Session .env file name from sessions folder. The test destination is this name without `.env`, on premise and cloud alike: the auth broker reads `sessions/<destination>.env` (and a cloud destination's `service-keys/<destination>.json`) under `auth_broker.paths.service_keys_dir`; a path outside that sessions folder names no destination | `"your-system.env"`, `"another-system.env"` |
 | `environment.system_type` | SAP system type | `"onprem"`, `"cloud"`, `"legacy"` |
 | `environment.connection_type` | Connection protocol | `"http"` (default), `"rfc"` |
 | `environment.realm_check_url` | RFC only, test-only (never part of the destination): the system's HTTP URL the realm check (the `401` and its realm) runs against, since an RFC destination states no `SAP_URL`. Required over RFC — without it the run is refused before anything is sent; over HTTP the session's `SAP_URL` is checked and this is not read | `"https://saphost.example:44300"` |
@@ -38,12 +38,6 @@ The template works out of the box with sensible defaults. Edit **only** the line
 | `environment.default_transport` | Transport request (or `""` for local) | `SIDK900001` |
 | `shared_dependencies.package` | Package for shared test objects | `ZMCP_SHARED` |
 | `shared_dependencies.software_component` | Software component | `LOCAL`, `HOME` |
-
-Optional (cloud/BTP, JWT token refresh):
-
-| Parameter | Description |
-|---|---|
-| `auth_broker.abap.destination` | Auth broker destination (`TRIAL`, `mcp`) |
 
 All other values (object names, CDS sources, unit test code) have working defaults. The configuration holds no time key: a live test has no bound, delay or poll limit.
 

@@ -884,6 +884,20 @@ A test helper of your own that called `getTimeout` or `getOperationDelay`
 live run that waits for ever is ended with Ctrl-C: once lets the running case and its cleanup
 finish, twice stops the run (`src/__tests__/integration/README.md`, "Interrupting a run").
 
+## Contributors: the test destination is `environment.env`'s name
+
+`auth_broker.abap.destination` in `tests/test-config.yaml` is no longer read, and the template
+no longer lists it. The test destination — the auth broker's, which the live coverage suites
+and the live run's setup log on with, on premise and on the cloud alike — is the name of the
+session file `environment.env` names, without `.env`: `env: "your-system.env"` is the
+destination `your-system`, read from `sessions/your-system.env` (and, for a cloud destination,
+`service-keys/your-system.json`) under `auth_broker.paths.service_keys_dir`. A copy whose
+`environment.env` and `auth_broker.abap.destination` named the same session (`"your-system.env"`
+and `"your-system"`) changes nothing; delete the field. A copy that named a destination there and no
+`environment.env` sets `environment.env` to that destination's session file name instead. An
+`environment.env` that is a path outside that sessions folder names no destination: the suites
+that need one are refused, naming it.
+
 ## Contributors: the test scripts
 
 The tests are moving from Jest to `node:test` (a first wave in 24.0.0; the rest stay on Jest

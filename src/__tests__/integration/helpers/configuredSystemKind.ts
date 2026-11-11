@@ -6,7 +6,7 @@
  * In order:
  * 1. the test config's `environment.system_type`;
  * 2. `SAP_SYSTEM_TYPE` in the environment;
- * 3. `SAP_SYSTEM_TYPE` in the destination's session file (`testSessionFile`).
+ * 3. `SAP_SYSTEM_TYPE` in the session file `environment.env` names (`testSessionFile`).
  *
  * `legacy` stays distinct here (an older on-premise system), unlike
  * production's `statedSystemKind`, which maps it to `onprem`.
@@ -19,6 +19,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
+import { getPlatformPaths } from '../../../../server-runtime/src/stdio/config/platformPaths';
 
 /** What a test run may state as its system kind. */
 export type ConfiguredSystemKind = 'onprem' | 'cloud' | 'legacy';
@@ -56,21 +57,41 @@ function brokerBase(config: unknown): string | undefined {
 
 /**
  * The destination's session file, as the server resolves `--env`: the
- * config's `environment.env` (a sessions-store name or a path), else the
- * destination's name, under the stores' base directory. `undefined` when the
- * config names neither.
+ * config's `environment.env` (a sessions-store name or a path), under the
+ * stores' base directory. `undefined` when the config names none.
  */
 export function testSessionFile(config: unknown): string | undefined {
-  const named =
-    textOf(config, 'environment', 'env') ??
-    textOf(config, 'auth_broker', 'abap', 'destination') ??
-    textOf(config, 'abap', 'destination') ??
-    textOf(config, 'environment', 'destination');
+  const named = textOf(config, 'environment', 'env');
   if (named === undefined) return undefined;
   return resolveEnvFilePath({
     envDestination: named,
     authBrokerPath: brokerBase(config),
   });
+}
+
+/** The suffix of a session file: the destination is the file's name without it. */
+const SESSION_SUFFIX = '.env';
+
+/**
+ * The test destination: the name of the session file `environment.env` names,
+ * without `.env`. The factory reads a named destination's
+ * `sessions/<name>.env` under the same base directory (`storesFor`), so the
+ * destination and `environment.env` name one file. `undefined` when the
+ * config names no session, or a file outside the stores' sessions directory
+ * or not named `<name>.env`: such a file is no destination of the stores.
+ */
+export function testDestinationName(config: unknown): string | undefined {
+  const file = testSessionFile(config);
+  if (file === undefined) return undefined;
+  const sessions = getPlatformPaths(brokerBase(config), 'sessions')[0];
+  if (sessions === undefined) return undefined;
+  if (path.resolve(path.dirname(file)) !== path.resolve(sessions)) {
+    return undefined;
+  }
+  const name = path.basename(file);
+  return name.endsWith(SESSION_SUFFIX) && name.length > SESSION_SUFFIX.length
+    ? name.slice(0, -SESSION_SUFFIX.length)
+    : undefined;
 }
 
 /** The session file's variables; empty when there is none. */

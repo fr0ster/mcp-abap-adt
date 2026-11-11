@@ -382,8 +382,8 @@ describe('the family selection', () => {
         [
           'auth_broker:',
           `  paths: { service_keys_dir: ${JSON.stringify(dir)} }`,
-          '  abap: { destination: STAND }',
           'environment:',
+          '  env: STAND.env',
           '  system_type: onprem',
           '  expected_realm: STAND',
           '',

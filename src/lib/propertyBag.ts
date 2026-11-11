@@ -31,13 +31,47 @@ export function givenText(
   return scalarText(given(bag, ...names));
 }
 
-/** The first of `names` the bag carries, a number as it is, else as text. */
+/** Whether `text` is a run of decimal digits, at least one. */
+function isDigits(text: string): boolean {
+  if (text === '') return false;
+  for (const character of text) {
+    if (character < '0' || character > '9') return false;
+  }
+  return true;
+}
+
+/**
+ * The first of `names` the bag carries, as a count: a number as it is, a
+ * text of decimal digits (surrounding blanks aside) as its number; none
+ * for anything else.
+ */
 export function givenCount(
   bag: unknown,
   ...names: string[]
-): number | string | undefined {
+): number | undefined {
   const value = given(bag, ...names);
-  return typeof value === 'number' ? value : scalarText(value);
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return undefined;
+  const digits = value.trim();
+  return isDigits(digits) ? Number(digits) : undefined;
+}
+
+/**
+ * The first of `names` the bag carries, as a flag: a boolean as it is, the
+ * text `true` or `false` (any case, surrounding blanks aside) as its flag;
+ * none for anything else.
+ */
+export function givenFlag(
+  bag: unknown,
+  ...names: string[]
+): boolean | undefined {
+  const value = given(bag, ...names);
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return undefined;
+  const text = value.trim().toLowerCase();
+  if (text === 'true') return true;
+  if (text === 'false') return false;
+  return undefined;
 }
 
 /**

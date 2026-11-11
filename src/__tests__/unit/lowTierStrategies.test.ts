@@ -984,8 +984,7 @@ describe('data_element', () => {
 
   // No corpus fixture exists for GET /sap/bc/adt/ddic/dataelements/{name} —
   // only a create response was captured. The two `currentXml` documents
-  // below are hand-built from patchDataElementXml's own dtel: tag names
-  // (ported from adt-clients v18.0.2), the same disclosure the transport
+  // below are hand-built with the data element's root, the same disclosure the transport
   // block below makes for its own missing fixture.
   it('UpdateDataElementLow passes the patched document via options.source, reaches getDataElement (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and leaves no body in the config', async () => {
     const currentXml =
@@ -1024,8 +1023,9 @@ describe('data_element', () => {
   });
 
   it('UpdateDataElementLow patches typeKind/typeName/dataType into the document read from readMetadata', async () => {
-    const currentXml =
-      '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="x"><dtel:typeKind>predefinedAbapType</dtel:typeKind><dtel:typeName></dtel:typeName><dtel:dataType>CHAR</dtel:dataType></blue:wbobj>';
+    const currentXml = corpusBody(
+      'read-metadata-data-element--01-ddic-dataelements',
+    );
     let patched = '';
     fakeClient = fakeClientOf({
       readMetadata: async () => okResponse(currentXml),
@@ -1048,8 +1048,9 @@ describe('data_element', () => {
   // The bag is the model's own object: a type name given as a number failed
   // the call (`toUpperCase` of a number); it is written out as text.
   it('UpdateDataElementLow writes a type name given as a number', async () => {
-    const currentXml =
-      '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="x"><dtel:typeKind>predefinedAbapType</dtel:typeKind><dtel:typeName></dtel:typeName><dtel:dataType>CHAR</dtel:dataType></blue:wbobj>';
+    const currentXml = corpusBody(
+      'read-metadata-data-element--01-ddic-dataelements',
+    );
     let patched = '';
     fakeClient = fakeClientOf({
       readMetadata: async () => okResponse(currentXml),

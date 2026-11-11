@@ -2,6 +2,7 @@ import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,
@@ -14,20 +15,7 @@ jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 /** A minimal but complete domain metadata document, for the create lifecycle's
  * read-modify-write to patch without tripping over a field it cannot find. */
-const DOMAIN_XML =
-  '<?xml version="1.0" encoding="UTF-8"?>' +
-  '<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" ' +
-  'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" ' +
-  'adtcore:description="before">' +
-  '<doma:datatype>CHAR</doma:datatype>' +
-  '<doma:length>10</doma:length>' +
-  '<doma:decimals>0</doma:decimals>' +
-  '<doma:conversionExit/>' +
-  '<doma:signExists>false</doma:signExists>' +
-  '<doma:lowercase>false</doma:lowercase>' +
-  '<doma:valueTableRef/>' +
-  '<doma:fixValues/>' +
-  '</doma:domain>';
+const DOMAIN_XML = corpusBody('create-domain--01-ddic-domains');
 
 const context = {
   connection: { getSessionId: () => null } as any,

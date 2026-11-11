@@ -11,7 +11,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * -> (activate). The wait is the pre-migration handler's long-polling
  * `read({withLongPolling: true})`, discarded for its result but not for
  * what it does — see `handleUpdateDomain.ts` (high) for the live incident
- * this guards against, documented in `xmlPatch.ts`.
+ * this guards against, documented in `documentPatch.ts`.
  *
  * **The source goes in `options`, not `config`.** See
  * `UpdateMetadataExtensionLow` — the shipped `AdtMetadataExtension.update()`

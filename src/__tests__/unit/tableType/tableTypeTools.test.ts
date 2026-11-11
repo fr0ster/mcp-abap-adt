@@ -309,8 +309,8 @@ describe('CreateTableType', () => {
     );
     const body = String(connection.requests[4]?.data);
     expect(body).toContain('<ttyp:dataType>CHAR</ttyp:dataType>');
-    expect(body).toContain('<ttyp:length>10</ttyp:length>');
-    expect(body).toContain('<ttyp:decimals>2</ttyp:decimals>');
+    expect(body).toContain('<ttyp:length>000010</ttyp:length>');
+    expect(body).toContain('<ttyp:decimals>000002</ttyp:decimals>');
     expect(body).toContain('<ttyp:accessType>sorted</ttyp:accessType>');
     expect(body).toContain('<ttyp:definition>rowType</ttyp:definition>');
     expect(body).toContain('<ttyp:kind>unique</ttyp:kind>');

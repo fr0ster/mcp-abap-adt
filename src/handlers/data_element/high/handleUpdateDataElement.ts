@@ -18,7 +18,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * `unlock` and `activate` here is `readMetadata({withLongPolling: true})`,
  * discarded for its result but not for what it does — see
  * `handleUpdateDomain.ts` (high) for the live incident this guards against,
- * documented in `xmlPatch.ts`. The pre-write "already exists" validation is
+ * documented in `documentPatch.ts`. The pre-write "already exists" validation is
  * gone — it tolerated exactly one refusal shape from an endpoint an update
  * never needs to call.
  *
@@ -33,7 +33,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * Not sent.
  */
 
-import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  dataElementDocuments,
+  patchDataElementDocument,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -43,11 +46,13 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { detailOf } from '../../../lib/strategies/detail';
 import {
   type DataElementChanges,
-  patchDataElementXml,
-} from '../../../lib/strategies/dataElementPatch';
-import { detailOf } from '../../../lib/strategies/detail';
+  type DataElementTypeKind,
+  dataElementChanges,
+} from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -55,7 +60,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -143,7 +147,7 @@ interface DataElementArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  type_kind?: string;
+  type_kind?: DataElementTypeKind;
   type_name?: string;
   data_type?: string;
   length?: number;
@@ -214,7 +218,15 @@ export async function handleUpdateDataElement(
                 { version: 'workingArea', analyse: analyseException },
               ),
             ),
-            atStep('update metadata', (current) =>
+            async (current) =>
+              patchedDocument(
+                patchDataElementDocument(
+                  current.raw,
+                  dataElementChanges(changes),
+                ),
+                `data element ${dataElementName}`,
+              ),
+            atStep('update metadata', (document) =>
               withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
                 obj.updateMetadata(
                   {
@@ -223,13 +235,7 @@ export async function handleUpdateDataElement(
                   },
                   {
                     headers,
-                    source: patchDataElementXml(
-                      extractXmlString(
-                        current.raw,
-                        `data element ${dataElementName}`,
-                      ),
-                      changes,
-                    ),
+                    source: document,
                     lockHandle,
                     analyse: analyseException,
                   },

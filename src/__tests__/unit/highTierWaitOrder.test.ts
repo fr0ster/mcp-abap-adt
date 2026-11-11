@@ -19,6 +19,7 @@ import { handleUpdateMetadataExtension } from '../../handlers/ddlx/high/handleUp
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
 import { handleUpdateFunctionModule } from '../../handlers/function/high/handleUpdateFunctionModule';
 import { handleUpdateServiceDefinition } from '../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
@@ -30,24 +31,16 @@ const context = {
   logger: undefined,
 };
 
-/** No optional field is given in any test below, so no patcher needs a real
- * document to patch — this satisfies `extractXmlString` and nothing more. */
-const MINIMAL_XML = '<x adtcore:description="d"></x>';
+/** A domain's document as SAP answers it: adt-clients' patch reads the
+ * document's own type, so each update reads a document of its type. */
+const DOMAIN_XML = corpusBody('create-domain--01-ddic-domains');
 
-/** `CreateDataElement` forces `type_kind`/`data_type`/`length`/`decimals`
- * defaults even when the caller gives none, so its patch always touches
- * these elements — unlike `UpdateDataElement`, which only patches what the
- * caller named. */
-const DATAELEMENT_CREATE_XML =
-  '<blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" ' +
-  'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" ' +
-  'adtcore:description="before">' +
-  '<dtel:typeKind>domain</dtel:typeKind>' +
-  '<dtel:typeName></dtel:typeName>' +
-  '<dtel:dataType>CHAR</dtel:dataType>' +
-  '<dtel:dataTypeLength>000010</dtel:dataTypeLength>' +
-  '<dtel:dataTypeDecimals>000000</dtel:dataTypeDecimals>' +
-  '</blue:wbobj>';
+/** A data element's document as SAP answers it. `CreateDataElement` forces
+ * `type_kind`/`data_type`/`length`/`decimals` defaults even when the caller
+ * gives none, so its patch always touches these elements. */
+const DATAELEMENT_CREATE_XML = corpusBody(
+  'read-metadata-data-element--01-ddic-dataelements',
+);
 
 describe('the restored long-polling wait: call order, per handler', () => {
   it('BehaviorDefinition create: create, lock, check, unlock, wait, activate', async () => {
@@ -267,7 +260,7 @@ describe('the restored long-polling wait: call order, per handler', () => {
       },
       readMetadata: async () => {
         order.push('read');
-        return okResponse(reading(MINIMAL_XML));
+        return okResponse(reading(DATAELEMENT_CREATE_XML));
       },
       updateMetadata: async () => {
         order.push('update');
@@ -313,7 +306,7 @@ describe('the restored long-polling wait: call order, per handler', () => {
       },
       readMetadata: async () => {
         order.push('read');
-        return okResponse(reading(MINIMAL_XML));
+        return okResponse(reading(DOMAIN_XML));
       },
       updateMetadata: async () => {
         order.push('update');

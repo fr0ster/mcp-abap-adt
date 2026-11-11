@@ -1,4 +1,7 @@
-import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  packageDocuments,
+  patchPackageDocument,
+} from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 /**
  * UpdatePackage Handler - Update ABAP Package Description
@@ -39,10 +42,9 @@ import { answer, messageCarriedBy } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
-import { patchPackageXml } from '../../../lib/strategies/packagePatch';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -129,7 +131,12 @@ export async function handleUpdatePackage(
               { version: 'active', analyse: analyseException },
             ),
         ),
-        atStep('update metadata', (current) =>
+        async (current) =>
+          patchedDocument(
+            patchPackageDocument(current, { description: updated_description }),
+            `package ${packageName}`,
+          ),
+        atStep('update metadata', (document) =>
           withAdtHeaders(context, 'package.updateMetadata', (headers) =>
             client.getPackage(packageDocuments).updateMetadata(
               {
@@ -140,10 +147,7 @@ export async function handleUpdatePackage(
               },
               {
                 headers,
-                source: patchPackageXml(
-                  extractXmlString(current, `package ${packageName}`),
-                  { description: updated_description },
-                ),
+                source: document,
                 lockHandle: lock_handle,
                 analyse: analyseException,
               },
@@ -185,8 +189,7 @@ export async function handleUpdatePackage(
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is
       // where that verdict is read, per this file's own top comment. This
-      // catch is left for a genuine bug in this block (`patchPackageXml`,
-      // say), not for a wire refusal, so it no longer guesses an HTTP
+      // catch is left for a genuine bug in this block, not for a wire refusal, so it no longer guesses an HTTP
       // status or re-parses an `exc` namespace `exception` element out of a body no v19 call here
       // can still produce — that read belongs to `analyseException`, not a
       // second opinion here (issue #200-adjacent; found while writing the

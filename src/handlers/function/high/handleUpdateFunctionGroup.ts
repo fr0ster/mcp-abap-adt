@@ -17,12 +17,17 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * `interfaces-adt@9` merged the channels — and does that request itself now.
  * Verified against `AdtFunctionGroup.ts` in adt-clients 22.
  *
- * The patch itself is `patchFunctionGroupXml` (`functionGroupPatch.ts`),
- * ported field-for-field from `v18.0.2`'s own patcher — description only, a
- * function group being a container with nothing else `update` ever touched.
+ * The patch itself is adt-clients' `patchFunctionGroupDocument` — the
+ * description only, on `group:abapFunctionGroup`, passed as given: SAP holds
+ * 40 characters and answers a longer one `400` `FUNC_ADT/103`, which reaches
+ * the model as it is. A refused patch is the failure of the step `patch`
+ * (`documentPatch.ts`); nothing is written.
  */
 
-import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  functionGroupDocuments,
+  patchFunctionGroupDocument,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -30,7 +35,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { patchFunctionGroupXml } from '../../../lib/strategies/functionGroupPatch';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -38,7 +43,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -100,7 +104,14 @@ export async function handleUpdateFunctionGroup(
                 { version: 'workingArea', analyse: analyseException },
               ),
             ),
-            atStep('update metadata', (current) =>
+            async (current) =>
+              patchedDocument(
+                patchFunctionGroupDocument(current.raw, {
+                  description: args.description || undefined,
+                }),
+                `function group ${functionGroupName}`,
+              ),
+            atStep('update metadata', (document) =>
               withAdtHeaders(
                 context,
                 'functionGroup.updateMetadata',
@@ -112,13 +123,7 @@ export async function handleUpdateFunctionGroup(
                     },
                     {
                       headers,
-                      source: patchFunctionGroupXml(
-                        extractXmlString(
-                          current.raw,
-                          `function group ${functionGroupName}`,
-                        ),
-                        { description: args.description },
-                      ),
+                      source: document,
                       lockHandle,
                       analyse: analyseException,
                     },

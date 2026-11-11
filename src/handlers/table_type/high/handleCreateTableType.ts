@@ -14,19 +14,22 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * schema defaults for its definition and fills them in code; the MCP SDK
  * fills a declared default into the arguments, so a property "not given"
  * would always be given. Here only `activate` declares one: every definition
- * property not given leaves SAP's value, because `patchTableTypeXml` leaves
+ * property not given leaves SAP's value, because adt-clients' `patchTableTypeDocument` leaves
  * an absent property untouched. The values are passed as given — which ones
  * SAP takes is SAP's answer.
  *
  * The wait is `readMetadata({withLongPolling: true})` (see
- * `handleCreateDomain.ts` and `xmlPatch.ts`): it sits right before `check`,
+ * `handleCreateDomain.ts` and `documentPatch.ts`): it sits right before `check`,
  * the first call that reads the write back. Its document, the inactive
  * version, is the definition SAP stored, answered beside the result; after
  * a successful activation one read of the active version answers it instead
  * (`tableTypeStored.ts`).
  */
 
-import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  patchTableTypeDocument,
+  tableTypeDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -36,18 +39,18 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -248,7 +251,25 @@ export async function handleCreateTableType(
                     { version: 'workingArea', analyse: analyseException },
                   ),
                 ),
-                atStep('update metadata', (current) =>
+                async (current) =>
+                  patchedDocument(
+                    patchTableTypeDocument(
+                      current.raw,
+                      tableTypeChanges({
+                        description,
+                        row_type_kind: args.row_type_kind,
+                        row_type_name: args.row_type_name,
+                        data_type: args.data_type,
+                        length: args.length,
+                        decimals: args.decimals,
+                        access_type: args.access_type,
+                        key_definition: args.key_definition,
+                        key_kind: args.key_kind,
+                      }),
+                    ),
+                    `table type ${tableTypeName}`,
+                  ),
+                atStep('update metadata', (document) =>
                   withAdtHeaders(
                     context,
                     'tableType.updateMetadata',
@@ -260,23 +281,7 @@ export async function handleCreateTableType(
                         },
                         {
                           headers,
-                          source: patchTableTypeXml(
-                            extractXmlString(
-                              current.raw,
-                              `table type ${tableTypeName}`,
-                            ),
-                            {
-                              description,
-                              row_type_kind: args.row_type_kind,
-                              row_type_name: args.row_type_name,
-                              data_type: args.data_type,
-                              length: args.length,
-                              decimals: args.decimals,
-                              access_type: args.access_type,
-                              key_definition: args.key_definition,
-                              key_kind: args.key_kind,
-                            },
-                          ),
+                          source: document,
                           lockHandle,
                           analyse: analyseException,
                         },

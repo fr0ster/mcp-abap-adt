@@ -16,7 +16,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * while holding it. The wait before `activate` is the pre-migration
  * handler's long-polling `read({withLongPolling: true})`, discarded for its
  * result but not for what it does — see `handleUpdateDomain.ts` (high) for
- * the live incident this guards against, documented in `xmlPatch.ts`.
+ * the live incident this guards against, documented in `documentPatch.ts`.
  */
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';

@@ -550,6 +550,30 @@ without it is refused by the schema now, naming the argument, and nothing is sen
 
 **What you do:** nothing for a call that worked — it passed `package_name`.
 
+## Callers of the DDIC metadata writes: the description as given, a refused patch as the step's failure
+
+The domain, data element, table type, function group, package and message class writes
+(`CreateDomain`, `UpdateDomain`, `UpdateDomainLow`, `CreateDataElement`, `UpdateDataElement`,
+`UpdateDataElementLow`, `CreateTableType`, `UpdateTableType`, `UpdateFunctionGroup`,
+`UpdatePackage`, `UpdatePackageLow`, `UpdateMessageClass`, and compact `HandlerCreate` /
+`HandlerUpdate` for those types) have the object's document patched by
+`@mcp-abap-adt/adt-clients` 45.2.0.
+
+- **The description is sent as given.** 23.x cut it at 60 characters (40 for a function group).
+  SAP refuses a longer one with `400` (`SWB_TOOL/018` for a domain, data element, table type or
+  package; `FUNC_ADT/103` for a function group) and stores nothing; a message class stores the
+  first 60 characters.
+- **A read that cannot be patched** (an empty or broken read, another type's document, a field
+  with no place in the document) is answered `isError` with `step: "patch"` and
+  `code: "DOCUMENT_NOT_PATCHED"`, its words naming the field; nothing is written.
+- **`UpdateDomainLow` / `UpdateDataElementLow` `properties`:** a length or a count is a number or
+  its digits, a flag a boolean or `true` / `false`; anything else is left out.
+  `UpdateDataElementLow` refuses a `type_kind` other than `domain`, `predefinedAbapType`,
+  `refToPredefinedAbapType`, `refToDictionaryType` and `refToClifType`.
+
+**What you do:** keep a description within SAP's limit (60, 40 for a function group), or read
+SAP's refusal; on `DOCUMENT_NOT_PATCHED`, read the object again and repeat the call.
+
 ## compact callers: refusals in the target tool's words
 
 A compact route calls its target tool's entry, so its arguments are parsed with the target's own

@@ -56,8 +56,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
+import { patchDomainDocument } from '@mcp-abap-adt/adt-clients';
 import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { patchDomainXml } from '../../../lib/strategies/domainPatch';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   assertNotSharedDependency,
@@ -464,11 +464,17 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
     );
     const document = payloadOf(documentRead.entries[0])?.metadata;
     assert.equal(typeof document, 'string');
-    const domainDocument = patchDomainXml(String(document), {
+    const patchedDomain = patchDomainDocument(String(document), {
       description: `Batch live domain ${MARKER}`,
-      datatype: 'CHAR',
+      dataType: 'CHAR',
       length: 10,
     });
+    if (!patchedDomain.ok) {
+      throw new Error(
+        `The domain document was not patched: ${JSON.stringify(patchedDomain.refusal)}`,
+      );
+    }
+    const domainDocument = patchedDomain.document;
 
     // 4. Lock.
     const lockCalls = objects.map((object) => ({

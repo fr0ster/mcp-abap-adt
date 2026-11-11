@@ -37,6 +37,7 @@
 
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
+import { patchTableTypeDocument } from '@mcp-abap-adt/adt-clients';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
 import { handleHandlerDelete } from '../../../../../compact-modify/src/handlers/handleHandlerDelete';
@@ -68,11 +69,11 @@ import { handleDeleteTableType } from '../../../../handlers/table_type/high/hand
 import { handleGetTableType } from '../../../../handlers/table_type/high/handleGetTableType';
 import { handleUpdateTableType } from '../../../../handlers/table_type/high/handleUpdateTableType';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import { tableTypeChanges } from '../../../../lib/strategies/documentChanges';
 import {
-  patchTableTypeXml,
   readTableTypeDefinition,
   type StoredTableTypeDefinition,
-} from '../../../../lib/strategies/tableTypePatch';
+} from '../../../../lib/strategies/tableTypeStored';
 import {
   getSharedDependenciesConfig,
   getSystemType,
@@ -588,11 +589,20 @@ describe('TableType High-Level Handlers Integration', () => {
         key_definition: 'standard',
         key_kind: 'nonUnique',
       };
+      const patched = patchTableTypeDocument(
+        bareDocument,
+        tableTypeChanges(compactDefinition),
+      );
+      if (!patched.ok) {
+        throw new Error(
+          `The table type document was not patched: ${JSON.stringify(patched.refusal)}`,
+        );
+      }
       await must(`HandlerUpdate TABLE_TYPE ${COMPACT_TABLE_TYPE}`, () =>
         handleHandlerUpdate(context, {
           object_type: 'TABLE_TYPE',
           table_type_name: COMPACT_TABLE_TYPE,
-          source_code: patchTableTypeXml(bareDocument, compactDefinition),
+          source_code: patched.document,
           lock_handle: handle,
           ...transport(),
         }),

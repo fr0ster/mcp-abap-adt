@@ -62,10 +62,10 @@ import { handleGetInactiveObjects } from '../../../../handlers/system/readonly/h
 import { CompactHandlersGroup } from '../../../../lib/compact/group';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { patchXmlAttribute } from '../../../../lib/strategies/xmlPatch';
 import { getSystemType } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { withRootDescription } from '../../helpers/rootDescription';
 import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -339,11 +339,7 @@ describe('Include High-Level Handlers Integration', () => {
       await must(`UpdateIncludeMetadata ${INCLUDE}`, () =>
         handleUpdateIncludeMetadata(context, {
           include_name: INCLUDE,
-          metadata: patchXmlAttribute(
-            document,
-            'adtcore:description',
-            changedDescription,
-          ),
+          metadata: withRootDescription(document, changedDescription),
         }),
       );
       const changed = await must(`GetInclude ${INCLUDE} metadata (after)`, () =>
@@ -420,11 +416,7 @@ describe('Include High-Level Handlers Integration', () => {
           object_type: 'INCLUDE',
           include_name: INCLUDE,
           part: 'metadata',
-          source_code: patchXmlAttribute(
-            compactDocument,
-            'adtcore:description',
-            compactDescription,
-          ),
+          source_code: withRootDescription(compactDocument, compactDescription),
           lock_handle: handle,
         }),
       );

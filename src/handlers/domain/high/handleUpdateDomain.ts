@@ -17,7 +17,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * refused, untouched). The wait between `unlock` and `activate` is the
  * pre-migration handler's long-polling `readMetadata({withLongPolling:
  * true})`, discarded for its result but not for what it does: this
- * repository's own `xmlPatch.ts` documents the live incident behind it — a
+ * repository's own `documentPatch.ts` documents the live incident behind it — a
  * read of a not-yet-ready object answers 200 with an empty body, never a
  * 404, so a slow read can otherwise patch nothing and PUT a document
  * missing a field that was in fact set all along.
@@ -35,7 +35,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * only — `args.package_name` is passed in but never read. Not sent.
  */
 
-import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  domainDocuments,
+  patchDomainDocument,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -46,7 +49,8 @@ import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { domainChanges } from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -54,7 +58,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -173,7 +176,25 @@ export async function handleUpdateDomain(
                 { version: 'workingArea', analyse: analyseException },
               ),
             ),
-            atStep('update metadata', (current) =>
+            async (current) =>
+              patchedDocument(
+                patchDomainDocument(
+                  current.raw,
+                  domainChanges({
+                    description: args.description,
+                    datatype: args.datatype,
+                    length: args.length,
+                    decimals: args.decimals,
+                    conversion_exit: args.conversion_exit,
+                    lowercase: args.lowercase,
+                    sign_exists: args.sign_exists,
+                    value_table: args.value_table,
+                    fixed_values: args.fixed_values,
+                  }),
+                ),
+                `domain ${domainName}`,
+              ),
+            atStep('update metadata', (document) =>
               withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
                 obj.updateMetadata(
                   {
@@ -182,20 +203,7 @@ export async function handleUpdateDomain(
                   },
                   {
                     headers,
-                    source: patchDomainXml(
-                      extractXmlString(current.raw, `domain ${domainName}`),
-                      {
-                        description: args.description,
-                        datatype: args.datatype,
-                        length: args.length,
-                        decimals: args.decimals,
-                        conversion_exit: args.conversion_exit,
-                        lowercase: args.lowercase,
-                        sign_exists: args.sign_exists,
-                        value_table: args.value_table,
-                        fixed_values: args.fixed_values,
-                      },
-                    ),
+                    source: document,
                     lockHandle,
                     analyse: analyseException,
                   },

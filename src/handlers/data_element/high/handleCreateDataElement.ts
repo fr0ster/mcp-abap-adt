@@ -21,7 +21,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * `read({withLongPolling: true})`; data element exposes no plain `read` in
  * adt-clients 19 (only `readMetadata`), so the wait here is
  * `readMetadata({withLongPolling: true})`, discarded for its result but not
- * for what it does — this repository's own `xmlPatch.ts` documents the live
+ * for what it does — this repository's own `documentPatch.ts` documents the live
  * incident behind it.
  *
  * **`config.packageName` never reaches the wire on `updateMetadata`.** The
@@ -32,7 +32,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * create call above still carries it, where it is read).
  */
 
-import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  dataElementDocuments,
+  patchDataElementDocument,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -42,8 +45,9 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { patchDataElementXml } from '../../../lib/strategies/dataElementPatch';
 import { detailOf } from '../../../lib/strategies/detail';
+import { dataElementChanges } from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -51,7 +55,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -249,7 +252,29 @@ export async function handleCreateDataElement(
                     { version: 'workingArea', analyse: analyseException },
                   ),
                 ),
-                atStep('update metadata', (current) =>
+                async (current) =>
+                  patchedDocument(
+                    patchDataElementDocument(
+                      current.raw,
+                      dataElementChanges({
+                        description: args.description || dataElementName,
+                        type_kind: typeKind,
+                        type_name: args.type_name,
+                        data_type: args.data_type || 'CHAR',
+                        length: args.length || 100,
+                        decimals: args.decimals || 0,
+                        short_label: args.short_label,
+                        medium_label: args.medium_label,
+                        long_label: args.long_label,
+                        heading_label: args.heading_label,
+                        search_help: args.search_help,
+                        search_help_parameter: args.search_help_parameter,
+                        set_get_parameter: args.set_get_parameter,
+                      }),
+                    ),
+                    `data element ${dataElementName}`,
+                  ),
+                atStep('update metadata', (document) =>
                   withAdtHeaders(
                     context,
                     'dataElement.updateMetadata',
@@ -261,27 +286,7 @@ export async function handleCreateDataElement(
                         },
                         {
                           headers,
-                          source: patchDataElementXml(
-                            extractXmlString(
-                              current.raw,
-                              `data element ${dataElementName}`,
-                            ),
-                            {
-                              description: args.description || dataElementName,
-                              type_kind: typeKind,
-                              type_name: args.type_name,
-                              data_type: args.data_type || 'CHAR',
-                              length: args.length || 100,
-                              decimals: args.decimals || 0,
-                              short_label: args.short_label,
-                              medium_label: args.medium_label,
-                              long_label: args.long_label,
-                              heading_label: args.heading_label,
-                              search_help: args.search_help,
-                              search_help_parameter: args.search_help_parameter,
-                              set_get_parameter: args.set_get_parameter,
-                            },
-                          ),
+                          source: document,
                           lockHandle,
                           analyse: analyseException,
                         },

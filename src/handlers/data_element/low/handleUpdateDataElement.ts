@@ -1,4 +1,7 @@
-import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  dataElementDocuments,
+  patchDataElementDocument,
+} from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 /**
  * UpdateDataElement Handler - Update ABAP Data Element Properties
@@ -24,15 +27,9 @@ import * as z from 'zod';
  * 14) is the one this handler avoids by construction, and the contract now
  * refuses it outright.
  *
- * **No corpus fixture exists for `GET /sap/bc/adt/ddic/dataelements/{name}`**
- * (the read half of this sequence) — the corpus has a data element `create`
- * response (`create-dataelement--01-ddic-dataelements`) but never a
- * metadata read. The `dtel:`-tagged document `patchDataElementXml` patches
- * is ported field-for-field from `v18.0.2`'s own patcher (see
- * `dataElementPatch.ts`), and the tests exercising this sequence build a
- * hand-written document with those same tags rather than a captured one —
- * the same disclosure `CreateTransportLow` makes for its own missing
- * fixture, made here for the same reason.
+ * The document read is patched by adt-clients' `patchDataElementDocument`
+ * (`documentPatch.ts`); a refused patch is the failure of the step `patch`,
+ * and nothing is written.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -47,11 +44,12 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { givenCount, givenText } from '../../../lib/propertyBag';
 import {
   type DataElementChanges,
-  patchDataElementXml,
-} from '../../../lib/strategies/dataElementPatch';
+  type DataElementTypeKind,
+  dataElementChanges,
+} from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -77,15 +75,33 @@ export const TOOL_DEFINITION = {
 /** The tool's arguments, as its schema parses them. */
 type UpdateDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/** The type kinds SAP knows for a data element. */
+const TYPE_KINDS: ReadonlyArray<DataElementTypeKind> = [
+  'domain',
+  'predefinedAbapType',
+  'refToPredefinedAbapType',
+  'refToDictionaryType',
+  'refToClifType',
+];
+
+/** `text` as a type kind SAP knows, or none. */
+function typeKindOf(text: string): DataElementTypeKind | undefined {
+  return TYPE_KINDS.find((kind) => kind === text);
+}
+
 /**
  * `properties` always took both spellings; the patch function only knows
  * snake_case. Each member as the patch writes it: text, a length or a count
- * a number or text; a value of no such kind is left out.
+ * a number (or its digits); a value of no such kind is left out. The type
+ * kind is read apart (`typeKindOf`): one SAP does not know is refused.
  */
-function changesOf(properties: unknown): DataElementChanges {
+function changesOf(
+  properties: unknown,
+  typeKind: DataElementTypeKind | undefined,
+): DataElementChanges {
   return {
     description: givenText(properties, 'description'),
-    type_kind: givenText(properties, 'type_kind', 'typeKind'),
+    type_kind: typeKind,
     type_name: givenText(properties, 'type_name', 'typeName'),
     data_type: givenText(properties, 'data_type', 'dataType'),
     length: givenCount(properties, 'length'),
@@ -153,7 +169,17 @@ export async function handleUpdateDataElement(
     const transportRequest =
       givenText(properties, 'transport_request') ||
       givenText(properties, 'transportRequest');
-    const changes = changesOf(properties);
+    const typeKindText = givenText(properties, 'type_kind', 'typeKind');
+    const typeKind =
+      typeKindText === undefined ? undefined : typeKindOf(typeKindText);
+    if (typeKindText !== undefined && typeKind === undefined) {
+      return return_error(
+        new Error(
+          `properties.type_kind must be one of ${TYPE_KINDS.join(', ')}; nothing was sent`,
+        ),
+      );
+    }
+    const changes = changesOf(properties, typeKind);
 
     try {
       // The three steps, in the handler because 19 put them there. `analyse`
@@ -169,7 +195,12 @@ export async function handleUpdateDataElement(
               { version: 'workingArea', analyse: analyseException },
             ),
         ),
-        atStep('update metadata', (current) =>
+        async (current) =>
+          patchedDocument(
+            patchDataElementDocument(current, dataElementChanges(changes)),
+            `data element ${dataElementName}`,
+          ),
+        atStep('update metadata', (document) =>
           withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
             client.getDataElement(dataElementDocuments).updateMetadata(
               {
@@ -178,10 +209,7 @@ export async function handleUpdateDataElement(
               },
               {
                 headers,
-                source: patchDataElementXml(
-                  extractXmlString(current, `data element ${dataElementName}`),
-                  changes,
-                ),
+                source: document,
                 lockHandle: lock_handle,
                 analyse: analyseException,
               },

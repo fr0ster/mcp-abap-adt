@@ -1,4 +1,7 @@
-import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  domainDocuments,
+  patchDomainDocument,
+} from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
@@ -36,19 +39,18 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   clearableText,
-  given,
   givenCount,
   givenElements,
+  givenFlag,
   givenText,
-  scalarText,
 } from '../../../lib/propertyBag';
 import {
   type DomainChanges,
-  patchDomainXml,
-} from '../../../lib/strategies/domainPatch';
+  domainChanges,
+} from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error, return_response } from '../../../lib/utils';
 import { child } from '../../../lib/xml/tree';
 
@@ -73,18 +75,10 @@ export const TOOL_DEFINITION = {
 /** The tool's arguments, as its schema parses them. */
 type UpdateDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** A flag of the bag as the patch writes it: a boolean, or its text. */
-function givenFlag(
-  properties: unknown,
-  name: string,
-): boolean | string | undefined {
-  const value = given(properties, name);
-  return typeof value === 'boolean' ? value : scalarText(value);
-}
-
 /**
  * The changes `properties` names, each as the patch writes it: text, a
- * length or a count a number or text, a flag a boolean or text, `null`
+ * length or a count a number (or its digits), a flag a boolean (or `true` /
+ * `false`), `null`
  * clearing the conversion exit and the value table, the fixed values a list
  * (each `low` and `text` written out); a value of no such kind is left out.
  */
@@ -153,7 +147,15 @@ export async function handleUpdateDomain(
               { version: 'workingArea', analyse: analyseException },
             ),
         ),
-        atStep('update metadata', (current) =>
+        async (current) =>
+          patchedDocument(
+            patchDomainDocument(
+              current,
+              domainChanges(domainChangesOf(properties)),
+            ),
+            `domain ${domainName}`,
+          ),
+        atStep('update metadata', (document) =>
           withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
             client.getDomain(domainDocuments).updateMetadata(
               {
@@ -162,10 +164,7 @@ export async function handleUpdateDomain(
               },
               {
                 headers,
-                source: patchDomainXml(
-                  extractXmlString(current, `domain ${domainName}`),
-                  domainChangesOf(properties),
-                ),
+                source: document,
                 lockHandle: lock_handle,
                 analyse: analyseException,
               },

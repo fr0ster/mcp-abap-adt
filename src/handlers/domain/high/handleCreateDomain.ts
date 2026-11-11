@@ -20,7 +20,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * wait was `read({withLongPolling: true})`; domain exposes no plain `read`
  * in adt-clients 19 (only `readMetadata`), so the wait here is
  * `readMetadata({withLongPolling: true})`, discarded for its result but not
- * for what it does — this repository's own `xmlPatch.ts` documents the live
+ * for what it does — this repository's own `documentPatch.ts` documents the live
  * incident behind it: a read of a not-yet-ready object answers 200 with an
  * empty body, never a 404.
  *
@@ -31,7 +31,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * sent (the create call above still carries it, where it is read).
  */
 
-import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  domainDocuments,
+  patchDomainDocument,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -42,7 +45,8 @@ import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { domainChanges } from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -50,7 +54,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 
@@ -221,7 +224,25 @@ export async function handleCreateDomain(
                     { version: 'workingArea', analyse: analyseException },
                   ),
                 ),
-                atStep('update metadata', (current) =>
+                async (current) =>
+                  patchedDocument(
+                    patchDomainDocument(
+                      current.raw,
+                      domainChanges({
+                        description: args.description || domainName,
+                        datatype: args.datatype || 'CHAR',
+                        length: args.length || 100,
+                        decimals: args.decimals || 0,
+                        conversion_exit: args.conversion_exit,
+                        lowercase: args.lowercase || false,
+                        sign_exists: args.sign_exists || false,
+                        value_table: args.value_table,
+                        fixed_values: args.fixed_values,
+                      }),
+                    ),
+                    `domain ${domainName}`,
+                  ),
+                atStep('update metadata', (document) =>
                   withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
                     obj.updateMetadata(
                       {
@@ -230,20 +251,7 @@ export async function handleCreateDomain(
                       },
                       {
                         headers,
-                        source: patchDomainXml(
-                          extractXmlString(current.raw, `domain ${domainName}`),
-                          {
-                            description: args.description || domainName,
-                            datatype: args.datatype || 'CHAR',
-                            length: args.length || 100,
-                            decimals: args.decimals || 0,
-                            conversion_exit: args.conversion_exit,
-                            lowercase: args.lowercase || false,
-                            sign_exists: args.sign_exists || false,
-                            value_table: args.value_table,
-                            fixed_values: args.fixed_values,
-                          },
-                        ),
+                        source: document,
                         lockHandle,
                         analyse: analyseException,
                       },
@@ -259,7 +267,7 @@ export async function handleCreateDomain(
           ),
         // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — this is the call most likely to
-        // meet a not-yet-ready object (see `xmlPatch.ts`), so the wait sits
+        // meet a not-yet-ready object (see `documentPatch.ts`), so the wait sits
         // immediately ahead of it, exactly where the pre-migration handler
         // put it (between `unlock` and `check`).
         atStep('check', async () => {

@@ -7,8 +7,9 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * PACKAGE without `lock_handle` (19.0.0). Like the other high updates it
  * locks, writes and unlocks inside the tool (`withLock`: the lock is held for
  * the read-modify-write in its body and released on every path out): the
- * package's metadata is read, its description patched (`patchPackageXml`,
- * the patch the write under a held lock uses too) and written back.
+ * package's metadata is read, its description patched (adt-clients'
+ * `patchPackageDocument`, the patch the write under a held lock uses too) and
+ * written back.
  *
  * **A package can be saved only once per ABAP session** (PAK/058). Over RFC
  * the whole lock → write → unlock runs in a session of its own, closed
@@ -16,7 +17,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * caller's connection serves, the write outside the lock's stateful context.
  */
 
-import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  packageDocuments,
+  patchPackageDocument,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -25,15 +29,14 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
 import { detailOf } from '../../../lib/strategies/detail';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
-import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -99,7 +102,14 @@ export async function handleUpdatePackage(
                     { version: 'active', analyse: analyseException },
                   ),
                 ),
-                atStep('update metadata', (current) =>
+                async (current) =>
+                  patchedDocument(
+                    patchPackageDocument(current.raw, {
+                      description: args.description || undefined,
+                    }),
+                    `package ${packageName}`,
+                  ),
+                atStep('update metadata', (document) =>
                   withAdtHeaders(context, 'package.updateMetadata', (headers) =>
                     pkg.updateMetadata(
                       {
@@ -110,13 +120,7 @@ export async function handleUpdatePackage(
                       },
                       {
                         headers,
-                        source: patchPackageXml(
-                          extractXmlString(
-                            current.raw,
-                            `package ${packageName}`,
-                          ),
-                          { description: args.description },
-                        ),
+                        source: document,
                         lockHandle,
                         analyse: analyseException,
                       },

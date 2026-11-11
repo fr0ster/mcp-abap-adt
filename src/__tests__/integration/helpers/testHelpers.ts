@@ -8,6 +8,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError } from 'axios';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { HeldLocks } from '../../../lib/state/heldLocks';
 import type { LoggerWithExtras } from './loggerHelpers';
 import { createTestLogger } from './loggerHelpers';
 
@@ -194,8 +195,12 @@ export function createHandlerContext(context: {
   connection: IAbapConnection;
   logger: LoggerWithExtras;
 }): HandlerContext {
+  // The context stands for a server instance: its own `HandlerLock` keeps
+  // the handles it took, and a write, a delete or an unlock is sent only
+  // under one of them (#4) — without an owner every compact lock is refused.
   const handlerContext: HandlerContext = {
     connection: context.connection,
+    heldLocks: new HeldLocks(),
   };
 
   // Include logger only if DEBUG_HANDLERS is enabled

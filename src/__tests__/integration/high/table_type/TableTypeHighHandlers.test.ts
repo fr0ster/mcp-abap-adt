@@ -589,10 +589,13 @@ describe('TableType High-Level Handlers Integration', () => {
         key_definition: 'standard',
         key_kind: 'nonUnique',
       };
-      const patched = patchTableTypeDocument(
-        bareDocument,
-        tableTypeChanges(compactDefinition),
-      );
+      // A fresh table type reads back with no description on its root
+      // (measured on cloud): the consumer's chain writes it, or SAP refuses
+      // the write with SWB_TOOL/019.
+      const patched = patchTableTypeDocument(bareDocument, {
+        ...tableTypeChanges(compactDefinition),
+        description,
+      });
       if (!patched.ok) {
         throw new Error(
           `The table type document was not patched: ${JSON.stringify(patched.refusal)}`,

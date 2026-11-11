@@ -63,8 +63,30 @@ export function safeRequest(
 
   const out: Record<string, string> = {};
   if (typeof method === 'string') out.method = method;
-  if (typeof url === 'string') out.url = url;
+  if (typeof url === 'string') out.url = withoutLockHandle(url);
   return out;
+}
+
+/**
+ * `url` without its lock handle: every query parameter whose name, decoded by
+ * `URLSearchParams`, is `lockHandle` in any case is left out, the others kept
+ * as they were written, and the `?` with them when none is left. A write
+ * under a lock carries the handle in its url, and the failure's request is
+ * rendered into answers and logs, where a handle does not belong.
+ */
+function withoutLockHandle(url: string): string {
+  const at = url.indexOf('?');
+  if (at < 0) return url;
+  const kept = url
+    .slice(at + 1)
+    .split('&')
+    .filter((part) =>
+      [...new URLSearchParams(part).keys()].every(
+        (name) => name.toLowerCase() !== 'lockhandle',
+      ),
+    );
+  const path = url.slice(0, at);
+  return kept.length > 0 ? `${path}?${kept.join('&')}` : path;
 }
 
 /**

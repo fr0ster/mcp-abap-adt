@@ -22,7 +22,10 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   - 223 have one shape: a handler's hand-declared argument type says `prop?: T`, and the zod
     schema's output says `prop?: T | undefined`. Example: `ActivateDomainArgs.detail` against
     `DETAIL_SHAPE`.
-  - 102 more `No overload matches` errors come from the same registrations.
+  - The 102 `No overload matches` errors (TS2769) lie outside the handler-group files: an
+    optional value passed into an upstream config, for example `handleCreateDomain.ts:203`
+    against interfaces-adt's `IDomainConfig.masterLanguage`. They are counted among the
+    upstream sites of §3.
   - The rest pass an optional value on as `T | undefined` to an option typed `?: T`.
   - There are 247 hand-declared `…Args` types in production, 9 of them exported; 69 sites
     already use `z.output<typeof …>`.
@@ -114,7 +117,7 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
 - **Handler arguments come from the schema.** 247 hand-declared `…Args` types are a handler's
   `args` parameter (`(context: HandlerContext, args: X)`; Measured). Each becomes
   `z.output<typeof TOOL_DEFINITION.inputSchema>`, or the zod schema it is built from. That
-  leaves one source, so the 223 mismatches and the 102 overload errors cannot drift back.
+  leaves one source, so the 223 mismatches cannot drift back.
   - Where a handler reads a key its schema does not declare, the key is declared in the
     schema, as in the earlier spec §3.
   - The handlers that `@mcp-abap-adt/lib/handlers`, `/read` and `/write` export change their
@@ -189,9 +192,9 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   - Properties typed `unknown`: 64.
   - The remaining positions write `unknown` inside a type (`Record<string, unknown>`,
     `unknown[]`, a function type). They follow the site they type.
-  - The 169 + 23 parameters that are boundary by their immediate sources are rechecked by the
-    transitive rule above. Any that the rule finds typed join the typed class in the plan's
-    first step, which commits the script and its output.
+  - The 169 + 23 parameters that are boundary by their immediate sources are under the same
+    rule: where the transitive rule finds a source typed, the site is typed and is retyped. The
+    gate applies the rule, so no such site can stay.
 - **Contracts typed `unknown`.** A value a contract of ours types `unknown`, while its producer
   has a concrete type, is a contract to fix where it lives (§2's order). A value a third party
   types `unknown` stays a boundary.
@@ -277,12 +280,21 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     `/write` export becomes its schema's output. Optional properties read `?: T | undefined`,
     which widens what a caller may pass. `ScheduleProfilerTraceArgs` (exported by `/write`) is
     one of them.
-  - **Shared contracts** that are exported from a package entry and that §3's sites meet:
-    `HandlerContext` (`/tool-set`), `IAdtSystemContext` and `ValidationReading` (`/utils`),
-    `RequestContext` and `SystemContextResolver` (`/request-context`). Their optional fields
-    become `?: T | undefined`, which widens: a caller still compiles, a reader already handled
-    absence. The other local types §3 retypes are not exported from a package entry (Measured
-    against the entries of `package.json` `exports`).
+  - **Shared contracts that §3's sites meet and that a package entry exports** (Measured: the
+    types the root project's diagnostics name, matched against the exports of every
+    `package.json` `exports` entry, by the type checker):
+    - `@mcp-abap-adt/lib`: `HandlerContext`, `SapEnvironment`, `BatchAnswer`,
+      `HandlerExporterOptions`;
+    - `/debugger`: `RunTarget`, `BreakpointTarget`, `StopView`, `SettingsReading`,
+      `DebugStartOptions`, `DebugListenerError`, `ObjectAddress`, `PlaceReading`;
+    - `/utils`: `IAdtSystemContext`;
+    - `/request-context`: `RequestContext`, `ResolvedSystemContext`, `SystemContextResolver`;
+    - `/state`: `StateIdleBound`, `InstanceStateOptions`;
+    - `/handlers/write`: `ActivationObject`.
+
+    Decision: their optional fields that a caller fills from a possibly absent value become
+    `?: T | undefined` (for example `InstanceStateOptions.idleMinutes`, `BatchAnswer.raw`).
+    This widens: a caller still compiles, and a reader already handles absence.
   - **The connection type.** Every exported signature that names `IAbapConnection` names
     interfaces-adt-connection 5's. A caller holding a generic connection still compiles.
     Noted in `MIGRATION-24.0.md`.
@@ -316,7 +328,9 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
 
 Each site is listed as `file:line`, together with the static types of the in-repository values that reach it (the language service's call sites and the type checker). §4 decides what each class becomes.
 
-### Parameters, typed only: retyped by the types that reach them (unless a listed sink)
+### Parameters, typed only by their immediate arguments
+
+Decided by §4's rule, applied to each site: a contract-typed source makes it typed (retyped by that type); a source that carries boundary data under its static type (an `Element` from the XML parser, a value the model sent) keeps it boundary; a logger or serializer parameter is a sink.
 
 | Site | Types that reach it |
 |---|---|
@@ -355,7 +369,9 @@ Each site is listed as `file:line`, together with the static types of the in-rep
 | `server-runtime/src/stdio/auth/serverLogin.ts:116` | string |
 | `compact-readonly-entries/src/handlers/handleHandlerGet.ts:67` | {} |
 
-### Parameters, mixed: split at the boundary
+### Parameters, mixed
+
+Each is split at the boundary, or typed by the union of the contract types it receives (§4).
 
 | Site | Types that reach it |
 |---|---|
@@ -433,26 +449,26 @@ Each site is listed as `file:line`, together with the static types of the in-rep
 | `src/lib/propertyBag.ts:28` | unknown \| {} |
 | `src/lib/config/authParameters.ts:442` | unknown \| Record<string, unknown> |
 
-### Variables declared `unknown` with a typed initializer: retyped
+### Variables declared `unknown` with a typed initializer: decided by provenance
 
-| Site | Initializer type |
-|---|---|
-| `src/lib/requestSystemResolution.ts:156 user` | string \| undefined |
-| `src/lib/credentialSources.ts:39 value` | string \| undefined |
-| `src/lib/credentialSources.ts:56 authType` | SapAuthType |
-| `src/embeddable/BaseMcpServer.ts:2836 register` | ("registerTool" extends keyof this ? this[keyof this & "regi |
-| `src/lib/config/authParameters.ts:156 node` | Record<string, unknown> |
-| `server-runtime/src/stdio/auth/vocabulary.ts:70 authType` | "basic" \| "jwt" \| "saml" \| "snc" \| undefined |
-| `server-runtime/src/stdio/auth/vocabulary.ts:80 grantType` | DestinationGrant \| undefined |
+| Site | Initializer type | Origin | Decision |
+|---|---|---|---|
+| `src/lib/requestSystemResolution.ts:156 user` | string \| undefined | `ResolvedSystemContext.responsible`, a contract field | typed: read as `string \| undefined`, no re-narrowing |
+| `src/lib/credentialSources.ts:39 value` | string \| undefined | `SapConfig[field]`, the embedder's typed config | typed: read as the field's type |
+| `src/lib/credentialSources.ts:56 authType` | SapAuthType | `SapConfig.authType` | typed: switch on `SapAuthType`, exhaustive |
+| `src/embeddable/BaseMcpServer.ts:2836 register` | ("registerTool" extends keyof this ? this[keyof this & "regi | `Reflect.get` on a Proxy target | boundary: stays |
+| `src/lib/config/authParameters.ts:156 node` | Record<string, unknown> | parsed YAML | boundary: stays |
+| `server-runtime/src/stdio/auth/vocabulary.ts:70 authType` | "basic" \| "jwt" \| "saml" \| "snc" \| undefined | `IConnectionConfig.authType`, the broker's contract | typed: read as the contract's union |
+| `server-runtime/src/stdio/auth/vocabulary.ts:80 grantType` | DestinationGrant \| undefined | `IConnectionConfig.grantType` | typed: read as the contract's union |
 
-### Functions returning `unknown` whose every return is typed: retyped
+### Functions returning `unknown` whose every return is typed: decided by provenance
 
-| Site | Returned types |
-|---|---|
-| `src/lib/search-source/readFailure.ts:121` | object \| DecidedPrimitive |
-| `src/lib/batch/eligibility.ts:201` | {} \| null |
-| `src/lib/propertyBag.ts:9` | {} \| undefined |
-| `server-runtime/src/http/StreamableHttpServer.ts:152` | { jsonrpc: string; id: {} \| null; result: { conten |
+| Site | Returned types | Origin | Decision |
+|---|---|---|---|
+| `src/lib/search-source/readFailure.ts:121` | object \| DecidedPrimitive | a caught value | boundary: stays |
+| `src/lib/batch/eligibility.ts:201` | {} \| null | the model's tool arguments | boundary: stays |
+| `src/lib/propertyBag.ts:9` | {} \| undefined | the model's free-form property bag | boundary: stays |
+| `server-runtime/src/http/StreamableHttpServer.ts:152` | { jsonrpc: string; id: {} \| null; result: { conten | JSON-RPC answers the function builds | typed: returns its answer type |
 
 ### Properties typed `unknown`: each checked by its writers (§4)
 

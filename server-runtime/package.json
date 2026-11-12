@@ -104,7 +104,7 @@
     "@mcp-abap-adt/auth-errors": "^2.2.1",
     "@mcp-abap-adt/auth-providers": "^6.0.2",
     "@mcp-abap-adt/auth-stores": "^5.1.0",
-    "@mcp-abap-adt/connection": "^22.0.0",
+    "@mcp-abap-adt/connection": "^22.0.1",
     "@mcp-abap-adt/interfaces-adt": "^27.2.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^4.1.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",

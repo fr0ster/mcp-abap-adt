@@ -1416,15 +1416,19 @@ export class DebugSession<O = unknown> {
   releaseDebugger(): Promise<DebugState> {
     return this.mutate(async () => {
       const stop = this.requireStop();
-      // terminateDebugger frees this ABAP session, and the system answers that with a
-      // plain ICF 500 (errata "The debugger freeing its session is answered as an ICF
-      // 500", measured on premise (2026-10-11), BASIS 816): analyseDebuggerFreed takes
-      // exactly that shape as no failure. An ADT document, an HTML 500 or a 400 stay
-      // failures, and the attachment is kept for DebugStop.
+      // terminateDebugger frees this ABAP session, and the system answers that in one
+      // of two shapes, each read as freed. Over HTTP a plain ICF 500 (errata "The
+      // debugger freeing its session is answered as an ICF 500", measured on premise
+      // (2026-10-11), BASIS 816): analyseDebuggerFreed takes exactly that shape as no
+      // failure. Over RFC the freed session closes the RFC conversation (measured on
+      // premise, 2026-11-12): the RFC SDK's RFC_CLOSED, read from the verdict's `rfc`
+      // field (adt-clients 45.3), never from its message. An ADT document, an HTML 500,
+      // a 400 or any other RFC failure stay failures, and the attachment is kept for
+      // DebugStop.
       const answer = await stop.debugger.terminateDebugger({
         analyse: analyseDebuggerFreed,
       });
-      if (!answer.ok) {
+      if (!answer.ok && answer.getError().rfc?.codeString !== 'RFC_CLOSED') {
         throw failedAt(
           new DebugRequestError(messageOf(answer)),
           answer,

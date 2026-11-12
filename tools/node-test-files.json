@@ -62,6 +62,7 @@
   "src/__tests__/integration/readOnly/transport/ListTransportsHandlers.test.ts",
   "src/__tests__/integration/server/EmbeddableMcpServer.systemType.test.ts",
   "src/__tests__/unit/access/accessLists.test.ts",
+  "src/__tests__/unit/access/changedHandlerRequests.test.ts",
   "src/__tests__/unit/access/deniedActions.test.ts",
   "src/__tests__/unit/adtHeaders/headerCallSites.test.ts",
   "src/__tests__/unit/analyseOmissions.test.ts",

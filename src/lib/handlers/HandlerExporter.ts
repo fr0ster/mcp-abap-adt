@@ -2,7 +2,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import type { IAccessChecks } from '../access/accessChecks.js';
+import {
+  accessCallOf,
+  checkedArgumentsOf,
+} from '../access/checkedArguments.js';
 import type { DeniedActions } from '../access/deniedActions.js';
+import { refusalOf } from '../access/listedAccessChecks.js';
+import { lazyPackageReader } from '../access/packageReader.js';
 import { withoutDenied } from '../access/withoutDenied.js';
 import { ServerRefusal } from '../auth/serverRefusal.js';
 import {
@@ -18,6 +25,8 @@ import {
 } from '../requestSystemResolution.js';
 import type { LineMatchStrategy } from '../search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../search-source/readFailure.js';
+import { readOnlyToolNames } from '../toolSet.js';
+import { return_error } from '../utils.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 import { DataHandlersGroup } from './groups/DataHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
@@ -95,6 +104,16 @@ export interface HandlerExporterOptions {
    * values; the full set's tools carry none. Absent or empty: nothing denied.
    */
   deniedActions?: DeniedActions | undefined;
+
+  /**
+   * The access checks (spec §3.2): applied to every call of the entries
+   * `getHandlerEntries()` hands out (before the handler runs, on the
+   * connection the embedder gives) and of the tools `registerOnServer()`
+   * registers (before the call's connection is asked for). On
+   * `createRegistry()` the hosting server's own `accessChecks` applies.
+   * Absent: no call is checked.
+   */
+  accessChecks?: IAccessChecks | undefined;
 
   /**
    * Include readonly handlers (getProgram, getClass, etc.)
@@ -201,6 +220,9 @@ export class HandlerExporter {
   private readonly systemType: string | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
+  private readonly access:
+    | { readonly checks: IAccessChecks; readonly readOnly: ReadonlySet<string> }
+    | undefined;
 
   constructor(options?: HandlerExporterOptions) {
     this.logger = options?.logger ?? noopLogger;
@@ -209,6 +231,10 @@ export class HandlerExporter {
     this.systemType = options?.systemType;
     this.systemContextResolver = options?.systemContextResolver ?? null;
     this.systemContextRules = options?.systemContextRules ?? null;
+    this.access =
+      options?.accessChecks === undefined
+        ? undefined
+        : { checks: options.accessChecks, readOnly: readOnlyToolNames() };
 
     // Create dummy context for group instantiation. A call's real context
     // is given by the server instance (BaseMcpServer.registerHandlers(), via
@@ -220,6 +246,9 @@ export class HandlerExporter {
       ...(options?.systemType !== undefined && {
         systemType: options.systemType,
       }),
+      // A plain registration's calls (`registerOnServer`) are checked by
+      // the groups (`BaseHandlerGroup.registerToolOnServer`).
+      ...(this.access !== undefined && { accessChecks: this.access }),
     };
 
     // Build handler groups based on options
@@ -319,13 +348,37 @@ export class HandlerExporter {
    */
   private wrapEntry(entry: HandlerEntry): HandlerEntry {
     const original = entry.call;
+    const access = this.access;
+    const checked =
+      access === undefined
+        ? undefined
+        : checkedArgumentsOf(entry.toolDefinition, access.readOnly);
     return {
       ...entry,
       call: (context, args) =>
         inStatedScope(
           { ...this.stated(), connection: context?.connection },
           args,
-          () => original(this.withStrategies(context), args),
+          async () => {
+            // The access checks (spec §3.2, path 5): before the handler,
+            // on the connection the embedder gave.
+            const accessCall =
+              checked === undefined
+                ? undefined
+                : accessCallOf(entry.toolDefinition.name, checked, args);
+            if (access !== undefined && accessCall !== undefined) {
+              const verdict = await access.checks.check(
+                accessCall,
+                lazyPackageReader(
+                  async () => context.connection,
+                  this.logger,
+                  new AbortController().signal,
+                ),
+              );
+              if (!verdict.allowed) return return_error(refusalOf(verdict));
+            }
+            return original(this.withStrategies(context), args);
+          },
         ),
     };
   }

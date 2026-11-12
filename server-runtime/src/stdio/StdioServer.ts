@@ -1,6 +1,7 @@
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
+import type { IAccessChecks } from '@mcp-abap-adt/lib';
 import {
   connectionCauseOf,
   noConnectionWords,
@@ -57,6 +58,11 @@ export interface StdioServerOptions {
    * `@mcp-abap-adt/background-runs-memory`). Absent: `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
   /**
    * `SearchSource`'s SAP-answer strategy, handed to the instance (the
    * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
@@ -122,6 +128,9 @@ export class StdioServer extends BaseMcpServer {
       stateLogger: stateLoggerOf(opts ?? {}),
       ...(opts?.leftoverSessions !== undefined && {
         leftoverSessions: opts.leftoverSessions,
+      }),
+      ...(opts?.accessChecks !== undefined && {
+        accessChecks: opts.accessChecks,
       }),
       ...(opts?.backgroundRuns !== undefined && {
         backgroundRuns: opts.backgroundRuns,

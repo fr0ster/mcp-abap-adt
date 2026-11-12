@@ -276,12 +276,15 @@ While the system cannot be reached, such a call answers
 ```
 
 naming the cause by the same code the start line names (`ECONNREFUSED`, `ECONNRESET`,
-`ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENETUNREACH`, or a TLS failure code) —
+`EPIPE`, `ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENETUNREACH`, or a TLS failure
+code; `EPIPE` is the system cutting the connection while the request was written, as macOS
+reports a connection reset at accept) —
 never the URL, the host, the port or a credential. The next call tries once more: there is no
 retry, no polling and no timer. A refused credential, an answer of SAP and an RFC logon that
 fails (named by its RFC key) are answered as before. A request on a connection already made
 that reaches no answer — the system stopped after the logon — answers `no_connection` too, with
-the network code adt-clients names on its failure (one of the seven above; a TLS failure on a
+the network code adt-clients names on its failure (one of the seven above but `EPIPE`, which
+adt-clients does not name; a TLS failure on a
 connection already made is answered as before): one attempt, the next call sends again.
 
 The parameter beats the variable, and the variable beats the configuration file; the

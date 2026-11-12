@@ -449,6 +449,18 @@ The owner's rule: every handler this PR adds or changes is pinned by unit tests 
 2. `age_seconds` is whole seconds: the floor of (now − `changed_at`); the ETag timestamp has second precision.
 3. The per-part answer's shape is a gate, not a decision: if Task 1 finds an include change does not move the main source's ETag, the work stops and the finding goes to the owner before Task 11.
 
+## Owner decisions since the plan
+
+Accepted deviations, as implemented:
+
+1. The launcher tests are one file, `src/__tests__/unit/launchers/accessRestrictionsAtStart.test.ts`, instead of the three `server-runtime/src/{stdio,http,sse}/__tests__/accessRestrictions.test.ts` of Task 10.
+2. Paths 2 and 3 (Task 8) take the strategy from `HandlerContext.accessChecks`, not from an options path of `BaseHandlerGroup`: it avoids a load-order cycle.
+3. When every name of a tool is denied but codes are left (`HandlerActivate`, `HandlerGet`'s address parts), `object_type` leaves the schema and its description clauses go.
+4. A variant with nothing left drops out of the tool's `available_in`.
+5. The debug texts read "The handle of this server's debug state; every operation takes it." and "the id of the debuggee attached".
+
+Open, decided after Task 2 (c) is measured: whether `lazyPackageReader` refuses while a batch is open.
+
 ## Measurement record
 
 (Filled by Tasks 1 and 2.)

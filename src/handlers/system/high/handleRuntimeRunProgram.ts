@@ -146,7 +146,10 @@ export async function handleRuntimeRunProgram(
  */
 export async function handleRuntimeRunProgramUnderProfiler(
   context: HandlerContext,
-  args: { program_name?: string; profiler_id?: string },
+  args: {
+    program_name?: string | undefined;
+    profiler_id?: string | undefined;
+  },
   tool: string,
 ) {
   const { connection, logger } = context;

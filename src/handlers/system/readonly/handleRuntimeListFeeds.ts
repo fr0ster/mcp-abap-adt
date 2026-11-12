@@ -383,8 +383,8 @@ const PAGE_FEEDS = {
 export async function handleRuntimeListFeedPage(
   context: HandlerContext,
   args: Omit<RuntimeListFeedsArgs, 'feed_type'> & {
-    feed_type?: keyof typeof PAGE_FEEDS;
-    top?: number;
+    feed_type?: keyof typeof PAGE_FEEDS | undefined;
+    top?: number | undefined;
   },
   tool = 'HandlerDumpList',
 ) {

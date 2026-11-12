@@ -202,7 +202,10 @@ export const compactWriteRouterMap: CompactRouterMap = {
 export async function routeCompactWrite(
   context: Parameters<typeof dispatchCompact>[0],
   operation: Exclude<CompactCrudOperation, 'get'>,
-  args: { object_type?: CompactObjectType } & Record<string, unknown>,
+  args: { object_type?: CompactObjectType | undefined } & Record<
+    string,
+    unknown
+  >,
 ): Promise<unknown> {
   return dispatchCompact(context, compactWriteRouterMap, operation, args);
 }

@@ -193,18 +193,18 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly port: number;
   private readonly enableJsonResponse: boolean;
   private readonly path: string;
-  private readonly externalApp?: IHttpApplication;
+  private readonly externalApp?: IHttpApplication | undefined;
   private readonly version: string;
-  private standaloneServer?: HttpServer | HttpsServer;
+  private standaloneServer?: HttpServer | HttpsServer | undefined;
   /** The listener stopped, until its last connections are closed after the last step. */
-  private stoppedListener?: HttpServer | HttpsServer;
-  private readonly tls?: TlsConfig;
-  private readonly allowedHosts?: string[];
-  private readonly allowedOrigins?: string[];
-  private readonly enableDnsRebindingProtection?: boolean;
+  private stoppedListener?: HttpServer | HttpsServer | undefined;
+  private readonly tls?: TlsConfig | undefined;
+  private readonly allowedHosts?: string[] | undefined;
+  private readonly allowedOrigins?: string[] | undefined;
+  private readonly enableDnsRebindingProtection?: boolean | undefined;
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
-  private readonly stateIdleMinutes?: number;
+  private readonly stateIdleMinutes?: number | undefined;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
   private readonly instanceAccessChecks: IAccessChecks | undefined;
@@ -313,8 +313,8 @@ export class StreamableHttpServer extends BaseMcpServer {
           async (server) => {
             // A client that left while this request waited for the lease gets nothing.
             if (res.destroyed) return;
+            // No sessionIdGenerator: stateless mode, to avoid ID collisions.
             const transport = new StreamableHTTPServerTransport({
-              sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
               enableJsonResponse: this.enableJsonResponse,
             });
             let transportClosed: Promise<void> | undefined;
@@ -562,7 +562,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         version: string,
         logger: Logger,
         state: {
-          stateIdleMinutes?: number;
+          stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;

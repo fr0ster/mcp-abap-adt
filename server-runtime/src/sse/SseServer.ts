@@ -171,15 +171,15 @@ export class SseServer {
   >();
   private readonly logger: Logger;
   private readonly version: string;
-  private readonly externalApp?: IHttpApplication;
-  private standaloneServer?: HttpServer | HttpsServer;
+  private readonly externalApp?: IHttpApplication | undefined;
+  private standaloneServer?: HttpServer | HttpsServer | undefined;
   /** The listener stopped, until its last connections are closed after the last step. */
-  private stoppedListener?: HttpServer | HttpsServer;
-  private readonly tls?: TlsConfig;
-  private readonly allowedHosts?: string[];
-  private readonly allowedOrigins?: string[];
-  private readonly enableDnsRebindingProtection?: boolean;
-  private readonly stateIdleMinutes?: number;
+  private stoppedListener?: HttpServer | HttpsServer | undefined;
+  private readonly tls?: TlsConfig | undefined;
+  private readonly allowedHosts?: string[] | undefined;
+  private readonly allowedOrigins?: string[] | undefined;
+  private readonly enableDnsRebindingProtection?: boolean | undefined;
+  private readonly stateIdleMinutes?: number | undefined;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
   private readonly accessChecks: IAccessChecks | undefined;
@@ -406,7 +406,7 @@ export class SseServer {
         readonly loggerImpl: Logger,
         readonly ver: string,
         state: {
-          stateIdleMinutes?: number;
+          stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           accessChecks?: IAccessChecks;

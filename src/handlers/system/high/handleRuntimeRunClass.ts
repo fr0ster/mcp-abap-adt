@@ -226,7 +226,10 @@ export async function handleRuntimeRunClass(
  */
 export async function handleRuntimeRunClassUnderProfiler(
   context: HandlerContext,
-  args: { class_name?: string; profiler_id?: string },
+  args: {
+    class_name?: string | undefined;
+    profiler_id?: string | undefined;
+  },
   tool: string,
 ) {
   const { connection, logger } = context;

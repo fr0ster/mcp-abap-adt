@@ -39,7 +39,7 @@ export async function dispatchCompact(
   context: HandlerContext,
   routes: Partial<CompactRouterMap>,
   operation: CompactCrudOperation,
-  args: { readonly object_type?: CompactObjectType } & ToolArgs,
+  args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
 ): Promise<unknown> {
   context.logger?.info?.(
     `[compact-router] route operation=${operation} object_type=${args?.object_type ?? 'undefined'}`,

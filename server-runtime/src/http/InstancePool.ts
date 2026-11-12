@@ -235,7 +235,7 @@ export class InstancePool<T extends Poolable> {
    * new instance as ever.
    */
   async serve(
-    request: { handle?: string; refuseUnknown?: boolean },
+    request: { handle?: string | undefined; refuseUnknown?: boolean },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
@@ -250,7 +250,7 @@ export class InstancePool<T extends Poolable> {
   }
 
   private route(
-    request: { handle?: string; refuseUnknown?: boolean },
+    request: { handle?: string | undefined; refuseUnknown?: boolean },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {

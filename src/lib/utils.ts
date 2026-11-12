@@ -879,19 +879,19 @@ const PRESENT = 'set';
  * never by a character of it
  */
 export interface AuthDisplayConfig {
-  envFile?: string;
-  serviceUrl?: string;
+  envFile?: string | undefined;
+  serviceUrl?: string | undefined;
   /** Over RFC, where the summary shows the URL over HTTP: each address field, labelled, as stated. */
-  rfcAddress?: ReadonlyArray<readonly [string, string]>;
+  rfcAddress?: ReadonlyArray<readonly [string, string]> | undefined;
   sapClient?: string | undefined;
-  authType?: string;
+  authType?: string | undefined;
   username?: string | undefined;
   password?: string | undefined;
   jwtToken?: string | undefined;
-  refreshToken?: string;
-  uaaUrl?: string;
-  uaaClientId?: string;
-  uaaClientSecret?: string;
+  refreshToken?: string | undefined;
+  uaaUrl?: string | undefined;
+  uaaClientId?: string | undefined;
+  uaaClientSecret?: string | undefined;
 }
 
 /**

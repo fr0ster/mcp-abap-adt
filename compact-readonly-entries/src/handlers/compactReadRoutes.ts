@@ -156,7 +156,7 @@ export const compactReadRouterMap: CompactRouterMap = {
 /** Route a compact read. The only operation this half carries is `get`. */
 export async function routeCompactRead(
   context: Parameters<typeof dispatchCompact>[0],
-  args: { readonly object_type?: CompactObjectType } & ToolArgs,
+  args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
 ): Promise<unknown> {
   return dispatchCompact(context, compactReadRouterMap, 'get', args);
 }

@@ -163,17 +163,16 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     model gets. Valid arguments are parsed with the tool's schema, so they carry its defaults.
     No assertion is added for either.
   - The handlers that `@mcp-abap-adt/lib/handlers`, `/read` and `/write` export change their
-    `args` type with it: optional properties read `?: T | undefined`. That widens what a caller
-    may pass, so nothing breaks, but it is an exported change (§8).
+    `args` type with it: optional properties read `?: T | undefined`, which widens; defaulted
+    fields and enums narrow for a direct caller (§8). It is an exported change.
 - **The 8 other `…Args` types are helper contracts, not tool arguments**, and keep their
   declarations: `HandlerGetArgs`, `ResultOnceArgs`, `RunTargetArgs`, `UnitTestScopeArgs`,
   `StartArgs` (already a `z.output`), `ToolArgs`, `SourceRangeArgs` and `SearchObjectsArgs`.
-  One exception: `SourceRangeArgs` becomes the output of an object of `SOURCE_RANGE_SHAPE`,
-  which every source reader's schema spreads, so the 17 readers whose types extend it take
-  their definition's output too.
-  One exception: `SourceRangeArgs` becomes the output of an object of `SOURCE_RANGE_SHAPE`,
-  which every source reader's schema spreads, so the 17 readers whose types extend it take
-  their definition's output too.
+  Two exceptions. `HandlerGetArgs` becomes HandlerGet's definition output, with `object_type`
+  the accepted member: as a `Record<string, unknown>` it loses the types the activation
+  readers take (plan S2a). And `SourceRangeArgs` becomes the output of an object of
+  `SOURCE_RANGE_SHAPE`, which every source reader's schema spreads, so the 17 readers whose
+  types extend it take their definition's output too.
   `ScheduleProfilerTraceArgs`, exported through `/write`, is a handler argument.
   - A helper contract's optional fields are declared `?: T | undefined` where a caller passes
     a possibly absent value.

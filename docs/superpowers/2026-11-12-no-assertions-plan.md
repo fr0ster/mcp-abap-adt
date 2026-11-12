@@ -301,6 +301,14 @@ below is what it carries besides.
       `handleRunAbapUnit` takes its definition's output in place of `unknown` (its readers
       that take `unknown` still accept it and are retyped in S3b); `handleHandlerGet` takes
       its definition's output.
+    - **HandlerGet's local `args`** (`handleHandlerGet.ts:50`, `:185`) is `HandlerGetArgs`, a
+      `Record<string, unknown>`, which loses the parameter's types. Once
+      `ActivationRunArgs` / `ActivationStatusArgs` are derived, the calls at `:207`, `:208`
+      and `:210` fail TS2322 (`unknown` for `string | undefined` / `boolean | undefined`;
+      Codex measured, round 2).
+      - `HandlerGetArgs` becomes the definition's output with `object_type` the accepted
+        member, built after `acceptedOf` in plain code as today. No cast and no new check.
+      - This goes in batch 1, before batch 4 derives the activation readers.
   - **Undeclared keys** (Measured: every key a handler reads from `args`, against its
     definition's schema output). None needs declaring, so **no listed schema changes** and
     tools/list stays byte for byte. No CHANGELOG fix entry follows from this step. The tool
@@ -410,8 +418,20 @@ below is what it carries besides.
       `dbviewName.test.ts:67`, `mainTypeBoundary.test.ts:65`,
       `projectionBoundary.test.ts:162` and `readonlySingleCall.test.ts:305`. Each passes the
       declared `objecttype` / `objectname`; its assertions stay.
+    - **`compactActivateTypes.test.ts`** does not compile unchanged after the split (Codex
+      measured, round 2): six TS2322 remain. The schema refuses both values (probed).
+      - The positive table gives `object_type: string` (`:88`). It is parsed with
+        HandlerActivate's schema, or typed by its members.
+      - `UNIT_TEST` (`:146`) and `TRANSPORT` (`:158`, `:165`, `:172`, `:180`) are outside
+        the schema's enum. Under reading (a) these cases go through the entry with `ToolArgs`
+        and assert the schema's refusal, with no request.
+        - Their assertions on the handler's words ("cannot turn object_type",
+          `object_adt_type`, "Known without it") then cannot hold, and become the schema's
+          refusal.
+        - Under reading (b) they stay direct calls.
+      - This goes in batch 1, with the split.
     - **The union branches.** These are TS2353 "`object_type` / `sql_query` does not exist"
-      at `compactActivateTypes.test.ts` (15), `compactSearchData.test.ts:163`,
+      at `compactActivateTypes.test.ts` (its other 9 sites), `compactSearchData.test.ts:163`,
       `compactTransportRead.test.ts`, `routesParseTargets.test.ts`,
       `batchedReadsTiming.test.ts:218`, `IncludeMainProgramsHandlers.test.ts:88`,
       `packageWalks.test.ts`, `projectionWalk.test.ts:423`, `projectionBoundary.test.ts`
@@ -432,7 +452,9 @@ below is what it carries besides.
        - The three builder splits.
        - The 12 compact spread definitions, the 20 mechanical compact types (compact-modify
          4, compact-readonly-entries 10, `src/lib/compact` 6) and `handleHandlerGet`.
+       - HandlerGet's local `args` typed by its definition's output.
        - The HandlerValidate narrowing, with its characterization tests first.
+       - The `compactActivateTypes.test.ts` adaptation.
     2. **Write-side directories:** behavior_definition 6, behavior_implementation 3,
        class 14, data_element 7, ddl 6, ddlx 5, domain 7 (48 mechanical).
        - Their inline literals: the check wrappers of class, ddl, behavior_definition,

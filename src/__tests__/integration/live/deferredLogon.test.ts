@@ -373,12 +373,18 @@ describe('the installed bin with --deferred-logon', () => {
     }
   }
 
-  /** The real `.env` copied into `dir`, its `SAP_URL` pointed at `url`. */
+  /**
+   * The real `.env` copied into `dir`, its `SAP_URL` pointed at `url`, and the
+   * connection type stated `http`: the variable names an HTTP `.env`, and the
+   * start refuses a destination that states none.
+   */
   function realEnvTo(dir: string, url: string): string {
     const stated = dotenv.parse(readFileSync(REAL_ENV, 'utf8'));
-    const lines = Object.entries({ ...stated, SAP_URL: url }).map(
-      ([key, value]) => `${key}=${value}`,
-    );
+    const lines = Object.entries({
+      ...stated,
+      SAP_URL: url,
+      SAP_CONNECTION_TYPE: 'http',
+    }).map(([key, value]) => `${key}=${value}`);
     const file = join(dir, 'real.env');
     writeFileSync(file, `${lines.join('\n')}\n`, { mode: 0o600 });
     return file;

@@ -67,6 +67,7 @@ import {
   resolveTransportRequest,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
+import { stderrTail } from '../helpers/failureText';
 import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { skipRunningTest } from '../helpers/runningTest';
@@ -233,7 +234,6 @@ async function serve(kind: Kind): Promise<Served> {
 
   // Guarded: the parent logs on first, and every answer is read for a
   // credential refusal (launchStdioScript); no SDK client, no timer.
-  const tail: string[] = [];
   let server: Awaited<ReturnType<typeof launchStdioScript>>;
   try {
     server = await launchStdioScript({
@@ -247,17 +247,8 @@ async function serve(kind: Kind): Promise<Served> {
   }
   const child = server.child;
   if (child === undefined) throw new Error('the server process did not start');
-  let pending = '';
-  const keep = (text: string): void => {
-    const lines = (pending + text).split('\n');
-    pending = lines.pop() ?? '';
-    for (const line of lines) tail.push(line);
-    if (tail.length > 200) tail.splice(0, tail.length - 200);
-  };
-  keep(child.stderr());
-  child.process.stderr?.on('data', (chunk: Buffer | string) =>
-    keep(chunk.toString()),
-  );
+  // Its stderr for a failure, the configuration banner left out.
+  const tail = stderrTail(child);
 
   return {
     call: (name, callArgs = {}) => server.call(name, callArgs),
@@ -268,7 +259,7 @@ async function serve(kind: Kind): Promise<Served> {
       fs.rmSync(dir, { recursive: true, force: true });
       return code;
     },
-    stderrTail: () => tail.join('\n'),
+    stderrTail: () => tail.text(),
   };
 }
 

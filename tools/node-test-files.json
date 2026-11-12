@@ -71,6 +71,7 @@
   "src/__tests__/unit/access/listedAccessChecks.test.ts",
   "src/__tests__/unit/access/packageTreeAccessChecks.test.ts",
   "src/__tests__/unit/access/rebuiltDescriptions.test.ts",
+  "src/__tests__/unit/access/restrictedServer.test.ts",
   "src/__tests__/unit/access/startLine.test.ts",
   "src/__tests__/unit/access/withoutDenied.test.ts",
   "src/__tests__/unit/adtHeaders/headerCallSites.test.ts",

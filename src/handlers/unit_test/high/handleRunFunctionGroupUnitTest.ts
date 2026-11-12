@@ -33,13 +33,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RunFunctionGroupUnitTestArgs {
-  function_group_name: string;
-  runner?: 'async' | 'sync';
-  wait?: boolean;
-  scope?: UnitTestScopeArgs;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RunFunctionGroupUnitTestArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRunFunctionGroupUnitTest(
   context: HandlerContext,

@@ -72,12 +72,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-interface GetObjectOutlineArgs {
-  object_type: OutlineType;
-  object_name: string;
-  version?: ReadVersion;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetObjectOutlineArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** A link as answered: where it points and, where SAP states one, the position. */
 interface AnsweredLink {

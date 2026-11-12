@@ -26,6 +26,14 @@ import type {
   TOOL_DEFINITION as GetObjectVersions,
   handleGetObjectVersions,
 } from '../../handlers/common/readonly/handleGetObjectVersions';
+import type {
+  TOOL_DEFINITION as GetObjectOutline,
+  handleGetObjectOutline,
+} from '../../handlers/system/readonly/handleGetObjectOutline';
+import type {
+  TOOL_DEFINITION as GetWhereUsed,
+  handleGetWhereUsed,
+} from '../../handlers/system/readonly/handleGetWhereUsed';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 
 /** The arguments `H` takes. */
@@ -77,4 +85,20 @@ export const versionDiffOnprem: Accepts<
 export const versionDiffCloud: Accepts<
   (typeof GetObjectVersionDiff.variants)['cloud']['inputSchema'],
   typeof handleGetObjectVersionDiff
+> = true;
+export const objectOutlineOnprem: Accepts<
+  (typeof GetObjectOutline.variants)['onprem']['inputSchema'],
+  typeof handleGetObjectOutline
+> = true;
+export const objectOutlineCloud: Accepts<
+  (typeof GetObjectOutline.variants)['cloud']['inputSchema'],
+  typeof handleGetObjectOutline
+> = true;
+export const whereUsedOnprem: Accepts<
+  (typeof GetWhereUsed.variants)['onprem']['inputSchema'],
+  typeof handleGetWhereUsed
+> = true;
+export const whereUsedCloud: Accepts<
+  (typeof GetWhereUsed.variants)['cloud']['inputSchema'],
+  typeof handleGetWhereUsed
 > = true;

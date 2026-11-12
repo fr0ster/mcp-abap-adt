@@ -224,8 +224,8 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
     variant,
     (context, value) =>
       handleGetObjectStructure(context, {
-        object_type: value,
-        object_name: 'ZA',
+        objecttype: value,
+        objectname: 'ZA',
       }),
     {
       valid: 'CLAS/OC',

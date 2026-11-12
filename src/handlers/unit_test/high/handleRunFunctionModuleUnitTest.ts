@@ -42,14 +42,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RunFunctionModuleUnitTestArgs {
-  function_module_name: string;
-  function_group_name?: string;
-  runner?: 'async' | 'sync';
-  wait?: boolean;
-  scope?: UnitTestScopeArgs;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RunFunctionModuleUnitTestArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRunFunctionModuleUnitTest(
   context: HandlerContext,

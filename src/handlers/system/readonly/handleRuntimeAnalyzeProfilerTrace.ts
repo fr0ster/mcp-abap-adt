@@ -37,12 +37,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeAnalyzeProfilerTraceArgs {
-  trace_id_or_uri: string;
-  view?: 'hitlist' | 'statements' | 'db_accesses';
-  top?: number;
-  with_system_events?: boolean;
-}
+type RuntimeAnalyzeProfilerTraceArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 interface RankedSummary {
   total_records: number;

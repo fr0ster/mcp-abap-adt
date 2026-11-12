@@ -111,28 +111,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeRunClassArgs {
-  class_name: string;
-  profile?: boolean;
-  description?: string;
-  all_procedural_units?: boolean;
-  all_misc_abap_statements?: boolean;
-  all_internal_table_events?: boolean;
-  all_dynpro_events?: boolean;
-  aggregate?: boolean;
-  explicit_on_off?: boolean;
-  with_rfc_tracing?: boolean;
-  all_system_kernel_events?: boolean;
-  sql_trace?: boolean;
-  all_db_events?: boolean;
-  max_size_for_trace_file?: number;
-  amdp_trace?: boolean;
-  max_time_for_tracing?: number;
-  max_trace_attempts?: number;
-  trace_retry_delay_ms?: number;
-  /** Accepted, no longer read — see the tool description and the file header. */
-  trace_lookup_uris?: string[];
-}
+type RuntimeRunClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRuntimeRunClass(
   context: HandlerContext,

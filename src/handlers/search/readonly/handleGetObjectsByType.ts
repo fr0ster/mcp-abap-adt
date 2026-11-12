@@ -102,14 +102,7 @@ function formatObjects(
 
 export async function handleGetObjectsByType(
   context: HandlerContext,
-  args: {
-    parent_name?: string;
-    parent_tech_name?: string;
-    parent_type?: string;
-    node_id?: string;
-    format?: string;
-    with_short_descriptions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const {

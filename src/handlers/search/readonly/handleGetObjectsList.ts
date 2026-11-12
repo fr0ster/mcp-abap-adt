@@ -346,13 +346,7 @@ function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
 
 export async function handleGetObjectsList(
   context: HandlerContext,
-  args: {
-    parent_name?: string;
-    parent_tech_name?: string;
-    parent_type?: string;
-    objects?: Array<{ parent_type?: string; parent_name?: string }>;
-    with_short_descriptions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const {
     parent_name,

@@ -38,12 +38,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateFunctionGroupUnitTestArgs {
-  function_group_name: string;
-  test_class_source: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateFunctionGroupUnitTestArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleUpdateFunctionGroupUnitTest(
   context: HandlerContext,

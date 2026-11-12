@@ -191,17 +191,11 @@ export function treeText(
 
 export async function handleGetObjectStructure(
   context: HandlerContext,
-  args: {
-    objecttype?: string;
-    objectname?: string;
-    object_type?: string;
-    object_name?: string;
-    detail?: 'terse' | 'full' | 'raw';
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
-  const objectType = args.objecttype ?? args.object_type;
-  const objectName = args.objectname ?? args.object_name;
+  const objectType = args.objecttype;
+  const objectName = args.objectname;
   if (!objectType || !objectName) {
     return return_error(
       new Error(

@@ -76,14 +76,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetVirtualFoldersArgs {
-  object_search_pattern?: string;
-  preselection?: Array<{ facet: string; values: string[] }>;
-  facet_order?: string[];
-  with_versions?: boolean;
-  ignore_short_descriptions?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetVirtualFoldersArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetVirtualFolders(
   context: HandlerContext,

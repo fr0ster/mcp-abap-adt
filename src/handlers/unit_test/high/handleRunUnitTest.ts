@@ -35,13 +35,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RunUnitTestArgs {
-  class_name: string;
-  runner?: 'async' | 'sync';
-  wait?: boolean;
-  scope?: UnitTestScopeArgs;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RunUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRunUnitTest(
   context: HandlerContext,

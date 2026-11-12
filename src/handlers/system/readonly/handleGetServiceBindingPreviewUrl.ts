@@ -135,14 +135,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleGetServiceBindingPreviewUrl(
   context: HandlerContext,
-  args: {
-    service_binding_name: string;
-    entity_set?: string;
-    navigation?: string;
-    target_entity_set?: string;
-    client?: string;
-    language?: string;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const { service_binding_name } = args;

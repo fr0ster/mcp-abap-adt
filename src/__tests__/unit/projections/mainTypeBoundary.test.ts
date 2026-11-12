@@ -68,8 +68,8 @@ const TABLE_TOOLS: readonly Argument[] = [
     tool: 'GetObjectStructure.object_type',
     send: (context, value) =>
       handleGetObjectStructure(context, {
-        object_type: value,
-        object_name: 'ZA',
+        objecttype: value,
+        objectname: 'ZA',
       }),
     one: ['DSFD', 'DSFD/SCF'],
     shared: ['MSAG', 'MSAG/N, MSAG/NN'],

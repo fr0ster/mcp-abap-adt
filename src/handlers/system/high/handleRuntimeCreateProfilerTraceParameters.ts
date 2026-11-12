@@ -25,6 +25,7 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
+import type { compactProfileScheduleSchema } from '../../../lib/compact/compactSchemas';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
@@ -55,22 +56,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeCreateProfilerTraceParametersArgs {
-  description: string;
-  all_misc_abap_statements?: boolean;
-  all_procedural_units?: boolean;
-  all_internal_table_events?: boolean;
-  all_dynpro_events?: boolean;
-  aggregate?: boolean;
-  explicit_on_off?: boolean;
-  with_rfc_tracing?: boolean;
-  all_system_kernel_events?: boolean;
-  sql_trace?: boolean;
-  all_db_events?: boolean;
-  max_size_for_trace_file?: number;
-  amdp_trace?: boolean;
-  max_time_for_tracing?: number;
-}
+type RuntimeCreateProfilerTraceParametersArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeCreateProfilerTraceParameters(
   context: HandlerContext,
@@ -126,10 +114,9 @@ export const SCHEDULE_WITHOUT_ID =
   'SAP answered the trace schedule without a profiler id: no Location header carried one, so no run can name it.';
 
 /** The profiling flags of a schedule, as compact's `HandlerProfileSchedule` takes them. */
-export type ScheduleProfilerTraceArgs = Omit<
-  RuntimeCreateProfilerTraceParametersArgs,
-  'description'
-> & { description?: string };
+export type ScheduleProfilerTraceArgs = z.output<
+  typeof compactProfileScheduleSchema
+>;
 
 /**
  * The trace schedule in one request (compact `HandlerProfileSchedule`; spec

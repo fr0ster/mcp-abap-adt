@@ -33,13 +33,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RunProgramUnitTestArgs {
-  program_name: string;
-  runner?: 'async' | 'sync';
-  wait?: boolean;
-  scope?: UnitTestScopeArgs;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RunProgramUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRunProgramUnitTest(
   context: HandlerContext,

@@ -56,11 +56,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteCdsUnitTestArgs {
-  class_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteCdsUnitTest(
   context: HandlerContext,

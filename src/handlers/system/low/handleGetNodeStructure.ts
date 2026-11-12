@@ -99,12 +99,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetNodeStructureArgs {
-  parent_type: string;
-  parent_name: string;
-  node_id?: string;
-  with_short_descriptions?: boolean;
-}
+type GetNodeStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The raw body, nothing parsed — this handler needs to see whether it was

@@ -59,7 +59,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleGetSqlQuery(
   context: HandlerContext,
-  args: { sql_query: string; row_number?: number; detail?: AnswerDetail },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   logger?.info('handleGetSqlQuery called');

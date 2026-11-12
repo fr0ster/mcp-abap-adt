@@ -73,24 +73,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeRunProgramArgs {
-  program_name: string;
-  profile?: boolean;
-  description?: string;
-  all_procedural_units?: boolean;
-  all_misc_abap_statements?: boolean;
-  all_internal_table_events?: boolean;
-  all_dynpro_events?: boolean;
-  aggregate?: boolean;
-  explicit_on_off?: boolean;
-  with_rfc_tracing?: boolean;
-  all_system_kernel_events?: boolean;
-  sql_trace?: boolean;
-  all_db_events?: boolean;
-  max_size_for_trace_file?: number;
-  amdp_trace?: boolean;
-  max_time_for_tracing?: number;
-}
+type RuntimeRunProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRuntimeRunProgram(
   context: HandlerContext,

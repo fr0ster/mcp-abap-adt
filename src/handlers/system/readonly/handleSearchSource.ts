@@ -100,7 +100,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-type SearchSourceArgs = Omit<OrchestratorInput, 'concurrency'>;
+type SearchSourceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 // Over RFC the sequential version (a destination with no communication batch)
 // runs one fetch at a time. An RFC connection is one ABAP session, and one

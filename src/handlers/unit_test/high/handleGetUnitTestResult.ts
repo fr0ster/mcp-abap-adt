@@ -28,12 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetUnitTestResultArgs {
-  run_id: string;
-  with_navigation_uris?: boolean;
-  format?: 'abapunit' | 'junit';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetUnitTestResultArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetUnitTestResult(
   context: HandlerContext,

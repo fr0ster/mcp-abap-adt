@@ -55,7 +55,7 @@ function extractNamedItems(value: unknown): NamedItem[] {
 
 export async function handleGetAdtTypes(
   context: HandlerContext,
-  args: { detail?: 'terse' | 'full' | 'raw' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const detail = detailOf(args);

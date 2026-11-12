@@ -145,12 +145,7 @@ function searchOn(
 
 export async function handleSearchObject(
   context: HandlerContext,
-  args: {
-    object_name: string;
-    object_type?: string;
-    maxResults?: number;
-    detail?: 'terse' | 'full' | 'raw';
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const { object_name, object_type, maxResults } = args;

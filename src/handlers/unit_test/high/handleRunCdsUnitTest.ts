@@ -25,11 +25,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RunCdsUnitTestArgs {
-  class_name: string;
-  wait?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RunCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRunCdsUnitTest(
   context: HandlerContext,

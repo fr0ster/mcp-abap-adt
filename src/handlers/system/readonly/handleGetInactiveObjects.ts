@@ -104,7 +104,7 @@ function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
 
 export async function handleGetInactiveObjects(
   context: HandlerContext,
-  args: { detail?: 'terse' | 'full' | 'raw' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const detail = detailOf(args);

@@ -140,14 +140,7 @@ function whereUsedSchema(variant: ProjectionVariant) {
   });
 }
 
-interface WhereUsedArgs {
-  object_name?: string;
-  object_type?: string;
-  objects?: Array<{ object_name: string; object_type: string }>;
-  enable_all_types?: boolean;
-  enable_only_types?: string[];
-  disable_types?: string[];
-}
+type WhereUsedArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The boundary of `object_type` on the variant declared for `connection`: a

@@ -148,7 +148,7 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
     [
       'GetObjectStructure',
       handleGetObjectStructure,
-      { object_name: 'ZCL_X', object_type: 'class' },
+      { objectname: 'ZCL_X', objecttype: 'class' },
     ],
     ['GetSqlQuery', handleGetSqlQuery, { sql_query: 'SELECT 1' }],
     ['GetTableContents', handleGetTableContents, { table_name: 'ZT' }],
@@ -305,8 +305,8 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetObjectStructure(context as any, {
-      object_name: 'ZCL_X',
-      object_type: 'class',
+      objectname: 'ZCL_X',
+      objecttype: 'class',
     });
     const call = seen.calls
       .filter((c) => c.member === 'getObjectStructure')

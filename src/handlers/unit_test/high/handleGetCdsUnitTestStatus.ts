@@ -23,11 +23,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetCdsUnitTestStatusArgs {
-  run_id: string;
-  with_long_polling?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetCdsUnitTestStatusArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetCdsUnitTestStatus(
   context: HandlerContext,

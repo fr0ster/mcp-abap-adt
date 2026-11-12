@@ -63,7 +63,7 @@ export function transactionPropertiesOf(value: unknown): {
 
 export async function handleGetTransaction(
   context: HandlerContext,
-  args: { transaction_name: string; detail?: AnswerDetail },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   if (!args?.transaction_name) {

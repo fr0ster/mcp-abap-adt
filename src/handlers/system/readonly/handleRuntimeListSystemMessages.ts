@@ -27,12 +27,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeListSystemMessagesArgs {
-  user?: string;
-  max_results?: number;
-  from?: string;
-  to?: string;
-}
+type RuntimeListSystemMessagesArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeListSystemMessages(
   context: HandlerContext,

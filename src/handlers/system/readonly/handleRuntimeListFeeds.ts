@@ -124,24 +124,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeListFeedsArgs {
-  feed_types?: Array<NonNullable<RuntimeListFeedsArgs['feed_type']>>;
-  feed_type?:
-    | 'descriptors'
-    | 'variants'
-    | 'dumps'
-    | 'system_messages'
-    | 'gateway_errors';
-  user?: string;
-  runtime_error?: string;
-  exception?: string;
-  object_name?: string;
-  package?: string;
-  component?: string;
-  max_results?: number;
-  from?: string;
-  to?: string;
-}
+type RuntimeListFeedsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The dumps feed's filters and the attribute and operator each one is sent

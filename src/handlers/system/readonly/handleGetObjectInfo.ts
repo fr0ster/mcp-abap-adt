@@ -696,14 +696,7 @@ async function buildTreesSequential(
 
 export async function handleGetObjectInfo(
   context: HandlerContext,
-  args: {
-    parent_type?: string;
-    parent_name?: string;
-    objects?: Array<{ object_type?: string; object_name?: string }>;
-    maxDepth?: number;
-    enrich?: boolean;
-    include_descriptions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { logger } = context;
   const listed = args?.objects;

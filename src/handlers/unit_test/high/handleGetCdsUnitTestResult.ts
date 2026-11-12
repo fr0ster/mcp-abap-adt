@@ -29,12 +29,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetCdsUnitTestResultArgs {
-  run_id: string;
-  with_navigation_uris?: boolean;
-  format?: 'abapunit' | 'junit';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetCdsUnitTestResultArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetCdsUnitTestResult(
   context: HandlerContext,

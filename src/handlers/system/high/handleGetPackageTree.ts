@@ -86,14 +86,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetPackageTreeArgs {
-  package_name?: string;
-  package_names?: string[];
-  include_subpackages?: boolean;
-  max_depth?: number;
-  include_descriptions?: boolean;
-  debug?: boolean;
-}
+type GetPackageTreeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 type Metadata = IAdtResponse<unknown, IAdtError>;
 

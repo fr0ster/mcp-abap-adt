@@ -107,7 +107,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleRunAbapUnit(
   context: HandlerContext,
-  args: unknown,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const target = runTargetOf(
     args !== null && typeof args === 'object'

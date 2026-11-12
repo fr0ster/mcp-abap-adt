@@ -35,11 +35,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeGetDumpByIdArgs {
-  dump_id: string;
-  view?: 'default' | 'summary' | 'formatted';
-  response_mode?: 'payload' | 'summary' | 'both';
-}
+type RuntimeGetDumpByIdArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 const dumpXmlParser = new XMLParser({
   ignoreAttributes: false,

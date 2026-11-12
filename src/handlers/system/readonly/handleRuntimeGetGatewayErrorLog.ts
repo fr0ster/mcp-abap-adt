@@ -33,13 +33,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeGetGatewayErrorLogArgs {
-  error_url?: string;
-  user?: string;
-  max_results?: number;
-  from?: string;
-  to?: string;
-}
+type RuntimeGetGatewayErrorLogArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeGetGatewayErrorLog(
   context: HandlerContext,

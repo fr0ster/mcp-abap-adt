@@ -36,12 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateCdsUnitTestArgs {
-  class_name: string;
-  test_class_source: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateCdsUnitTest(
   context: HandlerContext,

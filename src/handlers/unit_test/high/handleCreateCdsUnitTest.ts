@@ -66,14 +66,7 @@ const REQUIRED_ARGUMENTS = [
   'test_class_source',
 ] as const;
 
-interface CreateCdsUnitTestArgs {
-  cds_view_name: string;
-  class_name: string;
-  package_name: string;
-  test_class_source: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateCdsUnitTest(
   context: HandlerContext,

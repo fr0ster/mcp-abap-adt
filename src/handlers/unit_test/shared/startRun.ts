@@ -22,7 +22,9 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
+import type * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import type { compactUnitTestRunSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -32,20 +34,11 @@ import { type RunTargetArgs, runFlagsOf, runTargetOf } from './runTarget';
 
 export type { UnitTestRunner } from './runner';
 
-export interface StartUnitTestRunArgs {
-  tests?: Array<{ container_class: string; test_class: string }>;
-  title?: string;
-  context?: string;
-  scope?: {
-    own_tests?: boolean;
-    foreign_tests?: boolean;
-    add_foreign_tests_as_preview?: boolean;
-  };
-  risk_level?: { harmless?: boolean; dangerous?: boolean; critical?: boolean };
-  duration?: { short?: boolean; medium?: boolean; long?: boolean };
-  target?: RunTargetArgs;
-  runner?: UnitTestRunner;
-}
+/**
+ * The run's arguments, as compact `HandlerUnitTestRun`'s schema parses them
+ * (its one caller).
+ */
+export type StartUnitTestRunArgs = z.output<typeof compactUnitTestRunSchema>;
 
 export async function handleStartUnitTestRun(
   context: HandlerContext,

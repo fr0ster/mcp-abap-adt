@@ -35,12 +35,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateUnitTestArgs {
-  class_name: string;
-  test_class_source: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateUnitTest(
   context: HandlerContext,

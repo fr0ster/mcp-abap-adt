@@ -43,14 +43,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RuntimeGetProfilerTraceDataArgs {
-  trace_id_or_uri: string;
-  view: 'hitlist' | 'statements' | 'db_accesses';
-  with_system_events?: boolean;
-  id?: number;
-  with_details?: boolean;
-  auto_drill_down_threshold?: number;
-}
+type RuntimeGetProfilerTraceDataArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeGetProfilerTraceData(
   context: HandlerContext,

@@ -57,7 +57,7 @@ const BLOCKED: ReadonlyArray<{ where: string; text: string }> = [
     text: 'record(request) as Promise<IAdtWireResponse<T, D>>',
   },
   {
-    where: 'src/handlers/system/readonly/handleRuntimeListFeeds.ts:547',
+    where: 'src/handlers/system/readonly/handleRuntimeListFeeds.ts:530',
     text: 'ask(request) as Promise<IAdtWireResponse<T, D>>',
   },
 ];

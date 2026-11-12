@@ -448,20 +448,31 @@ function fixedBoundaries(text: string): string {
  * cache-busting `_` query parameter (a clock reading) stated as placeholders.
  */
 function canonical(request: ParityRequest): ParityRequest {
+  /** A value as JSON carries it, every boundary a placeholder. */
+  const fixed = (value: unknown): unknown =>
+    JSON.parse(fixedBoundaries(JSON.stringify(value)));
   const params = request.params;
   const fixedParams =
     typeof params === 'object' && params !== null && '_' in params
       ? { ...params, _: '<clock>' }
       : params;
-  const parsed: unknown = JSON.parse(
-    fixedBoundaries(
-      JSON.stringify({
-        ...request,
-        ...(fixedParams !== undefined ? { params: fixedParams } : {}),
-      }),
-    ),
-  );
-  return parsed as ParityRequest;
+  const headers = request.headers;
+  return {
+    method: fixedBoundaries(request.method),
+    url: fixedBoundaries(request.url),
+    ...(request.data !== undefined ? { data: fixed(request.data) } : {}),
+    ...(fixedParams !== undefined ? { params: fixed(fixedParams) } : {}),
+    ...(headers !== undefined
+      ? {
+          headers: Object.fromEntries(
+            Object.entries(headers).map(([name, value]) => [
+              name,
+              fixedBoundaries(value),
+            ]),
+          ),
+        }
+      : {}),
+  };
 }
 
 async function record(

@@ -8,8 +8,6 @@
  * writes. Reaches no Jest global: the node:test build compiles it.
  */
 
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -233,7 +231,7 @@ export async function variantSurface(): Promise<VariantSurface> {
 
 export type Schema = {
   type?: string;
-  properties?: Record<string, { type?: string; description?: string }>;
+  properties?: Record<string, unknown>;
   required?: string[];
   [key: string]: unknown;
 };
@@ -283,15 +281,70 @@ const sapHeaders = (url: string) => ({
   'x-sap-password': 'surface-password',
 });
 
+/**
+ * An input schema as `tools/list` answered it, read as data: every member
+ * kept in its order, `properties`, `required` and `type` checked by shape.
+ */
+function schemaOf(value: unknown): Schema {
+  const out: Schema = {};
+  if (typeof value !== 'object' || value === null) return out;
+  for (const [key, member] of Object.entries(value)) {
+    if (key === 'properties') {
+      if (typeof member === 'object' && member !== null) {
+        out.properties = Object.fromEntries(Object.entries(member));
+      }
+    } else if (key === 'required') {
+      if (Array.isArray(member)) {
+        out.required = member.filter(
+          (name): name is string => typeof name === 'string',
+        );
+      }
+    } else if (key === 'type') {
+      if (typeof member === 'string') out.type = member;
+    } else {
+      out[key] = member;
+    }
+  }
+  return out;
+}
+
 /** Tool name → input schema, sorted by name, as `tools/list` answers. */
 function byName(
   tools: ReadonlyArray<{ name: string; inputSchema: unknown }>,
 ): Record<string, Schema> {
   const out: Record<string, Schema> = {};
   for (const tool of [...tools].sort((a, b) => a.name.localeCompare(b.name))) {
-    out[tool.name] = tool.inputSchema as Schema;
+    out[tool.name] = schemaOf(tool.inputSchema);
   }
   return out;
+}
+
+/** The tools of a `tools/list` answer's JSON, read as data. */
+function toolsOf(json: unknown): { name: string; inputSchema: unknown }[] {
+  const result =
+    typeof json === 'object' && json !== null
+      ? Reflect.get(json, 'result')
+      : undefined;
+  const tools =
+    typeof result === 'object' && result !== null
+      ? Reflect.get(result, 'tools')
+      : undefined;
+  if (!Array.isArray(tools)) throw new Error('tools/list answered no tools');
+  return tools.map((tool: unknown) => {
+    const name =
+      typeof tool === 'object' && tool !== null
+        ? Reflect.get(tool, 'name')
+        : undefined;
+    if (typeof name !== 'string') throw new Error('a tool without a name');
+    return { name, inputSchema: Reflect.get(Object(tool), 'inputSchema') };
+  });
+}
+
+/** The port a started server listens on. */
+function portOf(server: { listeningPort(): number | undefined }): number {
+  const port = server.listeningPort();
+  if (port === undefined) throw new Error('the server listens on no port');
+  return port;
 }
 
 async function listOver(
@@ -333,9 +386,7 @@ async function sseSurface(
     },
   );
   await sse.start();
-  const listener = (sse as unknown as { standaloneServer: Server })
-    .standaloneServer;
-  const port = (listener.address() as AddressInfo).port;
+  const port = portOf(sse);
   const headers = sapHeaders(standIn.url);
   try {
     return await listOver(
@@ -352,12 +403,9 @@ async function sseSurface(
       }),
     );
   } finally {
-    sse.stopListening();
-    listener.closeAllConnections();
-    // Settled once every stream's close has run, so none lands after the test.
-    const open = (sse as unknown as { connections: Map<unknown, unknown> })
-      .connections;
-    while (open.size > 0) await new Promise((r) => setImmediate(r));
+    // The listener closed and every stream's instance close settled, so
+    // none lands after the test.
+    await sse.stop();
   }
 }
 
@@ -377,9 +425,7 @@ async function httpSurface(
     },
   );
   await mcp.start();
-  const listener = (mcp as unknown as { standaloneServer: Server })
-    .standaloneServer;
-  const port = (listener.address() as AddressInfo).port;
+  const port = portOf(mcp);
   try {
     const response = await fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
       method: 'POST',
@@ -400,13 +446,11 @@ async function httpSurface(
           .split('\n')
           .find((line) => line.startsWith('data: '))
           ?.slice('data: '.length) ?? '');
-    const body = JSON.parse(json) as {
-      result: { tools: { name: string; inputSchema: unknown }[] };
-    };
-    return byName(body.result.tools);
+    const body: unknown = JSON.parse(json);
+    return byName(toolsOf(body));
   } finally {
     mcp.stopListening();
-    listener.closeAllConnections();
+    mcp.releaseConnections();
   }
 }
 

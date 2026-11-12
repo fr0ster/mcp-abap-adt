@@ -124,7 +124,9 @@ whatever test config is present: the real-system cases log on only through their
   (`RFC_COMMUNICATION_FAILURE`) and no host.
 - **The real-system cases** run only where `MCP_LIVE_DEFERRED_ENV_PATH` names one HTTP `.env`
   of a real on-premise system (and `MCP_LIVE_DEFERRED_LOCK_CLASS` a class of the test user's,
-  for the take-up), else they are skipped with their reason: the system becoming reachable
+  for the take-up: `ZMCP_SHR_LOCK_CLS`, a shared dependency of the test config —
+  `npm run shared:setup` creates it, `npm run shared:check` keeps it present — which the case
+  only locks and unlocks), else they are skipped with their reason: the system becoming reachable
   mid-session (a forwarder on a loopback port, closed, then opened), and the first call of a
   `--restore-session` process taking up the session a killed process left, unlocking with its
   lock handle. Run the realm check first, and only with the owner's go.

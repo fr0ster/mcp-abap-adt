@@ -442,8 +442,8 @@ below is what it carries besides.
       - Under reading (b): the `Omit` stays and the tables stay as they are.
     - **`routesParseTargets.test.ts`** (batch 1). Its table types `object_type` as `string`
       (`:17`) and passes it to HandlerGet (`:110`): TS2322 after the split (Codex measured).
-      The table is typed by HandlerGet's members; its assertions on the target schema's
-      refusals stay.
+      The table's `object_type` column is typed by HandlerGet's members; its assertions on the
+      target schema's refusals stay. Its `part` column follows in S3b, with the part union.
     - **The GetObjectStructure fallback** (reading (a) above). Sites: `caseRule.test.ts:105`,
       `dbviewName.test.ts:67`, `mainTypeBoundary.test.ts:65`,
       `projectionBoundary.test.ts:162` and `readonlySingleCall.test.ts:305`. Each passes the
@@ -655,7 +655,12 @@ below is what it carries besides.
         `string[]`;
       - the address-part and run-part dispatch narrows that union statically, a `switch` on
         the literal where `ADDRESS_PARTS.includes` / `RUN_PARTS.includes` are today;
-      - a typecheck pins `part`'s output as the read-part union, written first.
+      - a typecheck pins `part`'s output as the read-part union, written first;
+      - the tests that pass `part` as a `string` are typed by the union or parse their
+        arguments with HandlerGet's schema, in the same batch, with every request and answer
+        assertion kept. Codex measured (round 5): `packageWalks.test.ts:591`'s `contents`
+        helper (TS2345 at `:601`, `:607`, `:619`, `:633`, `:647`, `:669`, `:687`, `:699`)
+        and the `part` column of `routesParseTargets.test.ts:17` (TS2322 at `:110`).
     - Neither needs a cast, and no listed schema changes (the enum's values stay).
 
   Each retyping that changes behaviour gets a failing-first test.

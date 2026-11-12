@@ -481,10 +481,13 @@ draft, and no other tool reads it.
       that version's answer as read, `null` when that answer carried none.
   - No `detail` argument, on `GetObjectDraft` or on `HandlerGet` `part: 'draft'`: the answer
     always carries these fields, the same on both.
-- **Failures.** A read that fails answers as the tool's reads answer today: SAP's status and
-  message (a `404` for an object that does not exist). An ETag missing, or not led by 14
-  digits, answers `draft: 'undetermined'` with what came (that version's ETag `null` when
-  missing).
+- **Failures (the owner's decision).** The tool answers a failure as its reads answer today
+  (SAP's status and message) in three cases: a read of the main part fails; any read fails
+  other than with `404`; or no part of the object answers (every read `404`: the object does
+  not exist). Otherwise a version is missing, not failed: an include whose three reads all
+  answer `404` has no entry, and a version that answers `404` while another version of the
+  same include answers — like an answer that carries no ETag, or one not led by 14 digits —
+  gives that version's ETag `null` and the part `draft: 'undetermined'`.
 - **The clock.** The age uses the server's clock against SAP's ETag time. Both systems measured
   an offset of 0 s; the description and the docs say a skewed server clock skews the age.
   Nothing is kept between calls.

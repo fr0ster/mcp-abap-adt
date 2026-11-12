@@ -223,6 +223,40 @@ for (const variant of ['onprem', 'cloud'] as const) {
       }
     });
 
+    it("an include's version answering 404 while the others answer: that ETag null, the part undetermined", async () => {
+      assert.ok(draftTool !== undefined);
+      const { connection } = draftConnection(variant, (request) =>
+        request.url.includes('/includes/testclasses') &&
+        request.url.includes('version=active')
+          ? 404
+          : undefined,
+      );
+      const answered = json(
+        await draftTool.call(
+          { connection },
+          { object_type: 'CLASS', object_name: 'ZCL_A' },
+        ),
+      );
+      const parts =
+        typeof answered === 'object' && answered !== null
+          ? Reflect.get(answered, 'parts')
+          : undefined;
+      assert.ok(Array.isArray(parts));
+      const testclasses: unknown = parts.find(
+        (part: unknown) =>
+          typeof part === 'object' &&
+          part !== null &&
+          Reflect.get(part, 'part') === 'testclasses',
+      );
+      assert.deepEqual(testclasses, {
+        part: 'testclasses',
+        draft: 'undetermined',
+        changed_at: null,
+        age_seconds: null,
+        etags: { active: null, inactive: DRAFT, workspace: DRAFT },
+      });
+    });
+
     it('an include whose three reads answer 404 has no entry', async () => {
       assert.ok(draftTool !== undefined);
       const { connection } = draftConnection(variant, (request) =>

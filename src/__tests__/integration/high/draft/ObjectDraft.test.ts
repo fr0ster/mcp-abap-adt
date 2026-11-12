@@ -894,6 +894,54 @@ liveSuite(
     it('INCLUDE: other for another user, alike on both tools', async () => {
       await otherCase('INCLUDE');
     });
+
+    // An include that exists only inactive (the owner's decision, spec §5
+    // "Failures"; measured: SAP answers its active version 200 with the
+    // class's ETag, so the part is a draft, never a missing version).
+    it('CLASS: a test-class include written and never activated reads own', async () => {
+      const name = `ZCL_MDR${S}_TC`;
+      recordCreated('DeleteClass', { class_name: name });
+      await prepare('CreateClass', {
+        class_name: name,
+        package_name: packageName(),
+        description: 'Draft live',
+      });
+      await prepare('UpdateClass', {
+        class_name: name,
+        source_code: classSource(name),
+        activate: true,
+      });
+      await prepare('UpdateLocalTestClass', {
+        class_name: name,
+        test_class_code: [
+          'CLASS ltc_probe DEFINITION FINAL FOR TESTING DURATION SHORT RISK LEVEL HARMLESS.',
+          '  PRIVATE SECTION.',
+          '    METHODS t FOR TESTING.',
+          'ENDCLASS.',
+          'CLASS ltc_probe IMPLEMENTATION.',
+          '  METHOD t.',
+          '  ENDMETHOD.',
+          'ENDCLASS.',
+        ].join('\n'),
+        activate_on_update: false,
+      });
+      const from = Date.now();
+      const tool = await liveCall('GetObjectDraft', {
+        object_type: 'CLASS',
+        object_name: name,
+      });
+      const part = await liveCall('HandlerGet', {
+        object_type: 'CLASS',
+        part: 'draft',
+        class_name: name,
+      });
+      const to = Date.now();
+      const viaTool = readingOfAnswer(tool, from, to);
+      const viaPart = readingOfAnswer(part, from, to);
+      assertStates(viaTool, 'CLASS', 'testclasses', 'own');
+      assertStates(viaPart, 'CLASS', 'testclasses', 'own');
+      assert.deepEqual(comparable(viaPart), comparable(viaTool));
+    });
   },
 );
 

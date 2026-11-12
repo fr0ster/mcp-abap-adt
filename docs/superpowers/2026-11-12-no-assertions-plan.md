@@ -62,9 +62,9 @@ The interfaces repository and mcp-abap-adt-clients each get a worktree, a branch
 their own; connection too. The owner publishes each release. A later step takes it from the
 registry only after its publication, verified by a clean install outside the repositories.
 
-Releases already moving: interfaces-adt 27.3.0 is published. adt-clients 45.4.0
-(verdict-session, mcp-abap-adt-clients#310) is being built in
-`mcp-abap-adt-clients/.worktrees/verdict-session`. The typing minors below come after it.
+Releases already moving when this plan was written: interfaces-adt 27.3.0 was published, and
+adt-clients 45.4.0 (verdict-session, mcp-abap-adt-clients#310) was being built. The typing
+releases below come after it. Where each stands now is recorded under its step ("As done").
 
 ### U1. interfaces-adt-connection 5.0.0 (major) — repository mcp-abap-adt-interfaces
 
@@ -115,6 +115,9 @@ Releases already moving: interfaces-adt 27.3.0 is published. adt-clients 45.4.0
   **Release order as accepted:** interfaces-adt-connection 5.0.0 is tagged at the merge commit
   and published first; interfaces-adt 27.4.0 (`^5.0.0`) follows as a small release PR.
 
+  **Released:** interfaces-adt-connection 5.0.0 and interfaces-adt 27.4.0 are both on the
+  registry (Measured 2026-11-12, `npm view`).
+
 ### U3. adt-clients 45.5.0 and adt-strategies (minor) — repository mcp-abap-adt-clients
 
 Branched after 45.4.0 is merged and published.
@@ -137,8 +140,19 @@ Branched after 45.4.0 is merged and published.
   - the existing unit tests of the activation utilities, unchanged.
 - **Deliberate break:** a widened field narrowed again goes red.
 - **Docs:** each package's CHANGELOG. **Publish order:** after U2.
+- **As done (owner-accepted deviations), mcp-abap-adt-clients#311:** adt-clients 45.5.0,
+  adt-strategies 0.23.0 and adt-clients-legacy 0.9.4.
+  - A third pass-through, `src/utils/requestTrace.ts`, drops its `<T, D>` too.
+  - `IMessageClassChanges` is widened as well (the owner's decision).
+  - Not yet on the registry when this plan was amended (Measured 2026-11-12 with `npm view`:
+    45.4.0, 0.22.3, 0.9.3), so S5 still waits for it.
 
-### U4. connection 23.1.0 (minor) — repository mcp-abap-connection
+### U4. connection 24.0.0 (major) — repository mcp-abap-connection
+
+**As done (an owner-accepted deviation):** released as **24.0.0**, a major, not the 23.1.0
+minor planned below. The owner's reason: the exported `AbapConnection` alias changed
+incompatibly. It is published (Measured 2026-11-12, `npm view`: 24.0.0). The planned change
+below is what it carries besides.
 
 - **Change.** The range of interfaces-adt-connection moves to `^5.0.0`. The generic
   `makeAdtRequest` keeps its signature (spec §2).
@@ -149,7 +163,7 @@ Branched after 45.4.0 is merged and published.
     dependency.
 - **Deliberate break:** pin the range back to 4. The `@ts-expect-error` is then unused, and the
   typecheck goes red.
-- **Docs:** CHANGELOG 23.1.0. **Publish order:** after U1; independent of U2 and U3.
+- **Docs:** CHANGELOG 24.0.0. **Publish order:** after U1; independent of U2 and U3.
 
 ## S. The server (PR #346)
 
@@ -201,20 +215,223 @@ Branched after 45.4.0 is merged and published.
     - They are enrolled in S5, once U2 and U3 are taken from the registry.
 - The other configs keep the option off until S2f, so every commit stays green.
 
-- **S2a. Handler arguments from the schema.**
-  - The 247 hand-declared `…Args` types that are a handler's `args` become `z.output<typeof …>`
-    of their schema, by handler directory.
-  - A key a handler reads that its schema does not declare is declared in the schema (spec §3,
-    as in the earlier spec).
-  - **Tests first:**
-    - the listed-schema fixtures and surface fixtures, unchanged;
-    - a positive pairing per converted directory in `__typechecks__/exact/`: the real
-      `TOOL_DEFINITION` and handler, for example `defineTool(ActivateDomain.TOOL_DEFINITION,
-      handleActivateDomain)`, compile under the option.
-    - The existing negative test (`defineTool.test.ts`) stays.
-  - **Deliberate break:** restore `ActivateDomainArgs` with `detail?: …`, and its pairing fails
-    under `test:check:exact`.
-  - **Acceptance:** the measurement shows the 223 TS2345 handler-group errors gone.
+- **S2a. Handler arguments from the schema** (spec §3, "Handler arguments come from the
+  schema"). The first version of this step ("the 247 types become `z.output` of their
+  schema") did not hold against the code; this is the step as measured.
+  - **What a handler receives (Code).** `defineTool` (`src/lib/handlers/interfaces.ts`) pairs a
+    handler with a definition, and the entry's `call` parses the model's arguments with that
+    definition's own `inputSchema` before the handler runs. The deny list keeps this: its
+    narrowed call parses with the narrowed schema, then hands the result to the original call,
+    which parses again (`src/lib/access/withoutDenied.ts`). So on every variant a handler
+    receives `z.output` of the `inputSchema` of the definition it is paired with. That is the
+    one source each `args` type is derived from.
+  - **What was measured.** A codemod (reverted) converted the hand-declared `…Args` types, then
+    `npm run test:check` ran on the result. The compiler API listed every `defineTool` pairing
+    and the keys each handler reads from `args`.
+    - 248 named `…Args` types are a handler's second parameter. 202 convert mechanically; 46 do
+      not, because their file has no plain `inputSchema` property or the type `extends`
+      another one.
+    - Beside them, 27 registered handlers declare `args` as an inline type literal; one takes
+      `unknown` (`handleRunAbapUnit`); one an `Omit` of a loose alias (`handleHandlerGet`).
+    - The 202 alone break the normal build: 32 errors in `test:check`. With every handler
+      converted, the production errors are those this step resolves below (undeclared keys,
+      handler-to-handler calls); the rest are test sites (below).
+  - **The 46, and how each is derived** (no cast anywhere):
+    - **17 source readers** whose type `extends SourceRangeArgs` (GetClass, GetProgram,
+      GetDdl, GetInterface, GetTable, GetStructure, GetServiceDefinition, GetFunctionModule,
+      GetBehaviorDefinition, GetBehaviorImplementation, GetMetadataExtension, GetInclude,
+      GetFunctionInclude, and the four class-include reads). Their schema spreads
+      `SOURCE_RANGE_SHAPE`, so `SourceRangeArgs` itself becomes the output of an object of that
+      shape (`src/lib/handlers/sourceRange.ts`). Each reader's type is then its own
+      definition's output. `handleGetIncludePart` shares `GetIncludeArgs`.
+    - **19 definitions built by a spread**, most by `byVariant` (Code: `src/lib/variantDefinition.ts`):
+      HandlerCreate, Update, Delete, Activate, Lock, Unlock, ProfileRun (compact-modify);
+      HandlerCheckRun, DeletionCheck, GetData, Validate, WhereUsed (compact-readonly-entries);
+      RunATC, GetObjectDraft, GetObjectVersions, GetObjectVersionSource, GetObjectVersionDiff,
+      GetObjectOutline, GetWhereUsed. Each type becomes its definition's
+      `z.output<typeof TOOL_DEFINITION.inputSchema>`.
+    - **The per-variant question.** `byVariant` takes one `state` callback, so both variants'
+      `inputSchema` have one static type, and the definition's own `inputSchema` is the
+      on-premise statement (Code). The SDK parses a call with the served variant's listed
+      schema (`listedTool.ts`, `servedDefinition`); the entry's `call` then parses it with the
+      definition's own. So the on-premise output is the handler's argument type on both
+      variants; the cloud values are a subset of it (`projected` checks each list against its
+      projection).
+      - The handler's `acceptedOf(…, X[variantOf(connection)])` stays. It relates the value
+        to the connection's variant, which the compiler does not see.
+      - A typecheck pins that each variant's schema output is assignable to the handler's
+        `args`, so a later `byVariant` with a type per variant cannot pass unnoticed.
+    - **Three schema builders return a union.** `compactActivateSchemaFor` and
+      `compactGetSchemaFor` return an object without `object_type` when the deny list denies
+      every name. `handlerGetDataDefinition(sql)` returns one of two schemas, only one with
+      `sql_query`. The union's output lacks the key on one member: 8 production errors at
+      `handleHandlerActivate.ts:92/105/108`, `handleHandlerGet.ts:187/189/193`,
+      `handleHandlerGetData.ts:34/36` (Measured).
+      - The handlers' own definitions always build the branch with the key. Only the deny
+        list's narrowing builds the other (`src/lib/access/narrowing.ts:143`, `:204`, `:312`),
+        and its call passes through the original call's parse.
+      - **Decision:** each builder is split in two, the one with the key and the one without.
+        The handler's definition uses the first, so its schema type has one shape. The
+        narrowing picks between the two in plain code, as it picks a branch today. The
+        schemas built are the same ones, so no listed schema changes.
+    - **The other 10.** Measured: each compiles as derived here.
+      - Typed by the schema whose output their one caller hands them:
+        - `StartUnitTestRunArgs`: the output of `compactUnitTestRunSchema`;
+        - `handleDeletionCheck`'s `Args`: the output of `compactDeletionCheckSchema`;
+        - `ActivationRunArgs` / `ActivationStatusArgs`: their two fields of HandlerGet's
+          output.
+      - `ActivateObjectArgs`: the output of its own (unregistered) `ActivateObjectLow`
+        definition, which its callers build.
+      - `IncludesListArgs`: its definition's output, without the `Omit` that widens
+        `object_type`.
+      - Already derived, unchanged: `handleCreateOnly`'s, `handleDeleteOnly`'s and
+        `handleUpdateUnderLock`'s `Args`, and `SessionArgs`.
+    - **One of the 202 is not mechanical.** `ScheduleProfilerTraceArgs` (exported by
+      `/write`) is the argument of `handleScheduleProfilerTraceOnce`, whose caller is compact
+      HandlerProfileSchedule. The codemod derived it from the high tool's schema, where
+      `description` is required, and broke `compact-modify/src/group.ts:109`. It becomes the
+      output of `compactProfileScheduleSchema`, the caller's schema (measured: compiles).
+    - **The other three:** the 27 inline literals become their definition's output;
+      `handleRunAbapUnit` takes its definition's output in place of `unknown` (its readers
+      that take `unknown` still accept it and are retyped in S3b); `handleHandlerGet` takes
+      its definition's output.
+  - **Undeclared keys** (Measured: every key a handler reads from `args`, against its
+    definition's schema output). None needs declaring, so **no listed schema changes** and
+    tools/list stays byte for byte. No CHANGELOG fix entry follows from this step. The tool
+    description guard, the pinned renderings (`fixtureRenderings.ts`, the `fixtureBytes` and
+    `rebuiltDescriptions` pins) and `changedHandlerRequests.test.ts` then require nothing,
+    and staying unchanged is their proof that no schema moved. None is a defect: no call can
+    deliver the key to the handler.
+
+    | Key | Read at | The schema | Decision |
+    |---|---|---|---|
+    | `super_package` | `handleCreateDomain.ts:158`, handed to `validateTransportRequest`, which ignores that parameter (`_superPackage`) | CreateDomain is a strict object (`createArguments`): the key is refused by name | dead: stop reading it; `validateTransportRequest` (not exported) loses the unused parameter, which no other caller passes |
+    | `object_type`, `object_name` | `handleGetObjectStructure.ts:197-198`, as fallbacks for `objecttype` / `objectname` | a plain object requiring `objecttype` and `objectname`; undeclared keys are stripped | dead: stop reading them. The refusal words, which name the fallback, stay as they are (an answer); rewording them is an open point for the owner |
+    | `object_type` | HandlerActivate, HandlerGet | declared; absent only in the deny list's every-name-denied branch | the builder split above |
+    | `sql_query` | HandlerGetData | declared; absent only in the branch without SQL | the builder split above |
+
+  - **Handler-to-handler calls** are typed by the callee's arguments; no callee widens.
+    - The five high check wrappers (CheckClass, CheckDdl, CheckFunctionModule,
+      CheckStructure, CheckTable) declare `version?: string` inline and pass it to the low
+      handler, whose `version` is its schema's enum. Typing each wrapper by its own schema
+      (the enum `active` / `inactive`) makes the value assignable. Measured: those five
+      errors go with that alone.
+    - HandlerProfileSchedule → `handleScheduleProfilerTraceOnce`: by
+      `ScheduleProfilerTraceArgs` from the compact schema (above).
+    - HandlerValidate → `handleValidateServiceBinding` (`handleHandlerValidate.ts:81`, `:83`
+      today; `:70`, `:72` after the conversion) passes `service_definition_name` and
+      `package_name` as `string | undefined`, and the callee's schema requires both.
+      - The facade narrows them in plain code. An absent one is answered with the callee's
+        own refusal ("service_definition_name is required", "package_name is required"),
+        its words exported from the callee so they have one source, and nothing is sent.
+        Then it passes `string`.
+      - The answer is the same as today: the callee refuses an absent value with those words
+        now. `compactRequiredArguments.test.ts:314` already drives this path. It stays and
+        passes before and after, so the step adds a characterization test, not a fix.
+  - **The test sites** (Measured with every handler converted; assertions in tests stay
+    allowed by the goal, but none is added here).
+    - **Values the tool's schema refuses, handed to the handler directly.** These test a
+      path no model call reaches.
+      - Sites: `'not_a_type'` (`commonLowOperations.test.ts:184`), `'prog/p'` and
+        `'ZZZZ/ZZ'` (`compactUnitTestRunTarget.test.ts:52`, `:148`), `'clas/oc'` and a loose
+        target table (`abapUnitRunTool.test.ts:58`, `:180`), `'nonsense'`
+        (`handleObjectVersions.test.ts:152`, `objectVersionDiff.test.ts:101`), an empty
+        `object_type` (`compactRequiredArguments.test.ts:136`, `:145`), string-typed
+        `object_type` tables (`updateSingleCall.test.ts:652`, `:662`, `atcTools.test.ts:530`,
+        `projectionBoundary.test.ts`), `'table_type'` (`tableTypeTools.test.ts:1198`,
+        `TableTypeHighHandlers.test.ts:483`), `it.each` tables that leave out a required key
+        (`includeWrites.test.ts:118`, `:278`, `:357`, `:464`, `:519`;
+        `tableTypeTools.test.ts:142`, `:391`, `:528`, `:994`, `:1047`, `:1120`), and a part
+        typed `string | number` (`unknownReadPart.test.ts:20`).
+      - Probed on this branch's build: the schemas refuse `'prog/p'`, `'ZZZZ/ZZ'` and
+        `'not_a_type'`.
+      - **They go through the boundary the model's arguments take:** the tool's entry
+        (`defineTool(TOOL_DEFINITION, handler).call(context, raw)`). `raw` is `ToolArgs`, the
+        type of the arguments before the schema, so a wrong value needs no cast.
+      - Each test asserts what the model gets. Where the schema refuses, that is the
+        refusal naming the issue, and no request is recorded. Where the schema accepts and
+        the handler refuses (a member outside the connection's variant), it is the handler's
+        refusal, as today.
+      - A test whose assertion was a handler refusal that the schema now comes before is
+        pointed at the schema's refusal. The model's answer does not change, since the
+        schema already ran first. The handler check behind it is dead code, a runtime check
+        of a value its type proves; the step lists it, and S3b removes it.
+      - A lower-case code a test used for a valid call (`'prog/p'`, `'clas/oc'`) becomes the
+        listed code (`PROG/P`, `CLAS/OC`).
+    - **Valid arguments without the schema's defaults** (a defaulted field is present in the
+      output). Sites: CreatePackage in `IncludeHighHandlers.test.ts:261`,
+      `PackageHighHandlers.test.ts:147`, `TableTypeHighHandlers.test.ts:343`,
+      `highTierWriteChannelReal.test.ts:323`; GetTableContents in
+      `TableContentsHandlers.test.ts:70`, `:110` and `readonlySingleCall.test.ts:328`. Each
+      parses its arguments with the tool's schema (`TOOL_DEFINITION.inputSchema.parse`), which
+      yields the output type with the defaults the server applies.
+    - **The dead GetObjectStructure fallback.** Sites: `caseRule.test.ts:105`,
+      `dbviewName.test.ts:67`, `mainTypeBoundary.test.ts:65`,
+      `projectionBoundary.test.ts:162` and `readonlySingleCall.test.ts:305`. Each passes the
+      declared `objecttype` / `objectname`; its assertions stay.
+    - **The union branches.** These are TS2353 "`object_type` / `sql_query` does not exist"
+      at `compactActivateTypes.test.ts` (15), `compactSearchData.test.ts:163`,
+      `compactTransportRead.test.ts`, `routesParseTargets.test.ts`,
+      `batchedReadsTiming.test.ts:218`, `IncludeMainProgramsHandlers.test.ts:88`,
+      `packageWalks.test.ts`, `projectionWalk.test.ts:423`, `projectionBoundary.test.ts`
+      (`:337`, `:558`, `:649`–`:719`), `IncludeHighHandlers.test.ts:482` and
+      `TableTypeHighHandlers.test.ts:647`. They compile unchanged once the builders are
+      split (Inference: the key is then on the definition's one shape).
+  - **Batches,** each green under `npm run test:check` and CI's step list before the next.
+    Each batch carries its own call fixes and test sites, so no commit breaks the normal
+    build.
+    1. **The splits and the compact handlers.**
+       - The three builder splits.
+       - The 12 compact spread definitions, the 20 mechanical compact types (compact-modify
+         4, compact-readonly-entries 10, `src/lib/compact` 6) and `handleHandlerGet`.
+       - The other 10 and `ScheduleProfilerTraceArgs`.
+       - The HandlerValidate narrowing, with its characterization test first.
+    2. **Mechanical, write-side directories** (48): behavior_definition 6,
+       behavior_implementation 3, class 14, data_element 7, ddl 6, ddlx 5, domain 7, with
+       the CreateDomain `super_package` read removed.
+    3. **Mechanical** (49): function 9, function_group 2, function_include 3,
+       function_module 1, include 6, interface 6, message_class 8, metadata_extension 1,
+       package 7, program 6.
+    4. **Mechanical** (49): service_binding 7, service_definition 4, structure 6, table 6,
+       table_type 7, transport 10, enhancement 1, atc 4, common 4.
+    5. **Mechanical** (35): system 14 (its fifteenth, `ScheduleProfilerTraceArgs`, is in
+       batch 1), unit_test 21.
+    6. **The 17 source readers** and `SourceRangeArgs`.
+    7. **The 27 inline literals**, the five check wrappers among them, the GetObjectStructure
+       fallback dropped, and the seven other spread definitions in `src` (RunATC,
+       GetObjectDraft, the three version reads, GetObjectOutline, GetWhereUsed) and
+       `handleRunAbapUnit`.
+
+    For each batch:
+    - **Tests first:**
+      - a positive pairing per converted directory in `__typechecks__/exact/`: the real
+        definition and handler, for example `defineTool(ActivateDomain.TOOL_DEFINITION,
+        handleActivateDomain)`, compile under the option;
+      - for the spread definitions, a typecheck that each variant's schema output is
+        assignable to the handler's `args`;
+      - the batch's test sites adapted as above;
+      - the listed-schema and surface fixtures and the pinned renderings, unchanged.
+      - The existing negative test (`defineTool.test.ts`) stays.
+    - **Gate enrolment.** The batch's pairing typechecks join
+      `tools/exact-optional-files.json` at once.
+      - A converted handler file joins when `measure:exact` reports none of its own
+        diagnostics.
+      - Otherwise it joins with the S2d batch that clears its sites, or in S5 for a site
+        against an upstream contract.
+    - **Deliberate breaks:**
+      - restore one hand-declared type of the batch with `prop?: T` (batch 2:
+        `ActivateDomainArgs` with `detail?: …`), and its pairing fails under
+        `test:check:exact`;
+      - batch 1: merge one split builder back into its union, and the handler's read of the
+        key fails `test:check`; type `ScheduleProfilerTraceArgs` from the high tool's
+        schema again, and `compact-modify/src/group.ts` fails `test:check`;
+      - for a spread definition: narrow its handler's `object_type` to the cloud members,
+        and the on-premise variant's typecheck fails.
+  - **Acceptance:**
+    - every `defineTool` pairing's handler takes its definition's output, and each
+      caller-typed contract takes its caller's;
+    - the measurement shows the 223 TS2345 handler-group errors gone;
+    - tools/list unchanged.
 - **S2b. The MCP SDK transport adapter** (spec §3), `SdkTransport implements Transport`, in
   server-runtime.
   - **Tests first,** with the installed SDK:
@@ -305,7 +522,10 @@ Branched after 45.4.0 is merged and published.
   - the decided variables and returns, among them `BaseMcpServer.ts:2836` (the registration
     wrapper, typed from the SDK's `registerTool` / `tool` signatures) and the `vocabulary.ts`
     reads;
-  - properties checked by their writers.
+  - properties checked by their writers;
+  - the handler checks S2a lists as dead: a runtime check of a value the handler's `args`
+    type now proves (a code the schema's enum already holds, case-folded again), each
+    removed with the boundary test S2a points at it kept green.
 
   Each retyping that changes behaviour gets a failing-first test.
 - **S3b in batches,** each verified by `npm run measure:unknown` (its list shrinks by the
@@ -353,8 +573,9 @@ Branched after 45.4.0 is merged and published.
 After U1 to U4 are published.
 
 - **Ranges:**
-  - interfaces-adt-connection `^5.0.0`, interfaces-adt `^27.4.0`, adt-clients `^45.5.0` (or
-    the version the owner published), adt-strategies its minor, connection `^23.1.0`;
+  - interfaces-adt-connection `^5.0.0`, interfaces-adt `^27.4.0`, adt-clients `^45.5.0`,
+    adt-strategies `^0.23.0`, adt-clients-legacy `^0.9.4` where it is named, connection
+    `^24.0.0` (U4 as done: a major);
   - in the root `package.json` and in every package that declares them.
 
   Lockfile by npm only, then checked.
@@ -394,12 +615,19 @@ After U1 to U4 are published.
 ### S7. Docs
 
 - **CHANGELOG 24.0.0** names the exported changes of spec §8, one line each:
-  - handler `args` types;
+  - handler `args` types, `ScheduleProfilerTraceArgs` and `StartUnitTestRunArgs` among them
+    (now their compact caller's schema output);
   - the widened contracts;
   - `IAbapConnection` v5;
+  - the connection range moving to 24.0.0 (U4 as done), named with what changed for an
+    embedder if any exported signature of the server names connection's `AbapConnection`;
   - `SdkTransport`, if exported.
+  - S2a changes no listed schema, so tools/list has no entry from it.
 - **`MIGRATION-24.0.md`:** what an embedder holding a generic connection or calling
-  `makeAdtRequest` with type arguments changes.
+  `makeAdtRequest` with type arguments changes; an embedder that calls an exported handler
+  with raw arguments (S2a: defaulted fields now present, enums where a string was taken)
+  parses them with the tool's schema or calls the tool's entry; and connection 24.0.0's
+  `AbapConnection` change, where an exported signature of the server names it.
 - **`docs/`:** the developer docs that describe the scans and gates (the static-types and
   regex sections, the test infrastructure's conventions) are updated.
 - **CLAUDE.md and SCOPE.md are not edited.**

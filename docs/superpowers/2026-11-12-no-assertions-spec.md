@@ -29,6 +29,11 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   - The rest pass an optional value on as `T | undefined` to an option typed `?: T`.
   - There are 247 hand-declared `…Args` types in production, 9 of them exported; 69 sites
     already use `z.output<typeof …>`.
+  - Re-measured for S2a (a codemod, reverted, and the compiler API over every `defineTool`
+    pairing): 248 named `…Args` types are a handler's second parameter, 202 of them
+    convertible mechanically. Beside them, 27 registered handlers declare `args` as an inline
+    type literal, one as `unknown` and one as an `Omit` of a loose alias. The plan's S2a lists
+    them by kind.
   - The package projects are smaller: server-runtime 37 errors, compact-readonly-entries 56,
     compact-modify 14, responsible-rules 1. Every package `tsconfig.json` but six extends the
     root one; the six (background-runs-memory, http, responsible-rules, server-runtime, server,
@@ -84,6 +89,9 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     is a minor for each of them.
   - Only code that passes type arguments to `makeAdtRequest` on an `IAbapConnection` stops
     compiling, which makes interfaces-adt-connection's change a major.
+- **Released so far** (Measured 2026-11-12, `npm view`): interfaces-adt-connection 5.0.0,
+  interfaces-adt 27.4.0 and connection 24.0.0 are on the registry; adt-clients is at 45.4.0,
+  adt-strategies at 0.22.3, adt-clients-legacy at 0.9.3, so step 3's releases are not yet out.
 - **Releases, in dependency order.** Each is published before the next takes it from the
   registry, and one copy of interfaces-adt-connection is left in each consumer's tree:
   1. **interfaces-adt-connection 5.0.0** (major: the type parameters go).
@@ -91,12 +99,18 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
      `IAdtWireResponse`, whose shape does not change.
   3. **adt-clients and adt-strategies** (minor): ranges to `^5.0.0`.
      - `activationUtils.ts` and `tools/header-probe` drop their pass-through `<T, D>`.
+     - As done (owner-accepted): mcp-abap-adt-clients#311, adt-clients 45.5.0,
+       adt-strategies 0.23.0, adt-clients-legacy 0.9.4. A third pass-through,
+       `src/utils/requestTrace.ts`, drops its `<T, D>` too, and `IMessageClassChanges` is
+       widened as well (the owner's decision).
      - `AdtBatchConnection.makeAdtRequest` keeps its signature.
      - This fits the adt-clients / interfaces-adt minors already coming into this release
        (verdict-session, mcp-abap-adt-clients#310, not merged). The change goes into that PR's
        release.
   4. **connection 23.1.0** (minor), the release after 23.0.0, which is published: the range
      moves to `^5.0.0`.
+     - As done (owner-accepted): released as **24.0.0**, a major, because the exported
+       `AbapConnection` alias changed incompatibly. It is published.
      - Its generic `makeAdtRequest` keeps its signature, so no caller of connection breaks.
      - The `as unknown as` inside it is connection's own code, outside this goal (the server's).
   5. **This server** takes the four from the registry.
@@ -118,14 +132,47 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   `args` parameter (`(context: HandlerContext, args: X)`; Measured). Each becomes
   `z.output<typeof TOOL_DEFINITION.inputSchema>`, or the zod schema it is built from. That
   leaves one source, so the 223 mismatches cannot drift back.
-  - Where a handler reads a key its schema does not declare, the key is declared in the
-    schema, as in the earlier spec §3.
+  - **The one source is the schema the handler's arguments are parsed with** (Code).
+    `defineTool`'s `call` parses with the paired definition's own `inputSchema`, also under the
+    deny list, whose narrowed call ends in the original call's parse. So:
+    - a handler paired with a definition takes `z.output<typeof TOOL_DEFINITION.inputSchema>`;
+    - a handler only another handler calls takes the output of the schema its caller's
+      arguments come from (for example `StartUnitTestRunArgs` from
+      `compactUnitTestRunSchema`, `ScheduleProfilerTraceArgs` from
+      `compactProfileScheduleSchema`).
+  - **Per-variant definitions** (`byVariant`) have one schema type for both variants, and the
+    definition's own `inputSchema` is the on-premise one, which the entry parses with. The
+    handler's argument type is that output on both variants; the cloud values are a subset.
+    A typecheck pins each variant's output as assignable to the handler's `args`.
+  - **A schema builder that returns a union of shapes** (`compactActivateSchemaFor`,
+    `compactGetSchemaFor` and `handlerGetDataDefinition`, whose deny-list branch drops a key)
+    is split in two. The handler's definition then has one shape, and the narrowing picks the
+    branch in plain code. The schemas built do not change.
+  - **Where a handler reads a key its schema does not declare,** each case is decided
+    (Measured: the plan's S2a lists them). The key is declared in the schema only where a call
+    could carry it to the handler. A listed-schema change is then a CHANGELOG fix, with its
+    fixtures updated. Where no call can carry it (a strict schema refuses it, a plain one strips
+    it), the read is dead and goes. Measured: every case is dead or a builder union, so no
+    listed schema changes.
+  - **A handler that calls another** passes the callee's argument type. Where its own value
+    is looser (an optional the callee requires), it narrows in plain code and answers as the
+    callee would; no callee widens.
+  - **Tests that hand a handler a value its schema refuses** go through the tool's entry
+    (`call`, which takes `ToolArgs` as the model's arguments arrive). They assert what the
+    model gets. Valid arguments are parsed with the tool's schema, so they carry its defaults.
+    No assertion is added for either.
   - The handlers that `@mcp-abap-adt/lib/handlers`, `/read` and `/write` export change their
     `args` type with it: optional properties read `?: T | undefined`. That widens what a caller
     may pass, so nothing breaks, but it is an exported change (§8).
 - **The 8 other `…Args` types are helper contracts, not tool arguments**, and keep their
   declarations: `HandlerGetArgs`, `ResultOnceArgs`, `RunTargetArgs`, `UnitTestScopeArgs`,
   `StartArgs` (already a `z.output`), `ToolArgs`, `SourceRangeArgs` and `SearchObjectsArgs`.
+  One exception: `SourceRangeArgs` becomes the output of an object of `SOURCE_RANGE_SHAPE`,
+  which every source reader's schema spreads, so the 17 readers whose types extend it take
+  their definition's output too.
+  One exception: `SourceRangeArgs` becomes the output of an object of `SOURCE_RANGE_SHAPE`,
+  which every source reader's schema spreads, so the 17 readers whose types extend it take
+  their definition's output too.
   `ScheduleProfilerTraceArgs`, exported through `/write`, is a handler argument.
   - A helper contract's optional fields are declared `?: T | undefined` where a caller passes
     a possibly absent value.
@@ -308,6 +355,14 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     `/write` export becomes its schema's output. Optional properties read `?: T | undefined`,
     which widens what a caller may pass. `ScheduleProfilerTraceArgs` (exported by `/write`) is
     one of them.
+    - **It also narrows, for a caller that calls a handler directly** (Measured, S2a's test
+      sites). A field with a schema default is present in the output, so a direct call must
+      give it (CreatePackage's `package_type` and `detail`, GetTableContents' `detail`). A
+      field the schema types as an enum takes the enum where the hand type said `string`
+      (the check wrappers' `version`, the codes of `object_type`).
+    - So an embedder that calls an exported handler with raw arguments parses them with the
+      tool's schema first, or calls the tool's entry. `MIGRATION-24.0.md` says so. It is a
+      break for those callers only, inside the 24.0.0 major.
   - **Shared contracts that §3's sites meet and that a package entry exports** (Measured: the
     types the root project's diagnostics name, matched against the exports of every
     `package.json` `exports` entry, by the type checker):
@@ -337,7 +392,9 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   - interfaces-adt-connection 5.0.0 (major);
   - interfaces-adt and adt-strategies minors, adt-clients minor in #310's release (ranges and
     §3's widening);
-  - connection 23.1.0 (minor).
+  - connection 23.1.0 (minor) as planned; released as 24.0.0, a major (owner-accepted, §2).
+    The server's CHANGELOG names the range move, and `MIGRATION-24.0.md` connection's
+    `AbapConnection` change where an exported signature of the server names it.
 
 ## 9. Tests and acceptance
 

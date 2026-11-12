@@ -55,13 +55,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateFunctionModuleArgs {
-  function_group_name: string;
-  function_module_name: string;
-  description?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateFunctionModuleArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateFunctionModule(
   context: HandlerContext,

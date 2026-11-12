@@ -98,19 +98,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreatePackageArgs {
-  package_name: string;
-  description?: string;
-  super_package: string;
-  package_type?: string;
-  software_component?: string;
-  transport_layer?: string;
-  transport_request?: string;
-  record_changes?: boolean;
-  application_component?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreatePackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreatePackage(
   context: HandlerContext,

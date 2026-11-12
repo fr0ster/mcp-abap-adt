@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateFunctionGroupArgs {
-  function_group_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateFunctionGroup(
   context: HandlerContext,

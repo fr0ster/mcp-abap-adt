@@ -73,14 +73,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateFunctionIncludeArgs {
-  function_group_name: string;
-  include_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateFunctionIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateFunctionInclude(
   context: HandlerContext,

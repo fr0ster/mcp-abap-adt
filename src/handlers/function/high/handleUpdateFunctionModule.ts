@@ -75,14 +75,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateFunctionModuleArgs {
-  function_group_name: string;
-  function_module_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateFunctionModuleArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateFunctionModule(
   context: HandlerContext,

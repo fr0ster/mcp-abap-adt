@@ -39,11 +39,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckFunctionGroupArgs {
-  function_group_name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckFunctionGroup(
   context: HandlerContext,

@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckPackage(
   context: HandlerContext,
-  args: { package_name: string; super_package?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckPackageLow(context, args);
   return normalizeCheckResponse(result, args.package_name?.toUpperCase());

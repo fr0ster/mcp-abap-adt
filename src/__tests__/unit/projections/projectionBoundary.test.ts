@@ -55,7 +55,10 @@ import { handleValidateObject } from '../../../handlers/common/low/handleValidat
 import { handleGetObjectVersionDiff } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { handleGetObjectVersionSource } from '../../../handlers/common/readonly/handleGetObjectVersionSource';
 import { handleGetObjectVersions } from '../../../handlers/common/readonly/handleGetObjectVersions';
-import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
+import {
+  TOOL_DEFINITION as GetIncludesList,
+  handleGetIncludesList,
+} from '../../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
 import { handleGetNodeStructure } from '../../../handlers/system/low/handleGetNodeStructure';
@@ -177,22 +180,21 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
       wrong: ['BDEF/BD', 'objects[].type "BDEF/BD" is not one of: CLAS/OC'],
     },
   ),
-  // Codes only.
+  // Codes only, through the tool's entry: a value outside the schema's
+  // members is refused there, before the handler.
   ...family(
     'GetIncludesList.object_type',
     variant,
     (context, value) =>
-      handleGetIncludesList(context, { object_type: value, object_name: 'ZA' }),
+      defineTool(GetIncludesList, handleGetIncludesList).call(context, {
+        object_type: value,
+        object_name: 'ZA',
+      }),
     {
       valid: 'PROG/P',
-      name: [
-        'program',
-        refused('Unsupported object_type "program": Supported: PROG/P'),
-      ],
-      wrong: [
-        'FUGR/FF',
-        'Unsupported object_type "FUGR/FF": Supported: PROG/P',
-      ],
+      lower: schemaRefused('GetIncludesList'),
+      name: ['program', schemaRefused('GetIncludesList')],
+      wrong: ['FUGR/FF', schemaRefused('GetIncludesList')],
     },
   ),
   // Any code of the variant's table, or a name.

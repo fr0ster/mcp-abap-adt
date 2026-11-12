@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteProgramArgs {
-  program_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteProgram(
   context: HandlerContext,

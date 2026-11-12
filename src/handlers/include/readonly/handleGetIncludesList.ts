@@ -121,19 +121,8 @@ function includesListSchema(variant: ProjectionVariant) {
   });
 }
 
-/**
- * GetIncludesList's arguments, as its schema parses them on either variant —
- * with each `object_type` any text: the handler reads it past the schema's
- * boundary (`parentOf`), and names the parents or the shared main type when
- * it is none of them.
- */
-type IncludesListArgs = Omit<
-  z.output<ReturnType<typeof includesListSchema>>,
-  'object_type' | 'objects'
-> & {
-  object_type?: string;
-  objects?: Array<{ object_name: string; object_type: string }>;
-};
+/** GetIncludesList's arguments, as its definition's schema parses them. */
+type IncludesListArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 interface IncludeNode {
   name: string;

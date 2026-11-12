@@ -55,7 +55,10 @@ import { handleUpdateInclude } from '../../../../handlers/include/high/handleUpd
 import { handleUpdateIncludeMetadata } from '../../../../handlers/include/high/handleUpdateIncludeMetadata';
 import { handleActivateInclude } from '../../../../handlers/include/low/handleActivateInclude';
 import { handleGetInclude } from '../../../../handlers/include/readonly/handleGetInclude';
-import { handleCreatePackage } from '../../../../handlers/package/high/handleCreatePackage';
+import {
+  TOOL_DEFINITION as CreatePackage,
+  handleCreatePackage,
+} from '../../../../handlers/package/high/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 import { handleSearchObject } from '../../../../handlers/search/readonly/handleSearchObject';
 import { handleGetInactiveObjects } from '../../../../handlers/system/readonly/handleGetInactiveObjects';
@@ -258,13 +261,16 @@ describe('Include High-Level Handlers Integration', () => {
 
       // The package of the run: local, no transport.
       await must(`CreatePackage ${PACKAGE}`, () =>
-        handleCreatePackage(context, {
-          package_name: PACKAGE,
-          super_package: '$TMP',
-          description: `Include suite run ${RUN}`,
-          package_type: 'development',
-          software_component: 'LOCAL',
-        }),
+        handleCreatePackage(
+          context,
+          CreatePackage.inputSchema.parse({
+            package_name: PACKAGE,
+            super_package: '$TMP',
+            description: `Include suite run ${RUN}`,
+            package_type: 'development',
+            software_component: 'LOCAL',
+          }),
+        ),
       );
       created.push({ kind: 'package', name: PACKAGE });
 

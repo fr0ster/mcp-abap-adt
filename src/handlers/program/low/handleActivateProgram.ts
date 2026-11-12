@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateProgramArgs {
-  program_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateProgram(
   context: HandlerContext,

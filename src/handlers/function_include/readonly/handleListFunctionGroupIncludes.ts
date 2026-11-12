@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleListFunctionGroupIncludes(
   context: HandlerContext,
-  args: { function_group_name: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const { function_group_name } = args;

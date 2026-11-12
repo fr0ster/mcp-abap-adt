@@ -30,11 +30,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateFunctionModuleArgs {
-  function_module_name: string;
-  function_group_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateFunctionModuleArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateFunctionModule(
   context: HandlerContext,

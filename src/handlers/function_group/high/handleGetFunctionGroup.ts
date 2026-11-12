@@ -21,10 +21,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetFunctionGroupArgs {
-  function_group_name: string;
-  version?: ReadVersion;
-}
+type GetFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetFunctionGroup(
   context: HandlerContext,

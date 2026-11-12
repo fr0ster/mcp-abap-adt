@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckFunctionGroup(
   context: HandlerContext,
-  args: { function_group_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckFunctionGroupLow(context, args);
   return normalizeCheckResponse(

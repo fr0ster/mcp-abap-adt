@@ -81,15 +81,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateFunctionGroupArgs {
-  function_group_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  activate?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateFunctionGroup(
   context: HandlerContext,

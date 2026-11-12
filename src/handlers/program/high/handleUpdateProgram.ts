@@ -63,13 +63,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateProgramArgs {
-  program_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateProgram(
   context: HandlerContext,

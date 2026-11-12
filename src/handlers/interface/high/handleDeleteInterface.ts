@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteInterfaceArgs {
-  interface_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteInterfaceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteInterface(
   context: HandlerContext,

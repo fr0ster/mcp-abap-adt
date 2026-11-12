@@ -59,12 +59,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdatePackageArgs {
-  package_name: string;
-  description: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdatePackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdatePackage(
   context: HandlerContext,

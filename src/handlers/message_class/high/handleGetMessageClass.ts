@@ -16,9 +16,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetMessageClassArgs {
-  message_class_name: string;
-}
+type GetMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetMessageClass(
   context: HandlerContext,

@@ -34,11 +34,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckInterfaceArgs {
-  interface_name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckInterfaceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckInterface(
   context: HandlerContext,

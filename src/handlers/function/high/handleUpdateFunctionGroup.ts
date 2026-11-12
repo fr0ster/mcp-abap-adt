@@ -65,12 +65,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateFunctionGroupArgs {
-  function_group_name: string;
-  description: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateFunctionGroup(
   context: HandlerContext,

@@ -42,12 +42,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteFunctionModuleArgs {
-  function_module_name: string;
-  function_group_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteFunctionModuleArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteFunctionModule(
   context: HandlerContext,

@@ -40,11 +40,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface DeleteIncludeArgs {
-  include_name?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteInclude(
   context: HandlerContext,

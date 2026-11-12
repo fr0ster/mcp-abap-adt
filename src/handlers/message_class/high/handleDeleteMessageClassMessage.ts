@@ -63,11 +63,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteMessageClassMessageArgs {
-  message_class_name: string;
-  msgno: string;
-  transport_request?: string;
-}
+type DeleteMessageClassMessageArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleDeleteMessageClassMessage(
   context: HandlerContext,

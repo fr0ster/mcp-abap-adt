@@ -41,11 +41,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckFunctionModule(
   context: HandlerContext,
-  args: {
-    function_group_name: string;
-    function_module_name: string;
-    version?: string;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckFunctionModuleLow(context, args);
   return normalizeCheckResponse(

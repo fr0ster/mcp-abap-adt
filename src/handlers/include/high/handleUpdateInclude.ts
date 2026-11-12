@@ -53,13 +53,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface UpdateIncludeArgs {
-  include_name?: string;
-  source_code?: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateInclude(
   context: HandlerContext,

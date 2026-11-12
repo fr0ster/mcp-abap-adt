@@ -51,14 +51,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateMessageClassArgs {
-  message_class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateMessageClass(
   context: HandlerContext,

@@ -45,12 +45,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckFunctionModuleArgs {
-  function_group_name: string;
-  function_module_name: string;
-  version?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckFunctionModuleArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckFunctionModule(
   context: HandlerContext,

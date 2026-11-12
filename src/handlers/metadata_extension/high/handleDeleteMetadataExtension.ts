@@ -62,11 +62,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteMetadataExtensionArgs {
-  metadata_extension_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteMetadataExtensionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteMetadataExtension(
   context: HandlerContext,

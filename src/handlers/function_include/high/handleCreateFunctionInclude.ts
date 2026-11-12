@@ -48,13 +48,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateFunctionIncludeArgs {
-  function_group_name: string;
-  include_name: string;
-  description?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateFunctionIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateFunctionInclude(
   context: HandlerContext,

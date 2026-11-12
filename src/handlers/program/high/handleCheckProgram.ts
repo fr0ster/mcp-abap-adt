@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckProgram(
   context: HandlerContext,
-  args: { program_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckProgramLow(context, args);
   return normalizeCheckResponse(result, args.program_name?.toUpperCase());

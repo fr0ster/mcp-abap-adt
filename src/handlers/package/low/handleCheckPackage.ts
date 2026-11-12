@@ -48,11 +48,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckPackageArgs {
-  package_name: string;
-  super_package?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckPackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckPackage(
   context: HandlerContext,

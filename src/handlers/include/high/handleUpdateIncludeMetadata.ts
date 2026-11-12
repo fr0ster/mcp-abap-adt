@@ -49,12 +49,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface UpdateIncludeMetadataArgs {
-  include_name?: string;
-  metadata?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateIncludeMetadataArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateIncludeMetadata(
   context: HandlerContext,

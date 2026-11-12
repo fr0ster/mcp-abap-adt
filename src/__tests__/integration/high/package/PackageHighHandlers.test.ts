@@ -16,7 +16,10 @@
 
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
-import { handleCreatePackage } from '../../../../handlers/package/high/handleCreatePackage';
+import {
+  TOOL_DEFINITION as CreatePackage,
+  handleCreatePackage,
+} from '../../../../handlers/package/high/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 
 import { createTestLogger } from '../../helpers/loggerHelpers';
@@ -144,18 +147,21 @@ describe('Package High-Level Handlers Integration', () => {
             connection,
             logger: createLogger,
           });
-          return handleCreatePackage(createCtx, {
-            package_name: objectName,
-            super_package: superPackage,
-            description:
-              params.description || `Test package for high-level handler`,
-            package_type: params.package_type || 'development',
-            software_component: params.software_component,
-            transport_layer: params.transport_layer,
-            transport_request: transportRequest,
-            application_component: params.application_component,
-            record_changes: params.record_changes,
-          });
+          return handleCreatePackage(
+            createCtx,
+            CreatePackage.inputSchema.parse({
+              package_name: objectName,
+              super_package: superPackage,
+              description:
+                params.description || `Test package for high-level handler`,
+              package_type: params.package_type || 'development',
+              software_component: params.software_component,
+              transport_layer: params.transport_layer,
+              transport_request: transportRequest,
+              application_component: params.application_component,
+              record_changes: params.record_changes,
+            }),
+          );
         },
       );
 

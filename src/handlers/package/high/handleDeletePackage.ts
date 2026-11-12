@@ -60,12 +60,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeletePackageArgs {
-  package_name: string;
-  transport_request?: string;
-  force_new_connection?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeletePackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeletePackage(
   context: HandlerContext,

@@ -53,14 +53,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface CreateIncludeArgs {
-  include_name?: string;
-  package_name?: string;
-  description?: string;
-  transport_request?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateInclude(
   context: HandlerContext,

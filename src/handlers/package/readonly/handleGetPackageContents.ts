@@ -57,13 +57,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetPackageContentsArgs {
-  package_name?: string;
-  package_names?: string[];
-  include_subpackages?: boolean;
-  max_depth?: number;
-  include_descriptions?: boolean;
-}
+type GetPackageContentsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetPackageContents(
   context: HandlerContext,

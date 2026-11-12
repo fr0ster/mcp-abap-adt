@@ -66,15 +66,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateProgramArgs {
-  program_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  application?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateProgram(
   context: HandlerContext,

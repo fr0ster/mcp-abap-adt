@@ -33,10 +33,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface ActivateIncludeArgs {
-  include_name?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateInclude(
   context: HandlerContext,

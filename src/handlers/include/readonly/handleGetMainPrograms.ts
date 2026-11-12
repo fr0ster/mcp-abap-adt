@@ -17,10 +17,7 @@ export const TOOL_DEFINITION = {
   inputSchema: z.object({ include_name: z.string().describe('Include name.') }),
 } as const;
 
-interface GetMainProgramsArgs {
-  /** Required by the schema; a call from outside it may leave it out. */
-  include_name?: string;
-}
+type GetMainProgramsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** One main program, as SAP's object reference names it. */
 export interface MainProgram {

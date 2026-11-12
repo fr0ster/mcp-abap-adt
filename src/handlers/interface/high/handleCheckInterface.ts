@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckInterface(
   context: HandlerContext,
-  args: { interface_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckInterfaceLow(context, args);
   return normalizeCheckResponse(result, args.interface_name?.toUpperCase());

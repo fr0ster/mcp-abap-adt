@@ -77,13 +77,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdatePackageArgs {
-  package_name: string;
-  super_package?: string;
-  updated_description: string;
-  lock_handle: string;
-  transport_request?: string;
-}
+type UpdatePackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdatePackage(
   context: HandlerContext,

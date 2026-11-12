@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteMessageClassArgs {
-  message_class_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteMessageClass(
   context: HandlerContext,

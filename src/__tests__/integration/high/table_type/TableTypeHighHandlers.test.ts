@@ -52,7 +52,10 @@ import { handleHandlerWhereUsed } from '../../../../../compact-readonly-entries/
 import { handleActivateObjects } from '../../../../handlers/common/high/handleActivateObjects';
 import { handleGetObjectVersionSource } from '../../../../handlers/common/readonly/handleGetObjectVersionSource';
 import { handleGetObjectVersions } from '../../../../handlers/common/readonly/handleGetObjectVersions';
-import { handleCreatePackage } from '../../../../handlers/package/high/handleCreatePackage';
+import {
+  TOOL_DEFINITION as CreatePackage,
+  handleCreatePackage,
+} from '../../../../handlers/package/high/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 import { handleSearchObject } from '../../../../handlers/search/readonly/handleSearchObject';
 import { handleGetTypeInfo } from '../../../../handlers/system/readonly/handleGetTypeInfo';
@@ -340,13 +343,16 @@ describe('TableType High-Level Handlers Integration', () => {
         }
       } else {
         await must(`CreatePackage ${OWN_PACKAGE}`, () =>
-          handleCreatePackage(context, {
-            package_name: OWN_PACKAGE,
-            super_package: '$TMP',
-            description: `Table type suite run ${RUN}`,
-            package_type: 'development',
-            software_component: 'LOCAL',
-          }),
+          handleCreatePackage(
+            context,
+            CreatePackage.inputSchema.parse({
+              package_name: OWN_PACKAGE,
+              super_package: '$TMP',
+              description: `Table type suite run ${RUN}`,
+              package_type: 'development',
+              software_component: 'LOCAL',
+            }),
+          ),
         );
         created.push({ kind: 'package', name: OWN_PACKAGE });
       }

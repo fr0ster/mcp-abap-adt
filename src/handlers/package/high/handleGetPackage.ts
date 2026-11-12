@@ -27,11 +27,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetPackageArgs {
-  package_name: string;
-  version?: ReadVersion;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetPackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetPackage(
   context: HandlerContext,

@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateInterfaceArgs {
-  interface_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateInterfaceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateInterface(
   context: HandlerContext,

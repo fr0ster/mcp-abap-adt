@@ -67,13 +67,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateInterfaceArgs {
-  interface_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateInterfaceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateInterface(
   context: HandlerContext,

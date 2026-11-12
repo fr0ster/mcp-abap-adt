@@ -67,12 +67,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateMessageClassArgs {
-  message_class_name: string;
-  description: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateMessageClass(
   context: HandlerContext,

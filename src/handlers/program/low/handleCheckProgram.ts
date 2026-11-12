@@ -41,11 +41,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckProgramArgs {
-  program_name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckProgram(
   context: HandlerContext,

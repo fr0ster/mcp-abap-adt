@@ -109,7 +109,7 @@ export interface ShutdownRun {
 
 export interface ShutdownSequenceOptions {
   /** Synchronous, in the trigger's tick, after the latch: stop listening, stop admission, stop input. */
-  begin?: () => void;
+  begin?: (() => void) | undefined;
   /**
    * The orderly sequence. `step(words)` names what it waits for now, for the
    * forced close's line (`"the instance close"`, …); `signal` aborts when the
@@ -123,7 +123,7 @@ export interface ShutdownSequenceOptions {
   stderr: (line: string) => void;
   processLike: ShutdownProcess;
   /** Whether the end of stdin starts it (stdio). */
-  onStdinEnd?: boolean;
+  onStdinEnd?: boolean | undefined;
   /** `--shutdown-timeout` in milliseconds: the forced close after this long. Absent: none. */
   shutdownTimeoutMs?: number | undefined;
 }

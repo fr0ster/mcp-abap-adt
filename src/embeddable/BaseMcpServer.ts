@@ -294,7 +294,7 @@ export abstract class BaseMcpServer extends McpServer {
    * Per-instance SAP system type. Overrides process.env.SAP_SYSTEM_TYPE
    * for `available_in` filtering at handler registration time.
    */
-  protected readonly systemType?: SapEnvironment;
+  protected readonly systemType?: SapEnvironment | undefined;
   /** The access-check strategy the host gave; `undefined`: none. */
   private readonly accessChecks: IAccessChecks | undefined;
   /** The tools the `-ro` twins serve, read once when a strategy is given. */
@@ -405,13 +405,13 @@ export abstract class BaseMcpServer extends McpServer {
 
   constructor(options: {
     name: string;
-    version?: string;
-    logger?: Logger;
+    version?: string | undefined;
+    logger?: Logger | undefined;
     systemType?: SapEnvironment | undefined;
     /** Asks a connection's system for its information; default none. */
-    systemContextResolver?: SystemContextResolver | null;
+    systemContextResolver?: SystemContextResolver | null | undefined;
     /** The rules that make a connection's parameters; default none. */
-    systemContextRules?: SystemContextRules | null;
+    systemContextRules?: SystemContextRules | null | undefined;
     /**
      * The idle bound on held state, in minutes: at least 30, default 30.
      * `NO_IDLE_BOUND`: none — held state never ends on the server's clock
@@ -424,12 +424,12 @@ export abstract class BaseMcpServer extends McpServer {
      * explicitly, else stderr, always on — never a transport logger a host
      * defaulted to silence (such a host passes this option itself).
      */
-    stateLogger?: StateLogger;
+    stateLogger?: StateLogger | undefined;
     /**
      * The host's index of state handles in use (a pool): a handle it answers
      * `true` for is drawn again, so no two instances of the host share one.
      */
-    isStateHandleTaken?: (handle: string) => boolean;
+    isStateHandleTaken?: ((handle: string) => boolean) | undefined;
     /**
      * The owner of the process's runtime session files, created by the host
      * and shared by its instances: each owned HTTP connection holding a
@@ -438,7 +438,7 @@ export abstract class BaseMcpServer extends McpServer {
      * leftover-session tools read it. Absent: no file, and those tools
      * answer "not available here".
      */
-    leftoverSessions?: LeftoverSessions;
+    leftoverSessions?: LeftoverSessions | undefined;
     /**
      * Where background runs and their answers are kept: the host's strategy,
      * shared by its instances (the launchers' `InMemoryBackgroundRuns` of
@@ -447,7 +447,7 @@ export abstract class BaseMcpServer extends McpServer {
      * background-run tools are refused, and a listed long tool answers its
      * result in the call.
      */
-    backgroundRuns?: IBackgroundRuns;
+    backgroundRuns?: IBackgroundRuns | undefined;
     /**
      * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
      * failed read leads to (`'skip' | 'end' | 'throw'`), asked once per SAP
@@ -456,12 +456,12 @@ export abstract class BaseMcpServer extends McpServer {
      * answer are thrown, before any strategy. Absent: the shipped one,
      * `skipSapAnswers`.
      */
-    sapAnswerStrategy?: SapAnswerStrategy;
+    sapAnswerStrategy?: SapAnswerStrategy | undefined;
     /**
      * `SearchSource`'s line-match strategy (DO24): which lines of a source are
      * hits. Absent: the shipped one, `substringLineMatch`.
      */
-    lineMatchStrategy?: LineMatchStrategy;
+    lineMatchStrategy?: LineMatchStrategy | undefined;
     /**
      * The owner of the running background runs (their controls, by
      * `run_handle`): handed by a host that serves one client through several
@@ -469,14 +469,14 @@ export abstract class BaseMcpServer extends McpServer {
      * ones), so `DiscardBackgroundRun` reaching any of them cancels a
      * running read. Absent: the instance holds its own.
      */
-    backgroundRunOwner?: BackgroundRunOwner;
+    backgroundRunOwner?: BackgroundRunOwner | undefined;
     /**
      * The owner of this instance's batch state, created by the host for this
      * instance alone (never shared between instances): the open batch and
      * the last batch's answers, held state under the idle bound. Absent:
      * the batch tools answer `batch_mode_unavailable`.
      */
-    batch?: InstanceBatch;
+    batch?: InstanceBatch | undefined;
     /**
      * The locks this instance holds between requests, created by the host
      * for this instance alone (every transport: the Streamable HTTP pool's
@@ -485,7 +485,7 @@ export abstract class BaseMcpServer extends McpServer {
      * sent only under a handle kept here. Absent: the instance makes its
      * own, as it is constructed.
      */
-    heldLocks?: HeldLocks;
+    heldLocks?: HeldLocks | undefined;
     /**
      * The long session of this instance, created by a host whose instances
      * last one request each (Streamable HTTP) for this instance alone: held
@@ -494,14 +494,14 @@ export abstract class BaseMcpServer extends McpServer {
      * tools answer `long_session_unavailable` (stdio, SSE: the instance
      * keeps its session).
      */
-    longSession?: LongSession;
+    longSession?: LongSession | undefined;
     /**
      * The corrected request header pairs of the systems the process talks
      * to, created by the host and shared by its instances: a pair SAP
      * answered `406`/`415` to, corrected, is sent from then on to that
      * system for that operation. Absent: this instance keeps its own.
      */
-    adtHeaderPairs?: AdtHeaderPairs;
+    adtHeaderPairs?: AdtHeaderPairs | undefined;
     /**
      * Whether the transport's close is the end of this instance's session
      * (default `true`): stdio's transport, an SSE stream, an embedder's
@@ -516,7 +516,7 @@ export abstract class BaseMcpServer extends McpServer {
      * Its calls are interrupted only by the instance's close
      * (`closeInstance`) or the process shutdown.
      */
-    transportCloseEndsSession?: boolean;
+    transportCloseEndsSession?: boolean | undefined;
     /**
      * Whether every tool's input schema declares an optional string
      * `state_handle` (`withStateHandle`; a tool declaring its own keeps it):
@@ -525,13 +525,13 @@ export abstract class BaseMcpServer extends McpServer {
      * header can send it. Default `false`: stdio and SSE register the
      * schemas as the tools declare them.
      */
-    stateHandleArgument?: boolean;
+    stateHandleArgument?: boolean | undefined;
     /**
      * The first birth a tool call makes takes up the destination's one
      * leftover session (stdio's `--deferred-logon --restore-session`).
      * Default `false`: such a birth is a logon.
      */
-    restoreAtFirstBirth?: boolean;
+    restoreAtFirstBirth?: boolean | undefined;
     /**
      * The access checks (spec §3.2): decided once per call, after the SDK
      * parsed the arguments and before the call takes its connection. Absent:

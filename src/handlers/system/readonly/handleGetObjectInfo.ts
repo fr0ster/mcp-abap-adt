@@ -154,8 +154,8 @@ interface Ended {
 
 /** What a node's enrichment search found: its package, description and type. */
 interface Enrichment {
-  packageName?: string;
-  description?: string;
+  packageName?: string | undefined;
+  description?: string | undefined;
   type: string;
 }
 

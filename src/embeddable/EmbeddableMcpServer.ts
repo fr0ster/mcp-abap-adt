@@ -145,7 +145,7 @@ export interface EmbeddableMcpServerOptions {
    * Logger instance
    * @default defaultLogger
    */
-  logger?: Logger;
+  logger?: Logger | undefined;
 
   /**
    * Handlers registry to use
@@ -355,7 +355,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
    */
   private createDefaultRegistry(
     exposition: NonNullable<EmbeddableMcpServerOptions['exposition']>,
-    logger?: Logger,
+    logger?: Logger | undefined,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
     // A registration-only context: BaseMcpServer.registerHandlers() gives

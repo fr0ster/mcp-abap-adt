@@ -24,15 +24,15 @@ function givenDescription(description: string | undefined): string | undefined {
 
 /** What a caller may change about a domain. */
 export interface DomainChanges {
-  description?: string;
-  datatype?: string;
-  length?: number;
-  decimals?: number;
-  conversion_exit?: string;
-  sign_exists?: boolean;
-  lowercase?: boolean;
-  value_table?: string;
-  fixed_values?: ReadonlyArray<{ low: string; text: string }>;
+  description?: string | undefined;
+  datatype?: string | undefined;
+  length?: number | undefined;
+  decimals?: number | undefined;
+  conversion_exit?: string | undefined;
+  sign_exists?: boolean | undefined;
+  lowercase?: boolean | undefined;
+  value_table?: string | undefined;
+  fixed_values?: ReadonlyArray<{ low: string; text: string }> | undefined;
 }
 
 /** A domain's changes as the library's patch takes them. */
@@ -55,19 +55,19 @@ export type DataElementTypeKind = NonNullable<IDataElementConfig['typeKind']>;
 
 /** What a caller may change about a data element. */
 export interface DataElementChanges {
-  description?: string;
-  type_kind?: DataElementTypeKind;
-  type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  short_label?: string;
-  medium_label?: string;
-  long_label?: string;
-  heading_label?: string;
-  search_help?: string;
-  search_help_parameter?: string;
-  set_get_parameter?: string;
+  description?: string | undefined;
+  type_kind?: DataElementTypeKind | undefined;
+  type_name?: string | undefined;
+  data_type?: string | undefined;
+  length?: number | undefined;
+  decimals?: number | undefined;
+  short_label?: string | undefined;
+  medium_label?: string | undefined;
+  long_label?: string | undefined;
+  heading_label?: string | undefined;
+  search_help?: string | undefined;
+  search_help_parameter?: string | undefined;
+  set_get_parameter?: string | undefined;
 }
 
 /**
@@ -119,15 +119,15 @@ export function dataElementChanges(
 
 /** What a caller may change about a table type. */
 export interface TableTypeChanges {
-  description?: string;
-  row_type_kind?: string;
-  row_type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  access_type?: string;
-  key_definition?: string;
-  key_kind?: string;
+  description?: string | undefined;
+  row_type_kind?: string | undefined;
+  row_type_name?: string | undefined;
+  data_type?: string | undefined;
+  length?: number | undefined;
+  decimals?: number | undefined;
+  access_type?: string | undefined;
+  key_definition?: string | undefined;
+  key_kind?: string | undefined;
 }
 
 /** A table type's changes as the library's patch takes them. */

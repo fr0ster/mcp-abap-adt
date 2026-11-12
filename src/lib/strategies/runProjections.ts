@@ -10,7 +10,7 @@ export interface RuntimeRunValue {
   readonly className: string;
   readonly output?: string;
   readonly profilerId?: string;
-  readonly traceId?: string;
+  readonly traceId?: string | undefined;
 }
 
 /**

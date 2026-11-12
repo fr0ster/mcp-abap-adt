@@ -658,7 +658,7 @@ export async function makeAdtRequest(
   timeout: number,
   data?: unknown,
   params?: IAbapRequestOptions['params'],
-  headers?: Record<string, string>,
+  headers?: Record<string, string> | undefined,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url,
@@ -666,7 +666,7 @@ export async function makeAdtRequest(
     timeout,
     data,
     params,
-    headers,
+    ...(headers !== undefined && { headers }),
   });
 }
 
@@ -676,8 +676,8 @@ export async function makeAdtRequest(
  * request sees it (see getStatedSystemContext)
  */
 export async function getSystemInformation(): Promise<{
-  systemID?: string;
-  userName?: string;
+  systemID?: string | undefined;
+  userName?: string | undefined;
 } | null> {
   const { getStatedSystemContext } = await import('./systemContext.js');
   const ctx = getStatedSystemContext();
@@ -688,10 +688,10 @@ export async function getSystemInformation(): Promise<{
 /** What `parseValidationResponse` answers. */
 interface ValidationReading {
   valid: boolean;
-  severity?: string;
+  severity?: string | undefined;
   message?: string;
   longText?: string;
-  exists?: boolean;
+  exists?: boolean | undefined;
 }
 
 /**
@@ -1013,8 +1013,8 @@ export function parseActivationResponse(responseData: unknown) {
     const messages: Array<{
       type: string;
       text: string;
-      line?: number;
-      column?: number;
+      line?: number | undefined;
+      column?: number | undefined;
     }> = [];
     const numberOrNone = (value: unknown) =>
       typeof value === 'number' ? value : undefined;

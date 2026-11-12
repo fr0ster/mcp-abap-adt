@@ -47,7 +47,7 @@ export interface SearchHit {
   name: string;
   type: string;
   description: string;
-  packageName?: string;
+  packageName?: string | undefined;
   /** The object's address (`adtcore:uri`), when the hit names one. */
   uri?: string;
 }

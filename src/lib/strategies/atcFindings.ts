@@ -39,26 +39,26 @@ export interface AtcFinding {
   /** `adtcore:type` — `CLAS`, `FUGR`, `TABL`… */
   object_type: string;
   /** From `location`'s `#start=LINE,COLUMN`, absent when it carries none. */
-  line?: number;
+  line?: number | undefined;
   /** The source the position is in, without the fragment. */
-  location?: string;
+  location?: string | undefined;
   /** 1, 2 or 3 as the document gives it. */
-  priority?: number;
+  priority?: number | undefined;
   /** `checkTitle` — what ran, in words. */
-  check?: string;
+  check?: string | undefined;
   /** `messageTitle` — what it found. */
-  message?: string;
+  message?: string | undefined;
 }
 
 /** The finding's `quickfixes` element, its flags as the document gives them. */
 export interface AtcQuickfixFlags {
-  manual?: boolean;
-  automatic?: boolean;
-  pseudo?: boolean;
+  manual?: boolean | undefined;
+  automatic?: boolean | undefined;
+  pseudo?: boolean | undefined;
   /** `aiBasedQF`. */
-  ai_based?: boolean;
+  ai_based?: boolean | undefined;
   /** `ai_enabled`. */
-  ai_enabled?: boolean;
+  ai_enabled?: boolean | undefined;
 }
 
 /**
@@ -67,24 +67,24 @@ export interface AtcQuickfixFlags {
  */
 export interface AtcFindingFull extends AtcFinding {
   /** From `location`'s `#start=LINE,COLUMN`, absent when it carries none. */
-  column?: number;
+  column?: number | undefined;
   /** `checkId`. */
-  check_id?: string;
+  check_id?: string | undefined;
   /** `checkClass` — the check's ABAP class. */
-  check_class?: string;
+  check_class?: string | undefined;
   /** `messageId`. */
-  message_id?: string;
+  message_id?: string | undefined;
   /**
    * The `href` of the finding's `atom:link` whose `rel` is ADT's
    * documentation relation (`/sap/bc/adt/documentation/atc/…`).
    */
-  documentation_uri?: string;
+  documentation_uri?: string | undefined;
   /** `exemptionApproval`, verbatim (`-` in every captured finding). */
-  exemption_approval?: string;
+  exemption_approval?: string | undefined;
   /** `exemptionKind`, verbatim; absent when empty. */
-  exemption_kind?: string;
+  exemption_kind?: string | undefined;
   /** Which kinds of quick fix the finding offers. */
-  quickfixes?: AtcQuickfixFlags;
+  quickfixes?: AtcQuickfixFlags | undefined;
 }
 
 /** The terse fields of a finding, in the order they were always answered. */
@@ -157,8 +157,8 @@ function digits(text: string | undefined): number | undefined {
  */
 function position(location: string | undefined): {
   location?: string;
-  line?: number;
-  column?: number;
+  line?: number | undefined;
+  column?: number | undefined;
 } {
   if (!location) return {};
   const hash = location.indexOf('#');

@@ -42,6 +42,7 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
+  presentScopeOptions,
   type WhereUsedSource,
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
@@ -224,9 +225,9 @@ function extractSource(
 async function structuresListOf(
   context: HandlerContext,
   args: {
-    structure_name?: string;
-    version?: ReadVersion;
-    include_extensions?: boolean;
+    structure_name?: string | undefined;
+    version?: ReadVersion | undefined;
+    include_extensions?: boolean | undefined;
   },
 ): Promise<McpResult> {
   const { connection, logger } = context;
@@ -616,7 +617,7 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
   // Local: builds the scope document, sends nothing.
   const local = createAdtClient(context.connection, logger).getUtils(ourUtils);
   const modify: WhereUsedSource['modifyWhereUsedScope'] = (xml, options) =>
-    local.modifyWhereUsedScope(xml, options);
+    local.modifyWhereUsedScope(xml, presentScopeOptions(options));
   const utilsOn = (connection: IAbapConnection) =>
     createAdtClient(connection, logger).getUtils(ourUtils);
 

@@ -65,12 +65,12 @@ type ReadTransportObjectsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 interface Entry {
   name: string;
   type: string;
-  pgmid?: string;
-  description?: string;
-  position?: string;
-  lockStatus?: string;
+  pgmid?: string | undefined;
+  description?: string | undefined;
+  position?: string | undefined;
+  lockStatus?: string | undefined;
   /** The task the entry is on, when a request was read. */
-  task?: string;
+  task?: string | undefined;
 }
 
 /**
@@ -86,8 +86,8 @@ interface Entry {
  */
 function collect(
   node: unknown,
-  found: { attributes: Element; task?: string }[],
-  task?: string,
+  found: { attributes: Element; task?: string | undefined }[],
+  task?: string | undefined,
   inRequest = false,
 ): void {
   if (isList(node)) {
@@ -119,7 +119,7 @@ const text = (value: string | undefined): string | undefined =>
   value === undefined || value === '' ? undefined : value;
 
 function entriesOf(value: unknown): Entry[] {
-  const found: { attributes: Element; task?: string }[] = [];
+  const found: { attributes: Element; task?: string | undefined }[] = [];
   collect(value, found);
   const read: Entry[] = [];
   for (const { attributes, task } of found) {

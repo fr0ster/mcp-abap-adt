@@ -161,7 +161,7 @@ export interface EnhancementImplementation {
 export interface EnhancementResponse {
   object_name: string;
   object_type: 'program' | 'include' | 'class' | 'function_group';
-  context?: string;
+  context?: string | undefined;
   enhancements: EnhancementImplementation[];
   detailed?: boolean;
   total_enhancements?: number;
@@ -282,7 +282,7 @@ async function determineObjectTypeAndPath(
   type: 'program' | 'include' | 'class' | 'function_group';
   /** The host's enhancement elements, read with `analyseException`. */
   readElements: () => Promise<IAdtResponse<unknown, IAdtError>>;
-  context?: string;
+  context?: string | undefined;
   /** Probes that were refused rather than answering "not this kind". */
   unreadable?: FailureEntry[];
 }> {
@@ -1182,7 +1182,7 @@ type EnhancementAnswers = ReturnType<typeof enhancementAnswers>;
 interface EnhancementPath {
   type: 'program' | 'include' | 'class' | 'function_group';
   elements: DocumentRead;
-  context?: string;
+  context?: string | undefined;
   unreadable?: FailureEntry[];
 }
 
@@ -1325,7 +1325,7 @@ type Resolved =
  */
 async function resolvePaths(
   answers: EnhancementAnswers,
-  objects: ReadonlyArray<{ name: string; type?: string }>,
+  objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
   manualProgramContext?: string,
 ): Promise<Resolved[]> {
   const resolved: Array<Resolved | undefined> = objects.map(() => undefined);
@@ -1501,7 +1501,7 @@ function responseFromAnswers(
 
 /** The call's options every object is read with. */
 interface EnhancementOptions {
-  manualProgram?: string;
+  manualProgram?: string | undefined;
   includeNested: boolean;
   isDetailed: boolean;
   maxIncludes: number;
@@ -1642,7 +1642,7 @@ function enhancementsAnswerFrom(
  */
 async function enhancementsInPhases(
   context: HandlerContext,
-  objects: ReadonlyArray<{ name: string; type?: string }>,
+  objects: ReadonlyArray<{ name: string; type?: string | undefined }>,
   options: EnhancementOptions,
 ): Promise<McpResult[]> {
   const answers = enhancementAnswers(context);

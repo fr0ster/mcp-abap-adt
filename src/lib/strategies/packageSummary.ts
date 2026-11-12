@@ -30,15 +30,15 @@ const count = (value: unknown): number =>
   value === undefined || value === '' ? 0 : isList(value) ? value.length : 1;
 
 export interface PackageSummary {
-  name?: string;
-  description?: string;
-  package_type?: string;
-  super_package?: string;
-  software_component?: string;
-  application_component?: string;
-  transport_layer?: string;
-  language_version?: string;
-  responsible?: string;
+  name?: string | undefined;
+  description?: string | undefined;
+  package_type?: string | undefined;
+  super_package?: string | undefined;
+  software_component?: string | undefined;
+  application_component?: string | undefined;
+  transport_layer?: string | undefined;
+  language_version?: string | undefined;
+  responsible?: string | undefined;
   sub_package_count: number;
 }
 
@@ -73,7 +73,10 @@ export function packageSummary(xml: string): PackageSummary {
 }
 
 export interface PackageDetails extends PackageSummary {
-  sub_packages: Array<{ name?: string; description?: string }>;
+  sub_packages: Array<{
+    name?: string | undefined;
+    description?: string | undefined;
+  }>;
 }
 
 /** The summary and, for `detail: full`, every sub-package by name and description. */

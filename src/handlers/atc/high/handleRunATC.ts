@@ -134,11 +134,11 @@ function runAtcSchema(variant: ProjectionVariant) {
 }
 
 interface RunATCObjectArg {
-  name?: string;
+  name?: string | undefined;
   /** Text from the model, checked against the variant's kinds. */
-  type?: string;
-  function_group?: string;
-  include_kind?: AtcClassIncludeKind;
+  type?: string | undefined;
+  function_group?: string | undefined;
+  include_kind?: AtcClassIncludeKind | undefined;
 }
 
 type RunATCArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;

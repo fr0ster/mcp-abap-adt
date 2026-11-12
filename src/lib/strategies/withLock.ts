@@ -242,13 +242,16 @@ function succeededWithCleanup<T>(
  * be extensible.
  */
 export class LockNotReleased extends Error {
-  readonly cleanup?: Cleanup;
-  readonly operation?: 'succeeded';
+  readonly cleanup?: Cleanup | undefined;
+  readonly operation?: 'succeeded' | undefined;
   /** The step the cause arose at (`atStep`), kept as it was. */
   readonly step?: string;
   constructor(
     cause: unknown,
-    extra: { cleanup?: Cleanup; operation?: 'succeeded' },
+    extra: {
+      cleanup?: Cleanup | undefined;
+      operation?: 'succeeded' | undefined;
+    },
   ) {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
     this.name = 'LockNotReleased';

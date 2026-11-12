@@ -43,8 +43,8 @@ import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
 import {
   ourClassExecutor,
@@ -150,22 +150,7 @@ export async function handleRuntimeRunClass(
       ? Math.trunc(args.trace_retry_delay_ms)
       : 2000;
 
-  const profilerParameters = definedOnly({
-    description: args.description,
-    allProceduralUnits: args.all_procedural_units,
-    allMiscAbapStatements: args.all_misc_abap_statements,
-    allInternalTableEvents: args.all_internal_table_events,
-    allDynproEvents: args.all_dynpro_events,
-    aggregate: args.aggregate,
-    explicitOnOff: args.explicit_on_off,
-    withRfcTracing: args.with_rfc_tracing,
-    allSystemKernelEvents: args.all_system_kernel_events,
-    sqlTrace: args.sql_trace,
-    allDbEvents: args.all_db_events,
-    maxSizeForTraceFile: args.max_size_for_trace_file,
-    amdpTrace: args.amdp_trace,
-    maxTimeForTracing: args.max_time_for_tracing,
-  });
+  const profilerParameters = profilerTraceParameters(args);
 
   const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
     ourProfiler,

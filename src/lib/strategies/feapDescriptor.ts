@@ -229,8 +229,8 @@ export function feapPreviewUrl(input: {
   baseUrl: string;
   protocol: 'odatav2' | 'odatav4';
   descriptor: FeapDescriptor | FeapV4Descriptor;
-  client?: string;
-  language?: string;
+  client?: string | undefined;
+  language?: string | undefined;
 }): string {
   const descriptor = input.descriptor;
   const segment = encodeFeapSegment(

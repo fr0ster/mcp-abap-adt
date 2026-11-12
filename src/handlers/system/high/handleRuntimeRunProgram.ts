@@ -32,8 +32,8 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremExecutor } from '../../../lib/clients';
-import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
@@ -110,22 +110,7 @@ export async function handleRuntimeRunProgram(
         atStep('schedule trace', () =>
           withAdtHeaders(context, 'programExecutor.scheduleTrace', (headers) =>
             programExecutor.scheduleTrace({
-              ...definedOnly({
-                description: args.description,
-                allProceduralUnits: args.all_procedural_units,
-                allMiscAbapStatements: args.all_misc_abap_statements,
-                allInternalTableEvents: args.all_internal_table_events,
-                allDynproEvents: args.all_dynpro_events,
-                aggregate: args.aggregate,
-                explicitOnOff: args.explicit_on_off,
-                withRfcTracing: args.with_rfc_tracing,
-                allSystemKernelEvents: args.all_system_kernel_events,
-                sqlTrace: args.sql_trace,
-                allDbEvents: args.all_db_events,
-                maxSizeForTraceFile: args.max_size_for_trace_file,
-                amdpTrace: args.amdp_trace,
-                maxTimeForTracing: args.max_time_for_tracing,
-              }),
+              ...profilerTraceParameters(args),
               analyse: analyseException,
               headers,
             }),

@@ -99,9 +99,9 @@ export function feedPage<T>(
 
 export interface FeedPaging {
   /** How many entries the caller wants; absent — {@link FEED_PAGE_DEFAULT}. */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /** The upper time bound the first request carries. */
-  to?: string;
+  to?: string | undefined;
 }
 
 /** How an entry is told apart and when it was stamped. */
@@ -179,7 +179,7 @@ export function secondBefore(bound: string): string {
 export async function feedPages<T>(
   fetch: (page: {
     maxResults?: number;
-    to?: string;
+    to?: string | undefined;
   }) => Promise<IAdtResponse<FeedPage<T>, IAdtError>>,
   paging: FeedPaging,
   identity: FeedEntryIdentity<T>,

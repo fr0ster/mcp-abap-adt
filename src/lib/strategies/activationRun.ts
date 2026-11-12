@@ -60,7 +60,7 @@ export interface ActivationRunOutcome {
    */
   executed?: boolean;
   /** The results document, for a caller that wants it verbatim. */
-  results?: string;
+  results?: string | undefined;
   /**
    * What the inactive list, read once after a silent results checklist
    * (`activationExecuted="false"`, no message), still names of the run's

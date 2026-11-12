@@ -33,15 +33,40 @@ export interface WhereUsedSource {
   modifyWhereUsedScope(
     scopeXml: string,
     options: {
-      enableAll?: boolean;
-      enableOnly?: string[];
-      enable?: string[];
-      disable?: string[];
+      enableAll?: boolean | undefined;
+      enableOnly?: string[] | undefined;
+      enable?: string[] | undefined;
+      disable?: string[] | undefined;
     },
   ): string;
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
   ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+}
+
+/** What `modifyWhereUsedScope` takes: each option may be absent. */
+export type WhereUsedScopeOptions = Parameters<
+  WhereUsedSource['modifyWhereUsedScope']
+>[1];
+
+/**
+ * The scope options with only the ones that have a value, for a client whose
+ * options are declared without `| undefined`.
+ */
+export function presentScopeOptions(options: WhereUsedScopeOptions): {
+  enableAll?: boolean;
+  enableOnly?: string[];
+  enable?: string[];
+  disable?: string[];
+} {
+  return {
+    ...(options.enableAll !== undefined && { enableAll: options.enableAll }),
+    ...(options.enableOnly !== undefined && {
+      enableOnly: options.enableOnly,
+    }),
+    ...(options.enable !== undefined && { enable: options.enable }),
+    ...(options.disable !== undefined && { disable: options.disable }),
+  };
 }
 
 /**
@@ -85,22 +110,22 @@ export function whereUsedOn(
 export interface WhereUsedReference {
   name: string;
   type: string;
-  uri?: string;
-  package_name?: string;
-  responsible?: string;
-  usage_information?: string;
+  uri?: string | undefined;
+  package_name?: string | undefined;
+  responsible?: string | undefined;
+  usage_information?: string | undefined;
 }
 
 export interface WhereUsedListResult {
   totalReferences: number;
-  resultDescription?: string;
+  resultDescription?: string | undefined;
   references: WhereUsedReference[];
 }
 
 export interface WhereUsedFilter {
-  enableAllTypes?: boolean;
-  enableOnlyTypes?: string[];
-  disableTypes?: string[];
+  enableAllTypes?: boolean | undefined;
+  enableOnlyTypes?: string[] | undefined;
+  disableTypes?: string[] | undefined;
 }
 
 /** The attribute `name` of `node`'s attribute group (`@`). */

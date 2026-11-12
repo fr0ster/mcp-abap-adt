@@ -86,9 +86,9 @@ function givenWait(args: unknown): unknown {
 
 /** The `scope` argument, as compact `HandlerUnitTestRun` takes it. */
 export interface UnitTestScopeArgs {
-  own_tests?: boolean;
-  foreign_tests?: boolean;
-  add_foreign_tests_as_preview?: boolean;
+  own_tests?: boolean | undefined;
+  foreign_tests?: boolean | undefined;
+  add_foreign_tests_as_preview?: boolean | undefined;
 }
 
 /** The `scope` field of a run tool's zod input schema. */

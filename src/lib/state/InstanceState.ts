@@ -92,8 +92,8 @@ export const stderrStateLogger: StateLogger = {
  * pass that default here — it passes nothing, and stderr answers.
  */
 export function stateLoggerOf(options: {
-  stateLogger?: StateLogger;
-  logger?: StateLogger;
+  stateLogger?: StateLogger | undefined;
+  logger?: StateLogger | undefined;
 }): StateLogger {
   return options.stateLogger ?? options.logger ?? stderrStateLogger;
 }

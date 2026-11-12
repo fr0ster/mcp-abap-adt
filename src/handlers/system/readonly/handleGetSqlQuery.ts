@@ -28,15 +28,15 @@ import { return_error } from '../../../lib/utils';
 export interface SqlQueryResponse {
   sql_query: string;
   row_number: number;
-  execution_time?: number;
-  total_rows?: number;
+  execution_time?: number | undefined;
+  total_rows?: number | undefined;
   columns: Array<{ name: string; type: string; description?: string }>;
   rows: Array<Record<string, string | null>>;
   /**
    * `detail: 'full'` only — the whole document, parsed generically, so
    * nothing the rows do not need is dropped on the way.
    */
-  document?: unknown;
+  document?: unknown | undefined;
 }
 
 export const TOOL_DEFINITION = {

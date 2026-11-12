@@ -29,18 +29,18 @@ export const TOOL_DEFINITION = {
 
 /** A node as the document lists it: each attribute as given, or absent. */
 interface FlatObjectStructureNode {
-  nodeid?: string;
-  parentid?: string;
-  objecttype?: string;
-  objectname?: string;
-  description?: string;
+  nodeid?: string | undefined;
+  parentid?: string | undefined;
+  objecttype?: string | undefined;
+  objectname?: string | undefined;
+  description?: string | undefined;
   isfolder: boolean;
 }
 
 interface ObjectStructureTreeNode {
-  objecttype?: string;
-  objectname?: string;
-  description?: string;
+  objecttype?: string | undefined;
+  objectname?: string | undefined;
+  description?: string | undefined;
   isfolder: boolean;
   children: ObjectStructureTreeNode[];
 }

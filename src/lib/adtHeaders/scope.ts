@@ -36,7 +36,7 @@ export interface AdtCallScope {
   /** Inside a read of an internal batch phase: the phase's identity. */
   readonly phase?: object;
   /** The `withAdtHeaders` call the read is making. */
-  readonly invocation?: HeaderInvocation;
+  readonly invocation?: HeaderInvocation | undefined;
   /** A call the phase records again: its requests go to the correction envelope. */
   readonly correcting?: {
     readonly phase: object;

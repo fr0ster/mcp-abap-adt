@@ -8,20 +8,20 @@ export interface ParsedCheckRunResult {
   errors: Array<{
     type: string;
     text: string;
-    line?: string | number;
-    href?: string;
+    line?: string | number | undefined;
+    href?: string | undefined;
   }>;
   warnings: Array<{
     type: string;
     text: string;
-    line?: string | number;
-    href?: string;
+    line?: string | number | undefined;
+    href?: string | undefined;
   }>;
   info: Array<{
     type: string;
     text: string;
-    line?: string | number;
-    href?: string;
+    line?: string | number | undefined;
+    href?: string | undefined;
   }>;
   total_messages: number;
   has_errors: boolean;

@@ -60,7 +60,7 @@ export interface EnumeratedObject {
 export interface EnumerateInput {
   packages: string[];
   include_subpackages: boolean;
-  object_filter?: string;
+  object_filter?: string | undefined;
   object_types: readonly ScanObjectType[];
 }
 

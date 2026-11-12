@@ -34,8 +34,8 @@ const TARGET_KINDS: readonly AbapUnitRunTarget['kind'][] = [
 export interface RunTargetArgs {
   kind: AbapUnitRunTarget['kind'];
   name: string;
-  type?: string;
-  include_subpackages?: boolean;
+  type?: string | undefined;
+  include_subpackages?: boolean | undefined;
 }
 
 const RUN_TARGET_WORDS =

@@ -22,6 +22,10 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
+import type {
+  IUnitTestDuration,
+  IUnitTestRiskLevel,
+} from '@mcp-abap-adt/interfaces-adt';
 import type * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { compactUnitTestRunSchema } from '../../../lib/compact/compactSchemas';
@@ -79,7 +83,11 @@ export async function handleStartUnitTestRun(
         runTestsSync(
           context,
           { carrier: 'class', target: definitions },
-          { scope: runScope, riskLevel: risk_level, duration },
+          {
+            scope: runScope,
+            riskLevel: riskLevelOf(risk_level),
+            duration: durationOf(duration),
+          },
         ),
       projectSync('terse'),
     );
@@ -97,8 +105,8 @@ export async function handleStartUnitTestRun(
         title,
         context: args.context,
         scope: runScope,
-        riskLevel: risk_level,
-        duration,
+        riskLevel: riskLevelOf(risk_level),
+        duration: durationOf(duration),
       }),
     (runId: string) => ({ success: true, run_id: runId }),
   );
@@ -141,4 +149,31 @@ async function startTargetRun(
       }),
     (runId: string) => ({ success: true, run_id: runId }),
   );
+}
+
+/**
+ * The risk levels the arguments give, each present only when given:
+ * `IUnitTestRiskLevel` declares its flags without `| undefined`.
+ */
+function riskLevelOf(
+  level: StartUnitTestRunArgs['risk_level'],
+): IUnitTestRiskLevel | undefined {
+  if (level === undefined) return undefined;
+  return {
+    ...(level.harmless !== undefined && { harmless: level.harmless }),
+    ...(level.dangerous !== undefined && { dangerous: level.dangerous }),
+    ...(level.critical !== undefined && { critical: level.critical }),
+  };
+}
+
+/** The durations the arguments give, each present only when given (`IUnitTestDuration`). */
+function durationOf(
+  duration: StartUnitTestRunArgs['duration'],
+): IUnitTestDuration | undefined {
+  if (duration === undefined) return undefined;
+  return {
+    ...(duration.short !== undefined && { short: duration.short }),
+    ...(duration.medium !== undefined && { medium: duration.medium }),
+    ...(duration.long !== undefined && { long: duration.long }),
+  };
 }

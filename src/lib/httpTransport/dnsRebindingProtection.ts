@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 
 export interface DnsRebindingOptions {
-  enable?: boolean;
+  enable?: boolean | undefined;
   /** Exact raw Host header values, including port (e.g. "localhost:3000"). */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Exact raw Origin header values, including scheme (e.g. "https://app.example.com"). */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | undefined;
 }
 
 type RouteHandler = (
@@ -23,7 +23,7 @@ function reject(message: string): { status: number; body: unknown } {
 
 /** Returns a 403 descriptor if the request must be rejected, else null. */
 export function checkDnsRebinding(
-  headers: { host?: string; origin?: string },
+  headers: { host?: string | undefined; origin?: string | undefined },
   opts: DnsRebindingOptions,
 ): { status: number; body: unknown } | null {
   if (opts.enable !== true) return null;

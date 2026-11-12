@@ -61,21 +61,21 @@ import {
 
 export interface OrchestratorInput {
   query: string;
-  query2?: string;
-  exclude?: string[];
+  query2?: string | undefined;
+  exclude?: string[] | undefined;
   packages: string[];
-  include_subpackages?: boolean;
-  object_filter?: string;
-  object_types?: readonly ScanObjectType[];
-  exclude_comments?: boolean;
+  include_subpackages?: boolean | undefined;
+  object_filter?: string | undefined;
+  object_types?: readonly ScanObjectType[] | undefined;
+  exclude_comments?: boolean | undefined;
   /** The most hits answered per object; absent, an object's hits are not limited. */
-  max_hits_per_object?: number;
+  max_hits_per_object?: number | undefined;
   /** The most hits of the whole answer; reached, the scan stops. Absent, no limit. */
-  max_hits?: number;
+  max_hits?: number | undefined;
   /** What each hit is answered as (`snippets` when absent). */
-  answer?: AnswerLevel;
-  concurrency?: number;
-  version?: SourceVersion;
+  answer?: AnswerLevel | undefined;
+  concurrency?: number | undefined;
+  version?: SourceVersion | undefined;
 }
 
 /**

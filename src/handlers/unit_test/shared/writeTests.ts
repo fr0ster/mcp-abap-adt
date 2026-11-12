@@ -156,7 +156,7 @@ export async function writeProgramTests(
   context: HandlerContext,
   programName: string,
   source: string,
-  options: { create: boolean; transportRequest?: string },
+  options: { create: boolean; transportRequest?: string | undefined },
 ): Promise<Answer> {
   // A report's test include is created, changed and activated on premise
   // only: only that table lists those operations for `PROG/P` and `PROG/I`.
@@ -283,7 +283,7 @@ export async function writeFunctionGroupTests(
   context: HandlerContext,
   functionGroupName: string,
   source: string,
-  options: { create: boolean; transportRequest?: string },
+  options: { create: boolean; transportRequest?: string | undefined },
 ): Promise<Answer> {
   const client = createAdtClient(context.connection, context.logger);
   const include = client.getFunctionInclude(

@@ -21,15 +21,15 @@ import {
 /** One entry of the result list. */
 export interface AtcResultEntry {
   display_id: string;
-  title?: string;
-  check_variant?: string;
+  title?: string | undefined;
+  check_variant?: string | undefined;
   /** Absent when SAP sent it empty. */
-  run_series?: string;
-  created_at?: string;
+  run_series?: string | undefined;
+  created_at?: string | undefined;
   /** `numPrio1`…`numPrio4`, keyed by the priority as a string. */
-  by_priority?: Record<string, number>;
+  by_priority?: Record<string, number> | undefined;
   /** `numFailure`. */
-  failures?: number;
+  failures?: number | undefined;
 }
 
 export interface AtcResultListReading {
@@ -39,9 +39,9 @@ export interface AtcResultListReading {
 /** One result by its Display ID, its findings as `GetATCFindings` reads them. */
 export interface AtcResultReading {
   display_id: string;
-  title?: string;
-  check_variant?: string;
-  created_at?: string;
+  title?: string | undefined;
+  check_variant?: string | undefined;
+  created_at?: string | undefined;
   objects_checked: number;
   by_priority: Record<string, number>;
   findings: AtcFindingFull[];

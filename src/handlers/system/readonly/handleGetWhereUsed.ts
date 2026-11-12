@@ -61,6 +61,7 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
+  presentScopeOptions,
   type WhereUsedListResult,
   type WhereUsedSource,
   whereUsedOn,
@@ -358,7 +359,7 @@ async function whereUsedFromAnswers(
         {
           getWhereUsedScope: () => answered(scope),
           modifyWhereUsedScope: (scopeXml, options) =>
-            utils.modifyWhereUsedScope(scopeXml, options),
+            utils.modifyWhereUsedScope(scopeXml, presentScopeOptions(options)),
           getWhereUsed: () => answered(references),
         },
         {

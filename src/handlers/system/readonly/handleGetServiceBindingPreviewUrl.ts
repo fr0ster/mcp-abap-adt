@@ -241,7 +241,11 @@ export async function handleGetServiceBindingPreviewUrl(
 
           const srvd = await atStep('read service definition', () =>
             definition.read(
-              { serviceDefinitionName: facts.serviceDefinition },
+              {
+                ...(facts.serviceDefinition !== undefined && {
+                  serviceDefinitionName: facts.serviceDefinition,
+                }),
+              },
               'active',
               { analyse: analyseException },
             ),

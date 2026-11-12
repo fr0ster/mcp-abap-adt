@@ -297,7 +297,7 @@ export interface ConnectionRecord {
    */
   kind: AbapSystemKind;
   credential: IAuthProvider;
-  logger?: ILogger | null;
+  logger?: ILogger | null | undefined;
 }
 
 const records = new WeakMap<object, ConnectionRecord>();
@@ -360,7 +360,7 @@ export const CLOUD_OVER_RFC_WORDS =
 export function createAbapConnection(
   settings: SapConfig,
   credential: IAuthProvider,
-  logger?: ILogger | null,
+  logger?: ILogger | null | undefined,
   sessionId?: string,
   /**
    * An existing SAP session to build the instance on (connection 17): the

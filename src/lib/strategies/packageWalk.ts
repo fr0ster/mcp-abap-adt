@@ -253,9 +253,9 @@ export interface NodeLevel {
   objects: Array<{
     name: string;
     type: string;
-    description?: string;
-    techName?: string;
-    uri?: string;
+    description?: string | undefined;
+    techName?: string | undefined;
+    uri?: string | undefined;
   }>;
   childNodes: Array<{ type: string; nodeId: string }>;
 }
@@ -446,7 +446,7 @@ export interface PackageItem {
   name: string;
   type: string;
   kind?: PackageItemKind;
-  description?: string;
+  description?: string | undefined;
   packageName: string;
   isPackage: boolean;
 }
@@ -459,7 +459,7 @@ export interface PackageNode {
   name: string;
   type: string;
   kind?: PackageItemKind;
-  description?: string;
+  description?: string | undefined;
   isPackage: boolean;
   codeFormat?: CodeFormat;
   restoreStatus?: 'ok' | 'not-implemented';
@@ -569,17 +569,17 @@ function textOf(value: unknown): string {
 }
 
 export interface WalkOptions {
-  includeSubpackages?: boolean;
-  maxDepth?: number;
-  includeDescriptions?: boolean;
+  includeSubpackages?: boolean | undefined;
+  maxDepth?: number | undefined;
+  includeDescriptions?: boolean | undefined;
   /**
    * What a `404` on a level answers: `'empty'` (the default) reads the level
    * as empty; `'refused'` makes it the walk's failure, SAP's answer with its
    * step — for a caller that must name every scope it did not read.
    */
-  missingLevel?: MissingLevel;
+  missingLevel?: MissingLevel | undefined;
   /** A refused level below the root excludes only its branch (`BranchRule`); absent, it ends the package's walk. */
-  branchRule?: BranchRule;
+  branchRule?: BranchRule | undefined;
 }
 
 /** What a `404` on a level of a walk answers. */
@@ -911,10 +911,10 @@ async function underBranchRule<T>(
 export type WalkedItem = {
   name: string;
   type: string;
-  description?: string;
+  description?: string | undefined;
   packageName?: string;
-  techName?: string;
-  uri?: string;
+  techName?: string | undefined;
+  uri?: string | undefined;
 };
 
 /** The step of a failed object metadata read. */

@@ -115,8 +115,8 @@ export interface LeftoverListing {
  * named none.
  */
 export interface KnownSystem {
-  responsible?: string;
-  masterSystem?: string;
+  responsible?: string | undefined;
+  masterSystem?: string | undefined;
 }
 
 /**

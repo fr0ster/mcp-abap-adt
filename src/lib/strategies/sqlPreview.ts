@@ -52,9 +52,9 @@ export interface SqlPreview {
   /** One object per row, keyed by column name. A blank cell is `null`. */
   rows: Array<Record<string, string | null>>;
   /** `dataPreview:totalRows` — how many the query has, not how many came. */
-  total_rows?: number;
+  total_rows?: number | undefined;
   /** `dataPreview:queryExecutionTime`, in seconds as the server reports it. */
-  execution_time?: number;
+  execution_time?: number | undefined;
   /**
    * The whole document, parsed generically — what `detail: 'full'` answers.
    *

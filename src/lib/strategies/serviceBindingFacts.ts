@@ -35,20 +35,20 @@ import {
 
 export interface ServiceBindingFacts {
   /** `srvb:services/@srvb:name` — the published service. */
-  service?: string;
+  service?: string | undefined;
   /** `srvb:serviceDefinition/@adtcore:name` — the SRVD behind it. */
-  serviceDefinition?: string;
+  serviceDefinition?: string | undefined;
   /** `srvb:content/@srvb:version`, e.g. `0001`. */
-  version?: string;
+  version?: string | undefined;
   /** From `srvb:binding/@srvb:version`: `V2` → `odatav2`, `V4` → `odatav4`. */
-  protocol?: 'odatav2' | 'odatav4';
+  protocol?: 'odatav2' | 'odatav4' | undefined;
   /** `srvb:binding/@srvb:type`, normally `ODATA`. */
-  bindingType?: string;
+  bindingType?: string | undefined;
   /**
    * `srvb:binding/@srvb:category`: `'ui'` from `0`, `'web_api'` from `1`.
    * `undefined` when the document does not say, which is not the same as UI.
    */
-  category?: 'ui' | 'web_api';
+  category?: 'ui' | 'web_api' | undefined;
   /** `srvb:published` — false means nothing below will open. */
   published: boolean;
 }
@@ -301,13 +301,13 @@ function redirectedNames(source: string): string[] {
 /** What the protocol-category resource says about a published service. */
 export interface CategoryServiceUrls {
   /** `…:services/@…:serviceUrl` — the URL the SYSTEM names, often empty. */
-  serviceUrl?: string;
+  serviceUrl?: string | undefined;
   /** `…:services/@…:annotationUrl`. */
-  annotationUrl?: string;
+  annotationUrl?: string | undefined;
   /** `odatav4:serviceGroup/@odatav4:serviceUrlPrefix` — V4 only. */
-  serviceUrlPrefix?: string;
+  serviceUrlPrefix?: string | undefined;
   /** `@…:published` on the list (V2) or the group (V4). */
-  published?: boolean;
+  published?: boolean | undefined;
 }
 
 /**

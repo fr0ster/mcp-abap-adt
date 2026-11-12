@@ -270,7 +270,7 @@ export const DELETION_TARGETS: Readonly<
       (c) => c.getFunctionModule(resultsFor(functionModuleDocuments)),
       ({ name, group }) => ({
         functionModuleName: name,
-        functionGroupName: group,
+        ...(group !== undefined && { functionGroupName: group }),
       }),
     ),
   ),

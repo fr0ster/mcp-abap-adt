@@ -406,6 +406,26 @@ describe('no connection: every failed build answers no_connection', () => {
     }
   });
 
+  it('DIAG (throwaway): the first call after reset, 500 times', async () => {
+    const odd: string[] = [];
+    for (let i = 0; i < 500; i += 1) {
+      resetProcessLatchForTests();
+      await gate.reset();
+      const s = await start();
+      try {
+        const first = await s.call('GetAdtTypes');
+        if (
+          payloadOf(first.text).error !== 'no_connection' ||
+          !String(payloadOf(first.text).message).includes('(ECONNRESET)')
+        )
+          odd.push(`#${i} isError=${String(first.isError)} ${first.text}`);
+      } finally {
+        await s.stop();
+      }
+    }
+    assert.deepEqual(odd.slice(0, 8), [], `DIAG odd=${odd.length}`);
+  });
+
   it('two consecutive failing first calls: each answers no_connection, each one new attempt', async () => {
     await gate.reset();
     const s = await start();

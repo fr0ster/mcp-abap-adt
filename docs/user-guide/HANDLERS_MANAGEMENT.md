@@ -310,6 +310,28 @@ the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
 4. **Debugging**: the debugger is in every core and compact write binary. A breakpoint
    catches every request of the request user, and a `state_handle` gives whoever holds it that debug session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
 
+5. **Narrower still**: the start-time access restrictions take tools, values, packages,
+   requests and tables away from any binary — see [Access restrictions](ACCESS_RESTRICTIONS.md)
+
+### Access restrictions for an embedder
+
+- `registryOf(toolSet, transport, served, denied)` (`@mcp-abap-adt/lib/tool-set`) and
+  `withoutDenied(groups, denied)` (`@mcp-abap-adt/lib`) leave denied tools out and narrow a
+  compact tool's values; `parseDeniedEntry(text, row)` parses an entry. A group that is not a
+  `BaseHandlerGroup` is the embedder's and is returned as it is.
+- `HandlerExporter` takes `deniedActions` (applied once, in its constructor, to every entry,
+  registration and registry it hands out) and `accessChecks`.
+- `BaseMcpServer` / `EmbeddableMcpServer` take `accessChecks` (`IAccessChecks`): checked once per
+  call before the call's connection is taken, on the server's own path (`registerHandlers`),
+  on a group registered on a plain `McpServer` (from `HandlerContext.accessChecks`), and on the
+  exporter's entries. A registry that registers its own tools is its own.
+- Two strategies ship: `listedAccessChecks(lists)` (names and prefixes, reads nothing) and
+  `packageTreeAccessChecks(lists)` (also `ZFOO/**`, through the `IPackageReader` it is handed:
+  one package metadata read per step, on the call's connection); `accessChecksFor(lists)` picks
+  the one the launchers use. An embedder may give its own.
+- Handlers an embedder takes into its own hands — parsing the exported entries' arguments
+  itself, a registry of its own — are its own.
+
 ## Implementation
 
 Handler sets are a `ToolSet` (`@mcp-abap-adt/lib/tool-set`, [src/lib/toolSet.ts](../../src/lib/toolSet.ts)),

@@ -32,7 +32,10 @@ In every binary's table: `CONF_ROW` (`--conf` / `--config`), `BATCH_KEEP_RAW_PAR
 `batch.keepRawParts`, a flag, default `false`, read alone by `readBatchKeepRawParts`), `ENABLE_DATA_TOOLS_ROW`
 (`--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / `enable-data-tools`, a flag, default `false`: the data tools,
 handed to the tool set as `ServedTools`), and `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`, required), which is
-`@mcp-abap-adt/responsible-rules`' with the rules that read it. In http's and sse's: `STATE_IDLE_ROW`
+`@mcp-abap-adt/responsible-rules`' with the rules that read it. `ACCESS_RESTRICTION_ROWS`
+(`--deny-actions`, `--allowed-packages`, `--allowed-requests`, `--denied-tables`, `--allowed-tables`, their
+`MCP_*` variables and `restrictions.*` keys, lists with no default), read by `readAccessRestrictions(argv, env, yaml)`
+into `{ deniedActions, lists }`; a malformed entry, or both table lists, is a `ParameterRefusal`. In http's and sse's: `STATE_IDLE_ROW`
 (`--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, the idle bound on held
 state; stdio has none: it refuses the flag and the YAML key and does not read the variable, 20.1.1) and `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-key` / `--tls-ca`,
 `MCP_TLS_*`), read with `tlsConfigOf(values)`.

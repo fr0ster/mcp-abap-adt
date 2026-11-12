@@ -112,6 +112,15 @@ same way.
    responsible person and master system are resolved first: what the system names
    (`systeminformation`, on ABAP Cloud and on-premise), over anything configured; the destination's
    `.env` and the request's headers only where an on-premise system gives no information.
+   **The access checks.** With an `accessChecks` option (`IAccessChecks`), a call that names a
+   checked package, request or table is checked once, after the SDK's parse and before
+   `getConnection` — so a refused call takes no connection, sends nothing, starts no background
+   run and takes no batch number. A strategy that reads (the package tree) is handed a lazy
+   `IPackageReader` whose first read takes the call's connection and its turn in the main flow,
+   exactly as the wrapper would next; the call then goes on with what it took. A refusal is the
+   server's own (`package_not_allowed`, `package_tree_unreadable`, `request_not_allowed`,
+   `table_not_allowed`). Denied actions are not checked per call: `registryOf` /
+   `withoutDenied` leave them out at registration.
 4. **The answer.** A failure is read by `readFailure(thrown)`, which is lib's `failureOf`; core
    reads the destination layer's failures first. A failure it knows is answered as JSON `{ error,
    kind?, message, hint?, … }`: `authentication_failed`, `destination_refused`, or one of the

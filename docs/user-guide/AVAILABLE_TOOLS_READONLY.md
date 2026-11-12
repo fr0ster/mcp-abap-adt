@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 75
+- Total tools: 76
 
 ## Navigation
 
@@ -32,6 +32,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetClass](#getclass-read-only-class)
   - [Common](#read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
+    - [GetObjectDraft](#getobjectdraft-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
     - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
   - [Data Element](#read-only-data-element)
@@ -333,6 +334,19 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type.
+
+---
+
+<a id="getobjectdraft-read-only-common"></a>
+#### GetObjectDraft (Read-Only / Common)
+**Description:** [read-only] Reads the active, inactive and working versions of each part of the object named by object_type and object_name, together, and tells whether it holds an unactivated change and whose. Answers { object_type, object_name, has_draft, parts }: per part (main, the source or metadata; for CLASS and BEHAVIOR_IMPLEMENTATION the includes implementations, definitions, testclasses, macros in place of the main source) draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's
+
+**Source:** `src/handlers/common/readonly/handleGetObjectDraft.ts`
+
+**Parameters:**
+- `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
 ---
 
@@ -1276,4 +1290,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-10*
+*Last updated: 2026-11-12*

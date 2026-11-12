@@ -469,6 +469,13 @@ After the Task 1 and Task 2 measurements (the owner):
 
 Consequences for Task 11: `DraftAnswer` becomes `{ has_draft: boolean; parts: readonly DraftPartAnswer[] }`, a `DraftPartAnswer` being `{ part, draft, changed_at, age_seconds, etags }`; `draftOf` takes the part's comparison (`etag` | `timestamp`) and whether its time is known; `readDraftEtags` reads each part of `DRAFT_PARTS[variant][type]`, an include whose three reads all answer `404` having no entry. `GetObjectDraft` and `HandlerGet` `part: 'draft'` get `tools/batch-handlers.json` entries (Task 2).
 
+### Deviations while implementing Tasks 11–14 (for the owner's review)
+
+11. **Descriptions name no `none`.** The repository's guard (`descriptionsFunctional.test.ts`) refuses the words `none`, `not`, `neither`, `instead` in a tool description, so `GetObjectDraft`'s and `HandlerGet`'s draft texts say the equal-versions state as "the active state when its versions are equal" and leave out "another user's lock is not visible" (it stays in the docs). The answer's value is still `none`.
+12. **The draft live cases are written out per type**, not built by a loop: the coverage ledger (`ledgerScan.ts`) reads only awaited `liveCall`s with literal tools and arguments directly in an `it`. Both tools are covered by one live file, `src/__tests__/integration/high/draft/ObjectDraft.test.ts`, in place of `GetObjectDraft.test.ts` and `HandlerGetDraft.test.ts`.
+13. **The compact suites of Task 14** are two files: `compact/NarrowedCompactTools.test.ts` and `compact/CompactRestrictedTools.test.ts` (HandlerProfileRun, HandlerGetData, HandlerSession and the debugger tools), in place of five. Their calls go through `livePrepare`: a `liveCall` of a key without a ledger row is an orphan for the ledger guard, and these keys are in `coverage-debt.json`.
+14. **The draft unit pins** (`src/__tests__/unit/pins/draft.pins.test.ts`, Jest, as every pin file) take their literals from the base run's `changed-handler-requests.json`.
+
 ## Measurement record
 
 ### Task 1: draft versions (Measured 2026-11-12)

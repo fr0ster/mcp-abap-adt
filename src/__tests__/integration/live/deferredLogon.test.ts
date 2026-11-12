@@ -21,8 +21,14 @@
  * `ZMCP_SHR_LOCK_CLS`, kept present by `npm run shared:setup` /
  * `shared:check`, which the case only locks and unlocks): the system
  * becomes reachable mid-session (a TCP forwarder on a port of the case's,
- * closed, then opened), and the first call of a `--restore-session` process
- * takes up the session a killed process left, unlocking with its handle.
+ * closed, then opened); and a take-up keeps the same SAP session and its
+ * logoff frees what it held — a killed `mcp-abap-adt-compact` process
+ * locked the class, the first call of a `--restore-session` process takes
+ * its session up, a separate session of the same user (a connection of the
+ * test's own) is refused the class while the second process holds it
+ * (SAP's answer is printed), and locks and unlocks it once the second has
+ * stopped and logged off (`helpers/takeUpCase.ts`). No lock handle is
+ * printed.
  *
  * **The RFC case** reaches no system: its host is the reserved name
  * `unreachable.invalid`, which never resolves, and its credentials exist
@@ -37,6 +43,7 @@ import { connect, createServer, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as dotenv from 'dotenv';
@@ -44,12 +51,22 @@ import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/bro
 import { readCoreConfig } from '../../../../server-runtime/src/stdio/config/coreParameters';
 import { factoryConfigFrom } from '../../../../server-runtime/src/stdio/launcher';
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
+import { lockObject } from '../../../handlers/common/low/handleLockObject';
+import { unlockObject } from '../../../handlers/common/low/handleUnlockObject';
+import type { HandlerContext } from '../../../handlers/interfaces';
+import { createAbapConnection } from '../../../lib/connectionFactory';
+import { credentialFromSapConfig } from '../../../lib/credentialSources';
+import { endConnection } from '../../../lib/ownedConnections';
 import { fullToolSet, registryOf } from '../../../lib/toolSet';
 import {
   installedFile,
   installPackedRelease,
 } from '../../helpers/installedRelease';
-import { type TakeUpServer, takeUpCase } from '../helpers/takeUpCase';
+import {
+  type SeparateSession,
+  type TakeUpServer,
+  takeUpCase,
+} from '../helpers/takeUpCase';
 import { launchStdioScript, McpSession } from '../helpers/testers/hardMode';
 
 /** The reserved name that never resolves (RFC 2606): no system is behind it. */
@@ -216,9 +233,13 @@ function payloadOf(text: string): Record<string, unknown> {
   }
 }
 
-/** The packed release, installed once for this file's cases that start the bin. */
-let installed: { workdir: string; bin: string } | undefined;
-function installedBin(): string {
+/**
+ * The packed release, installed once for this file's cases that start a bin:
+ * `mcp-abap-adt`, and `mcp-abap-adt-compact` for the take-up, whose lock and
+ * unlock are compact tools (`HandlerLock`).
+ */
+let installed: { workdir: string; bin: string; compactBin: string } | undefined;
+function installedRelease(): { bin: string; compactBin: string } {
   if (installed === undefined) {
     const workdir = mkdtempSync(join(tmpdir(), 'deferred-bin-'));
     installPackedRelease(workdir, [
@@ -229,13 +250,81 @@ function installedBin(): string {
       'http',
       'sse',
       'server',
+      'compact-readonly-entries',
+      'compact-modify',
+      'compact',
     ]);
     installed = {
       workdir,
       bin: installedFile(workdir, 'core', 'bin', 'mcp-abap-adt.js'),
+      compactBin: installedFile(
+        workdir,
+        'compact',
+        'bin',
+        'mcp-abap-adt-compact.js',
+      ),
     };
   }
-  return installed.bin;
+  return installed;
+}
+const installedBin = (): string => installedRelease().bin;
+
+/**
+ * A session of the same user as `envPath` names, on a connection of its own
+ * (stateful, the real address): what the take-up case locks the class with
+ * from outside the taken-up session. A lock answers its handle or SAP's
+ * refusal; nothing of it is logged.
+ */
+async function separateSession(
+  envPath: string,
+  className: string,
+): Promise<SeparateSession> {
+  const stated = dotenv.parse(readFileSync(envPath, 'utf8'));
+  const username = stated.SAP_USERNAME ?? '';
+  const password = stated.SAP_PASSWORD ?? '';
+  const settings: SapConfig = {
+    authType: 'basic',
+    username,
+    password,
+    url: stated.SAP_URL ?? '',
+    connectionType: 'http',
+    ...(stated.SAP_CLIENT !== undefined && { client: stated.SAP_CLIENT }),
+  };
+  const connection = createAbapConnection(
+    settings,
+    credentialFromSapConfig(settings),
+    null,
+    undefined,
+    undefined,
+    'onprem',
+  );
+  connection.setSessionType('stateful');
+  await connection.connect();
+  const context: HandlerContext = { connection };
+  const textOf = (answer: { content?: { text?: unknown }[] }): string =>
+    (answer.content ?? []).map((part) => String(part.text ?? '')).join('');
+  return {
+    lock: async () => {
+      const answer = await lockObject(context, {
+        object_name: className,
+        object_type: 'class',
+      });
+      const text = textOf(answer);
+      const handle = payloadOf(text).lock_handle;
+      return !answer.isError && typeof handle === 'string' && handle !== ''
+        ? { handle }
+        : { refused: text };
+    },
+    unlock: async (handle) => {
+      const answer = await unlockObject(context, {
+        object_name: className,
+        object_type: 'class',
+        lock_handle: handle,
+      });
+      return answer.isError ? { refused: textOf(answer) } : { ok: true };
+    },
+    close: () => endConnection(connection),
+  };
 }
 
 describe('the installed bin with --deferred-logon', () => {
@@ -455,7 +544,7 @@ describe('the installed bin with --deferred-logon', () => {
       assert.equal(code, 0);
     });
 
-    it('the first call takes up a leftover session: a killed process locked, the next process unlocks with its handle', {
+    it('the first call takes up a leftover session: its lock holds while taken up, and its logoff frees it', {
       skip:
         realSkip ??
         (LOCK_CLASS === ''
@@ -467,15 +556,14 @@ describe('the installed bin with --deferred-logon', () => {
         dotenv.parse(readFileSync(REAL_ENV, 'utf8')).SAP_URL ?? '',
       );
       const args: [string, ...string[]] = [
-        installedBin(),
+        installedRelease().compactBin,
         `--env-path=${envFile}`,
         `--auth-broker-path=${dir}`,
         '--deferred-logon',
       ];
       // The flow and its cleanup are takeUpCase's (pinned by
-      // unit/coverage/takeUpCase.test.ts): once the first process may have
-      // written its session, every path that did not unlock logs off the
-      // destination's leftover sessions.
+      // unit/coverage/takeUpCase.test.ts): every path that did not prove the
+      // class free logs off the destination's leftover sessions.
       const launch = async (
         argv: readonly [string, ...string[]],
       ): Promise<TakeUpServer> => {
@@ -500,11 +588,17 @@ describe('the installed bin with --deferred-logon', () => {
           first: () => launch(args),
           second: () =>
             launch([args[0], ...args.slice(1), '--restore-session']),
+          separate: () => separateSession(REAL_ENV, LOCK_CLASS),
           cleaner: () => launch(args),
         },
         LOCK_CLASS,
       );
-      assert.equal(result.unlocked, true);
+      // SAP's refusal while the session was taken up: no lock handle in it.
+      console.log(
+        `[deferred-logon] held while taken up: ${result.heldWhileTakenUp}`,
+      );
+      assert.notEqual(result.heldWhileTakenUp, '');
+      assert.equal(result.freedAfterLogoff, true);
       assert.equal(result.secondExit, 0);
     });
   });

@@ -127,9 +127,12 @@ whatever test config is present: the real-system cases log on only through their
   for the take-up: `ZMCP_SHR_LOCK_CLS`, a shared dependency of the test config —
   `npm run shared:setup` creates it, `npm run shared:check` keeps it present — which the case
   only locks and unlocks), else they are skipped with their reason: the system becoming reachable
-  mid-session (a forwarder on a loopback port, closed, then opened), and the first call of a
-  `--restore-session` process taking up the session a killed process left, unlocking with its
-  lock handle. Run the realm check first, and only with the owner's go.
+  mid-session (a forwarder on a loopback port, closed, then opened); and a take-up keeping the
+  same SAP session, its logoff freeing what it held: a killed `mcp-abap-adt-compact` process
+  locked the class, the first call of a `--restore-session` process takes its session up, a
+  separate session of the same user (a connection of the test's own) is refused the class while
+  the second process holds it — SAP's answer is printed — and locks and unlocks it once the
+  second has stopped and logged off. No lock handle is printed. Run the realm check first, and only with the owner's go.
 
 ## Live measurements of 19.0.0 (2026-10-15)
 

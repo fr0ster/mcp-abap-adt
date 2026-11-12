@@ -224,7 +224,8 @@ export type DraftReads =
  * answer, as its reads answer today (a `404` of the main part included: an
  * object that exists only inactive has no active version). An include whose
  * three reads all answer `404` does not exist and has no entry; one `404`
- * among an include's reads is that version's ETag `null`.
+ * among an include's reads is that version's ETag `null`; when no part
+ * answers at all, the object does not exist and its `404` is the answer.
  */
 export async function readDraftEtags(
   client: IServerAdtClient,
@@ -242,6 +243,9 @@ export async function readDraftEtags(
     ),
   );
   const answered: PartEtags[] = [];
+  // The first `404` of an include whose three reads all answered it: the
+  // answer when no part of the object answers at all.
+  let absent: IAdtResponse<IAdtWireResponse, IAdtError> | undefined;
   for (const [index, part] of parts.entries()) {
     const [active, inactive, working] = reads[index] ?? [];
     if (
@@ -266,7 +270,10 @@ export async function readDraftEtags(
         };
       }
     }
-    if (three.every((read) => read.kind === 'absent')) continue;
+    if (three.every((read) => read.kind === 'absent')) {
+      if (active.kind === 'absent') absent ??= active.failure;
+      continue;
+    }
     const etag = (read: VersionRead) =>
       read.kind === 'read' ? read.etag : null;
     answered.push({
@@ -277,6 +284,12 @@ export async function readDraftEtags(
         workspace: etag(working),
       },
     });
+  }
+  // No part answered — every include answered `404`: the object does not
+  // exist, and the read's failure is the answer (on premise a class is read
+  // by its includes alone).
+  if (answered.length === 0 && absent !== undefined) {
+    return { ok: false, failure: { kind: 'answer', response: absent } };
   }
   return { ok: true, parts: answered };
 }

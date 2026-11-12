@@ -199,6 +199,30 @@ for (const variant of ['onprem', 'cloud'] as const) {
       );
     });
 
+    it('a class none of whose parts exists answers its 404 on both tools, never an empty draft', async () => {
+      assert.ok(draftTool !== undefined && handlerGet !== undefined);
+      for (const [tool, args] of [
+        [draftTool, { object_type: 'CLASS', object_name: 'ZCL_NONE' }],
+        [
+          handlerGet,
+          { object_type: 'CLASS', part: 'draft', class_name: 'ZCL_NONE' },
+        ],
+      ] as const) {
+        const { connection } = draftConnection(variant, () => 404);
+        const answer = toolAnswer(await tool.call({ connection }, args));
+        assert.equal(answer.isError, true);
+        const parsed: unknown = JSON.parse(
+          answer.content.map((i) => i.text).join(''),
+        );
+        assert.equal(
+          typeof parsed === 'object' && parsed !== null
+            ? Reflect.get(parsed, 'status')
+            : undefined,
+          404,
+        );
+      }
+    });
+
     it('an include whose three reads answer 404 has no entry', async () => {
       assert.ok(draftTool !== undefined);
       const { connection } = draftConnection(variant, (request) =>

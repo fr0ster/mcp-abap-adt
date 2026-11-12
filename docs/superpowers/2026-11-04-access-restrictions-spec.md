@@ -19,7 +19,7 @@ controller is marked **controller's call**.
   (`server-runtime/src/{stdio,http,sse}/launcher.ts`). (Measured)
 - **The `list` kind drops empty entries silently** (`splitList`: `a,,b` is `[a, b]`). It cannot
   hold rows that must refuse a stray separator. (Measured)
-- **Every launcher builds its registry in one call**, `registryOf(toolSet, transport)`
+- **Every launcher builds its registry in one call**, `registryOf(toolSet, transport, served)`
   (`src/lib/toolSet.ts`), a `CompositeHandlersRegistry` of the set's groups. (Measured)
 - **A handler reaches a call by five paths.** (Measured)
   1. `BaseMcpServer.registerHandlers` with a `CompositeHandlersRegistry`: every entry wrapped

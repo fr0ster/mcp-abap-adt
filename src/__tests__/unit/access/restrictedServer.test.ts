@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { parseDeniedEntry } from '../../../lib/access/deniedActions';
 import {
@@ -15,6 +15,7 @@ import {
   type ServerRestriction,
   type ServerSource,
 } from '../../helpers/pinServer';
+import { recordingConnection } from '../../helpers/recordingConnection';
 import type { SystemKind } from '../../helpers/servedTools';
 
 /** A source no request ever reaches: listing tools connects nowhere. */
@@ -76,3 +77,20 @@ for (const variant of [
     });
   });
 }
+
+describe('closing the in-process server leaves an injected connection to its owner', () => {
+  it('sends no logoff on the connection it was given, a batch opened and dropped included', async () => {
+    const disconnect = mock.fn(async () => {});
+    const connection = { ...recordingConnection(), disconnect };
+    const server = await inProcessServer('onprem', { injected: connection });
+    await server.call('GetPackage', { package_name: 'ZANY' });
+    await server.call('BatchBegin', {});
+    await server.call('CreateClass', {
+      class_name: 'ZANY_CLASS',
+      package_name: 'ZANY',
+      description: 'recorded, never sent',
+    });
+    await server.close();
+    assert.equal(disconnect.mock.callCount(), 0);
+  });
+});

@@ -139,7 +139,7 @@ project has 0 errors without it.
 - The test infrastructure: how its `any` is replaced (typed stand-ins for the connection, the
   client and the handler context, or another way); whether the other assertions in test code
   go too, and what stays for fixtures that are wrong on purpose.
-- The gate: lint, a source test or both; how it covers `tools` and `bin`, which the scans skip today; the option in
+- The gate: lint, a source test or both; how it covers `tools` and `bin`, which the type-escape scan skips today; the option in
   every `tsconfig`; the `BLOCKED` list emptied; how each refusal is proved.
 - The semver of the server's release: which exported types change (handler argument types,
   options turning `?: T | undefined`).

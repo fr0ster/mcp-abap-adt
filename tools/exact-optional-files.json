@@ -1,0 +1,9 @@
+{
+  "projects": [
+    { "tsconfig": "tsconfig.json", "files": [], "typechecks": [] },
+    { "tsconfig": "server-runtime/tsconfig.json", "files": [], "typechecks": [] },
+    { "tsconfig": "compact-readonly-entries/tsconfig.json", "files": [], "typechecks": [] },
+    { "tsconfig": "compact-modify/tsconfig.json", "files": [], "typechecks": [] },
+    { "tsconfig": "responsible-rules/tsconfig.json", "files": [], "typechecks": [] }
+  ]
+}

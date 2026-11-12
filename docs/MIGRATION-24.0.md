@@ -14,8 +14,9 @@ ADT dependencies move to `@mcp-abap-adt/adt-clients` 45, `@mcp-abap-adt/adt-stra
 `@mcp-abap-adt/interfaces-adt` 27 (`@mcp-abap-adt/compact-modify` too): what that changes for a
 caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" and
 "Callers of the activation tools: an activation SAP did not carry out is an error" below (44
-adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 21,
-`@mcp-abap-adt/interfaces-auth-sap` 4 and `@mcp-abap-adt/interfaces-adt-connection` 4, the
+adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 22,
+`@mcp-abap-adt/interfaces-auth-sap` 4, `@mcp-abap-adt/interfaces-adt-connection` 4.1 and the
+optional `@mcp-abap-adt/sap-rfc-lite` 0.4, the
 destination path to `@mcp-abap-adt/auth-broker` 5.1, `@mcp-abap-adt/auth-stores` 5.1 and
 `@mcp-abap-adt/interfaces-auth-broker` 1.4: what that changes is under "RFC destinations: the
 address is stated" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
@@ -24,6 +25,12 @@ Connection 21 asks for the CSRF token once per endpoint, with no retry and no de
 logon against a closed port fails at once; an embedder that calls `createConnection`, a
 connector or `makeAdtRequest` changes nothing (a wire or subclass of its own: connection's
 MIGRATION-21.0).
+Connection 22, with sap-rfc-lite 0.4, reopens nothing over RFC: an error that ends the stateful
+RFC conversation ends that connection's SAP session, the request fails `ADT_SESSION_REPLACED`
+with the RFC SDK's error as fields (`IAdtError.rfc`, interfaces-adt 27.2), and every later request
+on that connection fails `ADT_NOT_CONNECTED` with nothing sent; 0.3.x went on, silently, on a new
+ABAP session without the old one's locks. An embedder that kept using a connection after such an
+error creates a new connection instead (connection's MIGRATION-22.0).
 
 ## RFC destinations: the address is stated
 

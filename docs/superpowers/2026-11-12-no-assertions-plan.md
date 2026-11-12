@@ -178,6 +178,14 @@ Branched after 45.4.0 is merged and published.
   - `npm run measure:exact` runs the same tool unfiltered.
   - Each batch below adds its files to the list, so a converted file cannot regress while its
     imports wait for their own batch.
+  - **A file that still meets an upstream contract is not enrolled until S5.** These are files
+    with a diagnostic against an interfaces-adt or adt-clients type (S2e), such as
+    `handleCreateDomain.ts:203` and `handleUpdateDomain.ts:183` / `:200`. `measure:exact` lists
+    them by the declaring package (as the spec's measurement did).
+    - Their handler/schema pairing is still checked in S2a, by its typecheck in
+      `__typechecks__/exact/`. That typecheck imports only the definition and the handler's
+      signature, and is itself enrolled.
+    - They are enrolled in S5, once U2 and U3 are taken from the registry.
 - The other configs keep the option off until S2f, so every commit stays green.
 
 - **S2a. Handler arguments from the schema.**

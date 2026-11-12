@@ -2,6 +2,8 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import type { DeniedActions } from '../access/deniedActions.js';
+import { withoutDenied } from '../access/withoutDenied.js';
 import { ServerRefusal } from '../auth/serverRefusal.js';
 import {
   longToolInTheCall,
@@ -84,6 +86,15 @@ export interface HandlerExporterOptions {
    * applies. Absent: the shipped one, `substringLineMatch`.
    */
   lineMatchStrategy?: LineMatchStrategy;
+
+  /**
+   * The denied actions (`readAccessRestrictions`, `parseDeniedEntry`):
+   * applied once to the exporter's groups (`withoutDenied`), so a denied
+   * tool is in none of `getHandlerEntries()`, `registerOnServer()` and
+   * `createRegistry()`. A `Tool.value` entry matches only a compact tool's
+   * values; the full set's tools carry none. Absent or empty: nothing denied.
+   */
+  deniedActions?: DeniedActions | undefined;
 
   /**
    * Include readonly handlers (getProgram, getClass, etc.)
@@ -255,6 +266,11 @@ export class HandlerExporter {
     if (options?.includeData === true) {
       this.handlerGroups.push(new DataHandlersGroup(dummyContext));
     }
+    // The denied actions, applied once: every path starts from these groups.
+    this.handlerGroups = withoutDenied(
+      this.handlerGroups,
+      options?.deniedActions ?? [],
+    );
   }
 
   /**

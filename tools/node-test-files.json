@@ -66,6 +66,7 @@
   "src/__tests__/unit/access/changedHandlerRequests.test.ts",
   "src/__tests__/unit/access/checkedArguments.test.ts",
   "src/__tests__/unit/access/deniedActions.test.ts",
+  "src/__tests__/unit/access/exporterDenied.test.ts",
   "src/__tests__/unit/access/listedAccessChecks.test.ts",
   "src/__tests__/unit/access/packageTreeAccessChecks.test.ts",
   "src/__tests__/unit/access/rebuiltDescriptions.test.ts",

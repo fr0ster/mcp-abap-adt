@@ -1,3 +1,4 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 /**
  * UnlockObject Handler - Unlock ABAP object after modification via ADT API
@@ -119,6 +120,8 @@ export async function handleUnlockObject(
 export async function unlockObject(
   context: HandlerContext,
   args: Omit<UnlockObjectArgs, 'object_type'> & { object_type: UnlockKind },
+  /** Hears the unlock's failed verdict, typed, before it is answered. */
+  onFailure?: (error: IAdtError) => void,
 ) {
   const { connection, logger } = context;
   const { object_name, object_type, lock_handle } = args;
@@ -151,141 +154,146 @@ export async function unlockObject(
   const objectName = object_name.toUpperCase();
   const client = createAdtClient(connection, logger);
 
+  const sent = () => {
+    switch (objectType) {
+      case 'class':
+        return client
+          .getClass(resultsFor(classDocuments))
+          .unlock({ className: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'program':
+        // A program is locked on premise only (`ADT_TYPES_ONPREM`).
+        return createOnPremAdtClient(connection, logger)
+          .getProgram(resultsFor(programDocuments))
+          .unlock({ programName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'include':
+        // An include is unlocked on premise only (`ADT_TYPES_ONPREM`).
+        return createOnPremAdtClient(connection, logger)
+          .getInclude(resultsFor(includeDocuments))
+          .unlock({ includeName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'table_type':
+        return client
+          .getTableType(resultsFor(tableTypeDocuments))
+          .unlock({ tableTypeName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'interface':
+        return client
+          .getInterface(resultsFor(interfaceDocuments))
+          .unlock({ interfaceName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'function_group':
+        return client
+          .getFunctionGroup(resultsFor(functionGroupDocuments))
+          .unlock({ functionGroupName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'function_module':
+        // SAP ignores the group of the address (#2): the unlock is sent
+        // after the module's metadata names the group given.
+        return inCheckedGroupOn(
+          client,
+          functionGroupName,
+          functionModuleName,
+          () =>
+            client
+              .getFunctionModule(resultsFor(functionModuleDocuments))
+              .unlock(
+                {
+                  functionGroupName,
+                  functionModuleName,
+                },
+                lock_handle,
+                { analyse: analyseException },
+              ),
+        );
+      case 'table':
+        return client
+          .getTable(resultsFor(tableDocuments))
+          .unlock({ tableName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'structure':
+        return client
+          .getStructure(resultsFor(structureDocuments))
+          .unlock({ structureName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'ddl':
+        return client
+          .getDdl(resultsFor(ddlDocuments))
+          .unlock({ ddlName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'domain':
+        return client
+          .getDomain(resultsFor(domainDocuments))
+          .unlock({ domainName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'data_element':
+        return client
+          .getDataElement(resultsFor(dataElementDocuments))
+          .unlock({ dataElementName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'package':
+        // Sent on the session holding the lock, which is then released
+        // whatever the unlock answered.
+        return createAdtClient(
+          connectionHoldingPackageLock(connection, lock_handle),
+          logger,
+        )
+          .getPackage(resultsFor(packageDocuments))
+          .unlock({ packageName: objectName }, lock_handle, {
+            analyse: analyseException,
+          })
+          .finally(() => releasePackageLockSession(lock_handle, logger));
+      case 'behavior_definition':
+        return client
+          .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+          .unlock({ name: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'metadata_extension':
+        return client
+          .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+          .unlock({ name: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'behavior_implementation':
+        // The implementation class's own unlock, pairing the lock.
+        return client
+          .getBehaviorImplementation(classDocuments)
+          .unlock({ className: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'service_definition':
+        return client
+          .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+          .unlock({ serviceDefinitionName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+      case 'service_binding':
+        return client
+          .getServiceBinding(resultsFor(serviceDocuments))
+          .unlock({ bindingName: objectName }, lock_handle, {
+            analyse: analyseException,
+          });
+    }
+  };
   return answer(
     { tool: 'UnlockObjectLow', detail: 'terse' },
-    () => {
-      switch (objectType) {
-        case 'class':
-          return client
-            .getClass(resultsFor(classDocuments))
-            .unlock({ className: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'program':
-          // A program is locked on premise only (`ADT_TYPES_ONPREM`).
-          return createOnPremAdtClient(connection, logger)
-            .getProgram(resultsFor(programDocuments))
-            .unlock({ programName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'include':
-          // An include is unlocked on premise only (`ADT_TYPES_ONPREM`).
-          return createOnPremAdtClient(connection, logger)
-            .getInclude(resultsFor(includeDocuments))
-            .unlock({ includeName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'table_type':
-          return client
-            .getTableType(resultsFor(tableTypeDocuments))
-            .unlock({ tableTypeName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'interface':
-          return client
-            .getInterface(resultsFor(interfaceDocuments))
-            .unlock({ interfaceName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'function_group':
-          return client
-            .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .unlock({ functionGroupName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'function_module':
-          // SAP ignores the group of the address (#2): the unlock is sent
-          // after the module's metadata names the group given.
-          return inCheckedGroupOn(
-            client,
-            functionGroupName,
-            functionModuleName,
-            () =>
-              client
-                .getFunctionModule(resultsFor(functionModuleDocuments))
-                .unlock(
-                  {
-                    functionGroupName,
-                    functionModuleName,
-                  },
-                  lock_handle,
-                  { analyse: analyseException },
-                ),
-          );
-        case 'table':
-          return client
-            .getTable(resultsFor(tableDocuments))
-            .unlock({ tableName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'structure':
-          return client
-            .getStructure(resultsFor(structureDocuments))
-            .unlock({ structureName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'ddl':
-          return client
-            .getDdl(resultsFor(ddlDocuments))
-            .unlock({ ddlName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'domain':
-          return client
-            .getDomain(resultsFor(domainDocuments))
-            .unlock({ domainName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'data_element':
-          return client
-            .getDataElement(resultsFor(dataElementDocuments))
-            .unlock({ dataElementName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'package':
-          // Sent on the session holding the lock, which is then released
-          // whatever the unlock answered.
-          return createAdtClient(
-            connectionHoldingPackageLock(connection, lock_handle),
-            logger,
-          )
-            .getPackage(resultsFor(packageDocuments))
-            .unlock({ packageName: objectName }, lock_handle, {
-              analyse: analyseException,
-            })
-            .finally(() => releasePackageLockSession(lock_handle, logger));
-        case 'behavior_definition':
-          return client
-            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-            .unlock({ name: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'metadata_extension':
-          return client
-            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-            .unlock({ name: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'behavior_implementation':
-          // The implementation class's own unlock, pairing the lock.
-          return client
-            .getBehaviorImplementation(classDocuments)
-            .unlock({ className: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'service_definition':
-          return client
-            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
-            .unlock({ serviceDefinitionName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-        case 'service_binding':
-          return client
-            .getServiceBinding(resultsFor(serviceDocuments))
-            .unlock({ bindingName: objectName }, lock_handle, {
-              analyse: analyseException,
-            });
-      }
+    async () => {
+      const verdict = await sent();
+      if (!verdict.ok) onFailure?.(verdict.getError());
+      return verdict;
     },
     (value) => terseWrite(value, 200),
   );

@@ -9,6 +9,7 @@ import {
   isCredentialPayload,
   thrownEntry,
 } from '../answer';
+import { spentBy } from '../sessionLoss';
 import {
   type Cleanup,
   type LeftLocked,
@@ -41,6 +42,13 @@ type Released =
 export function leftLockedWarning(reason: string): string {
   return `the object may be left locked: the unlock failed (${reason}); it is released when the SAP session ends (logoff) or by its owner`;
 }
+
+/**
+ * The fixed words of a release on a spent connection: the unlock found the
+ * SAP session ended, and SAP's logoff of it released the lock.
+ */
+export const LOCK_WENT_WITH_SESSION_WORDS =
+  "the lock went with its SAP session: the unlock found that session ended, and SAP's logoff of it released the lock";
 
 /** What every failed release adds: the lock may be held, its handle, its object. */
 function leftLocked<H>(
@@ -98,7 +106,15 @@ async function runRelease<H>(
       // The method's error as it is — status, code, adt_type, T100 messages,
       // raw body — with the step it arose at; a credential failure as it came.
       failures: [failureEntry(error, 'unlock')],
-      ...leftLocked(handle, object, error.message),
+      // A spent connection (the owner's decision): the lock went with its
+      // SAP session, so the carrier names the object and says so — no
+      // `left_locked`, no handle.
+      ...(spentBy(error)
+        ? {
+            object: { type: object.type, name: object.name },
+            warning: LOCK_WENT_WITH_SESSION_WORDS,
+          }
+        : leftLocked(handle, object, error.message)),
     },
   };
 }

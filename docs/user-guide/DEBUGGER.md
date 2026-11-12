@@ -584,6 +584,13 @@ ends by:
   - A failed release is reported as a note in the shape of every other entry, its `cleanup`
     saying the stop was dropped. It is no failure: the stop completes, and a new start is
     accepted.
+  - The same rule holds for every release the debug session sends: a release an earlier stop
+    owed, a debuggee caught during the stop, and an attach overtaken by a newer listener
+    generation. Each is dropped and owed no more; inside a stop, a failed one is a note.
+  - **AMDP** works the same way. A cancel, a breakpoint clear, a release or the stop that finds
+    the commands connection spent means the AMDP debug session went with its SAP session.
+    Nothing more is sent, both connections are dropped without a request, and the stop
+    completes.
   - Any other failure of the release, `ADT_RELEASE_PENDING` included, stays a failure kept for
     the next stop.
   - Unit-tested in `DebugSessionCleanup.test.ts`.

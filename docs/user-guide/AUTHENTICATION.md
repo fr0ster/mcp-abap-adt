@@ -418,6 +418,16 @@ it arose. A tool never rewrites it:
   ```
 
   The same fields ride on a write that landed. An unlock that answered adds none of them.
+  An unlock on a **spent connection** is different. The connection answered with its own
+  session error (`sessionError` `ADT_NOT_CONNECTED` or `ADT_SESSION_REPLACED`), or SAP's answer
+  is marked `sessionLost`; both are read from those fields, never from the words.
+  - The lock went with its SAP session, and SAP's logoff of that session released it.
+  - `cleanup` then names the `object` and its `warning` says so: "the lock went with its SAP
+    session: the unlock found that session ended, and SAP's logoff of it released the lock". It
+    carries no `left_locked` and no `lock_handle`.
+  - Compact `HandlerUnlock` answers the same case with `unlocked: false` and those words, and
+    the instance no longer holds the handle.
+  - Every other failed unlock stays as above.
 - **`hint` — the request SAP names.** A failure whose T100 messages hold `CTS_WBO_API` 019 (the
   object is already locked in a transport request) or 020 (a task was passed, and SAP names the
   request that holds the object) carries `hint: { transport_request, text }`: the request number

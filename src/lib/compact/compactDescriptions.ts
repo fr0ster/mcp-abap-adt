@@ -402,6 +402,9 @@ export function compactDeletionCheckDescription(
 type ActivateMember = (typeof COMPACT_ACTIVATE.onprem)[number];
 type ActivationCode = (typeof ACTIVATION_CODES.onprem)[number];
 
+/** The code HandlerActivate's description names as its example. */
+const ACTIVATE_EXAMPLE: readonly ActivationCode[] = ['CLAS/OC'];
+
 /**
  * HandlerActivate's description on `variant`, naming `members` and `codes`
  * (default: all the variant's).
@@ -413,7 +416,7 @@ export function compactActivateDescription(
 ): string {
   const left = leftOf(COMPACT_ACTIVATE[variant], members);
   const byName = members.filter((member) => member !== 'FUNCTION_MODULE');
-  const example = exampleCodes(['CLAS/OC'], codes, 1)
+  const example = exampleCodes(ACTIVATE_EXAMPLE, codes, 1)
     .map((code) => `"${code}"`)
     .join(', ');
   return `Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): ${when(byName.length > 0, `object_type is enough for ${listed(byName)}; `)}${when(left.has('FUNCTION_MODULE'), 'FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*) is activated under its function group; ')}any other type takes object_adt_type (e.g. ${example}), with parentName for a part of a function group (${parentedCodesOf(codes).join(', ')}). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of ${parentedCodesOf(codes).join(', ')} is listed with objects[].parentName set to its function group. One object of ${either(left.of(COMPACT_SINGLE_ACTIVATION[variant]))} (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id. Where the system's discovery leaves out the activation runs (SAP_BASIS 751, 7.40), that call answers SAP's refusal; a group activation there is ActivateObjects (the full set) or ActivateObjectLow (the low handlers group).`;

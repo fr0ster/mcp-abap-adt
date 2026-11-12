@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { RUN_TARGET_OPTIONAL } from '../../handlers/unit_test/shared/runTarget';
 import {
+  type ACTIVATION_CODES,
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
   COMPACT_CREATE,
@@ -1734,6 +1735,12 @@ export const compactCheckRunSchema = compactCheckRunSchemaFor(
   COMPACT_CHECK.onprem,
 );
 
+/** The codes `object_adt_type`'s description names as its examples. */
+const ADT_TYPE_EXAMPLES: readonly (typeof ACTIVATION_CODES.onprem)[number][] = [
+  'CLAS/OC',
+  'PROG/P',
+];
+
 /** A member of `HandlerActivate`'s `object_type`. */
 type ActivateMember = (typeof COMPACT_ACTIVATE.onprem)[number];
 
@@ -1746,7 +1753,7 @@ function activateProperties<const M extends readonly ActivateMember[]>(
   const examples =
     codes === undefined
       ? 'CLAS/OC, PROG/P'
-      : exampleCodes(['CLAS/OC', 'PROG/P'], codes, 2).join(', ');
+      : exampleCodes(ADT_TYPE_EXAMPLES, codes, 2).join(', ');
   const codeType =
     codes === undefined
       ? z.string().describe('ADT object type code.')

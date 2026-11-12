@@ -1,4 +1,7 @@
 [
+  "server-runtime/src/http/__tests__/ephemeralPort.test.ts",
+  "server-runtime/src/sse/__tests__/ephemeralPort.test.ts",
+  "server-runtime/src/stdio/__tests__/browserAuthPortRange.test.ts",
   "server-runtime/src/stdio/__tests__/cancel/loginBound.test.ts",
   "server-runtime/src/stdio/__tests__/config/deferredLogonParameters.test.ts",
   "server-runtime/src/stdio/__tests__/deferredLogon.test.ts",

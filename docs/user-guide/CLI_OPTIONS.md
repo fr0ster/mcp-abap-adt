@@ -422,7 +422,7 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 | CLI | Environment | YAML | Value | Meaning |
 |-----|-------------|------|-------|---------|
 | `--host=<host>` (alias `--http-host`) | `MCP_HTTP_HOST` | `http.host` | host | Host to listen on (default `127.0.0.1`; `0.0.0.0` for every interface) |
-| `--port=<port>` (alias `--http-port`) | `MCP_HTTP_PORT` | `http.port` | 1-65535 | Port to listen on (default `3000`) |
+| `--port=<port>` (alias `--http-port`) | `MCP_HTTP_PORT` | `http.port` | 0-65535 | Port to listen on (default `3000`); `0` binds a free port the system chooses, and the listening line (`[StreamableHttpServer] Server started on <host>:<port>`) names it |
 | `--path=<path>` (alias `--http-path`) | — | — | path | The MCP endpoint path (default `/mcp/stream/http`) |
 | `--http-json-response` | `MCP_HTTP_ENABLE_JSON_RESPONSE` | `http.json-response` | flag | Answer with JSON responses rather than SSE streams |
 | `--http-allowed-hosts=<list>` | `MCP_HTTP_ALLOWED_HOSTS` | `http.allowed-hosts` | list | Host header values accepted with DNS-rebinding protection (exact, with the port) |
@@ -492,7 +492,7 @@ answered `400`; a `GET` or `POST` with `x-mcp-destination` is answered `400`.
 | CLI | Environment | YAML | Value | Meaning |
 |-----|-------------|------|-------|---------|
 | `--sse-host=<host>` | `MCP_SSE_HOST` | `sse.host` | host | Host to listen on (default `127.0.0.1`; `0.0.0.0` for every interface) |
-| `--sse-port=<port>` | `MCP_SSE_PORT` | `sse.port` | 1-65535 | Port to listen on (default `3001`) |
+| `--sse-port=<port>` | `MCP_SSE_PORT` | `sse.port` | 0-65535 | Port to listen on (default `3001`); `0` binds a free port the system chooses, and the listening line (`[SseServer] Server started on <host>:<port>`) names it |
 | `--sse-path=<path>` | — | — | path | The path of the `GET` that opens an SSE connection (default `/sse`) |
 | `--post-path=<path>` | — | — | path | The path of a connection's `POST` messages (default `/messages`) |
 | `--sse-allowed-hosts=<list>` | `MCP_SSE_ALLOWED_HOSTS` | `sse.allowed-hosts` | list | Host header values accepted with DNS-rebinding protection (exact, with the port) |

@@ -310,19 +310,31 @@ export class SseServer {
 
       server.listen(this.port, this.host);
       server.once('listening', () => {
+        // The port bound, not the one configured: 0 is the system's choice.
+        const port = this.listeningPort() ?? this.port;
+        console.error(`[SseServer] Server started on ${this.host}:${port}`);
         console.error(
-          `[SseServer] Server started on ${this.host}:${this.port}`,
+          `[SseServer] SSE endpoint: ${protocol}://${this.host}:${port}${this.ssePath}`,
         );
         console.error(
-          `[SseServer] SSE endpoint: ${protocol}://${this.host}:${this.port}${this.ssePath}`,
-        );
-        console.error(
-          `[SseServer] POST endpoint: ${protocol}://${this.host}:${this.port}${this.postPath}`,
+          `[SseServer] POST endpoint: ${protocol}://${this.host}:${port}${this.postPath}`,
         );
         resolve();
       });
       server.once('error', reject);
     });
+  }
+
+  /**
+   * The port the standalone listener is bound to — the system's choice when
+   * the configured port is 0 — while it listens; undefined before the start,
+   * after the stop and on an external app.
+   */
+  listeningPort(): number | undefined {
+    const address = this.standaloneServer?.address();
+    return address !== null && typeof address === 'object'
+      ? address.port
+      : undefined;
   }
 
   /** Stops taking connections. Embedded on an external app there is no listener of its own. */

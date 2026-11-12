@@ -380,15 +380,23 @@ async function run(
   return started;
 }
 
-/** A port no one listens on now. */
-async function freePort(): Promise<number> {
-  const server = net.createServer();
-  await new Promise<void>((resolve) =>
-    server.listen(0, '127.0.0.1', () => resolve()),
-  );
-  const { port } = server.address() as net.AddressInfo;
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  return port;
+/**
+ * The port the server a launcher just started announced on its listening
+ * line: every server here is started on port 0, the system's choice read
+ * back, so no test binds a port it chose before the server did.
+ */
+function announcedPort(transportName: 'http' | 'sse'): number {
+  const prefix =
+    transportName === 'http'
+      ? '[StreamableHttpServer] Server started on '
+      : '[SseServer] Server started on ';
+  const lines = jest
+    .mocked(console.error)
+    .mock.calls.map((call) => call.map(String).join(' '))
+    .filter((line) => line.startsWith(prefix));
+  const last = lines[lines.length - 1];
+  if (last === undefined) throw new Error('no server announced its port');
+  return Number(last.slice(last.lastIndexOf(':') + 1));
 }
 
 /**
@@ -588,7 +596,9 @@ async function serveHttpLike(
         ? `http://127.0.0.1:${port}/mcp/stream/http`
         : `http://127.0.0.1:${port}/sse`,
   });
-  const { listen, endpoint } = at(await freePort());
+  const { listen } = at(0);
+  // Read once the server has started and announced its port.
+  let endpoint = '';
 
   const clientWith = async (
     headers: Record<string, string>,
@@ -635,6 +645,7 @@ async function serveHttpLike(
   };
 
   const started = await run(launcher, [...listen, '--system-type=onprem']);
+  endpoint = at(announcedPort(transportName)).endpoint;
   const basicClient = await clientWith(basicHeaders());
   const tools = await names(basicClient);
   // http and sse write no runtime file: not while a request's
@@ -1190,13 +1201,13 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         );
         await client.connect(clientSide);
       } else {
-        const port = await freePort();
         started = await run(launcher, [
           ...(transportName === 'http'
-            ? ['--host=127.0.0.1', `--port=${port}`]
-            : ['--sse-host=127.0.0.1', `--sse-port=${port}`]),
+            ? ['--host=127.0.0.1', '--port=0']
+            : ['--sse-host=127.0.0.1', '--sse-port=0']),
           '--system-type=onprem',
         ]);
+        const port = announcedPort(transportName);
         const url =
           transportName === 'http'
             ? `http://127.0.0.1:${port}/mcp/stream/http`
@@ -1294,12 +1305,12 @@ async function cancelledRead(
   let done: Promise<unknown>;
 
   if (transportName === 'sse') {
-    const port = await freePort();
     started = await run(launcher, [
       '--sse-host=127.0.0.1',
-      `--sse-port=${port}`,
+      '--sse-port=0',
       '--system-type=cloud',
     ]);
+    const port = announcedPort('sse');
     client = new Client({ name: 'parity', version: '1.0.0' });
     open.clients.push(client);
     await client.connect(
@@ -1311,12 +1322,12 @@ async function cancelledRead(
       .callTool(call, undefined, { signal: controller.signal })
       .catch(() => 'cancelled');
   } else {
-    const port = await freePort();
     started = await run(launcher, [
       '--host=127.0.0.1',
-      `--port=${port}`,
+      '--port=0',
       '--system-type=cloud',
     ]);
+    const port = announcedPort('http');
     done = fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
       method: 'POST',
       headers: {
@@ -1393,13 +1404,13 @@ describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
 
     it.each<SetName>(['full', 'compact'])('%s', async (set) => {
       const launcher = LAUNCHERS[transportName][set];
-      const port = await freePort();
       const started = await run(launcher, [
         ...(transportName === 'http'
-          ? ['--host=127.0.0.1', `--port=${port}`]
-          : ['--sse-host=127.0.0.1', `--sse-port=${port}`]),
+          ? ['--host=127.0.0.1', '--port=0']
+          : ['--sse-host=127.0.0.1', '--sse-port=0']),
         '--system-type=cloud',
       ]);
+      const port = announcedPort(transportName);
       const url =
         transportName === 'http'
           ? `http://127.0.0.1:${port}/mcp/stream/http`
@@ -1610,12 +1621,12 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
     late = () =>
       client.callTool(writeCall(set, lateClass)).catch(() => undefined);
   } else if (transportName === 'http') {
-    const port = await freePort();
     started = await run(launcher, [
       '--host=127.0.0.1',
-      `--port=${port}`,
+      '--port=0',
       '--system-type=onprem',
     ]);
+    const port = announcedPort('http');
     // Compact's write over HTTP runs under a lock the instance holds: the
     // lock first, its state_handle in the header of the write.
     let writeHeaders: Record<string, string> = basicHeaders();
@@ -1677,12 +1688,12 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
     started.processLike.emit('SIGTERM');
     late = () => pending.finish().catch(() => undefined);
   } else {
-    const port = await freePort();
     started = await run(launcher, [
       '--sse-host=127.0.0.1',
-      `--sse-port=${port}`,
+      '--sse-port=0',
       '--system-type=onprem',
     ]);
+    const port = announcedPort('sse');
     const controller = new AbortController();
     done = () => controller.abort();
     const stream = await fetch(`http://127.0.0.1:${port}/sse`, {

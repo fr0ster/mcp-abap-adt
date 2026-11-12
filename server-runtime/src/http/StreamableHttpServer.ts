@@ -480,11 +480,13 @@ export class StreamableHttpServer extends BaseMcpServer {
 
       server.listen(this.port, this.host);
       server.once('listening', () => {
+        // The port bound, not the one configured: 0 is the system's choice.
+        const port = this.listeningPort() ?? this.port;
         console.error(
-          `[StreamableHttpServer] Server started on ${this.host}:${this.port}`,
+          `[StreamableHttpServer] Server started on ${this.host}:${port}`,
         );
         console.error(
-          `[StreamableHttpServer] Endpoint: ${protocol}://${this.host}:${this.port}${this.path}`,
+          `[StreamableHttpServer] Endpoint: ${protocol}://${this.host}:${port}${this.path}`,
         );
         resolve();
       });
@@ -498,6 +500,18 @@ export class StreamableHttpServer extends BaseMcpServer {
    */
   beginShutdown(): void {
     this.pool.stopAdmitting();
+  }
+
+  /**
+   * The port the standalone listener is bound to — the system's choice when
+   * the configured port is 0 — while it listens; undefined before the start,
+   * after the stop and on an external app.
+   */
+  listeningPort(): number | undefined {
+    const address = this.standaloneServer?.address();
+    return address !== null && typeof address === 'object'
+      ? address.port
+      : undefined;
   }
 
   /** Stops taking connections. Embedded on an external app there is no listener of its own. */

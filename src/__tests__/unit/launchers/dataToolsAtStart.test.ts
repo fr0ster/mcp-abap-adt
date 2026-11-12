@@ -7,7 +7,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
-import { createServer } from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
@@ -87,14 +86,11 @@ const processLike = () =>
 const dataIn = (names: readonly string[], data: readonly string[]) =>
   names.filter((name) => data.includes(name)).sort();
 
-/** A port nothing listens on now. */
-async function freePort(): Promise<number> {
-  const probe = createServer();
-  await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
-  const address = probe.address();
-  assert.ok(address !== null && typeof address === 'object');
-  await new Promise<void>((resolve) => probe.close(() => resolve()));
-  return address.port;
+/** The port a launched server listens on: port 0 asked, the system's choice read back. */
+function boundPort(server: { listeningPort(): number | undefined }): number {
+  const port = server.listeningPort();
+  assert.ok(port !== undefined, 'the server listens on no port');
+  return port;
 }
 
 const sapHeaders = () => ({
@@ -157,12 +153,11 @@ async function stdioNames(toolSet: ToolSet, flag: boolean): Promise<string[]> {
 
 /** Streamable HTTP: the launcher on a free port; the tool names `tools/list` answers. */
 async function httpNames(flag: boolean): Promise<string[]> {
-  const port = await freePort();
   const config = readHttpConfig(
     [
       '--system-type=onprem',
       '--host=127.0.0.1',
-      `--port=${port}`,
+      `--port=0`,
       ...(flag ? [FLAG] : []),
     ],
     process.env,
@@ -184,6 +179,7 @@ async function httpNames(flag: boolean): Promise<string[]> {
     },
   );
   assert.ok(server !== undefined, `the HTTP launcher exited: ${exits}`);
+  const port = boundPort(server);
   try {
     const response = await fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
       method: 'POST',
@@ -221,12 +217,11 @@ async function httpNames(flag: boolean): Promise<string[]> {
 
 /** SSE: the launcher on a free port; the tool names its stream lists. */
 async function sseNames(flag: boolean): Promise<string[]> {
-  const port = await freePort();
   const config = readSseConfig(
     [
       '--system-type=onprem',
       '--sse-host=127.0.0.1',
-      `--sse-port=${port}`,
+      `--sse-port=0`,
       ...(flag ? [FLAG] : []),
     ],
     process.env,
@@ -248,6 +243,7 @@ async function sseNames(flag: boolean): Promise<string[]> {
     },
   );
   assert.ok(server !== undefined, `the SSE launcher exited: ${exits}`);
+  const port = boundPort(server);
   const headers = sapHeaders();
   const client = new Client({ name: 'data-tools', version: '1' });
   try {

@@ -147,7 +147,7 @@ state-idle-minutes: 30
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `http.host` | string | `127.0.0.1` | Host to listen on |
-| `http.port` | number | `3000` | Port to listen on |
+| `http.port` | number | `3000` | Port to listen on; `0` for a free one the system chooses, named on the listening line |
 | `http.json-response` | boolean | `false` | JSON responses rather than SSE streams |
 | `http.allowed-hosts` | string[] | - | DNS-rebinding protection: exact Host header values to allow, including port. NOT browser CORS — no Access-Control-Allow-Origin headers are emitted |
 | `http.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
@@ -183,7 +183,7 @@ state-idle-minutes: 30
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `sse.host` | string | `127.0.0.1` | Host to listen on |
-| `sse.port` | number | `3001` | Port to listen on |
+| `sse.port` | number | `3001` | Port to listen on; `0` for a free one the system chooses, named on the listening line |
 | `sse.allowed-hosts` | string[] | - | DNS-rebinding protection: exact Host header values to allow, including port |
 | `sse.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `sse.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set) |

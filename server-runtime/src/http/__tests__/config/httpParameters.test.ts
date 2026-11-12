@@ -281,7 +281,7 @@ describe('the Streamable HTTP rows', () => {
 
   it('a port out of range is refused, naming the form', () => {
     expect(() => readHttpConfig(['--port=70000'], {})).toThrow(
-      'Invalid --port: "70000". Must be a port between 1 and 65535',
+      'Invalid --port: "70000". Must be a port between 0 and 65535 (0: one the system chooses)',
     );
   });
 });

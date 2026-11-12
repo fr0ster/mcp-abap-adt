@@ -289,7 +289,12 @@ below is what it carries besides.
       - `ActivateObjectArgs`: the output of its own (unregistered) `ActivateObjectLow`
         definition, which its callers build.
       - `IncludesListArgs`: its definition's output, without the `Omit` that widens
-        `object_type`.
+        `object_type`, under reading (a) of the direct-call decision below.
+        - The widening serves a direct call past the schema. Lower-case main types and an
+          ambiguous one (`PROG`) reach `parentOf`, and the schema refuses them (probed:
+          `FUGR` and `CLAS` accepted; `fugr`, `clas`, `PROG` and `prog` refused).
+        - Under reading (b) the `Omit` stays. A parameter wider than the parse output is
+          sound.
       - Already derived, unchanged: `handleCreateOnly`'s, `handleDeleteOnly`'s and
         `handleUpdateUnderLock`'s `Args`, and `SessionArgs`.
     - **One of the 202 is not mechanical.** `ScheduleProfilerTraceArgs` (exported by
@@ -335,8 +340,12 @@ below is what it carries besides.
         refusal a direct caller relies on keep a boundary of their own: a value from outside
         the type system, read in plain code.
     - The plan is written for **(a)**, the reading S2a's type change already implies. The
-      three items that depend on it (the fallback, `unknownReadPart.test.ts`, S3b's dead
-      re-checks) wait for the owner's answer; nothing else in S2a does.
+      items that depend on it wait for the owner's answer; nothing else in S2a does:
+      - the GetObjectStructure fallback;
+      - `unknownReadPart.test.ts`;
+      - the `IncludesListArgs` widening and its main-type tables;
+      - the schema-refused cases of `compactActivateTypes.test.ts`;
+      - S3b's dead re-checks.
 
     | Key | Read at | The schema | Decision |
     |---|---|---|---|
@@ -356,17 +365,26 @@ below is what it carries besides.
     - HandlerValidate → `handleValidateServiceBinding` (`handleHandlerValidate.ts:81`, `:83`
       today; `:70`, `:72` after the conversion) passes `service_definition_name` and
       `package_name` as `string | undefined`, and the callee's schema requires both.
-      - The facade narrows them in plain code. An absent one is answered with the callee's
-        own refusal ("service_definition_name is required", "package_name is required"),
-        its words exported from the callee so they have one source, and nothing is sent.
+      - The facade narrows them in plain code, **in the callee's own order**
+        (`handleValidateServiceBinding.ts:104`, `:107`, `:112`-`:114`). Its words are exported
+        from the callee, so they have one source, and nothing is sent on a refusal:
+        1. an empty `object_name` (HandlerValidate's schema accepts `""`) gets
+           "service_binding_name is required", whatever else is given;
+        2. then an absent or empty `service_definition_name` gets "service_definition_name is
+           required";
+        3. then an absent `package_name` gets "package_name is required". An empty or blank
+           one passes on as a `string`, and the callee refuses it with the same words, as
+           now.
         Then it passes `string`.
-      - The answer is the same as today: the callee refuses an absent value with those words
-        now. So these are characterization tests, not a fix. Written first in batch 1, through
-        HandlerValidate's entry with `object_type` SERVICE_BINDING, they pass before and after:
-        - `service_definition_name` absent;
-        - `package_name` absent;
-        - both absent: `service_definition_name` is named, as the callee checks it first
-          (`handleValidateServiceBinding.ts:100`, before `:105`);
+      - The answer is the same as today in every case: the callee answers those words in
+        that order now (Codex verified the first through the real entry). So these are
+        characterization tests, not a fix. Written first in batch 1, through HandlerValidate's
+        entry with `object_type` SERVICE_BINDING, they pass before and after:
+        - `object_name` `""`, alone and with `service_definition_name` given;
+        - `service_definition_name` absent, and `""`;
+        - `package_name` absent, `""` and blank;
+        - `service_definition_name` and `package_name` both absent: `service_definition_name`
+          is named;
         - each case sends nothing.
       - `compactRequiredArguments.test.ts:312`-`:327` calls the callee directly, with
         `package_name` left out (`{}`), empty and blank. Once the callee is typed by its schema
@@ -414,6 +432,18 @@ below is what it carries besides.
       `TableContentsHandlers.test.ts:70`, `:110` and `readonlySingleCall.test.ts:328`. Each
       parses its arguments with the tool's schema (`TOOL_DEFINITION.inputSchema.parse`), which
       yields the output type with the defaults the server applies.
+    - **GetIncludesList's main-type tables** (`mainTypeBoundary.test.ts:207`, `:215`;
+      batch 3). The tables pass `object_type` / `objects[].object_type` as strings.
+      - The test expects a lower-case main type to send the same requests (`:285`), and an
+        ambiguous one to get the handler's words (`:298`).
+      - Under reading (a): the values the schema accepts (`FUGR`, `CLAS`) are typed by its
+        members and keep their request assertions. The ones it refuses (lower case, `PROG`)
+        go through the entry and assert the schema's refusal, with no request.
+      - Under reading (b): the `Omit` stays and the tables stay as they are.
+    - **`routesParseTargets.test.ts`** (batch 1). Its table types `object_type` as `string`
+      (`:17`) and passes it to HandlerGet (`:110`): TS2322 after the split (Codex measured).
+      The table is typed by HandlerGet's members; its assertions on the target schema's
+      refusals stay.
     - **The GetObjectStructure fallback** (reading (a) above). Sites: `caseRule.test.ts:105`,
       `dbviewName.test.ts:67`, `mainTypeBoundary.test.ts:65`,
       `projectionBoundary.test.ts:162` and `readonlySingleCall.test.ts:305`. Each passes the
@@ -432,7 +462,7 @@ below is what it carries besides.
       - This goes in batch 1, with the split.
     - **The union branches.** These are TS2353 "`object_type` / `sql_query` does not exist"
       at `compactActivateTypes.test.ts` (its other 9 sites), `compactSearchData.test.ts:163`,
-      `compactTransportRead.test.ts`, `routesParseTargets.test.ts`,
+      `compactTransportRead.test.ts`,
       `batchedReadsTiming.test.ts:218`, `IncludeMainProgramsHandlers.test.ts:88`,
       `packageWalks.test.ts`, `projectionWalk.test.ts:423`, `projectionBoundary.test.ts`
       (`:337`, `:558`, `:649`–`:719`), `IncludeHighHandlers.test.ts:482` and
@@ -454,7 +484,7 @@ below is what it carries besides.
          4, compact-readonly-entries 10, `src/lib/compact` 6) and `handleHandlerGet`.
        - HandlerGet's local `args` typed by its definition's output.
        - The HandlerValidate narrowing, with its characterization tests first.
-       - The `compactActivateTypes.test.ts` adaptation.
+       - The `compactActivateTypes.test.ts` and `routesParseTargets.test.ts` adaptations.
     2. **Write-side directories:** behavior_definition 6, behavior_implementation 3,
        class 14, data_element 7, ddl 6, ddlx 5, domain 7 (48 mechanical).
        - Their inline literals: the check wrappers of class, ddl, behavior_definition,
@@ -466,7 +496,8 @@ below is what it carries besides.
        - Their inline literals: the check wrappers of function (CheckFunctionModule,
          CheckFunctionGroup), interface, package and program, and the two function_include
          lists.
-       - `IncludesListArgs`.
+       - `IncludesListArgs` and the `mainTypeBoundary.test.ts` GetIncludesList tables, as the
+         owner decides.
     4. **service_binding 7, service_definition 4, structure 6, table 6, table_type 7,
        transport 10, enhancement 1, atc 4, common 4** (49 mechanical).
        - Their inline literals: CheckStructure, CheckTable, GetStructuresList and

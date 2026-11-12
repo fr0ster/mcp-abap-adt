@@ -157,11 +157,22 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     party's object contract, so it cannot be fixed where it lives. Measured: the installed SDK
     is 1.32.1, and 1.32.2, the latest, declares `Transport` the same way.
     - Decision: one adapter of the server's, `class SdkTransport implements Transport`, wraps
-      the SDK's transport.
-    - It forwards `start`, `send`, `close` and `sessionId`.
-    - It holds the `onclose`, `onerror` and `onmessage` handlers the protocol sets, and exposes
-      them as getters that always return a function, which calls the stored handler if one is
-      set. It registers one forwarding function of its own on the SDK transport.
+      the SDK's transport. It forwards `start`, `send` and `close`.
+    - **Handlers.** `onclose`, `onerror` and `onmessage` are accessor pairs over stored
+      fields.
+      - The setter stores the protocol's handler.
+      - The getter returns the handler stored at that moment, or one stable no-op of the
+        adapter's when none is stored. It never returns a function that reads the current
+        field: the SDK's `Protocol.connect` saves the getter's result and then sets a handler
+        that calls it, and a reader of the current field would call itself (measured by
+        Codex: `RangeError` with the installed SDK).
+    - **SDK events.** These are forwarded separately: at construction the adapter sets, once,
+      its own `onclose` / `onerror` / `onmessage` on the SDK transport. Each reads the stored
+      handler when the event comes and calls it if one is stored.
+    - **`sessionId`.** This is a plain optional field (`sessionId?: string`), never a getter.
+      Before it hands a message to the protocol's `onmessage`, and after `start`, the adapter
+      copies the SDK transport's `sessionId`: assigned when it is a string, deleted when it
+      is not. So an absent ID stays absent, and no ID is made up.
     - So each side sees the type its contract states, without a cast. A later SDK whose
       `Transport` declares `| undefined` lets the adapter go.
 - **The RFC `url?: never` hole closes.**

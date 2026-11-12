@@ -198,6 +198,7 @@ async function stand(set: SetKind): Promise<Stand> {
     amdp: new AmdpSession({
       openConnection: open,
       closeConnection: async () => undefined,
+      dropConnection: () => {},
       amdpDebugger: (c) => AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',
       run: async () => ({ ok: true, output: '' }),

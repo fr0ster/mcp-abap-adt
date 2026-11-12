@@ -153,6 +153,7 @@ function install(
     amdp: new AmdpSession({
       openConnection: open,
       closeConnection: close,
+      dropConnection: () => {},
       amdpDebugger: (c) => AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',
       run: async () => ({ ok: true, output: '' }),

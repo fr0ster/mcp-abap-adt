@@ -197,6 +197,7 @@ async function stand(set: SetKind): Promise<Stand> {
       closeConnection: async () => undefined,
       // The session's own connections answer through the script; a
       // recorder (a recorded call's connection) through a real debugger.
+      dropConnection: () => {},
       amdpDebugger: (c) =>
         own(c) ? (scripted.dbg as never) : AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',

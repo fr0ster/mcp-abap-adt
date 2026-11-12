@@ -93,6 +93,7 @@ describe('stateful sessions of a debug run', () => {
       closeConnection: async (c) => {
         closed.push(c);
       },
+      dropConnection: () => {},
       amdpDebugger: () => dbg as never,
       requestUser: async () => 'SAPUSER01',
       run: async () => run.promise,

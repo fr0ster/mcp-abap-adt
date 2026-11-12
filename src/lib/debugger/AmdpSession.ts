@@ -27,6 +27,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { adtHeadersOf, withAdtHeaders } from '../adtHeaders/withAdtHeaders';
 import { currentRequestSignal } from '../requestSignal';
+import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
   carryingPayload,
@@ -78,6 +79,11 @@ export interface AmdpSessionPorts<O = unknown> {
     session?: 'stateful' | 'stateless',
   ): Promise<IAbapConnection>;
   closeConnection(c: IAbapConnection): Promise<void>;
+  /**
+   * Takes out a connection whose SAP session is gone: nothing more is sent
+   * on it, not even a logoff of the session that ended.
+   */
+  dropConnection(c: IAbapConnection): void;
   amdpDebugger(c: IAbapConnection): AmdpDebuggerT;
   requestUser(origin: O): Promise<string>;
   run(c: IAbapConnection, target: RunTarget): Promise<RunOutcome>;
@@ -546,6 +552,7 @@ export class AmdpSession<O = unknown> {
         .syncBreakpoints(open.mainId, [])
         .catch(asFailure);
       if (cleared.ok) open.cleared = true;
+      else if (spentBy(cleared.getError())) return this.dropSpent(open);
       else failures.push(failedEntry(cleared, 'clear breakpoints'));
     }
     for (const id of [...open.unreleased]) {
@@ -556,11 +563,13 @@ export class AmdpSession<O = unknown> {
       if (released.ok) {
         open.unreleased.delete(id);
         open.released.add(id);
-      } else failures.push(failedEntry(released, `release debuggee ${id}`));
+      } else if (spentBy(released.getError())) return this.dropSpent(open);
+      else failures.push(failedEntry(released, `release debuggee ${id}`));
     }
     if (!open.stopped && !skipped('stop')) {
       const stopped = await open.onCommands.stop(open.mainId).catch(asFailure);
       if (stopped.ok) open.stopped = true;
+      else if (spentBy(stopped.getError())) return this.dropSpent(open);
       else failures.push(failedEntry(stopped, 'stop'));
     }
     // A stopped session owes no breakpoint clear: SAP removes a breakpoint
@@ -1244,6 +1253,23 @@ export class AmdpSession<O = unknown> {
   }
 
   /**
+   * A closing session whose commands connection is spent (the owner's
+   * decision): the AMDP debug session went with its SAP session, and SAP's
+   * logoff freed what it held. Nothing more is sent on it; both connections
+   * are dropped without a request, and nothing is owed.
+   */
+  private dropSpent(open: Open): DebugFailure[] {
+    if (this.closing === open) this.closing = undefined;
+    open.stopped = true;
+    open.cleared = true;
+    open.unreleased.clear();
+    open.readDone = true;
+    this.ports.dropConnection(open.commands);
+    this.ports.dropConnection(open.events);
+    return [];
+  }
+
+  /**
    * Inside stop, before the session is retired: a debuggee standing at a
    * break is cancelled, and the stop waits until it has ended — the event
    * read reports `ON_WARNING`, `ON_EXECUTION_END` or `STOP`, and every run
@@ -1278,6 +1304,10 @@ export class AmdpSession<O = unknown> {
       .catch(asFailure);
     if (!cancelled.ok) {
       if (this.sessionEnding) return undefined;
+      // The commands connection spent: the AMDP debug session went with its
+      // SAP session, so there is nothing to cancel or wait for. The stop goes
+      // on; the cleanup finds it spent and drops the session.
+      if (spentBy(cancelled.getError())) return undefined;
       failures.push(failedEntry(cancelled, `release debuggee ${debuggee}`));
       return 'refused';
     }

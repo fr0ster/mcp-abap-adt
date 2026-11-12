@@ -134,6 +134,12 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
+    // Its SAP session is gone: it ends like every owned connection, with its
+    // one `disconnect()` (connection 16 sends no logoff for a session it no
+    // longer holds).
+    dropConnection: (connection) => {
+      void endConnection(connection);
+    },
     amdpDebugger: (c) => AmdpDebugger.create(c),
     requestUser: async () => requestUserOf(),
     run,

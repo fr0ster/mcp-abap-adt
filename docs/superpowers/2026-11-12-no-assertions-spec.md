@@ -89,9 +89,10 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     is a minor for each of them.
   - Only code that passes type arguments to `makeAdtRequest` on an `IAbapConnection` stops
     compiling, which makes interfaces-adt-connection's change a major.
-- **Released so far** (Measured 2026-11-12, `npm view`): interfaces-adt-connection 5.0.0,
-  interfaces-adt 27.4.0 and connection 24.0.0 are on the registry; adt-clients is at 45.4.0,
-  adt-strategies at 0.22.3, adt-clients-legacy at 0.9.3, so step 3's releases are not yet out.
+- **Released** (Measured 2026-11-13, `npm view` and a clean install): interfaces-adt-connection
+  5.0.0, interfaces-adt 27.4.0, adt-clients 45.5.0, adt-strategies 0.23.0, adt-clients-legacy
+  0.9.4 and connection 24.0.0 are on the registry. Installed together they resolve one
+  interfaces-adt 27.4.0 and one interfaces-adt-connection 5.0.0.
 - **Releases, in dependency order.** Each is published before the next takes it from the
   registry, and one copy of interfaces-adt-connection is left in each consumer's tree:
   1. **interfaces-adt-connection 5.0.0** (major: the type parameters go).
@@ -363,8 +364,8 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     - So an embedder that calls an exported handler with raw arguments parses them with the
       tool's schema first, or calls the tool's entry. `MIGRATION-24.0.md` says so. It is a
       break for those callers only, inside the 24.0.0 major.
-    - Whether a direct call's answers past the schema stay as they are (the dead fallbacks and
-      re-checks) is open for the owner (plan S2a, "direct calls").
+    - Its answers past the schema do not stay: the fallbacks and re-checks for values the
+      schema refuses go (§9, the owner's decision).
   - **`/compact-shared` additions.** `compactActivateSchemaFor`, `compactGetSchemaFor` and
     `handlerGetDataDefinition` keep their names and signatures. The two halves each is split
     into (plan S2a) are new exports, a compatible addition.
@@ -406,6 +407,15 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
 - **A defect the types reveal is fixed with a test that fails before the fix.** This holds in
   §3 and §4 above all: a `T | undefined` that reached a callee that assumed `T`. Every other
   answer stays as it is.
+- **Whose answers stay: the model's calls** (the owner's decision). The invariant binds the
+  calls that reach a handler through its tool schema, the entry's `call` included.
+  - A direct caller of an exported handler gets the schema's types. 24.0.0 is a major, and
+    `MIGRATION-24.0.md` names the change.
+  - So a handler's fallback or re-check for a value the schema refuses is dead code and goes:
+    GetObjectStructure's `object_type` / `object_name` fallback, HandlerGet's unknown-part
+    paths, the `IncludesListArgs` widening, and S3b's dead re-checks.
+  - Their tests move to the schema boundary: `defineTool(...).call(context, raw)`, expecting
+    the refusal, with no request sent.
 - **What stays as it is:** every existing test passes; the listed-schema and surface fixtures
   stay unchanged; the tool counts stay unchanged.
 - **Acceptance:**

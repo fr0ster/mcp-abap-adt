@@ -144,8 +144,10 @@ Branched after 45.4.0 is merged and published.
   adt-strategies 0.23.0 and adt-clients-legacy 0.9.4.
   - A third pass-through, `src/utils/requestTrace.ts`, drops its `<T, D>` too.
   - `IMessageClassChanges` is widened as well (the owner's decision).
-  - Not yet on the registry when this plan was amended (Measured 2026-11-12 with `npm view`:
-    45.4.0, 0.22.3, 0.9.3), so S5 still waits for it.
+  - Published (Measured 2026-11-13: the latest adt-clients 45.5.0, adt-strategies 0.23.0 and
+    adt-clients-legacy 0.9.4; a clean install of them with connection 24.0.0 resolves one
+    interfaces-adt 27.4.0 and one interfaces-adt-connection 5.0.0). S5 takes them from the
+    registry.
 
 ### U4. connection 24.0.0 (major) — repository mcp-abap-connection
 
@@ -289,12 +291,10 @@ below is what it carries besides.
       - `ActivateObjectArgs`: the output of its own (unregistered) `ActivateObjectLow`
         definition, which its callers build.
       - `IncludesListArgs`: its definition's output, without the `Omit` that widens
-        `object_type`, under reading (a) of the direct-call decision below.
-        - The widening serves a direct call past the schema. Lower-case main types and an
-          ambiguous one (`PROG`) reach `parentOf`, and the schema refuses them (probed:
+        `object_type` (the owner's decision on direct calls, below).
+        - The widening serves only a direct call past the schema. Lower-case main types and
+          an ambiguous one (`PROG`) reach `parentOf`, and the schema refuses them (probed:
           `FUGR` and `CLAS` accepted; `fugr`, `clas`, `PROG` and `prog` refused).
-        - Under reading (b) the `Omit` stays. A parameter wider than the parse output is
-          sound.
       - Already derived, unchanged: `handleCreateOnly`'s, `handleDeleteOnly`'s and
         `handleUpdateUnderLock`'s `Args`, and `SessionArgs`.
     - **One of the 202 is not mechanical.** `ScheduleProfilerTraceArgs` (exported by
@@ -321,36 +321,29 @@ below is what it carries besides.
     `rebuiltDescriptions` pins) and `changedHandlerRequests.test.ts` then require nothing,
     and staying unchanged is their proof that no schema moved. None is a defect: no call
     through the schema can deliver the key to the handler.
-  - **Open for the owner: direct calls of an exported handler past its schema** (goal-changing,
-    Codex round 1).
+  - **Direct calls of an exported handler past its schema: the owner's decision (a).**
     - The handlers that `/handlers`, `/read` and `/write` export can be called directly,
-      without the schema. The code supports this in places: `unknownReadPart.test.ts` tests
+      without the schema. The code served that in places: `unknownReadPart.test.ts` tests
       HandlerGet refusing a part "reaching the handler past its schema, as an embedder's call
       can", and GetObjectStructure reads fallbacks no schema passes.
-    - Typing `args` by the schema already narrows what a direct caller may pass (spec §8). The
-      dead reads and checks then remain reachable only by a JavaScript caller, or one that
-      casts.
-    - The goal says "every other answer stays as it is". Two readings:
-      - **(a)** it binds the model's calls, which always pass the schema. S2a then drops the
-        GetObjectStructure fallback; `unknownReadPart.test.ts` goes through HandlerGet's entry
-        and asserts the schema's refusal; S3b removes the dead re-checks. A direct caller
-        follows `MIGRATION-24.0.md`: it parses with the tool's schema or calls the entry.
-      - **(b)** it binds direct calls too. Then the fallback, HandlerGet's own part check and
-        every handler re-check stay, with their tests as they are. Exported handlers whose
-        refusal a direct caller relies on keep a boundary of their own: a value from outside
-        the type system, read in plain code.
-    - The plan is written for **(a)**, the reading S2a's type change already implies. The
-      items that depend on it wait for the owner's answer; nothing else in S2a does:
-      - the GetObjectStructure fallback;
-      - `unknownReadPart.test.ts`;
-      - the `IncludesListArgs` widening and its main-type tables;
-      - the schema-refused cases of `compactActivateTypes.test.ts`;
+    - **Decided:** the goal's "every other answer stays as it is" binds the model's calls,
+      which go through the tool schema (spec §9). A direct caller of an exported handler gets
+      the schema's types: 24.0.0 is a major, and `MIGRATION-24.0.md` names it (it parses with
+      the tool's schema or calls the entry).
+    - So every fallback for a value the schema refuses goes, and its test moves to the schema
+      boundary (`defineTool(...).call(context, raw)`, expecting the refusal, no request
+      sent):
+      - the GetObjectStructure fallback (batch 5);
+      - the unknown-read-part paths: `unknownReadPart.test.ts` goes through HandlerGet's entry
+        (batch 1), and HandlerGet's own part check goes in S3b;
+      - the `IncludesListArgs` widening and its main-type tables (batch 3);
+      - the schema-refused cases of `compactActivateTypes.test.ts` (batch 1);
       - S3b's dead re-checks.
 
     | Key | Read at | The schema | Decision |
     |---|---|---|---|
     | `super_package` | `handleCreateDomain.ts:158`, handed to `validateTransportRequest`, which ignores that parameter (`_superPackage`) | CreateDomain is a strict object (`createArguments`): the key is refused by name | dead: stop reading it; `validateTransportRequest` (not exported) loses the unused parameter, which no other caller passes |
-    | `object_type`, `object_name` | `handleGetObjectStructure.ts:197-198`, as fallbacks for `objecttype` / `objectname` | a plain object requiring `objecttype` and `objectname`; undeclared keys are stripped | unreachable through the schema, but the handler is exported (`/handlers/read`) and a direct call reaches the fallback: the owner's decision on direct calls (below). The refusal words, which name the fallback, stay as they are |
+    | `object_type`, `object_name` | `handleGetObjectStructure.ts:197-198`, as fallbacks for `objecttype` / `objectname` | a plain object requiring `objecttype` and `objectname`; undeclared keys are stripped | unreachable through the schema; only a direct call of the exported handler reached it. The fallback goes (the owner's decision on direct calls, below). The refusal words, which name the fallback, stay as they are |
     | `object_type` | HandlerActivate, HandlerGet | declared; absent only in the deny list's every-name-denied branch | the builder split above |
     | `sql_query` | HandlerGetData | declared; absent only in the branch without SQL | the builder split above |
 
@@ -410,7 +403,6 @@ below is what it carries besides.
         typed `string | number` (`unknownReadPart.test.ts:20`).
       - Probed on this branch's build: the schemas refuse `'prog/p'`, `'ZZZZ/ZZ'` and
         `'not_a_type'`.
-      - Except where the owner's decision on direct calls (below) keeps them.
       - **They go through the boundary the model's arguments take:** the tool's entry
         (`defineTool(TOOL_DEFINITION, handler).call(context, raw)`). `raw` is `ToolArgs`, the
         type of the arguments before the schema, so a wrong value needs no cast.
@@ -436,15 +428,15 @@ below is what it carries besides.
       batch 3). The tables pass `object_type` / `objects[].object_type` as strings.
       - The test expects a lower-case main type to send the same requests (`:285`), and an
         ambiguous one to get the handler's words (`:298`).
-      - Under reading (a): the values the schema accepts (`FUGR`, `CLAS`) are typed by its
-        members and keep their request assertions. The ones it refuses (lower case, `PROG`)
-        go through the entry and assert the schema's refusal, with no request.
-      - Under reading (b): the `Omit` stays and the tables stay as they are.
+      - The values the schema accepts (`FUGR`, `CLAS`) are typed by its members and keep
+        their request assertions. The ones it refuses (lower case, `PROG`) go through the
+        entry and assert the schema's refusal, with no request; the handler's words for
+        them go with the widening.
     - **`routesParseTargets.test.ts`** (batch 1). Its table types `object_type` as `string`
       (`:17`) and passes it to HandlerGet (`:110`): TS2322 after the split (Codex measured).
       The table's `object_type` column is typed by HandlerGet's members; its assertions on the
       target schema's refusals stay. Its `part` column follows in S3b, with the part union.
-    - **The GetObjectStructure fallback** (reading (a) above). Sites: `caseRule.test.ts:105`,
+    - **The GetObjectStructure fallback** (the owner's decision above). Sites: `caseRule.test.ts:105`,
       `dbviewName.test.ts:67`, `mainTypeBoundary.test.ts:65`,
       `projectionBoundary.test.ts:162` and `readonlySingleCall.test.ts:305`. Each passes the
       declared `objecttype` / `objectname`; its assertions stay.
@@ -453,12 +445,11 @@ below is what it carries besides.
       - The positive table gives `object_type: string` (`:88`). It is parsed with
         HandlerActivate's schema, or typed by its members.
       - `UNIT_TEST` (`:146`) and `TRANSPORT` (`:158`, `:165`, `:172`, `:180`) are outside
-        the schema's enum. Under reading (a) these cases go through the entry with `ToolArgs`
-        and assert the schema's refusal, with no request.
+        the schema's enum. These cases go through the entry with `ToolArgs` and assert the
+        schema's refusal, with no request.
         - Their assertions on the handler's words ("cannot turn object_type",
-          `object_adt_type`, "Known without it") then cannot hold, and become the schema's
+          `object_adt_type`, "Known without it") cannot hold there, and become the schema's
           refusal.
-        - Under reading (b) they stay direct calls.
       - This goes in batch 1, with the split.
     - **The union branches.** These are TS2353 "`object_type` / `sql_query` does not exist"
       at `compactActivateTypes.test.ts` (its other 9 sites), `compactSearchData.test.ts:163`,
@@ -484,7 +475,9 @@ below is what it carries besides.
          4, compact-readonly-entries 10, `src/lib/compact` 6) and `handleHandlerGet`.
        - HandlerGet's local `args` typed by its definition's output.
        - The HandlerValidate narrowing, with its characterization tests first.
-       - The `compactActivateTypes.test.ts` and `routesParseTargets.test.ts` adaptations.
+       - The `compactActivateTypes.test.ts`, `routesParseTargets.test.ts` and
+         `unknownReadPart.test.ts` adaptations; the last goes through HandlerGet's entry
+         and expects the schema's refusal of each part, with no request.
     2. **Write-side directories:** behavior_definition 6, behavior_implementation 3,
        class 14, data_element 7, ddl 6, ddlx 5, domain 7 (48 mechanical).
        - Their inline literals: the check wrappers of class, ddl, behavior_definition,
@@ -496,8 +489,7 @@ below is what it carries besides.
        - Their inline literals: the check wrappers of function (CheckFunctionModule,
          CheckFunctionGroup), interface, package and program, and the two function_include
          lists.
-       - `IncludesListArgs` and the `mainTypeBoundary.test.ts` GetIncludesList tables, as the
-         owner decides.
+       - `IncludesListArgs` and the `mainTypeBoundary.test.ts` GetIncludesList tables.
     4. **service_binding 7, service_definition 4, structure 6, table 6, table_type 7,
        transport 10, enhancement 1, atc 4, common 4** (49 mechanical).
        - Their inline literals: CheckStructure, CheckTable, GetStructuresList and
@@ -513,7 +505,7 @@ below is what it carries besides.
          GetObjectInfo, GetInactiveObjects, GetAdtTypes, GetObjectStructure,
          GetServiceBindingPreviewUrl, SearchObject, GetObjectsList, GetObjectsByType).
        - GetObjectOutline, GetWhereUsed and `handleRunAbapUnit`.
-       - The GetObjectStructure fallback, as the owner decides (below).
+       - The GetObjectStructure fallback removed, with its tests on the declared keys.
     6. **The 17 source readers** and `SourceRangeArgs`. Batches 2 to 5 leave both as they are,
        and no other conversion depends on them.
 
@@ -643,8 +635,8 @@ below is what it carries besides.
   - properties checked by their writers;
   - the handler checks S2a lists as dead: a runtime check of a value the handler's `args`
     type now proves (a code the schema's enum already holds, case-folded again), each
-    removed with the boundary test S2a points at it kept green. This item waits for the
-    owner's answer on direct calls (S2a); under reading (b) the checks stay.
+    removed with the boundary test S2a points at it kept green (the owner's decision on
+    direct calls, S2a).
     - **HandlerGet's part check** (`handleHandlerGet.ts:212`) is not yet proved by the type.
       `compactGetSchemaFor` builds `extra` as `string[]` (`compactSchemas.ts:597`), and
       spreading it into `z.enum` (`:615`) widens `part`'s output to `string | undefined`.

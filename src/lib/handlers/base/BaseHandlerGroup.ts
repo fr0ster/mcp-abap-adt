@@ -36,6 +36,15 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     this.context = context;
   }
   /**
+   * The context this group runs its calls in by default: a group that
+   * stands for this one (the deny list's `NarrowedHandlerGroup`) is built
+   * on it, so it states what this one states.
+   */
+  groupContext(): HandlerContext {
+    return this.context;
+  }
+
+  /**
    * Gets the name of the handler group
    */
   getName(): string {

@@ -684,18 +684,31 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
     object_type: objectTypeOf(members),
     ...redescribed(GET_PROPERTIES, getTexts(left)),
   } as const;
-  return z.object({
-    ...offered(properties, COMPACT_READ_TAKES, members),
-    background: properties.background,
-    object_type: properties.object_type,
-    part: readPartFor(mainPrograms),
-    ...(codes === undefined
+  const codeArgument =
+    codes === undefined
       ? {}
       : {
           object_adt_type: codeEnum(codes).describe(
             'ADT type code of the object (object_structure) or of the parent node (node_structure).',
           ),
-        }),
+        };
+  const offeredProperties = offered(properties, COMPACT_READ_TAKES, members);
+  if (members.length > 0) {
+    return z.object({
+      ...offeredProperties,
+      background: properties.background,
+      object_type: properties.object_type,
+      part: readPartFor(mainPrograms),
+      ...codeArgument,
+    });
+  }
+  // Every name denied: the parts that read no object are left.
+  const { object_type: _none, ...rest } = offeredProperties;
+  return z.object({
+    ...rest,
+    background: properties.background,
+    part: readPartFor(mainPrograms),
+    ...codeArgument,
   });
 }
 
@@ -1807,9 +1820,26 @@ export function compactActivateSchemaFor<
   const M extends readonly ActivateMember[],
 >(members: M, variant: ProjectionVariant, codes?: readonly string[]) {
   const properties = activateProperties(members, variant, codes);
+  const offeredProperties = offered(
+    properties,
+    COMPACT_ACTIVATE_TAKES,
+    members,
+  );
+  if (members.length > 0) {
+    return z.object({
+      ...offeredProperties,
+      object_type: properties.object_type,
+      object_name: properties.object_name,
+      object_adt_type: properties.object_adt_type,
+      parentName: properties.parentName,
+      objects: properties.objects,
+      preaudit: properties.preaudit,
+    });
+  }
+  // Every name denied: the objects are named by their codes.
+  const { object_type: _none, ...rest } = offeredProperties;
   return z.object({
-    ...offered(properties, COMPACT_ACTIVATE_TAKES, members),
-    object_type: properties.object_type,
+    ...rest,
     object_name: properties.object_name,
     object_adt_type: properties.object_adt_type,
     parentName: properties.parentName,

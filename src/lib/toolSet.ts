@@ -44,6 +44,8 @@
  */
 
 import './instance.js';
+import type { DeniedActions } from './access/deniedActions';
+import { withoutDenied } from './access/withoutDenied';
 
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactBatchHandlersGroup } from './compact/batch/group';
@@ -148,15 +150,20 @@ export interface ServedTools {
 
 /**
  * The registry a launcher serving `transport` serves: `toolSet`'s groups
- * against a context with no connection yet, with what `served` adds.
+ * against a context with no connection yet, with what `served` adds, the
+ * `denied` actions applied (`withoutDenied`; none by default).
  */
 export function registryOf(
   toolSet: ToolSet,
   transport: ServedTransport,
   served: ServedTools,
+  denied: DeniedActions = [],
 ): CompositeHandlersRegistry {
   return new CompositeHandlersRegistry(
-    toolSet.groups(noConnectionContext(), transport, served),
+    withoutDenied(
+      toolSet.groups(noConnectionContext(), transport, served),
+      denied,
+    ),
   );
 }
 

@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * GetObjectVersions Handler - read-only version history of an ABAP object.
  *
@@ -33,26 +34,16 @@ export const TOOL_DEFINITION = {
 
 /** GetObjectVersions's input on `variant`. */
 function objectVersionsSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      object_type: {
-        type: 'string',
-        description: 'Object type.',
-        enum: VERSIONED_KINDS[variant],
-      },
-      object_name: {
-        type: 'string',
-        description: 'Object name.',
-      },
-      function_group_name: {
-        type: 'string',
-        description:
-          'Owning function group name. Required when object_type is function_module.',
-      },
-    },
-    required: ['object_type', 'object_name'],
-  } as const;
+  return z.object({
+    object_type: z.enum(VERSIONED_KINDS[variant]).describe('Object type.'),
+    object_name: z.string().describe('Object name.'),
+    function_group_name: z
+      .string()
+      .optional()
+      .describe(
+        'Owning function group name. Required when object_type is function_module.',
+      ),
+  });
 }
 
 interface GetObjectVersionsArgs {
@@ -92,7 +83,7 @@ export async function handleGetObjectVersions(
         object_name,
         function_group_name,
       );
-    } catch (e: any) {
+    } catch (e) {
       return return_error(e instanceof Error ? e : new Error(String(e)));
     }
 
@@ -109,13 +100,13 @@ export async function handleGetObjectVersions(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       return return_error(
         error instanceof Error ? error : new Error(String(error)),
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

@@ -13,38 +13,32 @@
  * The watch only forwards: every member reaches the connection it is placed
  * over, the session members as that connection has them.
  */
+
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { sessionOf } from './sessionOf';
 
 type Session = 'stateful' | 'stateless';
-
-/** What an optional session member of a connection may answer. */
-interface SessionAware {
-  getSessionType?: () => Session | undefined;
-  getSessionMode?: () => Session | undefined;
-}
-
 export class EnvelopeWatch {
   private readonly thrown = new Set<unknown>();
   private answers = 0;
 
   /** A forwarding connection over `connection`, seen by this watch. */
   over(connection: IAbapConnection): IAbapConnection {
-    const typed = connection as IAbapConnection & SessionAware;
     const thrown = this.thrown;
     const answered = () => {
       this.answers += 1;
     };
-    return {
+    const forwarding = {
       connect: () => connection.connect(),
       getBaseUrl: () => connection.getBaseUrl(),
       getSessionId: () => connection.getSessionId(),
       setSessionType: (type: Session) => connection.setSessionType(type),
-      getSessionType: () => typed.getSessionType?.(),
-      getSessionMode: () => typed.getSessionMode?.(),
+      getSessionType: () => sessionOf(connection, 'getSessionType'),
+      getSessionMode: () => sessionOf(connection, 'getSessionMode'),
       makeAdtRequest<T = unknown, D = unknown>(
         request: IAbapRequestOptions,
       ): Promise<IAdtWireResponse<T, D>> {
@@ -66,7 +60,8 @@ export class EnvelopeWatch {
           },
         );
       },
-    } as IAbapConnection;
+    };
+    return forwarding;
   }
 
   /** Whether the connection threw `error` for an envelope. */

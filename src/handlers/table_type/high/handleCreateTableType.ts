@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTableType Handler - ABAP Table Type Creation via ADT API
  *
@@ -11,19 +14,22 @@
  * schema defaults for its definition and fills them in code; the MCP SDK
  * fills a declared default into the arguments, so a property "not given"
  * would always be given. Here only `activate` declares one: every definition
- * property not given leaves SAP's value, because `patchTableTypeXml` leaves
+ * property not given leaves SAP's value, because adt-clients' `patchTableTypeDocument` leaves
  * an absent property untouched. The values are passed as given — which ones
  * SAP takes is SAP's answer.
  *
  * The wait is `readMetadata({withLongPolling: true})` (see
- * `handleCreateDomain.ts` and `xmlPatch.ts`): it sits right before `check`,
+ * `handleCreateDomain.ts` and `documentPatch.ts`): it sits right before `check`,
  * the first call that reads the write back. Its document, the inactive
  * version, is the definition SAP stored, answered beside the result; after
  * a successful activation one read of the active version answers it instead
  * (`tableTypeStored.ts`).
  */
 
-import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  patchTableTypeDocument,
+  tableTypeDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -32,19 +38,19 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
+import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -91,85 +97,78 @@ export type KeyKind = (typeof KEY_KINDS)[number];
  * so the two tools describe them in the same words. Each is passed as given.
  */
 export const TABLE_TYPE_DEFINITION_PROPERTIES = {
-  row_type_kind: {
-    type: 'string',
-    enum: ROW_TYPE_KINDS,
-    description: 'Kind of the row type (ttyp:rowType/ttyp:typeKind).',
-  },
-  row_type_name: {
-    type: 'string',
-    description:
+  row_type_kind: z
+    .enum(ROW_TYPE_KINDS)
+    .optional()
+    .describe('Kind of the row type (ttyp:rowType/ttyp:typeKind).'),
+  row_type_name: z
+    .string()
+    .optional()
+    .describe(
       'Dictionary type used as the row type (ttyp:rowType/ttyp:typeName).',
-  },
-  data_type: {
-    type: 'string',
-    description:
+    ),
+  data_type: z
+    .string()
+    .optional()
+    .describe(
       'Built-in data type of the row (ttyp:builtInType/ttyp:dataType).',
-  },
-  length: {
-    type: 'number',
-    description:
+    ),
+  length: z
+    .number()
+    .optional()
+    .describe(
       'Length of the built-in row type (ttyp:builtInType/ttyp:length).',
-  },
-  decimals: {
-    type: 'number',
-    description:
+    ),
+  decimals: z
+    .number()
+    .optional()
+    .describe(
       'Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).',
-  },
-  access_type: {
-    type: 'string',
-    enum: ACCESS_TYPES,
-    description: 'Access type of the table (ttyp:accessType).',
-  },
-  key_definition: {
-    type: 'string',
-    enum: KEY_DEFINITIONS,
-    description:
+    ),
+  access_type: z
+    .enum(ACCESS_TYPES)
+    .optional()
+    .describe('Access type of the table (ttyp:accessType).'),
+  key_definition: z
+    .enum(KEY_DEFINITIONS)
+    .optional()
+    .describe(
       'Definition of the primary key (ttyp:primaryKey/ttyp:definition).',
-  },
-  key_kind: {
-    type: 'string',
-    enum: KEY_KINDS,
-    description: 'Kind of the primary key (ttyp:primaryKey/ttyp:kind).',
-  },
-} as const;
+    ),
+  key_kind: z
+    .enum(KEY_KINDS)
+    .optional()
+    .describe('Kind of the primary key (ttyp:primaryKey/ttyp:kind).'),
+};
 
 export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package the table type is created in.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Table type description. When left out, table_type_name is used.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...TABLE_TYPE_DEFINITION_PROPERTIES,
-      activate: {
-        type: 'boolean',
-        description: 'Activate the table type after creation (default: true).',
-        default: true,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_type_name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateTableType', {
+    table_type_name: z.string().describe('Table type name.'),
+    package_name: z.string().describe('Package the table type is created in.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Table type description. When left out, table_type_name is used.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...TABLE_TYPE_DEFINITION_PROPERTIES,
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Activate the table type after creation (default: true).'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a
@@ -252,7 +251,25 @@ export async function handleCreateTableType(
                     { version: 'workingArea', analyse: analyseException },
                   ),
                 ),
-                atStep('update metadata', (current) =>
+                async (current) =>
+                  patchedDocument(
+                    patchTableTypeDocument(
+                      current.raw,
+                      tableTypeChanges({
+                        description,
+                        row_type_kind: args.row_type_kind,
+                        row_type_name: args.row_type_name,
+                        data_type: args.data_type,
+                        length: args.length,
+                        decimals: args.decimals,
+                        access_type: args.access_type,
+                        key_definition: args.key_definition,
+                        key_kind: args.key_kind,
+                      }),
+                    ),
+                    `table type ${tableTypeName}`,
+                  ),
+                atStep('update metadata', (document) =>
                   withAdtHeaders(
                     context,
                     'tableType.updateMetadata',
@@ -264,23 +281,7 @@ export async function handleCreateTableType(
                         },
                         {
                           headers,
-                          source: patchTableTypeXml(
-                            extractXmlString(
-                              current.raw,
-                              `table type ${tableTypeName}`,
-                            ),
-                            {
-                              description,
-                              row_type_kind: args.row_type_kind,
-                              row_type_name: args.row_type_name,
-                              data_type: args.data_type,
-                              length: args.length,
-                              decimals: args.decimals,
-                              access_type: args.access_type,
-                              key_definition: args.key_definition,
-                              key_kind: args.key_kind,
-                            },
-                          ),
+                          source: document,
                           lockHandle,
                           analyse: analyseException,
                         },

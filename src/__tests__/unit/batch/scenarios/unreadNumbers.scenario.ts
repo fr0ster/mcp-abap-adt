@@ -15,6 +15,7 @@
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { EmbeddableMcpServer } from '../../../../embeddable/EmbeddableMcpServer';
 import {
   InstanceBatch,
@@ -69,12 +70,9 @@ const tool = (name: string, property: string, handler: Handler) =>
     toolDefinition: {
       name,
       description: name,
-      inputSchema: {
-        type: 'object',
-        properties: { [property]: { type: 'string' } },
-      },
+      inputSchema: z.object({ [property]: z.string().optional() }),
     },
-    handler: handler as never,
+    call: handler as never,
   }) as HandlerEntry;
 
 const group = {

@@ -12,12 +12,12 @@ import { handleDeleteInclude } from '../../../handlers/include/high/handleDelete
 import { handleUpdateInclude } from '../../../handlers/include/high/handleUpdateInclude';
 import { handleUpdateIncludeMetadata } from '../../../handlers/include/high/handleUpdateIncludeMetadata';
 import { handleActivateInclude } from '../../../handlers/include/low/handleActivateInclude';
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type RecordingConnection,
   recordingConnection,

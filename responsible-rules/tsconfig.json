@@ -19,7 +19,6 @@
     ],
     "rootDir": "./src",
     "outDir": "./dist",
-    "noImplicitAny": false,
     "paths": {
       "@mcp-abap-adt/lib/auth": [
         "../dist/lib/auth/index.d.ts"

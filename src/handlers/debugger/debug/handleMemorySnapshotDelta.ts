@@ -1,9 +1,9 @@
 import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
 import {
@@ -17,29 +17,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      from_id: { type: 'string', description: 'Snapshot id to compare from.' },
-      to_id: { type: 'string', description: 'Snapshot id to compare to.' },
-      view: {
-        type: 'string',
-        enum: ['overview', 'ranking', 'children', 'references'],
-        default: 'overview',
-        description:
-          'overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.',
-      },
-      key: SNAPSHOT_VIEW_PROPERTIES.key,
-      max_objects: SNAPSHOT_VIEW_PROPERTIES.max_objects,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['from_id', 'to_id'],
-  },
+  inputSchema: z.object({
+    from_id: z.string().describe('Snapshot id to compare from.'),
+    to_id: z.string().describe('Snapshot id to compare to.'),
+    view: z
+      .enum(['overview', 'ranking', 'children', 'references'])
+      .default('overview')
+      .optional()
+      .describe(
+        'overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.',
+      ),
+    key: SNAPSHOT_VIEW_PROPERTIES.key,
+    max_objects: SNAPSHOT_VIEW_PROPERTIES.max_objects,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleMemorySnapshotDelta(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const snapshots = MemorySnapshots.create(context.connection, {
     logger: context.logger,

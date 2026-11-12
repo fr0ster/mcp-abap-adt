@@ -6,10 +6,13 @@ import type {
   ConnectionContext,
   IBackgroundRuns,
   IHttpApplication,
+  LineMatchStrategy,
   RouteRegistrationOptions,
+  SapAnswerStrategy,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   AdtHeaderPairs,
+  BackgroundRunOwner,
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
@@ -31,15 +34,17 @@ import {
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
 import {
+  HeldLocks,
   isLatched,
   parseStateIdleMinutes,
   type StateLogger,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
+import { child } from '@mcp-abap-adt/lib/utils';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import { RUNTIME_VERSION } from '../runtimeVersion.js';
 
 export interface SseServerOptions {
@@ -107,6 +112,16 @@ export interface SseServerOptions {
    * `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to every instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy, handed to every instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 }
 
 type SessionEntry = {
@@ -160,6 +175,10 @@ export class SseServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
+  private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
+  private readonly lineMatchStrategy: LineMatchStrategy | undefined;
+  /** The running background runs' owner: this server's, shared by every stream's instance. */
+  private readonly runOwner = new BackgroundRunOwner();
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
   /** The corrected header pairs: the process's, shared by every stream's instance. */
   private readonly adtHeaderPairs = new AdtHeaderPairs();
@@ -187,6 +206,8 @@ export class SseServer {
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
+    this.sapAnswerStrategy = opts?.sapAnswerStrategy;
+    this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -205,7 +226,7 @@ export class SseServer {
     _options?: RouteRegistrationOptions,
   ): void {
     // Health check endpoint — lightweight, no MCP protocol logic
-    app.get('/mcp/health', ((_req: any, res: any) => {
+    app.get('/mcp/health', (_req: Request, res: Response) => {
       res.json({
         status: 'ok',
         uptime: Math.floor(process.uptime()),
@@ -213,7 +234,7 @@ export class SseServer {
         transport: 'sse',
         activeSessions: this.sessions.size,
       });
-    }) as any);
+    });
 
     const dnsOpts = {
       enable: this.enableDnsRebindingProtection,
@@ -223,23 +244,17 @@ export class SseServer {
 
     app.get(
       this.ssePath,
-      withDnsRebindingProtection(
-        (async (req: any, res: any) => {
-          await this.handleGet(req, res);
-        }) as any,
-        dnsOpts,
-      ) as any,
+      withDnsRebindingProtection(async (req: Request, res: Response) => {
+        await this.handleGet(req, res);
+      }, dnsOpts),
     );
 
     app.post(
       this.postPath,
-      withDnsRebindingProtection(
-        (async (req: any, res: any) => {
-          const url = new URL(req.originalUrl, `http://${req.headers.host}`);
-          await this.handlePost(req, res, url);
-        }) as any,
-        dnsOpts,
-      ) as any,
+      withDnsRebindingProtection(async (req: Request, res: Response) => {
+        const url = new URL(req.originalUrl, `http://${req.headers.host}`);
+        await this.handlePost(req, res, url);
+      }, dnsOpts),
     );
 
     console.error(`[SseServer] Routes registered on external app`);
@@ -278,11 +293,11 @@ export class SseServer {
     const app = express();
     app.use(express.json());
 
-    this.registerRoutes(app as unknown as IHttpApplication);
+    this.registerRoutes(app);
 
     await new Promise<void>((resolve, reject) => {
       const protocol = getProtocol(this.tls);
-      const server = createServerListener(app as any, this.tls);
+      const server = createServerListener(app, this.tls);
       this.standaloneServer = server;
 
       server.listen(this.port, this.host);
@@ -344,7 +359,7 @@ export class SseServer {
     await Promise.all([...this.connections.values()].map((c) => c.close()));
   }
 
-  private async handleGet(req: any, res: any): Promise<void> {
+  private async handleGet(req: Request, res: Response): Promise<void> {
     // The shutdown began: no new connection (embedded hosts keep their
     // listener; a launcher's is closed already).
     if (isLatched()) {
@@ -373,7 +388,11 @@ export class SseServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
+          backgroundRunOwner?: BackgroundRunOwner;
+          sapAnswerStrategy?: SapAnswerStrategy;
+          lineMatchStrategy?: LineMatchStrategy;
           batch?: InstanceBatch;
+          heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
@@ -402,13 +421,25 @@ export class SseServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        ...(this.sapAnswerStrategy !== undefined && {
+          sapAnswerStrategy: this.sapAnswerStrategy,
+        }),
+        ...(this.lineMatchStrategy !== undefined && {
+          lineMatchStrategy: this.lineMatchStrategy,
+        }),
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,
+          // The running runs' owner is this server's, shared by every
+          // instance it makes: a discard reaching any of them cancels.
+          backgroundRunOwner: this.runOwner,
         }),
         // Batch mode: this connection's own, never shared with another.
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
         }),
+        // The locks this connection's instance took: a write, a delete or
+        // an unlock under a lock_handle is sent only under one it holds.
+        heldLocks: new HeldLocks(),
         adtHeaderPairs: this.adtHeaderPairs,
       },
     );
@@ -484,7 +515,11 @@ export class SseServer {
     }
   }
 
-  private async handlePost(req: any, res: any, url?: URL): Promise<void> {
+  private async handlePost(
+    req: Request,
+    res: Response,
+    url?: URL,
+  ): Promise<void> {
     // A header this server no longer serves is refused on a POST too; the
     // POST's own x-sap-* headers are not read (the connection's are its GET's).
     try {
@@ -494,12 +529,14 @@ export class SseServer {
       return;
     }
 
-    const sessionId = (url?.searchParams.get('sessionId') ||
-      req.headers['x-session-id'] ||
-      '') as string;
+    const header = req.headers['x-session-id'];
+    const sessionId =
+      url?.searchParams.get('sessionId') ||
+      (typeof header === 'string' ? header : undefined) ||
+      '';
 
-    const mcpMethod = req.body?.method as string | undefined;
-    const isPing = mcpMethod === 'ping';
+    const body: unknown = req.body;
+    const isPing = child(body, 'method') === 'ping';
 
     if (!isPing) {
       console.error(
@@ -554,7 +591,7 @@ export class SseServer {
   }
 
   /** A request refused or failed: the refusal's words (400), the reader's, or as before. */
-  private answerFailure(res: any, error: unknown): void {
+  private answerFailure(res: Response, error: unknown): void {
     const answer = requestFailureAnswer(error);
     if (answer.logLine !== undefined) console.error(answer.logLine);
     if (answer.known) {

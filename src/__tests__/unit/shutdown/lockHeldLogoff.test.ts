@@ -45,7 +45,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 it('core, at shutdown: the lock tool and the refused UNLOCK end with the session logged off', async () => {
-  const s = await coreStand({ shutdown: {} });
+  const s = await coreStand({ kind: 'onprem', shutdown: {} });
   try {
     s.adt.answer((r) => isUnlockOf('B')(r.url), 500);
     expect(await s.callTool('LockOnly', { id: 'A' })).toMatchObject({

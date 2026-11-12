@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateMetadataExtension Handler - ABAP Metadata Extension Update via ADT API
  *
@@ -9,7 +11,7 @@
  * -> (activate). The wait is the pre-migration handler's long-polling
  * `read({withLongPolling: true})`, discarded for its result but not for
  * what it does — see `handleUpdateDomain.ts` (high) for the live incident
- * this guards against, documented in `xmlPatch.ts`.
+ * this guards against, documented in `documentPatch.ts`.
  *
  * **The source goes in `options`, not `config`.** See
  * `UpdateMetadataExtensionLow` — the shipped `AdtMetadataExtension.update()`
@@ -26,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -40,41 +42,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Metadata Extension name',
-      },
-      source_code: {
-        type: 'string',
-        description: 'New source code',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. If not provided, will attempt to lock internally.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after update. Default: true',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name', 'source_code'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('Metadata Extension name'),
+    source_code: z.string().describe('New source code'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after update. Default: true'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateMetadataExtensionArgs {
   name: string;
   source_code: string;
-  lock_handle?: string;
   transport_request?: string;
   activate?: boolean;
   detail?: 'terse' | 'full' | 'raw';
@@ -94,9 +81,8 @@ export async function handleUpdateMetadataExtension(
   const shouldActivate = args.activate !== false;
   const detail = detailOf(args);
 
-  // `lock_handle` given by the caller is honoured, not re-acquired — the same
-  // shape the pre-migration handler had. Without one, this locks and unlocks
-  // itself through `withLock`.
+  // The handler locks, writes and unlocks itself through `withLock`: it takes
+  // no lock_handle (on the full set no tool issues one).
   return answer(
     { tool: 'UpdateMetadataExtension', detail },
     async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
@@ -117,20 +103,18 @@ export async function handleUpdateMetadataExtension(
           ),
         );
 
-      const written = args.lock_handle
-        ? await update(args.lock_handle)
-        : await withLock(
-            () => obj.lock({ name: ddlxName }, { analyse: analyseLock }),
-            atStep('update', update),
-            (lockHandle) =>
-              obj.unlock({ name: ddlxName }, lockHandle, {
-                analyse: analyseException,
-              }),
-            { type: 'METADATA_EXTENSION', name: ddlxName },
-          );
+      const written = await withLock(
+        () => obj.lock({ name: ddlxName }, { analyse: analyseLock }),
+        atStep('update', update),
+        (lockHandle) =>
+          obj.unlock({ name: ddlxName }, lockHandle, {
+            analyse: analyseException,
+          }),
+        { type: 'METADATA_EXTENSION', name: ddlxName },
+      );
 
       if (!written.ok) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.

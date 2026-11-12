@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Every send on the instance's connection is inside its main flow; only work
  * on a connection of its own is outside it.
@@ -56,9 +57,9 @@ function testGroup(
         toolDefinition: {
           name,
           description: name,
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema: z.object({}),
         },
-        handler,
+        call: handler,
       }) as unknown as HandlerEntry,
   );
   return {

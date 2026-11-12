@@ -9,11 +9,12 @@
  * Run: npm test -- --testPathPattern=integration/high/serviceBinding
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateServiceBinding } from '../../../../handlers/service_binding/high/handleCreateServiceBinding';
 import { handleDeleteServiceBinding } from '../../../../handlers/service_binding/high/handleDeleteServiceBinding';
 import { handleActivateServiceBinding } from '../../../../handlers/service_binding/low/handleActivateServiceBinding';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
 
@@ -33,7 +34,7 @@ async function activateAsUpdate(
 describe('ServiceBinding High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_service_binding',
       'builder_service_binding',
@@ -46,9 +47,9 @@ describe('ServiceBinding High-Level Handlers Integration', () => {
     );
     await tester.beforeAll();
     await ensureSharedObjects(tester.getConnection()!);
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -60,11 +61,7 @@ describe('ServiceBinding High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all ServiceBinding high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all ServiceBinding high-level handlers', async () => {
+    await tester.run();
+  });
 });

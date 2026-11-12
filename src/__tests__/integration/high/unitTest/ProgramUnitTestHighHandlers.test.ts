@@ -1,3 +1,4 @@
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * Integration tests for a report's ABAP Unit tools: CreateProgramUnitTest,
@@ -16,7 +17,7 @@ import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createOnPremAdtClient } from '../../../../lib/clients';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -27,7 +28,7 @@ describe('Unit Test High-Level Handlers (report)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('program-unit-test-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'program_unit_test',
       'full_workflow',
@@ -77,7 +78,7 @@ describe('Unit Test High-Level Handlers (report)', () => {
         }
       },
     );
-  }, getTimeout('long'));
+  });
 
   beforeEach(async () => {
     await tester.beforeEach(async (_context: LambdaTesterContext) => {});
@@ -87,82 +88,78 @@ describe('Unit Test High-Level Handlers (report)', () => {
     await tester.afterEach();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
-  it(
-    'Unit Test High-Level Handlers: create, run, update, run',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { params, packageName, transportRequest } = context;
-        const programName: string | undefined = params?.program_name;
-        if (!programName || !params?.test_class_source || !packageName) {
-          logger?.warn('program_unit_test not configured, skipping');
-          return;
-        }
-        const transport = { transport_request: transportRequest };
-        const { step } = stepsFor(tester, context);
-        const expected: string[] = params.expected_test_methods ?? [];
+  it('Unit Test High-Level Handlers: create, run, update, run', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { params, packageName, transportRequest } = context;
+      const programName: string | undefined = params?.program_name;
+      if (!programName || !params?.test_class_source || !packageName) {
+        logger?.warn('program_unit_test not configured, skipping');
+        return;
+      }
+      const transport = { transport_request: transportRequest };
+      const { step } = stepsFor(tester, context);
+      const expected: string[] = params.expected_test_methods ?? [];
 
-        await step(
-          'CreateProgram',
-          {
-            program_name: programName,
-            package_name: packageName,
-            description: 'ABAP Unit test report',
-            ...transport,
-          },
-          handleCreateProgram,
-        );
-        await step(
-          'UpdateProgram',
-          {
-            program_name: programName,
-            source_code: params.program_source,
-            activate: true,
-            ...transport,
-          },
-          handleUpdateProgram,
-        );
+      await step(
+        'CreateProgram',
+        {
+          program_name: programName,
+          package_name: packageName,
+          description: 'ABAP Unit test report',
+          ...transport,
+        },
+        handleCreateProgram,
+      );
+      await step(
+        'UpdateProgram',
+        {
+          program_name: programName,
+          source_code: params.program_source,
+          activate: true,
+          ...transport,
+        },
+        handleUpdateProgram,
+      );
 
+      await step(
+        'CreateProgramUnitTest',
+        {
+          program_name: programName,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleCreateProgramUnitTest,
+      );
+      expectTestsRan(
         await step(
-          'CreateProgramUnitTest',
-          {
-            program_name: programName,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleCreateProgramUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunProgramUnitTest',
-            { program_name: programName },
-            handleRunProgramUnitTest,
-          ),
-          expected,
-        );
+          'RunProgramUnitTest',
+          { program_name: programName },
+          handleRunProgramUnitTest,
+        ),
+        expected,
+      );
 
+      await step(
+        'UpdateProgramUnitTest',
+        {
+          program_name: programName,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleUpdateProgramUnitTest,
+      );
+      expectTestsRan(
         await step(
-          'UpdateProgramUnitTest',
-          {
-            program_name: programName,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleUpdateProgramUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunProgramUnitTest',
-            { program_name: programName },
-            handleRunProgramUnitTest,
-          ),
-          expected,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+          'RunProgramUnitTest',
+          { program_name: programName },
+          handleRunProgramUnitTest,
+        ),
+        expected,
+      );
+    });
+  });
 });

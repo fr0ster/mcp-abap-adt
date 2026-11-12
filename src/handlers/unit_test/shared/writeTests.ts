@@ -19,25 +19,30 @@ import {
   functionIncludeDocuments,
   includeDocuments,
   programDocuments,
+  wireItself,
 } from '@mcp-abap-adt/adt-clients';
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
-import {
-  type AdtHeadersContext,
-  withAdtHeaders,
-} from '../../../lib/adtHeaders/withAdtHeaders';
+import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { asciiUpper } from '../../../lib/plainText';
 import {
-  type ActivationRunSource,
+  abapStatementsOf,
+  includeOfStatement,
+} from '../../../lib/strategies/abapIncludeStatement';
+import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
+import {
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
+import { packageRefNameOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import {
@@ -62,12 +67,40 @@ export function programTestInclude(programName: string): string {
  */
 export function functionGroupTestInclude(functionGroupName: string): string {
   const name = functionGroupName.toUpperCase();
-  const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
-  return namespaced ? `${namespaced[1]}L${namespaced[2]}T99` : `L${name}T99`;
+  const namespaced = namespaceOf(name);
+  return namespaced
+    ? `${namespaced.namespace}L${namespaced.rest}T99`
+    : `L${name}T99`;
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * A namespaced name split into its namespace and the rest: `/NS/NAME` is
+ * `/NS/` and `NAME`. `undefined` for a name with no namespace — one not
+ * starting with `/`, or with an empty namespace or nothing after it.
+ */
+function namespaceOf(
+  name: string,
+): { namespace: string; rest: string } | undefined {
+  if (!name.startsWith('/')) return undefined;
+  const closing = name.indexOf('/', 1);
+  if (closing <= 1 || closing === name.length - 1) return undefined;
+  return {
+    namespace: name.slice(0, closing + 1),
+    rest: name.slice(closing + 1),
+  };
+}
+
+/**
+ * Whether a report's source pulls `includeName` in: a statement
+ * `INCLUDE <name>` (or `… IF FOUND`) naming it, the keywords in any case,
+ * over one line or several — statements split at the period outside
+ * comments and literals, as ABAP splits them.
+ */
+export function pullsInclude(source: string, includeName: string): boolean {
+  const wanted = asciiUpper(includeName);
+  return abapStatementsOf(source).some(
+    (statement) => includeOfStatement(statement) === wanted,
+  );
 }
 
 /** Write (or, with an empty source, clear) a class's test classes, and activate. */
@@ -98,7 +131,7 @@ export async function writeClassTests(
       }),
     { type: 'CLASS', name },
   );
-  if (!written.ok) return written as Answer;
+  if (!written.ok) return written;
   return carryCleanup(
     written,
     atStep('activate', () =>
@@ -109,12 +142,7 @@ export async function writeClassTests(
         ),
       ),
     ),
-  ) as Promise<Answer>;
-}
-
-/** Where a new include goes: the report's own package, read off its metadata. */
-function packageOf(metadata: string): string | undefined {
-  return /adtcore:packageRef[^>]*adtcore:name="([^"]+)"/.exec(metadata)?.[1];
+  );
 }
 
 /**
@@ -146,13 +174,13 @@ export async function writeProgramTests(
         { version: 'workingArea', analyse: analyseException },
       ),
     )();
-    if (!metadata.ok) return metadata as unknown as Answer;
+    if (!metadata.ok) return metadata;
     const created = await atStep('create include', () =>
       withAdtHeaders(context, 'include.create', (headers) =>
         include.create(
           {
             includeName,
-            packageName: packageOf(metadata.getResult().value.raw),
+            packageName: packageRefNameOf(metadata.getResult().value.raw),
             description: `ABAP Unit tests of ${name}`,
             transportRequest,
           },
@@ -160,7 +188,7 @@ export async function writeProgramTests(
         ),
       ),
     )();
-    if (!created.ok) return created as unknown as Answer;
+    if (!created.ok) return created;
   }
 
   const written = await withLock(
@@ -179,7 +207,7 @@ export async function writeProgramTests(
       }),
     { type: 'INCLUDE', name: includeName },
   );
-  if (!written.ok) return written as Answer;
+  if (!written.ok) return written;
 
   // Activate the include, then the report — as one step after the write, so a
   // lock the write could not release still reaches the caller.
@@ -201,16 +229,12 @@ export async function writeProgramTests(
           ),
         ),
       ),
-    ) as Promise<Answer>;
+    );
 
   return carryCleanup(written, async (): Promise<Answer> => {
     if (!options.create) return activateBoth();
     // Read and write the report under one lock: a source read before the lock
     // and written after it would overwrite whatever was saved in between.
-    const pulledIn = new RegExp(
-      `^\\s*INCLUDE\\s+${escapeRegExp(includeName)}\\s*\\.`,
-      'im',
-    );
     const linked = await withLock(
       () => program.lock({ programName: name }, { analyse: analyseLock }),
       async (lockHandle): Promise<Answer> => {
@@ -219,10 +243,10 @@ export async function writeProgramTests(
             analyse: analyseException,
           }),
         )();
-        if (!current.ok) return current as unknown as Answer;
+        if (!current.ok) return current;
         const reportSource = current.getResult().value.raw;
-        if (pulledIn.test(reportSource)) {
-          return current as unknown as Answer;
+        if (pullsInclude(reportSource, includeName)) {
+          return current;
         }
         return atStep('update program', () =>
           withAdtHeaders(context, 'program.update', (headers) =>
@@ -230,13 +254,13 @@ export async function writeProgramTests(
               { programName: name, transportRequest },
               {
                 headers,
-                source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
+                source: `${reportSource.trimEnd()}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
                 lockHandle,
                 analyse: analyseException,
               },
             ),
           ),
-        )() as Promise<Answer>;
+        )();
       },
       (lockHandle) =>
         program.unlock({ programName: name }, lockHandle, {
@@ -244,7 +268,7 @@ export async function writeProgramTests(
         }),
       { type: 'PROGRAM', name },
     );
-    if (!linked.ok) return linked as Answer;
+    if (!linked.ok) return linked;
     return carryCleanup(linked, activateBoth);
   });
 }
@@ -283,7 +307,7 @@ export async function writeFunctionGroupTests(
         ),
       ),
     )();
-    if (!created.ok) return created as unknown as Answer;
+    if (!created.ok) return created;
   }
 
   const written = await withLock(
@@ -300,7 +324,7 @@ export async function writeFunctionGroupTests(
       include.unlock(target, lockHandle, { analyse: analyseException }),
     { type: 'FUNCTION_INCLUDE', name: includeName },
   );
-  if (!written.ok) return written as Answer;
+  if (!written.ok) return written;
 
   return carryCleanup(
     written,
@@ -316,12 +340,11 @@ export async function writeFunctionGroupTests(
  */
 export function functionGroupMainProgram(functionGroupName: string): string {
   const name = functionGroupName.toUpperCase();
-  const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
-  return namespaced ? `${namespaced[1]}SAPL${namespaced[2]}` : `SAPL${name}`;
+  const namespaced = namespaceOf(name);
+  return namespaced
+    ? `${namespaced.namespace}SAPL${namespaced.rest}`
+    : `SAPL${name}`;
 }
-
-/** How many long polls the activation run is waited for. */
-const ACTIVATION_POLLS = 6;
 
 /**
  * Activate the test include, the group and its main program in one run.
@@ -331,17 +354,39 @@ const ACTIVATION_POLLS = 6;
  * answered `200` with the inactive list instead of an activation — a
  * document `analyseActivation` does not read, so it passed as a success —
  * and the main program stayed inactive: ABAP Unit then found no test class
- * (measured on premise, BASIS 816, 2026-10-12). The three go in one run
- * without the pre-audit, as Eclipse activates the list it was shown; the run
- * is accepted, not done, so its results are read before answering.
+ * (measured on premise, BASIS 816, 2026-10-12). The three go in one
+ * activation without the pre-audit, as Eclipse activates the list it was
+ * shown, on the endpoint the system's discovery offers
+ * (fr0ster/mcp-abap-adt#351): the run where it lists
+ * `/sap/bc/adt/activation/runs` — accepted, not done, so its results are read
+ * before answering — else the one `POST /sap/bc/adt/activation`
+ * (SAP_BASIS 751, 7.40), judged by `analyseActivation`.
  */
 async function activateWithMainProgram(
-  context: AdtHeadersContext,
+  context: HandlerContext,
   client: IServerAdtClient,
   groupName: string,
   includeName: string,
 ): Promise<Answer> {
-  const utils = client.getUtils(ourUtils);
+  // The inactive list read after a silent results checklist is judged on
+  // the wire as it came (`stillInactiveAmong`).
+  const utils = client.getUtils({ ...ourUtils, inactive: wireItself });
+  const mainProgram = functionGroupMainProgram(groupName);
+  const offered = await activationRunsOffered(context);
+  if (!offered.ok) return failedWith(offered.getError());
+  if (!offered.getResult().value) {
+    return withAdtHeaders(context, 'utils.activateObjects', (headers) =>
+      utils.activateObjects(
+        [
+          { type: 'FUGR/I', name: includeName, parentName: groupName },
+          { type: 'FUGR/F', name: groupName },
+          { type: 'FUGR/I', name: mainProgram, parentName: groupName },
+        ],
+        false,
+        { headers, analyse: analyseActivation },
+      ),
+    );
+  }
   const started = await withAdtHeaders(
     context,
     'utils.activateObjectsGroup',
@@ -350,34 +395,46 @@ async function activateWithMainProgram(
         [
           { type: 'FUGR/I', name: includeName, parentName: groupName },
           { type: 'FUGR/F', name: groupName },
-          {
-            type: 'FUGR/I',
-            name: functionGroupMainProgram(groupName),
-            parentName: groupName,
-          },
+          { type: 'FUGR/I', name: mainProgram, parentName: groupName },
         ],
         false,
         { headers, analyse: analyseException },
       ),
   );
-  if (!started.ok) return started as unknown as Answer;
+  if (!started.ok) return started;
   // Long polls back to back, no timer of ours: the server holds each one
-  // until the run moves.
+  // until the run ends.
   const outcome = await awaitActivationRun(
-    utils as unknown as ActivationRunSource,
+    utils,
     started.getResult().value,
     analyseException,
-    ACTIVATION_POLLS,
-    0,
+    [
+      buildObjectUri(includeName, 'FUGR/I', groupName),
+      buildObjectUri(groupName, 'FUGR/F'),
+      buildObjectUri(mainProgram, 'FUGR/I', groupName),
+    ],
   );
   // Reading the run failed: the method's error as it is, with its step.
   if (outcome.failure !== undefined) return failedWith(outcome.failure);
+  if (outcome.runId === '') {
+    // Not SAP's refusal: the start answered no run id, so no run was read.
+    // Said as a failure on our side (the outcome's own words), never dressed
+    // as SAP's answer.
+    throw new Error(outcome.messages.map((m) => m.text).join('; '));
+  }
+  // A silent results checklist with the run's references still listed: not
+  // activated, those entries named.
+  if (outcome.stillInactive !== undefined && outcome.stillInactive.length > 0)
+    return failedWith({
+      origin: 'refusal',
+      message: `Activation run ${outcome.runId} finished without activating: the inactive list still names ${outcome.stillInactive.map((o) => o.name).join(', ')}`,
+      stillInactive: outcome.stillInactive,
+    });
   const refusals = outcome.messages.filter(isRefusal);
   if (
-    outcome.settled &&
-    (refusals.length > 0 ||
-      outcome.status === 'failed' ||
-      outcome.status === 'error')
+    refusals.length > 0 ||
+    outcome.status === 'failed' ||
+    outcome.status === 'error'
   ) {
     // SAP reported the run failed: its messages as they are.
     return failedWith({
@@ -387,18 +444,11 @@ async function activateWithMainProgram(
         : `Activation run ${outcome.runId} ended with status ${outcome.status}`,
     });
   }
-  if (!outcome.settled) {
-    // Not SAP's refusal: our wait bound ran out while the run went on. Said
-    // as a failure on our side, never dressed as SAP's answer.
-    throw new Error(
-      `The activation run ${outcome.runId} had not finished after ${ACTIVATION_POLLS} polls — the wait bound ran out (status ${outcome.status || 'unknown'}); the run may still be going on in SAP.`,
-    );
-  }
   // The run's results as the reading: a write's terse answer reads the
   // status, and `raw` shows what SAP said about the activation.
   return succeededWith({
     value: { run_id: outcome.runId, status: outcome.status },
     raw: outcome.results ?? '',
     status: 200,
-  }) as unknown as Answer;
+  });
 }

@@ -116,11 +116,14 @@ function closable(rfc = false): Closable {
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 const SETTINGS: SapConfig = {
-  url: 'https://system.invalid',
   authType: 'basic',
   username: 'placeholder-user',
   password: 'placeholder-password',
   connectionType: 'rfc',
+  client: '100',
+  language: 'EN',
+  ashost: 'system.invalid',
+  sysnr: '00',
 };
 
 /** A credential; `authorized` counts the requests it wrote. */
@@ -522,10 +525,10 @@ describe('the ./utils process cache', () => {
   afterEach(() => cleanup());
 
   it('a managed connection replaced by a new config, and one dropped by cleanup(), each end once; a connection handed in is the caller’s', async () => {
-    setConfigOverride({ ...SETTINGS, url: 'https://one.invalid' });
+    setConfigOverride({ ...SETTINGS, ashost: 'one.invalid' });
     const firstOverride = built[0];
     expect(getManagedConnection()).toBe(firstOverride);
-    setConfigOverride({ ...SETTINGS, url: 'https://two.invalid' });
+    setConfigOverride({ ...SETTINGS, ashost: 'two.invalid' });
     expect(firstOverride?.disconnects).toBe(1);
     const given = closable();
     setConnectionOverride(given);

@@ -4,7 +4,9 @@ import type {
   AdtModernVariant,
   IAdtError,
   IAdtResponse,
+  IAdtSuccess,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import type {
   IServerAdtClient,
   UtilsApi,
@@ -38,11 +40,17 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { linesOf } from '../../../lib/plainText';
+import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
 } from '../../../lib/strategies/functionGroupChildren';
+import { classIncludeTypesOf } from '../../../lib/strategies/metadataFields';
 import {
   endsTheCall,
   type NodeLevel,
@@ -52,6 +60,7 @@ import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
+import { child } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
@@ -65,56 +74,66 @@ export const TOOL_DEFINITION = {
 
 /** GetIncludesList's input on `variant`. */
 function includesListSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      object_name: {
-        type: 'string',
-        description:
-          'Name of the ABAP program or include (with object_type; or give objects)',
-      },
-      object_type: {
-        type: 'string',
-        enum: [
-          ...INCLUDES_PARENTS[variant],
-          ...INCLUDES_PARENT_MAIN_TYPES[variant],
-        ],
-        description: `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several objects, read together (give this or object_name and object_type)',
-        items: {
-          type: 'object',
-          properties: {
-            object_name: {
-              type: 'string',
-              description: 'Name of the ABAP program or include',
-            },
-            object_type: {
-              type: 'string',
-              enum: [
-                ...INCLUDES_PARENTS[variant],
-                ...INCLUDES_PARENT_MAIN_TYPES[variant],
-              ],
-              description: `ADT object type. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
-            },
-          },
-          required: ['object_name', 'object_type'],
-        },
-      },
-      detailed: {
-        type: 'boolean',
-        description:
-          '[read-only] If true, returns structured JSON with metadata and raw XML.',
-        default: false,
-      },
-    },
-    required: [],
-  } as const;
+  return z.object({
+    background: LONG_BACKGROUND_FIELD,
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        'Name of the ABAP program or include (with object_type; or give objects)',
+      ),
+    object_type: z
+      .enum([
+        ...INCLUDES_PARENTS[variant],
+        ...INCLUDES_PARENT_MAIN_TYPES[variant],
+      ])
+      .optional()
+      .describe(
+        `[read-only] ADT object type of the parent. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
+      ),
+    objects: z
+      .array(
+        z.object({
+          object_name: z
+            .string()
+            .describe('Name of the ABAP program or include'),
+          object_type: z
+            .enum([
+              ...INCLUDES_PARENTS[variant],
+              ...INCLUDES_PARENT_MAIN_TYPES[variant],
+            ])
+            .describe(
+              `ADT object type. ${supported(INCLUDES_PARENTS[variant])} ${MAIN_TYPE_SENTENCE}`,
+            ),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or object_name and object_type)',
+      ),
+    detailed: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        '[read-only] If true, returns structured JSON with metadata and raw XML.',
+      ),
+  });
 }
+
+/**
+ * GetIncludesList's arguments, as its schema parses them on either variant —
+ * with each `object_type` any text: the handler reads it past the schema's
+ * boundary (`parentOf`), and names the parents or the shared main type when
+ * it is none of them.
+ */
+type IncludesListArgs = Omit<
+  z.output<ReturnType<typeof includesListSchema>>,
+  'object_type' | 'objects'
+> & {
+  object_type?: string;
+  objects?: Array<{ object_name: string; object_type: string }>;
+};
 
 interface IncludeNode {
   name: string;
@@ -178,29 +197,32 @@ function resolveParent(
 }
 
 /**
- * The includes a piece of ABAP source names, in order. A full-line comment
- * (`*`) and a trailing one (`"`) are not code; `INCLUDE STRUCTURE` and
- * `INCLUDE TYPE` embed a type, not a program include.
+ * The includes a piece of ABAP source names, in order, each once — read line
+ * by line (`includeNameOf`; CR LF, LF and a lone CR end a line). A full-line
+ * comment (`*`) and a trailing one (`"`) are not code; `INCLUDE STRUCTURE`
+ * and `INCLUDE TYPE` embed a type, not a program include.
  */
 export function includeStatementsOf(source: string): string[] {
   const found: string[] = [];
-  for (const rawLine of source.split(/\r?\n/)) {
-    if (rawLine.startsWith('*')) continue;
-    const line = rawLine.replace(/".*$/, '');
-    const m = line.match(/^\s*INCLUDE\s+([A-Z0-9_/]+)\s*(?:IF\s+FOUND\s*)?\./i);
-    if (!m) continue;
-    const name = m[1].toUpperCase();
-    if (name === 'STRUCTURE' || name === 'TYPE') continue;
+  for (const line of linesOf(source)) {
+    const name = includeNameOf(line);
+    if (name === undefined || name === 'STRUCTURE' || name === 'TYPE') continue;
     if (!found.includes(name)) found.push(name);
   }
   return found;
 }
 
+/** A source's or metadata's read, as this tool sends it. */
+type SourceAnswer = IAdtResponse<unknown, IAdtError>;
+
+/** A function group's node structure level, as this tool reads it. */
+type NodeAnswer = IAdtResponse<NodeLevel, IAdtError>;
+
 /** The text inside a source reading — a string, or `{value, raw}`. */
-function textOf(response: any): string {
-  const v = response?.getResult?.().value;
+function textOf(response: IAdtSuccess<unknown>): string {
+  const v = response.getResult().value;
   if (typeof v === 'string') return v;
-  return String(v?.value ?? v?.raw ?? '');
+  return String(child(v, 'value') ?? child(v, 'raw') ?? '');
 }
 
 /**
@@ -226,16 +248,19 @@ type SourceRead =
   | { kind: 'absent' }
   | { kind: 'refused'; error: IAdtError };
 
-function readSource(response: any): SourceRead {
-  if (response?.ok) return { kind: 'text', text: textOf(response) };
-  const error = response?.getError?.() ?? {};
+function readSource(response: SourceAnswer): SourceRead {
+  if (response.ok) return { kind: 'text', text: textOf(response) };
+  const error = response.getError();
   const absent =
-    error?.response?.status === 404 ||
-    error?.adtType === 'ExceptionResourceNotFound';
+    error.response?.status === 404 ||
+    error.adtType === 'ExceptionResourceNotFound';
   return absent ? { kind: 'absent' } : { kind: 'refused', error };
 }
 
-async function includesListOf(context: HandlerContext, args: any) {
+async function includesListOf(
+  context: HandlerContext,
+  args: IncludesListArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
   try {
     const { object_name, object_type } = args;
@@ -262,9 +287,9 @@ async function includesListOf(context: HandlerContext, args: any) {
       );
     }
 
-    // No deadline of the server's on a request: the call's own
-    // `timeout`, when given, ends only the wait — a request abandoned here
-    // would run on in SAP while its session is logged off under it.
+    // No deadline of the server's on a request: the read ends when SAP
+    // answers, or when its background run is cancelled (its session logged
+    // off).
     logger?.info(
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
@@ -276,9 +301,9 @@ async function includesListOf(context: HandlerContext, args: any) {
     const unreadable: Record<string, unknown>[] = [];
     const sourceOf = async (
       what: string,
-      read: Promise<unknown>,
+      read: Promise<SourceAnswer>,
     ): Promise<string> => {
-      const answer = await readSource(await read);
+      const answer = readSource(await read);
       if (answer.kind === 'text') return answer.text;
       if (answer.kind === 'refused') {
         // A credential SAP refused is every include's: the call ends with
@@ -352,9 +377,11 @@ async function includesListOf(context: HandlerContext, args: any) {
           analyse: analyseException,
         }),
       );
-      children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
-        (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
-      );
+      children = classIncludeTypesOf(meta).map((name) => ({
+        name,
+        type: 'CLAS/I',
+        children: [],
+      }));
     } else if (parent.kind === 'FUGR/F') {
       // The group's main program cannot be read, so which includes it names
       // directly is worked out from the rest: every include of the group,
@@ -438,10 +465,21 @@ async function includesListOf(context: HandlerContext, args: any) {
   }
 }
 
+/** A read answered by a source or a class's metadata. */
+interface SourceRead_ {
+  kind: 'program' | 'include' | 'class';
+  name: string;
+}
+
+/** A read of a function group's node structure: its root, or its includes node. */
+interface GroupRead {
+  kind: 'group';
+  name: string;
+  nodeId?: string;
+}
+
 /** One read of the batched version: a source, a class's metadata, a group's node. */
-type IncludeRead =
-  | { kind: 'program' | 'include' | 'class'; name: string }
-  | { kind: 'group'; name: string; nodeId?: string };
+type IncludeRead = SourceRead_ | GroupRead;
 
 const readKey = (read: IncludeRead): string =>
   read.kind === 'group'
@@ -458,33 +496,56 @@ function readIncludeSource(client: IServerAdtClient, includeName: string) {
     .read({ includeName }, 'active', { analyse: analyseException });
 }
 
+/** A read's answer, by what the read was: a source or metadata, or a group's node. */
+type IncludeAnswer =
+  | { of: 'source'; response: SourceAnswer }
+  | { of: 'node'; response: NodeAnswer };
+
 /** `read` sent on `client`, as the sequential version sends it. */
-function sendRead(
+async function sendRead(
   context: AdtHeadersContext,
   client: IServerAdtClient,
   read: IncludeRead,
-): Promise<unknown> {
+): Promise<IncludeAnswer> {
   const utils: IncludeUtils = client.getUtils(ourUtils);
   switch (read.kind) {
     case 'program':
-      return utils.readObjectSource('PROG/P', read.name, undefined, 'active', {
-        analyse: analyseException,
-      });
+      return {
+        of: 'source',
+        response: await utils.readObjectSource(
+          'PROG/P',
+          read.name,
+          undefined,
+          'active',
+          { analyse: analyseException },
+        ),
+      };
     case 'include':
-      return readIncludeSource(client, read.name);
+      return {
+        of: 'source',
+        response: await readIncludeSource(client, read.name),
+      };
     case 'class':
-      return utils.readObjectMetadata('CLAS/OC', read.name, undefined, {
-        version: 'active',
-        analyse: analyseException,
-      });
+      return {
+        of: 'source',
+        response: await utils.readObjectMetadata(
+          'CLAS/OC',
+          read.name,
+          undefined,
+          { version: 'active', analyse: analyseException },
+        ),
+      };
     case 'group': {
       // `fetchFunctionGroupChildren`'s two requests: the group's node
       // structure, then its includes node — on the source it reads.
       const groups: FunctionGroupNodeSource = nodeStructureOn(context, utils);
-      return groups.fetchNodeStructure('FUGR/F', read.name, {
-        ...(read.nodeId !== undefined ? { nodeId: read.nodeId } : {}),
-        withShortDescriptions: true,
-      });
+      return {
+        of: 'node',
+        response: await groups.fetchNodeStructure('FUGR/F', read.name, {
+          ...(read.nodeId !== undefined ? { nodeId: read.nodeId } : {}),
+          withShortDescriptions: true,
+        }),
+      };
     }
   }
 }
@@ -496,16 +557,30 @@ function sendRead(
  * the sequential version throws it.
  */
 function includeAnswers(context: HandlerContext) {
-  const answers = new Map<string, PhaseResult<unknown>>();
+  const sources = new Map<string, PhaseResult<SourceAnswer>>();
+  const nodes = new Map<string, PhaseResult<NodeAnswer>>();
+  /** The entry an earlier phase set for `read`; a read no phase sent throws in words. */
+  const earlier = <V>(map: ReadonlyMap<string, V>, read: IncludeRead): V => {
+    const result = map.get(readKey(read));
+    if (result === undefined) {
+      throw new Error(`${readKey(read)} was not read in an earlier phase`);
+    }
+    return result;
+  };
   return {
-    get(read: IncludeRead): PhaseResult<unknown> {
-      return answers.get(readKey(read)) as PhaseResult<unknown>;
+    /** A source's or metadata's answer, read in an earlier phase. */
+    get(read: SourceRead_): PhaseResult<SourceAnswer> {
+      return earlier(sources, read);
+    },
+    /** A group's node answer, read in an earlier phase. */
+    getNode(read: GroupRead): PhaseResult<NodeAnswer> {
+      return earlier(nodes, read);
     },
     async phase(reads: readonly IncludeRead[]): Promise<void> {
       const asked = new Map<string, IncludeRead>();
       for (const read of reads) {
         const key = readKey(read);
-        if (!answers.has(key)) asked.set(key, read);
+        if (!sources.has(key) && !nodes.has(key)) asked.set(key, read);
       }
       if (asked.size === 0) return;
       const pending = [...asked.values()];
@@ -513,11 +588,17 @@ function includeAnswers(context: HandlerContext) {
         sendRead(context, createAdtClient(connection, context.logger), read),
       );
       results.forEach((result, i) => {
-        const read = pending[i] as IncludeRead;
+        const read = pending[i];
+        const key = readKey(read);
         if (!result.ok) {
           if (endsTheCall(result.error)) throw result.error;
-        } else if (read.kind === 'group') {
-          const response = result.value as IAdtResponse<unknown, IAdtError>;
+          if (read.kind === 'group') nodes.set(key, result);
+          else sources.set(key, result);
+          return;
+        }
+        const answer = result.value;
+        if (answer.of === 'node') {
+          const response = answer.response;
           if (
             !response.ok &&
             isCredentialPayload(
@@ -530,20 +611,21 @@ function includeAnswers(context: HandlerContext) {
               'list function group includes',
             );
           }
+          nodes.set(key, { ok: true, value: response });
         } else {
-          const answer = readSource(result.value);
+          const read = readSource(answer.response);
           if (
-            answer.kind === 'refused' &&
-            isCredentialPayload(failureEntry(answer.error, 'read source'))
+            read.kind === 'refused' &&
+            isCredentialPayload(failureEntry(read.error, 'read source'))
           ) {
             throw carryingFailure(
-              new Error(answer.error.message),
-              answer.error,
+              new Error(read.error.message),
+              read.error,
               'read source',
             );
           }
+          sources.set(key, { ok: true, value: answer.response });
         }
-        answers.set(readKey(read), result);
       });
     },
   };
@@ -552,14 +634,20 @@ function includeAnswers(context: HandlerContext) {
 type IncludeAnswers = ReturnType<typeof includeAnswers>;
 
 /** A source an answer carries, `''` for anything else — what the walk reads on. */
-function answeredText(result: PhaseResult<unknown>): string {
+function answeredText(result: PhaseResult<SourceAnswer>): string {
   if (!result.ok) return '';
   const answer = readSource(result.value);
   return answer.kind === 'text' ? answer.text : '';
 }
 
-/** The first read of an object: its source, its metadata or its group's node. */
-function firstRead(parent: { kind: ParentKind; name: string }): IncludeRead {
+/**
+ * The first read of an object answered by a document: its source or its
+ * metadata; `undefined` for a function group, whose first read is its node.
+ */
+function firstSourceRead(parent: {
+  kind: ParentKind;
+  name: string;
+}): SourceRead_ | undefined {
   switch (parent.kind) {
     case 'PROG/P':
       return { kind: 'program', name: parent.name };
@@ -568,17 +656,19 @@ function firstRead(parent: { kind: ParentKind; name: string }): IncludeRead {
     case 'CLAS/OC':
       return { kind: 'class', name: parent.name };
     case 'FUGR/F':
-      return { kind: 'group', name: parent.name };
+      return undefined;
   }
 }
 
+/** The first read of an object: its source, its metadata or its group's node. */
+function firstRead(parent: { kind: ParentKind; name: string }): IncludeRead {
+  return firstSourceRead(parent) ?? { kind: 'group', name: parent.name };
+}
+
 /** The includes node a group's node structure lists, if it answered. */
-function includesNodeOf(result: PhaseResult<unknown>): string | undefined {
+function includesNodeOf(result: PhaseResult<NodeAnswer>): string | undefined {
   if (!result.ok) return undefined;
-  const response = result.value as IAdtResponse<
-    { childNodes: Array<{ type: string; nodeId: string }> },
-    IAdtError
-  >;
+  const response = result.value;
   if (!response.ok) return undefined;
   return response
     .getResult()
@@ -601,13 +691,18 @@ async function treeFromAnswers(
     logger?.info(
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
-    const answered = (read: IncludeRead): unknown => {
+    const answered = (read: SourceRead_): SourceAnswer => {
       const result = answers.get(read);
       if (!result.ok) throw result.error;
       return result.value;
     };
+    const answeredNode = (read: GroupRead): NodeAnswer => {
+      const result = answers.getNode(read);
+      if (!result.ok) throw result.error;
+      return result.value;
+    };
     const unreadable: Record<string, unknown>[] = [];
-    const sourceOf = (what: string, read: IncludeRead): string => {
+    const sourceOf = (what: string, read: SourceRead_): string => {
       const answer = readSource(answered(read));
       if (answer.kind === 'text') return answer.text;
       if (answer.kind === 'refused') {
@@ -656,20 +751,22 @@ async function treeFromAnswers(
         kind: 'class',
         name: parent.name,
       });
-      children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
-        (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
-      );
+      children = classIncludeTypesOf(meta).map((name) => ({
+        name,
+        type: 'CLAS/I',
+        children: [],
+      }));
     } else if (parent.kind === 'FUGR/F') {
       const listed = await fetchFunctionGroupChildren(
         {
           fetchNodeStructure: async (_type, name, options) =>
-            answered({
+            answeredNode({
               kind: 'group',
               name,
               ...(options?.nodeId !== undefined
                 ? { nodeId: options.nodeId }
                 : {}),
-            }) as IAdtResponse<NodeLevel, IAdtError>,
+            }),
         },
         parent.name,
         'FUGR/I',
@@ -755,7 +852,9 @@ async function includeTrees(
   const groupNodes: IncludeRead[] = [];
   for (const parent of parents) {
     if (parent.kind !== 'FUGR/F') continue;
-    const nodeId = includesNodeOf(answers.get(firstRead(parent)));
+    const nodeId = includesNodeOf(
+      answers.getNode({ kind: 'group', name: parent.name }),
+    );
     if (nodeId !== undefined) {
       groupNodes.push({ kind: 'group', name: parent.name, nodeId });
     }
@@ -769,15 +868,14 @@ async function includeTrees(
     .map((parent) => {
       let level: string[] = [];
       if (parent.kind === 'FUGR/F') {
-        const nodeId = includesNodeOf(answers.get(firstRead(parent)));
+        const nodeId = includesNodeOf(
+          answers.getNode({ kind: 'group', name: parent.name }),
+        );
         const node =
           nodeId === undefined
             ? undefined
-            : answers.get({ kind: 'group', name: parent.name, nodeId });
-        const response =
-          node?.ok === true
-            ? (node.value as IAdtResponse<NodeLevel, IAdtError>)
-            : undefined;
+            : answers.getNode({ kind: 'group', name: parent.name, nodeId });
+        const response = node?.ok === true ? node.value : undefined;
         if (response?.ok) {
           level = [
             ...new Set(
@@ -788,9 +886,11 @@ async function includeTrees(
           ];
         }
       } else {
-        level = includeStatementsOf(
-          answeredText(answers.get(firstRead(parent))),
-        );
+        const first = firstSourceRead(parent);
+        level =
+          first === undefined
+            ? []
+            : includeStatementsOf(answeredText(answers.get(first)));
       }
       return { reached: new Set([parent.name, ...level]), level };
     });
@@ -842,7 +942,7 @@ function listAnswer(
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) => {
-    const asked = objects[i] as (typeof objects)[number];
+    const asked = objects[i];
     return result.isError
       ? {
           object_name: asked.object_name,
@@ -859,7 +959,7 @@ function listAnswer(
 
 export async function handleGetIncludesList(
   context: HandlerContext,
-  args: any,
+  args: IncludesListArgs,
 ) {
   const { logger } = context;
   const listed = args?.objects;
@@ -877,8 +977,8 @@ export async function handleGetIncludesList(
     try {
       return await withSequentialFallback<McpResult>(
         context,
-        async () => (await includeTrees(context, [parent]))[0] as McpResult,
-        () => includesListOf(context, args) as Promise<McpResult>,
+        async () => (await includeTrees(context, [parent]))[0],
+        () => includesListOf(context, args),
       );
     } catch (error) {
       logger?.error(
@@ -897,9 +997,9 @@ export async function handleGetIncludesList(
       'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })',
     );
   }
-  const objects = listed.map((o: any) => ({
-    object_name: o?.object_name,
-    object_type: o?.object_type,
+  const objects = listed.map((o) => ({
+    object_name: o.object_name,
+    object_type: o.object_type,
   }));
   const single = (o: (typeof objects)[number]) => {
     const { objects: _list, ...rest } = args;
@@ -924,14 +1024,9 @@ export async function handleGetIncludesList(
         let at = 0;
         for (const [i, parent] of parents.entries()) {
           if (parent === undefined) {
-            results.push(
-              (await includesListOf(
-                context,
-                single(objects[i] as (typeof objects)[number]),
-              )) as McpResult,
-            );
+            results.push(await includesListOf(context, single(objects[i])));
           } else {
-            results.push(trees[at++] as McpResult);
+            results.push(trees[at++]);
           }
         }
         return listAnswer(objects, results);
@@ -941,10 +1036,7 @@ export async function handleGetIncludesList(
         // credential failure ends the call, and nothing after it is read.
         const results: McpResult[] = [];
         for (const o of objects) {
-          const result = (await includesListOf(
-            context,
-            single(o),
-          )) as McpResult;
+          const result = await includesListOf(context, single(o));
           if (endsList(result)) return result;
           results.push(result);
         }

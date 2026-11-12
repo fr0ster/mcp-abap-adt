@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Over real HTTP, every request its own MCP session: the pool keeps the
  * instance that holds state, routes its handle back to it, leases it to one
@@ -79,18 +80,14 @@ let gateEntered = gate();
 type Ctx = { state: InstanceState };
 type Args = { state_handle?: string };
 const text = (t: string) => ({ content: [{ type: 'text', text: t }] });
-const withHandle = {
-  type: 'object',
-  properties: { state_handle: { type: 'string', description: 'h' } },
-  required: ['state_handle'],
-};
+const withHandle = z.object({ state_handle: z.string().describe('h') });
 const tool = (
   name: string,
-  inputSchema: object,
+  inputSchema: z.ZodObject,
   handler: (ctx: Ctx, args: Args) => Promise<unknown>,
 ): HandlerEntry => ({
   toolDefinition: { name, description: 'probe', inputSchema } as never,
-  handler: handler as never,
+  call: handler as never,
 });
 
 const probes = new CompositeHandlersRegistry([
@@ -98,14 +95,10 @@ const probes = new CompositeHandlersRegistry([
     getName: () => 'pool-probes',
     registerHandlers: () => {},
     getHandlers: () => [
-      tool(
-        'PoolProbeHold',
-        { type: 'object', properties: {} },
-        async (ctx, _args) => {
-          partOf(ctx.state).set(true);
-          return text(JSON.stringify({ state_handle: ctx.state.handle }));
-        },
-      ),
+      tool('PoolProbeHold', z.object({}), async (ctx, _args) => {
+        partOf(ctx.state).set(true);
+        return text(JSON.stringify({ state_handle: ctx.state.handle }));
+      }),
       tool('PoolProbeEcho', withHandle, async (ctx, args) => {
         ctx.state.check(args.state_handle);
         return text(ctx.state.handle);

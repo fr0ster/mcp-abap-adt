@@ -60,8 +60,10 @@ import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import { hasMethod } from '../capability';
 import { resolveSystemKind } from '../connectionFactory';
 import { isEnded, whenLogoffCompleted } from '../ownedConnections';
+import { child } from '../xml/tree';
 import {
   nodeProcessProbe,
   type ProcessProbe,
@@ -201,16 +203,15 @@ function withoutTrailingSlashes(url: string): string {
  * The identity of a session opened for `destination` with `settings`: where
  * they point, and the backend user they state (`SAP_USERNAME`, or the
  * destination's login) — `null` when none (a token credential). `undefined`
- * over RFC — an RFC session is its conversation and keeps no file — and
- * without a URL.
+ * over RFC: an RFC session is its conversation and keeps no file.
  */
 export function sessionIdentity(
   destination: string,
   settings: SapConfig,
   login?: string,
 ): SessionIdentity | undefined {
+  // Narrowed by the wire: an HTTP config states its URL.
   if (settings.connectionType === 'rfc') return undefined;
-  if (typeof settings.url !== 'string') return undefined;
   const user = (settings.username ?? login ?? '').trim().toUpperCase();
   return {
     destination,
@@ -277,11 +278,9 @@ function sameCaller(a: SessionIdentity, b: SessionIdentity): boolean {
 
 /** The connection's session cookies, read structurally; `null` without. */
 function cookiesOf(connection: object): string | null {
-  const reader = (connection as { sessionCookies?: () => string | null })
-    .sessionCookies;
-  if (typeof reader !== 'function') return null;
+  if (!hasMethod(connection, 'sessionCookies')) return null;
   try {
-    const cookies = reader.call(connection);
+    const cookies = connection.sessionCookies();
     return typeof cookies === 'string' && cookies !== '' ? cookies : null;
   } catch {
     return null;
@@ -296,43 +295,59 @@ function parseFile(text: string): RuntimeFile | undefined {
   } catch {
     return undefined;
   }
-  const file = value as Partial<RuntimeFile> | null;
-  const destination = file?.destination as
-    | Partial<RuntimeFile['destination']>
-    | undefined;
+  const format = child(value, 'format');
+  const pid = child(value, 'pid');
+  const start = child(value, 'start');
+  const role = child(value, 'role');
+  const user = child(value, 'user');
+  const system = child(value, 'system');
+  const cookies = child(value, 'cookies');
+  const writtenAt = child(value, 'written_at');
+  const destination = child(value, 'destination');
+  const name = child(destination, 'name');
+  const url = child(destination, 'url');
+  const client = child(destination, 'client');
+  const kind = child(destination, 'system');
+  const wire = child(destination, 'wire');
   if (
-    file === null ||
-    typeof file !== 'object' ||
-    file.format !== 3 ||
-    !isFileSystem(file.system) ||
-    typeof file.pid !== 'number' ||
-    !(file.start === null || typeof file.start === 'string') ||
-    (file.role !== 'built' && file.role !== 'debugger') ||
-    typeof destination !== 'object' ||
-    destination === null ||
-    typeof destination.name !== 'string' ||
-    typeof destination.url !== 'string' ||
-    typeof destination.client !== 'string' ||
-    (destination.system !== 'onprem' && destination.system !== 'cloud') ||
-    destination.wire !== 'http' ||
-    !(file.user === null || typeof file.user === 'string') ||
-    typeof file.cookies !== 'string' ||
-    file.cookies === '' ||
-    typeof file.written_at !== 'string'
+    format !== 3 ||
+    !isFileSystem(system) ||
+    typeof pid !== 'number' ||
+    !(start === null || typeof start === 'string') ||
+    (role !== 'built' && role !== 'debugger') ||
+    typeof name !== 'string' ||
+    typeof url !== 'string' ||
+    typeof client !== 'string' ||
+    (kind !== 'onprem' && kind !== 'cloud') ||
+    wire !== 'http' ||
+    !(user === null || typeof user === 'string') ||
+    typeof cookies !== 'string' ||
+    cookies === '' ||
+    typeof writtenAt !== 'string'
   ) {
     return undefined;
   }
-  return file as RuntimeFile;
+  return {
+    format,
+    pid,
+    start,
+    role,
+    destination: { name, url, client, system: kind, wire },
+    user,
+    system,
+    cookies,
+    written_at: writtenAt,
+  };
 }
 
 /** Whether `value` is a file's system information: `null`, or both fields a string or `null`. */
 function isFileSystem(value: unknown): value is FileSystem | null {
   if (value === null) return true;
-  if (typeof value !== 'object') return false;
-  const system = value as Partial<FileSystem>;
+  const responsible = child(value, 'responsible');
+  const master = child(value, 'master_system');
   return (
-    (system.responsible === null || typeof system.responsible === 'string') &&
-    (system.master_system === null || typeof system.master_system === 'string')
+    (responsible === null || typeof responsible === 'string') &&
+    (master === null || typeof master === 'string')
   );
 }
 
@@ -603,12 +618,9 @@ export class LeftoverSessions {
    * reach the context its locks are in.
    */
   private watch(connection: object): void {
-    const target = connection as {
-      makeAdtRequest?: (...args: unknown[]) => Promise<unknown>;
-    };
-    const original = target.makeAdtRequest;
-    if (typeof original !== 'function') return;
-    target.makeAdtRequest = async (...args: unknown[]) => {
+    if (!hasMethod(connection, 'makeAdtRequest')) return;
+    const original = connection.makeAdtRequest;
+    connection.makeAdtRequest = async (...args: unknown[]) => {
       try {
         return await original.apply(connection, args);
       } finally {

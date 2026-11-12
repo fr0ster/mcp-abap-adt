@@ -9,10 +9,13 @@ import type {
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   type AdtHeaderPairs,
+  type BackgroundRunOwner,
   BaseMcpServer,
   closeInstance,
   type IBackgroundRuns,
   InstanceBatch,
+  type LineMatchStrategy,
+  type SapAnswerStrategy,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -37,6 +40,7 @@ import {
   StateUnavailableError,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
+import { child, childAt } from '@mcp-abap-adt/lib/utils';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -118,6 +122,16 @@ export interface StreamableHttpServerOptions {
    * `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to every instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy, handed to every instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 }
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
@@ -130,15 +144,14 @@ interface PerRequestServerApi extends Poolable {
 
 /** Whether a request body is, or holds, a `tools/call`: a JSON-RPC batch counts by its elements. */
 function carriesToolCall(body: unknown): boolean {
-  const isCall = (m: unknown) =>
-    (m as { method?: unknown } | null | undefined)?.method === 'tools/call';
+  const isCall = (m: unknown) => child(m, 'method') === 'tools/call';
   return Array.isArray(body) ? body.some(isCall) : isCall(body);
 }
 
 /** One tool error per request (an element with an id), in the body's shape; none: nothing to answer. */
 function notAvailableAnswers(body: unknown): unknown {
   const answerOf = (m: unknown) => {
-    const id = (m as { id?: unknown } | null | undefined)?.id;
+    const id = child(m, 'id');
     return id === undefined
       ? undefined
       : {
@@ -187,6 +200,8 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
+  private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
+  private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
 
   constructor(
@@ -208,6 +223,8 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
+    this.sapAnswerStrategy = opts?.sapAnswerStrategy;
+    this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -236,11 +253,14 @@ export class StreamableHttpServer extends BaseMcpServer {
   ) => Promise<void> {
     return async (req: Request, res: Response) => {
       const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
-      const mcpMethod = req.body?.method as string | undefined;
-      const mcpId = req.body?.id;
+      const body: unknown = req.body;
+      const method = child(body, 'method');
+      const mcpMethod = typeof method === 'string' ? method : undefined;
+      const mcpId = child(body, 'id');
+      const name = childAt(body, 'params', 'name');
       const toolName =
-        mcpMethod === 'tools/call'
-          ? (req.body?.params?.name as string | undefined)
+        mcpMethod === 'tools/call' && typeof name === 'string'
+          ? name
           : undefined;
       const methodInfo = toolName
         ? `${mcpMethod} -> ${toolName}`
@@ -401,14 +421,14 @@ export class StreamableHttpServer extends BaseMcpServer {
     };
 
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
-    app.post(this.path, withDnsRebindingProtection(handler, dnsOpts) as any);
+    app.post(this.path, withDnsRebindingProtection(handler, dnsOpts));
 
     // Return 405 for other methods to avoid SSE stream issues
     app.all(
       this.path,
       withDnsRebindingProtection((_req: Request, res: Response) => {
         res.status(405).send('Method Not Allowed');
-      }, dnsOpts) as any,
+      }, dnsOpts),
     );
 
     console.error(
@@ -443,11 +463,11 @@ export class StreamableHttpServer extends BaseMcpServer {
     const app = express();
     app.use(express.json());
 
-    this.registerRoutes(app as unknown as IHttpApplication);
+    this.registerRoutes(app);
 
     await new Promise<void>((resolve, reject) => {
       const protocol = getProtocol(this.tls);
-      const server = createServerListener(app as any, this.tls);
+      const server = createServerListener(app, this.tls);
       this.standaloneServer = server;
 
       server.listen(this.port, this.host);
@@ -523,6 +543,9 @@ export class StreamableHttpServer extends BaseMcpServer {
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
+          backgroundRunOwner?: BackgroundRunOwner;
+          sapAnswerStrategy?: SapAnswerStrategy;
+          lineMatchStrategy?: LineMatchStrategy;
           batch?: InstanceBatch;
           heldLocks?: HeldLocks;
           longSession?: LongSession;
@@ -579,8 +602,17 @@ export class StreamableHttpServer extends BaseMcpServer {
         stateLogger: this.stateLogger,
         // A handle the pool already files is drawn again.
         isStateHandleTaken: this.pool.isHandleTaken,
+        ...(this.sapAnswerStrategy !== undefined && {
+          sapAnswerStrategy: this.sapAnswerStrategy,
+        }),
+        ...(this.lineMatchStrategy !== undefined && {
+          lineMatchStrategy: this.lineMatchStrategy,
+        }),
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
+          // The running runs' owner is this server's, shared by every
+          // instance it makes: a discard reaching any of them cancels.
+          backgroundRunOwner: this.runOwner,
         }),
         // Batch mode: this pooled instance's own, never shared with another.
         ...(this.batchSettings !== undefined && {
@@ -589,7 +621,8 @@ export class StreamableHttpServer extends BaseMcpServer {
         // An instance lasts one request unless it holds state: a lock taken
         // here is kept as state, so the write and the unlock under it reach
         // this instance (and its SAP session) by its state_handle.
-        heldLocks: new HeldLocks(),
+        // routed by the state_handle: the refusal names it.
+        heldLocks: new HeldLocks({ routedByStateHandle: true }),
         // The long session the model opens: held state while open, so this
         // instance and its SAP connection serve every call carrying its
         // state_handle.

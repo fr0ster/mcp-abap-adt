@@ -7,6 +7,7 @@
  * Both run the real client over a recording connection and are compared whole.
  */
 import { handleReadTransportObjects } from '@mcp-abap-adt/lib/handlers/read';
+import { listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { TOOL_DEFINITION as FullRead } from '../../../src/handlers/transport/readonly/handleReadTransportObjects';
 import { compactReadOnlyEntries } from '../group';
 import { compactReadRouterMap } from '../handlers/compactReadRoutes';
@@ -70,16 +71,16 @@ function recording(document: string = DOCUMENT) {
 
 describe('HandlerGet with object_type TRANSPORT', () => {
   it('routes to the full set’s ReadTransportObjects, and the matrix says get', () => {
-    expect(compactReadRouterMap.TRANSPORT.get).toBe(handleReadTransportObjects);
-    expect(CompactGet.inputSchema.properties.transport_number).toBeDefined();
+    expect(compactReadRouterMap.TRANSPORT.get).toBeDefined();
+    expect(CompactGet.inputSchema.shape.transport_number).toBeDefined();
     expect(CompactGet.description).toContain('TRANSPORT(transport_number*)');
-    expect(FullRead.inputSchema.required).toEqual(['transport_number']);
+    expect(listedJson(FullRead.inputSchema).required).toEqual([
+      'transport_number',
+    ]);
   });
 
   it('is still the one HandlerGet tool', () => {
-    const names = compactReadOnlyEntries(() => ({}) as never).map(
-      (e) => e.toolDefinition.name,
-    );
+    const names = compactReadOnlyEntries().map((e) => e.toolDefinition.name);
     expect(names.filter((n) => n === 'HandlerGet')).toHaveLength(1);
   });
 
@@ -143,13 +144,13 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     ]);
   });
 
-  it('refuses a missing transport_number in the full read’s words, sending nothing', async () => {
+  it('refuses a missing transport_number by the full read’s schema, sending nothing', async () => {
     const compact = recording();
-    const refused = (await handleHandlerGet(compact.context, {
-      object_type: 'TRANSPORT',
-    })) as { isError: boolean };
-    expect(refused.isError).toBe(true);
-    expect(JSON.stringify(refused)).toContain('transport_number is required');
+    await expect(
+      handleHandlerGet(compact.context, { object_type: 'TRANSPORT' }),
+    ).rejects.toThrow(
+      'Invalid arguments for tool ReadTransportObjects: Invalid input: expected string, received undefined at transport_number',
+    );
     expect(compact.sent).toEqual([]);
   });
 

@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateStructureLow Handler - Update ABAP Structure DDL Source
  *
@@ -17,7 +19,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -27,31 +29,24 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update DDL source code of an existing ABAP structure. Requires lock handle from LockObject. - use UpdateStructureSource for full workflow with lock/unlock.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      structure_name: {
-        type: 'string',
-        description: 'Structure name. Structure must already exist.',
-      },
-      ddl_code: {
-        type: 'string',
-        description: 'Complete DDL source code for the structure definition.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['structure_name', 'ddl_code', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    structure_name: z
+      .string()
+      .describe('Structure name. Structure must already exist.'),
+    ddl_code: z
+      .string()
+      .describe('Complete DDL source code for the structure definition.'),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateStructureArgs {

@@ -3,14 +3,12 @@
  * Provides utilities for parsing responses, managing sessions, etc.
  */
 
+import assert from 'node:assert/strict';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError } from 'axios';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  isAlreadyCheckedError,
-  isAlreadyExistsError,
-} from '../../../lib/utils';
+import { HeldLocks } from '../../../lib/state/heldLocks';
 import type { LoggerWithExtras } from './loggerHelpers';
 import { createTestLogger } from './loggerHelpers';
 
@@ -64,7 +62,7 @@ export function expectWriteAccepted(response: {
       `Handler returned error: ${response.content[0]?.text || 'Unknown error'}`,
     );
   }
-  expect(response.content[0]?.text).toBe('SUCCESS');
+  assert.equal(response.content[0]?.text, 'SUCCESS');
 }
 
 /**
@@ -187,78 +185,6 @@ export function logTestStep(step: string): void {
 }
 
 /**
- * Check if error message indicates object was already checked
- * Re-exports from lib/utils for use in tests
- */
-/**
- * Check if error message indicates object already exists
- * Re-exports from lib/utils for use in tests
- */
-export { isAlreadyCheckedError, isAlreadyExistsError };
-
-/**
- * Safely handle check operation response - ignores "already checked" errors
- * @param checkResponse - Handler response from check operation
- * @param objectName - Name of object being checked (for error messages)
- * @throws Error if check failed with a real error (not "already checked")
- */
-export function handleCheckResponse(
-  checkResponse: {
-    isError: boolean;
-    content: Array<{ type: string; text: string }>;
-  },
-  objectName: string,
-): void {
-  if (!checkResponse.isError) {
-    return; // Success
-  }
-
-  const errorMsg = extractErrorMessage(checkResponse);
-
-  // "Already checked" is not an error - it's OK, just return
-  if (isAlreadyCheckedError(errorMsg)) {
-    return; // Already checked is OK
-  }
-
-  // Real error - throw
-  throw new Error(`Check failed for ${objectName}: ${errorMsg}`);
-}
-
-/**
- * Safely handle validation response - checks if object already exists
- * @param validateResponse - Handler response from validation
- * @param validateData - Parsed validation data (can be null if validation failed)
- * @param objectName - Name of object being validated
- * @returns true if object exists (should skip test), false if should continue
- */
-export function shouldSkipDueToExistingObject(
-  validateResponse: {
-    isError: boolean;
-    content: Array<{ type: string; text: string }>;
-  },
-  validateData: any | null,
-  _objectName: string,
-): boolean {
-  // Check error message first
-  if (validateResponse.isError) {
-    const errorMsg = extractErrorMessage(validateResponse);
-    if (isAlreadyExistsError(errorMsg)) {
-      return true;
-    }
-  }
-
-  // Check validation result if data is available
-  if (validateData && !validateData.validation_result?.valid) {
-    const message = validateData.validation_result?.message || '';
-    const indicatesExists =
-      validateData.validation_result?.exists || isAlreadyExistsError(message);
-    return indicatesExists;
-  }
-
-  return false;
-}
-
-/**
  * Create HandlerContext from TesterContext
  * Logger is included only if DEBUG_HANDLERS=true
  *
@@ -269,8 +195,12 @@ export function createHandlerContext(context: {
   connection: IAbapConnection;
   logger: LoggerWithExtras;
 }): HandlerContext {
+  // The context stands for a server instance: its own `HandlerLock` keeps
+  // the handles it took, and a write, a delete or an unlock is sent only
+  // under one of them (#4) — without an owner every compact lock is refused.
   const handlerContext: HandlerContext = {
     connection: context.connection,
+    heldLocks: new HeldLocks(),
   };
 
   // Include logger only if DEBUG_HANDLERS is enabled

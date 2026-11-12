@@ -18,6 +18,7 @@ import * as fs from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -141,9 +142,11 @@ async function listOver(
 async function stdioSurface(
   kind: ToolSetKind,
 ): Promise<Record<string, Schema>> {
+  // As the launcher builds it: every set keeps background runs.
   const server = new StdioServer(
-    registryOf(toolSets.stdio[kind], 'stdio'),
+    registryOf(toolSets.stdio[kind], 'stdio', { dataTools: true }),
     undefined,
+    { backgroundRuns: new InMemoryBackgroundRuns() },
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
@@ -154,10 +157,14 @@ async function sseSurface(
   kind: ToolSetKind,
   standIn: AdtStandIn,
 ): Promise<Record<string, Schema>> {
-  const sse = new SseServer(registryOf(toolSets.sse[kind], 'sse'), {
-    host: '127.0.0.1',
-    port: 0,
-  });
+  const sse = new SseServer(
+    registryOf(toolSets.sse[kind], 'sse', { dataTools: true }),
+    {
+      host: '127.0.0.1',
+      port: 0,
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   await sse.start();
   const listener = (sse as unknown as { standaloneServer: Server })
     .standaloneServer;
@@ -192,12 +199,14 @@ async function httpSurface(
   standIn: AdtStandIn,
 ): Promise<Record<string, Schema>> {
   const mcp = new StreamableHttpServer(
-    registryOf(toolSets.http[kind], 'http'),
+    registryOf(toolSets.http[kind], 'http', { dataTools: true }),
     {
       host: '127.0.0.1',
       port: 0,
-      // As the launcher: batch mode on, so descriptions carry its sentence.
+      // As the launcher: batch mode on, so descriptions carry its sentence;
+      // background runs kept.
       batch: { keepRawParts: false },
+      backgroundRuns: new InMemoryBackgroundRuns(),
     },
   );
   await mcp.start();

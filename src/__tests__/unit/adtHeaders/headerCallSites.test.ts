@@ -1,6 +1,10 @@
+import assert from 'node:assert/strict';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
 import { headerCallSites } from '../../../../scripts/lib/headerCallSites';
 import { globSync } from '../../helpers/platform';
+import { repositoryRoot } from '../../helpers/repoRoot';
+import { assertEquals } from '../../integration/helpers/liveAssert';
 
 /**
  * Every server call of a member that takes a header pair goes through the
@@ -10,37 +14,37 @@ import { globSync } from '../../helpers/platform';
  */
 const fixture = (name: string) =>
   join(
-    __dirname,
-    '../../../../scripts/lib/__fixtures__/headerCallSites',
+    repositoryRoot(__dirname),
+    'scripts/lib/__fixtures__/headerCallSites',
     `${name}.fixture.ts`,
   );
 
 describe('headerCallSites', () => {
   it('passes a call through the wrapper with its pair', () => {
     const { offenders, inspected } = headerCallSites([fixture('wrapped')]);
-    expect(inspected).toBe(1);
-    expect(offenders).toEqual([]);
+    assert.equal(inspected, 1);
+    assertEquals(offenders, []);
   });
 
   it('reports a literal pair inside the wrapper', () => {
     const { offenders, inspected } = headerCallSites([fixture('literalPair')]);
-    expect(inspected).toBe(1);
-    expect(offenders).toHaveLength(1);
-    expect(offenders[0]).toContain('not the pair `withAdtHeaders` hands it');
+    assert.equal(inspected, 1);
+    assert.equal(offenders.length, 1);
+    assert.ok(offenders[0].includes('not the pair `withAdtHeaders` hands it'));
   });
 
   it('reports a call outside the wrapper', () => {
     const { offenders, inspected } = headerCallSites([fixture('unwrapped')]);
-    expect(inspected).toBe(1);
-    expect(offenders).toHaveLength(1);
-    expect(offenders[0]).toContain('not the pair `withAdtHeaders` hands it');
+    assert.equal(inspected, 1);
+    assert.equal(offenders.length, 1);
+    assert.ok(offenders[0].includes('not the pair `withAdtHeaders` hands it'));
   });
 
   it('reports an operation naming another member', () => {
     const { offenders } = headerCallSites([fixture('otherMember')]);
-    expect(offenders).toHaveLength(1);
-    expect(offenders[0]).toContain(
-      'names the operation of `getWhereUsedScope`',
+    assert.equal(offenders.length, 1);
+    assert.ok(
+      offenders[0].includes('names the operation of `getWhereUsedScope`'),
     );
   });
 });
@@ -54,10 +58,10 @@ describe('every server call of a header-taking member', () => {
   it('was found: the scan resolved the members', () => {
     // 200-odd call sites across the handlers and lib; a run that resolved
     // nothing would find none and pass.
-    expect(inspected).toBeGreaterThan(200);
+    assert.ok(inspected > 200);
   });
 
   it('goes through withAdtHeaders with the pair it hands', () => {
-    expect(offenders).toEqual([]);
+    assertEquals(offenders, []);
   });
 });

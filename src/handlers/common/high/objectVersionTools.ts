@@ -15,21 +15,19 @@
  * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
  */
 
+import * as z from 'zod';
 import type {
   VersionedKind,
   VersionSourceKind,
 } from '../../../lib/adtProjections';
+import type { McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,
   SapEnvironment,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
 import {
   readVersionSource,
@@ -37,8 +35,15 @@ import {
   resolveVersionedObject,
 } from '../readonly/resolveVersionedObject';
 
-/** Handler signature before context injection (the group wraps with withContext). */
-type RawHandler = (context: HandlerContext, args: any) => Promise<any>;
+/**
+ * A version tool's handler: the arguments as its schema parses them — the
+ * name parameter is the type's own (`nameParam`), so the keys are known
+ * only per row, and each is read as a value of unknown shape.
+ */
+type RawHandler = (
+  context: HandlerContext,
+  args: Readonly<Record<string, unknown>>,
+) => Promise<McpResult>;
 
 export interface ObjectVersionToolEntry {
   toolDefinition: ToolDefinition;
@@ -160,30 +165,25 @@ function buildVersionsTool(
   row: VersionedTypeRow<VersionedKind>,
 ): ObjectVersionToolEntry {
   const isFm = row.object_type === 'function_module';
-  const properties: Record<string, unknown> = {
-    [row.nameParam]: {
-      type: 'string',
-      description: `${row.label} name.`,
-    },
+  const named = {
+    [row.nameParam]: z.string().describe(`${row.label} name.`),
   };
-  const required = [row.nameParam];
-  if (isFm) {
-    properties.function_group_name = {
-      type: 'string',
-      description: 'Owning function group name (required).',
-    };
-    required.push('function_group_name');
-  }
+  const inputSchema = z.object(
+    isFm
+      ? {
+          ...named,
+          function_group_name: z
+            .string()
+            .describe('Owning function group name (required).'),
+        }
+      : named,
+  );
 
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
     description: `[read-only] Lists the version history of the ${row.label} named by ${row.nameParam}: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.${row.note ? ` ${row.note}` : ''}`,
-    inputSchema: {
-      type: 'object',
-      properties,
-      required,
-    },
+    inputSchema,
   };
 
   const handler: RawHandler = async (context, args) => {
@@ -207,7 +207,7 @@ function buildVersionsTool(
           String(name),
           functionGroupName ? String(functionGroupName) : undefined,
         );
-      } catch (e: any) {
+      } catch (e) {
         return return_error(e instanceof Error ? e : new Error(String(e)));
       }
 
@@ -224,13 +224,13 @@ function buildVersionsTool(
             null,
             2,
           ),
-        } as AxiosResponse);
-      } catch (error: any) {
+        });
+      } catch (error) {
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       return return_error(error);
     }
   };
@@ -245,16 +245,13 @@ function buildVersionSourceTool(
     name: `Get${row.display}VersionSource`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
     description: `[read-only] Reads the source of the ${row.label} version named by content_uri, an entry of the ${row.label}'s version history.${row.note ? ` ${row.note}` : ''}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        content_uri: {
-          type: 'string',
-          description: `Opaque content_uri of a version, from the ${row.label}'s version history.`,
-        },
-      },
-      required: ['content_uri'],
-    },
+    inputSchema: z.object({
+      content_uri: z
+        .string()
+        .describe(
+          `Opaque content_uri of a version, from the ${row.label}'s version history.`,
+        ),
+    }),
   };
 
   const handler: RawHandler = async (context, args) => {
@@ -279,13 +276,13 @@ function buildVersionSourceTool(
         const source = await readVersionSource(resolved, String(content_uri));
         return return_response({
           data: JSON.stringify({ success: true, content_uri, source }, null, 2),
-        } as AxiosResponse);
-      } catch (error: any) {
+        });
+      } catch (error) {
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       return return_error(error);
     }
   };
@@ -300,20 +297,18 @@ function buildVersionDiffTool(
     name: `Get${row.display}VersionDiff`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
     description: `[read-only] Compares the two ${row.label} versions named by content_uri_from and content_uri_to, entries of its version history: answers the unified diff of their sources.${row.note ? ` ${row.note}` : ''}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        content_uri_from: {
-          type: 'string',
-          description: `Opaque content_uri of the OLD/base version, from the ${row.label}'s version history.`,
-        },
-        content_uri_to: {
-          type: 'string',
-          description: `Opaque content_uri of the NEW/compare version, from the ${row.label}'s version history.`,
-        },
-      },
-      required: ['content_uri_from', 'content_uri_to'],
-    },
+    inputSchema: z.object({
+      content_uri_from: z
+        .string()
+        .describe(
+          `Opaque content_uri of the OLD/base version, from the ${row.label}'s version history.`,
+        ),
+      content_uri_to: z
+        .string()
+        .describe(
+          `Opaque content_uri of the NEW/compare version, from the ${row.label}'s version history.`,
+        ),
+    }),
   };
 
   const handler: RawHandler = async (context, args) => {
@@ -339,7 +334,7 @@ function buildVersionDiffTool(
 
       try {
         const { diff, identical, notes } = await buildVersionDiff(
-          resolved.obj,
+          resolved,
           String(content_uri_from),
           String(content_uri_to),
         );
@@ -357,13 +352,13 @@ function buildVersionDiffTool(
             null,
             2,
           ),
-        } as AxiosResponse);
-      } catch (error: any) {
+        });
+      } catch (error) {
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       return return_error(error);
     }
   };

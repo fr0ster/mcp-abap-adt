@@ -1,4 +1,3 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
@@ -7,6 +6,7 @@ import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
+import { DataHandlersGroup } from '../lib/handlers/groups/DataHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
 import { RuntimeRunHandlersGroup } from '../lib/handlers/groups/RuntimeRunHandlersGroup.js';
@@ -21,12 +21,16 @@ import type {
   IHandlersRegistry,
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
+import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { registerFreshConnectionFactory } from '../lib/packageSessions.js';
 import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution.js';
+import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
+import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
+import type { HeldLocks } from '../lib/state/heldLocks.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
 import { setSystemContext } from '../lib/systemContext.js';
@@ -42,7 +46,7 @@ export interface EmbeddableMcpServerOptions {
    * ABAP connection to use for all handler calls
    * Injected from consumer (e.g., CloudSdkAbapConnection in cloud-llm-hub)
    */
-  connection: AbapConnection;
+  connection: IAbapConnection;
 
   /**
    * A connection of its own for an operation that needs a new ABAP session:
@@ -69,10 +73,39 @@ export interface EmbeddableMcpServerOptions {
    * keeps them in this process's memory).
    * A run tool called with `background: true` runs on a connection of its
    * own — from `freshConnection` on an injected connection — and its answer
-   * is handed to the strategy. Without it, `background: true` and the
-   * background-run tools are refused (`background_runs_unavailable`).
+   * is handed to the strategy; a listed long tool runs in the background by
+   * default, and the server serves the background-run tools beside any long
+   * tool its registry carries. Without it, a code run's `background: true` and the
+   * background-run tools are refused (`background_runs_unavailable`), and a
+   * long tool answers in the call.
    */
   backgroundRuns?: IBackgroundRuns;
+
+  /**
+   * The system the injected connection reaches, as a key of your choosing,
+   * when the connection answers no URL (`getBaseUrl()` answers `undefined`:
+   * RFC). Background runs are kept per system, client and user; a
+   * connection that answers a URL is keyed by it, and this is not read.
+   * Without a URL and without it, background runs are refused
+   * (`background_runs_unavailable`). Two different systems must be given
+   * different keys: a run of one is never served to the other.
+   */
+  system?: string;
+
+  /**
+   * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
+   * failed read leads to (`'skip' | 'end' | 'throw'`), asked once per SAP
+   * answer with its place. Only SAP answers reach it: a credential refusal
+   * ends the call, a failed batch envelope and anything that is no SAP
+   * answer are thrown, before any strategy. Absent: the shipped one,
+   * `skipSapAnswers`.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy (DO24): which lines of a source are
+   * hits. Absent: the shipped one, `substringLineMatch`.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -92,6 +125,17 @@ export interface EmbeddableMcpServerOptions {
   batch?: InstanceBatch;
 
   /**
+   * The locks this instance takes, created by the embedder for this instance
+   * alone — `new HeldLocks()` — never shared with another instance: compact
+   * `HandlerLock` keeps the handle it answered there, and a write, a delete
+   * or an unlock under a `lock_handle` is sent only under one it keeps.
+   * Absent: the instance makes its own, as it is constructed. A host that
+   * makes an instance per request and keeps a lock across requests hands
+   * each request's instance the owner it keeps for that caller.
+   */
+  heldLocks?: HeldLocks;
+
+  /**
    * Logger instance
    * @default defaultLogger
    */
@@ -104,10 +148,22 @@ export interface EmbeddableMcpServerOptions {
   handlersRegistry?: IHandlersRegistry;
 
   /**
-   * Exposition levels to include when creating default registry
+   * Exposition levels to include when creating default registry.
+   * `data` adds the data tools (`GetSqlQuery`, `GetTableContents`), which
+   * are opt-in: no default names it. SAP API Policy FAQ v1.3 (June 2026),
+   * Q33, says ADT APIs are not intended for reading application tables,
+   * exporting business data or running SQL against SAP systems; whether to
+   * serve them is the customer's decision.
    * @default ['readonly', 'high']
    */
-  exposition?: ('readonly' | 'high' | 'compact' | 'system' | 'search')[];
+  exposition?: (
+    | 'readonly'
+    | 'high'
+    | 'compact'
+    | 'system'
+    | 'search'
+    | 'data'
+  )[];
 
   /**
    * Server version
@@ -243,7 +299,16 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       ...(options.backgroundRuns !== undefined && {
         backgroundRuns: options.backgroundRuns,
       }),
+      ...(options.sapAnswerStrategy !== undefined && {
+        sapAnswerStrategy: options.sapAnswerStrategy,
+      }),
+      ...(options.lineMatchStrategy !== undefined && {
+        lineMatchStrategy: options.lineMatchStrategy,
+      }),
       ...(options.batch !== undefined && { batch: options.batch }),
+      ...(options.heldLocks !== undefined && {
+        heldLocks: options.heldLocks,
+      }),
       ...(options.adtHeaderPairs !== undefined && {
         adtHeaderPairs: options.adtHeaderPairs,
       }),
@@ -253,6 +318,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'injected',
       connection: options.connection,
+      ...(options.system !== undefined && { system: options.system }),
       sessionId: 'embedded',
     });
 
@@ -279,14 +345,15 @@ export class EmbeddableMcpServer extends BaseMcpServer {
    * Creates default handlers registry based on exposition levels
    */
   private createDefaultRegistry(
-    exposition: ('readonly' | 'high' | 'compact' | 'system' | 'search')[],
+    exposition: NonNullable<EmbeddableMcpServerOptions['exposition']>,
     logger?: Logger,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
-    // Dummy context - not actually used because BaseMcpServer.registerHandlers()
-    // creates wrapper lambdas that call getConnection() for fresh context
+    // A registration-only context: BaseMcpServer.registerHandlers() gives
+    // every call a context of its own (getConnection()); this connection
+    // refuses any use in words.
     const dummyContext: HandlerContext = {
-      connection: null as unknown as AbapConnection,
+      connection: noConnection,
       logger: logger ?? noopLogger,
     };
 
@@ -323,6 +390,10 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
     if (exposition.includes('search')) {
       groups.push(new SearchHandlersGroup(dummyContext));
+    }
+    // The data tools, opt-in: only when the exposition names `data`.
+    if (exposition.includes('data')) {
+      groups.push(new DataHandlersGroup(dummyContext));
     }
 
     return new CompositeHandlersRegistry(groups);

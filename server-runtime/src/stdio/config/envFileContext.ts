@@ -2,33 +2,25 @@ import * as fs from 'node:fs';
 import * as dotenv from 'dotenv';
 
 /**
- * The keys of an `--env` file the process reads from `process.env`: the
- * client, the connection and system type, the language, and the RFC message
- * server's address (`SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`,
- * `SAP_SAPROUTER`), which the launcher reads after the file as it reads the
- * connection type.
+ * The keys of a destination's own `.env` the process reads from
+ * `process.env`: the connection type and the system type, which decide the
+ * start before any destination is read.
  *
- * `--env-path` hands the file to the auth broker's session store, which
- * connects with it but never touches `process.env`, so these are bridged
- * here. `SAP_LANGUAGE` was missing from the list, and every object created
- * through a session from `--env-path` took the library's default language
- * instead of the file's (#182).
+ * Nothing else of the file joins the environment (24.0.0): the client, the
+ * language and the RFC address (`SAP_CLIENT`, `SAP_LANGUAGE`, `SAP_ASHOST`,
+ * `SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`,
+ * `SAP_SAPROUTER`) are the destination's own means, read from the file by
+ * its store. A value in the environment is therefore one the process was
+ * started with, and no destination's file ranks above another destination's
+ * means.
  *
  * `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are not bridged
  * (16.0.0): they are the file's destination's own, read per destination
- * (`IDestinations.systemContextFor`). In the process environment they would
- * become every other destination's fallback.
+ * (`IDestinations.systemContextFor`).
  */
 export const ENV_FILE_CONTEXT_KEYS = [
-  'SAP_CLIENT',
   'SAP_CONNECTION_TYPE',
   'SAP_SYSTEM_TYPE',
-  'SAP_LANGUAGE',
-  'SAP_MSHOST',
-  'SAP_MSSERV',
-  'SAP_SYSID',
-  'SAP_GROUP',
-  'SAP_SAPROUTER',
 ] as const;
 
 /**

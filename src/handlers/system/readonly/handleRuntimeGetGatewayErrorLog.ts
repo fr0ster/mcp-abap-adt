@@ -1,5 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
@@ -9,33 +10,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     '[read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      error_url: {
-        type: 'string',
-        description:
-          'Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.',
-      },
-      user: {
-        type: 'string',
-        description: 'Filter errors by SAP username.',
-      },
-      max_results: {
-        type: 'number',
-        description: 'Maximum number of errors to return.',
-      },
-      from: {
-        type: 'string',
-        description: 'Start of time range in YYYYMMDDHHMMSS format.',
-      },
-      to: {
-        type: 'string',
-        description: 'End of time range in YYYYMMDDHHMMSS format.',
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    error_url: z
+      .string()
+      .optional()
+      .describe(
+        'Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.',
+      ),
+    user: z.string().optional().describe('Filter errors by SAP username.'),
+    max_results: z
+      .number()
+      .optional()
+      .describe('Maximum number of errors to return.'),
+    from: z
+      .string()
+      .optional()
+      .describe('Start of time range in YYYYMMDDHHMMSS format.'),
+    to: z
+      .string()
+      .optional()
+      .describe('End of time range in YYYYMMDDHHMMSS format.'),
+  }),
 } as const;
 
 interface RuntimeGetGatewayErrorLogArgs {

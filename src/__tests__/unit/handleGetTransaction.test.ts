@@ -19,6 +19,7 @@ import {
 } from '../../handlers/system/readonly/handleGetTransaction';
 import { structured } from '../../lib/strategies/reading';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { listedJson } from '../helpers/listedJson';
 
 const DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?>' +
@@ -236,6 +237,8 @@ describe('GetTransaction', () => {
   });
 
   it('declares detail', () => {
-    expect(TOOL_DEFINITION.inputSchema.properties).toHaveProperty('detail');
+    expect(listedJson(TOOL_DEFINITION.inputSchema).properties).toHaveProperty(
+      'detail',
+    );
   });
 });

@@ -74,7 +74,7 @@ Every public function and method operates against well-defined input/output type
 | ADT Objects | `IAdtObject<TConfig, TState>`, `IAdtObjectState`, `IAdtObjectConfig` | CRUD lifecycle for ABAP objects |
 | Logging | `ILogger`, `LogLevel` | Structured logging |
 | Validation | `IHeaderValidationResult`, `IValidatedAuthConfig` | Header analysis |
-| SAP Config | `ISapConfig`, `SapAuthType` | SAP system configuration |
+| SAP Config | `ISapConfig` (the union of `ISapHttpConfig` and `ISapRfcConfig`, by `connectionType`), `SapAuthType` | SAP system configuration |
 | Headers | `HEADER_*` constants, header group arrays | HTTP header contracts |
 
 **Generic object model** -- every ABAP object type is modeled through two generic parameters:
@@ -263,6 +263,16 @@ type Source =
 | sse | `headerSource` of the `GET` that opened the connection | one per SSE connection |
 | embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
 
+**Where a configuration enters the type system.** Input from outside the type system is checked
+where it is read; past that point nothing checks again what the type proves:
+
+| Source | Where it enters | Who checks |
+|:---|:---|:---|
+| stdio destination: its means, its URL sources, the start parameters | `AuthBrokerFactory.readSettings` | the server, before any connection opens: an RFC destination states one address, its client and language and no URL (`checkDestinationStatement`, `DestinationAddressRefusal`) |
+| HTTP / SSE: `x-sap-*` headers | `credentialFromHeaders` | the server: `x-sap-url` required; the result is an `ISapHttpConfig` |
+| embedder: a typed `SapConfig` (`setConfigOverride`, `createAbapConnection`, the exported factories) | the embedder's code | the embedder: an embedder that reads configuration from outside the type system (an env file, the environment, YAML) validates it before it builds an `ISapConfig`, narrowed on `connectionType`, a literal of its shape; the server uses it as typed |
+| embedder: an injected `IAbapConnection` / `freshConnection` | the embedder's code | the embedder; `getBaseUrl()` is read as typed — `undefined` over RFC, then `EmbeddableMcpServerOptions.system` identifies the system of its background runs |
+
 The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.ts`): the published
 lib and the http and sse packages declare and reach no broker, stores or `interfaces-auth-broker`;
 `server-runtime` declares them and only its stdio paths reach them; http and sse never reach each
@@ -335,7 +345,8 @@ responsible and master system a create fills, which also name the debugger's req
 background run's caller — are made once, together with the connection, per destination (the
 resolved credential and its target system — URL, client, wire —, not the session): on stdio at the
 start (`bornAtStart`, or the leftover session's file), a failure ending the process before the
-transport opens; on SSE once per stream, on Streamable HTTP when the pooled instance's connection is
+transport opens — with `--deferred-logon` at the first tool call that builds the connection
+(`getConnection`, `birthEntry` with `--restore-session`), a failure that call's answer; on SSE once per stream, on Streamable HTTP when the pooled instance's connection is
 created (`buildConnection` → `requireSystem`), a failure that call's answer — the connection ends
 and nothing is kept, so the next call that creates one asks again. Never after a tool: **no tool
 runs twice**. The lookup (`systeminformation`, through the resolver the host passes; none by
@@ -426,24 +437,30 @@ deployments, a write binary for full access.
 CompositeHandlersRegistry
   └── for each IHandlerGroup:
         └── BaseHandlerGroup.registerHandlers(server)
-              └── for each HandlerEntry:
-                    ├── Convert JSON Schema → Zod
-                    ├── Wrap handler with context injection
-                    └── server.registerTool(name, schema, wrappedHandler)
+              └── for each HandlerEntry { toolDefinition, call }:
+                    ├── The variant's zod schema and description (listedTool)
+                    ├── Wrap entry.call with the call's context
+                    └── server.registerTool(name, { description, inputSchema }, wrappedCall)
 ```
 
 Each handler follows a uniform pattern:
 
 ```typescript
-// Tool definition (static metadata)
+// Tool definition (static metadata); the schema is zod: the arguments' type and their check
 export const TOOL_DEFINITION = {
   name: "GetProgram",
   description: "Retrieve ABAP program source code",
-  inputSchema: { type: "object", properties: { program_name: { type: "string" } }, required: ["program_name"] }
+  inputSchema: z.object({
+    program_name: z.string().describe("Program name."),
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
-// Handler function (receives injected context)
-export async function handleGetProgram(context: HandlerContext, args: GetProgramArgs) {
+// Handler function (receives injected context and the schema's output)
+export async function handleGetProgram(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
   const client = new AdtClient(context.connection, context.logger);
   const result = await client.getProgram().read({ programName: args.program_name }, args.version || 'active');
   return return_response(result);
@@ -586,13 +603,13 @@ graph TD
 4. Handler invocation
    ├── BaseMcpServer resolves tool name → handler function
    ├── Creates HandlerContext { connection: IAbapConnection, logger: ILogger }
-   └── Calls the handler in its form (callInItsForm): handler(context, args), or handler(args) for an args-only one
+   └── Calls the entry: entry.call(context, args) — the arguments parsed with the tool's schema, then the handler
 
 5. ADT operation execution
    ├── Handler creates AdtClient(connection, logger)
    ├── Calls typed operation (e.g., client.getProgram().read(...))
    ├── AdtClient delegates to IAbapConnection.makeAdtRequest()
-   └── Connection handles auth, CSRF, retries, session
+   └── Connection handles auth, CSRF (one fetch, no retry), its named resends, session
 
 6. Response
    └── Handler returns MCP-formatted response (text content)
@@ -616,7 +633,7 @@ The system has three distinct IoC boundaries:
 2. Reads configuration (CLI, YAML, env)
 3. Chooses the stores of a destination (`server-runtime/src/stdio/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 4. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
-5. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`
+5. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`. With `--deferred-logon` nothing is sent at the start: the transport opens, and the first tool call that needs the connection makes it (a failure is its answer — `no_connection`, naming the cause code only, when the system cannot be reached)
 6. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
 7. Starts `StdioServer` with `destinationSource`
 
@@ -680,7 +697,7 @@ For deeper customization, consumers can build the config directly (`CoreConfig`,
 
 To add new tools:
 
-1. **Create a handler** following the existing pattern (TOOL_DEFINITION + handler function)
+1. **Create a handler** following the existing pattern (TOOL_DEFINITION with a zod `inputSchema` + handler function)
 2. **Create a handler group** implementing `IHandlerGroup`
 3. **Register it** via `CompositeHandlersRegistry.addHandlerGroup()`
 
@@ -690,10 +707,14 @@ class CustomHandlerGroup extends BaseHandlerGroup {
 
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: { name: 'CustomTool', description: '...', inputSchema: { ... } },
-        handler: (context, args) => handleCustomTool(context, args),
-      },
+      defineTool(
+        {
+          name: 'CustomTool',
+          description: '...',
+          inputSchema: z.object({ name: z.string().describe('...') }),
+        },
+        (context, args) => handleCustomTool(context, args), // args: { name: string }
+      ),
     ];
   }
 }
@@ -702,11 +723,15 @@ class CustomHandlerGroup extends BaseHandlerGroup {
 registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 ```
 
-A handler takes the call's context and its arguments, `(context, args)`, or its arguments alone,
-`(args) => handleX(this.context, args)`: `ToolHandler` is the union of the two forms
-(`ContextHandler | ArgsOnlyHandler`). Every registration path tells them apart by the handler's
-parameter count, `isArgsOnly(handler)`, and calls it in its form with `callInItsForm` (both from
-`@mcp-abap-adt/lib/handlers`); code that calls a `HandlerEntry`'s handler itself does the same.
+`defineTool(definition, handler)` (`@mcp-abap-adt/lib/handlers`) pairs a definition with its
+handler, checked by the compiler: the handler takes the call's context and the output of the
+definition's zod schema, `(context, z.output<typeof inputSchema>)`. The entry it answers,
+`HandlerEntry`, is `{ toolDefinition, call(context, args), connectionless? }`; every registration
+path passes the call's context at the call, and `call` parses the arguments with the schema before
+the handler runs — arguments that do not parse are refused, naming each issue
+(`Input validation error: Invalid arguments for tool <Tool>: …`), and the handler does not run. Code
+that calls an entry itself calls `entry.call(context, args)`; `registry.registerTool(server, entry)`
+registers one.
 
 ### 5.5 Architectural Guarantees
 
@@ -755,7 +780,7 @@ For troubleshooting:
 
 - Enable debug logging: `AUTH_LOG_LEVEL=debug` or `DEBUG_AUTH_LOG=true`
 - Token flow diagnostics: `AuthBroker` logs every step of the acquisition flow
-- Connection diagnostics: `AbstractAbapConnection` logs CSRF operations, retries, and session state
+- Connection diagnostics: `AbstractAbapConnection` logs CSRF operations, its named resends, and session state
 - Handler diagnostics: Each handler logs operation parameters and error details
 - All sensitive data (tokens, passwords, secrets) is redacted in log output
 

@@ -1,12 +1,16 @@
 import * as fs from 'node:fs';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLBuilder } from 'fast-xml-parser';
-import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   parseStructure,
   structured,
   verbatim,
 } from '../../lib/strategies/reading';
+import {
+  ADT_CORPUS_DIR,
+  corpusBody,
+  corpusSidecar,
+} from '../helpers/adtCorpus';
 
 /**
  * Why an XML-bodied object must be read with `verbatim`.

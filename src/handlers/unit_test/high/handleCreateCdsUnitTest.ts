@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateCdsUnitTest — give a CDS view ABAP Unit tests, in one call: check the
  * view can be tested with test doubles, create the global class that holds the
@@ -17,7 +20,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
@@ -30,42 +33,38 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      cds_view_name: {
-        type: 'string',
-        description:
-          'CDS view under test (DDL source). Must be active and testable with test doubles.',
-      },
-      class_name: {
-        type: 'string',
-        description: 'Name of the new global class that holds the tests.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package of the new test class.',
-      },
-      test_class_source: {
-        type: 'string',
-        description:
-          'ABAP source of the local test classes: definitions and implementations, FOR TESTING.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request, not a task. Required for a transportable package.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [
-      'cds_view_name',
-      'class_name',
-      'package_name',
-      'test_class_source',
-    ],
-  },
+  inputSchema: createArguments('CreateCdsUnitTest', {
+    cds_view_name: z
+      .string()
+      .describe(
+        'CDS view under test (DDL source). Must be active and testable with test doubles.',
+      ),
+    class_name: z
+      .string()
+      .describe('Name of the new global class that holds the tests.'),
+    package_name: z.string().describe('Package of the new test class.'),
+    test_class_source: z
+      .string()
+      .describe(
+        'ABAP source of the local test classes: definitions and implementations, FOR TESTING.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request, not a task. Required for a transportable package.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
+
+/** The arguments the schema requires, checked again before anything is sent. */
+const REQUIRED_ARGUMENTS = [
+  'cds_view_name',
+  'class_name',
+  'package_name',
+  'test_class_source',
+] as const;
 
 interface CreateCdsUnitTestArgs {
   cds_view_name: string;
@@ -80,7 +79,7 @@ export async function handleCreateCdsUnitTest(
   context: HandlerContext,
   args: CreateCdsUnitTestArgs,
 ) {
-  for (const required of TOOL_DEFINITION.inputSchema.required) {
+  for (const required of REQUIRED_ARGUMENTS) {
     if (!args?.[required]) {
       return return_error(new Error(`${required} is required`));
     }

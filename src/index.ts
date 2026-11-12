@@ -14,4 +14,9 @@ import './lib/instance.js';
 
 export * from './embeddable/index.js';
 export * from './lib/handlers/index.js';
-export { type LibInstance, libInstances } from './lib/instance.js';
+export {
+  type EarlierLibCopy,
+  type LibCopy,
+  type LibInstance,
+  libInstances,
+} from './lib/instance.js';

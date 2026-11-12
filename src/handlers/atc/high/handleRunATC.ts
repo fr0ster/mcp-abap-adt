@@ -5,6 +5,7 @@ import type {
   AtcObjectType,
   IAtcObjectRef,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import {
   ATC_OBJECT_TYPES,
   type AtcKindOn,
@@ -79,63 +80,57 @@ function typeWords(kind: AtcKindOn<ProjectionVariant>): string {
 
 /** RunATC's input on `variant`: its object types are the variant's. */
 function runAtcSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      objects: {
-        type: 'array',
-        description:
-          'The objects to check. One run may cover several; each needs a name and a type.',
-        items: {
-          type: 'object',
-          properties: {
-            name: {
-              type: 'string',
-              description: 'Object name.',
-            },
-            type: {
-              type: 'string',
-              enum: ATC_OBJECT_TYPES[variant],
-              description:
-                'Object type. "package" checks everything inside the package. An include is checked as the object that owns it. "function_include" needs function_group; "class_include" needs include_kind, with name the class.',
-            },
-            function_group: {
-              type: 'string',
-              description:
-                'For type "function_include" only: the function group the include belongs to. Refused on any other type.',
-            },
-            include_kind: {
-              type: 'string',
-              enum: CLASS_INCLUDE_KINDS,
-              description:
-                'For type "class_include" only: which include of the class named by name. Refused on any other type.',
-            },
-          },
-          required: ['name', 'type'],
-        },
-        minItems: 1,
-      },
-      check_variant: {
-        type: 'string',
-        description:
-          "ATC check variant. Omitted, the system's own default variant is used.",
-      },
-      max_findings: {
-        type: 'integer',
-        minimum: 1,
-        description:
-          'Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.',
-        default: 100,
-      },
-      wait: {
-        type: 'boolean',
-        description:
-          'Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.',
-        default: false,
-      },
-    },
-    required: ['objects'],
-  } as const;
+  return z.object({
+    objects: z
+      .array(
+        z.object({
+          name: z.string().describe('Object name.'),
+          type: z
+            .enum(ATC_OBJECT_TYPES[variant])
+            .describe(
+              'Object type. "package" checks everything inside the package. An include is checked as the object that owns it. "function_include" needs function_group; "class_include" needs include_kind, with name the class.',
+            ),
+          function_group: z
+            .string()
+            .optional()
+            .describe(
+              'For type "function_include" only: the function group the include belongs to. Refused on any other type.',
+            ),
+          include_kind: z
+            .enum(CLASS_INCLUDE_KINDS)
+            .optional()
+            .describe(
+              'For type "class_include" only: which include of the class named by name. Refused on any other type.',
+            ),
+        }),
+      )
+      .min(1)
+      .describe(
+        'The objects to check. One run may cover several; each needs a name and a type.',
+      ),
+    check_variant: z
+      .string()
+      .optional()
+      .describe(
+        "ATC check variant. Omitted, the system's own default variant is used.",
+      ),
+    max_findings: z
+      .number()
+      .int()
+      .min(1)
+      .default(100)
+      .optional()
+      .describe(
+        'Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.',
+      ),
+    wait: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.',
+      ),
+  });
 }
 
 interface RunATCObjectArg {
@@ -182,6 +177,8 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
   const variant = variantOf(connection);
   const refs: IAtcObjectRef[] = [];
   for (const o of objects) {
+    // Named, as checked above.
+    const name = o.name ?? '';
     const kind = acceptedOf(o.type ?? '', ATC_OBJECT_TYPES[variant]);
     if (kind === undefined) {
       return return_error(
@@ -190,7 +187,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
         ),
       );
     }
-    const ref = toObjectRef(o, kind);
+    const ref = toObjectRef(o, name, kind);
     if (typeof ref === 'string') return return_error(new Error(ref));
     refs.push(ref);
   }
@@ -236,7 +233,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
             analyse: analyseException,
           }),
         )();
-        if (!variant.ok) return variant as never;
+        if (!variant.ok) return variant;
         checkVariant = variant.getResult().value;
       }
 
@@ -245,7 +242,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
           analyse: analyseException,
         }),
       )();
-      if (!worklist.ok) return worklist as never;
+      if (!worklist.ok) return worklist;
       const worklistId = worklist.getResult().value;
 
       const run = await atStep('start run', () =>
@@ -255,7 +252,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
           maximumVerdicts,
         }),
       )();
-      if (!run.ok) return run as never;
+      if (!run.ok) return run;
 
       return succeededWith({
         checkVariant,
@@ -288,9 +285,10 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
  */
 function toObjectRef(
   o: RunATCObjectArg,
+  name: string,
   objectType: AtcObjectType,
 ): IAtcObjectRef | string {
-  const objectName = (o.name as string).toUpperCase();
+  const objectName = name.toUpperCase();
   // A field only one kind reads is refused on every other kind, rather than
   // dropped without a word.
   if (o.function_group !== undefined && objectType !== 'function_include') {

@@ -6,12 +6,12 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "23.1.0",
+  "version": "24.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact-http-ro",
-      "version": "23.1.0",
+      "version": "24.0.0",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:{MCP_HTTP_PORT}/mcp/stream/http",
@@ -57,6 +57,12 @@
             "onprem",
             "legacy"
           ]
+        },
+        {
+          "name": "MCP_ENABLE_DATA_TOOLS",
+          "description": "Serve the data tools (GetSqlQuery, GetTableContents; compact HandlerGetData). Off by default: SAP API Policy FAQ v1.3, Q33; the customer decides.",
+          "format": "boolean",
+          "default": "false"
         },
         {
           "name": "MCP_HTTP_HOST",

@@ -25,6 +25,7 @@ import {
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
+import { entries, isElement, isList } from '../xml/tree';
 import type { TlsConfig } from './IServerConfig.js';
 
 /** A start the parameters refuse, in words that name parameters only. */
@@ -76,6 +77,13 @@ export interface Parameter {
   readonly parse?: (raw: unknown, name: string) => ParameterValue;
   /** The value when no form gives one; also the template's value. */
   readonly default?: ParameterValue;
+  /**
+   * A flag the `--conf` template leaves unstated (an empty value) instead of
+   * writing `false`: one whose stated `false` is refused in some starts
+   * (`--restore-session` without `--deferred-logon`), so a template written
+   * and used as it is never states it.
+   */
+  readonly unstatedInTemplate?: true;
   /** The value placeholder of the help (`=<minutes>`); default by kind. */
   readonly valueHint?: string;
   /** The help section the row is listed under. */
@@ -141,10 +149,8 @@ function yamlAt(
   if (!yaml || dotted === undefined) return undefined;
   let node: unknown = yaml;
   for (const segment of dotted.split('.')) {
-    if (node === null || typeof node !== 'object' || Array.isArray(node)) {
-      return undefined;
-    }
-    node = (node as Record<string, unknown>)[segment];
+    if (!isElement(node)) return undefined;
+    node = node[segment];
   }
   return node;
 }
@@ -166,7 +172,7 @@ function removedYamlHits(
       if (key in yaml) {
         found.push({
           form: `${key} (config file)`,
-          value: (yaml as Record<string, unknown>)[key],
+          value: yaml[key],
           removed,
         });
       }
@@ -427,10 +433,10 @@ const SECRET_KEY_FRAGMENTS = [
 export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
   if (value === null || typeof value !== 'object') return [];
   const found: string[] = [];
-  const entries: [string, unknown][] = Array.isArray(value)
+  const members: [string, unknown][] = isList(value)
     ? value.map((v, i) => [String(i), v])
-    : Object.entries(value as Record<string, unknown>);
-  for (const [key, inner] of entries) {
+    : entries(value);
+  for (const [key, inner] of members) {
     const path = prefix ? `${prefix}.${key}` : key;
     const lower = key.toLowerCase();
     if (
@@ -590,7 +596,7 @@ function renderNode(node: TemplateNode, depth: number): string {
     if (!p) continue;
     const values = p.values ? ` (${p.values.join(' | ')})` : '';
     const value =
-      p.kind === 'flag'
+      p.kind === 'flag' && p.unstatedInTemplate !== true
         ? templateValue(p.default ?? false)
         : templateValue(p.default);
     const forms = [p.cli, ...(p.cliAliases ?? []), ...(p.env ? [p.env] : [])];
@@ -703,6 +709,31 @@ export const BATCH_KEEP_RAW_PARTS_ROW: Parameter = {
   help: "Each answer of a batch (BatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
 };
 
+export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';
+export const ENABLE_DATA_TOOLS_ENV = 'MCP_ENABLE_DATA_TOOLS';
+export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';
+
+/**
+ * `--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / YAML `enable-data-tools`:
+ * whether the binary serves the tools that read business data —
+ * `GetSqlQuery` and `GetTableContents`, compact `HandlerGetData`. `true` or
+ * `false`, default `false`; an empty value or YAML null is not given (the
+ * next form decides, as for every row), and any other value is refused at
+ * startup. In every binary's table: on Streamable HTTP and SSE it is a start parameter of the
+ * server, never a request header. SAP API Policy FAQ v1.3 (June 2026), Q33,
+ * is the reason for the default; whether to turn it on is the customer's.
+ */
+export const ENABLE_DATA_TOOLS_ROW: Parameter = {
+  key: 'enableDataTools',
+  cli: ENABLE_DATA_TOOLS_CLI,
+  env: ENABLE_DATA_TOOLS_ENV,
+  yaml: ENABLE_DATA_TOOLS_YAML,
+  kind: 'flag',
+  default: false,
+  section: 'DATA TOOLS',
+  help: "Serves the tools that read business data: GetSqlQuery and GetTableContents (compact: HandlerGetData). true or false; off by default (an empty value counts as not given). SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems. Whether to turn this on is the customer's decision.",
+};
+
 /** The longest `--shutdown-timeout`: a day. */
 export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
 
@@ -794,13 +825,18 @@ export function tlsRows(yamlPrefix: 'http' | 'sse'): readonly Parameter[] {
   ];
 }
 
+/** A text parameter's value; any other kind is none. */
+function textValue(value: ParameterValue | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
 /** The TLS configuration of the read values: cert and key together, or no TLS. */
 export function tlsConfigOf(
   values: Record<string, ParameterValue>,
 ): TlsConfig | undefined {
-  const cert = values.tlsCert as string | undefined;
-  const key = values.tlsKey as string | undefined;
-  const ca = values.tlsCa as string | undefined;
+  const cert = textValue(values.tlsCert);
+  const key = textValue(values.tlsKey);
+  const ca = textValue(values.tlsCa);
   if (cert === undefined && key === undefined && ca === undefined) {
     return undefined;
   }
@@ -886,11 +922,15 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     '--allow-destination-header',
     '--unsafe',
     '--connection-type',
+    '--ashost',
+    '--sysnr',
     '--mshost',
     '--msserv',
     '--sysid',
     '--group',
     '--saprouter',
+    '--client',
+    '--language',
     '--login-timeout',
     '--renewal',
     '--auth-debug',
@@ -904,11 +944,15 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     'allow-destination-header',
     'unsafe',
     'connection-type',
+    'ashost',
+    'sysnr',
     'mshost',
     'msserv',
     'sysid',
     'group',
     'saprouter',
+    'client',
+    'language',
     'browser',
     'browser-program',
     'browser-auth-port',

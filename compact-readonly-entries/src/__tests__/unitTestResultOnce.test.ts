@@ -11,12 +11,12 @@
  * Real adt-clients code runs over the batch proof's counting connection.
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import {
   TOOL_DEFINITION as CDS_RESULT_TOOL,
   handleHandlerCdsUnitTestResult,

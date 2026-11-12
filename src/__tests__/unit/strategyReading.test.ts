@@ -1,11 +1,11 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   parseStructure,
   statusOnly,
   structured,
   verbatim,
 } from '../../lib/strategies/reading';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * The parse every structured reading shares, against real documents.

@@ -7,10 +7,10 @@ import { handleCheckObject } from '../../handlers/common/low/handleCheckObject';
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured } from '../../lib/strategies/reading';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,
@@ -20,8 +20,16 @@ import {
 } from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
-// that reads `seen.last`/`seen.calls` needs this wiring.
-const seen = recordAnalyse();
+// that reads `seen.last`/`seen.calls` needs this wiring. A group activation
+// reads its run until SAP states it ended, so the run reads `finished`.
+const seen = recordAnalyse({
+  getActivationRun: () =>
+    reading(
+      { 'runs:run': { '@': { 'runs:status': 'finished' } } },
+      '<runs:run runs:status="finished"/>',
+      200,
+    ),
+});
 let fakeClient: unknown = seen.client;
 jest.mock('../../lib/clients', () => ({
   // The declared variant the boundary checks a type argument against.
@@ -366,10 +374,13 @@ describe('ActivateObjectLow', () => {
     });
     // Three requests, not one: the POST answers `202` with the id in
     // `Location` and an empty body, so the verdict is in the run's results.
-    // `getActivationRun` repeats while the run has not settled, which the
-    // recording double never reports — only the sequence is pinned here.
+    // `getActivationRun` repeats while the run has not ended; the recording
+    // double answers it finished — only the sequence is pinned here.
+    // The discovery is read first: which endpoint the system offers
+    // (fr0ster/mcp-abap-adt#351); the recording double offers the runs.
     const members = seen.calls.map((c) => c.member);
-    expect(members[0]).toBe('activateObjectsGroup');
+    expect(members[0]).toBe('discovery');
+    expect(members[1]).toBe('activateObjectsGroup');
     expect(members).toContain('getActivationRun');
     expect(members.at(-1)).toBe('getActivationResults');
     for (const call of seen.calls) {
@@ -383,7 +394,10 @@ describe('ActivateObjectLow', () => {
     await handleActivateObject(context as any, {
       objects: [{ name: 'zsb', type: 'SRVB/SVB' }],
     });
-    expect(seen.calls[0].member).toBe('activateObjectsGroup');
+    expect(seen.calls.map((c) => c.member).slice(0, 2)).toEqual([
+      'discovery',
+      'activateObjectsGroup',
+    ]);
   });
 
   it('the group path reads acceptance from the run id, not a hardcoded true', async () => {

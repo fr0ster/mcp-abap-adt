@@ -4,7 +4,7 @@
  * addressed under their function group, so each schema that offers them
  * declares the parent the boundary reads (`parentName`), described as
  * required for those codes. The arguments pass through the schema the server
- * registers (`jsonSchemaToZod`, which drops an undeclared property), then
+ * registers (a zod object, which drops an undeclared property), then
  * the tool's own handler runs over a recording connection declared the
  * variant — real adt-clients code, no SAP.
  */
@@ -28,23 +28,23 @@ import {
   TYPE_NAMES,
 } from '../../../lib/adtProjections';
 import { parentedCodesOf } from '../../../lib/adtTypeCode';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
+import type {
+  HandlerContext,
+  ToolDefinition,
+} from '../../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import {
+  type JsonSchema,
+  jsonFind,
+  listedJson,
+} from '../../helpers/listedJson';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
-
-/** A property of a JSON schema, as the definitions state it. */
-interface Stated {
-  readonly description?: string;
-  readonly properties?: Readonly<Record<string, Stated>>;
-  readonly items?: Stated;
-}
 
 type Handler = (context: HandlerContext, args: unknown) => Promise<unknown>;
 
@@ -55,8 +55,10 @@ type Handler = (context: HandlerContext, args: unknown) => Promise<unknown>;
  */
 interface Offering {
   readonly argument: string;
-  readonly inputSchema: (variant: ProjectionVariant) => Stated;
-  readonly parentOf: (schema: Stated) => Stated | undefined;
+  readonly inputSchema: (
+    variant: ProjectionVariant,
+  ) => ToolDefinition['inputSchema'];
+  readonly parentOf: (schema: JsonSchema) => JsonSchema | undefined;
   readonly args: (
     type: string,
     parentName: string | undefined,
@@ -64,8 +66,8 @@ interface Offering {
   readonly handler: Handler;
 }
 
-const inList = (schema: Stated) =>
-  schema.properties?.objects?.items?.properties?.parentName;
+const inList = (schema: JsonSchema) =>
+  jsonFind(schema, 'objects', '[]', 'parentName');
 
 const listArgs = (type: string, parentName: string | undefined) => ({
   objects: [
@@ -83,7 +85,7 @@ const OFFERINGS: readonly Offering[] = [
     inputSchema: (variant) => ACTIVATE_OBJECTS.variants[variant].inputSchema,
     parentOf: inList,
     args: listArgs,
-    handler: handleActivateObjects,
+    handler: (context, args) => handleActivateObjects(context, parsedLow(args)),
   },
   {
     argument: 'ActivateObjectLow.objects[]',
@@ -103,7 +105,7 @@ const OFFERINGS: readonly Offering[] = [
   {
     argument: 'HandlerActivate.object_adt_type',
     inputSchema: (variant) => HANDLER_ACTIVATE.variants[variant].inputSchema,
-    parentOf: (schema) => schema.properties?.parentName,
+    parentOf: (schema) => jsonFind(schema, 'parentName'),
     args: (type, parentName) => ({
       object_name: 'Z_MCP_PART',
       object_adt_type: type,
@@ -158,8 +160,9 @@ async function call(
   declareSystemKind(connection, variant);
   // What the server hands the handler: the arguments through the schema it
   // registered for the tool on this variant.
-  const shape = jsonSchemaToZod(offering.inputSchema(variant));
-  const registered = z.object(shape).parse(offering.args(type, parentName));
+  const registered = offering
+    .inputSchema(variant)
+    .parse(offering.args(type, parentName));
   const answered = await offering
     .handler({ connection }, registered)
     .catch((thrown: unknown) => ({ thrown: String(thrown) }));
@@ -205,7 +208,9 @@ describe('activation codes that need a parent are servable through the schema', 
   it.each(schemas)(
     '%s on %s declares parentName, required for every code and name needing it',
     (_argument, variant, offering) => {
-      const parent = offering.parentOf(offering.inputSchema(variant));
+      const parent = offering.parentOf(
+        listedJson(offering.inputSchema(variant)),
+      );
       expect(parent).toBeDefined();
       for (const value of parentedOn(variant)) {
         expect(parent?.description).toContain(value);

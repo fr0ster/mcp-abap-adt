@@ -9,20 +9,14 @@
  * `compactToolSetOf` (`@mcp-abap-adt/lib/tool-set`). One implementation
  * for the three compact binaries, none of which may take it from another.
  *
- * **It composes the entry builders, not group instances.** The launcher sets the
- * context on the group that owns an entry, once per request; a child group
- * constructed here would hold the context that existed when the list was built,
- * and its handlers would run against a stale connection or the `null` a server
- * holds before it has connected. Passing `() => this.context` makes every
- * handler read THIS group's context at call time.
+ * It composes the entry builders, not group instances: every entry takes the
+ * call's context at the call.
  */
 import { BaseHandlerGroup } from '../handlers/base/BaseHandlerGroup';
 import type { HandlerContext, HandlerEntry } from '../handlers/interfaces';
 
-/** A half's entry builder: its tools, each reading the context at call time. */
-export type CompactEntryBuilder = (
-  getContext: () => HandlerContext,
-) => HandlerEntry[];
+/** A half's entry builder: its tools, each taking the call's context at the call. */
+export type CompactEntryBuilder = () => HandlerEntry[];
 
 export class CompactHandlersGroup extends BaseHandlerGroup {
   protected groupName: string;
@@ -43,7 +37,6 @@ export class CompactHandlersGroup extends BaseHandlerGroup {
   }
 
   getHandlers(): HandlerEntry[] {
-    const context = () => this.context;
-    return this.builders.flatMap((build) => build(context));
+    return this.builders.flatMap((build) => build());
   }
 }

@@ -1,3 +1,4 @@
+import { child, type Element, entries, isElement, isList } from '../xml/tree';
 import { parseStructure } from './reading';
 
 /**
@@ -19,30 +20,26 @@ export interface ClassMessage {
   readonly element: unknown;
 }
 
-const asArray = (value: unknown): unknown[] =>
-  Array.isArray(value) ? value : value === undefined ? [] : [value];
+const asArray = (value: unknown): readonly unknown[] =>
+  isList(value) ? value : value === undefined ? [] : [value];
 
-const attributesOf = (element: unknown): Record<string, unknown> => {
-  const group = (element as { '@'?: unknown } | null | undefined)?.['@'];
-  return group !== null && typeof group === 'object'
-    ? (group as Record<string, unknown>)
-    : {};
+const attributesOf = (element: unknown): Element => {
+  const group = child(element, '@');
+  return isElement(group) ? group : {};
 };
 
 /**
  * The attributes under their local names. A local name two prefixes share
  * keeps both, each under its full name, so neither hides the other.
  */
-function localFields(
-  attributes: Record<string, unknown>,
-): Record<string, string> {
+function localFields(attributes: Element): Record<string, string> {
   const local = (name: string) => name.slice(name.indexOf(':') + 1);
   const counts = new Map<string, number>();
   for (const name of Object.keys(attributes)) {
     counts.set(local(name), (counts.get(local(name)) ?? 0) + 1);
   }
   const fields: Record<string, string> = {};
-  for (const [name, value] of Object.entries(attributes)) {
+  for (const [name, value] of entries(attributes)) {
     const key = counts.get(local(name)) === 1 ? local(name) : name;
     fields[key] = String(value);
   }
@@ -50,13 +47,8 @@ function localFields(
 }
 
 /** The value under the key whose local name (the part after any prefix) is `name`. */
-const byLocalName = (node: unknown, name: string): unknown => {
-  if (node === null || typeof node !== 'object') return undefined;
-  const key = Object.keys(node).find(
-    (k) => k.slice(k.indexOf(':') + 1) === name,
-  );
-  return key === undefined ? undefined : (node as Record<string, unknown>)[key];
-};
+const byLocalName = (node: unknown, name: string): unknown =>
+  entries(node).find(([k]) => k.slice(k.indexOf(':') + 1) === name)?.[1];
 
 /**
  * The message numbered `msgno` in `document`, compared as the string SAP

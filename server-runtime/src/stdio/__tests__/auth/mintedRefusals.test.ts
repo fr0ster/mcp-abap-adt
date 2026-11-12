@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The server's refusals are minted or its own. Behind the closed gate a
  * provider call answers auth-errors' `interactive-login` `aborted`, never a
@@ -79,9 +80,9 @@ describe('inspection-only mode', () => {
           toolDefinition: {
             name: TOOL,
             description: 'a tool that would read the system',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           },
-          handler: async () => {
+          call: async () => {
             this.reached();
             return { content: [{ type: 'text', text: 'read' }] };
           },

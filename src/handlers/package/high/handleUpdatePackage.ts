@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdatePackage Handler - Update an ABAP package's description, atomically
  *
@@ -5,8 +7,9 @@
  * PACKAGE without `lock_handle` (19.0.0). Like the other high updates it
  * locks, writes and unlocks inside the tool (`withLock`: the lock is held for
  * the read-modify-write in its body and released on every path out): the
- * package's metadata is read, its description patched (`patchPackageXml`,
- * the patch the write under a held lock uses too) and written back.
+ * package's metadata is read, its description patched (adt-clients'
+ * `patchPackageDocument`, the patch the write under a held lock uses too) and
+ * written back.
  *
  * **A package can be saved only once per ABAP session** (PAK/058). Over RFC
  * the whole lock → write → unlock runs in a session of its own, closed
@@ -14,7 +17,10 @@
  * caller's connection serves, the write outside the lock's stateful context.
  */
 
-import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  packageDocuments,
+  patchPackageDocument,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -22,16 +28,15 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
-import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -39,26 +44,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name. Package must already exist.',
-      },
-      description: {
-        type: 'string',
-        description: 'New description for the package.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['package_name', 'description'],
-  },
+  inputSchema: z.object({
+    package_name: z
+      .string()
+      .describe('Package name. Package must already exist.'),
+    description: z.string().describe('New description for the package.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdatePackageArgs {
@@ -104,7 +102,14 @@ export async function handleUpdatePackage(
                     { version: 'active', analyse: analyseException },
                   ),
                 ),
-                atStep('update metadata', (current) =>
+                async (current) =>
+                  patchedDocument(
+                    patchPackageDocument(current.raw, {
+                      description: args.description || undefined,
+                    }),
+                    `package ${packageName}`,
+                  ),
+                atStep('update metadata', (document) =>
                   withAdtHeaders(context, 'package.updateMetadata', (headers) =>
                     pkg.updateMetadata(
                       {
@@ -115,13 +120,7 @@ export async function handleUpdatePackage(
                       },
                       {
                         headers,
-                        source: patchPackageXml(
-                          extractXmlString(
-                            current.raw,
-                            `package ${packageName}`,
-                          ),
-                          { description: args.description },
-                        ),
+                        source: document,
                         lockHandle,
                         analyse: analyseException,
                       },
@@ -134,7 +133,7 @@ export async function handleUpdatePackage(
                 analyse: analyseException,
               }),
             { type: 'PACKAGE', name: packageName },
-          ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+          );
         },
       ),
     project(detail, terseWrite),

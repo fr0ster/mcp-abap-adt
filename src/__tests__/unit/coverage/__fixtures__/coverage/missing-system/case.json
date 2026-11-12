@@ -1,0 +1,17 @@
+{
+  "expect": "missing-system",
+  "ledger": {
+    "GetThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "DeleteThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    }
+  }
+}

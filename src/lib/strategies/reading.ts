@@ -1,5 +1,7 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { withoutNamePrefix } from '../plainText';
+import { attr, child, type Visit, walk } from '../xml/tree';
 
 /**
  * What a result strategy of ours answers.
@@ -48,6 +50,17 @@ export interface AdtReading<T> {
  *
  * Numeric coercion is off on both axes: `T100KEY-NO` is `"026"`, and `026`
  * parsed as a number is `26`, a message key no SAP system knows.
+ *
+ * Entities are decoded: the five XML ones and character references
+ * (`&#39;`, `&#x26;`) — the parser's `htmlEntities`, which also knows the
+ * common HTML names, a spelling no well-formed SAP document uses.
+ *
+ * **Names are matched by prefix, not by namespace URI.** Every reader here
+ * looks an element or an attribute up by the name the document spells
+ * (`adtcore:name`, `atom:link`), or by its local name; none resolves a prefix
+ * to its `xmlns` URI. SAP spells each document type with fixed prefixes, so
+ * this reads SAP's answers; a document that bound another prefix to the same
+ * URI would not be read.
  */
 const REPEATABLE = new Set([
   'msg',
@@ -78,7 +91,8 @@ const parser = new XMLParser({
   parseAttributeValue: false,
   parseTagValue: false,
   removeNSPrefix: false,
-  isArray: (name) => REPEATABLE.has(name.replace(/^\w+:/, '')),
+  htmlEntities: true,
+  isArray: (name) => REPEATABLE.has(withoutNamePrefix(name)),
 });
 
 /** Parse a document into named structure with verbatim attributes. */
@@ -91,9 +105,68 @@ export function parseStructure(document: unknown): unknown {
   }
 }
 
+/** The attribute `name` of an element {@link parseStructure} answered (its attributes sit under `@`). */
+export function attributeOf(node: unknown, name: string): string | undefined {
+  return attr(child(node, '@'), name);
+}
+
+/**
+ * Every element and text member of a document {@link parseStructure} answered,
+ * at any depth ({@link walk}); attributes are not members.
+ *
+ * **The order is the grouped parse's, not the document's.** An element comes
+ * before what it holds and siblings of one name come in their order, but
+ * siblings of different names are grouped by name, in the order each name
+ * first appears: in `<r><x/><p/><x/></r>` both `x` come before `p`. Where
+ * document order matters, read the ordered form (`xml/ordered`).
+ */
+export function walkStructure(document: unknown): Visit[] {
+  return walk(document, ATTRIBUTES).filter(
+    (visit) => !ATTRIBUTES.has(visit.name),
+  );
+}
+
+const ATTRIBUTES: ReadonlySet<string> = new Set(['@']);
+
+/** The members named `name` (as the document spells it), at any depth, in {@link walkStructure}'s order. */
+export function membersNamed(document: unknown, name: string): Visit[] {
+  return walkStructure(document).filter((visit) => visit.name === name);
+}
+
+/**
+ * The value of attribute `name` on the first element that carries it, in
+ * {@link walkStructure}'s order — an element before the ones it holds.
+ */
+export function firstAttribute(
+  document: unknown,
+  name: string,
+): string | undefined {
+  for (const visit of walkStructure(document)) {
+    const value = attributeOf(visit.node, name);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+/**
+ * The value of attribute `name` on the first element named `element` (as the
+ * document spells it) that carries it, in {@link walkStructure}'s order.
+ */
+export function firstAttributeOn(
+  document: unknown,
+  element: string,
+  name: string,
+): string | undefined {
+  for (const { node } of membersNamed(document, element)) {
+    const value = attributeOf(node, name);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
 /** `answer.data` as text, without pretending an object was ever a string. */
 export function rawOf(answer: IAdtWireResponse): string {
-  const body = (answer as { data?: unknown }).data;
+  const body = answer.data;
   if (typeof body === 'string') return body;
   if (body === undefined || body === null) return '';
   if (typeof body === 'object') {
@@ -113,7 +186,7 @@ export function reading<T>(
   return (answer) => ({
     value: parse(answer),
     raw: rawOf(answer),
-    status: Number((answer as { status?: unknown }).status ?? 0),
+    status: answer.status,
   });
 }
 

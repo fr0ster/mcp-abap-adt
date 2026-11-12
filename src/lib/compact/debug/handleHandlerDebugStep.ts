@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import {
   debugBatchRecorder,
   LINE_TARGET_PROPERTIES,
@@ -5,8 +6,8 @@ import {
   STATE_HANDLE_PROPERTY,
   terseOnceStep,
 } from '../../debugger/index';
-import type { ArgsOf, HandlerContext } from '../../handlers/index';
-import { DETAIL_PROPERTY } from '../index';
+import type { HandlerContext } from '../../handlers/index';
+import { DETAIL_SHAPE } from '../../strategies/detail';
 import { KIND_PROPERTY, needed, onceAnswer, refuseOperation } from './shared';
 
 const ABAP_OPERATIONS = [
@@ -25,34 +26,29 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Moves the stopped debuggee: each call sends one SAP request, the operation's. kind abap, on the attached debuggee: stepInto, stepOver, stepReturn and stepContinue step from where it stands; stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack. setStackPosition makes frame position the one variables are read in. kind amdp: stepOver and stepContinue move debuggee_id and answer the request id; the next stop arrives as a break event.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      ...KIND_PROPERTY,
-      operation: {
-        type: 'string',
-        enum: [...ABAP_OPERATIONS],
-        description:
-          'The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.',
-      },
-      ...LINE_TARGET_PROPERTIES,
-      position: {
-        type: 'integer',
-        description:
-          "abap setStackPosition: the frame's position in the stack.",
-      },
-      debuggee_id: {
-        type: 'string',
-        description: 'amdp: the debuggee id of the break event.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'kind', 'operation'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    ...KIND_PROPERTY,
+    operation: z
+      .enum([...ABAP_OPERATIONS])
+      .describe(
+        'The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.',
+      ),
+    ...LINE_TARGET_PROPERTIES,
+    position: z
+      .number()
+      .int()
+      .optional()
+      .describe("abap setStackPosition: the frame's position in the stack."),
+    debuggee_id: z
+      .string()
+      .optional()
+      .describe('amdp: the debuggee id of the break event.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-type Args = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
+type Args = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 const STEPS = {
   stepInto: 'stepInto',

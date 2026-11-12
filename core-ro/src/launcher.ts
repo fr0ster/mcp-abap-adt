@@ -12,7 +12,7 @@
  * decision), and a user installs only what they need. The high,
  * debugger, background-run and resume tools are `mcp-abap-adt`'s.
  */
-import { processEdges } from '@mcp-abap-adt/lib/config';
+import { packageManifestOf, processEdges } from '@mcp-abap-adt/lib/config';
 import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
   main as coreMain,
@@ -27,17 +27,16 @@ import {
 export const readOnlyToolSet: ToolSet = fullReadOnlyToolSet;
 
 /**
- * THIS package's version, for `--version` and `initialize`. `require`, not a
- * file read: a bundler (the portable build) inlines it.
+ * THIS package's manifest, read by its shape (`packageManifestOf`). `require`,
+ * not a file read: a bundler (the portable build) inlines it.
  */
-export const CORE_RO_VERSION: string = (
-  require('../package.json') as { version: string }
-).version;
+const MANIFEST = packageManifestOf(require('../package.json'));
+
+/** THIS package's version, for `--version` and `initialize`. */
+export const CORE_RO_VERSION: string = MANIFEST.version;
 
 /** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
-export const CORE_RO_PACKAGE: string = (
-  require('../package.json') as { name: string }
-).name;
+export const CORE_RO_PACKAGE: string = MANIFEST.name;
 
 export function main(
   edges: StdioLauncherEdges = processEdges(),

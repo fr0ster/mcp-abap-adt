@@ -52,8 +52,8 @@ export function withDnsRebindingProtection(
   return (req, res, next) => {
     const rejection = checkDnsRebinding(
       {
-        host: req.headers?.host as string | undefined,
-        origin: req.headers?.origin as string | undefined,
+        host: req.headers.host,
+        origin: req.headers.origin,
       },
       opts,
     );

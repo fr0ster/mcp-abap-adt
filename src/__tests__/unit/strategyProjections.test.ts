@@ -1,4 +1,5 @@
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import {
   project,
   terseActivation,
@@ -8,6 +9,7 @@ import {
   terseWrite,
 } from '../../lib/strategies/projections';
 import { parseStructure } from '../../lib/strategies/reading';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * One parse, three answers, against real documents.
@@ -64,30 +66,22 @@ describe('activation', () => {
     });
   });
 
-  it("reads a function group's `ioc:inactiveObjects` answer, and states no verdict of its own", () => {
-    // Measured live (RFC, 2026-09-21): ActivateFunctionGroupLow's 2xx answer
-    // for a function group comes back as `ioc:inactiveObjects`, not
-    // `chkl:messages`. Before this case was known, `undefined` here turned a
-    // real SAP answer into `projection_failed`.
-    //
-    // **And it must not turn it into `activated: true` either.** The document
-    // lists objects and says nothing about an outcome; an activation that
-    // failed answers 200 just the same, which is what #154 was. What the
-    // reading offers instead is the objects the answer named, and the fact
-    // that the answer stated no outcome — which is a caller's cue to read the
-    // state back with `GetInactiveObjects`, as the run that measured this did:
-    // it answered `count: 0`. That read is a snapshot — activation is
-    // asynchronous, so a later run seeing a count above zero would mean "not
-    // yet" as readily as "not done", which is why the verdict belongs to
-    // whoever can read again and not to this function.
-    const r = readingOf('activation-still-inactive--01-activation');
-    expect(terseActivation(r.value as never, r.status)).toEqual({
-      activation_not_stated: true,
-      objects: [
-        { type: 'FUGR/F', name: 'ZMCP_BLD_FGR_L1' },
-        { type: 'FUGR/F', name: 'ZMCP_BLD_FGR_L1' },
-      ],
+  it('projects no ioc:inactiveObjects answer: analyseActivation fails it first', () => {
+    // fr0ster/mcp-abap-adt#351: the document lists what is still inactive and
+    // activated nothing (751; S/4HANA 2025 measured the objects still inactive
+    // in two reads ten seconds apart). adt-strategies 0.22.0 answers it as
+    // not activated, with the objects in `stillInactive`, so it never reaches
+    // the projection of a success — and the projection has no branch for it.
+    const name = 'activation-still-inactive--01-activation';
+    const r = readingOf(name);
+    expect(terseActivation(r.value as never, r.status)).toBeUndefined();
+    const verdict = analyseActivation(ADT_NO_FAILURE, {
+      data: corpusBody(name),
+      status: 200,
+      statusText: 'OK',
+      headers: {},
     });
+    expect(verdict).not.toBe(ADT_NO_FAILURE);
   });
 
   /** A checklist still answers a verdict, because a checklist states one. */
@@ -139,13 +133,11 @@ describe('deletion', () => {
     expect(terse.message.text).toContain('already editing');
   });
 
-  // A delete tool answers the check's document only when it sent no delete
-  // (the check said the object is not there), so it says so.
-  it('the check step answers deletable, and not deleted', () => {
+  // A delete tool answers the delete's document: a permitted check is
+  // followed by the delete, so a check's document is no deletion to project.
+  it("the check's document is no deletion", () => {
     const r = readingOf('deletion-check-allows--01-deletion-check');
-    const terse = terseDeletion(r.value as never, r.status) as any;
-    expect(terse.deletable).toBe(true);
-    expect(terse.deleted).toBe(false);
+    expect(terseDeletion(r.value, r.status)).toBeUndefined();
   });
 });
 

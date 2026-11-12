@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteUnitTest — remove every ABAP Unit test of a class: its test include
  * is written empty and the class activated. The class itself stays.
@@ -5,7 +7,7 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { writeClassTests } from '../shared/writeTests';
@@ -15,22 +17,18 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Deletes the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are deleted, and the class stays.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Class that holds the tests. Must already exist.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request, not a task. Required for a transportable object.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z
+      .string()
+      .describe('Class that holds the tests. Must already exist.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request, not a task. Required for a transportable object.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DeleteUnitTestArgs {

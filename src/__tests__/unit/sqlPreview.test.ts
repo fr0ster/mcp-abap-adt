@@ -1,5 +1,5 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import { parseSqlPreview } from '../../lib/strategies/sqlPreview';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * The reading behind `GetSqlQuery` and `GetTableContents`, against the

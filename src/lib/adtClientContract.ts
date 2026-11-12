@@ -25,6 +25,7 @@ import type {
   AdtPerformingVariantsIn,
   AdtReadVersion,
   AdtServingVariantsIn,
+  AdtTypeCode,
   AdtVariant,
   IAccessControlConfig,
   IAccessControlResults,
@@ -34,14 +35,17 @@ import type {
   IAdtCreatable,
   IAdtDataPreview,
   IAdtDeletable,
+  IAdtDiscovery,
   IAdtEnhancementHost,
   IAdtError,
   IAdtGroupLifecycle,
+  IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
   IAdtMainProgramsReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
+  IAdtObjectActivation,
   IAdtObjectProperties,
   IAdtOperationOptions,
   IAdtRepositoryStructure,
@@ -772,7 +776,13 @@ export type FunctionModuleApi<
       'checkDeletion'
     >
   > &
-  IAdtValidatable<IFunctionModuleConfig, ReturnType<R['validation']>> &
+  // The validation names its group and states a description: SAP answers
+  // `400` without one (measured), and adt-clients 43 types it so.
+  IAdtValidatable<
+    IFunctionModuleConfig,
+    ReturnType<R['validation']>,
+    'functionGroupName' | 'description'
+  > &
   IAdtCheckable<IFunctionModuleConfig, ReturnType<R['check']>> &
   IAdtActivatable<IFunctionModuleConfig, ReturnType<R['activation']>> &
   IAdtLockable<IFunctionModuleConfig> &
@@ -879,13 +889,26 @@ export type MessageClassApi<
   > &
   IAdtLockable<IMessageClassConfig>;
 
-/** What the server calls on `getMessageClassMessage()`'s answer. */
+/**
+ * What the server calls on `getMessageClassMessage()`'s answer — `delete`
+ * included: removing a message is a write of its parent class, so it is a
+ * member of the message's own (`AdtMessageClassMessage.delete`), not the
+ * deletion atom.
+ */
 export type MessageClassMessageApi<
   R extends IMessageClassMessageResults,
   V extends AdtVariant,
 > = IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>> &
   StatedReadable<IMessageClassMessageConfig, ReturnType<R['read']>> &
-  IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>;
+  IAdtUpdatable<
+    Partial<IMessageClassMessageConfig>,
+    ReturnType<R['written']>
+  > & {
+    delete<E extends IAdtError = IAdtError>(
+      config: Partial<IMessageClassMessageConfig>,
+      options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>>;
+  };
 
 /** What the server calls on `getAccessControl()`'s answer. */
 export type AccessControlApi<
@@ -1203,6 +1226,35 @@ export type LocalMacrosApi<
   IAdtLockable<IClassConfig>;
 
 /**
+ * The kinds SAP serves an outline for (`GET <object uri>/objectstructure`):
+ * class, interface, program, include and function group — measured on
+ * premise and on ABAP cloud (2026-11-04), the program and the include on
+ * premise only. The implementation's `AdtOutlineCode` names the same five;
+ * interfaces-adt has no outline contract yet, so the list is stated here.
+ */
+export type ServerOutlineCode = OutlineCodes<
+  'CLAS/OC' | 'INTF/OI' | 'PROG/P' | 'PROG/I' | 'FUGR/F'
+>;
+
+/** Codes of the tables, as given: what keeps `ServerOutlineCode` to codes. */
+type OutlineCodes<C extends AdtTypeCode> = C;
+
+/**
+ * An object's outline: one GET, the document as it came (no result slot of
+ * interfaces-adt names it, so no reading is injected for it).
+ */
+export interface IServerObjectOutline {
+  getObjectOutline<E extends IAdtError = IAdtError>(
+    objectType: ServerOutlineCode,
+    objectName: string,
+    options?: {
+      version?: AdtReadVersion;
+      accept?: string;
+    } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>>;
+}
+
+/**
  * The repository search of variant `V`: `IAdtObjectSearch`'s member, its
  * filter the search names every variant of `V` takes
  * (`IAdtSearchObjectsParamsOf<V>`, interfaces-adt 24) — a name of the
@@ -1261,13 +1313,19 @@ export type UtilsApi<
     ReturnType<R['deletion']>,
     V
   > &
+  // The synchronous group activation, for a system whose discovery lists no
+  // `/activation/runs` (adt-clients 45, fr0ster/mcp-abap-adt#351), and the
+  // discovery that says which one the system offers.
+  IAdtObjectActivation<ReturnType<R['objectActivation']>, V> &
+  IAdtDiscovery<ReturnType<R['discovery']>> &
   IAdtDataPreview<
     ReturnType<R['query']>,
     ReturnType<R['columns']>,
     ReturnType<R['contents']>
   > &
   ObjectAccess<ReturnType<R['source']>, ReturnType<R['metadata']>> &
-  IAdtObjectProperties<ReturnType<R['objectProperties']>>;
+  IAdtObjectProperties<ReturnType<R['objectProperties']>> &
+  IServerObjectOutline;
 
 export type IServerAdtClient<V extends AdtVariant = AdtModernVariant> =
   ServedOn<

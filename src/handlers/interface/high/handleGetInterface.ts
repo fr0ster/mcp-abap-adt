@@ -1,17 +1,26 @@
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  SOURCE_RANGE_WORDS,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readInterfaceMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -20,23 +29,16 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetInterface',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      interface_name: {
-        type: 'string',
-        description: 'Interface name.',
-      },
-      part: READ_PART_PROPERTY,
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['interface_name'],
-  },
+  description: `[read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
+  inputSchema: z.object({
+    interface_name: z.string().describe('Interface name.'),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
+  }),
 } as const;
 
-interface GetInterfaceArgs {
+interface GetInterfaceArgs extends SourceRangeArgs {
   interface_name: string;
   part?: ReadPart;
   version?: ReadVersion;
@@ -52,6 +54,8 @@ export async function handleGetInterface(
     return return_error(new Error('interface_name is required'));
   const part = readPartOf(args.part);
   if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args, part);
+  if (range instanceof Error) return return_error(range);
 
   const interfaceName = interface_name.toUpperCase();
   const client = createAdtClient(connection, logger);
@@ -70,15 +74,17 @@ export async function handleGetInterface(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetInterface', detail: 'terse' },
+    range,
     () => obj.read({ interfaceName }, version, { analyse: analyseException }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       interface_name: interfaceName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

@@ -1,7 +1,7 @@
 import { handleMemorySnapshotDelta } from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
 import { handleMemorySnapshotGet } from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 const ctx = (conn: any) => ({ connection: conn, logger: undefined }) as any;

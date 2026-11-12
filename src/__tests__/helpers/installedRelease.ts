@@ -1,9 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { isAbsolute, join } from 'node:path';
 import { spawnOptionsForNpm } from './platform';
+import { repositoryRoot } from './repoRoot';
 
-/** The repository root, where the library's own manifest lives. */
-export const ROOT = join(__dirname, '../../..');
+/**
+ * The repository root, where the library's own manifest lives — found from
+ * here wherever this file was compiled to (`.test-build/` too).
+ */
+export const ROOT = repositoryRoot(__dirname);
 
 /**
  * Every package of this repository's release, by directory, in publish order

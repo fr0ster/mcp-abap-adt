@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,27 +27,21 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Class name.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.",
-        enum: ['active', 'inactive'],
-      },
-      source_code: {
-        type: 'string',
-        description:
-          'Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.',
-      },
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Class name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.",
+      ),
+    source_code: z
+      .string()
+      .optional()
+      .describe(
+        'Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckClass(

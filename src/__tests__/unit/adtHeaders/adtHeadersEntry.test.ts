@@ -75,7 +75,11 @@ describe('the one-shot correction through the subpath', () => {
 
   it('a 406 is answered once more with the type SAP named, and the system keeps it, keyed as the server keys it', async () => {
     const pairs = new AdtHeaderPairs();
-    const system = adtSystemKey({ url: 'https://sap.invalid/', client: '100' });
+    const system = adtSystemKey({
+      url: 'https://sap.invalid/',
+      client: '100',
+      authType: 'basic',
+    });
     const port = pairs.forSystem(system);
     const sent: string[] = [];
     const answer = await withAdtHeaders(
@@ -94,7 +98,11 @@ describe('the one-shot correction through the subpath', () => {
     ]);
     // The same system, another spelling of its URL: the kept pair.
     const again = pairs.forSystem(
-      adtSystemKey({ url: 'https://sap.invalid', client: '100' }),
+      adtSystemKey({
+        url: 'https://sap.invalid',
+        client: '100',
+        authType: 'basic',
+      }),
     );
     expect(again.pairFor('utils.getWhereUsed').accept).toBe(NEWER);
   });

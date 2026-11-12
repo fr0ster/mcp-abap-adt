@@ -14,6 +14,11 @@ export {
   failureLogLine,
   failurePayload,
 } from './answerFailure';
+export {
+  CONNECTION_CAUSE_CODES,
+  type ConnectionCauseCode,
+  connectionCauseOf,
+} from './connectionCause';
 export { assertDestinationName } from './destinationName';
 export type { DestinationSystemContext } from './destinationSystemContext';
 export { errorClassOf, SettingsError } from './errors';
@@ -33,6 +38,7 @@ export {
   INSPECTION_ONLY_WORDS,
   LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
   LEFTOVER_SESSIONS_UNAVAILABLE_WORDS,
+  noConnectionWords,
   ServerRefusal,
   type ServerRefusalCode,
   serverRefusalOf,

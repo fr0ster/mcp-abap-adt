@@ -14,16 +14,17 @@
  * Run: npm test -- --testPathPattern=integration/program
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Program High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_program',
       'builder_program',
@@ -37,7 +38,7 @@ describe('Program High-Level Handlers Integration', () => {
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +50,7 @@ describe('Program High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Program high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Program high-level handlers', async () => {
+    await tester.run();
+  });
 });

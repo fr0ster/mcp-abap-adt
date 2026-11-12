@@ -14,16 +14,17 @@
  * Run: npm test -- --testPathPattern=integration/table
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateTable } from '../../../../handlers/table/high/handleCreateTable';
 import { handleDeleteTable } from '../../../../handlers/table/high/handleDeleteTable';
 import { handleUpdateTable } from '../../../../handlers/table/high/handleUpdateTable';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Table High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester('create_table', 'builder_table', 'table-high', {
       create: handleCreateTable,
       update: handleUpdateTable,
@@ -32,7 +33,7 @@ describe('Table High-Level Handlers Integration', () => {
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -44,11 +45,7 @@ describe('Table High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Table high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Table high-level handlers', async () => {
+    await tester.run();
+  });
 });

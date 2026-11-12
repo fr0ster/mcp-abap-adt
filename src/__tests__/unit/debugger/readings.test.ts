@@ -1,4 +1,3 @@
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   breakpointKey,
   failureText,
@@ -14,6 +13,7 @@ import {
   terseStop,
   terseVariables,
 } from '../../../lib/debugger/readings';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { settingsXml } from './fakes';
 
 describe('readings of the debugger documents (recorded answers)', () => {

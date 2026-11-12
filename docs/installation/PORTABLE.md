@@ -95,8 +95,8 @@ npm run portable:smoke
   the full one more than 250);
 - the RFC stack: started against an RFC destination whose host does not resolve (`unreachable.invalid`,
   fake credentials — nothing is contacted), it must stop at the RFC logon with a start line naming the
-  RFC key, `the RFC logon failed (RFC_COMMUNICATION_FAILURE)`. Since 19.0.0 stdio logs on at its start,
-  so this is where the RFC stack runs; the line holds fixed words and the key only, and a module or SDK
+  RFC key, `the RFC logon failed (RFC_COMMUNICATION_FAILURE)`. Since 19.0.0 stdio logs on at its start
+  (the check runs without `--deferred-logon`), so this is where the RFC stack runs; the line holds fixed words and the key only, and a module or SDK
   that did not load reads `could not be connected at start: Error` instead — that is the failure the
   check catches.
 

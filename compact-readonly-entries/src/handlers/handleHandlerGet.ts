@@ -8,13 +8,18 @@ import {
   compactGetSchemaFor,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import {
+  defineTool,
+  type HandlerContext,
+  variantOf,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetActivationResults,
   handleGetActivationStatus,
   handleGetNodeStructureOnce,
   handleGetObjectStructure,
   handleGetVirtualFolders,
+  READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import {
@@ -49,19 +54,47 @@ const ADDRESS_PARTS = ['object_structure', 'node_structure', 'virtual_folders'];
 /** The parts that read an activation run by its run_id. */
 const RUN_PARTS = ['activation_status', 'activation_results'];
 
+/** The parts that read an object by object_type. */
+const OBJECT_PARTS: readonly CompactReadPart[] = [
+  'source',
+  'metadata',
+  'urls',
+  'contents',
+  'main_programs',
+];
+
+/** Whether `value` is a part read by object_type. */
+function isCompactReadPart(value: unknown): value is CompactReadPart {
+  return OBJECT_PARTS.some((part) => part === value);
+}
+
+/** The address parts' targets: each tool's entry, so its schema parses the call. */
+const virtualFolders = defineTool(
+  READ_DEFINITIONS.GetVirtualFoldersLow,
+  handleGetVirtualFolders,
+).call;
+const nodeStructure = defineTool(
+  READ_DEFINITIONS.GetNodeStructureLow,
+  handleGetNodeStructureOnce,
+).call;
+const objectStructure = defineTool(
+  READ_DEFINITIONS.GetObjectStructure,
+  handleGetObjectStructure,
+).call;
+
 function routeAddressPart(
   context: HandlerContext,
   part: string,
   args: Record<string, unknown>,
 ): Promise<unknown> | unknown {
   if (part === 'virtual_folders') {
-    return handleGetVirtualFolders(context, {
+    return virtualFolders(context, {
       object_search_pattern: args.object_search_pattern,
       preselection: args.preselection,
       facet_order: args.facet_order,
       with_versions: args.with_versions,
       ignore_short_descriptions: args.ignore_short_descriptions,
-    } as never);
+    });
   }
   if (!args.object_adt_type || !args.object_name) {
     return return_error(
@@ -69,17 +102,18 @@ function routeAddressPart(
     );
   }
   if (part === 'node_structure') {
-    return handleGetNodeStructureOnce(context, {
+    return nodeStructure(context, {
       parent_type: args.object_adt_type,
       parent_name: args.object_name,
       node_id: args.node_id,
       with_short_descriptions: args.with_short_descriptions,
-    } as never);
+    });
   }
-  return handleGetObjectStructure(context, {
-    object_type: args.object_adt_type,
-    object_name: args.object_name,
-  } as never);
+  // GetObjectStructure's own arguments: `objecttype`, `objectname`.
+  return objectStructure(context, {
+    objecttype: args.object_adt_type,
+    objectname: args.object_name,
+  });
 }
 
 /**
@@ -158,18 +192,26 @@ export async function handleHandlerGet(
   } else {
     args = { ...given, object_type: undefined };
   }
-  const requested = (args.part as string | undefined) ?? 'source';
-  if (ADDRESS_PARTS.includes(requested)) {
+  const requested = args.part ?? 'source';
+  if (typeof requested === 'string' && ADDRESS_PARTS.includes(requested)) {
     return routeAddressPart(context, requested, args);
   }
-  if (RUN_PARTS.includes(requested)) {
-    const read =
-      requested === 'activation_status'
-        ? handleGetActivationStatus
-        : handleGetActivationResults;
-    return read(context, { run_id: args.run_id });
+  if (typeof requested === 'string' && RUN_PARTS.includes(requested)) {
+    return requested === 'activation_status'
+      ? handleGetActivationStatus(context, {
+          run_id: args.run_id,
+          with_long_polling: args.with_long_polling,
+        })
+      : handleGetActivationResults(context, { run_id: args.run_id });
   }
-  const part = requested as CompactReadPart;
+  if (!isCompactReadPart(requested)) {
+    return return_error(
+      new Error(
+        `part=${String(requested)} is not a part HandlerGet reads. Its parts: ${[...OBJECT_PARTS, ...ADDRESS_PARTS, ...RUN_PARTS].join(', ')}.`,
+      ),
+    );
+  }
+  const part = requested;
   // Every other part reads an object: without object_type the router
   // refuses it, in its own words and through its log, whatever the part.
   if (!args.object_type) {

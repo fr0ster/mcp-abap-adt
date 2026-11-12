@@ -33,9 +33,10 @@
  * Run: MCP_TEST_CONFIG=<config> npm test -- src/__tests__/integration/high/include/IncludeHighHandlers.test.ts
  */
 
+import assert from 'node:assert/strict';
+import { after, afterEach, before, describe, it } from 'node:test';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
@@ -61,12 +62,14 @@ import { handleGetInactiveObjects } from '../../../../handlers/system/readonly/h
 import { CompactHandlersGroup } from '../../../../lib/compact/group';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { patchXmlAttribute } from '../../../../lib/strategies/xmlPatch';
-import { getSystemType, getTimeout } from '../../helpers/configHelpers';
+import { getSystemType } from '../../helpers/configHelpers';
+import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { withRootDescription } from '../../helpers/rootDescription';
+import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import { createHandlerContext, delay } from '../../helpers/testHelpers';
+import { createHandlerContext } from '../../helpers/testHelpers';
 
 /** A tool's answer as the model reads it: the error flag and the first text. */
 type Answer = { isError: boolean; text: string };
@@ -188,7 +191,7 @@ describe('Include High-Level Handlers Integration', () => {
     }
   };
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester('create_include', 'builder_include', 'incl-high');
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
@@ -207,7 +210,7 @@ describe('Include High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async () => {
       // Whatever the outcome, nothing of the run stays.
       await deleteEverything();
@@ -224,331 +227,319 @@ describe('Include High-Level Handlers Integration', () => {
         }),
       );
       record(`absence SearchObject ${PACKAGE}`, pkg);
-      expect(created).toEqual([]);
-      expect(includes.isError).toBe(false);
-      expect(includes.text.includes(NAME_PREFIX)).toBe(false);
-      expect(pkg.isError).toBe(false);
-      expect(pkg.text.includes(PACKAGE)).toBe(false);
+      assertEquals(created, []);
+      assert.equal(includes.isError, false);
+      assert.equal(includes.text.includes(NAME_PREFIX), false);
+      assert.equal(pkg.isError, false);
+      assert.equal(pkg.text.includes(PACKAGE), false);
     });
   });
 
-  it(
-    'creates, writes, reads, activates and deletes an include, high and compact',
-    async () => {
-      await tester.run(async (ctx: LambdaTesterContext) => {
-        const context = handlerContext;
-        if (context === undefined) throw new Error('No handler context');
-        ran = true;
-        const params = ctx.params;
-        const description: string =
-          params.description || 'Include for the include high-level tests';
-        const source: string = params.update_source_code;
-        if (!source) throw new Error('update_source_code is required');
-        const settle = () => delay(ctx.getOperationDelay('create'));
+  it('creates, writes, reads, activates and deletes an include, high and compact', async () => {
+    await tester.run(async (ctx: LambdaTesterContext) => {
+      const context = handlerContext;
+      if (context === undefined) throw new Error('No handler context');
+      ran = true;
+      const params = ctx.params;
+      const description: string =
+        params.description || 'Include for the include high-level tests';
+      const source: string = params.update_source_code;
+      if (!source) throw new Error('update_source_code is required');
 
-        /** A step that must succeed: its answer, or the test ends with it. */
-        const must = async (label: string, call: () => Promise<unknown>) => {
-          const answer = answerOf(await call());
-          record(label, answer);
-          if (answer.isError) {
-            throw new Error(`${label} was refused: ${answer.text}`);
-          }
-          return answer;
-        };
+      /** A step that must succeed: its answer, or the test ends with it. */
+      const must = async (label: string, call: () => Promise<unknown>) => {
+        const answer = answerOf(await call());
+        record(label, answer);
+        if (answer.isError) {
+          throw new Error(`${label} was refused: ${answer.text}`);
+        }
+        return answer;
+      };
 
-        // The package of the run: local, no transport.
-        await must(`CreatePackage ${PACKAGE}`, () =>
-          handleCreatePackage(context, {
-            package_name: PACKAGE,
-            super_package: '$TMP',
-            description: `Include suite run ${RUN}`,
-            package_type: 'development',
-            software_component: 'LOCAL',
-          }),
-        );
-        created.push({ kind: 'package', name: PACKAGE });
+      // The package of the run: local, no transport.
+      await must(`CreatePackage ${PACKAGE}`, () =>
+        handleCreatePackage(context, {
+          package_name: PACKAGE,
+          super_package: '$TMP',
+          description: `Include suite run ${RUN}`,
+          package_type: 'development',
+          software_component: 'LOCAL',
+        }),
+      );
+      created.push({ kind: 'package', name: PACKAGE });
 
-        // CreateInclude: inactive, with the comment header SAP writes.
-        await must(`CreateInclude ${INCLUDE}`, () =>
-          handleCreateInclude(context, {
+      // CreateInclude: inactive, with the comment header SAP writes.
+      await must(`CreateInclude ${INCLUDE}`, () =>
+        handleCreateInclude(context, {
+          include_name: INCLUDE,
+          package_name: PACKAGE,
+          description,
+        }),
+      );
+      created.push({ kind: 'include', name: INCLUDE });
+
+      // GetInclude, both parts: a source of no code, the document. SAP
+      // writes a comment header naming the include into the new one
+      // (measured on premise, 2026-11-01: three `*&` comment lines, the
+      // name in lower case).
+      const emptySource = await must(`GetInclude ${INCLUDE} source`, () =>
+        handleGetInclude(context, {
+          include_name: INCLUDE,
+          version: 'workingArea',
+        }),
+      );
+      const headerLines = normalisedSource(emptySource.text)
+        .split('\n')
+        .filter((line) => line.trim() !== '');
+      assert.equal(
+        headerLines.every((line) => line.startsWith('*')),
+        true,
+      );
+      assert.equal(
+        headerLines.some((line) => line.includes(INCLUDE.toLowerCase())),
+        true,
+      );
+      const firstMetadata = await must(`GetInclude ${INCLUDE} metadata`, () =>
+        handleGetInclude(context, {
+          include_name: INCLUDE,
+          part: 'metadata',
+          version: 'workingArea',
+        }),
+      );
+      const document = field(parsed(firstMetadata.text), 'metadata');
+      if (typeof document !== 'string') {
+        throw new Error(`GetInclude metadata answered no document`);
+      }
+      assert.equal(document.includes(INCLUDE), true);
+      assert.equal(
+        document.includes(`adtcore:description="${description}"`),
+        true,
+      );
+
+      // UpdateInclude, activated; the source reads back equal.
+      await must(`UpdateInclude ${INCLUDE} activate`, () =>
+        handleUpdateInclude(context, {
+          include_name: INCLUDE,
+          source_code: source,
+          activate: true,
+        }),
+      );
+      const written = await must(`GetInclude ${INCLUDE} source (active)`, () =>
+        handleGetInclude(context, { include_name: INCLUDE }),
+      );
+      assert.equal(normalisedSource(written.text), normalisedSource(source));
+      const inactive = await must('GetInactiveObjects', () =>
+        handleGetInactiveObjects(context, {}),
+      );
+      assert.equal(inactive.text.includes(INCLUDE), false);
+
+      // UpdateIncludeMetadata: the document with its description changed.
+      // Its answer measures the include.updateMetadata header pair.
+      const changedDescription = `${description} (metadata ${RUN})`;
+      await must(`UpdateIncludeMetadata ${INCLUDE}`, () =>
+        handleUpdateIncludeMetadata(context, {
+          include_name: INCLUDE,
+          metadata: withRootDescription(document, changedDescription),
+        }),
+      );
+      const changed = await must(`GetInclude ${INCLUDE} metadata (after)`, () =>
+        handleGetInclude(context, {
+          include_name: INCLUDE,
+          part: 'metadata',
+          version: 'workingArea',
+        }),
+      );
+      const changedDocument = field(parsed(changed.text), 'metadata');
+      if (typeof changedDocument !== 'string') {
+        throw new Error('GetInclude metadata answered no document');
+      }
+      assert.equal(
+        changedDocument.includes(`adtcore:description="${changedDescription}"`),
+        true,
+      );
+
+      await must(`ActivateIncludeLow ${INCLUDE}`, () =>
+        handleActivateInclude(context, { include_name: INCLUDE }),
+      );
+      await must(`ActivateObjects ${INCLUDE} PROG/I`, () =>
+        handleActivateObjects(context, {
+          objects: [{ name: INCLUDE, type: 'PROG/I' }],
+        }),
+      );
+
+      // Compact: lock, write the source, then the metadata, unlock.
+      const locked = answerOf(
+        await handleHandlerLock(context, {
+          object_type: 'INCLUDE',
+          object_name: INCLUDE,
+        }),
+      );
+      // The lock's answer carries the handle: never logged.
+      logger?.info(
+        `[answer] HandlerLock INCLUDE ${INCLUDE}: ${locked.isError ? `isError ${locked.text}` : 'locked'}`,
+      );
+      if (locked.isError) {
+        throw new Error(`HandlerLock was refused: ${locked.text}`);
+      }
+      const handle = field(parsed(locked.text), 'lock_handle');
+      if (typeof handle !== 'string' || handle === '') {
+        throw new Error('HandlerLock answered no lock handle');
+      }
+      heldLock = { name: INCLUDE, handle };
+
+      const compactSource = `${source}* written through HandlerUpdate ${RUN}\n`;
+      await must(`HandlerUpdate INCLUDE ${INCLUDE} source`, () =>
+        handleHandlerUpdate(context, {
+          object_type: 'INCLUDE',
+          include_name: INCLUDE,
+          source_code: compactSource,
+          lock_handle: handle,
+        }),
+      );
+      const compactRead = await must(
+        `HandlerGet INCLUDE ${INCLUDE} metadata`,
+        () =>
+          handleHandlerGet(context, {
+            object_type: 'INCLUDE',
             include_name: INCLUDE,
-            package_name: PACKAGE,
-            description,
+            part: 'metadata',
+            version: 'workingArea',
           }),
-        );
+      );
+      const compactDocument = field(parsed(compactRead.text), 'metadata');
+      if (typeof compactDocument !== 'string') {
+        throw new Error('HandlerGet metadata answered no document');
+      }
+      const compactDescription = `${description} (compact ${RUN})`;
+      await must(`HandlerUpdate INCLUDE ${INCLUDE} metadata`, () =>
+        handleHandlerUpdate(context, {
+          object_type: 'INCLUDE',
+          include_name: INCLUDE,
+          part: 'metadata',
+          source_code: withRootDescription(compactDocument, compactDescription),
+          lock_handle: handle,
+        }),
+      );
+      await must(`HandlerUnlock INCLUDE ${INCLUDE}`, () =>
+        handleHandlerUnlock(context, {
+          object_type: 'INCLUDE',
+          object_name: INCLUDE,
+          lock_handle: handle,
+        }),
+      );
+      heldLock = undefined;
+
+      const inactiveSource = await must(
+        `HandlerGet INCLUDE ${INCLUDE} source (inactive)`,
+        () =>
+          handleHandlerGet(context, {
+            object_type: 'INCLUDE',
+            include_name: INCLUDE,
+            version: 'inactive',
+          }),
+      );
+      const readSource = field(parsed(inactiveSource.text), 'source');
+      assert.equal(typeof readSource, 'string');
+      assert.equal(
+        normalisedSource(String(readSource)),
+        normalisedSource(compactSource),
+      );
+      const compactMetadata = await must(
+        `HandlerGet INCLUDE ${INCLUDE} metadata (after)`,
+        () =>
+          handleHandlerGet(context, {
+            object_type: 'INCLUDE',
+            include_name: INCLUDE,
+            part: 'metadata',
+            version: 'workingArea',
+          }),
+      );
+      const compactChanged = field(parsed(compactMetadata.text), 'metadata');
+      assert.equal(typeof compactChanged, 'string');
+      assert.equal(
+        String(compactChanged).includes(
+          `adtcore:description="${compactDescription}"`,
+        ),
+        true,
+      );
+
+      await must(`HandlerValidate INCLUDE ${FREE_NAME}`, () =>
+        handleHandlerValidate(context, {
+          object_type: 'INCLUDE',
+          object_name: FREE_NAME,
+          package_name: PACKAGE,
+          description,
+        }),
+      );
+      await must(`HandlerDeletionCheck INCLUDE ${INCLUDE}`, () =>
+        handleHandlerDeletionCheck(context, {
+          object_type: 'INCLUDE',
+          object_name: INCLUDE,
+        }),
+      );
+      await must(`HandlerActivate INCLUDE ${INCLUDE}`, () =>
+        handleHandlerActivate(context, {
+          object_type: 'INCLUDE',
+          object_name: INCLUDE,
+        }),
+      );
+      const activeAgain = await must(
+        `GetInclude ${INCLUDE} source (after HandlerActivate)`,
+        () => handleGetInclude(context, { include_name: INCLUDE }),
+      );
+      assert.equal(
+        normalisedSource(activeAgain.text),
+        normalisedSource(compactSource),
+      );
+
+      // DeleteInclude, then a create of the same name right after: SAP's
+      // answer recorded as sent.
+      await must(`DeleteInclude ${INCLUDE}`, () =>
+        handleDeleteInclude(context, { include_name: INCLUDE }),
+      );
+      forget(INCLUDE);
+      const recreated = answerOf(
+        await handleCreateInclude(context, {
+          include_name: INCLUDE,
+          package_name: PACKAGE,
+          description,
+        }),
+      );
+      record(
+        `CreateInclude ${INCLUDE} again, right after the delete`,
+        recreated,
+      );
+      if (!recreated.isError) {
         created.push({ kind: 'include', name: INCLUDE });
-        await settle();
-
-        // GetInclude, both parts: a source of no code, the document. SAP
-        // writes a comment header naming the include into the new one
-        // (measured on premise, 2026-11-01: three `*&` comment lines, the
-        // name in lower case).
-        const emptySource = await must(`GetInclude ${INCLUDE} source`, () =>
-          handleGetInclude(context, {
-            include_name: INCLUDE,
-            version: 'workingArea',
-          }),
-        );
-        const headerLines = normalisedSource(emptySource.text)
-          .split('\n')
-          .filter((line) => line.trim() !== '');
-        expect(headerLines.every((line) => line.startsWith('*'))).toBe(true);
-        expect(
-          headerLines.some((line) => line.includes(INCLUDE.toLowerCase())),
-        ).toBe(true);
-        const firstMetadata = await must(`GetInclude ${INCLUDE} metadata`, () =>
-          handleGetInclude(context, {
-            include_name: INCLUDE,
-            part: 'metadata',
-            version: 'workingArea',
-          }),
-        );
-        const document = field(parsed(firstMetadata.text), 'metadata');
-        if (typeof document !== 'string') {
-          throw new Error(`GetInclude metadata answered no document`);
-        }
-        expect(document.includes(INCLUDE)).toBe(true);
-        expect(document.includes(`adtcore:description="${description}"`)).toBe(
-          true,
-        );
-
-        // UpdateInclude, activated; the source reads back equal.
-        await must(`UpdateInclude ${INCLUDE} activate`, () =>
-          handleUpdateInclude(context, {
-            include_name: INCLUDE,
-            source_code: source,
-            activate: true,
-          }),
-        );
-        const written = await must(
-          `GetInclude ${INCLUDE} source (active)`,
-          () => handleGetInclude(context, { include_name: INCLUDE }),
-        );
-        expect(normalisedSource(written.text)).toBe(normalisedSource(source));
-        const inactive = await must('GetInactiveObjects', () =>
-          handleGetInactiveObjects(context, {}),
-        );
-        expect(inactive.text.includes(INCLUDE)).toBe(false);
-
-        // UpdateIncludeMetadata: the document with its description changed.
-        // Its answer measures the include.updateMetadata header pair.
-        const changedDescription = `${description} (metadata ${RUN})`;
-        await must(`UpdateIncludeMetadata ${INCLUDE}`, () =>
-          handleUpdateIncludeMetadata(context, {
-            include_name: INCLUDE,
-            metadata: patchXmlAttribute(
-              document,
-              'adtcore:description',
-              changedDescription,
-            ),
-          }),
-        );
-        const changed = await must(
-          `GetInclude ${INCLUDE} metadata (after)`,
-          () =>
-            handleGetInclude(context, {
-              include_name: INCLUDE,
-              part: 'metadata',
-              version: 'workingArea',
-            }),
-        );
-        const changedDocument = field(parsed(changed.text), 'metadata');
-        if (typeof changedDocument !== 'string') {
-          throw new Error('GetInclude metadata answered no document');
-        }
-        expect(
-          changedDocument.includes(
-            `adtcore:description="${changedDescription}"`,
-          ),
-        ).toBe(true);
-
-        await must(`ActivateIncludeLow ${INCLUDE}`, () =>
-          handleActivateInclude(context, { include_name: INCLUDE }),
-        );
-        await must(`ActivateObjects ${INCLUDE} PROG/I`, () =>
-          handleActivateObjects(context, {
-            objects: [{ name: INCLUDE, type: 'PROG/I' }],
-          }),
-        );
-
-        // Compact: lock, write the source, then the metadata, unlock.
-        const locked = answerOf(
-          await handleHandlerLock(context, {
-            object_type: 'INCLUDE',
-            object_name: INCLUDE,
-          }),
-        );
-        // The lock's answer carries the handle: never logged.
-        logger?.info(
-          `[answer] HandlerLock INCLUDE ${INCLUDE}: ${locked.isError ? `isError ${locked.text}` : 'locked'}`,
-        );
-        if (locked.isError) {
-          throw new Error(`HandlerLock was refused: ${locked.text}`);
-        }
-        const handle = field(parsed(locked.text), 'lock_handle');
-        if (typeof handle !== 'string' || handle === '') {
-          throw new Error('HandlerLock answered no lock handle');
-        }
-        heldLock = { name: INCLUDE, handle };
-
-        const compactSource = `${source}* written through HandlerUpdate ${RUN}\n`;
-        await must(`HandlerUpdate INCLUDE ${INCLUDE} source`, () =>
-          handleHandlerUpdate(context, {
-            object_type: 'INCLUDE',
-            include_name: INCLUDE,
-            source_code: compactSource,
-            lock_handle: handle,
-          }),
-        );
-        const compactRead = await must(
-          `HandlerGet INCLUDE ${INCLUDE} metadata`,
-          () =>
-            handleHandlerGet(context, {
-              object_type: 'INCLUDE',
-              include_name: INCLUDE,
-              part: 'metadata',
-              version: 'workingArea',
-            }),
-        );
-        const compactDocument = field(parsed(compactRead.text), 'metadata');
-        if (typeof compactDocument !== 'string') {
-          throw new Error('HandlerGet metadata answered no document');
-        }
-        const compactDescription = `${description} (compact ${RUN})`;
-        await must(`HandlerUpdate INCLUDE ${INCLUDE} metadata`, () =>
-          handleHandlerUpdate(context, {
-            object_type: 'INCLUDE',
-            include_name: INCLUDE,
-            part: 'metadata',
-            source_code: patchXmlAttribute(
-              compactDocument,
-              'adtcore:description',
-              compactDescription,
-            ),
-            lock_handle: handle,
-          }),
-        );
-        await must(`HandlerUnlock INCLUDE ${INCLUDE}`, () =>
-          handleHandlerUnlock(context, {
-            object_type: 'INCLUDE',
-            object_name: INCLUDE,
-            lock_handle: handle,
-          }),
-        );
-        heldLock = undefined;
-
-        const inactiveSource = await must(
-          `HandlerGet INCLUDE ${INCLUDE} source (inactive)`,
-          () =>
-            handleHandlerGet(context, {
-              object_type: 'INCLUDE',
-              include_name: INCLUDE,
-              version: 'inactive',
-            }),
-        );
-        const readSource = field(parsed(inactiveSource.text), 'source');
-        expect(typeof readSource).toBe('string');
-        expect(normalisedSource(String(readSource))).toBe(
-          normalisedSource(compactSource),
-        );
-        const compactMetadata = await must(
-          `HandlerGet INCLUDE ${INCLUDE} metadata (after)`,
-          () =>
-            handleHandlerGet(context, {
-              object_type: 'INCLUDE',
-              include_name: INCLUDE,
-              part: 'metadata',
-              version: 'workingArea',
-            }),
-        );
-        const compactChanged = field(parsed(compactMetadata.text), 'metadata');
-        expect(typeof compactChanged).toBe('string');
-        expect(
-          String(compactChanged).includes(
-            `adtcore:description="${compactDescription}"`,
-          ),
-        ).toBe(true);
-
-        await must(`HandlerValidate INCLUDE ${FREE_NAME}`, () =>
-          handleHandlerValidate(context, {
-            object_type: 'INCLUDE',
-            object_name: FREE_NAME,
-            package_name: PACKAGE,
-            description,
-          }),
-        );
-        await must(`HandlerDeletionCheck INCLUDE ${INCLUDE}`, () =>
-          handleHandlerDeletionCheck(context, {
-            object_type: 'INCLUDE',
-            object_name: INCLUDE,
-          }),
-        );
-        await must(`HandlerActivate INCLUDE ${INCLUDE}`, () =>
-          handleHandlerActivate(context, {
-            object_type: 'INCLUDE',
-            object_name: INCLUDE,
-          }),
-        );
-        const activeAgain = await must(
-          `GetInclude ${INCLUDE} source (after HandlerActivate)`,
-          () => handleGetInclude(context, { include_name: INCLUDE }),
-        );
-        expect(normalisedSource(activeAgain.text)).toBe(
-          normalisedSource(compactSource),
-        );
-
-        // DeleteInclude, then a create of the same name right after: SAP's
-        // answer recorded as sent.
-        await must(`DeleteInclude ${INCLUDE}`, () =>
+        await must(`DeleteInclude ${INCLUDE} (the re-created one)`, () =>
           handleDeleteInclude(context, { include_name: INCLUDE }),
         );
         forget(INCLUDE);
-        const recreated = answerOf(
-          await handleCreateInclude(context, {
-            include_name: INCLUDE,
-            package_name: PACKAGE,
-            description,
-          }),
+        const gone = await must(`SearchObject ${INCLUDE}`, () =>
+          handleSearchObject(context, { object_name: INCLUDE }),
         );
-        record(
-          `CreateInclude ${INCLUDE} again, right after the delete`,
-          recreated,
-        );
-        if (!recreated.isError) {
-          created.push({ kind: 'include', name: INCLUDE });
-          await settle();
-          await must(`DeleteInclude ${INCLUDE} (the re-created one)`, () =>
-            handleDeleteInclude(context, { include_name: INCLUDE }),
-          );
-          forget(INCLUDE);
-          const gone = await must(`SearchObject ${INCLUDE}`, () =>
-            handleSearchObject(context, { object_name: INCLUDE }),
-          );
-          expect(gone.text.includes(INCLUDE)).toBe(false);
-        }
+        assert.equal(gone.text.includes(INCLUDE), false);
+      }
 
-        // A second include through the compact create and delete.
-        await must(`HandlerCreate INCLUDE ${COMPACT_INCLUDE}`, () =>
-          handleHandlerCreate(context, {
-            object_type: 'INCLUDE',
-            include_name: COMPACT_INCLUDE,
-            package_name: PACKAGE,
-            description,
-          }),
-        );
-        created.push({ kind: 'include', name: COMPACT_INCLUDE });
-        await settle();
-        await must(`HandlerDelete INCLUDE ${COMPACT_INCLUDE}`, () =>
-          handleHandlerDelete(context, {
-            object_type: 'INCLUDE',
-            include_name: COMPACT_INCLUDE,
-          }),
-        );
-        forget(COMPACT_INCLUDE);
-      });
-    },
-    getTimeout('long'),
-  );
+      // A second include through the compact create and delete.
+      await must(`HandlerCreate INCLUDE ${COMPACT_INCLUDE}`, () =>
+        handleHandlerCreate(context, {
+          object_type: 'INCLUDE',
+          include_name: COMPACT_INCLUDE,
+          package_name: PACKAGE,
+          description,
+        }),
+      );
+      created.push({ kind: 'include', name: COMPACT_INCLUDE });
+      await must(`HandlerDelete INCLUDE ${COMPACT_INCLUDE}`, () =>
+        handleHandlerDelete(context, {
+          object_type: 'INCLUDE',
+          include_name: COMPACT_INCLUDE,
+        }),
+      );
+      forget(COMPACT_INCLUDE);
+    });
+  });
 });
 
 /** The tools a server instance lists through the MCP protocol (`tools/list`). */
@@ -556,10 +547,11 @@ async function listedTools(
   server: EmbeddableMcpServer,
 ): Promise<Array<{ name: string; inputSchema: unknown }>> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'incl-cloud', version: '1.0.0' });
-  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+  // Timer-free JSON-RPC over the in-memory transport (no SDK client).
+  const client = new McpSession(clientSide);
+  await Promise.all([server.connect(serverSide), client.initialize()]);
   try {
-    const { tools } = await client.listTools();
+    const tools = await client.listTools();
     return tools.map((tool) => ({
       name: tool.name,
       inputSchema: tool.inputSchema,
@@ -599,7 +591,7 @@ describe('Include on ABAP cloud: listed read-only, read', () => {
       `[answer] ${label}: ${answer.isError ? 'isError ' : ''}${answer.text}`,
     );
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'include_cloud_read',
       'read_delivered_include',
@@ -623,128 +615,122 @@ describe('Include on ABAP cloud: listed read-only, read', () => {
     await tester.afterEach();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async () => {});
   });
 
-  it(
-    'lists no include write, and HandlerCreate offers no INCLUDE',
-    async () => {
-      await tester.run(async (ctx: LambdaTesterContext) => {
-        expect(getSystemType()).toBe('cloud');
-        // The core set (readonly + high, low included), as cloud lists it.
-        const core = await listedTools(
-          new EmbeddableMcpServer({
-            connection: ctx.connection,
-            exposition: ['readonly', 'high'],
-            systemType: 'cloud',
-          }),
-        );
-        const coreNames = core.map((tool) => tool.name);
-        logger?.info(
-          `[answer] tools/list core (cloud): ${coreNames.length} tools; include tools: ${coreNames.filter((name) => name.includes('Include')).join(', ')}`,
-        );
-        for (const write of [
-          'CreateInclude',
-          'UpdateInclude',
-          'UpdateIncludeMetadata',
-          'DeleteInclude',
-          'ActivateIncludeLow',
-        ]) {
-          expect(coreNames).not.toContain(write);
-        }
-        expect(coreNames).toContain('GetInclude');
-
-        // The compact set, as cloud lists it.
-        const compactContext = createHandlerContext({
+  it('lists no include write, and HandlerCreate offers no INCLUDE', async () => {
+    await tester.run(async (ctx: LambdaTesterContext) => {
+      assert.equal(getSystemType(), 'cloud');
+      // The core set (readonly + high, low included), as cloud lists it.
+      const core = await listedTools(
+        new EmbeddableMcpServer({
           connection: ctx.connection,
-          logger: ctx.logger,
-        });
-        const compact = await listedTools(
-          new EmbeddableMcpServer({
-            connection: ctx.connection,
-            systemType: 'cloud',
-            handlersRegistry: new CompositeHandlersRegistry([
-              new CompactHandlersGroup(compactContext, [
-                compactReadOnlyEntries,
-                compactModifyEntries,
-              ]),
-            ]),
-          }),
-        );
-        const enumOf = (name: string) => {
-          const members = objectTypesOf(compact, name);
-          logger?.info(
-            `[answer] tools/list ${name} object_type (cloud): ${JSON.stringify(members)}`,
-          );
-          return members;
-        };
-        expect(enumOf('HandlerCreate')).not.toContain('INCLUDE');
-        expect(enumOf('HandlerUpdate')).not.toContain('INCLUDE');
-        expect(enumOf('HandlerDelete')).not.toContain('INCLUDE');
-        expect(enumOf('HandlerGet')).toContain('INCLUDE');
-        expect(enumOf('HandlerDeletionCheck')).toContain('INCLUDE');
-      });
-    },
-    getTimeout('long'),
-  );
+          exposition: ['readonly', 'high'],
+          systemType: 'cloud',
+        }),
+      );
+      const coreNames = core.map((tool) => tool.name);
+      logger?.info(
+        `[answer] tools/list core (cloud): ${coreNames.length} tools; include tools: ${coreNames.filter((name) => name.includes('Include')).join(', ')}`,
+      );
+      for (const write of [
+        'CreateInclude',
+        'UpdateInclude',
+        'UpdateIncludeMetadata',
+        'DeleteInclude',
+        'ActivateIncludeLow',
+      ]) {
+        assert.ok(!coreNames.includes(write));
+      }
+      assert.ok(coreNames.includes('GetInclude'));
 
-  it(
-    'reads a delivered include: GetInclude both parts, HandlerGet, HandlerDeletionCheck',
-    async () => {
-      await tester.run(async (ctx: LambdaTesterContext) => {
-        const context = handlerContext;
-        if (context === undefined) throw new Error('No handler context');
-        const includeName: string = ctx.params.include_name ?? '';
-        if (includeName === '') {
-          throw new Error(
-            'SKIP: include_cloud_read.include_name is empty: the configuration names no delivered include to read',
-          );
-        }
-        const must = async (label: string, call: () => Promise<unknown>) => {
-          const answer = answerOf(await call());
-          record(label, answer);
-          if (answer.isError) {
-            throw new Error(`${label} was refused: ${answer.text}`);
-          }
-          return answer;
-        };
-        const source = await must(`GetInclude ${includeName} source`, () =>
-          handleGetInclude(context, { include_name: includeName }),
-        );
-        expect(source.text).not.toBe('');
-        const metadata = await must(`GetInclude ${includeName} metadata`, () =>
-          handleGetInclude(context, {
-            include_name: includeName,
-            part: 'metadata',
-          }),
-        );
-        expect(typeof field(parsed(metadata.text), 'metadata')).toBe('string');
-        await must(`HandlerGet INCLUDE ${includeName}`, () =>
-          handleHandlerGet(context, {
-            object_type: 'INCLUDE',
-            include_name: includeName,
-          }),
-        );
-        await must(`HandlerGet INCLUDE ${includeName} metadata`, () =>
-          handleHandlerGet(context, {
-            object_type: 'INCLUDE',
-            include_name: includeName,
-            part: 'metadata',
-          }),
-        );
-        // SAP's verdict on a delivered include, recorded as answered.
-        record(
-          `HandlerDeletionCheck INCLUDE ${includeName}`,
-          answerOf(
-            await handleHandlerDeletionCheck(context, {
-              object_type: 'INCLUDE',
-              object_name: includeName,
-            }),
-          ),
-        );
+      // The compact set, as cloud lists it.
+      const compactContext = createHandlerContext({
+        connection: ctx.connection,
+        logger: ctx.logger,
       });
-    },
-    getTimeout('long'),
-  );
+      const compact = await listedTools(
+        new EmbeddableMcpServer({
+          connection: ctx.connection,
+          systemType: 'cloud',
+          handlersRegistry: new CompositeHandlersRegistry([
+            new CompactHandlersGroup(compactContext, [
+              compactReadOnlyEntries,
+              compactModifyEntries,
+            ]),
+          ]),
+        }),
+      );
+      const enumOf = (name: string): unknown[] => {
+        const members = objectTypesOf(compact, name);
+        // Read from the listed schema, data from outside the type system.
+        assert.ok(Array.isArray(members), name);
+        logger?.info(
+          `[answer] tools/list ${name} object_type (cloud): ${JSON.stringify(members)}`,
+        );
+        return members;
+      };
+      assert.ok(!enumOf('HandlerCreate').includes('INCLUDE'));
+      assert.ok(!enumOf('HandlerUpdate').includes('INCLUDE'));
+      assert.ok(!enumOf('HandlerDelete').includes('INCLUDE'));
+      assert.ok(enumOf('HandlerGet').includes('INCLUDE'));
+      assert.ok(enumOf('HandlerDeletionCheck').includes('INCLUDE'));
+    });
+  });
+
+  it('reads a delivered include: GetInclude both parts, HandlerGet, HandlerDeletionCheck', async () => {
+    await tester.run(async (ctx: LambdaTesterContext) => {
+      const context = handlerContext;
+      if (context === undefined) throw new Error('No handler context');
+      const includeName: string = ctx.params.include_name ?? '';
+      if (includeName === '') {
+        throw new Error(
+          'SKIP: include_cloud_read.include_name is empty: the configuration names no delivered include to read',
+        );
+      }
+      const must = async (label: string, call: () => Promise<unknown>) => {
+        const answer = answerOf(await call());
+        record(label, answer);
+        if (answer.isError) {
+          throw new Error(`${label} was refused: ${answer.text}`);
+        }
+        return answer;
+      };
+      const source = await must(`GetInclude ${includeName} source`, () =>
+        handleGetInclude(context, { include_name: includeName }),
+      );
+      assert.notEqual(source.text, '');
+      const metadata = await must(`GetInclude ${includeName} metadata`, () =>
+        handleGetInclude(context, {
+          include_name: includeName,
+          part: 'metadata',
+        }),
+      );
+      assert.equal(typeof field(parsed(metadata.text), 'metadata'), 'string');
+      await must(`HandlerGet INCLUDE ${includeName}`, () =>
+        handleHandlerGet(context, {
+          object_type: 'INCLUDE',
+          include_name: includeName,
+        }),
+      );
+      await must(`HandlerGet INCLUDE ${includeName} metadata`, () =>
+        handleHandlerGet(context, {
+          object_type: 'INCLUDE',
+          include_name: includeName,
+          part: 'metadata',
+        }),
+      );
+      // SAP's verdict on a delivered include, recorded as answered.
+      record(
+        `HandlerDeletionCheck INCLUDE ${includeName}`,
+        answerOf(
+          await handleHandlerDeletionCheck(context, {
+            object_type: 'INCLUDE',
+            object_name: includeName,
+          }),
+        ),
+      );
+    });
+  });
 });

@@ -1,9 +1,10 @@
 import { messageDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseMessageClassMessage } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { classMessageOf } from '../../../lib/strategies/messageClassMessage';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
@@ -13,21 +14,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the message numbered msgno of the ABAP message class (MSAG/T100) named by message_class_name in one request, from the active version of the class. Answers the one message under `message`: its number (msgno), text (msgtext), self-explanatory flag (selfexplainatory), long-text flag (documented), last changer (lastchangedby), change time (lastmodified), and every other field the system gives the message. A number absent from the class is refused as missing.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Parent message class name.',
-      },
-      msgno: {
-        type: 'string',
-        description: 'Message number (e.g., "001").',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['message_class_name', 'msgno'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Parent message class name.'),
+    msgno: z.string().describe('Message number (e.g., "001").'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface GetMessageClassMessageArgs {

@@ -11,8 +11,10 @@
  * Run: npm test -- --testPathPattern=integration/readOnly/system/TableContents
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import { handleGetTableContents } from '../../../../handlers/table/readonly/handleGetTableContents';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -30,7 +32,7 @@ describe('GetTableContents Handler Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('table-contents-test');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'get_table_contents',
       'limited_rows',
@@ -44,84 +46,76 @@ describe('GetTableContents Handler Integration', () => {
         // No cleanup needed for read-only handler
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {
       logger?.info('Test suite cleanup complete');
     });
   });
 
-  it(
-    'should retrieve table contents',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
-        const tableName = params?.test_table || 'T000';
-        const maxRows = params?.max_rows || 10;
+  it('should retrieve table contents', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, params } = context;
+      const tableName = params?.test_table || 'T000';
+      const maxRows = params?.max_rows || 10;
 
-        logger?.info(`Reading table: ${tableName} (max_rows=${maxRows})`);
+      logger?.info(`Reading table: ${tableName} (max_rows=${maxRows})`);
 
-        const result = await tester.invokeToolOrHandler(
-          'GetTableContents',
-          { table_name: tableName, max_rows: maxRows },
-          async () => {
-            const handlerContext = createHandlerContext({ connection, logger });
-            return handleGetTableContents(handlerContext, {
-              table_name: tableName,
-              max_rows: maxRows,
-            });
-          },
-        );
+      const result = await tester.invokeToolOrHandler(
+        'GetTableContents',
+        { table_name: tableName, max_rows: maxRows },
+        async () => {
+          const handlerContext = createHandlerContext({ connection, logger });
+          return handleGetTableContents(handlerContext, {
+            table_name: tableName,
+            max_rows: maxRows,
+          });
+        },
+      );
 
-        if (result.isError) {
-          logger?.error(`Error: ${result.content?.[0]?.text}`);
-        }
-        expect(result.isError).toBe(false);
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
+      if (result.isError) {
+        logger?.error(`Error: ${result.content?.[0]?.text}`);
+      }
+      assert.equal(result.isError, false);
+      assert.ok(result.content !== undefined);
+      assert.ok(result.content.length > 0);
 
-        const data = extractResultData(result);
-        expect(data.columns).toBeDefined();
-        expect(Array.isArray(data.columns)).toBe(true);
-        expect(data.columns.length).toBeGreaterThan(0);
-        expect(data.rows).toBeDefined();
-        expect(Array.isArray(data.rows)).toBe(true);
-        expect(data.rows.length).toBeGreaterThan(0);
-        expect(data.rows.length).toBeLessThanOrEqual(maxRows);
+      const data = extractResultData(result);
+      assert.ok(data.columns !== undefined);
+      assert.equal(Array.isArray(data.columns), true);
+      assert.ok(data.columns.length > 0);
+      assert.ok(data.rows !== undefined);
+      assert.equal(Array.isArray(data.rows), true);
+      assert.ok(data.rows.length > 0);
+      assert.ok(data.rows.length <= maxRows);
 
-        logger?.info(
-          `Table ${tableName}: ${data.rows.length} rows, ${data.columns.length} columns`,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+      logger?.info(
+        `Table ${tableName}: ${data.rows.length} rows, ${data.columns.length} columns`,
+      );
+    });
+  });
 
-  it(
-    'should handle missing table_name parameter',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection } = context;
+  it('should handle missing table_name parameter', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
 
-        logger?.info('Testing error handling: missing table_name');
+      logger?.info('Testing error handling: missing table_name');
 
-        const result = await tester.invokeToolOrHandler(
-          'GetTableContents',
-          { table_name: '' },
-          async () => {
-            const handlerContext = createHandlerContext({ connection, logger });
-            return handleGetTableContents(handlerContext, { table_name: '' });
-          },
-        );
+      const result = await tester.invokeToolOrHandler(
+        'GetTableContents',
+        { table_name: '' },
+        async () => {
+          const handlerContext = createHandlerContext({ connection, logger });
+          return handleGetTableContents(handlerContext, { table_name: '' });
+        },
+      );
 
-        expect(result.isError).toBe(true);
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
+      assert.equal(result.isError, true);
+      assert.ok(result.content !== undefined);
+      assert.ok(result.content.length > 0);
 
-        logger?.info('Error handling validated: missing table_name');
-      });
-    },
-    getTimeout('default'),
-  );
+      logger?.info('Error handling validated: missing table_name');
+    });
+  });
 });

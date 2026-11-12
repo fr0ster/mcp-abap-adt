@@ -6,8 +6,16 @@
 
 import '../instance.js';
 
-export { type LibInstance, libInstances } from '../instance.js';
-
+export {
+  type EarlierLibCopy,
+  type LibCopy,
+  type LibInstance,
+  libInstances,
+} from '../instance.js';
+export {
+  type PackageManifest,
+  packageManifestOf,
+} from '../packageManifest.js';
 export {
   BATCH_KEEP_RAW_PARTS_CLI,
   BATCH_KEEP_RAW_PARTS_ENV,
@@ -16,6 +24,10 @@ export {
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
   DESTINATIONS_ELSEWHERE,
+  ENABLE_DATA_TOOLS_CLI,
+  ENABLE_DATA_TOOLS_ENV,
+  ENABLE_DATA_TOOLS_ROW,
+  ENABLE_DATA_TOOLS_YAML,
   findSecretYamlKeys,
   generateHelp,
   HTTP_ELSEWHERE,
@@ -59,12 +71,35 @@ export {
 } from './binaries.js';
 export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
 export {
-  applyMessageServerFields,
-  MESSAGE_SERVER_ENV,
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
-  rfcAddressRefusalOf,
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKey,
+  type DestinationKeyValues,
+  RFC_ADDRESS_KEYS,
+  type RfcAddressKey,
 } from './messageServer.js';
+export {
+  flagValue,
+  listValue,
+  numberValue,
+  textValue,
+  wordValue,
+} from './parameterValues.js';
+export {
+  checkDestinationStatement,
+  type DestinationAddressCase,
+  type DestinationAddressFault,
+  type DestinationStatement,
+  type DestinationUrlKey,
+  destinationAddressHint,
+  destinationAddressWords,
+  type MessageServerService,
+  MSSERV_OR_SYSID,
+  rfcConfigOf,
+  type StatedRfcAddress,
+  type StatedRfcDestination,
+  URL_KEYS,
+} from './rfcDestination.js';
 export {
   answerVersionOrHelp,
   type LauncherEdges,

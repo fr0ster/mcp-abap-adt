@@ -9,6 +9,7 @@
  */
 import {
   associationsOf,
+  categoryServiceUrlsOf,
   exposedEntitiesOf,
   serviceBindingFactsOf,
 } from '../../lib/strategies/serviceBindingFacts';
@@ -71,6 +72,65 @@ describe('what a service binding document says', () => {
         V4_BINDING.replace('srvb:published="true"', 'srvb:published="false"'),
       ).published,
     ).toBe(false);
+  });
+});
+
+describe('the binding document read through the XML parser', () => {
+  it('reads attributes quoted with apostrophes, as XML allows', () => {
+    const quoted = V4_BINDING.replace('srvb:version="V4"', "srvb:version='V4'")
+      .replace(
+        '<srvb:services srvb:name="ZUI_TRAVEL">',
+        "<srvb:services srvb:name='ZUI_TRAVEL'>",
+      )
+      .replace('srvb:published="true"', "srvb:published='true'");
+    expect(serviceBindingFactsOf(quoted)).toEqual(
+      serviceBindingFactsOf(V4_BINDING),
+    );
+  });
+
+  it('reads nothing of a document that is not XML', () => {
+    expect(serviceBindingFactsOf('')).toEqual({
+      service: undefined,
+      serviceDefinition: undefined,
+      version: undefined,
+      protocol: undefined,
+      bindingType: undefined,
+      category: undefined,
+      published: false,
+    });
+  });
+});
+
+/** A V2 protocol-category answer, as a trial answered it (serviceBindingPreviewUrl.test.ts). */
+const V2_SERVICE_LIST = `<?xml version="1.0" encoding="utf-8"?>
+<odatav2:serviceList xmlns:odatav2="http://www.sap.com/categories/odatav2">
+  <odatav2:services odatav2:serviceId="ZSB_STUDENT_V2" odatav2:serviceVersion="0001"
+    odatav2:serviceUrl="/sap/opu/odata/sap/ELSEWHERE/" odatav2:annotationUrl="/sap/opu/odata/annotations/X/"
+    odatav2:published="true"/>
+</odatav2:serviceList>`;
+
+describe('what the protocol-category resource says', () => {
+  it('reads the service URL, the annotation URL and the published flag', () => {
+    expect(categoryServiceUrlsOf(V2_SERVICE_LIST)).toEqual({
+      serviceUrl: '/sap/opu/odata/sap/ELSEWHERE/',
+      annotationUrl: '/sap/opu/odata/annotations/X/',
+      serviceUrlPrefix: undefined,
+      published: true,
+    });
+  });
+
+  it('reads a V4 group: the prefix on the group, the URLs on its services, an entity decoded', () => {
+    const group =
+      '<odatav4:serviceGroup xmlns:odatav4="http://www.sap.com/categories/odatav4" ' +
+      "odatav4:serviceUrlPrefix='/sap/opu/odata4/sap/zgroup/srvd/sap/' odatav4:published='false'>" +
+      '<odatav4:services odatav4:serviceUrl="/x?a=1&amp;b=2" odatav4:annotationUrl=""/>' +
+      '</odatav4:serviceGroup>';
+    expect(categoryServiceUrlsOf(group)).toEqual({
+      serviceUrl: '/x?a=1&b=2',
+      annotationUrl: undefined,
+      serviceUrlPrefix: '/sap/opu/odata4/sap/zgroup/srvd/sap/',
+      published: false,
+    });
   });
 });
 

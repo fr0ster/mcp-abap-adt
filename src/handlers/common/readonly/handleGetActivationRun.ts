@@ -4,10 +4,13 @@
  * parts `activation_status` and `activation_results`; spec §4.6).
  *
  * A run is started by `POST /activation/runs`, which answers its id in
- * `Location`. `GET /activation/runs/{id}` states `runs:status` — `finished`,
- * `error`, `failed`, or a progress value while it runs; `GET
+ * `Location`. `GET /activation/runs/{id}` states `runs:status` — `running`
+ * while the run goes on (progress is in attributes of its own), `finished`,
+ * `error` or `failed` once it ended (measured on premise and on the cloud
+ * trial, 2026-11-04); `GET
  * /activation/results/{id}` carries the `chkl:messages` the run produced.
- * How often to ask, and which status ends the asking, is the caller's.
+ * How often to ask, and which status ends the asking, is the caller's; a
+ * status read with `with_long_polling` is held by SAP until the run ends.
  */
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
@@ -27,6 +30,11 @@ interface ActivationRunArgs {
   run_id?: unknown;
 }
 
+interface ActivationStatusArgs extends ActivationRunArgs {
+  /** `true`: SAP holds the read until the run ends (`?withLongPolling=true`). */
+  with_long_polling?: unknown;
+}
+
 function runIdOf(args: ActivationRunArgs): string | undefined {
   return typeof args?.run_id === 'string' && args.run_id.trim() !== ''
     ? args.run_id.trim()
@@ -36,10 +44,16 @@ function runIdOf(args: ActivationRunArgs): string | undefined {
 const missingRunId = (part: string) =>
   return_error(new Error(`part=${part} requires run_id`));
 
-/** `GET /activation/runs/{run_id}`: `{ run_id, part, status, document }`. */
+/**
+ * `GET /activation/runs/{run_id}`: `{ run_id, part, status, document }`.
+ * With `with_long_polling`, the read is a long poll
+ * (`?withLongPolling=true`), which SAP holds until the run ends (measured on
+ * premise and on the cloud trial, 2026-11-04); without it, one read answered
+ * at once.
+ */
 export async function handleGetActivationStatus(
   context: HandlerContext,
-  args: ActivationRunArgs,
+  args: ActivationStatusArgs,
 ) {
   const runId = runIdOf(args);
   if (runId === undefined) return missingRunId('activation_status');
@@ -48,7 +62,14 @@ export async function handleGetActivationStatus(
   );
   return answer(
     { tool: 'HandlerGet', detail: 'raw' },
-    () => utils.getActivationRun(runId, { analyse: analyseException }),
+    () =>
+      utils.getActivationRun(runId, {
+        analyse: analyseException,
+        withLongPolling:
+          typeof args.with_long_polling === 'boolean'
+            ? args.with_long_polling
+            : undefined,
+      }),
     (value: unknown) => ({
       run_id: runId,
       part: 'activation_status',

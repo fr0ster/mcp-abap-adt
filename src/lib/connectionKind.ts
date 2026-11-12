@@ -5,11 +5,10 @@
  * ABAP program leaves in its session — a static buffer, say — is still there
  * on the next call. Over HTTP a stateless request ends its session.
  */
+import { hasMethod } from './capability';
+import { child } from './xml/tree';
+
 export function isRfcConnection(connection: unknown): boolean {
-  const config = (
-    connection as
-      | { getConfig?: () => { connectionType?: string } | undefined }
-      | undefined
-  )?.getConfig?.();
-  return config?.connectionType === 'rfc';
+  if (!hasMethod(connection, 'getConfig')) return false;
+  return child(connection.getConfig(), 'connectionType') === 'rfc';
 }

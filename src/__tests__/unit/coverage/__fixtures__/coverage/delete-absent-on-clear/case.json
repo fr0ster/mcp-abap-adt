@@ -1,0 +1,106 @@
+{
+  "expect": "delete-wrong-check",
+  "served": [
+    {
+      "name": "GetThing",
+      "variant": "onprem",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "thing_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "GetThing",
+      "variant": "cloud",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "thing_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "DeleteThing",
+      "variant": "onprem",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "thing_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "DeleteLocalTypes",
+      "variant": "onprem",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "listed": {
+    "DeleteThing": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt",
+          "legacy mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ],
+    "GetThing": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt",
+          "cloud mcp-abap-adt",
+          "legacy mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ],
+    "DeleteLocalTypes": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  "ledger": {
+    "GetThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts",
+        "cloud": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "DeleteThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "DeleteLocalTypes": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    }
+  },
+  "files": {
+    "src/__tests__/unit/thing.test.ts": "unit.ts",
+    "src/__tests__/integration/thing.test.ts": "live.ts"
+  }
+}

@@ -1,38 +1,27 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      parent_name: {
-        type: 'string',
-        description: '[read-only] Parent object name',
-      },
-      parent_tech_name: {
-        type: 'string',
-        description: '[read-only] Parent technical name',
-      },
-      parent_type: {
-        type: 'string',
-        description: '[read-only] Parent object type',
-      },
-      node_id: { type: 'string', description: '[read-only] Node ID' },
-      format: {
-        type: 'string',
-        description:
-          "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.",
-      },
-      with_short_descriptions: {
-        type: 'boolean',
-        description: '[read-only] Include short descriptions',
-      },
-    },
-    required: ['parent_name', 'parent_tech_name', 'parent_type', 'node_id'],
-  },
+  inputSchema: z.object({
+    parent_name: z.string().describe('[read-only] Parent object name'),
+    parent_tech_name: z.string().describe('[read-only] Parent technical name'),
+    parent_type: z.string().describe('[read-only] Parent object type'),
+    node_id: z.string().describe('[read-only] Node ID'),
+    format: z
+      .string()
+      .optional()
+      .describe(
+        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.",
+      ),
+    with_short_descriptions: z
+      .boolean()
+      .optional()
+      .describe('[read-only] Include short descriptions'),
+  }),
 } as const;
 
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';

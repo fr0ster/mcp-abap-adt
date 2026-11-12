@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteInterface Handler - Delete ABAP Interface via ADT deletion API
  *
@@ -12,7 +14,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -22,22 +24,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      interface_name: {
-        type: 'string',
-        description: 'Interface name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['interface_name'],
-  },
+  inputSchema: z.object({
+    interface_name: z.string().describe('Interface name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DeleteInterfaceArgs {

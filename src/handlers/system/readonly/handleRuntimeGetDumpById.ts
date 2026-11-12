@@ -1,9 +1,12 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { afterLast, digitsAfter } from '../../../lib/plainText';
 import { return_error } from '../../../lib/utils';
+import { attr, child, childAt, isList } from '../../../lib/xml/tree';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
@@ -11,31 +14,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      dump_id: {
-        type: 'string',
-        description:
-          "The dump's id, or its URI as a dumps feed entry carries it.",
-      },
-      view: {
-        type: 'string',
-        enum: ['default', 'summary', 'formatted'],
-        description:
-          'Dump view mode: default payload, summary section, or formatted long text.',
-        default: 'default',
-      },
-      response_mode: {
-        type: 'string',
-        enum: ['payload', 'summary', 'both'],
-        description:
-          'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.',
-        default: 'both',
-      },
-    },
-    required: ['dump_id'],
-  },
+  inputSchema: z.object({
+    dump_id: z
+      .string()
+      .describe("The dump's id, or its URI as a dumps feed entry carries it."),
+    view: z
+      .enum(['default', 'summary', 'formatted'])
+      .default('default')
+      .optional()
+      .describe(
+        'Dump view mode: default payload, summary section, or formatted long text.',
+      ),
+    response_mode: z
+      .enum(['payload', 'summary', 'both'])
+      .default('both')
+      .optional()
+      .describe(
+        'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.',
+      ),
+  }),
 } as const;
 
 interface RuntimeGetDumpByIdArgs {
@@ -56,13 +53,20 @@ const dumpXmlParser = new XMLParser({
  * link — so everything up to `runtime/dumps/` is dropped.
  */
 export function dumpIdFrom(value: string): string {
-  return value.trim().replace(/^.*\/runtime\/dumps\//, '');
+  return afterLast(value.trim(), '/runtime/dumps/');
 }
+
+/**
+ * The relation of the link to the source position a dump terminated at, as
+ * the BTP ABAP environment answered it (2026-10-01): compared as a whole.
+ */
+const TERMINATION_RELATION =
+  'http://www.sap.com/adt/relations/runtime/dump/termination';
 
 /**
  * What a dump is about, read from the default view's `dump:dump` root: its
  * attributes name the runtime error, the exception, the terminated program,
- * when and whose; the `…/runtime/dump/termination` link is the source
+ * when and whose; the link of relation `TERMINATION_RELATION` is the source
  * position where it terminated. That link is addressed `adt://<system>/sap/
  * bc/adt/…#start=<line>,<column>` (BTP ABAP environment, 2026-10-01): the
  * system part is dropped, so the URI is the ADT path any reader takes.
@@ -72,17 +76,18 @@ export function dumpSummaryOf(
   raw: unknown,
 ): Record<string, unknown> | undefined {
   if (typeof raw !== 'string' || !raw.trim().startsWith('<')) return undefined;
-  let root: Record<string, unknown> | undefined;
+  let parsed: unknown;
   try {
-    root = dumpXmlParser.parse(raw)?.dump;
+    parsed = dumpXmlParser.parse(raw);
   } catch {
     return undefined;
   }
+  const root = child(parsed, 'dump');
   if (!root || typeof root !== 'object') return undefined;
 
   const summary: Record<string, unknown> = {};
   const take = (attribute: string, as: string) => {
-    const value = root?.[attribute];
+    const value = child(root, attribute);
     if (typeof value === 'string' && value !== '') summary[as] = value;
   };
   take('error', 'runtime_error');
@@ -92,23 +97,30 @@ export function dumpSummaryOf(
   take('datetime', 'datetime');
   take('author', 'user');
 
-  const linksRaw = (root.links as { link?: unknown } | undefined)?.link;
-  const links = (
-    Array.isArray(linksRaw) ? linksRaw : linksRaw ? [linksRaw] : []
-  ) as Array<{ relation?: string; uri?: string }>;
-  const termination =
-    links.find(
-      (l) => /termination/i.test(l.relation ?? '') && l.uri?.includes('#'),
-    ) ?? links.find((l) => /#start=\d+/.test(l.uri ?? ''));
+  const linksRaw = childAt(root, 'links', 'link');
+  const links = (isList(linksRaw) ? linksRaw : linksRaw ? [linksRaw] : []).map(
+    (link) => ({
+      relation: attr(link, 'relation'),
+      uri: attr(link, 'uri'),
+    }),
+  );
+  const termination = links.find((l) => l.relation === TERMINATION_RELATION);
   if (termination?.uri) {
     const [addressed, fragment = ''] = termination.uri.split('#');
-    const uri = addressed.replace(/^adt:\/\/[^/]*/, '');
-    const line = /start=(\d+)/.exec(fragment)?.[1];
+    const uri = withoutAdtSystem(addressed);
+    const line = digitsAfter(fragment, 'start=');
     summary.termination = line
       ? { uri: decodeURIComponent(uri), line: Number(line) }
       : { uri: decodeURIComponent(uri) };
   }
   return Object.keys(summary).length > 0 ? summary : undefined;
+}
+
+/** An `adt://<system>/…` URI without its `adt://<system>` part; any other URI as it is. */
+function withoutAdtSystem(uri: string): string {
+  if (!uri.startsWith('adt://')) return uri;
+  const path = uri.indexOf('/', 'adt://'.length);
+  return path === -1 ? '' : uri.slice(path);
 }
 
 export async function handleRuntimeGetDumpById(

@@ -9,29 +9,33 @@
  * - Lifecycle hooks (beforeAll, afterAll, beforeEach, afterEach)
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
-  getOperationDelay,
   getSystemType,
-  getTimeout,
   loadTestConfig,
   loadTestEnv,
   resolvePackageName,
   resolveTestSystemContext,
   resolveTransportRequest,
 } from '../configHelpers';
+import {
+  type ConfiguredSystemKind,
+  configuredSystemKindOf,
+  NO_KIND_STATED,
+} from '../configuredSystemKind';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
 import { primeSystemContext } from '../primeSystemContext';
+import { skipRunningTest } from '../runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
-import { delay } from '../testHelpers';
 import {
   createHardModeClient,
+  type HardModeClient,
   isHardModeEnabled,
   parseToolText,
 } from './hardMode';
@@ -43,6 +47,22 @@ type HandlerLikeResponse = {
   content: Array<{ type: 'text'; text: string }>;
 };
 const HARD_MODE_RUN_ID = Math.random().toString(36).slice(2, 6).toUpperCase();
+
+/**
+ * The kind a tester runs on, or why it skips: stated only
+ * (`configuredSystemKindOf` — the config's `environment.system_type`, then
+ * `SAP_SYSTEM_TYPE`), never from the credential (a JWT is no sign of a cloud
+ * system) and never `onprem` by default.
+ */
+export function testerSystemKind(
+  config: unknown,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): { kind: ConfiguredSystemKind; isCloudSystem: boolean } | { skip: string } {
+  const kind = configuredSystemKindOf(config, env);
+  return kind === undefined
+    ? { skip: NO_KIND_STATED }
+    : { kind, isCloudSystem: kind === 'cloud' };
+}
 
 export class LambdaTester {
   // Configuration
@@ -62,11 +82,9 @@ export class LambdaTester {
   protected testFailed = false;
   /** A test that skipped itself created nothing, so nothing is deleted. */
   protected testSkipped = false;
-  protected hardModeMcp: {
-    client: any;
-    toolNames: Set<string>;
-    close: () => Promise<void>;
-  } | null = null;
+  /** Why the tester does not run at all: no system kind stated. */
+  protected kindSkip: string | undefined;
+  protected hardModeMcp: HardModeClient | null = null;
 
   /**
    * Constructor
@@ -97,7 +115,7 @@ export class LambdaTester {
    */
   async init(): Promise<void> {
     let hasConfig = false;
-    let connection: AbapConnection | null = null;
+    let connection: IAbapConnection | null = null;
     let session: SessionInfo | null = null;
     let logger: LoggerWithExtras | null = null;
     let testCase: any = null;
@@ -112,6 +130,13 @@ export class LambdaTester {
     try {
       // Load test config from YAML
       const config = loadTestConfig();
+      // The system kind, stated: the tester refuses to start without one.
+      const stated = testerSystemKind(config);
+      if ('skip' in stated) {
+        this.kindSkip = stated.skip;
+        throw new Error(stated.skip);
+      }
+      isCloudSystem = stated.isCloudSystem;
       const hardModeEnabled =
         config?.environment?.integration_hard_mode?.enabled === true ||
         config?.integration_hard_mode?.enabled === true;
@@ -238,23 +263,19 @@ export class LambdaTester {
         packageName = resolvePackageName(testCaseWithParams);
         transportRequest = resolveTransportRequest(testCaseWithParams);
         const defaultPackage = config.environment?.default_package;
-        const getOperationDelayForContext = (operation: string): number =>
-          getOperationDelay(operation, testCase);
-
         this.context = {
           hasConfig: true,
-          connection: {} as AbapConnection,
+          connection: {} as IAbapConnection,
           session: {} as SessionInfo,
           logger,
           authType: undefined,
           connectionSource: 'unknown',
-          isCloudSystem: false,
+          isCloudSystem,
           objectName,
           params: testParams,
           packageName,
           transportRequest,
           cleanupAfter: this.cleanupAfter.bind(this),
-          getOperationDelay: getOperationDelayForContext,
           defaultPackage,
           testCase,
         };
@@ -282,7 +303,6 @@ export class LambdaTester {
         connectionResult.authType ||
         ((connection as any)?.getConfig?.()?.authType as string | undefined);
       connectionSource = connectionResult.connectionSource || 'unknown';
-      isCloudSystem = authType === 'jwt';
 
       // Resolve object name from params
       objectName =
@@ -314,11 +334,6 @@ export class LambdaTester {
       // Get default package from config
       const defaultPackage = config.environment?.default_package;
 
-      // Create getOperationDelay function bound to this testCase
-      const getOperationDelayForContext = (operation: string): number => {
-        return getOperationDelay(operation, testCase);
-      };
-
       // Create context with cleanupAfter method and common config parameters
       this.context = {
         hasConfig,
@@ -333,7 +348,6 @@ export class LambdaTester {
         packageName,
         transportRequest,
         cleanupAfter: this.cleanupAfter.bind(this),
-        getOperationDelay: getOperationDelayForContext,
         defaultPackage,
         testCase,
       };
@@ -347,25 +361,19 @@ export class LambdaTester {
         `⚠️ Failed to initialize tester: ${error?.message || String(error)}`,
       );
 
-      // Create minimal getOperationDelay function for error case (returns default)
-      const getOperationDelayForContext = (operation: string): number => {
-        return getOperationDelay(operation, null);
-      };
-
       this.context = {
         hasConfig: false,
-        connection: connection || ({} as AbapConnection),
+        connection: connection || ({} as IAbapConnection),
         session: session || ({} as SessionInfo),
         logger: errorLogger,
         authType: undefined,
         connectionSource: 'unknown',
-        isCloudSystem: false,
+        isCloudSystem,
         objectName: null,
         params: {},
         packageName: '',
         transportRequest: undefined,
         cleanupAfter: async () => {},
-        getOperationDelay: getOperationDelayForContext,
         defaultPackage: undefined,
         testCase: null,
       };
@@ -570,8 +578,8 @@ export class LambdaTester {
     if (availableIn.includes(systemType)) {
       return false;
     }
-    this.context?.logger?.testSkip(
-      `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
+    skipRunningTest(
+      `not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
     );
     // Nothing was created, so the cleanup deletes nothing: a delete here
     // could only reach an object of that name made by someone else.
@@ -584,8 +592,13 @@ export class LambdaTester {
       throw new Error('Tester not initialized. Call beforeAll() first.');
     }
 
+    if (this.kindSkip !== undefined) {
+      skipRunningTest(`${this.kindSkip}`);
+      return;
+    }
+
     if (!this.context.hasConfig) {
-      this.context.logger?.testSkip(`Skipping test: No configuration found`);
+      skipRunningTest(`No configuration found`);
       return;
     }
 
@@ -615,7 +628,7 @@ export class LambdaTester {
       // Check if error is a skip condition
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        skipRunningTest(`${skipReason}`);
         this.testSkipped = true;
         return; // Don't throw, just skip the test
       }
@@ -652,14 +665,9 @@ export class LambdaTester {
       throw new Error(`MCP tool "${toolName}" not found in hard mode`);
     }
 
-    const result = await mcp.client.callTool({
-      name: toolName,
-      arguments: args,
-    });
-    if (result?.isError) {
-      const text = (result.content || [])
-        .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
-        .join('\n');
+    const result = await mcp.call(toolName, args);
+    if (result.isError) {
+      const text = result.content.map((c) => c.text).join('\n');
       return {
         isError: true,
         content: [
@@ -675,9 +683,9 @@ export class LambdaTester {
     };
   }
 
-  protected async getHardModeClient() {
+  protected async getHardModeClient(): Promise<HardModeClient> {
     if (!this.hardModeMcp) {
-      this.hardModeMcp = await createHardModeClient();
+      this.hardModeMcp = await createHardModeClient('full');
     }
     return this.hardModeMcp;
   }

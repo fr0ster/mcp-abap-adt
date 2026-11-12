@@ -40,11 +40,13 @@ import { handleUpdateServiceDefinition } from '../../handlers/service_definition
 import { handleCreateStructure } from '../../handlers/structure/high/handleCreateStructure';
 import { handleUpdateStructure } from '../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOfWithFactory,
   okResponse,
   reading,
 } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -73,32 +75,11 @@ function baseMembers() {
   };
 }
 
-const DATAELEMENT_XML =
-  '<?xml version="1.0" encoding="UTF-8"?>' +
-  '<blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" ' +
-  'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" ' +
-  'adtcore:description="before">' +
-  '<dtel:typeKind>domain</dtel:typeKind>' +
-  '<dtel:typeName></dtel:typeName>' +
-  '<dtel:dataType>CHAR</dtel:dataType>' +
-  '<dtel:dataTypeLength>000010</dtel:dataTypeLength>' +
-  '<dtel:dataTypeDecimals>000000</dtel:dataTypeDecimals>' +
-  '</blue:wbobj>';
+const DATAELEMENT_XML = corpusBody(
+  'read-metadata-data-element--01-ddic-dataelements',
+);
 
-const DOMAIN_XML =
-  '<?xml version="1.0" encoding="UTF-8"?>' +
-  '<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" ' +
-  'xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" ' +
-  'adtcore:description="before">' +
-  '<doma:datatype>CHAR</doma:datatype>' +
-  '<doma:length>10</doma:length>' +
-  '<doma:decimals>0</doma:decimals>' +
-  '<doma:conversionExit/>' +
-  '<doma:signExists>false</doma:signExists>' +
-  '<doma:lowercase>false</doma:lowercase>' +
-  '<doma:valueTableRef/>' +
-  '<doma:fixValues/>' +
-  '</doma:domain>';
+const DOMAIN_XML = corpusBody('create-domain--01-ddic-domains');
 
 const FUNCTIONGROUP_XML =
   '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -362,7 +343,10 @@ const cases: WireCase[] = [
     field: 'source',
     marker: 'MARKER_FM',
     run: async () => {
-      const { members, captured } = capture({}, 'update');
+      const { members, captured } = capture(
+        { readMetadata: readsModuleIn('ZFG_X', 'Z_FM_X') },
+        'update',
+      );
       const double = fakeClientOfWithFactory(members);
       fakeClient = double.client;
       await handleUpdateFunctionModule(context as any, {

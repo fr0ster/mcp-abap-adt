@@ -127,12 +127,17 @@ function requireFresh(pkg, file = 'index.js') {
 
 /** `name*` for required, `name` for optional — the same rendering the fixture uses. */
 function parametersOf(schema) {
-  const properties = (schema && schema.properties) || {};
-  const required = new Set((schema && schema.required) || []);
-  return Object.keys(properties).map((name) => ({
+  const { z } = require('zod');
+  // Required as the schema states it: neither optional nor a default over
+  // an optional field; the words as the server lists them.
+  const listed = z.toJSONSchema(schema, { io: 'input' }).properties || {};
+  return Object.entries(schema.shape).map(([name, field]) => ({
     name,
-    required: required.has(name),
-    description: (properties[name] && properties[name].description) || '',
+    required: !(
+      field instanceof z.ZodOptional ||
+      (field instanceof z.ZodDefault && field.unwrap() instanceof z.ZodOptional)
+    ),
+    description: (listed[name] && listed[name].description) || '',
   }));
 }
 
@@ -197,11 +202,11 @@ function page(entries, surfaces) {
   md +=
     '- Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both; no `-compact-http` or `-compact-sse` binary serves them\n';
   md +=
-    '- Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)\n';
+    '- Background-run tools: `@mcp-abap-adt/lib`, in every compact binary: the long reads run in the background by default, and in the write binaries `HandlerProfileRun` too\n';
   md +=
     "- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))\n";
   md +=
-    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool under Tools; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff. `-compact-sse` and `-compact-sse-ro` serve the same without the leftover-session tools; `-compact-http` and `-compact-http-ro` the same, with what [Streamable HTTP Binaries](#streamable-http-binaries) adds\n\n';
+    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool under Tools; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half, the background-run tools and the leftover-session list and logoff. `-compact-sse` and `-compact-sse-ro` serve the same without the leftover-session tools; `-compact-http` and `-compact-http-ro` the same, with what [Streamable HTTP Binaries](#streamable-http-binaries) adds\n\n';
   md += '## How it works\n\n';
   md +=
     'One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with\n';
@@ -224,6 +229,8 @@ function page(entries, surfaces) {
               ? '**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary\n\n'
             : half === 'readonly'
               ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
+            : half === 'data'
+              ? "**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n"
               : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
@@ -254,6 +261,11 @@ function main() {
     ...readOnly
       .compactReadOnlyEntries(context)
       .map((entry) => ({ half: 'readonly', entry })),
+    // The data tool (HandlerGetData), opt-in: documented, served only with
+    // --enable-data-tools.
+    ...readOnly
+      .compactDataEntries()
+      .map((entry) => ({ half: 'data', entry })),
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
@@ -289,15 +301,23 @@ function main() {
   // the HTTP server uses (lib's `streamableHttpSurface`).
   const { compactToolSetOf, compactReadOnlyToolSetOf, streamableHttpSurface } =
     requireFresh('.', path.join('lib', 'toolSet.js'));
+  // Documented with the data tool served, as the pages list it.
+  const documented = { dataTools: true };
   const surfaces = [
     streamableHttpSurface(
       compactToolSetOf({
         readOnly: readOnly.compactReadOnlyEntries,
+        data: readOnly.compactDataEntries,
         modify: modify.compactModifyEntries,
       }),
+      documented,
     ),
     streamableHttpSurface(
-      compactReadOnlyToolSetOf(readOnly.compactReadOnlyEntries),
+      compactReadOnlyToolSetOf({
+        readOnly: readOnly.compactReadOnlyEntries,
+        data: readOnly.compactDataEntries,
+      }),
+      documented,
     ),
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

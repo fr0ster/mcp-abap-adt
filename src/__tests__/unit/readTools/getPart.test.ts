@@ -10,7 +10,10 @@
  */
 
 import { compactModifyEntries } from '../../../../compact-modify/src';
-import { compactReadOnlyEntries } from '../../../../compact-readonly-entries/src';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '../../../../compact-readonly-entries/src';
 import { TOOL_DEFINITION as GET_INCLUDE } from '../../../handlers/include/readonly/handleGetInclude';
 import type {
   HandlerContext,
@@ -30,6 +33,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { type Mode, runCase, servedTools } from '../../helpers/batchHarness';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -99,11 +103,6 @@ const SOURCE_TYPES: SourceType[] = [
     sourcePath: '/ddic/ddlx/sources/ddlx_a/source/main',
   },
   {
-    tool: 'GetFunctionModule',
-    args: { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-    sourcePath: '/functions/groups/fugr_a/fmodules/fm_a/source/main',
-  },
-  {
     tool: 'GetFunctionInclude',
     args: { function_group_name: 'FUGR_A', include_name: 'INCL_A' },
     sourcePath: '/functions/groups/fugr_a/includes/incl_a/source/main',
@@ -125,7 +124,7 @@ const MODES: Mode[] = ['pending', 'document', 'not-found'];
 const payloadOf = (text: string | undefined): Record<string, unknown> =>
   JSON.parse(text ?? '{}') as Record<string, unknown>;
 
-describe('Get<Type>: one request per call, only the part asked for', () => {
+describe('Get<Type>: one request per call, only the part asked for (a function module: its group checked first)', () => {
   const context = {
     connection: undefined,
     logger: silentLogger,
@@ -147,10 +146,10 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
     '%s',
     (_name, t) => {
       it('declares part source | metadata, default source', () => {
-        const schema = tools.get(t.tool)?.toolDefinition.inputSchema as {
-          properties: Record<string, { enum?: unknown; default?: unknown }>;
-        };
-        expect(schema.properties.part).toMatchObject({
+        const entry = tools.get(t.tool);
+        if (entry === undefined) throw new Error(`no served tool ${t.tool}`);
+        const schema = listedJson(entry.toolDefinition.inputSchema);
+        expect(jsonAt(schema, 'part')).toMatchObject({
           enum: ['source', 'metadata'],
           default: 'source',
         });
@@ -205,27 +204,98 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
     },
   );
 
-  it('GetFunctionModule source: one request with the given group, no metadata read', async () => {
-    for (const mode of MODES) {
-      const ran = await run(
-        'GetFunctionModule',
-        { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-        mode,
-      );
-      expect(ran.sent.map((s) => s.toLowerCase())).toEqual([
-        expect.stringContaining(
-          'get /sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main',
-        ),
-      ]);
-    }
+  /**
+   * A function module is the one type whose source read is two requests: its
+   * metadata at the group given, then the source when the metadata names
+   * that group (#2: SAP ignores the group of a module's address). Its
+   * metadata part is the one metadata read. The corpus module, at its group.
+   */
+  describe('GetFunctionModule', () => {
+    const module = {
+      function_module_name: 'Z_MCP_SHR_FM',
+      function_group_name: 'ZMCP_SHR_FGRP',
+    };
+    const metadata =
+      'get /sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm?version=active';
+    const source =
+      'get /sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main?version=active';
+    const lower = (sent: readonly string[]) => sent.map((s) => s.toLowerCase());
+
+    it('declares part source | metadata, default source', () => {
+      const entry = tools.get('GetFunctionModule');
+      if (entry === undefined)
+        throw new Error('no served tool GetFunctionModule');
+      const schema = listedJson(entry.toolDefinition.inputSchema);
+      expect(jsonAt(schema, 'part')).toMatchObject({
+        enum: ['source', 'metadata'],
+        default: 'source',
+      });
+    });
+
+    it.each([{ part: 'source' }, {}])(
+      'part source (%o): the metadata read, then the source when the group holds the module',
+      async (part) => {
+        const held = await run(
+          'GetFunctionModule',
+          { ...module, ...part },
+          'pending',
+        );
+        expect(lower(held.sent)).toEqual([expect.stringContaining(metadata)]);
+
+        const answered = await run(
+          'GetFunctionModule',
+          { ...module, ...part },
+          'document',
+        );
+        expect(lower(answered.sent)).toEqual([
+          expect.stringContaining(metadata),
+          expect.stringContaining(source),
+        ]);
+        expect(answered.answer?.isError).toBe(false);
+        const payload = payloadOf(answered.answer?.content?.[0]?.text);
+        expect(payload).toHaveProperty('source');
+        expect(payload.part).toBe('source');
+        expect(payload).not.toHaveProperty('metadata');
+
+        const refused = await run(
+          'GetFunctionModule',
+          { ...module, ...part },
+          'not-found',
+        );
+        expect(lower(refused.sent)).toEqual([
+          expect.stringContaining(metadata),
+        ]);
+        expect(refused.answer?.isError).toBe(true);
+      },
+    );
+
+    it.each(MODES)(
+      'part metadata (%s): exactly one request, the metadata only',
+      async (mode) => {
+        const ran = await run(
+          'GetFunctionModule',
+          { ...module, part: 'metadata' },
+          mode,
+        );
+        expect(lower(ran.sent)).toEqual([expect.stringContaining(metadata)]);
+        if (mode === 'document') {
+          expect(ran.answer?.isError).toBe(false);
+          const payload = payloadOf(ran.answer?.content?.[0]?.text);
+          expect(payload).toHaveProperty('metadata');
+          expect(payload).not.toHaveProperty('source');
+        }
+        if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
+      },
+    );
   });
 
   it.each(METADATA_ONLY)(
     '%s (metadata-only type): one request, no part in the schema',
     async (tool, args) => {
-      const schema = tools.get(tool)?.toolDefinition.inputSchema as {
-        properties: Record<string, unknown>;
-      };
+      const entry = tools.get(tool);
+      if (entry === undefined) throw new Error(`no served tool ${tool}`);
+      const schema = listedJson(entry.toolDefinition.inputSchema);
+      expect(schema.properties).toBeDefined();
       expect(schema.properties).not.toHaveProperty('part');
       for (const mode of MODES) {
         const ran = await run(tool, args, mode);
@@ -254,7 +324,7 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
   const entriesOf = (set: ToolSet): Map<string, HandlerEntry> =>
     new Map(
       set
-        .groups(context, 'stdio')
+        .groups(context, 'stdio', { dataTools: false })
         .flatMap((g: IHandlerGroup) => g.getHandlers())
         .map((e) => [e.toolDefinition.name, e]),
     );
@@ -280,9 +350,13 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
       fullReadOnlyToolSet,
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: compactModifyEntries,
       }),
-      compactReadOnlyToolSetOf(compactReadOnlyEntries),
+      compactReadOnlyToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
+      }),
     ];
     // The transport request reads (objects, action log) are not object
     // reads and have no Get<Type>.
@@ -314,19 +388,19 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
   it('declares include_name required, part and version', () => {
     // The served definition is the handler's own, read by its declared type.
     expect(tools.get('GetInclude')?.toolDefinition).toBe(GET_INCLUDE);
-    const schema = GET_INCLUDE.inputSchema;
+    const schema = listedJson(GET_INCLUDE.inputSchema);
     expect(schema.type).toBe('object');
     expect(schema.required).toEqual(['include_name']);
-    expect(schema.properties.part).toMatchObject({
+    expect(jsonAt(schema, 'part')).toMatchObject({
       enum: ['source', 'metadata'],
       default: 'source',
     });
-    expect(schema.properties.version.enum).toEqual([
+    expect(jsonAt(schema, 'version').enum).toEqual([
       'active',
       'inactive',
       'workingArea',
     ]);
-    expect(schema.properties.version).not.toHaveProperty('default');
+    expect(jsonAt(schema, 'version')).not.toHaveProperty('default');
   });
 
   it.each([
@@ -387,12 +461,12 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
     },
   );
 
-  it('another part is refused before any request, naming the two', async () => {
+  it('another part is refused by the schema before any request, naming the two', async () => {
     const ran = await run({ include_name: 'INCL_A', part: 'urls' }, 'document');
     expect(ran.sent).toEqual([]);
-    expect(ran.answer?.isError).toBe(true);
-    expect(ran.answer?.content?.[0]?.text).toContain(
-      'part must be "source" or "metadata"',
+    expect(ran.answer).toBeUndefined();
+    expect(String(ran.threw)).toContain(
+      'Invalid arguments for tool GetInclude: Invalid option: expected one of "source"|"metadata" at part',
     );
   });
 });

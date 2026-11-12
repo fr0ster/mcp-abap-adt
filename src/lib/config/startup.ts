@@ -1,4 +1,4 @@
-import type { EventEmitter } from 'node:events';
+import type { ShutdownProcess } from '../shutdownSequence.js';
 import { ParameterRefusal, type ParameterTable } from './authParameters.js';
 import { readConfigFile, type YamlConfig } from './yamlConfig.js';
 
@@ -55,8 +55,8 @@ export interface LauncherEdges extends StartupEdges {
   readonly argv: readonly string[];
   /** `--version`'s one line: the only thing a launcher writes to stdout. */
   readonly stdout: (line: string) => void;
-  /** Where the shutdown listens: `process` in the program. */
-  readonly processLike: EventEmitter & { stdin?: EventEmitter };
+  /** Where the shutdown listens: the process's `on`, `stdin` and `stdout` in the program. */
+  readonly processLike: ShutdownProcess;
 }
 
 /** The edges of the program: `process`. */
@@ -66,7 +66,14 @@ export function processEdges(): LauncherEdges {
     stdout: (line) => console.log(line),
     stderr: (line) => process.stderr.write(`${line}\n`),
     exit: (code) => process.exit(code),
-    processLike: process,
+    // The process's own members, never `process` itself.
+    processLike: {
+      on: (event, listener) => {
+        process.on(event, listener);
+      },
+      stdin: process.stdin,
+      stdout: process.stdout,
+    },
   };
 }
 

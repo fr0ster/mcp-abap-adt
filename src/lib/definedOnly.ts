@@ -10,7 +10,11 @@
  * the member at all.
  */
 export function definedOnly<T extends object>(value: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, entry]) => entry !== undefined),
-  ) as Partial<T>;
+  const defined: Partial<T> = {};
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    const entry = value[key];
+    if (entry !== undefined) defined[key] = entry;
+  }
+  return defined;
 }

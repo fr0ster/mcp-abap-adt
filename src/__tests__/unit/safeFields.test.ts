@@ -14,6 +14,35 @@ describe('safeRequest', () => {
     expect(JSON.stringify(out)).not.toContain(SECRET);
   });
 
+  it('drops the lock handle from the url, keeping the rest of it as sent', () => {
+    const handle = 'A1B2C3D4E5F60718293A4B5C6D7E8F90LOCK';
+    const out = safeRequest({
+      method: 'PUT',
+      url: `/sap/bc/adt/ddic/domains/zd?lockHandle=${handle}&corrNr=SYSK900001`,
+    });
+    expect(out).toEqual({
+      method: 'PUT',
+      url: '/sap/bc/adt/ddic/domains/zd?corrNr=SYSK900001',
+    });
+    expect(JSON.stringify(out)).not.toContain(handle);
+  });
+
+  it('drops the query mark too when the lock handle was all the url asked', () => {
+    expect(
+      safeRequest({
+        method: 'PUT',
+        url: '/sap/bc/adt/ddic/domains/zd?lockHandle=SECRETHANDLE',
+      }),
+    ).toEqual({ method: 'PUT', url: '/sap/bc/adt/ddic/domains/zd' });
+  });
+
+  it('drops the lock handle whatever its place, spelling or encoding', () => {
+    const out = safeRequest({
+      url: '/sap/bc/adt/x?version=inactive&lockhandle=H1&a=%2F&lock%48andle=H2&lockHandle=H3',
+    });
+    expect(out).toEqual({ url: '/sap/bc/adt/x?version=inactive&a=%2F' });
+  });
+
   it('answers undefined when neither field is a string', () => {
     expect(safeRequest(undefined)).toBeUndefined();
     expect(safeRequest({ headers: { authorization: SECRET } })).toBeUndefined();

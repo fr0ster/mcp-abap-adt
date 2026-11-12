@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { child } from '../xml/tree';
 import type { AnswerDetail } from './projections';
 
 export type { AnswerDetail };
@@ -10,22 +12,25 @@ export type { AnswerDetail };
  * the answer is noise on a surface callers read to decide what to call. It
  * shapes the SUCCESS answer only; a failure carries everything at every level.
  */
-export const DETAIL_PROPERTY = {
-  detail: {
-    type: 'string',
-    enum: ['terse', 'full', 'raw'],
-    default: 'terse',
-    description:
-      'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
-  },
-} as const;
+const DETAIL_WORDS =
+  'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).';
 
-const LEVELS = new Set<AnswerDetail>(['terse', 'full', 'raw']);
+/** The `detail` field of a tool's zod input schema. */
+export const DETAIL_SHAPE = {
+  detail: z
+    .enum(['terse', 'full', 'raw'])
+    .default('terse')
+    .optional()
+    .describe(DETAIL_WORDS),
+};
+
+/** Whether `value` is one of the three levels. */
+function isDetail(value: unknown): value is AnswerDetail {
+  return value === 'terse' || value === 'full' || value === 'raw';
+}
 
 /** Read it out of `args`, defaulting to terse. An unknown value is terse too. */
 export function detailOf(args: unknown): AnswerDetail {
-  const value = (args as { detail?: unknown } | undefined)?.detail;
-  return typeof value === 'string' && LEVELS.has(value as AnswerDetail)
-    ? (value as AnswerDetail)
-    : 'terse';
+  const value = child(args, 'detail');
+  return isDetail(value) ? value : 'terse';
 }

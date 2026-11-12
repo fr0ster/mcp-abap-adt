@@ -264,7 +264,8 @@ export function statedUserOf(
  * win over the destination, and the destination over the process
  * configuration (which a key left absent falls back to). The destination's
  * `SAP_USERNAME` (or an `x-sap-*` basic connection's `x-sap-login`) enters as
- * the login.
+ * the login, and its `SAP_LANGUAGE` in effect as the master language where
+ * the scope states none.
  * Per call, in the request scope — never the process cache — so concurrent
  * requests to different destinations cannot see each other's values.
  */
@@ -274,6 +275,7 @@ export function withDestinationSystemContext<T>(
         responsible?: string;
         login?: string;
         masterSystem?: string;
+        masterLanguage?: string;
         debugTerminalId?: string;
         debugIdeId?: string;
         debugBreakpointConflict?: string;
@@ -309,14 +311,25 @@ export function withDestinationSystemContext<T>(
     added.debugBreakpointConflict = stated.debugBreakpointConflict;
   }
   if (stated?.login) added.login = stated.login;
-  if (Object.keys(added).length === 0) return fn();
+  // The destination's language enters where the scope states none: a
+  // request's own language wins, and the destination's beats the process's.
+  const masterLanguage =
+    (scope ? scope.masterLanguage : undefined) ??
+    stated?.masterLanguage ??
+    getStatedSystemContext().masterLanguage;
+  if (
+    Object.keys(added).length === 0 &&
+    masterLanguage === getStatedSystemContext().masterLanguage
+  ) {
+    return fn();
+  }
   return runWithRequestContext(
     {
       ...scope,
       ...added,
-      // Entering a scope must not change the language the call sees: inside
-      // a scope it is the scope's, outside one the process's.
-      masterLanguage: getStatedSystemContext().masterLanguage,
+      // Entering a scope keeps the language the call sees, the
+      // destination's filling one the scope lacks.
+      masterLanguage,
     },
     fn,
   );

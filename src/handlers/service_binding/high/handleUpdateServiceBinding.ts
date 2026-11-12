@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateServiceBinding Handler - Change an ABAP service binding's
  * publication state
@@ -97,7 +99,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -112,56 +114,44 @@ export const TOOL_DEFINITION = {
   name: 'UpdateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description: 'Update publication state of an existing ABAP service binding.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name to update.',
-      },
-      desired_publication_state: {
-        type: 'string',
-        enum: ['published', 'unpublished', 'unchanged'],
-        description: 'Target publication state.',
-      },
-      binding_variant: {
-        type: 'string',
-        enum: [
-          'ODATA_V2_UI',
-          'ODATA_V2_WEB_API',
-          'ODATA_V4_UI',
-          'ODATA_V4_WEB_API',
-        ],
-        description:
-          'Service binding variant. Determines OData version for publish/unpublish routing.',
-        default: 'ODATA_V4_UI',
-      },
-      service_name: {
-        type: 'string',
-        description:
-          'Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.',
-      },
-      service_version: {
-        type: 'string',
-        description:
-          'Published service version. Default 0001. Used by an OData V2 publication job together with the service name; ignored for V4.',
-      },
-      response_format: {
-        type: 'string',
-        enum: ['xml', 'json', 'plain'],
-        default: 'xml',
-        description:
-          'Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [
-      'service_binding_name',
-      'desired_publication_state',
-      'binding_variant',
-      'service_name',
-    ],
-  },
+  inputSchema: z.object({
+    service_binding_name: z
+      .string()
+      .describe('Service binding name to update.'),
+    desired_publication_state: z
+      .enum(['published', 'unpublished', 'unchanged'])
+      .describe('Target publication state.'),
+    binding_variant: z
+      .enum([
+        'ODATA_V2_UI',
+        'ODATA_V2_WEB_API',
+        'ODATA_V4_UI',
+        'ODATA_V4_WEB_API',
+      ])
+      .default('ODATA_V4_UI')
+      .describe(
+        'Service binding variant. Determines OData version for publish/unpublish routing.',
+      ),
+    service_name: z
+      .string()
+      .describe(
+        'Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.',
+      ),
+    service_version: z
+      .string()
+      .optional()
+      .describe(
+        'Published service version. Default 0001. Used by an OData V2 publication job together with the service name; ignored for V4.',
+      ),
+    response_format: z
+      .enum(['xml', 'json', 'plain'])
+      .default('xml')
+      .optional()
+      .describe(
+        'Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface UpdateServiceBindingArgs {

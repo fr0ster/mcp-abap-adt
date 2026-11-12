@@ -4,6 +4,7 @@
  * read a run's answer.
  */
 
+import assert from 'node:assert/strict';
 import type { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -72,10 +73,39 @@ export function stepsFor(tester: LambdaTester, context: LambdaTesterContext) {
  */
 export function expectTestsRan(response: Response, expected: string[]): void {
   const data = parseHandlerResponse(response);
-  expect(data.finished).toBe(true);
+  assert.equal(data.finished, true);
   const result = JSON.stringify(data.run_result ?? '').toUpperCase();
   for (const method of expected) {
-    expect(result).toContain(method.toUpperCase());
+    assert.ok(result.includes(method.toUpperCase()), method);
   }
-  expect(result).not.toMatch(/"(\w+:)?ALERT"\s*:/);
+  assert.equal(hasAlertKey(result), false, result);
+}
+
+/** A word character, as a JSON key's namespace prefix spells it. */
+const WORD = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_';
+
+/**
+ * Whether JSON `text` (upper case) holds an `ALERT` key — `"ALERT":` or
+ * `"<prefix>:ALERT":`, white space before the colon allowed. Plain code.
+ */
+export function hasAlertKey(text: string): boolean {
+  for (
+    let at = text.indexOf('ALERT"');
+    at >= 0;
+    at = text.indexOf('ALERT"', at + 1)
+  ) {
+    let after = at + 'ALERT"'.length;
+    while (after < text.length && ' \t\n\r'.includes(text[after] ?? ''))
+      after += 1;
+    if (text[after] !== ':') continue;
+    let before = at - 1;
+    if (text[before] === ':') {
+      before -= 1;
+      const end = before;
+      while (before >= 0 && WORD.includes(text[before] ?? '')) before -= 1;
+      if (before === end) continue;
+    }
+    if (text[before] === '"') return true;
+  }
+  return false;
 }

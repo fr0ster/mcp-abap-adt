@@ -39,6 +39,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import {
   answer,
   answerFailure,
@@ -50,6 +51,7 @@ import {
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { withoutTrailing } from '../../../lib/plainText';
 import {
   annotationServiceOf,
   type FeapDescriptor,
@@ -77,46 +79,58 @@ import { return_error } from '../../../lib/utils';
 /** The resource `getSystemInformation` reads. */
 const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
 
+/** The note of an answer over RFC: its URLs carry no origin. */
+export const NO_ORIGIN_NOTE =
+  "The destination is RFC and states no URL: prefix the system's HTTP origin.";
+
+/**
+ * The path of a service URL: an absolute one's (the URL parser's), a path
+ * as it is up to its query.
+ */
+function pathOf(serviceUrl: string): string {
+  if (!serviceUrl.startsWith('/')) return new URL(serviceUrl).pathname;
+  const query = serviceUrl.indexOf('?');
+  return query === -1 ? serviceUrl : serviceUrl.slice(0, query);
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name.',
-      },
-      entity_set: {
-        type: 'string',
-        description:
-          'Entity set to open. Omitted, the first one the service definition exposes is used.',
-      },
-      navigation: {
-        type: 'string',
-        description:
-          'Association or composition to follow. Omitted, the first one of the exposed root view is used.',
-      },
-      target_entity_set: {
-        type: 'string',
-        description:
-          'Entity set the navigation reaches. Omitted, the second exposed entity set is used.',
-      },
-      client: {
-        type: 'string',
-        description:
-          'Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.',
-      },
-      language: {
-        type: 'string',
-        description:
-          'Logon language for the preview. Omitted, the language the system reports is used.',
-      },
-    },
-    required: ['service_binding_name'],
-  },
+    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.',
+  inputSchema: z.object({
+    service_binding_name: z.string().describe('Service binding name.'),
+    entity_set: z
+      .string()
+      .optional()
+      .describe(
+        'Entity set to open. Omitted, the first one the service definition exposes is used.',
+      ),
+    navigation: z
+      .string()
+      .optional()
+      .describe(
+        'Association or composition to follow. Omitted, the first one of the exposed root view is used.',
+      ),
+    target_entity_set: z
+      .string()
+      .optional()
+      .describe(
+        'Entity set the navigation reaches. Omitted, the second exposed entity set is used.',
+      ),
+    client: z
+      .string()
+      .optional()
+      .describe(
+        'Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.',
+      ),
+    language: z
+      .string()
+      .optional()
+      .describe(
+        'Logon language for the preview. Omitted, the language the system reports is used.',
+      ),
+  }),
 } as const;
 
 export async function handleGetServiceBindingPreviewUrl(
@@ -141,7 +155,10 @@ export async function handleGetServiceBindingPreviewUrl(
   const definition = adt.getServiceDefinition(
     resultsFor(serviceDefinitionDocuments),
   );
-  const baseUrl = (await connection.getBaseUrl()).replace(/\/+$/, '');
+  // Over RFC the connection has no HTTP origin: the URLs are answered as
+  // their paths and query, and the answer says the origin is unknown.
+  const origin = await connection.getBaseUrl();
+  const baseUrl = origin === undefined ? '' : withoutTrailing(origin, '/');
 
   // `client` and `language` are what the preview URL carries and what a caller
   // has no way to know. ADT answers both from `systeminformation`, which this
@@ -236,11 +253,8 @@ export async function handleGetServiceBindingPreviewUrl(
               { analyse: analyseException },
             ),
           )();
-          if (!srvd.ok)
-            return srvd as unknown as IAdtResponse<Found, IAdtError>;
-          const exposed = exposedEntitiesOf(
-            (srvd.getResult().value as AdtReading<string>).raw,
-          );
+          if (!srvd.ok) return srvd;
+          const exposed = exposedEntitiesOf(srvd.getResult().value.raw);
 
           // The view is read only when a navigation is needed and none was
           // named: a third request for a segment the caller already knows is
@@ -253,9 +267,7 @@ export async function handleGetServiceBindingPreviewUrl(
                 analyse: analyseException,
               });
             if (ddl.ok) {
-              associations = associationsOf(
-                (ddl.getResult().value as AdtReading<string>).raw,
-              );
+              associations = associationsOf(ddl.getResult().value.raw);
             }
           }
 
@@ -279,9 +291,7 @@ export async function handleGetServiceBindingPreviewUrl(
               { analyse: analyseException },
             );
             if (looked.ok) {
-              category = categoryServiceUrlsOf(
-                (looked.getResult().value as AdtReading<unknown>).raw,
-              );
+              category = categoryServiceUrlsOf(looked.getResult().value.raw);
             } else {
               // A `401` SAP answered ends the call with the lookup's error and
               // its step (a thrown credential refusal rejects from the member
@@ -384,7 +394,7 @@ export async function handleGetServiceBindingPreviewUrl(
           ? undefined
           : facts.protocol === 'odatav4'
             ? {
-                servicePath: new URL(serviceUrl).pathname,
+                servicePath: pathOf(serviceUrl),
                 entitySet,
                 navigation: navigation ?? '',
                 targetEntitySet: target ?? entitySet,
@@ -410,6 +420,7 @@ export async function handleGetServiceBindingPreviewUrl(
             'The service and $metadata URLs are how it is addressed.'
           : undefined,
 
+        origin === undefined ? NO_ORIGIN_NOTE : undefined,
         systemLookupFailed === undefined
           ? undefined
           : 'The client and language the system reports could not be read (system_information_failure), so the preview URL carries only what was passed in.',
@@ -428,6 +439,7 @@ export async function handleGetServiceBindingPreviewUrl(
         client,
         language,
         associations,
+        ...(origin === undefined && { origin: 'unknown' as const }),
         service_url: serviceUrl,
         service_url_source:
           category.serviceUrl === undefined ? 'composed' : 'system',

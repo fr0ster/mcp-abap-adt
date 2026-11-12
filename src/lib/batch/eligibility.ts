@@ -17,10 +17,16 @@
  */
 
 import * as path from 'node:path';
+import { child, isList } from '../xml/tree';
 
-/** One condition on a named argument; an entry's `when` holds when all of them do. */
+/**
+ * One condition on a named argument; an entry's `when` holds when all of them
+ * do. With `field`, the argument is a list and `equals` / `notEquals` hold
+ * for the member `field` of each of its entries (a list absent has none).
+ */
 export type WhenRule = {
   argument: string;
+  field?: string;
   equals?: string[];
   notEquals?: string[];
   present?: boolean;
@@ -60,12 +66,86 @@ export const BATCH_HANDLERS_FILE = path.join(
 
 let table: ReadonlyMap<string, readonly BatchEntry[]> | undefined;
 
+/** A list of strings, or `undefined` when `value` is not one. */
+function stringsOf(value: unknown): string[] | undefined {
+  if (!isList(value)) return undefined;
+  const strings = value.filter((v): v is string => typeof v === 'string');
+  return strings.length === value.length ? strings : undefined;
+}
+
+/** One `when` rule of a row, or `undefined` when `value` is not one. */
+function whenRuleOf(value: unknown): WhenRule[number] | undefined {
+  const argument = child(value, 'argument');
+  if (typeof argument !== 'string') return undefined;
+  const rule: WhenRule[number] = { argument };
+  const field = child(value, 'field');
+  if (field !== undefined) {
+    if (typeof field !== 'string') return undefined;
+    rule.field = field;
+  }
+  for (const name of ['equals', 'notEquals'] as const) {
+    const given = child(value, name);
+    if (given === undefined) continue;
+    const strings = stringsOf(given);
+    if (strings === undefined) return undefined;
+    rule[name] = strings;
+  }
+  const present = child(value, 'present');
+  if (present !== undefined) {
+    if (typeof present !== 'boolean') return undefined;
+    rule.present = present;
+  }
+  return rule;
+}
+
+/**
+ * Row `at` of the table, read: the file is data, read as it is written —
+ * a row this reading does not recognise stops the load with its index.
+ */
+function batchEntryOf(value: unknown, at: number): BatchEntry {
+  const malformed = () =>
+    new Error(`tools/batch-handlers.json: row ${at} is malformed`);
+  const tool = child(value, 'tool');
+  const set = child(value, 'set');
+  const handler = child(value, 'handler');
+  const sends = child(value, 'sends');
+  if (
+    typeof tool !== 'string' ||
+    (set !== 'full' && set !== 'compact') ||
+    typeof handler !== 'string' ||
+    typeof sends !== 'string'
+  ) {
+    throw malformed();
+  }
+  const entry: BatchEntry = { tool, set, handler, sends };
+  const when = child(value, 'when');
+  if (when !== undefined) {
+    if (!isList(when)) throw malformed();
+    const rules: WhenRule = [];
+    for (const given of when) {
+      const rule = whenRuleOf(given);
+      if (rule === undefined) throw malformed();
+      rules.push(rule);
+    }
+    entry.when = rules;
+  }
+  const connection = child(value, 'connection');
+  if (connection !== undefined) {
+    if (connection !== 'http') throw malformed();
+    entry.connection = connection;
+  }
+  return entry;
+}
+
 /** The entries, by tool — loaded at the first use, then kept. */
 function entriesByTool(): ReadonlyMap<string, readonly BatchEntry[]> {
   if (table === undefined) {
     // `BATCH_HANDLERS_FILE`, as a literal a bundler inlines.
-    const entries =
-      require('../../../tools/batch-handlers.json') as readonly BatchEntry[];
+    const file: unknown = require('../../../tools/batch-handlers.json');
+    if (!isList(file)) {
+      throw new Error('tools/batch-handlers.json: the table is not a list');
+    }
+    const entries = file.map(batchEntryOf);
     const byTool = new Map<string, BatchEntry[]>();
     for (const entry of entries) {
       const listed = byTool.get(entry.tool) ?? [];
@@ -113,16 +193,29 @@ function compared(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * An argument as the rules read it: absent, its fallback (`ABSENT_READS_AS`).
+ * An empty list is no argument: the handlers dispatch on a list only when it
+ * holds an entry (`HandlerActivate`'s `objects: []` is its single form).
+ */
 function argumentOf(tool: string, args: unknown, name: string): unknown {
-  const given =
-    args !== null && typeof args === 'object'
-      ? (args as Record<string, unknown>)[name]
-      : undefined;
-  return given === undefined ? ABSENT_READS_AS[tool]?.[name] : given;
+  const given = child(args, name);
+  const stated = isList(given) && given.length === 0 ? undefined : given;
+  return stated === undefined ? ABSENT_READS_AS[tool]?.[name] : stated;
 }
 
 const among = (value: string | undefined, values: string[]) =>
   value !== undefined && values.some((v) => v.toUpperCase() === value);
+
+/** Whether `value` holds a rule's `equals` and `notEquals`. */
+function valueHolds(rule: WhenRule[number], value: unknown): boolean {
+  if (rule.equals !== undefined && !among(compared(value), rule.equals)) {
+    return false;
+  }
+  return !(
+    rule.notEquals !== undefined && among(compared(value), rule.notEquals)
+  );
+}
 
 /** Whether every rule of `when` holds for `args`. */
 export function whenHolds(
@@ -135,15 +228,15 @@ export function whenHolds(
     if (rule.present !== undefined && (value !== undefined) !== rule.present) {
       return false;
     }
-    if (rule.equals !== undefined && !among(compared(value), rule.equals)) {
-      return false;
+    if (rule.field !== undefined) {
+      const field = rule.field;
+      const members = isList(value) ? value : [];
+      if (!members.every((member) => valueHolds(rule, child(member, field)))) {
+        return false;
+      }
+      continue;
     }
-    if (
-      rule.notEquals !== undefined &&
-      among(compared(value), rule.notEquals)
-    ) {
-      return false;
-    }
+    if (!valueHolds(rule, value)) return false;
   }
   return true;
 }

@@ -17,10 +17,10 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 - the **leftover-session list** (`ListLeftoverSessions`): the SAP sessions a killed server
   process left open, only the caller's own. Their logoff (`LogoffLeftoverSession`) releases every
   lock a session holds, so it is `mcp-abap-adt`'s;
+- the background-run tools of the long reads (`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`): a long read runs in the background by default and is read, listed and cancelled by them;
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-71 tools in all on premise, 70 on cloud: the tools, their enums and the object types each argument accepts are those of `--system-type`'s ADT type table ([MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md)). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger, the leftover-session logoff
-and background runs — those are
+74 tools in all on premise, 73 on cloud: the tools, their enums and the object types each argument accepts are those of `--system-type`'s ADT type table ([MIGRATION-22.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-22.0.md)). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and the leftover-session logoff — those are
 `mcp-abap-adt`'s ([`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)).
 
 **Nothing here changes the system.** No tool of this binary runs code or changes data: the class

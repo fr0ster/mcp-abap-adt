@@ -5,7 +5,10 @@
  * tools that answer or need a handle.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { LOCK_NOT_HELD_WORDS } from '../../../lib/state/heldLocks';
 import { compactToolSetOf, fullToolSet } from '../../../lib/toolSet';
 
@@ -31,10 +34,15 @@ const descriptions = new Map(
     fullToolSet,
     compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     }),
   ]
-    .flatMap((set) => set.groups({ connection: undefined as never }, 'http'))
+    .flatMap((set) =>
+      set.groups({ connection: undefined as never }, 'http', {
+        dataTools: false,
+      }),
+    )
     .flatMap((group) => group.getHandlers())
     .map((entry) => [
       entry.toolDefinition.name,

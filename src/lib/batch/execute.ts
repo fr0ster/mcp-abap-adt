@@ -31,7 +31,7 @@
 
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { answerFailure, type McpResult, requestFailureOf } from '../answer';
+import { answerFailure, type McpResult, requestErrorOf } from '../answer';
 import { answerRead } from '../auth/answerFailure';
 import { failureOf, readOwn } from '../auth/failures';
 import {
@@ -189,7 +189,7 @@ function failureAnswer(error: unknown): McpResult {
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
   return answerFailure(
-    withStep(requestFailureOf(error, undefined) as IAdtError, EXECUTE_STEP),
+    withStep(requestErrorOf(error, undefined), EXECUTE_STEP),
   );
 }
 

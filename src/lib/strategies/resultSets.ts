@@ -103,6 +103,11 @@ export const READING_BY_SLOT = {
   // to the DDL set in adt-clients 24; it reads the same answer.
   testDoubles: structured,
   activation: structured,
+  // Arrived with adt-clients 45.0.0, on `getUtils().activateObjects`: the
+  // synchronous group activation answers the same document a single object's
+  // activation does (`chkl:messages`, `ioc:inactiveObjects`, or nothing), so
+  // it is read the same way, and `terseActivation` projects it.
+  objectActivation: structured,
   validation: structured,
   deletion: structured,
   deleted: structured,
@@ -330,13 +335,21 @@ export function resultsFor<
   const K extends readonly (keyof R)[] = [],
 >(
   shipped: R,
-  keep: K = [] as unknown as K,
-): { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> } {
-  const kept = new Set<keyof R>(keep);
+  keep?: K,
+): { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> };
+// The signature above is the contract; TypeScript cannot follow a mapped
+// type through an object built slot by slot, so the body is checked against
+// this wider one (an overload, not an assertion).
+export function resultsFor(
+  shipped: Record<string, unknown>,
+  keep: readonly PropertyKey[] = [],
+): Record<string, unknown> {
+  const kept = new Set<PropertyKey>(keep);
   const out: Record<string, unknown> = {};
-  const table = READING_BY_SLOT as Record<string, IResultStrategy<unknown>>;
+  const table: Readonly<Record<string, IResultStrategy<unknown>>> =
+    READING_BY_SLOT;
   for (const slot of Object.keys(shipped)) {
-    if (kept.has(slot as keyof R)) {
+    if (kept.has(slot)) {
       out[slot] = shipped[slot];
       continue;
     }
@@ -346,7 +359,7 @@ export function resultsFor<
     }
     out[slot] = reading;
   }
-  return out as { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> };
+  return out;
 }
 
 /**

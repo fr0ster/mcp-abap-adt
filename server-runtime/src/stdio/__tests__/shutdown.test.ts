@@ -116,6 +116,28 @@ describe('installShutdown (core)', () => {
     expect(exits).toEqual([1]);
   });
 
+  it('refuses a birth startBirth() did not make, before any trigger is installed', () => {
+    const processLike = fakeProcess();
+    expect(() =>
+      installShutdown({
+        factory: {
+          beginShutdown: () => {},
+          endLogins: async () => {},
+          settle: async () => ({ notStored: [] }),
+        },
+        instance: { close: async () => {} },
+        exit: () => {},
+        stderr: () => {},
+        processLike,
+        birth: {
+          shutdownBegan: () => false,
+          joining: (birth) => birth,
+          open: () => true,
+        },
+      }),
+    ).toThrow('installShutdown takes a birth made by startBirth()');
+  });
+
   it('two calls of run() answer the same run', async () => {
     const held = deferred<{ notStored: string[] }>();
     const s = setup({ settle: () => held.promise });

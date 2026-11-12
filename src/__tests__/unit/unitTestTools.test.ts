@@ -8,6 +8,11 @@
  * started it, so one capture serves every Run* tool.
  */
 
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
 import { handleCreateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest';
 import { handleCreateProgramUnitTest } from '../../handlers/unit_test/high/handleCreateProgramUnitTest';
@@ -22,12 +27,14 @@ import {
   functionGroupTestInclude,
   programTestInclude,
 } from '../../handlers/unit_test/shared/writeTests';
-import { corpusBody } from '../../lib/adtCorpus';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { corpusBody } from '../helpers/adtCorpus';
+import { moduleInGroup } from '../helpers/functionModuleMetadata';
 import {
+  LOCK_SUCCESS_XML,
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
@@ -55,6 +62,26 @@ const RUNNING = {
 };
 
 const line = (r: RecordedRequest) => `${r.method} ${r.url.split('?')[0]}`;
+
+/**
+ * What a call reads before its run, answered: a function module addressed
+ * through its group has its metadata read first, naming that group (#2).
+ */
+function readFirst(args: Readonly<Record<string, unknown>>) {
+  const group = args.function_group_name;
+  const module = args.function_module_name;
+  return typeof group === 'string' && typeof module === 'string'
+    ? [moduleInGroup(module.toUpperCase(), group.toUpperCase())]
+    : [];
+}
+
+/** The request lines of what `readFirst` answers. */
+const firstLines = (args: Readonly<Record<string, unknown>>) =>
+  readFirst(args).length === 0
+    ? []
+    : [
+        `GET /sap/bc/adt/functions/groups/${String(args.function_group_name).toLowerCase()}/fmodules/${String(args.function_module_name).toLowerCase()}`,
+      ];
 const payload = (result: any) => JSON.parse(result.content[0].text);
 
 describe('Run* tools: start, wait, answer the result — one call', () => {
@@ -179,7 +206,8 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
   ] as const)(
     '%s posts the object to /abapunit/testruns once and answers the result',
     async (_name, handler, args, uri) => {
-      const connection = recordingConnection([RESULT]);
+      const first = readFirst(args);
+      const connection = recordingConnection([...first, RESULT]);
 
       const result: any = await (handler as any)(ctx(connection), {
         ...args,
@@ -188,9 +216,12 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
 
       expect(result.isError).toBe(false);
       expect(connection.requests.map(line)).toEqual([
+        ...firstLines(args),
         'POST /sap/bc/adt/abapunit/testruns',
       ]);
-      expect(String(connection.requests[0].data).toLowerCase()).toContain(uri);
+      expect(
+        String(connection.requests[first.length].data).toLowerCase(),
+      ).toContain(uri);
       const answer = payload(result);
       expect(answer).toMatchObject({ runner: 'sync', finished: true });
       expect(answer.run_id).toBeUndefined();
@@ -334,11 +365,17 @@ describe('Run* tools: scope reaches the run, with either runner', () => {
   it.each(TOOLS)(
     '%s async: the scope given is the run configuration',
     async (_name, handler, args) => {
-      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+      const first = readFirst(args);
+      const connection = recordingConnection([
+        ...first,
+        STARTED,
+        FINISHED,
+        RESULT,
+      ]);
 
       await (handler as any)(ctx(connection), { ...args, scope });
 
-      expect(String(connection.requests[0].data)).toContain(
+      expect(String(connection.requests[first.length].data)).toContain(
         '<aunit:scope ownTests="false" foreignTests="true" addForeignTestsAsPreview="false"/>',
       );
     },
@@ -347,7 +384,8 @@ describe('Run* tools: scope reaches the run, with either runner', () => {
   it.each(TOOLS)(
     '%s sync: the scope given is the run configuration',
     async (_name, handler, args) => {
-      const connection = recordingConnection([RESULT]);
+      const first = readFirst(args);
+      const connection = recordingConnection([...first, RESULT]);
 
       await (handler as any)(ctx(connection), {
         ...args,
@@ -355,7 +393,7 @@ describe('Run* tools: scope reaches the run, with either runner', () => {
         scope,
       });
 
-      expect(String(connection.requests[0].data)).toContain(
+      expect(String(connection.requests[first.length].data)).toContain(
         '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="false"/>',
       );
     },
@@ -364,15 +402,21 @@ describe('Run* tools: scope reaches the run, with either runner', () => {
   it.each(TOOLS)(
     "%s without scope: adt-clients' defaults, both runners",
     async (_name, handler, args) => {
-      const asyncRun = recordingConnection([STARTED, FINISHED, RESULT]);
+      const first = readFirst(args);
+      const asyncRun = recordingConnection([
+        ...first,
+        STARTED,
+        FINISHED,
+        RESULT,
+      ]);
       await (handler as any)(ctx(asyncRun), args);
-      expect(String(asyncRun.requests[0].data)).toContain(
+      expect(String(asyncRun.requests[first.length].data)).toContain(
         '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
       );
 
-      const syncRun = recordingConnection([RESULT]);
+      const syncRun = recordingConnection([...first, RESULT]);
       await (handler as any)(ctx(syncRun), { ...args, runner: 'sync' });
-      expect(String(syncRun.requests[0].data)).toContain(
+      expect(String(syncRun.requests[first.length].data)).toContain(
         '<testDeterminationStrategy sameProgram="true" assignedTests="false" appendAssignedTestsPreview="true"/>',
       );
     },
@@ -716,10 +760,11 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
     expect(result.isError).toBe(true);
   });
 
-  it('waits on the run with long polls and no timer of its own', async () => {
+  it('waits on the run with long polls and no timer of its own, past six reads', async () => {
     const timer = jest.spyOn(global, 'setTimeout');
     try {
-      // A run that never settles: six long polls, back to back, then a failure.
+      // A run still going for seven reads, then finished: long polls back
+      // to back, no attempt limit, then the results.
       const running = {
         data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="running"/>',
       };
@@ -738,6 +783,10 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
         running,
         running,
         running,
+        running,
+        {
+          data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+        },
         { data: '' },
       ]);
 
@@ -746,24 +795,19 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
         { function_group_name: 'zfg_x', test_class_source: 'x' },
       );
 
-      expect(result.isError).toBe(true);
-      // Not SAP's refusal: our wait bound ran out, said as a failure on our
-      // side — no `origin`, no status SAP never gave.
-      const answered = payload(result);
-      expect(answered.error).toBe('client_threw');
-      expect(answered.origin).toBeUndefined();
-      expect(answered.status).toBeUndefined();
-      expect(answered.step).toBe('activate');
-      expect(answered.message).toMatch(
-        /had not finished after 6 polls — the wait bound ran out/,
-      );
+      expect(result.isError).toBe(false);
       const polls = connection.requests.filter((r) =>
         r.url.includes('/activation/runs/RUN-4?'),
       );
-      expect(polls).toHaveLength(6);
+      expect(polls).toHaveLength(8);
       expect(polls.every((r) => r.url.includes('withLongPolling=true'))).toBe(
         true,
       );
+      expect(
+        connection.requests.some((r) =>
+          r.url.includes('/activation/results/RUN-4'),
+        ),
+      ).toBe(true);
       const ours = timer.mock.calls.filter(([, ms]) => ms === 1000);
       expect(ours).toHaveLength(0);
     } finally {
@@ -771,8 +815,197 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
     }
   });
 
+  it('a run status nobody knows ends the write as a failure on our side, naming it', async () => {
+    // Past READ_BOUND reads the double refuses and records it: a wait that
+    // does not end fails the case. The bound is this test's alone.
+    const READ_BOUND = 5;
+    const paused = {
+      data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="paused"/>',
+    };
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 202,
+        headers: { location: '/sap/bc/adt/activation/runs/RUN-5' },
+      },
+      ...Array.from({ length: READ_BOUND }, () => paused),
+    ]);
+    const reads = { count: 0, overRead: false };
+    const answer = connection.makeAdtRequest.bind(connection);
+    connection.makeAdtRequest = (options) => {
+      if (options.url.startsWith('/sap/bc/adt/activation/runs/RUN-5')) {
+        reads.count += 1;
+        if (reads.count > READ_BOUND) {
+          reads.overRead = true;
+          throw new Error('the run was read past the test bound');
+        }
+      }
+      return answer(options);
+    };
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(reads.overRead).toBe(false);
+    expect(reads.count).toBe(1);
+    expect(result.isError).toBe(true);
+    const answered = payload(result);
+    expect(answered.error).toBe('client_threw');
+    expect(answered.origin).toBeUndefined();
+    expect(answered.status).toBeUndefined();
+    expect(answered.step).toBe('activate');
+    expect(answered.message).toContain(
+      'The activation run RUN-5 answered the status "paused"',
+    );
+    expect(
+      connection.requests.some((r) => r.url.includes('/activation/results/')),
+    ).toBe(false);
+  });
+
+  it('a run start with no run id ends the write as a failure on our side', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { status: 202 },
+    ]);
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(result.isError).toBe(true);
+    const answered = payload(result);
+    expect(answered.error).toBe('client_threw');
+    expect(answered.origin).toBeUndefined();
+    expect(answered.status).toBeUndefined();
+    expect(answered.step).toBe('activate');
+    expect(answered.message).toContain('The activation run answered no id');
+    expect(
+      connection.requests.some((r) => r.url.includes('/activation/runs/')),
+    ).toBe(false);
+    expect(
+      connection.requests.some((r) => r.url.includes('/activation/results/')),
+    ).toBe(false);
+  });
+
   it("a function group's main program: SAPL<group>, namespace in front", () => {
     expect(functionGroupMainProgram('zfg_x')).toBe('SAPLZFG_X');
     expect(functionGroupMainProgram('/ns/group')).toBe('/NS/SAPLGROUP');
+  });
+});
+
+/**
+ * The function-group test include is activated with the group and its main
+ * program on the endpoint the system's discovery offers
+ * (fr0ster/mcp-abap-adt#351): the run where it lists
+ * `/sap/bc/adt/activation/runs`, else the one `POST /sap/bc/adt/activation`.
+ * The discoveries are the recorded ones of SAP_BASIS 7.40, the 751 partial
+ * one and S/4HANA 2025; the 751 answers to the synchronous POST are the
+ * recorded `activation-sync-activated-751` (an empty `200`: activated) and
+ * `activation-preaudit-still-inactive-751` (the objects still inactive).
+ */
+describe('CreateFunctionGroupUnitTest: the activation endpoint by discovery', () => {
+  const RUN_FINISHED =
+    '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>';
+  const RUN_ACTIVATED =
+    '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/></chkl:messages>';
+
+  /** A connection answering by request: the discovery and the activation as given, everything else `200`. */
+  function system(discovery: string, activation = '') {
+    const lines: string[] = [];
+    const connection: IAbapConnection = {
+      async connect() {},
+      async getBaseUrl() {
+        return 'https://example.com';
+      },
+      getSessionId() {
+        return null;
+      },
+      setSessionType() {},
+      async makeAdtRequest<T = unknown, D = unknown>(
+        options: IAbapRequestOptions,
+      ): Promise<IAdtWireResponse<T, D>> {
+        lines.push(`${options.method} ${options.url.split('?')[0]}`);
+        const url = options.url;
+        let data = '';
+        let headers: Record<string, string> = {};
+        let status = 200;
+        if (url === '/sap/bc/adt/discovery') data = discovery;
+        else if (url.includes('_action=LOCK')) data = LOCK_SUCCESS_XML;
+        else if (url.startsWith('/sap/bc/adt/activation/runs?')) {
+          status = 202;
+          headers = { location: '/sap/bc/adt/activation/runs/RUN-9' };
+        } else if (url.startsWith('/sap/bc/adt/activation/runs/RUN-9'))
+          data = RUN_FINISHED;
+        else if (url.startsWith('/sap/bc/adt/activation/results/RUN-9'))
+          data = RUN_ACTIVATED;
+        else if (url.startsWith('/sap/bc/adt/activation?')) data = activation;
+        // A recorded body is text; `T` is the caller's view of it, which a
+        // replay does not narrow — the assertion every fake connection makes.
+        return { data: data as T, status, statusText: 'OK', headers };
+      },
+    };
+    return { connection, lines };
+  }
+
+  const create = (connection: IAbapConnection) =>
+    handleCreateFunctionGroupUnitTest(ctx(connection) as any, {
+      function_group_name: 'zfg_x',
+      test_class_source: 'x',
+    });
+
+  it.each([
+    ['SAP_BASIS 7.40', 'system-description-basis-740--03-discovery'],
+    ['751 (partial)', 'system-description-751-partial--01-discovery'],
+  ])(
+    '%s lists no /activation/runs: the discovery, then one POST /activation',
+    async (_what, name) => {
+      const { connection, lines } = system(
+        corpusBody(name),
+        corpusBody('activation-sync-activated-751--01-activation'),
+      );
+      const result: any = await create(connection);
+      expect(result.isError).toBe(false);
+      const activation = lines.slice(
+        lines.indexOf('GET /sap/bc/adt/discovery'),
+      );
+      expect(activation).toEqual([
+        'GET /sap/bc/adt/discovery',
+        'POST /sap/bc/adt/activation',
+      ]);
+    },
+  );
+
+  it('S/4HANA 2025 lists /activation/runs: the discovery, then the run', async () => {
+    const { connection, lines } = system(
+      corpusBody('system-description-s4-2025--03-discovery'),
+    );
+    const result: any = await create(connection);
+    expect(result.isError).toBe(false);
+    expect(lines.slice(lines.indexOf('GET /sap/bc/adt/discovery'))).toEqual([
+      'GET /sap/bc/adt/discovery',
+      'POST /sap/bc/adt/activation/runs',
+      'GET /sap/bc/adt/activation/runs/RUN-9',
+      'GET /sap/bc/adt/activation/results/RUN-9',
+    ]);
+  });
+
+  it('751: the objects still inactive after the POST are an error naming them', async () => {
+    const { connection } = system(
+      corpusBody('system-description-751-partial--01-discovery'),
+      corpusBody('activation-preaudit-still-inactive-751--01-activation'),
+    );
+    const result: any = await create(connection);
+    expect(result.isError).toBe(true);
+    expect(payload(result).step).toBe('activate');
+    expect(payload(result).still_inactive?.length).toBeGreaterThan(0);
   });
 });

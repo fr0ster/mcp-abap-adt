@@ -8,13 +8,13 @@
  * testers provide all common infrastructure (connection, session, logger, etc.)
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { LoggerWithExtras } from '../loggerHelpers';
 import type { SessionInfo } from '../sessionHelpers';
 
 export interface LambdaTesterContext {
   hasConfig: boolean;
-  connection: AbapConnection;
+  connection: IAbapConnection;
   session: SessionInfo;
   logger: LoggerWithExtras;
   authType?: string;
@@ -28,7 +28,6 @@ export interface LambdaTesterContext {
   lockSession?: SessionInfo | null;
   cleanupAfter: () => Promise<void>;
   // Common configuration parameters shared across all tests
-  getOperationDelay: (operation: string) => number;
   defaultPackage?: string;
   testCase: any; // Test case definition from YAML
 }

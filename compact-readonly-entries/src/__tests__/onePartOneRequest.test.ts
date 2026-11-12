@@ -10,7 +10,10 @@
  * - DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE and PACKAGE have no source: `source`
  *   is refused before any request, naming the parts the type has;
  * - FUNCTION_MODULE takes its group in the arguments (`GROUP|MODULE`, or
- *   `function_group_name`): its source is one request at that group;
+ *   `function_group_name`): its metadata is read at that group first, and
+ *   its source is read there when the metadata names that group (#2: SAP
+ *   ignores the group of a module's address) — two requests; its metadata
+ *   part is the one metadata read;
  * - `node_structure` of a package (`DEVC/K`) is one request: a blank body
  *   answers an empty listing that states both of its readings;
  * - `urls` is the owner's exception and answers as before.
@@ -19,12 +22,12 @@
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetServiceBindingPreviewUrl } from '@mcp-abap-adt/lib/handlers/read';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -86,7 +89,6 @@ const BOTH: Array<[string, Record<string, unknown>]> = [
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
-  ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -208,39 +210,68 @@ describe('compact HandlerGet: one part, one request', () => {
   });
 
   describe('FUNCTION_MODULE: the group in the arguments', () => {
+    // The corpus module, at the group its metadata states.
+    const MODULE_METADATA =
+      'GET /sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm?version=active';
     const MODULE_SOURCE =
-      'GET /sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=active';
+      'GET /sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main?version=active';
 
     it.each([
-      ['GROUP|MODULE', { function_module_name: 'FUGR_A|FM_A' }],
+      ['GROUP|MODULE', { function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM' }],
       [
         'function_group_name',
-        { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+        {
+          function_module_name: 'Z_MCP_SHR_FM',
+          function_group_name: 'ZMCP_SHR_FGRP',
+        },
       ],
       [
         'both, agreeing',
-        { function_module_name: 'fugr_a|fm_a', function_group_name: 'FUGR_A' },
+        {
+          function_module_name: 'zmcp_shr_fgrp|z_mcp_shr_fm',
+          function_group_name: 'ZMCP_SHR_FGRP',
+        },
       ],
     ])(
-      'source by %s: one request at that group, no metadata read',
+      'source by %s: the metadata read at that group, then the source there when the group holds the module',
       async (_label, names) => {
-        for (const mode of MODES) {
-          const { sent } = await run(mode, {
-            object_type: 'FUNCTION_MODULE',
-            ...names,
-          });
-          expect(sent).toEqual([MODULE_SOURCE]);
-        }
+        const args = { object_type: 'FUNCTION_MODULE', ...names };
+        const [held, documented, refused] = await Promise.all(
+          MODES.map((mode) => run(mode, args)),
+        );
+        expect(held.sent).toEqual([MODULE_METADATA]);
+        expect(documented.sent).toEqual([MODULE_METADATA, MODULE_SOURCE]);
+        expect(refused.sent).toEqual([MODULE_METADATA]);
+        expect(refused.answer?.isError).toBe(true);
       },
     );
+
+    it('part metadata: exactly one request, the metadata, held, answered and 404 alike', async () => {
+      const args = {
+        object_type: 'FUNCTION_MODULE',
+        function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM',
+        part: 'metadata',
+      };
+      const [held, documented, refused] = await Promise.all(
+        MODES.map((mode) => run(mode, args)),
+      );
+      expect(held.sent).toEqual([MODULE_METADATA]);
+      expect(documented.sent).toEqual(held.sent);
+      expect(refused.sent).toEqual(held.sent);
+      expect(documented.answer?.isError).not.toBe(true);
+      const body = jsonOf(documented.answer);
+      expect(body.part).toBe('metadata');
+      expect(body).toHaveProperty('metadata');
+      expect(body).not.toHaveProperty('source');
+    });
 
     it("a caller's own isError argument is sent on as an argument, the read answered", async () => {
       const { sent, answer } = await run('document', {
         object_type: 'FUNCTION_MODULE',
-        function_module_name: 'FUGR_A|FM_A',
+        function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM',
         isError: true,
       });
-      expect(sent).toEqual([MODULE_SOURCE]);
+      expect(sent).toEqual([MODULE_METADATA, MODULE_SOURCE]);
       expect(answer?.isError).not.toBe(true);
       expect(jsonOf(answer)).toMatchObject({ part: 'source' });
     });
@@ -248,11 +279,12 @@ describe('compact HandlerGet: one part, one request', () => {
     it('answers the module and its group', async () => {
       const { answer } = await run('document', {
         object_type: 'FUNCTION_MODULE',
-        function_module_name: 'FUGR_A|FM_A',
+        function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM',
       });
+      expect(answer?.isError).not.toBe(true);
       expect(jsonOf(answer)).toMatchObject({
-        function_module_name: 'FM_A',
-        function_group_name: 'FUGR_A',
+        function_module_name: 'Z_MCP_SHR_FM',
+        function_group_name: 'ZMCP_SHR_FGRP',
         part: 'source',
       });
     });
@@ -384,7 +416,7 @@ describe('compact HandlerGet: one part, one request', () => {
     });
 
     it.each(['source', 'metadata'])(
-      'part %s with another version: refused before any request, naming the three',
+      'part %s with another version: refused by GetInclude’s schema before any request, naming the three',
       async (part) => {
         const { sent, answer } = await run('document', {
           object_type: 'INCLUDE',
@@ -395,7 +427,7 @@ describe('compact HandlerGet: one part, one request', () => {
         expect(sent).toEqual([]);
         expect(answer?.isError).toBe(true);
         expect(textOf(answer)).toContain(
-          'version must be "active", "inactive" or "workingArea"',
+          'Invalid arguments for tool GetInclude: Invalid option: expected one of "active"|"inactive"|"workingArea" at version',
         );
       },
     );

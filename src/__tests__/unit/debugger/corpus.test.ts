@@ -1,4 +1,8 @@
-import { corpusBody, corpusCases, corpusSidecar } from '../../../lib/adtCorpus';
+import {
+  corpusBody,
+  corpusCases,
+  corpusSidecar,
+} from '../../helpers/adtCorpus';
 
 describe('the debugger answers recorded on a system', () => {
   it.each([

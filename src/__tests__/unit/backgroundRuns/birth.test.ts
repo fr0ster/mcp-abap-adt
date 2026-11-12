@@ -90,7 +90,11 @@ async function embedder(factory: () => Promise<IAbapConnection>) {
     client,
     /** The runs the strategy keeps for the instance's caller. */
     kept: () =>
-      strategy.list({ url: standIn.url, client: '', user: 'EMBEDDED_USER' }),
+      strategy.list({
+        system: JSON.stringify(['http', standIn.url, '']),
+        client: '',
+        user: 'EMBEDDED_USER',
+      }),
     close: async () => {
       await client.close();
       await (built as unknown as { disconnect(): Promise<void> })

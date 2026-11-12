@@ -21,14 +21,13 @@ import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclu
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapAST } from '../../handlers/system/readonly/handleGetAbapAST';
-import { handleGetAbapSemanticAnalysis } from '../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
 import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
+import { child, listOf } from '../../lib/xml/tree';
 import {
   fakeClientOf,
   okResponse,
@@ -292,44 +291,11 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
     );
     // Nothing of the failure was cached as the node's content.
     expect(
-      (objectsListCache.getCache().objects as any[])[0].object_uri_response,
+      child(
+        listOf(child(objectsListCache.getCache(), 'objects'))[0],
+        'object_uri_response',
+      ),
     ).toBeUndefined();
-  });
-});
-
-describe('GetAbapAST / GetAbapSemanticAnalysis: a local parser that threw', () => {
-  it("GetAbapAST: the parser's own failure, client_threw at the parse step", async () => {
-    const result: any = await handleGetAbapAST(
-      { connection: {} as any, logger: undefined } as any,
-      { code: 42 },
-    );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      error: 'client_threw',
-      tool: 'GetAbapAST',
-      step: 'parse',
-    });
-    expect(payloadOf(result).message).toContain('Failed to parse ABAP code');
-  });
-
-  it("GetAbapSemanticAnalysis: the analysis' own failure, client_threw at the analysis step", async () => {
-    const logger = {
-      debug: () => {
-        throw new Error('logger down');
-      },
-      error: () => undefined,
-    };
-    const result: any = await handleGetAbapSemanticAnalysis(
-      { connection: {} as any, logger } as any,
-      { code: 'DATA a TYPE i.' },
-    );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      error: 'client_threw',
-      tool: 'GetAbapSemanticAnalysis',
-      message: 'logger down',
-      step: 'analyse',
-    });
   });
 });
 
@@ -370,6 +336,8 @@ describe('GetEnhancements include_nested: the nested walk threw', () => {
       message: 'logger down',
       step: 'list includes',
     });
+    // A partial answer is not a failure, and says so as every answer does.
+    expect(result.isError).toBe(false);
   });
 });
 

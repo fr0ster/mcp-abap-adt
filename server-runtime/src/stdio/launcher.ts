@@ -1,30 +1,33 @@
 import * as path from 'node:path';
 import { classify, logFields } from '@mcp-abap-adt/auth-errors';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
   browserCallbackStrategy,
+  connectionCauseOf,
   errorClassOf,
 } from '@mcp-abap-adt/lib/auth';
 import {
   answerVersionOrHelp,
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKeyValues,
   generateHelp,
   type LauncherEdges,
   libInstances,
-  MESSAGE_SERVER_ENV,
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
   processEdges,
   readStartupConfig,
-  rfcAddressRefusalOf,
 } from '@mcp-abap-adt/lib/config';
 import {
   InstanceBatch,
   LeftoverSessions,
   runtimeDirectory,
   sapAnswerOf,
+  skipSapAnswers,
+  substringLineMatch,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   logOffAtOnce,
@@ -51,10 +54,12 @@ import {
   destinationFailureWords,
   type IAuthBrokerFactoryConfig,
   promptLogger,
+  type StartDestinationKeys,
 } from './auth';
 import {
   type CoreConfig,
   coreParameters,
+  MESSAGE_SERVER_KEYS,
   readCoreConfig,
   statedLoginTimeout,
 } from './config/coreParameters';
@@ -68,10 +73,10 @@ import {
 } from './shutdown.js';
 
 const stderrLogger: ILogger = {
-  info: (...args: any[]) => console.error(...args),
-  warn: (...args: any[]) => console.error(...args),
-  error: (...args: any[]) => console.error(...args),
-  debug: (...args: any[]) => console.error(...args),
+  info: (...args: unknown[]) => console.error(...args),
+  warn: (...args: unknown[]) => console.error(...args),
+  error: (...args: unknown[]) => console.error(...args),
+  debug: (...args: unknown[]) => console.error(...args),
 };
 
 const silentLogger: ILogger = {
@@ -106,6 +111,9 @@ ENVIRONMENT VARIABLES:
   MCP Server Configuration:
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
+    MCP_DEFERRED_LOGON             Start without contacting SAP; the first tool call logs on (true|false)
+    MCP_RESTORE_SESSION            With MCP_DEFERRED_LOGON: the first tool call takes up the leftover session (true|false)
+    MCP_ENABLE_DATA_TOOLS          Serve the data tools: GetSqlQuery, GetTableContents (true|false)
     MCP_BROWSER                    Browser for a login: system|auto|chrome|edge|firefox|none|headless
     MCP_BROWSER_PROGRAM            The program that opens the login URL (excludes MCP_BROWSER)
     MCP_RENEWAL                    refresh-then-login (default) | refresh-only (never a login)
@@ -133,8 +141,8 @@ AUTHENTICATIONS (exactly three; a .env or service key stating another is refused
 SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
 
   Basic Authentication (on-premise):
-    SAP_URL                        SAP system URL (required)
-    SAP_CLIENT                     SAP client number (required for basic auth)
+    SAP_URL                        SAP system URL (required over HTTP; never over RFC)
+    SAP_CLIENT                     SAP client number (required over RFC)
     SAP_AUTH_TYPE                  Authentication type: basic|snc|jwt (required)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (required for a destination)
                                    Precedence: --connection-type, then the environment
@@ -147,7 +155,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    and how the system's answers are read
     SAP_USERNAME                   SAP username (required for basic auth)
     SAP_PASSWORD                   SAP password (required for basic auth)
-    SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
+    SAP_LANGUAGE                   Logon language (required over RFC) and master language
+                                   of created objects (e.g., EN, DE)
 
   SNC (passwordless logon over RFC; no SAP_USERNAME, no SAP_PASSWORD):
     SAP_AUTH_TYPE=snc with SAP_CONNECTION_TYPE=rfc (or --connection-type=rfc)
@@ -166,20 +175,18 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
   RFC Connection (any system with SAP NW RFC SDK):
     --connection-type=rfc          Enables RFC transport via SADT_REST_RFC_ENDPOINT
                                    (or SAP_CONNECTION_TYPE=rfc in the .env or the environment)
-    SAP_URL                        SAP system URL (host:port used to derive RFC params)
-    SAP_USERNAME                   SAP username
-    SAP_PASSWORD                   SAP password
-    SAP_CLIENT                     SAP client number
-    Through a message server and a logon group (load-balanced logon); each also
-    --mshost, --msserv, --sysid, --group, --saprouter, or the YAML key of that name.
-    Precedence: the CLI, then the environment (this file joins it), then YAML:
-    SAP_MSHOST                     Message server host. With it, the URL gives no RFC host
-                                   and no system number (SAP_SYSNR is not read)
-    SAP_MSSERV                     Message server service (name or port)
-    SAP_SYSID                      System id; SAP_MSSERV or SAP_SYSID is required with
-                                   SAP_MSHOST (refused naming both otherwise)
-    SAP_GROUP                      Logon group (connection default: PUBLIC)
-    SAP_SAPROUTER                  SAProuter string, with either addressing
+    An RFC destination states one address, its client and its language, and no
+    SAP_URL; nothing is derived from a URL and nothing has a default. Each key is
+    also --<key> and the YAML key <key> (ashost, sysnr, mshost, ..., client,
+    language). Precedence: the CLI, then the process environment, then this file,
+    then YAML:
+    SAP_ASHOST, SAP_SYSNR          An application server: its host and system number
+    SAP_MSHOST                     Or a message server: its host,
+    SAP_MSSERV / SAP_SYSID         its service (name or port) or system id, or both,
+    SAP_GROUP                      and its logon group (required with SAP_MSHOST)
+    SAP_SAPROUTER                  SAProuter string, with either address
+    SAP_CLIENT, SAP_LANGUAGE       Required
+    SAP_USERNAME, SAP_PASSWORD     Basic authentication (SNC takes neither)
     Requires: @mcp-abap-adt/sap-rfc-lite (an optional dependency, prebuilt for
     linux-x64 glibc, win32-x64 and darwin-arm64, nothing compiled on install;
     npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out) and,
@@ -233,9 +240,13 @@ EXAMPLES:
   # An explicit env file (a .env in the working directory is read only when named)
   ${program} --env-path=./.env
 
-  # RFC connection (any system with SAP NW RFC SDK)
+  # RFC connection (any system with SAP NW RFC SDK): the .env states its
+  # address (SAP_ASHOST, SAP_SYSNR), SAP_CLIENT and SAP_LANGUAGE, no SAP_URL
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)
   ${program} --env-path=my-system.env --connection-type=rfc
+
+  # RFC to an application server stated on the command line
+  ${program} --env-path=my-system.env --connection-type=rfc --ashost=<host> --sysnr=<NN> --client=<client> --language=<language>
 
   # RFC through a message server and a logon group
   ${program} --env-path=my-system.env --connection-type=rfc --mshost=<host> --sysid=<SID> --group=<group>
@@ -277,7 +288,7 @@ export function coreHelp(
  * `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` the compact sets.
  */
 export interface LauncherOptions {
-  /** The tools served: fixed by the command, never by a flag. */
+  /** The tools served: fixed by the command, but for the data tools (`--enable-data-tools`). */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -356,15 +367,12 @@ export interface LauncherDeps {
 function envFileOf(
   config: CoreConfig,
 ): Pick<IAuthBrokerFactoryConfig, 'envFile'> {
-  const field = config.envFile
-    ? 'envFile'
-    : config.envFilePath
-      ? 'envFilePath'
-      : undefined;
-  if (!field) return {};
+  const field = config.envFile ? 'envFile' : 'envFilePath';
+  const path = config.envFile || config.envFilePath;
+  if (!path) return {};
   return {
     envFile: {
-      path: config[field] as string,
+      path,
       source: config.envFileSource ?? `CoreConfig.${field}`,
     },
   };
@@ -402,7 +410,8 @@ function effectiveFromEnvironment<T extends string>(
   if (!overridable) return value;
   const raw = env[key]?.trim().toLowerCase();
   if (!raw) return value;
-  if (!(values as readonly string[]).includes(raw)) {
+  const word = values.find((each) => each === raw);
+  if (word === undefined) {
     const words =
       values.length === 2
         ? values.join(' or ')
@@ -411,14 +420,7 @@ function effectiveFromEnvironment<T extends string>(
       `${key} (environment or env file) must be ${words}`,
     );
   }
-  return raw as T;
-}
-
-/** `config` without its message-server fields: they are read again after the env file. */
-function withoutMessageServer(config: CoreConfig): CoreConfig {
-  const rest: CoreConfig = { ...config };
-  for (const field of MESSAGE_SERVER_FIELDS) delete rest[field];
-  return rest;
+  return word;
 }
 
 /** The connection type: see {@link effectiveFromEnvironment}. */
@@ -436,37 +438,50 @@ export function effectiveConnectionType(
 }
 
 /**
- * The message server's fields (RFC, connection 18), each as
- * {@link effectiveFromEnvironment} reads the connection type: the CLI, then
- * the process environment — which by now holds what the env file states,
- * never over a value set before — then YAML. Taken as given, trimmed; no
- * default, no check: connection refuses what it cannot dial.
+ * The destination keys the start parameters state (the RFC address, the
+ * client, the language), by rank against the destination's means: the CLI
+ * and the process's own environment above them, YAML below. A config made
+ * by hand, with no source, ranks above them, as the CLI does. Read once,
+ * at the start: no destination's `.env` joins the environment, so nothing
+ * is read again after it.
+ */
+export function startDestinationKeys(config: CoreConfig): StartDestinationKeys {
+  const overMeans: DestinationKeyValues = {};
+  const underMeans: DestinationKeyValues = {};
+  for (const key of DESTINATION_KEYS) {
+    const value = config[key];
+    if (value === undefined) continue;
+    const source = config.destinationKeySource?.[key];
+    const belowMeans =
+      source !== undefined &&
+      !source.startsWith('--') &&
+      source !== DESTINATION_KEY_ENV[key];
+    if (belowMeans) underMeans[key] = value;
+    else overMeans[key] = value;
+  }
+  return { overMeans, underMeans };
+}
+
+/**
+ * The message server's five fields of `config` as 19.1.0 read them: the CLI
+ * form, else `env`'s variable, else the value read (YAML) — trimmed, a blank
+ * one unset. The launcher no longer calls it: no destination's `.env` joins
+ * the environment, so the start reads the keys once
+ * ({@link startDestinationKeys}).
  */
 export function effectiveMessageServer(
   config: CoreConfig,
   env: NodeJS.ProcessEnv,
-): Pick<CoreConfig, MessageServerField> {
-  const out: Pick<CoreConfig, MessageServerField> = {};
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = config[field];
-    const source = config.messageServerSource?.[field];
+): Pick<CoreConfig, (typeof MESSAGE_SERVER_KEYS)[number]> {
+  const out: Pick<CoreConfig, (typeof MESSAGE_SERVER_KEYS)[number]> = {};
+  for (const key of MESSAGE_SERVER_KEYS) {
+    const value = config[key];
+    const source = config.destinationKeySource?.[key];
     const fromCli = value !== undefined && (source?.startsWith('--') ?? true);
     const stated = fromCli
       ? value
-      : env[MESSAGE_SERVER_ENV[field]]?.trim() || value;
-    if (stated) out[field] = stated;
-  }
-  return out;
-}
-
-/** The message-server fields set on `config`, as `SapConfig` takes them. */
-function messageServerOf(
-  config: Pick<CoreConfig, MessageServerField>,
-): Pick<IAuthBrokerFactoryConfig, MessageServerField> {
-  const out: Pick<IAuthBrokerFactoryConfig, MessageServerField> = {};
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = config[field];
-    if (value !== undefined) out[field] = value;
+      : env[DESTINATION_KEY_ENV[key]]?.trim() || value;
+    if (stated) out[key] = stated;
   }
   return out;
 }
@@ -520,7 +535,8 @@ export function factoryConfigFrom(
       browserAuthPort: config.browserAuthPort,
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
-    ...messageServerOf(config),
+    ...(config.systemType && { systemType: config.systemType }),
+    destinationKeys: startDestinationKeys(config),
     ...(config.renewal && { renewal: config.renewal }),
     ...(config.authDebug === true && { authDebug: true }),
     ...(config.loginTimeout !== undefined && {
@@ -607,7 +623,9 @@ export function startSystemUserUnknownWords(destination: string): string {
  * The words the connection at start failed in: what the failure reader
  * makes of it (a chain failure, the server's own refusal — a system lookup
  * that failed — or the destination layer's), else the destination, the
- * error's class and the status SAP answered — never its message.
+ * error's class, its network or TLS code when it is a listed one
+ * (`connectionCauseOf`) and the status SAP answered — never its
+ * message.
  */
 export function startConnectionWords(
   error: unknown,
@@ -633,14 +651,37 @@ export function startConnectionWords(
   if (read !== undefined) {
     return destinationFailureWords(error, destination, options);
   }
-  // connection's refusal of an RFC address it cannot dial (a message server
-  // with neither msserv nor sysid): its own fixed words, as it came.
-  const address = rfcAddressRefusalOf(error);
-  if (address !== undefined) {
-    return `Destination "${destination}" could not be connected at start: ${address}`;
-  }
   const sap = sapAnswerOf(error);
-  return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;
+  const cause = connectionCauseOf(error);
+  return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${cause === undefined ? '' : ` (${cause})`}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;
+}
+
+/** Where the summary says the settings point: the URL over HTTP, the address over RFC. */
+function displayAddressOf(
+  settings: SapConfig,
+): Pick<AuthDisplayConfig, 'serviceUrl' | 'rfcAddress'> {
+  if (settings.connectionType !== 'rfc') return { serviceUrl: settings.url };
+  const rfcAddress: Array<[string, string]> =
+    settings.ashost !== undefined
+      ? [
+          ['RFC ashost', settings.ashost],
+          ['RFC sysnr', settings.sysnr],
+        ]
+      : [
+          ['RFC mshost', settings.mshost],
+          ...(settings.msserv !== undefined
+            ? [['RFC msserv', settings.msserv] satisfies [string, string]]
+            : []),
+          ...(settings.sysid !== undefined
+            ? [['RFC sysid', settings.sysid] satisfies [string, string]]
+            : []),
+          ['RFC group', settings.group],
+        ];
+  if (settings.saprouter !== undefined) {
+    rfcAddress.push(['RFC saprouter', settings.saprouter]);
+  }
+  rfcAddress.push(['Language', settings.language]);
+  return { rfcAddress };
 }
 
 /**
@@ -668,7 +709,7 @@ async function checkAndSummarise(
     const broker = await factory.getBroker(destination);
     const connConfig = await broker.getConnectionConfig(destination);
     const displayConfig: AuthDisplayConfig = {
-      serviceUrl: settings.url,
+      ...displayAddressOf(settings),
       sapClient: settings.client,
       authType: settings.authType,
       username: connConfig?.username,
@@ -774,15 +815,14 @@ async function launchStdio(
   if (connectionType) process.env.SAP_CONNECTION_TYPE = connectionType;
   // The connector reads the system type from the environment.
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
-  config = {
-    ...withoutMessageServer(config),
-    connectionType,
-    systemType,
-    ...effectiveMessageServer(config, process.env),
-  };
+  config = { ...config, connectionType, systemType };
 
-  // The command's tool set: fixed by the command, never by a flag.
-  const handlersRegistry = registryOf(options.toolSet, 'stdio');
+  // The command's tool set: fixed by the command, but for the data tools,
+  // which --enable-data-tools adds.
+  // The data tools only when the configuration turns them on.
+  const handlersRegistry = registryOf(options.toolSet, 'stdio', {
+    dataTools: config.enableDataTools === true,
+  });
 
   // The browser of a login, mapped by the platform; a choice that
   // cannot be served stops the start before anything is read.
@@ -852,6 +892,13 @@ async function launchStdio(
       if (config.mcpDestination) {
         assertDestinationName(config.mcpDestination, '--mcp');
       }
+      // Its wire is required (#320) and decided before its settings are
+      // read: they are read per wire.
+      if (connectionType === undefined) {
+        deps.stderr(`[MCP] ${startConnectionTypeRequiredWords(destination)}`);
+        deps.exit(1);
+        return;
+      }
       await checkAndSummarise(
         factory,
         destination,
@@ -881,13 +928,6 @@ async function launchStdio(
     deps.exit(1);
     return;
   }
-  // So is its wire (#320): an absent connection type is not HTTP.
-  if (destination && connectionType === undefined) {
-    deps.stderr(`[MCP] ${startConnectionTypeRequiredWords(destination)}`);
-    deps.exit(1);
-    return;
-  }
-
   // Inspection lists the declared variant's tool set: without a system type
   // there is none to list, and none is picked.
   if (!destination && systemType === undefined) {
@@ -916,12 +956,15 @@ async function launchStdio(
       leftoverSessions: new LeftoverSessions({
         directory: runtimeDirectory(getPlatformPaths(config.authBrokerPath)[0]),
       }),
-      // Background runs of the run tools, kept in this process's memory;
-      // they end with the process. Only where the set serves them: a -ro
-      // command has none, so a run's `background: true` is refused.
+      // Background runs of the long reads (and, in the write sets, of the
+      // run tools), kept in this process's memory; they end with the
+      // process. Every set serves them.
       ...(options.toolSet.backgroundRuns && {
         backgroundRuns: new InMemoryBackgroundRuns(),
       }),
+      // SearchSource's strategies: the shipped ones (DO22, DO24).
+      sapAnswerStrategy: skipSapAnswers,
+      lineMatchStrategy: substringLineMatch,
       // Batch mode: the one instance's batch state, owned here.
       batch: new InstanceBatch({
         keepRawParts: config.batchKeepRawParts === true,
@@ -929,6 +972,11 @@ async function launchStdio(
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
       sentenceFor: (error) => factory.sentenceFor(error),
+      // --deferred-logon: the first tool call makes the connection
+      // (--restore-session: on the destination's one leftover session).
+      deferredLogon: config.deferredLogon === true,
+      restoreAtFirstBirth:
+        config.deferredLogon === true && config.restoreSession === true,
     },
   );
   activeServer = server;
@@ -936,7 +984,13 @@ async function launchStdio(
   // the process ends with what failed. A shutdown during the birth (stdin
   // closed, a signal) ends it, and its exit — 1, the start failed — is the
   // process's one exit.
-  if (destination) {
+  if (destination && config.deferredLogon === true) {
+    // Nothing is sent to the system before the first tool call that needs
+    // the connection: it is born there.
+    deps.stderr(
+      `[MCP] Destination "${destination}": the logon is deferred to the first tool call (deferred logon)`,
+    );
+  } else if (destination) {
     try {
       await birth.joining(server.connectAtStart(destination));
     } catch (error) {

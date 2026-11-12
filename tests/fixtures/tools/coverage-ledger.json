@@ -1,0 +1,120 @@
+{
+  "DiscardBackgroundRun": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetBackgroundRun": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetFunctionModule#source": {
+    "unit": "src/__tests__/unit/pins/searchSource.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "GetObjectOutline#CLAS/OC": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#FUGR/F": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#INTF/OI": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#PROG/P": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetSqlQuery": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerBackgroundRunGet": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerGet#-#activation_status": {
+    "unit": "src/__tests__/unit/pins/activate.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activate.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activate.live.test.ts"
+    }
+  },
+  "HandlerGetData": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "ListBackgroundRuns": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "RunAbapUnit": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "RunUnitTest": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "SearchSource": {
+    "unit": "src/__tests__/unit/pins/searchSource.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  }
+}

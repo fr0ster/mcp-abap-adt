@@ -327,11 +327,15 @@ describe('every removed parameter stops sse with its words', () => {
     ],
     ['--unsafe', '--unsafe', DESTINATION_WORDS],
     ['--connection-type=rfc', '--connection-type', DESTINATION_WORDS],
+    ['--ashost=value-one', '--ashost', DESTINATION_WORDS],
+    ['--sysnr=00', '--sysnr', DESTINATION_WORDS],
     ['--mshost=value-one', '--mshost', DESTINATION_WORDS],
     ['--msserv=value-one', '--msserv', DESTINATION_WORDS],
     ['--sysid=value-one', '--sysid', DESTINATION_WORDS],
     ['--group=value-one', '--group', DESTINATION_WORDS],
     ['--saprouter=value-one', '--saprouter', DESTINATION_WORDS],
+    ['--client=100', '--client', DESTINATION_WORDS],
+    ['--language=EN', '--language', DESTINATION_WORDS],
     ['--browser=none', '--browser', DESTINATION_WORDS],
     ['--browser-program=/x', '--browser-program', DESTINATION_WORDS],
     ['--browser-auth-port=61001', '--browser-auth-port', DESTINATION_WORDS],
@@ -432,6 +436,7 @@ describe('the YAML template and validation come from the table', () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
         'batch',
+        'enable-data-tools',
         'sse',
         'shutdown-timeout',
         'state-idle-minutes',

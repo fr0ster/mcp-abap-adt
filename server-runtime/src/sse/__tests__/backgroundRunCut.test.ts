@@ -14,6 +14,7 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import { adtSystemKey } from '../../../../src/lib/adtHeaders/systemKey';
 import { BackgroundRunHandlersGroup } from '../../../../src/lib/handlers/groups/BackgroundRunHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../../src/lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SystemHandlersGroup } from '../../../../src/lib/handlers/groups/SystemHandlersGroup';
@@ -60,7 +61,7 @@ const sessionOf = (match: (r: StandInRequest) => boolean) =>
 /** Waits until the store holds run `handle` as finished. */
 async function finished(
   handle: string,
-  caller: { url: string; client: string; user: string },
+  caller: { system: string; client: string; user: string },
 ): Promise<void> {
   const end = Date.now() + 10_000;
   while ((await strategy.get(handle, caller))?.state !== 'finished') {
@@ -95,7 +96,11 @@ it('the stream closes: the run it started is logged off at once and ends in the 
   const runA = sessionOf(runOf('ZCL_RUN_A'));
   const runB = sessionOf(runOf('ZCL_RUN_B'));
   const caller = {
-    url: s.standIn.url,
+    system: adtSystemKey({
+      url: s.standIn.url,
+      client: '100',
+      authType: 'jwt',
+    }),
     client: '100',
     user: 'SHUTDOWN_USER',
   };

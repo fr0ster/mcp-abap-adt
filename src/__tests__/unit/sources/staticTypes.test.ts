@@ -1,0 +1,274 @@
+/**
+ * Production code is checked by the compiler, not by the author's word: no
+ * type assertion but `as const`, no `any`, no non-null or definite-assignment
+ * `!`, no `ts-ignore`, `ts-expect-error` or `ts-nocheck` directive, no
+ * `biome-ignore`.
+ * The scan (`helpers/typeEscapeScan.ts`) reads the syntax tree of every production
+ * source — the root `src`, `scripts`, and every package's `src`; tests,
+ * fixtures and typechecks are outside it. It is what makes `as unknown as`
+ * fail the build, since `tsc` accepts it; Biome's three rules
+ * (`noExplicitAny`, `noImplicitAnyLet`, `noUnsafeTypeAssertion`) and
+ * `noImplicitAny` stand beside it.
+ *
+ * Each fixture under `__fixtures__/typeEscapes/refused` is one escape and must
+ * be reported under its rule alone; the one under `clean` must not be.
+ */
+
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
+import { REPO, rel } from './helpers/failureScan';
+import {
+  type Escape,
+  type EscapeRule,
+  productionDirectories,
+  productionFiles,
+  scanFile,
+} from './helpers/typeEscapeScan';
+
+/**
+ * The assertions that cannot go without a change in another package — the
+ * only escapes allowed, each by file, line and exact text. The list may only
+ * shrink: an entry no longer found fails, and so does any other escape, in
+ * these files too.
+ *
+ * Upstream change that removes all three:
+ * `IAbapConnection.makeAdtRequest<T = unknown, D = unknown>(…):
+ * Promise<IAdtWireResponse<T, D>>` (`@mcp-abap-adt/interfaces-adt-connection`)
+ * lets the caller choose `T`, so a connection that records or forwards a
+ * request holds only `IAdtWireResponse<unknown>` and must assert the caller's
+ * `T`. Once interfaces-adt-connection answers `data: unknown` (the caller reads
+ * it) and adt-clients and connection follow, published first, these go — and
+ * with them Biome's `noUnsafeTypeAssertion` override for their files in
+ * `biome.json`, which must name exactly the files listed here.
+ */
+const BLOCKED: ReadonlyArray<{ where: string; text: string }> = [
+  {
+    where: 'src/lib/batch/phases.ts:178',
+    text: 'correcting.record(request) as Promise<IAdtWireResponse<T, D>>',
+  },
+  {
+    where: 'src/lib/batch/phases.ts:181',
+    text: 'record(request) as Promise<IAdtWireResponse<T, D>>',
+  },
+  {
+    where: 'src/handlers/system/readonly/handleRuntimeListFeeds.ts:547',
+    text: 'ask(request) as Promise<IAdtWireResponse<T, D>>',
+  },
+];
+
+const isBlocked = (found: Escape) =>
+  found.rule === 'assertion' &&
+  BLOCKED.some(
+    (blocked) => blocked.where === found.where && blocked.text === found.text,
+  );
+
+const fileOf = (where: string) => where.slice(0, where.lastIndexOf(':'));
+
+/** A JSON value's member at `keys`, read by shape; absent when any step is not an object. */
+function member(value: unknown, keys: readonly string[]): unknown {
+  let current = value;
+  for (const key of keys) {
+    if (typeof current !== 'object' || current === null || !(key in current)) {
+      return undefined;
+    }
+    current = Reflect.get(current, key);
+  }
+  return current;
+}
+
+function readJson(file: string): unknown {
+  return JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
+}
+
+/** The files `biome.json` exempts from `noUnsafeTypeAssertion`. */
+function biomeAssertionExemptions(): string[] {
+  const overrides = member(readJson('biome.json'), ['overrides']);
+  const exempt: string[] = [];
+  for (const override of Array.isArray(overrides) ? overrides : []) {
+    const rule = member(override, [
+      'linter',
+      'rules',
+      'nursery',
+      'noUnsafeTypeAssertion',
+    ]);
+    const includes = member(override, ['includes']);
+    if (rule !== 'off' || !Array.isArray(includes)) continue;
+    for (const include of includes) {
+      if (typeof include === 'string') exempt.push(include);
+    }
+  }
+  return exempt;
+}
+
+/** The paths a script's first `biome check` names (its words that are not flags). */
+function biomeCheckPaths(script: string): string[] {
+  const command = member(readJson('package.json'), ['scripts', script]);
+  if (typeof command !== 'string') return [];
+  const words = command.split(' && ')[0]?.split(' ') ?? [];
+  if (words[0] !== 'biome' || words[1] !== 'check') return [];
+  return words.slice(2).filter((word) => !word.startsWith('--'));
+}
+
+describe('production sources', () => {
+  const directories = productionDirectories();
+  const files = directories.flatMap((dir) =>
+    productionFiles(path.join(REPO, dir)),
+  );
+  const escapes = files.flatMap(scanFile);
+
+  it('scans the root src, scripts and every package src', () => {
+    assert.deepEqual(
+      [
+        'src',
+        'scripts',
+        'server/src',
+        'server-runtime/src',
+        'http/src',
+        'sse/src',
+        'compact-modify/src',
+        'compact-readonly-entries/src',
+        'background-runs-memory/src',
+        'responsible-rules/src',
+        'compact-sse-ro/src',
+      ].filter((dir) => !directories.includes(dir)),
+      [],
+    );
+    for (const dir of directories) {
+      assert.equal(
+        files.some((file) => rel(file).startsWith(`${dir}/`)),
+        true,
+        dir,
+      );
+    }
+    const scanned = files.map(rel);
+    assert.deepEqual(
+      [
+        'src/lib/batch/phases.ts',
+        'scripts/list-tools.ts',
+        'server-runtime/src/stdio/launcher.ts',
+      ].filter((file) => !scanned.includes(file)),
+      [],
+    );
+    assert.equal(
+      scanned.some((file) => file.includes('__tests__')),
+      false,
+    );
+    assert.equal(
+      scanned.some((file) => file.endsWith('.test.ts')),
+      false,
+    );
+    assert.equal(
+      scanned.some((file) => file.includes('__fixtures__')),
+      false,
+    );
+  });
+
+  it('holds no escape but the blocked assertions', () => {
+    assert.deepEqual(
+      escapes.filter((found) => !isBlocked(found)),
+      [],
+    );
+  });
+
+  it('still finds every blocked assertion (a stale entry fails)', () => {
+    for (const blocked of BLOCKED) {
+      const wanted: Escape = { rule: 'assertion', ...blocked };
+      assert.ok(
+        escapes.some((found) => isDeepStrictEqual(found, wanted)),
+        `${blocked.where} ${blocked.text}`,
+      );
+    }
+  });
+
+  it("exempts from Biome's assertion rule exactly the tests and the blocked files", () => {
+    const tests = ['**/__tests__/**', '**/*.test.ts', '**/*.spec.ts'];
+    const blockedFiles = BLOCKED.map((blocked) => fileOf(blocked.where));
+    assert.deepEqual(
+      biomeAssertionExemptions().sort(),
+      [...new Set([...tests, ...blockedFiles])].sort(),
+    );
+  });
+
+  for (const script of ['lint', 'lint:check', 'build']) {
+    it(`the root ${script} runs Biome over every production directory`, () => {
+      // Its directories are exactly the production directories; every other
+      // entry names a file that exists (the node:test tools, D27).
+      const paths = biomeCheckPaths(script);
+      const isDirectory = (entry: string): boolean => {
+        const at = path.join(REPO, entry);
+        return fs.existsSync(at) && fs.statSync(at).isDirectory();
+      };
+      assert.deepEqual(
+        paths.filter(isDirectory).sort(),
+        [...directories].sort(),
+      );
+      const files = paths.filter((entry) => !isDirectory(entry));
+      assert.deepEqual(
+        files.filter((entry) => {
+          const at = path.join(REPO, entry);
+          return !fs.existsSync(at) || !fs.statSync(at).isFile();
+        }),
+        [],
+      );
+    });
+  }
+});
+
+describe('the scan refuses each escape, and only those', () => {
+  const root = path.join(
+    REPO,
+    'src',
+    '__tests__',
+    'unit',
+    'sources',
+    '__fixtures__',
+    'typeEscapes',
+  );
+  const fixture = (kind: 'refused' | 'clean', name: string) =>
+    path.join(root, kind, `${name}.ts`);
+  const REFUSED: ReadonlyArray<readonly [string, EscapeRule]> = [
+    ['assertion', 'assertion'],
+    ['angleBracketAssertion', 'assertion'],
+    ['asUnknownAs', 'assertion'],
+    ['any', 'any'],
+    ['nonNull', '!'],
+    ['definiteAssignment', '!'],
+    ['tsIgnore', '@ts-ignore'],
+    ['tsExpectError', '@ts-expect-error'],
+    ['tsNocheck', '@ts-nocheck'],
+    ['biomeIgnore', 'biome-ignore'],
+  ];
+
+  it('has one fixture per way past it, every rule among them', () => {
+    const onDisk = fs
+      .readdirSync(path.join(root, 'refused'))
+      .map((name) => path.basename(name, '.ts'))
+      .sort();
+    assert.deepEqual(onDisk, REFUSED.map(([name]) => name).sort());
+    const rules: EscapeRule[] = [
+      'assertion',
+      'any',
+      '!',
+      '@ts-ignore',
+      '@ts-expect-error',
+      '@ts-nocheck',
+      'biome-ignore',
+    ];
+    assert.deepEqual(new Set(REFUSED.map(([, rule]) => rule)), new Set(rules));
+  });
+
+  for (const [name, rule] of REFUSED) {
+    it(`refuses ${name} under ${rule} alone`, () => {
+      const found = scanFile(fixture('refused', name));
+      assert.ok(found.length > 0, `${name}: nothing found`);
+      assert.deepEqual(new Set(found.map((one) => one.rule)), new Set([rule]));
+    });
+  }
+
+  it('accepts as const, <const>, satisfies, the logical ! and the words in a string', () => {
+    assert.deepEqual(scanFile(fixture('clean', 'allowed')), []);
+  });
+});

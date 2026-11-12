@@ -70,15 +70,36 @@ mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
    - [High-level tools](AVAILABLE_TOOLS_HIGH.md)
    - [Compact tools](../../compact/docs/AVAILABLE_TOOLS.md) (the low set's analogue since 19.0.0)
    - Compact tools — in the `@mcp-abap-adt/compact` package
-4. **Long reads take a `timeout`** (seconds, no default) — the approved list, each on an ABAP
-   session of its own. When it passes the read is cancelled (its session logged off) and nothing
-   was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels
-   at 60 s — because a tool call cannot be cancelled: a client's cancel aborts nothing, the call
-   runs to its end. No run (unit test, ATC, class, program) takes
-   one. The list:
-   [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own).
+4. **Long reads run in the background by default** — the approved list
+   (`tools/long-handlers.json`), each on an ABAP session of its own: a call without `background`
+   answers a `run_handle` at once; `background: false` answers the result in the call. A running
+   read is cancelled with `DiscardBackgroundRun`. No tool takes a `timeout` — see below.
 5. **A class or program run may go on in the background** (`background: true`): it cannot be
    cut, so instead of waiting the call answers at once with a `run_handle` — see below.
+
+## Background runs of the long reads
+
+A long read (where-used and search, `SearchSource`, package walks, data preview, the dump feed,
+profiler traces, ATC results, …) only reads. Called **without** `background` (or with
+`background: true`), it answers at once with a `run_handle` and reads on an ABAP session of its
+own; `background: false` answers the result in the call, on a session of its own, as 23.x did.
+
+- `GetBackgroundRun { run_handle }` (compact `HandlerBackgroundRunGet`) — `running`; `finished`
+  followed by what the tool would have answered in the call; or `cancelled`. A read's finished or
+  cancelled answer is answered once and then removed. Once Get answers a finished or cancelled read, that read is gone: a Get response lost on the way cannot be recovered, `ListBackgroundRuns` no longer shows it, and the read must be started again.
+- `ListBackgroundRuns` (compact `HandlerBackgroundRunList`) — your runs with their state:
+  `running`, `finished` or `cancelled`.
+- `DiscardBackgroundRun { run_handle }` (compact `HandlerBackgroundRunDiscard`) — on a running
+  read, cancels it: its session is logged off, SAP ends the read, and the run reads `cancelled`
+  until Get answers it; on a finished run, removes its answer.
+
+Every binary serves these tools, the `-ro` ones included: their runs are reads alone, and a
+`-ro` binary's `DiscardBackgroundRun` cancels or removes reads only. A server without background
+runs (an embedder without a store) lists a long tool without `background` and answers its read in
+the call. `HandlerGet`'s run-reading parts (the `UNIT_TEST` / `CDS_UNIT_TEST` results,
+`activation_status`, `activation_results`) are read in the call on the instance's connection and
+take no `background`. In batch mode a long read is recorded; `background: true` there is refused
+`batch_no_background`. Details: [MIGRATION-24.0](../MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).
 
 ## Background runs of a class or a program
 
@@ -89,11 +110,12 @@ a `run_handle`; the run goes on in an ABAP session of its own until SAP answers,
 is logged off and the answer is kept for you. No default: without it the call waits, as before.
 
 - `GetBackgroundRun { run_handle }` (compact `HandlerBackgroundRunGet`) — `running`, or `finished`
-  followed by what the run tool would have answered, SAP's error included. Reading keeps it.
+  followed by what the run tool would have answered, SAP's error included. Reading keeps a code
+  run's answer, until `DiscardBackgroundRun`.
 - `ListBackgroundRuns` (compact `HandlerBackgroundRunList`) — your runs: handle, tool, object,
   start, running or finished; no output.
 - `DiscardBackgroundRun { run_handle }` (compact `HandlerBackgroundRunDiscard`) — removes a
-  finished run's answer. A running run cannot be discarded: it cannot be stopped.
+  finished run's answer. A running code run cannot be discarded: it cannot be stopped.
 
 A run is yours when its destination and SAP user equal those of your request (for a token
 credential, the user SAP answers); another user's handle reads as an unknown one. You may hold 16
@@ -121,7 +143,10 @@ normally and starts a new session instead; its locks are gone. The record stays 
 either way. With several records, none is picked: the server logs on normally and leaves them for
 the tools below. A debugger's session is never taken up. After a start on a leftover session the
 server checks and repairs nothing: if the session ended or its locks are gone, SAP's answers say
-so, and you redo your requests. Two tools act on the leftover sessions of the destination the
+so, and you redo your requests. With `--deferred-logon` (the start contacts no system) the record
+is not taken up on its own: the first tool call logs on and the record stays for the tools below;
+with `--restore-session` as well, the first tool call takes it up as a start does (see
+[CLI options](CLI_OPTIONS.md#--deferred-logon)). Two tools act on the leftover sessions of the destination the
 server serves:
 
 - `ListLeftoverSessions` (compact `HandlerLeftoverSessionList`) — the handle, role, destination,

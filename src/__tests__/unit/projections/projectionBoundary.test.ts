@@ -45,6 +45,8 @@ import {
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { moduleInGroup } from '../../helpers/functionModuleMetadata';
+import { holding } from '../../helpers/heldLocks';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 jest.setTimeout(60_000);
@@ -604,7 +606,8 @@ describe('every type argument is checked once, against its projection', () => {
     const connection = recordingConnection();
     declareSystemKind(connection, variant);
     const answered = await each
-      .send({ connection })
+      // The instance locked what the cases write under.
+      .send({ connection, heldLocks: holding('LOCKHANDLE') })
       .catch((thrown: unknown) => ({ thrown: String(thrown) }));
     if (each.expected === 'sent') {
       expect({
@@ -629,9 +632,10 @@ describe('HandlerActivate: a function module and a behaviour implementation', ()
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
+  // A function module's metadata, read first, names ZFG_A (#2).
   const on = (variant: ProjectionVariant) => {
     process.env.SAP_SYSTEM_TYPE = variant;
-    const connection = recordingConnection();
+    const connection = recordingConnection([moduleInGroup('Z_FM_A', 'ZFG_A')]);
     declareSystemKind(connection, variant);
     return connection;
   };
@@ -644,7 +648,10 @@ describe('HandlerActivate: a function module and a behaviour implementation', ()
         { connection },
         { object_type: 'FUNCTION_MODULE', object_name: 'zfg_a|z_fm_a' },
       );
-      const [request] = connection.requests;
+      const [metadata, request] = connection.requests;
+      expect(metadata?.url).toBe(
+        '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea',
+      );
       expect(request?.url).toContain('/activation/runs');
       expect(String(request?.data)).toContain(
         '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a',
@@ -665,7 +672,7 @@ describe('HandlerActivate: a function module and a behaviour implementation', ()
           function_group_name: 'zfg_a',
         },
       );
-      expect(String(connection.requests[0]?.data)).toContain(
+      expect(String(connection.requests[1]?.data)).toContain(
         '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a',
       );
     },

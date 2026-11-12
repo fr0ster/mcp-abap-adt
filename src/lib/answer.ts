@@ -12,19 +12,24 @@ import {
   type IAdtError,
   type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { readAdtFailureInCall } from './adtFailureReading';
 import {
   answerRead,
   failurePayload as chainFailurePayload,
+  type FailureAnswer,
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
+import { cleanupOf, type StepError } from './strategies/stepResponse';
 import {
   isSystemContextRefusal,
   SystemContextMissingError,
 } from './systemContextGuard';
+import { wireResponseOf } from './wireResponse';
+import { child, isElement, isList } from './xml/tree';
 
 export type { AnswerDetail };
 
@@ -50,10 +55,19 @@ function withBeside(
   return beside === undefined ? payload : { ...payload, ...beside };
 }
 
-export interface McpResult {
+export type McpResult = {
   isError: boolean;
   content: Array<{ type: 'text'; text: string }>;
-}
+};
+
+/**
+ * An answer whose content is a value, not text: the registration serialises
+ * each `json` item to text (`normalizeToolContent`).
+ */
+export type JsonAnswer = {
+  isError: boolean;
+  content: Array<{ type: 'json'; json: unknown }>;
+};
 
 function text(value: string, isError = false): McpResult {
   return { isError, content: [{ type: 'text', text: value }] };
@@ -61,6 +75,14 @@ function text(value: string, isError = false): McpResult {
 
 function json(payload: unknown, isError = false): McpResult {
   return text(JSON.stringify(payload, null, 2), isError);
+}
+
+/** A failure's payload as its answer: `isError` always. */
+function failedJson(payload: unknown): FailureAnswer {
+  return {
+    isError: true,
+    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+  };
 }
 
 /**
@@ -73,7 +95,7 @@ function local(
   ctx: AnswerContext,
   message: string,
   thrown?: unknown,
-): McpResult {
+): FailureAnswer {
   const payload: Record<string, unknown> = {
     error: kind,
     tool: ctx.tool,
@@ -84,20 +106,16 @@ function local(
   // A lock left held is a fact about SAP, not about the throw, and it must
   // survive it. Read structurally rather than by `instanceof`, so an error
   // built against a second copy of the module still renders.
-  const cleanup = safeCleanup(
-    (thrown as { cleanup?: unknown } | undefined)?.cleanup,
-  );
+  const cleanup = safeCleanup(child(thrown, 'cleanup'));
   if (cleanup !== undefined) payload.cleanup = cleanup;
-  if (
-    (thrown as { operation?: unknown } | undefined)?.operation === 'succeeded'
-  ) {
+  if (child(thrown, 'operation') === 'succeeded') {
     payload.operation = 'succeeded';
   }
   // The step the handler was doing when it threw (`atStep`).
   const step = stepOf(thrown);
   if (step !== undefined) payload.step = step;
 
-  return json(withBeside(payload, ctx), true);
+  return failedJson(withBeside(payload, ctx));
 }
 
 /**
@@ -108,6 +126,18 @@ function local(
  * See `@mcp-abap-adt/adt-strategies` and `tests/fixtures/adt/README.md`.
  */
 interface MessageCarrier {
+  /**
+   * What an activation left inactive — `IAdtActivationFailure.stillInactive`
+   * of `@mcp-abap-adt/adt-strategies` (0.22.0): the objects SAP listed
+   * (`ioc:inactiveObjects`), or the ones the inactive list read after a
+   * silent checklist still names (fr0ster/mcp-abap-adt#351).
+   */
+  stillInactive?: ReadonlyArray<{
+    uri: string;
+    type: string;
+    name: string;
+    parentUri?: string;
+  }>;
   messages?: ReadonlyArray<{
     type: string;
     text: string;
@@ -142,14 +172,14 @@ const TRANSPORT_HINTS: ReadonlyMap<string, string> = new Map([
 function isRequestNumber(value: unknown): value is string {
   if (typeof value !== 'string' || value.length !== 10) return false;
   for (let i = 0; i < 3; i += 1) {
-    const c = value[i] as string;
+    const c = value.charAt(i);
     const letter = c >= 'A' && c <= 'Z';
     const digit = c >= '0' && c <= '9';
     if (!letter && !digit) return false;
   }
   if (value[3] !== 'K') return false;
   for (let i = 4; i < 10; i += 1) {
-    const c = value[i] as string;
+    const c = value.charAt(i);
     if (c < '0' || c > '9') return false;
   }
   return true;
@@ -221,7 +251,7 @@ export function transportHint(
  * `detail: 'raw'`.
  */
 export function failurePayload(
-  error: IAdtError & MessageCarrier,
+  error: StepError & MessageCarrier,
   detail?: AnswerDetail,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -234,7 +264,7 @@ export function failurePayload(
   if (step !== undefined) payload.step = step;
   // The status SAP answered with, when SAP answered: what tells a refusal by
   // SAP from a failure with no answer behind it (no status, no `raw_body`).
-  const status = (error.response as { status?: unknown } | undefined)?.status;
+  const status = error.response?.status;
   if (typeof status === 'number') payload.status = status;
   if (error.code !== undefined) payload.code = error.code;
   if (error.adtType !== undefined) payload.adt_type = error.adtType;
@@ -248,9 +278,9 @@ export function failurePayload(
   // What a failed release left behind, and whether the operation itself
   // landed. Both are facts no strategy judged, so they are added beside the
   // failure rather than folded into its message.
-  const cleanup = safeCleanup((error as { cleanup?: unknown }).cleanup);
+  const cleanup = safeCleanup(error.cleanup);
   if (cleanup !== undefined) payload.cleanup = cleanup;
-  if ((error as { operation?: unknown }).operation === 'succeeded') {
+  if (error.operation === 'succeeded') {
     payload.operation = 'succeeded';
   }
 
@@ -285,6 +315,18 @@ export function failurePayload(
     if (hint !== undefined) payload.hint = hint;
   }
 
+  // What an activation left inactive, field by field like the messages: the
+  // objects a caller names in its next call (activating them again with
+  // `preaudit: false`, or in a group).
+  if (error.stillInactive !== undefined && error.stillInactive.length > 0) {
+    payload.still_inactive = error.stillInactive.map((o) => ({
+      name: o.name,
+      type: o.type,
+      uri: o.uri,
+      ...(o.parentUri !== undefined ? { parent_uri: o.parentUri } : {}),
+    }));
+  }
+
   // SAP's body, by who said no.
   //
   // **A refusal SAP made — any status but a `2xx` — carries it whatever
@@ -304,7 +346,7 @@ export function failurePayload(
   //
   // The empty string is not a document — emitting `raw_body: ""` would read as
   // "SAP sent an empty body" when nothing was sent at all.
-  const body = (error.response as { data?: unknown } | undefined)?.data;
+  const body = error.response?.data;
   const answeredOk =
     typeof status === 'number' && status >= 200 && status < 300;
   if (
@@ -326,17 +368,22 @@ export function failurePayload(
 export function answerFailure(
   failed: IAdtError,
   ctx?: AnswerContext,
-): McpResult {
-  const error = failed as IAdtError & MessageCarrier;
+): FailureAnswer {
+  const error: StepError & MessageCarrier = failed;
   // A failure that carries a refusal: answered as the chain
   // made it, never rebuilt from the error's message.
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
+  // The instance's own reading of the failure, when the call runs inside one
+  // (`runWithAdtFailureReader`): stdio's `--deferred-logon` answers a request
+  // that reached no answer as `no_connection`.
+  const own = readAdtFailureInCall(failed);
+  if (own !== undefined) return answerRead(own);
   // Refused here, before any request: not a claim about the server.
   if (ctx !== undefined && isSystemContextRefusal(error.message)) {
     return local('system_context_missing', ctx, error.message);
   }
-  return json(withBeside(failurePayload(error, ctx?.detail), ctx), true);
+  return failedJson(withBeside(failurePayload(error, ctx?.detail), ctx));
 }
 
 /**
@@ -355,10 +402,7 @@ export function failureEntry(
 ): FailureEntry {
   const read = failureOf(failed);
   if (read !== undefined) return { ...chainFailurePayload(read), step };
-  return failurePayload(
-    withStep(failed, step) as IAdtError & MessageCarrier,
-    detail,
-  );
+  return failurePayload(withStep(failed, step), detail);
 }
 
 /**
@@ -382,9 +426,7 @@ export function thrownEntry(thrown: unknown, step: string): FailureEntry {
 export function isCredentialFailure(thrown: unknown): boolean {
   if (failureOf(thrown)?.error === 'authentication_failed') return true;
   const carried = methodFailureOf(thrown);
-  return (
-    (carried?.response as { status?: unknown } | undefined)?.status === 401
-  );
+  return carried?.response?.status === 401;
 }
 
 /**
@@ -411,8 +453,8 @@ export function failedPayloadOf(
   result: { isError?: boolean; content?: unknown } | undefined,
   step: string,
 ): FailureEntry | undefined {
-  if (result?.isError !== true || !Array.isArray(result.content)) return;
-  const text = (result.content[0] as { text?: unknown } | undefined)?.text;
+  if (result?.isError !== true || !isList(result.content)) return;
+  const text = child(result.content[0], 'text');
   if (typeof text !== 'string') return;
   let payload: unknown;
   try {
@@ -420,11 +462,8 @@ export function failedPayloadOf(
   } catch {
     return;
   }
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
-    return;
-  return 'step' in payload
-    ? (payload as FailureEntry)
-    : { ...(payload as FailureEntry), step };
+  if (!isElement(payload)) return;
+  return 'step' in payload ? payload : { ...payload, step };
 }
 
 /**
@@ -437,31 +476,24 @@ export function failedAtStep(
   result: { isError?: boolean; content?: unknown },
   step: string,
 ): { isError?: boolean; content?: unknown } {
-  if (result?.isError !== true || !Array.isArray(result.content)) return result;
-  const [first, ...rest] = result.content as Array<{
-    type?: string;
-    text?: unknown;
-  }>;
-  if (typeof first?.text !== 'string') return result;
+  if (result?.isError !== true || !isList(result.content)) return result;
+  const [first, ...rest] = result.content;
+  const shown = child(first, 'text');
+  if (!isElement(first) || typeof shown !== 'string') return result;
   let payload: unknown;
   try {
-    payload = JSON.parse(first.text);
+    payload = JSON.parse(shown);
   } catch {
     return result;
   }
-  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
-    return result;
+  if (!isElement(payload)) return result;
   if ('step' in payload) return result;
   return {
     ...result,
     content: [
       {
         ...first,
-        text: JSON.stringify(
-          { ...(payload as Record<string, unknown>), step },
-          null,
-          2,
-        ),
+        text: JSON.stringify({ ...payload, step }, null, 2),
       },
       ...rest,
     ],
@@ -498,16 +530,19 @@ export function return_answer<T>(
   // always. A terse write's `'SUCCESS'` is a string and has nowhere to put a
   // field, so in the rare case it becomes `{ result: 'SUCCESS', cleanup }`.
   // The context's facts (`AnswerContext.beside`) ride along the same way.
-  const cleanup = safeCleanup(
-    (answer as { cleanup?: unknown } | undefined)?.cleanup,
-  );
+  const cleanup = safeCleanup(cleanupOf(answer));
   const beside = ctx.beside?.();
   if (cleanup !== undefined || beside !== undefined) {
     const added = { ...(cleanup !== undefined ? { cleanup } : {}), ...beside };
     return json(
       typeof projected === 'string'
         ? { result: projected, ...added }
-        : { ...(projected as Record<string, unknown>), ...added },
+        : {
+            ...(typeof projected === 'object' && projected !== null
+              ? projected
+              : {}),
+            ...added,
+          },
     );
   }
 
@@ -519,10 +554,25 @@ function messageOf(thrown: unknown): string {
 }
 
 /**
+ * A thrown value's `message` when it carries one (an `Error`, or any object
+ * with the member), written out; else the value itself written out — what
+ * `error?.message ?? String(error)` read, without assuming the shape.
+ */
+export function messageCarriedBy(thrown: unknown): string {
+  const message = child(thrown, 'message');
+  return message === undefined || message === null
+    ? String(thrown)
+    : String(message);
+}
+
+/**
  * A throw from a handler's call, as the consumer gets it — the one rendering
  * `answer()` and a handler that works by throws share.
  */
-export function answerThrown(thrown: unknown, ctx: AnswerContext): McpResult {
+export function answerThrown(
+  thrown: unknown,
+  ctx: AnswerContext,
+): FailureAnswer {
   // The failure reader first: a thrown refusal is the chain's.
   const read = failureOf(thrown);
   if (read !== undefined) return answerRead(read);
@@ -600,28 +650,33 @@ export function requestFailureOf(
   sent: SentRequest | undefined,
 ): IAdtError | undefined {
   if (failureOf(thrown) !== undefined) return undefined;
-  const carried =
-    thrown !== null && typeof thrown === 'object'
-      ? (thrown as { message?: unknown; response?: unknown })
-      : undefined;
+  return requestErrorOf(thrown, sent);
+}
+
+/** A request's throw as its error, as SAP answered it; the chain is not asked. */
+export function requestErrorOf(
+  thrown: unknown,
+  sent: SentRequest | undefined,
+): IAdtError {
+  const carried = child(thrown, 'message');
   const message =
-    typeof carried?.message === 'string'
-      ? carried.message
+    typeof carried === 'string'
+      ? carried
       : typeof thrown === 'string'
         ? thrown
         : 'The request did not complete';
-  const verdict = {
+  // The thrown value is outside the type system: its answer is read, and one
+  // that is not a wire answer is none.
+  const response = wireResponseOf(child(thrown, 'response'));
+  const verdict: IAdtError = {
     origin: 'connection',
     message,
-    response: carried?.response,
+    response,
     ...(sent !== undefined
       ? { request: { method: sent.method, url: sent.url } }
       : {}),
-  } as IAdtError;
-  const read = analyseException(
-    verdict,
-    carried?.response as Parameters<typeof analyseException>[1],
-  );
+  };
+  const read = analyseException(verdict, response);
   return read === ADT_NO_FAILURE ? verdict : read;
 }
 
@@ -636,9 +691,7 @@ export function answerRequestThrown(
 ): McpResult {
   const read = failureOf(thrown);
   if (read !== undefined) return answerRead(read);
-  return answerFailure(
-    withStep(requestFailureOf(thrown, sent) as IAdtError, step),
-  );
+  return answerFailure(withStep(requestErrorOf(thrown, sent), step));
 }
 
 /** A direct request's throw as an entry: the chain's payload, or the request's error, with the step. */
@@ -649,5 +702,5 @@ export function requestThrownEntry(
 ): FailureEntry {
   const read = failureOf(thrown);
   if (read !== undefined) return { ...chainFailurePayload(read), step };
-  return failureEntry(requestFailureOf(thrown, sent) as IAdtError, step);
+  return failureEntry(requestErrorOf(thrown, sent), step);
 }

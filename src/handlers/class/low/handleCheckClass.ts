@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckClass Handler - Syntax check for ABAP Class
  *
@@ -12,7 +14,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -22,28 +24,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Class name',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active",
-        enum: ['active', 'inactive'],
-      },
-      source_code: {
-        type: 'string',
-        description:
-          'Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Class name'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active",
+      ),
+    source_code: z
+      .string()
+      .optional()
+      .describe(
+        'Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface CheckClassArgs {
@@ -65,9 +61,7 @@ export async function handleCheckClass(
   }
 
   const checkVersion =
-    version && ['active', 'inactive'].includes(version.toLowerCase())
-      ? (version.toLowerCase() as 'active' | 'inactive')
-      : 'active';
+    version?.toLowerCase() === 'inactive' ? 'inactive' : 'active';
 
   const className = class_name.toUpperCase();
   const detail = detailOf(args);

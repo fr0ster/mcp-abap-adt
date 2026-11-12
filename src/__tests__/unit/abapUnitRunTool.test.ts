@@ -14,7 +14,8 @@ import {
   handleRunAbapUnit,
   TOOL_DEFINITION,
 } from '../../handlers/unit_test/high/handleRunAbapUnit';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -215,13 +216,13 @@ it.each([
 describe('RunAbapUnit: the schema', () => {
   it("target.type's enum is the keys of ABAP_UNIT_RUN_TYPES, in their order", () => {
     expect(
-      TOOL_DEFINITION.inputSchema.properties.target.properties.type.enum,
+      jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'target', 'type').enum,
     ).toEqual(Object.keys(ABAP_UNIT_RUN_TYPES));
   });
 
   it("target.kind's enum is the run target's kinds", () => {
     expect(
-      TOOL_DEFINITION.inputSchema.properties.target.properties.kind.enum,
+      jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'target', 'kind').enum,
     ).toEqual(['object', 'package']);
   });
 });

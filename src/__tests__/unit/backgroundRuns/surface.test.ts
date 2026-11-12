@@ -10,11 +10,19 @@ import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import {
@@ -26,17 +34,24 @@ import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
+import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
+import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
+import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   HandlerContext,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
   noConnectionContext,
   registryForExposition,
 } from '../../../lib/handlers/registry/expositionRegistry';
+import { LONG_TOOLS } from '../../../lib/longTools';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   compactReadOnlyToolSetOf,
@@ -47,6 +62,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { adtStandIn } from '../../helpers/adtStandIn';
+import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { clientOf, isClassRun, shippedGroups, silent, until } from './harness';
 
@@ -102,7 +118,7 @@ describe('an embedder', () => {
       });
       expect(
         strategy.list({
-          url: standIn.url,
+          system: JSON.stringify(['http', standIn.url, '']),
           client: '',
           user: 'EMBEDDED_USER',
         }),
@@ -204,7 +220,14 @@ describe('a group registered on its own (no server instance, no strategy)', () =
   });
 });
 
-describe('where the background-run tools are served: beside the run tools', () => {
+/** A connection the listing never uses: nothing is called on it. */
+const unconnected = () =>
+  createAbapConnection(
+    { url: 'http://127.0.0.1:9', client: '100', authType: 'basic' },
+    new BasicAuthProvider('LIST_USER', 'list-password'),
+  );
+
+describe('where the background-run tools are served: beside the run tools and the long reads', () => {
   const FULL = [
     'GetBackgroundRun',
     'ListBackgroundRuns',
@@ -219,46 +242,257 @@ describe('where the background-run tools are served: beside the run tools', () =
     groups: { getHandlers(): { toolDefinition: { name: string } }[] }[],
   ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
-  it.each<[HandlerSet[], boolean]>([
-    [['readonly'], false],
+  it.each<[HandlerSet[], boolean, boolean]>([
+    // The registry builder adds them beside the run tools only; a server
+    // with a strategy adds them beside any long read (below).
+    [['readonly'], false, false],
+    [['readonly', 'high'], true, true],
+    [['readonly', 'debug'], false, false],
+    [['high'], true, true],
+    [['debug'], false, false],
+  ])(
+    'full %j: the registry carries the background-run tools %s (beside the run tools), RuntimeRunClass %s',
+    (exposition, served, runs) => {
+      const tools = namesOf(
+        registryForExposition(exposition).getHandlerGroups(),
+      );
+      expect(tools.includes('RuntimeRunClass')).toBe(runs);
+      for (const name of FULL) expect(tools.includes(name)).toBe(served);
+      expect(tools.filter((name) => FULL.includes(name))).toHaveLength(
+        served ? 3 : 0,
+      );
+    },
+  );
+
+  it.each<[('readonly' | 'high' | 'system' | 'search')[], boolean]>([
+    [['readonly'], true],
+    [['search'], true],
     [['readonly', 'high'], true],
-    [['readonly', 'debug'], false],
-    [['high'], true],
-    [['debug'], false],
-  ])('full %j: served %s, as RuntimeRunClass is', (exposition, served) => {
-    const tools = namesOf(registryForExposition(exposition).getHandlerGroups());
-    expect(tools.includes('RuntimeRunClass')).toBe(served);
-    for (const name of FULL) expect(tools.includes(name)).toBe(served);
+    [['system'], true],
+  ])(
+    'an EmbeddableMcpServer of exposition %j with a strategy serves the background-run tools (%s), and its long tools list background',
+    async (exposition, served) => {
+      const server = new EmbeddableMcpServer({
+        connection: unconnected(),
+        exposition,
+        systemType: 'onprem',
+        logger: silent,
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      });
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.list();
+        const names = tools.map((t) => t.name);
+        for (const name of FULL) expect(names.includes(name)).toBe(served);
+        const long = tools.filter((t) => LONG_TOOLS.includes(t.name));
+        expect(long.length).toBeGreaterThan(0);
+        for (const tool of long) {
+          expect({
+            tool: tool.name,
+            background: Object.keys(tool.inputSchema.properties ?? {}).includes(
+              'background',
+            ),
+          }).toEqual({ tool: tool.name, background: true });
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it.each<[HandlerSet[]]>([[['readonly']], [['high']], [['readonly', 'high']]])(
+    'a supplied registryForExposition(%j) on an EmbeddableMcpServer without a strategy lists no background-run tool, and its long tools answer in the call',
+    async (exposition) => {
+      const server = new EmbeddableMcpServer({
+        connection: unconnected(),
+        handlersRegistry: registryForExposition(exposition),
+        systemType: 'onprem',
+        logger: silent,
+      });
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.list();
+        expect(tools.filter((t) => FULL.includes(t.name))).toEqual([]);
+        const long = tools.filter((t) => LONG_TOOLS.includes(t.name));
+        expect(long.length).toBeGreaterThan(0);
+        for (const tool of long) {
+          expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain(
+            'background',
+          );
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it.each<[string, () => CompositeHandlersRegistry, readonly string[]]>([
+    [
+      'registryForExposition(["debug"])',
+      () => registryForExposition(['debug']),
+      FULL,
+    ],
+    [
+      'registryForExposition(["high"])',
+      () => registryForExposition(['high']),
+      FULL,
+    ],
+    [
+      'a search group alone',
+      () =>
+        new CompositeHandlersRegistry([
+          new SearchHandlersGroup(noConnectionContext()),
+        ]),
+      FULL,
+    ],
+    [
+      'the compact read-only group alone',
+      () =>
+        new CompositeHandlersRegistry([
+          new CompactReadOnlyHandlersGroup(noConnectionContext()),
+          new CompactDataHandlersGroup(noConnectionContext()),
+        ]),
+      COMPACT,
+    ],
+  ])(
+    'a supplied registry carrying a long tool (%s) on a server with a strategy serves the background-run tools, and its long tools list background',
+    async (_name, registry, runTools) => {
+      const server = new EmbeddableMcpServer({
+        connection: unconnected(),
+        handlersRegistry: registry(),
+        systemType: 'onprem',
+        logger: silent,
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      });
+      const client = await clientOf(server);
+      try {
+        const { tools } = await client.list();
+        const names = tools.map((t) => t.name);
+        expect(runTools.filter((n) => !names.includes(n))).toEqual([]);
+        const long = tools.filter((t) => LONG_TOOLS.includes(t.name));
+        expect(long.length).toBeGreaterThan(0);
+        for (const tool of long) {
+          expect({
+            tool: tool.name,
+            background: Object.keys(tool.inputSchema.properties ?? {}).includes(
+              'background',
+            ),
+          }).toEqual({ tool: tool.name, background: true });
+        }
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it('with a strategy, the same supplied registry lists them and its long tools list background', async () => {
+    const server = new EmbeddableMcpServer({
+      connection: unconnected(),
+      // With the data tools (opt-in), so GetTableContents is among the
+      // long reads listed.
+      handlersRegistry: registryForExposition(['readonly', 'data']),
+      systemType: 'onprem',
+      logger: silent,
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    });
+    const client = await clientOf(server);
+    try {
+      const { tools } = await client.list();
+      expect(
+        tools
+          .filter((t) => FULL.includes(t.name))
+          .map((t) => t.name)
+          .sort(),
+      ).toEqual([...FULL].sort());
+      const contents = tools.find((t) => t.name === 'GetTableContents');
+      expect(Object.keys(contents?.inputSchema.properties ?? {})).toContain(
+        'background',
+      );
+    } finally {
+      await client.close();
+    }
+  });
+
+  it.each<[HandlerSet[]]>([[['readonly']], [['high']]])(
+    'a plain registration of registryForExposition(%j) on an McpServer lists no background-run tool: it keeps no background runs',
+    async (exposition) => {
+      const server = new McpServer({ name: 'plain', version: '1.0.0' });
+      registryForExposition(exposition).registerAllTools(server);
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'plain', version: '1.0.0' });
+      await Promise.all([
+        server.connect(serverSide),
+        client.connect(clientSide),
+      ]);
+      try {
+        const { tools } = await client.listTools();
+        expect(tools.filter((t) => FULL.includes(t.name))).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it('an EmbeddableMcpServer of exposition readonly without a strategy serves no background-run tool, and its long tools answer in the call', async () => {
+    const server = new EmbeddableMcpServer({
+      connection: unconnected(),
+      exposition: ['readonly'],
+      systemType: 'onprem',
+      logger: silent,
+    });
+    const client = await clientOf(server);
+    try {
+      const { tools } = await client.list();
+      expect(tools.filter((t) => FULL.includes(t.name))).toEqual([]);
+      const contents = tools.find((t) => t.name === 'GetTableContents');
+      expect(Object.keys(contents?.inputSchema.properties ?? {})).not.toContain(
+        'background',
+      );
+    } finally {
+      await client.close();
+    }
   });
 
   // The binary fixes its set: the four kinds of binary.
   it.each<[string, ToolSet, boolean]>([
     ['core', fullToolSet, true],
-    ['core-ro', fullReadOnlyToolSet, false],
+    ['core-ro', fullReadOnlyToolSet, true],
   ])('%s: served %s', (_kind, set, served) => {
     for (const transport of ['stdio', 'http', 'sse'] as const) {
-      const tools = namesOf(registryOf(set, transport).getHandlerGroups());
+      const tools = namesOf(
+        registryOf(set, transport, { dataTools: false }).getHandlerGroups(),
+      );
       for (const name of FULL) expect(tools.includes(name)).toBe(served);
     }
     expect(set.backgroundRuns).toBe(served);
   });
 
   it.each<[string, ToolSet, boolean]>([
-    ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries), false],
+    [
+      'compact-ro',
+      compactReadOnlyToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
+      }),
+      false,
+    ],
     [
       'compact',
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: compactModifyEntries,
       }),
       true,
     ],
-  ])('%s: served %s, as HandlerProfileRun is', (_kind, set, served) => {
-    expect(set.backgroundRuns).toBe(served);
+  ])('%s: served, HandlerProfileRun %s', (_kind, set, runs) => {
+    expect(set.backgroundRuns).toBe(true);
     for (const transport of ['stdio', 'http', 'sse'] as const) {
-      const tools = namesOf(registryOf(set, transport).getHandlerGroups());
-      expect(tools.includes('HandlerProfileRun')).toBe(served);
-      for (const name of COMPACT) expect(tools.includes(name)).toBe(served);
+      const tools = namesOf(
+        registryOf(set, transport, { dataTools: false }).getHandlerGroups(),
+      );
+      expect(tools.includes('HandlerProfileRun')).toBe(runs);
+      for (const name of COMPACT) expect(tools.includes(name)).toBe(true);
     }
   });
 
@@ -267,9 +501,53 @@ describe('where the background-run tools are served: beside the run tools', () =
     expect(names).toContain('RuntimeRunClass');
     expect(names.filter((name) => FULL.includes(name))).toEqual([]);
   });
+
+  it('the exporter hands out every listed long tool without background: its read answers in the call', () => {
+    const entries = new HandlerExporter({
+      systemType: 'onprem',
+    }).getHandlerEntries();
+    const long = entries.filter((e) =>
+      LONG_TOOLS.includes(e.toolDefinition.name),
+    );
+    expect(long.length).toBeGreaterThan(10);
+    // Its description says the call answers the result, on every variant.
+    for (const entry of long) {
+      const { description, variants } = entry.toolDefinition;
+      for (const text of [
+        description,
+        ...(variants !== undefined
+          ? [variants.onprem.description, variants.cloud.description]
+          : []),
+      ]) {
+        expect({
+          tool: entry.toolDefinition.name,
+          handle: text.includes('run_handle'),
+          inCall: text.includes(
+            'Runs on an ABAP session of its own and answers its result in the call.',
+          ),
+        }).toEqual({
+          tool: entry.toolDefinition.name,
+          handle: false,
+          inCall: true,
+        });
+      }
+    }
+    expect(
+      long
+        .filter((e) =>
+          Object.hasOwn(
+            listedJson(e.toolDefinition.inputSchema).properties ?? {},
+            'background',
+          ),
+        )
+        .map((e) => e.toolDefinition.name),
+    ).toEqual([]);
+  });
 });
 
 describe('which tools take background', () => {
+  // A long tool's default (`true`) is the wrapper's: the schema states it in
+  // words only, so a call that leaves it out is told from one that states it.
   /** Every tool definition the packages ship: full groups and compact. */
   const definitions: ToolDefinition[] = [
     ...new HandlerExporter({
@@ -281,13 +559,22 @@ describe('which tools take background', () => {
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
-    // What the exporter leaves out (no store, no debugger): the groups' own.
+    // What the exporter leaves out (no store, no debugger; its long tools
+    // without `background`): the groups' own.
     ...[
+      new ReadOnlyHandlersGroup(noConnectionContext()),
+      new SystemHandlersGroup(noConnectionContext()),
+      new DataHandlersGroup(noConnectionContext()),
+      new SearchHandlersGroup(noConnectionContext()),
+      new HighLevelHandlersGroup(noConnectionContext()),
       new RuntimeRunHandlersGroup(noConnectionContext()),
       new BackgroundRunHandlersGroup(noConnectionContext()),
       new DebugHandlersGroup(noConnectionContext()),
     ].flatMap((group) => group.getHandlers().map((e) => e.toolDefinition)),
     ...new CompactReadOnlyHandlersGroup(placeholder)
+      .getHandlers()
+      .map((e) => e.toolDefinition),
+    ...new CompactDataHandlersGroup(placeholder)
       .getHandlers()
       .map((e) => e.toolDefinition),
     ...new CompactModifyHandlersGroup(placeholder)
@@ -296,25 +583,24 @@ describe('which tools take background', () => {
     ...compactDebugEntries().map((e) => e.toolDefinition),
   ];
   const declares = (definition: ToolDefinition) => {
-    const schema = definition.inputSchema as {
-      properties?: Record<string, unknown>;
-    };
-    return Object.hasOwn(schema?.properties ?? {}, 'background');
+    const schema = listedJson(definition.inputSchema);
+    return Object.hasOwn(schema.properties ?? {}, 'background');
   };
 
-  it('exactly the listed run tools declare it, optional, a boolean with no default', () => {
+  it('exactly the listed run tools and the listed long tools declare it, optional, a boolean with no default in the schema', () => {
     const declaring = [
       ...new Set(definitions.filter(declares).map((d) => d.name)),
     ].sort();
-    expect(declaring).toEqual(Object.keys(BACKGROUND_TOOLS).sort());
+    expect(declaring).toEqual(
+      [...Object.keys(BACKGROUND_TOOLS), ...LONG_TOOLS].sort(),
+    );
     for (const definition of definitions.filter(declares)) {
-      const schema = definition.inputSchema as {
-        properties: Record<string, { type: string; default?: unknown }>;
-        required?: string[];
-      };
-      expect(schema.properties.background?.type).toBe('boolean');
-      expect(schema.properties.background).not.toHaveProperty('default');
-      expect(schema.required ?? []).not.toContain('background');
+      const schema = listedJson(definition.inputSchema);
+      expect(jsonAt(schema, 'background').type).toBe('boolean');
+      expect(jsonAt(schema, 'background')).not.toHaveProperty('default');
+      expect(declaredRequired(definition.inputSchema)).not.toContain(
+        'background',
+      );
     }
   });
 

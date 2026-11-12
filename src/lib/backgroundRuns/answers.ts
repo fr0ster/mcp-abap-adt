@@ -8,7 +8,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { BackgroundRunTools } from './port';
 import type { StartedBackgroundRun } from './run';
-import { BACKGROUND_TOOLS } from './tools';
+import { runToolsOf } from './tools';
 
 export interface BackgroundAnswer {
   isError?: true;
@@ -31,23 +31,24 @@ function portOf(context: HandlerContext): BackgroundRunTools {
 export function answerBackgroundStarted(
   started: StartedBackgroundRun,
 ): BackgroundAnswer {
-  const names = BACKGROUND_TOOLS[started.tool] ?? {
-    get: 'GetBackgroundRun',
-    discard: 'DiscardBackgroundRun',
-  };
+  const names = runToolsOf(started.tool);
   return json({
     run_handle: started.run_handle,
     state: 'running',
     tool: started.tool,
     object: started.object,
     started_at: started.started_at,
-    message: `Started in the background on an ABAP session of its own; it runs until SAP answers and cannot be stopped. Read its answer with ${names.get} (run_handle); it is kept until you remove it with ${names.discard}.`,
+    message:
+      started.kind === 'read'
+        ? `Started in the background on an ABAP session of its own; it runs until SAP answers. Read its answer with ${names.get} (run_handle): it is answered once, then removed. ${names.discard} cancels it while it runs.`
+        : `Started in the background on an ABAP session of its own; it runs until SAP answers and cannot be stopped. Read its answer with ${names.get} (run_handle); it is kept until you remove it with ${names.discard}.`,
   });
 }
 
 /**
- * A run as read: `running`, or `finished` — its header, then what the run
- * tool answered, as it answered it (`isError` included).
+ * A run as read: `running`, or `finished` / `cancelled` — its header, then
+ * its answer: what the run tool answered, as it answered it (`isError`
+ * included), or the cancel's fixed words.
  */
 export async function answerBackgroundGet(
   context: HandlerContext,
@@ -65,7 +66,7 @@ export async function answerBackgroundGet(
   }
   const header = json({
     run_handle: record.run_handle,
-    state: 'finished',
+    state: record.state,
     tool: record.tool,
     object: record.object,
     started_at: record.started_at,

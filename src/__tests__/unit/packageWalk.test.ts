@@ -1,7 +1,6 @@
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { HandlerContext } from '../../handlers/interfaces';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   assembleList,
   assembleTree,
@@ -13,6 +12,8 @@ import {
   nodeLevel,
   walkPackage,
 } from '../../lib/strategies/packageWalk';
+import { succeeded } from '../../lib/strategies/stepResponse';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * The walk, offline, over the levels the corpus recorded.
@@ -50,7 +51,8 @@ function replaying(): NodeStructureSource & { calls: number } {
       source.calls += 1;
       const nodeId = options?.nodeId;
       const data = nodeId ? (byNodeId.get(nodeId) ?? '') : root;
-      return { data };
+      // The document as a verbatim reading answers it.
+      return succeeded(data);
     },
   };
   return source;
@@ -164,7 +166,7 @@ describe('the node reading', () => {
  * nameless children, and `include_subpackages` never recursed.
  */
 describe("the library's own reading is mapped, never passed through as ours", () => {
-  const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
+  const ok = (value: unknown) => succeeded(value);
 
   it('names the objects and types the child nodes', async () => {
     const source: NodeStructureSource = {
@@ -204,7 +206,7 @@ describe("the library's own reading is mapped, never passed through as ours", ()
  * subpackage's objects the ROOT as their `packageName`.
  */
 describe('subpackages keep their own objects', () => {
-  const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
+  const ok = (value: unknown) => succeeded(value);
   const levels: Record<string, Record<string, unknown>> = {
     'P|root': {
       objects: [],

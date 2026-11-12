@@ -13,6 +13,8 @@
  * server's clock.
  */
 
+import { isAsciiDigits } from '../plainText';
+
 /**
  * No idle bound: held state never ends on the server's clock. What stdio
  * states; an instance given it arms no timer.
@@ -37,12 +39,23 @@ export const MAX_STATE_IDLE_MINUTES = Math.floor((2 ** 31 - 1) / 60_000);
  * was given in (`--state-idle-minutes`, the env variable, the YAML key, the
  * option), for the refusal.
  */
+/** `-`, then digits, then optionally `.` and digits: a decimal written out, nothing else. */
+function isDecimal(text: string): boolean {
+  const unsigned = text.startsWith('-') ? text.slice(1) : text;
+  const point = unsigned.indexOf('.');
+  if (point === -1) return isAsciiDigits(unsigned);
+  return (
+    isAsciiDigits(unsigned.slice(0, point)) &&
+    isAsciiDigits(unsigned.slice(point + 1))
+  );
+}
+
 export function parseStateIdleMinutes(raw: unknown, name: string): number {
   const text = typeof raw === 'string' ? raw.trim() : undefined;
   const value =
     typeof raw === 'number'
       ? raw
-      : text !== undefined && /^-?\d+(\.\d+)?$/.test(text)
+      : text !== undefined && isDecimal(text)
         ? Number(text)
         : Number.NaN;
   if (

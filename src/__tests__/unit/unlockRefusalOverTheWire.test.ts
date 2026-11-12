@@ -5,8 +5,8 @@
  */
 
 import { handleUpdatePackage } from '../../handlers/package/high/handleUpdatePackage';
-import { corpusBody } from '../../lib/adtCorpus';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
+import { corpusBody } from '../helpers/adtCorpus';
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
 

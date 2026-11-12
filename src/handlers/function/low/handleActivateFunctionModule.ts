@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ActivateFunctionModuleLow Handler - Activate ABAP Function Module
  *
@@ -10,8 +12,9 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroup } from '../../../lib/strategies/functionModuleGroup';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -20,21 +23,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP function module. Returns activation status and any warnings/errors.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_module_name: {
-        type: 'string',
-        description: 'Function module name.',
-      },
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_module_name', 'function_group_name'],
-  },
+  inputSchema: z.object({
+    function_module_name: z.string().describe('Function module name.'),
+    function_group_name: z.string().describe('Function group name.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ActivateFunctionModuleArgs {
@@ -64,14 +57,16 @@ export async function handleActivateFunctionModule(
   return answer(
     { tool: 'ActivateFunctionModuleLow', detail },
     () =>
-      withAdtHeaders(context, 'functionModule.activate', (headers) =>
-        createAdtClient(connection, logger)
-          .getFunctionModule(resultsFor(functionModuleDocuments))
-          .activate(
-            { functionModuleName, functionGroupName },
-            { headers, analyse: analyseActivation },
-          ),
+      inCheckedGroup(context, functionGroupName, functionModuleName, () =>
+        withAdtHeaders(context, 'functionModule.activate', (headers) =>
+          createAdtClient(connection, logger)
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .activate(
+              { functionModuleName, functionGroupName },
+              { headers, analyse: analyseActivation },
+            ),
+        ),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

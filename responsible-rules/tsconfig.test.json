@@ -20,7 +20,6 @@
     ],
     "rootDir": "..",
     "outDir": "./dist",
-    "noImplicitAny": false,
     "paths": {
       "@mcp-abap-adt/lib": [
         "../src/index.ts"

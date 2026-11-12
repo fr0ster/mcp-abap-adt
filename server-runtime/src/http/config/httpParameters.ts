@@ -10,23 +10,28 @@ import {
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
+  ENABLE_DATA_TOOLS_ROW,
+  flagValue,
   type IServerConfig,
+  listValue,
+  numberValue,
   type Parameter,
   type ParameterTable,
-  type ParameterValue,
   parameterSource,
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_ROW,
   type TlsConfig,
+  textValue,
   tlsConfigOf,
   tlsRows,
   transportRemoved,
+  wordValue,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
+import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 
 const HTTP = 'STREAMABLE HTTP';
 
@@ -122,6 +127,7 @@ export function httpParameters(
       ...tlsRows('http'),
       STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
@@ -154,9 +160,6 @@ export interface HttpConfig extends IServerConfig {
   tls?: TlsConfig;
 }
 
-const list = (v: ParameterValue | undefined): string[] | undefined =>
-  Array.isArray(v) ? [...v] : undefined;
-
 /**
  * `mcp-abap-adt-http`'s configuration from the arguments, the environment
  * and the loaded config file. A removed parameter, or an invalid value,
@@ -171,20 +174,21 @@ export function readHttpConfig(
   const table = httpParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    configFile: values.configFile as string | undefined,
-    systemType: values.systemType as HttpConfig['systemType'],
+    configFile: textValue(values.configFile),
+    systemType: wordValue(values.systemType, SYSTEM_TYPES),
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
-    stateIdleMinutes: values.stateIdleMinutes as number,
+    stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
-    shutdownTimeout: values.shutdownTimeout as number | undefined,
-    host: values.host as string,
-    port: values.port as number,
-    httpPath: values.httpPath as string | undefined,
-    httpJsonResponse: values.httpJsonResponse as boolean | undefined,
-    allowedHosts: list(values.allowedHosts),
-    allowedOrigins: list(values.allowedOrigins),
+    enableDataTools: values.enableDataTools === true,
+    shutdownTimeout: numberValue(values.shutdownTimeout),
+    host: textValue(values.host),
+    port: numberValue(values.port),
+    httpPath: textValue(values.httpPath),
+    httpJsonResponse: flagValue(values.httpJsonResponse),
+    allowedHosts: listValue(values.allowedHosts),
+    allowedOrigins: listValue(values.allowedOrigins),
     enableDnsRebindingProtection:
-      (values.enableDnsRebindingProtection as boolean | undefined) ?? false,
+      flagValue(values.enableDnsRebindingProtection) ?? false,
     tls: tlsConfigOf(values),
   };
 }

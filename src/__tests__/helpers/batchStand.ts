@@ -16,6 +16,7 @@
  *   jest.mock('../../../lib/connectionFactory', () => ({
  *     createAbapConnection: jest.fn(),
  *     systemKindOf: jest.fn(() => 'onprem'),
+ *     withSystemKindOf: jest.fn((view: object) => view),
  *   }));
  */
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
@@ -27,7 +28,10 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../compact-readonly-entries/src/group';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../embeddable/ConnectionContext';
 import type { AnswerEntry } from '../../lib/batch/answers';
@@ -37,6 +41,7 @@ import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import {
   BatchHandlersGroup,
+  DataHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   RuntimeRunHandlersGroup,
@@ -132,9 +137,11 @@ function shippedGroup(names: string[]): IHandlerGroup[] {
     new ReadOnlyHandlersGroup(placeholder),
     new SearchHandlersGroup(placeholder),
     new SystemHandlersGroup(placeholder),
+    new DataHandlersGroup(placeholder),
     new RuntimeRunHandlersGroup(placeholder),
     new HighLevelHandlersGroup(placeholder),
     new CompactReadOnlyHandlersGroup(placeholder),
+    new CompactDataHandlersGroup(placeholder),
     new CompactModifyHandlersGroup(placeholder),
   ];
   return names.map((name) => {

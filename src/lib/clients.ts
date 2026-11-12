@@ -3,7 +3,6 @@ import {
   AdtClientOnPrem,
   AdtExecutor,
 } from '@mcp-abap-adt/adt-clients';
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -31,7 +30,7 @@ export type ServerAdtClient =
   | { readonly variant: 'cloud'; readonly client: IServerAdtClient<'cloud'> };
 
 let adtClient: IServerAdtClient | undefined;
-let adtClientConnection: AbapConnection | undefined;
+let adtClientConnection: IAbapConnection | undefined;
 
 /**
  * The system context every client of this server carries: it refuses an

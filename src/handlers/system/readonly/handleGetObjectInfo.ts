@@ -1,11 +1,13 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtModernVariant,
   AdtTypeCode,
   IAdtError,
   IAdtFailure,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import * as z from 'zod';
+import type { UtilsApi } from '../../../lib/adtClientContract';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   notATableType,
@@ -14,6 +16,7 @@ import {
 } from '../../../lib/adtTypeCode';
 import {
   answer,
+  type FailureEntry,
   failedPayloadOf,
   failureEntry,
   isCredentialPayload,
@@ -23,7 +26,10 @@ import {
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import {
   type MetadataTarget,
   metadataKeyOf,
@@ -39,6 +45,7 @@ import {
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
@@ -48,56 +55,54 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      parent_type: {
-        type: 'string',
-        description:
-          '[read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects',
-      },
-      parent_name: {
-        type: 'string',
-        description: '[read-only] Parent object name',
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several objects, read together (give this or parent_type and parent_name)',
-        items: {
-          type: 'object',
-          properties: {
-            object_type: {
-              type: 'string',
-              description: 'Object type (e.g. DEVC/K, CLAS/OC, PROG/P)',
-            },
-            object_name: { type: 'string', description: 'Object name' },
-          },
-          required: ['object_type', 'object_name'],
-        },
-      },
-      maxDepth: {
-        type: 'integer',
-        description:
-          "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
-        default: 1,
-      },
-      enrich: {
-        type: 'boolean',
-        description:
-          '[read-only] Whether to add description and package via SearchObject (default true)',
-        default: true,
-      },
-      include_descriptions: {
-        type: 'boolean',
-        description:
-          "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
-        default: false,
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    parent_type: z
+      .string()
+      .optional()
+      .describe(
+        '[read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects',
+      ),
+    parent_name: z
+      .string()
+      .optional()
+      .describe('[read-only] Parent object name'),
+    objects: z
+      .array(
+        z.object({
+          object_type: z
+            .string()
+            .describe('Object type (e.g. DEVC/K, CLAS/OC, PROG/P)'),
+          object_name: z.string().describe('Object name'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or parent_type and parent_name)',
+      ),
+    maxDepth: z
+      .number()
+      .int()
+      .default(1)
+      .optional()
+      .describe(
+        "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
+      ),
+    enrich: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        '[read-only] Whether to add description and package via SearchObject (default true)',
+      ),
+    include_descriptions: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
+      ),
+  }),
 } as const;
 
 function getDefaultDepth(parent_type: string): number {
@@ -114,14 +119,18 @@ interface TreeNode {
   CHILDREN?: TreeNode[];
 }
 
+/** A root whose tree could not be read: its type and name, and its failure. */
+interface FailedTree {
+  OBJECT_TYPE: string;
+  OBJECT_NAME: string;
+  error: FailureEntry;
+}
+
+/** One root's entry in the answer: its tree, or its failure. */
+type InfoEntry = TreeNode | FailedTree;
+
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  return succeeded(value);
 }
 
 /**
@@ -254,11 +263,11 @@ async function enrichNodeWithSearchObject(
   ended: Ended,
 ): Promise<Enrichment> {
   try {
-    const searchResult = (await handleSearchObject(context, {
+    const searchResult = await handleSearchObject(context, {
       object_name: objectName,
       object_type: objectType,
       maxResults: 1,
-    })) as McpResult;
+    });
     return enrichmentOf(searchResult, objectType, objectName, ended);
   } catch {
     // Enrichment is best-effort; the tree still answers without it.
@@ -266,7 +275,8 @@ async function enrichNodeWithSearchObject(
   }
 }
 
-type NodeSource = ReturnType<IServerAdtClient['getUtils']>;
+/** The utilities a tree is read on: our node reading (`ourUtils`). */
+type NodeSource = UtilsApi<typeof ourUtils, AdtModernVariant>;
 
 /**
  * One tree node: the object itself, enriched, plus its children — the
@@ -348,9 +358,9 @@ async function buildTree(
         }),
     );
     if (!rootResponse.ok) {
-      return rootResponse as IAdtResponse<TreeNode, IAdtError>;
+      return rootResponse;
     }
-    const root = rootResponse.getResult().value as NodeLevel;
+    const root = rootResponse.getResult().value;
 
     for (const o of root.objects) {
       children.push({
@@ -376,9 +386,9 @@ async function buildTree(
           }),
       );
       if (!childResponse.ok) {
-        return childResponse as IAdtResponse<TreeNode, IAdtError>;
+        return childResponse;
       }
-      const childLevel = childResponse.getResult().value as NodeLevel;
+      const childLevel = childResponse.getResult().value;
       for (const o of childLevel.objects) {
         // A subpackage is walked further by its code; a type ADT sent that
         // is no code of the tables stays a leaf.
@@ -401,7 +411,7 @@ async function buildTree(
           );
           if (ended.answer !== undefined) return subtree;
           if (!subtree.ok) {
-            return subtree as IAdtResponse<TreeNode, IAdtError>;
+            return subtree;
           }
           children.push(subtree.getResult().value);
         } else {
@@ -452,7 +462,7 @@ async function buildTrees(
   describe: boolean,
   ended: Ended,
 ): Promise<Trees> {
-  const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
+  const read = batchReader(context, (request: NodeRequest, c) =>
     readNode(
       nodeStructureOn(
         context,
@@ -502,8 +512,7 @@ async function buildTrees(
     });
     return leaf;
   };
-  const limit = (node: InfoNode) =>
-    (objects[node.root] as (typeof objects)[number]).maxDepth;
+  const limit = (node: InfoNode) => objects[node.root].maxDepth;
   let ending: IAdtFailure | undefined;
   /** The level a read answered, or undefined once its root failed. */
   const settle = (
@@ -518,13 +527,13 @@ async function buildTrees(
       failures.set(node.root, { ok: false, thrown: result.error });
       return undefined;
     }
-    const response = result.value as IAdtResponse<unknown, IAdtError>;
+    const response = result.value;
     if (!response.ok) {
       if (credentialRefused(response)) ending = response;
       else failures.set(node.root, response);
       return undefined;
     }
-    return response.getResult().value as NodeLevel;
+    return response.getResult().value;
   };
 
   let tier = roots.filter((node) => node.depth < limit(node));
@@ -540,7 +549,7 @@ async function buildTrees(
     );
     const typeNodes: Array<{ node: InfoNode; nodeId: string }> = [];
     tier.forEach((node, i) => {
-      const level = settle(node, rootAnswers[i] as (typeof rootAnswers)[0]);
+      const level = settle(node, rootAnswers[i]);
       if (level === undefined) return;
       node.children.push(...level.objects.map((o) => bareLeaf(node, o)));
       for (const child of level.childNodes) {
@@ -563,7 +572,7 @@ async function buildTrees(
         : [];
     const next: InfoNode[] = [];
     typeNodes.forEach(({ node }, i) => {
-      const level = settle(node, typeAnswers[i] as (typeof typeAnswers)[0]);
+      const level = settle(node, typeAnswers[i]);
       if (level === undefined) return;
       for (const o of level.objects) {
         const code = tableCodeOf(o.type);
@@ -613,14 +622,14 @@ async function buildTrees(
     const searched = nodes.filter((node) => !failures.has(node.root));
     const searches = await batchReader<InfoNode, McpResult>(
       context,
-      async (node, c) =>
-        (await handleSearchObject(
+      (node, c) =>
+        handleSearchObject(
           { ...context, connection: c },
           { object_name: node.name, object_type: node.type, maxResults: 1 },
-        )) as McpResult,
+        ),
     )(searched);
     searched.forEach((node, i) => {
-      const search = searches[i] as (typeof searches)[number];
+      const search = searches[i];
       // Enrichment is best-effort; the tree still answers without it.
       node.enrichment = enrichmentOf(
         search.ok ? search.value : undefined,
@@ -752,8 +761,8 @@ export async function handleGetObjectInfo(
     `Building object info tree for ${objects.map((o) => `${o.type}/${o.name}`).join(', ')}`,
   );
   const depthOf = (type: string) =>
-    Number.isInteger(args.maxDepth)
-      ? (args.maxDepth as number)
+    typeof args.maxDepth === 'number' && Number.isInteger(args.maxDepth)
+      ? args.maxDepth
       : getDefaultDepth(type);
   const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
   const describe = args.include_descriptions === true;
@@ -770,19 +779,18 @@ export async function handleGetObjectInfo(
   const entryOf = (
     o: { type: string; name: string },
     failed: IAdtFailure | Thrown,
-  ) =>
-    ({
-      OBJECT_TYPE: o.type,
-      OBJECT_NAME: o.name,
-      error:
-        'thrown' in failed
-          ? thrownEntry(failed.thrown, 'read node structure')
-          : failureEntry(failed.getError(), 'read node structure'),
-    }) as unknown as TreeNode;
+  ): FailedTree => ({
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
+    error:
+      'thrown' in failed
+        ? thrownEntry(failed.thrown, 'read node structure')
+        : failureEntry(failed.getError(), 'read node structure'),
+  });
   const answered = await answer(
     { tool: 'GetObjectInfo', detail: 'terse' },
     () =>
-      withSequentialFallback<IAdtResponse<TreeNode[], IAdtError>>(
+      withSequentialFallback<IAdtResponse<InfoEntry[], IAdtError>>(
         context,
         async () => {
           ended = {};
@@ -804,14 +812,14 @@ export async function handleGetObjectInfo(
               const failed = trees.failures.get(root.root);
               return failed === undefined
                 ? treeNodeOf(root)
-                : entryOf(asked[root.root] as (typeof asked)[number], failed);
+                : entryOf(asked[root.root], failed);
             }),
           );
         },
         async () => {
           ended = {};
           if (listed === undefined) {
-            const only = asked[0] as (typeof asked)[number];
+            const only = asked[0];
             const tree = await buildTree(
               context,
               createAdtClient(context.connection, logger).getUtils(ourUtils),
@@ -835,14 +843,12 @@ export async function handleGetObjectInfo(
           if (read.ended !== undefined) return read.ended;
           return ok(
             read.trees.map((tree, i) =>
-              tree.ok
-                ? tree.getResult().value
-                : entryOf(asked[i] as (typeof asked)[number], tree),
+              tree.ok ? tree.getResult().value : entryOf(asked[i], tree),
             ),
           );
         },
       ),
-    (trees: TreeNode[]) => (listed === undefined ? trees[0] : trees),
+    (trees: InfoEntry[]) => (listed === undefined ? trees[0] : trees),
   );
   // A credential failure the enrichment search answered ends the call as it came.
   return ended.answer ?? answered;

@@ -68,7 +68,9 @@ export function resolveDebuggerIds(
  * `.env` entered into it), then the environment, then the embedder's option.
  */
 export type BreakpointConflict = 'replace' | 'refuse-if-held';
-const BREAKPOINT_CONFLICTS: readonly string[] = ['replace', 'refuse-if-held'];
+function isBreakpointConflict(value: string): value is BreakpointConflict {
+  return value === 'replace' || value === 'refuse-if-held';
+}
 
 export function resolveBreakpointConflict(
   fallback?: BreakpointConflict,
@@ -79,9 +81,9 @@ export function resolveBreakpointConflict(
     env.SAP_DEBUG_BREAKPOINT_CONFLICT?.trim() ||
     fallback ||
     'replace';
-  if (!BREAKPOINT_CONFLICTS.includes(stated))
+  if (!isBreakpointConflict(stated))
     throw new Error(
       `SAP_DEBUG_BREAKPOINT_CONFLICT: ${stated} is neither replace nor refuse-if-held`,
     );
-  return stated as BreakpointConflict;
+  return stated;
 }

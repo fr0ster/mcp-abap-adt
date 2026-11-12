@@ -3,38 +3,38 @@ import {
   handleActivateObject,
   TOOL_DEFINITION,
 } from '../../handlers/common/low/handleActivateObject';
+import { SINGLE_ACTIVATION } from '../../lib/adtProjections';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /**
- * The single-object path takes no preaudit parameter, and every family's
- * `activate()` sends `preauditRequested=true` (adt-clients
- * `activateObjectInSession`, and the function group's and data element's own
- * request). The description says what is sent.
+ * `preaudit` is sent as `preauditRequested` on both paths — the single
+ * object's own activation (adt-clients 45, `options.preauditRequested`) and
+ * the group activation — default true (fr0ster/mcp-abap-adt#351). The
+ * description says so.
  */
 describe("ActivateObject's preaudit, as described", () => {
-  it('says what the single-object path sends', () => {
-    const text = TOOL_DEFINITION.inputSchema.properties.preaudit.description;
-    expect(text).toContain('preauditRequested=true');
-    expect(text).not.toContain('no preaudit parameter at all');
-  });
-
-  it('ActivateObjects, which serves that handler, says the same', () => {
-    const text = ActivateObjects.inputSchema.properties.preaudit.description;
-    expect(text).toContain('always sends preauditRequested=true');
+  it.each([
+    ['ActivateObjectLow', TOOL_DEFINITION.inputSchema],
+    ['ActivateObjects', ActivateObjects.inputSchema],
+  ])('%s says it is sent on both paths, default true', (_tool, schema) => {
+    const text = jsonAt(listedJson(schema), 'preaudit').description;
+    expect(text).toContain('Default: true');
+    expect(text).toContain('single-object activation and group activation');
+    expect(text).not.toContain('always sends preauditRequested=true');
   });
 });
 
 /**
  * What the description says is what goes on the wire: over a recording
- * connection (real adt-clients code, no SAP), one object of a listed type —
- * its code, a name standing for it, its main type — sends
- * `preauditRequested=true` whatever `preaudit` says; a group activation sends
- * `preaudit` as given.
+ * connection (real adt-clients code, no SAP), one object of every code and
+ * kind a single-object activation takes — and a name and a main type standing
+ * for one — sends `preaudit` as given, and `true` when it is not given.
  */
 describe('ActivateObject: preaudit on the wire', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
@@ -56,22 +56,41 @@ describe('ActivateObject: preaudit on the wire', () => {
   /** The activation URLs one call with `objects` and `preaudit` sends. */
   async function activationUrls(
     objects: { name: string; type: string }[],
-    preaudit: boolean,
+    preaudit: boolean | undefined,
   ): Promise<string[]> {
     const connection = recordingConnection();
     declareSystemKind(connection, 'onprem');
-    await handleActivateObject({ connection }, { objects, preaudit }).catch(
-      () => undefined,
-    );
+    await handleActivateObject(
+      { connection },
+      preaudit === undefined ? { objects } : { objects, preaudit },
+    ).catch(() => undefined);
     return connection.requests
       .map((request) => request.url)
       .filter((url) => url.includes('/sap/bc/adt/activation'));
   }
 
-  it.each(['TABL/DS', 'stru', 'structure', 'DDLS/DF', 'view', 'CLAS'])(
-    'one object of %s sends preauditRequested=true with preaudit false',
+  const SINGLE = [
+    ...SINGLE_ACTIVATION.onprem,
+    'stru',
+    'structure',
+    'view',
+    'CLAS',
+  ];
+
+  it.each(SINGLE)(
+    'one object of %s sends preauditRequested=false with preaudit false',
     async (type) => {
       const urls = await activationUrls([{ name: 'ZA', type }], false);
+      expect(urls).toEqual([
+        '/sap/bc/adt/activation?method=activate&preauditRequested=false',
+      ]);
+    },
+  );
+
+  it.each(SINGLE)(
+    'one object of %s sends preauditRequested=true without preaudit',
+    async (type) => {
+      const urls = await activationUrls([{ name: 'ZA', type }], undefined);
       expect(urls).toEqual([
         '/sap/bc/adt/activation?method=activate&preauditRequested=true',
       ]);

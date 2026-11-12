@@ -10,6 +10,7 @@
  * Plain code over the words, no regular expression.
  */
 
+import { isList } from '../xml/tree';
 import type { RemovedParameter } from './authParameters.js';
 
 /** The transport a binary serves: one binary per transport and tool set. */
@@ -89,9 +90,7 @@ type DecidingWord = (typeof DECIDING_ORDER)[number];
 
 /** `a,b` / `['a','b']` → lower-cased trimmed words. Plain code. */
 function wordsOf(value: unknown): string[] {
-  const items = Array.isArray(value)
-    ? value.map(String)
-    : [String(value ?? '')];
+  const items = isList(value) ? value.map(String) : [String(value ?? '')];
   return items.flatMap((item) =>
     item
       .toLowerCase()

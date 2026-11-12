@@ -1,4 +1,6 @@
-import { DETAIL_PROPERTY, detailOf } from '../../lib/strategies/detail';
+import * as z from 'zod';
+import { DETAIL_SHAPE, detailOf } from '../../lib/strategies/detail';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 
 describe('detailOf', () => {
   it('defaults to terse', () => {
@@ -18,7 +20,8 @@ describe('detailOf', () => {
   });
 
   it('declares exactly the three levels it accepts', () => {
-    expect(DETAIL_PROPERTY.detail.enum).toEqual(['terse', 'full', 'raw']);
-    expect(DETAIL_PROPERTY.detail.default).toBe('terse');
+    const detail = jsonAt(listedJson(z.object(DETAIL_SHAPE)), 'detail');
+    expect(detail.enum).toEqual(['terse', 'full', 'raw']);
+    expect(detail.default).toBe('terse');
   });
 });

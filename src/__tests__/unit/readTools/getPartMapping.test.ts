@@ -29,6 +29,7 @@ import {
   refusingClient,
   throwingClient,
 } from '../../helpers/fakeClient';
+import { moduleMetadataDocument } from '../../helpers/functionModuleMetadata';
 
 let fakeClient: any;
 jest.mock('../../../lib/clients', () => ({
@@ -42,6 +43,11 @@ interface Row {
   handler: (ctx: any, args: any) => Promise<any>;
   args: Record<string, unknown>;
   identity: Record<string, string>;
+  /**
+   * The metadata is read before the source, and names the group given: a
+   * function module's group is checked first (#2).
+   */
+  metadataFirst?: true;
 }
 
 const rows: Row[] = [
@@ -116,6 +122,7 @@ const rows: Row[] = [
     handler: handleGetFunctionModule,
     args: { function_module_name: 'zfm', function_group_name: 'zfg' },
     identity: { function_module_name: 'ZFM', function_group_name: 'ZFG' },
+    metadataFirst: true,
   },
   {
     name: 'GetFunctionInclude',
@@ -127,11 +134,16 @@ const rows: Row[] = [
 
 const SOURCE = 'SOURCE MARKER';
 const METADATA = 'METADATA MARKER';
+
+/** The metadata a row's `readMetadata` answers: one naming the group given where it is read first. */
+const metadataOf = (row: Row): string =>
+  row.metadataFirst ? moduleMetadataDocument('ZFM', 'ZFG') : METADATA;
+
 describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
   it('part source answers the source from read, and nothing of the metadata', async () => {
     const seen = recordAnalyse({
       read: () => reading(SOURCE),
-      readMetadata: () => reading(METADATA),
+      readMetadata: () => reading(metadataOf(row)),
     });
     fakeClient = seen.client;
     const result = await row.handler(context, { ...row.args, part: 'source' });
@@ -144,7 +156,8 @@ describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
       expect(payload[field]).toBe(value);
     }
     expect([seen.countOf('read'), seen.countOf('readMetadata')]).toEqual([
-      1, 0,
+      1,
+      row.metadataFirst ? 1 : 0,
     ]);
     expect(seen.calls[0]?.carriedAnalyse).toBe(true);
   });
@@ -152,7 +165,7 @@ describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
   it('part metadata answers the metadata from readMetadata, and nothing of the source', async () => {
     const seen = recordAnalyse({
       read: () => reading(SOURCE),
-      readMetadata: () => reading(METADATA),
+      readMetadata: () => reading(metadataOf(row)),
     });
     fakeClient = seen.client;
     const result = await row.handler(context, {
@@ -161,7 +174,7 @@ describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
     });
     expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.metadata).toBe(METADATA);
+    expect(payload.metadata).toBe(metadataOf(row));
     expect(payload.part).toBe('metadata');
     expect(payload).not.toHaveProperty('source');
     for (const [field, value] of Object.entries(row.identity)) {

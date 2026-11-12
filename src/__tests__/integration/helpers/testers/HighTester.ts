@@ -10,6 +10,7 @@
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter, getSystemType } from '../configHelpers';
 import type { LoggerWithExtras } from '../loggerHelpers';
+import { skipRunningTest } from '../runningTest';
 import { createHandlerContext, delay } from '../testHelpers';
 import {
   callTool,
@@ -80,8 +81,7 @@ export class HighTester extends LambdaTester {
             const mcp = await this.getHardModeClient();
             const deleteArgs = this.buildDeleteArgs(context);
             await callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('delete', entity, 'high', this.handlerName),
               deleteArgs,
             );
@@ -130,7 +130,7 @@ export class HighTester extends LambdaTester {
     }
 
     if (!this.context.hasConfig) {
-      this.context.logger?.testSkip(`Skipping test: No configuration found`);
+      skipRunningTest(`No configuration found`);
       return;
     }
 
@@ -167,15 +167,6 @@ export class HighTester extends LambdaTester {
           8000,
         );
         logger?.info(`   ✅ create completed`);
-
-        // Wait for SAP to propagate creation before update
-        const createDelay = this.context.getOperationDelay('create');
-        if (createDelay > 0) {
-          logger?.debug?.(
-            `⏳ Waiting ${createDelay}ms for SAP to propagate create...`,
-          );
-          await delay(createDelay);
-        }
       }
 
       // Execute update workflow
@@ -193,7 +184,7 @@ export class HighTester extends LambdaTester {
       // Check if error is a skip condition
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        skipRunningTest(`${skipReason}`);
         return;
       }
 
@@ -223,8 +214,7 @@ export class HighTester extends LambdaTester {
         await this.retryOnConflict(
           () =>
             callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('create', entity, 'high', this.handlerName),
               args,
             ),
@@ -240,8 +230,7 @@ export class HighTester extends LambdaTester {
         await this.retryOnConflict(
           () =>
             callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('update', entity, 'high', this.handlerName),
               args,
             ),
@@ -253,7 +242,7 @@ export class HighTester extends LambdaTester {
     } catch (error: any) {
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        skipRunningTest(`${skipReason}`);
         return;
       }
 

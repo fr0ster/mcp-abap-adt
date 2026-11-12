@@ -9,11 +9,14 @@
 import {
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKey,
+  ENABLE_DATA_TOOLS_ROW,
+  flagValue,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
-  MESSAGE_SERVER_ENV,
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
+  numberValue,
   type Parameter,
   ParameterRefusal,
   type ParameterTable,
@@ -26,14 +29,26 @@ import {
   STATE_IDLE_CLI,
   STATE_IDLE_YAML,
   TLS_OPTIONS_REMOVED,
+  textValue,
   transportRemoved,
+  wordValue,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
+import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 import { resolveEnvFilePath } from './envResolver';
 
 const DESTINATION = 'DESTINATION AND LOGIN';
+
+/** How an expired session is renewed (`--renewal`). */
+const RENEWALS = ['refresh-then-login', 'refresh-only'] as const;
+
+/** The connection types (`--connection-type`). */
+const CONNECTION_TYPES = ['http', 'rfc'] as const;
+
+/** `--deferred-logon`'s and `--restore-session`'s CLI forms, as the refusal names them. */
+const DEFERRED_LOGON_CLI = '--deferred-logon';
+const RESTORE_SESSION_CLI = '--restore-session';
 
 /** The destination, browser and login rows: core's own. */
 export const CORE_ROWS: readonly Parameter[] = [
@@ -104,7 +119,7 @@ export const CORE_ROWS: readonly Parameter[] = [
     env: 'MCP_RENEWAL',
     yaml: 'renewal',
     kind: 'enum',
-    values: ['refresh-then-login', 'refresh-only'],
+    values: RENEWALS,
     section: DESTINATION,
     help: 'How an expired session is renewed: refresh, then log in (default); or refresh only, never a login',
   },
@@ -118,42 +133,88 @@ export const CORE_ROWS: readonly Parameter[] = [
     help: 'Login callback port, 1-65535 (default: 61001)',
   },
   {
+    key: 'deferredLogon',
+    cli: DEFERRED_LOGON_CLI,
+    env: 'MCP_DEFERRED_LOGON',
+    yaml: 'deferred-logon',
+    kind: 'flag',
+    section: DESTINATION,
+    help: 'Start without contacting the SAP system: the tools are listed at once and the first tool call logs on. Default: off — the start logs on and exits 1 when it fails',
+  },
+  {
+    key: 'restoreSession',
+    cli: RESTORE_SESSION_CLI,
+    env: 'MCP_RESTORE_SESSION',
+    yaml: 'restore-session',
+    kind: 'flag',
+    section: DESTINATION,
+    help: "With --deferred-logon: the first tool call takes up the destination's one leftover session instead of logging on. Refused without --deferred-logon",
+    // A template used as it is states nothing a start without
+    // --deferred-logon refuses.
+    unstatedInTemplate: true,
+  },
+  {
     key: 'connectionType',
     cli: '--connection-type',
     env: 'SAP_CONNECTION_TYPE',
     yaml: 'connection-type',
     kind: 'enum',
-    values: ['http', 'rfc'],
+    values: CONNECTION_TYPES,
     section: DESTINATION,
     help: 'SAP connection type, required for a destination. rfc needs the SAP NW RFC SDK',
   },
 ];
 
 /**
- * RFC through a message server and a logon group (connection 18), in
- * `--connection-type`'s form: `SAP_X` → `--x` → `x`. Carried as configured;
- * no default here (`group`'s `PUBLIC` is connection's), no check (connection
- * refuses `mshost` with neither `msserv` nor `sysid`).
+ * The RFC address, the client and the logon language, in
+ * `--connection-type`'s form: `SAP_X` → `--x` → `x`. Each is read as stated
+ * — no default, no derivation; the destination's own `.env` ranks between
+ * the environment and YAML (the broker factory merges them).
  */
-const MESSAGE_SERVER_HELP: Readonly<Record<MessageServerField, string>> = {
+const DESTINATION_KEY_HELP: Readonly<Record<DestinationKey, string>> = {
+  ashost:
+    'RFC: the application server host; with --sysnr, the application-server address',
+  sysnr: 'RFC: the system number of the application server (two digits)',
   mshost:
-    'RFC: the message server host. With it, RFC logs on through the message server and takes no host or system number from the URL; needs --msserv or --sysid',
+    'RFC: the message server host; with --msserv or --sysid and --group, the message-server address',
   msserv: 'RFC: the message server service (name or port)',
   sysid: 'RFC: the system id, which names the message server service',
-  group: 'RFC: the logon group (connection default: PUBLIC)',
-  saprouter: 'RFC: the SAProuter string, with or without a message server',
+  group: 'RFC: the logon group of the message server, required with --mshost',
+  saprouter: 'RFC: the SAProuter string, with either address',
+  client: 'The SAP client; required over RFC',
+  language:
+    'The logon language (RFC, required) and the master language of created objects',
 };
 
-export const MESSAGE_SERVER_ROWS: readonly Parameter[] =
-  MESSAGE_SERVER_FIELDS.map((field) => ({
-    key: field,
-    cli: `--${field}`,
-    env: MESSAGE_SERVER_ENV[field],
-    yaml: field,
+export const DESTINATION_KEY_ROWS: readonly Parameter[] = DESTINATION_KEYS.map(
+  (key) => ({
+    key,
+    cli: `--${key}`,
+    env: DESTINATION_KEY_ENV[key],
+    yaml: key,
     kind: 'string',
     section: DESTINATION,
-    help: MESSAGE_SERVER_HELP[field],
-  }));
+    help: DESTINATION_KEY_HELP[key],
+  }),
+);
+
+/** The message server's five keys (`--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`). */
+export const MESSAGE_SERVER_KEYS = [
+  'mshost',
+  'msserv',
+  'sysid',
+  'group',
+  'saprouter',
+] as const satisfies readonly DestinationKey[];
+
+/**
+ * The message server's rows of {@link DESTINATION_KEY_ROWS}, as 19.1.0
+ * exported them; the table carries every destination key.
+ */
+export const MESSAGE_SERVER_ROWS: readonly Parameter[] =
+  DESTINATION_KEY_ROWS.filter((row) =>
+    MESSAGE_SERVER_KEYS.some((key) => key === row.key),
+  );
 
 /** The longest login bound: a day. */
 export const MAX_LOGIN_TIMEOUT_SECONDS = 86_400;
@@ -291,10 +352,11 @@ export function coreParameters(
       CONF_ROW,
       SYSTEM_TYPE_ROW,
       ...CORE_ROWS,
-      ...MESSAGE_SERVER_ROWS,
+      ...DESTINATION_KEY_ROWS,
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
@@ -339,6 +401,22 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** Write named sessions to disk (`--unsafe`) */
   unsafe?: boolean;
   /**
+   * `--deferred-logon`: the start contacts no SAP system and the first tool
+   * call logs on (#353); off, the start logs on and exits 1 when it fails.
+   */
+  deferredLogon?: boolean;
+  /**
+   * `--restore-session`: with `deferredLogon`, the first tool call takes up
+   * the destination's one leftover session. `undefined` when no form states
+   * it; stated without `deferredLogon` it is refused (`readCoreConfig`).
+   */
+  restoreSession?: boolean;
+  /**
+   * The form `restoreSession` came from: `--restore-session`,
+   * `MCP_RESTORE_SESSION`, or `restore-session (config file)`.
+   */
+  restoreSessionSource?: string;
+  /**
    * The browser of a login (`--browser`): system (default), auto, chrome,
    * edge, firefox, none, headless — mapped by the platform to one of
    * auth-providers' browsers.
@@ -347,7 +425,7 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** The program that opens the login URL (`--browser-program`); excludes `browser`. */
   browserProgram?: string;
   /** How an expired session is renewed (`--renewal`); default `refresh-then-login`. */
-  renewal?: 'refresh-then-login' | 'refresh-only';
+  renewal?: (typeof RENEWALS)[number];
   /** Port for the login's callback (`--browser-auth-port`) */
   browserAuthPort?: number;
   /** `--login-timeout` in seconds: the bound on each login; absent: none. */
@@ -360,13 +438,17 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** `--auth-debug`: the providers' debug lines on stderr, secrets in their prepared form. */
   authDebug?: boolean;
   /** SAP connection type: http or rfc; required for a destination, no default */
-  connectionType?: 'http' | 'rfc';
+  connectionType?: (typeof CONNECTION_TYPES)[number];
   /**
    * The form `connectionType` came from: `--connection-type`,
    * `SAP_CONNECTION_TYPE`, or `connection-type (config file)`. Only the CLI
    * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
    */
   connectionTypeSource?: string;
+  /** RFC: the application server host (`--ashost`, `SAP_ASHOST`, `ashost`). */
+  ashost?: string;
+  /** RFC: the system number (`--sysnr`, `SAP_SYSNR`, `sysnr`). */
+  sysnr?: string;
   /** RFC: the message server host (`--mshost`, `SAP_MSHOST`, `mshost`). */
   mshost?: string;
   /** RFC: the message server service (`--msserv`, `SAP_MSSERV`, `msserv`). */
@@ -377,15 +459,19 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   group?: string;
   /** RFC: the SAProuter string (`--saprouter`, `SAP_SAPROUTER`, `saprouter`). */
   saprouter?: string;
+  /** The client (`--client`, `SAP_CLIENT`, `client`). */
+  client?: string;
+  /** The logon language (`--language`, `SAP_LANGUAGE`, `language`). */
+  language?: string;
   /**
-   * The form each message-server field came from, as `connectionTypeSource`:
-   * only the CLI form beats what the env file brings.
+   * The form each destination key came from (`--<key>`, `SAP_<KEY>`, or
+   * `<key> (config file)`): the CLI and the environment rank above the
+   * destination's own means, YAML below them.
    */
-  messageServerSource?: Partial<Record<MessageServerField, string>>;
+  destinationKeySource?: Partial<Record<DestinationKey, string>>;
 }
 
-const str = (v: ParameterValue | undefined): string | undefined =>
-  typeof v === 'string' ? v : undefined;
+const str = textValue;
 
 /**
  * core's configuration from the arguments (without the program's own two),
@@ -404,6 +490,18 @@ export function readCoreConfig(
   const values = readParameters(table, argv, env, yaml);
   const source = (key: string) => parameterSource(table, key, argv, env, yaml);
 
+  const deferredLogon = flagValue(values.deferredLogon) ?? false;
+  const restoreSession = flagValue(values.restoreSession);
+  const restoreSessionSource = source('restoreSession');
+  // Without the deferred logon the start takes up the destination's
+  // leftover session on its own: a restore flag stated there, `true` or
+  // `false`, would be ignored in silence, so it stops the start.
+  if (restoreSession !== undefined && !deferredLogon) {
+    throw new ParameterRefusal(
+      `${restoreSessionSource ?? RESTORE_SESSION_CLI} needs ${DEFERRED_LOGON_CLI}: a start without it takes up the destination's leftover session on its own`,
+    );
+  }
+
   const envDestination = str(values.envDestination);
   const envPath = str(values.envPath);
   const authBrokerPath = str(values.authBrokerPath);
@@ -418,13 +516,14 @@ export function readCoreConfig(
 
   return {
     configFile: str(values.configFile),
-    systemType: values.systemType as CoreConfig['systemType'],
+    systemType: wordValue(values.systemType, SYSTEM_TYPES),
     // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins
     // the environment later, and the launcher resolves the precedence then
     // (effectiveSystemType), as for the connection type.
     systemTypeSource: source('systemType'),
     batchKeepRawParts: values.batchKeepRawParts === true,
-    shutdownTimeout: values.shutdownTimeout as number | undefined,
+    enableDataTools: values.enableDataTools === true,
+    shutdownTimeout: numberValue(values.shutdownTimeout),
     mcpDestination: str(values.mcpDestination),
     envDestination,
     envPath,
@@ -438,34 +537,37 @@ export function readCoreConfig(
           ? source('envPath')
           : source('envDestination'),
     authBrokerPath,
-    unsafe: (values.unsafe as boolean | undefined) ?? false,
+    unsafe: flagValue(values.unsafe) ?? false,
+    deferredLogon,
+    restoreSession,
+    restoreSessionSource,
     browser: str(values.browser),
     browserProgram: str(values.browserProgram),
-    renewal: values.renewal as CoreConfig['renewal'],
-    browserAuthPort: values.browserAuthPort as number | undefined,
-    loginTimeout: values.loginTimeout as number | undefined,
+    renewal: wordValue(values.renewal, RENEWALS),
+    browserAuthPort: numberValue(values.browserAuthPort),
+    loginTimeout: numberValue(values.loginTimeout),
     authDebug: values.authDebug === true,
     loginTimeoutSource:
       values.loginTimeout === undefined ? undefined : source('loginTimeout'),
-    connectionType: values.connectionType as CoreConfig['connectionType'],
+    connectionType: wordValue(values.connectionType, CONNECTION_TYPES),
     connectionTypeSource: source('connectionType'),
-    ...messageServerOf(values, source),
+    ...destinationKeysOf(values, source),
   };
 }
 
-/** The message-server fields set, each with its source; an unset one has no key. */
-function messageServerOf(
+/** The destination keys set, each with its source; an unset one has no key. */
+function destinationKeysOf(
   values: Record<string, ParameterValue>,
   source: (key: string) => string | undefined,
-): Pick<CoreConfig, MessageServerField | 'messageServerSource'> {
-  const out: Pick<CoreConfig, MessageServerField> = {};
-  const sources: Partial<Record<MessageServerField, string>> = {};
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = str(values[field]);
+): Pick<CoreConfig, DestinationKey | 'destinationKeySource'> {
+  const out: Pick<CoreConfig, DestinationKey> = {};
+  const sources: Partial<Record<DestinationKey, string>> = {};
+  for (const key of DESTINATION_KEYS) {
+    const value = str(values[key]);
     if (value === undefined) continue;
-    out[field] = value;
-    const from = source(field);
-    if (from !== undefined) sources[field] = from;
+    out[key] = value;
+    const from = source(key);
+    if (from !== undefined) sources[key] = from;
   }
-  return { ...out, messageServerSource: sources };
+  return { ...out, destinationKeySource: sources };
 }

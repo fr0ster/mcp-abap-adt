@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteInclude Handler - Delete an ABAP Include via the ADT deletion API
  *
@@ -14,7 +16,7 @@ import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -24,22 +26,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Deletes the ABAP include named by include_name through the ADT deletion service, after asking whether it can be deleted. Returns the deletion result.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      include_name: {
-        type: 'string',
-        description: 'Include name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['include_name'],
-  },
+  inputSchema: z.object({
+    include_name: z.string().describe('Include name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a

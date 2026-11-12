@@ -20,6 +20,7 @@ import { readStartupConfig } from '../../lib/config/startup';
 import {
   generateConfigTemplateIfNeeded,
   loadYamlConfig,
+  parseConfigArg,
   validateYamlConfig,
 } from '../../lib/config/yamlConfig';
 
@@ -70,13 +71,9 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
       ['http:', '  port: 8080', '  host: 127.0.0.1'].join('\n'),
     );
 
-    const config = loadYamlConfig(TABLE, file) as {
-      http?: { port?: number; host?: string };
-    };
-
-    expect(config).not.toBeNull();
-    expect(config?.http?.port).toBe(8080);
-    expect(config?.http?.host).toBe('127.0.0.1');
+    expect(loadYamlConfig(TABLE, file)).toEqual({
+      http: { port: 8080, host: '127.0.0.1' },
+    });
   });
 
   it('parses a YAML array into a string[]', () => {
@@ -104,16 +101,22 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
 
   it('a file that is not YAML is refused by its position, never its text', () => {
     const file = writeTempYaml('broken.yaml', 'a: [unclosed\nsecret-ish\n');
-    let words = '';
+    let thrown: unknown;
     try {
       loadYamlConfig(TABLE, file);
     } catch (error) {
-      words = (error as Error).message;
+      thrown = error;
     }
-    expect(words).toMatch(
-      /^The config file .* is not valid YAML \(line \d+, column \d+\)$/,
+    // Exactly these words: the file and the position, nothing of the document.
+    expect(thrown).toBeInstanceOf(ParameterRefusal);
+    expect(String(thrown)).toBe(
+      String(
+        new ParameterRefusal(
+          `The config file ${file} is not valid YAML (line 2, column 1)`,
+        ),
+      ),
     );
-    expect(words).not.toContain('secret-ish');
+    expect(String(thrown)).not.toContain('secret-ish');
   });
 
   it('validateYamlConfig rejects an out-of-range port, naming its key', () => {
@@ -169,5 +172,34 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
         expect(exits).toEqual([1]);
       }
     });
+  });
+});
+
+describe('parseConfigArg reads the program arguments by default', () => {
+  /** `process.argv` as `argv` while `body` runs, then restored. */
+  function withArgv<T>(argv: string[], body: () => T): T {
+    const saved = process.argv;
+    process.argv = argv;
+    try {
+      return body();
+    } finally {
+      process.argv = saved;
+    }
+  }
+
+  it('a script path starting with --conf is not read', () => {
+    expect(
+      withArgv(['/usr/bin/node', '--conf=/from/the/script/path.yaml'], () =>
+        parseConfigArg(),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('a --conf among the arguments is read', () => {
+    expect(
+      withArgv(['/usr/bin/node', '/bin/server', '--conf=/etc/given.yaml'], () =>
+        parseConfigArg(),
+      ),
+    ).toBe('/etc/given.yaml');
   });
 });

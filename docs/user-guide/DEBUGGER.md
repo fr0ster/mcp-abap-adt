@@ -483,11 +483,13 @@ only:
   in a loop finished without stopping at that line's next pass; the system
   answered the detach as the run ended, before the listener polled again).
 - **`release_debugger`**: frees the debugger; the program runs on and returns its
-  output. The system answers this with a plain `500` that is the request having
-  worked (adt-clients' errata, "The debugger freeing its session is answered as an
-  ICF 500"); the server reads exactly that as no failure, and anything else — an
-  ADT document, an HTML page, a `400` — as a failure that keeps the stop for
-  `DebugStop`. The freed ABAP session takes no further request, so the server sends
+  output. Over HTTP the system answers this with a plain `500` that is the request
+  having worked (adt-clients' errata, "The debugger freeing its session is answered
+  as an ICF 500"); over RFC the freed session closes the RFC conversation, and the
+  RFC SDK reports `RFC_CLOSED` (measured on premise, 2026-11-12). The server reads
+  exactly those two as no failure — the RFC code from the error's fields, never its
+  message — and anything else — an ADT document, an HTML page, a `400`, any other
+  RFC error — as a failure that keeps the stop for `DebugStop`. The freed ABAP session takes no further request, so the server sends
   it none, not even a logoff.
 
 Both answer the listening state, or the run's end when the program finished before the answer (measured on premise (2026-10-12) for `release_debugger`). `DebugTerminate` ends the

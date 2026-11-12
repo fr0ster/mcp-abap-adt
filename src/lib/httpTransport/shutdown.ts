@@ -18,8 +18,11 @@
  * persisted, so nothing is flushed.
  */
 
-import type { EventEmitter } from 'node:events';
-import { installShutdownSequence, logOffAtOnce } from '../shutdownSequence';
+import {
+  installShutdownSequence,
+  logOffAtOnce,
+  type ShutdownProcess,
+} from '../shutdownSequence';
 
 export interface TransportShutdownOptions {
   /** Synchronous, in the trigger's tick: the transport stops admitting (http: the pool's `503`). */
@@ -33,8 +36,8 @@ export interface TransportShutdownOptions {
   release?: () => void;
   exit: (code: number) => void;
   stderr: (line: string) => void;
-  /** Where the triggers are listened for: `process` in the program. */
-  processLike: EventEmitter;
+  /** Where the triggers are listened for: the process's `on` in the program. */
+  processLike: ShutdownProcess;
   /** `--shutdown-timeout` in milliseconds; absent: none. */
   shutdownTimeoutMs?: number | undefined;
 }

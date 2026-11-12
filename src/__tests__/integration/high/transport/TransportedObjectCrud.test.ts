@@ -18,25 +18,26 @@
  * Run: npm test -- --testPathPattern=TransportedObjectCrud
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import {
-  getOperationDelay,
-  getSystemType,
-  getTimeout,
+  configuredSystemKind,
   loadTestConfig,
   loadTestEnv,
 } from '../../helpers/configHelpers';
+import { NO_KIND_STATED } from '../../helpers/configuredSystemKind';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
 import {
   createHandlerContext,
-  delay,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -50,10 +51,14 @@ describe('Transported Object CRUD (GitHub #11)', () => {
   let className: string;
   let testEnabled = false;
 
-  beforeAll(async () => {
+  before(async () => {
     await loadTestEnv();
 
-    const systemType = getSystemType();
+    const systemType = configuredSystemKind();
+    if (systemType === undefined) {
+      logger?.warn(`No system kind stated, the case skips: ${NO_KIND_STATED}`);
+      return;
+    }
     logger?.info(`System type: ${systemType}`);
 
     const config = loadTestConfig();
@@ -88,9 +93,9 @@ describe('Transported Object CRUD (GitHub #11)', () => {
     connection = result.connection;
     session = result.session;
     testEnabled = true;
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     if (testEnabled && className && connection) {
       logger?.info(`Cleanup: deleting class ${className}`);
       try {
@@ -104,47 +109,43 @@ describe('Transported Object CRUD (GitHub #11)', () => {
         logger?.warn(`Cleanup class delete failed: ${e.message}`);
       }
     }
-  }, getTimeout('long'));
+  });
 
-  it(
-    'should CRUD a class in a transportable package',
-    async () => {
-      if (!testEnabled) {
-        logger?.warn('Skipping — test not enabled or missing config');
-        return;
-      }
+  it('should CRUD a class in a transportable package', async () => {
+    if (!testEnabled) {
+      skipRunningTest('test not enabled or missing config');
+      return;
+    }
 
-      // Step 1: Create class in transportable package
-      logger?.info(
-        `Step 1: Creating class ${className} in ${packageName}, TR ${transportRequest}`,
-      );
-      const createCtx = createHandlerContext({ connection, logger });
-      const createResponse = await handleCreateClass(createCtx, {
-        class_name: className,
-        package_name: packageName,
-        transport_request: transportRequest,
-        description: 'MCP test class in transport (GitHub #11)',
-      });
+    // Step 1: Create class in transportable package
+    logger?.info(
+      `Step 1: Creating class ${className} in ${packageName}, TR ${transportRequest}`,
+    );
+    const createCtx = createHandlerContext({ connection, logger });
+    const createResponse = await handleCreateClass(createCtx, {
+      class_name: className,
+      package_name: packageName,
+      transport_request: transportRequest,
+      description: 'MCP test class in transport (GitHub #11)',
+    });
 
-      expect(createResponse.isError).toBe(false);
-      // CreateClass's terse projection is `terseWrite`: on success it answers
-      // the literal text "SUCCESS", not a JSON object — `success` no longer
-      // exists to read (CHANGELOG Unreleased: "Terse writes answer the
-      // literal string `SUCCESS` ... uniformly across every write tool"; see
-      // projections.ts `terseWrite`).
-      expect(createResponse.content[0]?.text).toBe('SUCCESS');
-      logger?.success(`Step 1: Class ${className} created`);
+    assert.equal(createResponse.isError, false);
+    // CreateClass's terse projection is `terseWrite`: on success it answers
+    // the literal text "SUCCESS", not a JSON object — `success` no longer
+    // exists to read (CHANGELOG Unreleased: "Terse writes answer the
+    // literal string `SUCCESS` ... uniformly across every write tool"; see
+    // projections.ts `terseWrite`).
+    assert.equal(createResponse.content[0]?.text, 'SUCCESS');
+    logger?.success(`Step 1: Class ${className} created`);
 
-      await delay(getOperationDelay('create'));
-
-      // Step 2: Update the class source code (the critical operation — GitHub #11).
-      // Before the reads, as adt-clients' class suite does: a class just
-      // created has no version to read yet. Over RFC — one ABAP session for the
-      // run — a read in the creating session answered 400 SADT_RESOURCE 007
-      // "wrong input data" (on premise, 2026-09-26); after the first write it reads.
-      logger?.info(`Step 2: Updating class source (TR: ${transportRequest})`);
-      const updateCtx = createHandlerContext({ connection, logger });
-      const newSource = `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
+    // Step 2: Update the class source code (the critical operation — GitHub #11).
+    // Before the reads, as adt-clients' class suite does: a class just
+    // created has no version to read yet. Over RFC — one ABAP session for the
+    // run — a read in the creating session answered 400 SADT_RESOURCE 007
+    // "wrong input data" (on premise, 2026-09-26); after the first write it reads.
+    logger?.info(`Step 2: Updating class source (TR: ${transportRequest})`);
+    const updateCtx = createHandlerContext({ connection, logger });
+    const newSource = `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     METHODS run.
 ENDCLASS.
@@ -155,64 +156,62 @@ CLASS ${className} IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-      // Activated, so the reads below see what was written: UpdateClass
-      // leaves the source inactive unless asked, and the active version of a
-      // class never activated is the generated shell.
-      const updateResponse = await handleUpdateClass(updateCtx, {
-        class_name: className,
-        source_code: newSource,
-        transport_request: transportRequest,
-        activate: true,
-      });
+    // Activated, so the reads below see what was written: UpdateClass
+    // leaves the source inactive unless asked, and the active version of a
+    // class never activated is the generated shell.
+    const updateResponse = await handleUpdateClass(updateCtx, {
+      class_name: className,
+      source_code: newSource,
+      transport_request: transportRequest,
+      activate: true,
+    });
 
-      expect(updateResponse.isError).toBe(false);
-      // UpdateClass's terse projection is `terseWrite` too — same literal
-      // "SUCCESS" text, no `success` field (projections.ts `terseWrite`).
-      expect(updateResponse.content[0]?.text).toBe('SUCCESS');
-      logger?.success('Step 2: UpdateClass in transport succeeded');
+    assert.equal(updateResponse.isError, false);
+    // UpdateClass's terse projection is `terseWrite` too — same literal
+    // "SUCCESS" text, no `success` field (projections.ts `terseWrite`).
+    assert.equal(updateResponse.content[0]?.text, 'SUCCESS');
+    logger?.success('Step 2: UpdateClass in transport succeeded');
 
-      // Step 3: Read the class (high-level GetClass)
-      logger?.info('Step 3: Reading class via GetClass');
-      const getCtx = createHandlerContext({ connection, logger });
-      const getResponse = await handleGetClass(getCtx, {
-        class_name: className,
-      });
+    // Step 3: Read the class (high-level GetClass)
+    logger?.info('Step 3: Reading class via GetClass');
+    const getCtx = createHandlerContext({ connection, logger });
+    const getResponse = await handleGetClass(getCtx, {
+      class_name: className,
+    });
 
-      expect(getResponse.isError).toBe(false);
-      const getData = parseHandlerResponse(getResponse);
-      expect(getData.success).toBe(true);
-      // The source the update wrote, not the shell the create made.
-      expect(String(getData.source)).toContain(
-        'Updated by MCP transport CRUD test',
-      );
-      logger?.success('Step 3: GetClass succeeded');
+    assert.equal(getResponse.isError, false);
+    const getData = parseHandlerResponse(getResponse);
+    assert.equal(getData.success, true);
+    // The source the update wrote, not the shell the create made.
+    assert.ok(
+      String(getData.source).includes('Updated by MCP transport CRUD test'),
+    );
+    logger?.success('Step 3: GetClass succeeded');
 
-      // Step 4: Read the metadata (GetClass part metadata)
-      logger?.info('Step 4: Reading class metadata via GetClass part metadata');
-      const readCtx = createHandlerContext({ connection, logger });
-      const readResponse = await handleGetClass(readCtx, {
-        class_name: className,
-        part: 'metadata',
-      });
+    // Step 4: Read the metadata (GetClass part metadata)
+    logger?.info('Step 4: Reading class metadata via GetClass part metadata');
+    const readCtx = createHandlerContext({ connection, logger });
+    const readResponse = await handleGetClass(readCtx, {
+      class_name: className,
+      part: 'metadata',
+    });
 
-      expect(readResponse.isError).toBe(false);
-      const readData = parseHandlerResponse(readResponse);
-      expect(readData.success).toBe(true);
-      expect(readData.metadata).toBeDefined();
-      logger?.success('Step 4: GetClass part metadata succeeded');
+    assert.equal(readResponse.isError, false);
+    const readData = parseHandlerResponse(readResponse);
+    assert.equal(readData.success, true);
+    assert.ok(readData.metadata !== undefined);
+    logger?.success('Step 4: GetClass part metadata succeeded');
 
-      // Step 5: Delete the class
-      logger?.info(`Step 5: Deleting class ${className}`);
-      const deleteCtx = createHandlerContext({ connection, logger });
-      const deleteResponse = await handleDeleteClass(deleteCtx, {
-        class_name: className,
-        transport_request: transportRequest,
-      });
+    // Step 5: Delete the class
+    logger?.info(`Step 5: Deleting class ${className}`);
+    const deleteCtx = createHandlerContext({ connection, logger });
+    const deleteResponse = await handleDeleteClass(deleteCtx, {
+      class_name: className,
+      transport_request: transportRequest,
+    });
 
-      expect(deleteResponse.isError).toBe(false);
-      logger?.success('Step 5: DeleteClass succeeded');
-      className = ''; // Prevent double-delete in afterAll
-    },
-    getTimeout('long'),
-  );
+    assert.equal(deleteResponse.isError, false);
+    logger?.success('Step 5: DeleteClass succeeded');
+    className = ''; // Prevent double-delete in afterAll
+  });
 });

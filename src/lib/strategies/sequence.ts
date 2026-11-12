@@ -1,4 +1,10 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  failed,
+  type StepError,
+  type StepResponse,
+  succeeded,
+} from './stepResponse';
 import { attachCleanup, carryCleanup } from './withLock';
 
 /**
@@ -112,25 +118,13 @@ export async function sequence(
  * here rather than writing a third copy: the failing `getError` sentinel is
  * the one thing worth keeping identical across every caller.
  */
-export function succeededWith<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('succeededWith: asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+export function succeededWith<T>(value: T): StepResponse<T> {
+  return succeeded(value, 'succeededWith');
 }
 
 /** `succeededWith`'s twin, for a composite that reads a refusal out of a later request. */
-export function failedWith<T>(error: IAdtError): IAdtResponse<T, IAdtError> {
-  return {
-    ok: false,
-    getResult: () => {
-      throw new Error('failedWith: asked for the result of a failure');
-    },
-    getError: () => error,
-  } as unknown as IAdtResponse<T, IAdtError>;
+export function failedWith<T>(error: StepError): StepResponse<T> {
+  return failed(error, 'failedWith');
 }
 
 /**
@@ -147,13 +141,13 @@ export function failedWith<T>(error: IAdtError): IAdtResponse<T, IAdtError> {
 export async function pair<A, B>(
   first: () => Promise<IAdtResponse<A, IAdtError>>,
   second: (a: A) => Promise<IAdtResponse<B, IAdtError>>,
-): Promise<IAdtResponse<[A, B], IAdtError>> {
+): Promise<StepResponse<[A, B]>> {
   const a = await first();
-  if (!a.ok) return a as unknown as IAdtResponse<[A, B], IAdtError>;
+  if (!a.ok) return a;
 
   const valueA = a.getResult().value;
   const b = await second(valueA);
-  if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
+  if (!b.ok) return b;
 
   const both: [A, B] = [valueA, b.getResult().value];
   // Built fresh, so anything hanging off either answer would be dropped here
@@ -181,7 +175,7 @@ export async function pair<A, B>(
 export async function both<A, B>(
   first: () => Promise<IAdtResponse<A, IAdtError>>,
   second: () => Promise<IAdtResponse<B, IAdtError>>,
-): Promise<IAdtResponse<[A, B], IAdtError>> {
+): Promise<StepResponse<[A, B]>> {
   const answeringA = first();
   const answeringB = second();
   // Settled, whatever it answers: `both` never ends while its second request
@@ -200,10 +194,10 @@ export async function both<A, B>(
   }
   if (!a.ok) {
     await settledB;
-    return a as unknown as IAdtResponse<[A, B], IAdtError>;
+    return a;
   }
   const b = await answeringB;
-  if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
+  if (!b.ok) return b;
   const both: [A, B] = [a.getResult().value, b.getResult().value];
   return attachCleanup(a, attachCleanup(b, succeededWith(both)));
 }

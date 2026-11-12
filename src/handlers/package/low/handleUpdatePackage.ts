@@ -1,4 +1,8 @@
-import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  packageDocuments,
+  patchPackageDocument,
+} from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdatePackage Handler - Update ABAP Package Description
  *
@@ -34,54 +38,43 @@ import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer } from '../../../lib/answer';
+import { answer, messageCarriedBy } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
-import { patchPackageXml } from '../../../lib/strategies/packagePatch';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name. Package must already exist.',
-      },
-      super_package: {
-        type: 'string',
-        description:
-          'Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.',
-      },
-      updated_description: {
-        type: 'string',
-        description: 'New description for the package.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-    },
-    required: ['package_name', 'updated_description', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    package_name: z
+      .string()
+      .describe('Package name. Package must already exist.'),
+    super_package: z
+      .string()
+      .optional()
+      .describe(
+        'Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.',
+      ),
+    updated_description: z
+      .string()
+      .describe('New description for the package.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+  }),
 } as const;
 
 interface UpdatePackageArgs {
@@ -104,7 +97,7 @@ export async function handleUpdatePackage(
       updated_description,
       lock_handle,
       transport_request,
-    } = args as UpdatePackageArgs;
+    } = args;
 
     if (!package_name || !updated_description || !lock_handle) {
       return return_error(
@@ -138,7 +131,12 @@ export async function handleUpdatePackage(
               { version: 'active', analyse: analyseException },
             ),
         ),
-        atStep('update metadata', (current) =>
+        async (current) =>
+          patchedDocument(
+            patchPackageDocument(current, { description: updated_description }),
+            `package ${packageName}`,
+          ),
+        atStep('update metadata', (document) =>
           withAdtHeaders(context, 'package.updateMetadata', (headers) =>
             client.getPackage(packageDocuments).updateMetadata(
               {
@@ -149,10 +147,7 @@ export async function handleUpdatePackage(
               },
               {
                 headers,
-                source: patchPackageXml(
-                  extractXmlString(current, `package ${packageName}`),
-                  { description: updated_description },
-                ),
+                source: document,
                 lockHandle: lock_handle,
                 analyse: analyseException,
               },
@@ -189,22 +184,21 @@ export async function handleUpdatePackage(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is
       // where that verdict is read, per this file's own top comment. This
-      // catch is left for a genuine bug in this block (`patchPackageXml`,
-      // say), not for a wire refusal, so it no longer guesses an HTTP
+      // catch is left for a genuine bug in this block, not for a wire refusal, so it no longer guesses an HTTP
       // status or re-parses an `exc` namespace `exception` element out of a body no v19 call here
       // can still produce — that read belongs to `analyseException`, not a
       // second opinion here (issue #200-adjacent; found while writing the
       // handler invariant that checks for exactly this).
-      const message = error?.message ?? String(error);
+      const message = messageCarriedBy(error);
       logger?.error(`Error updating package ${packageName}: ${message}`);
       return return_error(new Error(`Failed to update package: ${message}`));
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

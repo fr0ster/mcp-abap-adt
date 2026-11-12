@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckTableTypeLow Handler - Check an ABAP Table Type
  *
@@ -11,7 +13,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -21,23 +23,16 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform a check on an ABAP table type. Returns errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_type_name'],
-  },
+  inputSchema: z.object({
+    table_type_name: z.string().describe('Table type name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a

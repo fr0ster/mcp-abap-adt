@@ -1,10 +1,10 @@
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   readMemorySizes,
   readSnapshotList,
   readXmlDocument,
   terseMemorySizes,
 } from '../../../lib/debugger/memoryReadings';
+import { corpusBody } from '../../helpers/adtCorpus';
 
 it('lists the recorded snapshots of a user; none for a user with none', () => {
   const list = readSnapshotList(

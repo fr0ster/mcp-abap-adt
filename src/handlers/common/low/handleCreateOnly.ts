@@ -55,11 +55,20 @@ import type {
   IAdtResponse,
   ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
+import type * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { COMPACT_CREATE_TAKES } from '../../../lib/compact/compactSchemas';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  COMPACT_CREATE_TAKES,
+  type compactCreateSchema,
+} from '../../../lib/compact/compactSchemas';
+import {
+  defineTool,
+  type HandlerContext,
+  type ToolArgs,
+  type ToolDefinition,
+} from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -67,15 +76,42 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import { return_error } from '../../../lib/utils';
-import { handleCreateClass } from '../../class/high/handleCreateClass';
-import { handleCreateDdl } from '../../ddl/high/handleCreateDdl';
-import { handleCreateFunctionModule } from '../../function/high/handleCreateFunctionModule';
-import { handleCreateInclude } from '../../include/high/handleCreateInclude';
-import { handleCreateInterface } from '../../interface/high/handleCreateInterface';
-import { handleCreatePackage } from '../../package/high/handleCreatePackage';
-import { handleCreateProgram } from '../../program/high/handleCreateProgram';
-import { handleCreateTable } from '../../table/high/handleCreateTable';
-import { handleCreateTransport } from '../../transport/high/handleCreateTransport';
+import {
+  TOOL_DEFINITION as CreateClass_Tool,
+  handleCreateClass,
+} from '../../class/high/handleCreateClass';
+import {
+  TOOL_DEFINITION as CreateDdl_Tool,
+  handleCreateDdl,
+} from '../../ddl/high/handleCreateDdl';
+import {
+  TOOL_DEFINITION as CreateFunctionModule_Tool,
+  handleCreateFunctionModule,
+} from '../../function/high/handleCreateFunctionModule';
+import {
+  TOOL_DEFINITION as CreateInclude_Tool,
+  handleCreateInclude,
+} from '../../include/high/handleCreateInclude';
+import {
+  TOOL_DEFINITION as CreateInterface_Tool,
+  handleCreateInterface,
+} from '../../interface/high/handleCreateInterface';
+import {
+  TOOL_DEFINITION as CreatePackage_Tool,
+  handleCreatePackage,
+} from '../../package/high/handleCreatePackage';
+import {
+  TOOL_DEFINITION as CreateProgram_Tool,
+  handleCreateProgram,
+} from '../../program/high/handleCreateProgram';
+import {
+  TOOL_DEFINITION as CreateTable_Tool,
+  handleCreateTable,
+} from '../../table/high/handleCreateTable';
+import {
+  TOOL_DEFINITION as CreateTransport_Tool,
+  handleCreateTransport,
+} from '../../transport/high/handleCreateTransport';
 
 /** Accepted for every type: they take no part in the request. */
 const ALWAYS = ['object_type', 'detail'] as const;
@@ -93,9 +129,10 @@ const CREATE_CARRIES: Readonly<Record<string, readonly string[] | undefined>> =
 
 /**
  * The arguments given that the type's create does not send, in the order
- * given: every argument present (`!== undefined`) outside the type's list.
+ * the schema declares them (the parse's): every argument present
+ * (`!== undefined`) outside the type's list.
  */
-function notSent(objectType: string, args: Args): string[] {
+function notSent(objectType: string, args: ToolArgs): string[] {
   const carried = new Set<string>([
     ...ALWAYS,
     ...COMMON,
@@ -120,7 +157,51 @@ function notSentRefusal(names: string[]) {
   );
 }
 
-type Args = Record<string, unknown> & { object_type?: string };
+/** HandlerCreate's arguments, as its schema parses them. */
+type Args = z.output<typeof compactCreateSchema>;
+
+/**
+ * A target tool's call over the arguments it declares. `HandlerCreate`'s
+ * own schema has refused every argument it does not declare, and `notSent`
+ * every one the type's create does not carry; what is left that the target
+ * does not declare is `HandlerCreate`'s alone (`object_type`, an argument
+ * every type accepts but this create does not send). The target's schema is
+ * strict, so it is handed only its own.
+ */
+function delegate<S extends z.ZodObject, R>(
+  definition: ToolDefinition<S>,
+  handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
+): (context: HandlerContext, args: ToolArgs) => Promise<R> {
+  const entry = defineTool(definition, handler);
+  return (context, args) =>
+    entry.call(
+      context,
+      Object.fromEntries(
+        Object.entries(args).filter(([name]) =>
+          Object.hasOwn(definition.inputSchema.shape, name),
+        ),
+      ),
+    );
+}
+
+/**
+ * The creates a type delegates to: each the target tool's entry, so the
+ * arguments are parsed with the target's own schema.
+ */
+const create = {
+  PACKAGE: delegate(CreatePackage_Tool, handleCreatePackage),
+  TRANSPORT: delegate(CreateTransport_Tool, handleCreateTransport),
+  TABLE: delegate(CreateTable_Tool, handleCreateTable),
+  DDL: delegate(CreateDdl_Tool, handleCreateDdl),
+  CLASS: delegate(CreateClass_Tool, handleCreateClass),
+  PROGRAM: delegate(CreateProgram_Tool, handleCreateProgram),
+  INCLUDE: delegate(CreateInclude_Tool, handleCreateInclude),
+  INTERFACE: delegate(CreateInterface_Tool, handleCreateInterface),
+  FUNCTION_MODULE: delegate(
+    CreateFunctionModule_Tool,
+    handleCreateFunctionModule,
+  ),
+} as const;
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -175,7 +256,7 @@ function createAlone(
 }
 
 /** `${field} is required` when `args[field]` is not a non-empty string. */
-function missing(args: Args, fields: string[]): unknown | undefined {
+function missing(args: ToolArgs, fields: string[]): unknown | undefined {
   for (const field of fields) {
     if (!text(args[field])) {
       return return_error(new Error(`${field} is required`));
@@ -208,21 +289,21 @@ export async function handleCreateOnly(
 
   switch (args.object_type) {
     case 'PACKAGE':
-      return handleCreatePackage(context, args as never);
+      return create.PACKAGE(context, args);
     case 'TRANSPORT':
-      return handleCreateTransport(context, args as never);
+      return create.TRANSPORT(context, args);
     case 'TABLE':
-      return handleCreateTable(context, args as never);
+      return create.TABLE(context, args);
     case 'DDL':
-      return handleCreateDdl(context, args as never);
+      return create.DDL(context, args);
     case 'CLASS':
-      return handleCreateClass(context, args as never);
+      return create.CLASS(context, args);
     case 'PROGRAM':
-      return handleCreateProgram(context, args as never);
+      return create.PROGRAM(context, args);
     case 'INCLUDE':
       // The arguments it reads, each a string or absent: they arrive from
       // outside the type system.
-      return handleCreateInclude(context, {
+      return create.INCLUDE(context, {
         include_name: text(args.include_name),
         package_name: text(args.package_name),
         description: text(args.description),
@@ -231,9 +312,9 @@ export async function handleCreateOnly(
         detail: detailOf(args),
       });
     case 'INTERFACE':
-      return handleCreateInterface(context, args as never);
+      return create.INTERFACE(context, args);
     case 'FUNCTION_MODULE':
-      return handleCreateFunctionModule(context, args as never);
+      return create.FUNCTION_MODULE(context, args);
 
     case 'DOMAIN': {
       const refused = missing(args, ['domain_name', 'package_name']);
@@ -373,9 +454,7 @@ export async function handleCreateOnly(
                   .trim()
                   .toUpperCase(),
                 serviceVersion: (text(args.service_version) || '0001').trim(),
-                bindingVariant:
-                  (args.binding_variant as ServiceBindingVariant | undefined) ??
-                  'ODATA_V4_UI',
+                bindingVariant: args.binding_variant ?? 'ODATA_V4_UI',
                 transportRequest,
                 masterLanguage,
               },
@@ -423,7 +502,7 @@ export async function handleCreateOnly(
                 description: text(args.description) || name,
                 packageName,
                 transportRequest,
-                implementationType: args.implementation_type as never,
+                implementationType: args.implementation_type,
                 masterLanguage,
               },
               { headers, analyse: analyseException },
@@ -432,12 +511,16 @@ export async function handleCreateOnly(
       );
     }
     case 'BEHAVIOR_IMPLEMENTATION': {
-      // The create is the class shell: the behavior definition is named in
-      // the implementation's source, written afterwards, never in this
-      // request — so the create neither needs nor takes it.
-      const refused = missing(args, ['class_name', 'package_name']);
+      // The create is the class shell; adt-clients' create config requires
+      // the behavior definition it is for, so the create takes it.
+      const refused = missing(args, [
+        'class_name',
+        'package_name',
+        'behavior_definition',
+      ]);
       if (refused) return refused;
       const className = String(args.class_name).toUpperCase();
+      const behaviorDefinition = String(args.behavior_definition).toUpperCase();
       return createAlone(args, 'CreateBehaviorImplementation', async () => {
         // adt-clients builds the inner class with an empty system context:
         // the responsible and the master system go in the config.
@@ -451,12 +534,13 @@ export async function handleCreateOnly(
               .create(
                 {
                   className,
+                  behaviorDefinition,
                   packageName: packageName.toUpperCase(),
                   description: text(args.description) || className,
                   transportRequest,
                   responsible,
                   masterSystem,
-                } as never,
+                },
                 { headers, analyse: analyseException },
               ),
         );

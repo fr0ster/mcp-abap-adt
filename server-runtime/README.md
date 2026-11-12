@@ -47,11 +47,12 @@ Each transport's `main` first counts the copies of `@mcp-abap-adt/lib` loaded in
 `--help` — starts nothing, and exits `1` with one line on stderr:
 
 ```
-Two copies of @mcp-abap-adt/lib are loaded in this process (<file>, <file>): reinstall <package> (npm install -g <package>).
+Two copies of @mcp-abap-adt/lib are loaded in this process (<copy>, <copy>): reinstall <package> (npm install -g <package>).
 ```
 
-The files are the first two registered copies (inside a Node SEA executable, the executable's
-path); `<package>` is the server package that started. No install layout measured for 19.2.0
+Each `<copy>` is one of the first two registered copies: its version and label (`24.0.0 dist`,
+or `bundled` inside a Node SEA executable), and `a copy before 24.0.0` for an earlier copy,
+which registered a file — no path is shown; `<package>` is the server package that started. No install layout measured for 19.2.0
 gets there; if you see the line, reinstall the package it names.
 
 ## Dependencies

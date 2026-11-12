@@ -25,9 +25,10 @@ import { handleCheckStructure as strucHigh } from '../../handlers/structure/high
 import { handleCheckStructure as strucLow } from '../../handlers/structure/low/handleCheckStructure';
 import { handleCheckTable as tablHigh } from '../../handlers/table/high/handleCheckTable';
 import { handleCheckTable as tablLow } from '../../handlers/table/low/handleCheckTable';
-import { corpusBody } from '../../lib/adtCorpus';
 import { parseStructure } from '../../lib/strategies/reading';
+import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 /**
  * #181: a check names the version it runs on, and without `version` that is
@@ -52,7 +53,8 @@ const asking = (asked: unknown[]) => {
     asked.push(version);
     return okResponse(reading(parseStructure(DOCUMENT), DOCUMENT, 200));
   };
-  return fakeClientOf({ check });
+  // A function module's metadata names the group the cases give (#2).
+  return fakeClientOf({ check, readMetadata: readsModuleIn('ZG', 'ZFM') });
 };
 
 type Handler = (context: any, args: any) => Promise<any>;

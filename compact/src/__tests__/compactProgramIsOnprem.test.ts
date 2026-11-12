@@ -2,7 +2,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import {
+  jsonFind,
+  listedJson,
+} from '../../../src/__tests__/helpers/listedJson';
 
 /**
  * A compact tool offered on cloud must not offer PROGRAM without saying where
@@ -84,13 +87,7 @@ describe('compact tools that mention PROGRAM', () => {
  */
 describe('compact tools that offer INCLUDE on ABAP cloud', () => {
   // No handler runs here: only the definitions are read.
-  const context = (): HandlerContext => {
-    throw new Error('no handler runs in this test');
-  };
-  const entries = [
-    ...compactReadOnlyEntries(context),
-    ...compactModifyEntries(context),
-  ];
+  const entries = [...compactReadOnlyEntries(), ...compactModifyEntries()];
 
   /** The enum values of the tool's `object_type` on `variant`, if it has one. */
   const membersOn = (
@@ -98,10 +95,12 @@ describe('compact tools that offer INCLUDE on ABAP cloud', () => {
     variant: 'onprem' | 'cloud',
   ): readonly string[] => {
     const stated = entry.toolDefinition.variants?.[variant];
-    const values: unknown = stated?.inputSchema?.properties?.object_type?.enum;
-    return Array.isArray(values)
-      ? values.filter((value) => typeof value === 'string')
-      : [];
+    if (stated === undefined) return [];
+    const values = jsonFind(
+      listedJson(stated.inputSchema),
+      'object_type',
+    )?.enum;
+    return (values ?? []).filter((value) => typeof value === 'string');
   };
 
   it('finds tools that offer INCLUDE on premise, so the check is not vacuous', () => {

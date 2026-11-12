@@ -10,7 +10,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import {
   BATCH_HANDLERS_FILE,
   type BatchEntry,
@@ -18,6 +21,7 @@ import {
   whenHolds,
 } from '../../../lib/batch/eligibility';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -52,10 +56,12 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
   })
     .getHandlerEntries()
     .map((e) => e.toolDefinition.name)
-    // What the exporter leaves out (no store, no debugger): the groups' own.
+    // What the exporter leaves out (no store, no debugger, the data tools
+    // unless asked for): the groups' own.
     .concat(
       [
         new BackgroundRunHandlersGroup(noConnectionContext()),
+        new DataHandlersGroup(noConnectionContext()),
         new DebugHandlersGroup(noConnectionContext()),
       ].flatMap((group) =>
         group.getHandlers().map((e) => e.toolDefinition.name),
@@ -63,6 +69,7 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
     );
   const compact = [
     ...new CompactReadOnlyHandlersGroup(placeholder).getHandlers(),
+    ...new CompactDataHandlersGroup(placeholder).getHandlers(),
     ...new CompactModifyHandlersGroup(placeholder).getHandlers(),
   ].map((e) => e.toolDefinition.name);
   return { full: new Set(full), compact: new Set(compact) };
@@ -97,7 +104,6 @@ const LONG_BY_REQUESTS: Readonly<
   HandlerGet: 'by-arguments',
   GetWhereUsed: 'by-arguments',
   RuntimeListFeeds: 'by-arguments',
-  SearchSource: 'chained',
   GetPackageContents: 'chained',
   GetPackageTree: 'chained',
   GetObjectsList: 'chained',
@@ -106,7 +112,7 @@ const LONG_BY_REQUESTS: Readonly<
   ListTransports: 'chained',
   GetObjectInfo: 'chained',
   DescribeByList: 'chained',
-  GetAbapSystemSymbols: 'chained',
+  SearchSource: 'chained',
   HandlerDumpList: 'independent',
 };
 
@@ -115,7 +121,8 @@ const GROUPS_DIR = path.join(REPO, 'src/lib/handlers/groups');
 /**
  * Whether a group registers `tool` with handler `fn`: a tool the full set
  * names in its group (`name: 'ActivateDomain'`) over a low handler's
- * definition, `handler: withContext(fn)` in the same registration.
+ * definition, `defineTool({ ...definition, name }, fn)` — the handler the
+ * argument after that definition, before the next tool's name.
  */
 function groupRegisters(tool: string, fn: string): boolean {
   for (const file of fs.readdirSync(GROUPS_DIR)) {
@@ -123,16 +130,14 @@ function groupRegisters(tool: string, fn: string): boolean {
     const source = fs.readFileSync(path.join(GROUPS_DIR, file), 'utf8');
     const at = source.indexOf(`name: '${tool}',`);
     if (at === -1) continue;
-    const handlerAt = source.indexOf('handler:', at);
     const nextName = source.indexOf('name:', at + 1);
     const registration = source.slice(
-      handlerAt,
-      source.indexOf('\n', handlerAt),
+      at,
+      nextName === -1 ? undefined : nextName,
     );
     if (
-      handlerAt !== -1 &&
-      (nextName === -1 || handlerAt < nextName) &&
-      registration.includes(`(${fn})`)
+      registration.includes(`},\n        ${fn},\n`) ||
+      registration.includes(`}, ${fn})`)
     ) {
       return true;
     }

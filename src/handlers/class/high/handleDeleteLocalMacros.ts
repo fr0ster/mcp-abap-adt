@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteLocalMacros Handler - Empty a class's local macros include
  *
@@ -20,7 +22,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -34,26 +36,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros belong to older ABAP versions.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Parent class name.',
-      },
-      transport_request: {
-        type: 'string',
-        description: 'Transport request number, not a task.',
-      },
-      activate_on_delete: {
-        type: 'boolean',
-        description: 'Activate parent class after deleting. Default: false',
-        default: false,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Parent class name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe('Transport request number, not a task.'),
+    activate_on_delete: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('Activate parent class after deleting. Default: false'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface DeleteLocalMacrosArgs {
@@ -100,7 +95,7 @@ export async function handleDeleteLocalMacros(
       );
 
       if (!deleted.ok || !shouldActivate) {
-        return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return deleted;
       }
 
       return carryCleanup(

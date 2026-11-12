@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * Every batch end sends one envelope (spec §4.1): a batch is homogeneous by
  * session kind — the first recorded call decides LOCK, UNLOCK or stateless,
@@ -12,6 +14,8 @@
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import type {
@@ -26,6 +30,7 @@ import {
   payloadOf,
   type Stand,
 } from '../../helpers/batchStand';
+import { holding } from '../../helpers/heldLocks';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -105,7 +110,11 @@ afterEach(() => jest.restoreAllMocks());
 
 describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
   it('a LOCK batch: the first call decides LOCK; a read and an UNLOCK are refused batch_other_kind, nothing recorded, no number; one stateful envelope', async () => {
-    const s = await batchStand({ tools: TOOLS, part: sap });
+    const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
+      tools: TOOLS,
+      part: sap,
+    });
     await set.begin(s);
     expect(s.owner.kind()).toBeUndefined();
     expect(await s.call('HandlerLock', lock('CLAS_A'))).toEqual({
@@ -152,7 +161,11 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
   });
 
   it('a stateless batch: the first read decides stateless; a LOCK and an UNLOCK are refused, no number; one stateless envelope', async () => {
-    const s = await batchStand({ tools: TOOLS, part: sap });
+    const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
+      tools: TOOLS,
+      part: sap,
+    });
     await set.begin(s);
     expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
       content: [],
@@ -185,7 +198,11 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
   });
 
   it('an UNLOCK batch: the first call decides UNLOCK; a LOCK and a read are refused, no number; one stateful envelope', async () => {
-    const s = await batchStand({ tools: TOOLS, part: sap });
+    const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
+      tools: TOOLS,
+      part: sap,
+    });
     await set.begin(s);
     expect(await s.call('HandlerUnlock', unlock('CLAS_A'))).toEqual({
       content: [],
@@ -220,7 +237,11 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
   });
 
   it('the next batch decides its kind anew: each phase its own batch, one envelope each', async () => {
-    const s = await batchStand({ tools: TOOLS, part: sap });
+    const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
+      tools: TOOLS,
+      part: sap,
+    });
     await set.begin(s);
     await s.call('HandlerLock', lock('CLAS_A'));
     expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
@@ -261,12 +282,9 @@ function memberOf(steps: Step[]): IHandlerGroup {
         toolDefinition: {
           name: 'GetProgram',
           description: 'GetProgram',
-          inputSchema: {
-            type: 'object',
-            properties: { program_name: { type: 'string' } },
-          },
+          inputSchema: z.object({ program_name: z.string().optional() }),
         },
-        handler: async (context: HandlerContext, _args: unknown) => {
+        call: async (context: HandlerContext, _args: unknown) => {
           const parts: Promise<unknown>[] = [];
           for (const step of steps) {
             if (step === 'read') {
@@ -301,6 +319,7 @@ function memberOf(steps: Step[]): IHandlerGroup {
 describe('a call with a part of another kind', () => {
   it('first part refused: the call answers batch_other_kind, its later part of the batch kind is not recorded, no number', async () => {
     const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
       tools: ['GetClass'],
       part: sap,
       groups: [memberOf(['lock', 'read'])],
@@ -333,6 +352,7 @@ describe('a call with a part of another kind', () => {
 
   it('a later part refused: the call answers batch_other_kind naming its number, the earlier part is sent, its number answers the refusal', async () => {
     const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
       tools: ['GetClass'],
       part: sap,
       groups: [memberOf(['read', 'lock', 'read'])],
@@ -369,6 +389,7 @@ describe('a call with a part of another kind', () => {
 
   it("a refused part's stateful switch is undone: the next call's read goes stateless into the batch's one envelope", async () => {
     const s = await batchStand({
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
       tools: ['GetClass'],
       part: sap,
       groups: [memberOf(['stateful'])],

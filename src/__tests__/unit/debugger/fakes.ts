@@ -1,12 +1,12 @@
 import { analyseDebuggerFreed } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import type {
   Debugger,
   DebugSessionPorts,
   RunOutcome,
 } from '../../../lib/debugger/DebugSession';
+import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 
 export function deferred<T>() {

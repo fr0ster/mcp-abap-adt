@@ -14,16 +14,17 @@
  * Run: npm test -- --testPathPattern=integration/domain
  */
 
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateDomain } from '../../../../handlers/domain/high/handleCreateDomain';
 import { handleDeleteDomain } from '../../../../handlers/domain/high/handleDeleteDomain';
 import { handleUpdateDomain } from '../../../../handlers/domain/high/handleUpdateDomain';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Domain High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester('create_domain', 'builder_domain', 'domain-high', {
       create: handleCreateDomain,
       update: handleUpdateDomain,
@@ -32,7 +33,7 @@ describe('Domain High-Level Handlers Integration', () => {
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -44,11 +45,7 @@ describe('Domain High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Domain high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Domain high-level handlers', async () => {
+    await tester.run();
+  });
 });

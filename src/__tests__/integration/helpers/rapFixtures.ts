@@ -315,7 +315,6 @@ export async function activateAndConfirm(
   }
   const verdict = parseHandlerResponse(activation) as {
     activated?: boolean;
-    activation_not_stated?: boolean;
     messages?: { type?: string; text?: string }[];
   };
   const refusals = (verdict?.messages ?? []).filter((m) =>

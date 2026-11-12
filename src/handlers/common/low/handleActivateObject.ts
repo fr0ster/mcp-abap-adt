@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  *
@@ -71,7 +72,9 @@ import {
   programDocuments,
   structureDocuments,
   tableDocuments,
+  wireItself,
 } from '@mcp-abap-adt/adt-clients';
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import {
   analyseActivation,
   analyseException,
@@ -112,15 +115,17 @@ import {
   variantOf,
 } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
   type ActivationRunOutcome,
-  type ActivationRunSource,
   activationVerdict,
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
+import { projectActivation } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { withStep } from '../../../lib/strategies/step';
@@ -143,7 +148,7 @@ type SingleActivationApi =
  * (`SINGLE_ACTIVATION_NAMES`).
  */
 export function preauditDescription(variant: ProjectionVariant): string {
-  return `Request pre-audit before activation. Default: true. Sent as preauditRequested when the call takes group activation: more than one object, or one object of any other type. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type or a search name standing for one of these codes. Their family's activate() always sends preauditRequested=true.`;
+  return `Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: ${[...SINGLE_ACTIVATION[variant], ...SINGLE_ACTIVATION_NAMES[variant]].join(', ')}. So does a main type or a search name standing for one of these codes; any other call is a group activation.`;
 }
 
 /**
@@ -165,51 +170,38 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description:
-      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
+      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages; objects SAP left inactive are an error naming them in still_inactive.',
     inputSchema: activateObjectSchema(variant),
   })),
 } as const;
 
 /** ActivateObjectLow's input on `variant`. */
 function activateObjectSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      objects: {
-        type: 'array',
-        description:
-          "Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.",
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Object name in uppercase' },
-            type: {
-              type: 'string',
-              description: activationTypeDescription(variant),
-            },
-            uri: { type: 'string', description: 'Optional ADT URI' },
-            parentName: {
-              type: 'string',
-              description: activationParentDescription(variant),
-            },
-          },
-          required: ['name', 'type'],
-        },
-      },
-      preaudit: {
-        type: 'boolean',
-        description: preauditDescription(variant),
-      },
-      detail: {
-        type: 'string',
-        enum: ['terse', 'full', 'raw'],
-        default: 'terse',
-        description:
-          'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.',
-      },
-    },
-    required: ['objects'],
-  } as const;
+  return z.object({
+    objects: z
+      .array(
+        z.object({
+          name: z.string().describe('Object name in uppercase'),
+          type: z.string().describe(activationTypeDescription(variant)),
+          uri: z.string().optional().describe('Optional ADT URI'),
+          parentName: z
+            .string()
+            .optional()
+            .describe(activationParentDescription(variant)),
+        }),
+      )
+      .describe(
+        "Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.",
+      ),
+    preaudit: z.boolean().optional().describe(preauditDescription(variant)),
+    detail: z
+      .enum(['terse', 'full', 'raw'])
+      .default('terse')
+      .optional()
+      .describe(
+        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored when a group activation (more than one object, or a type this tool cannot map to a single family) runs in the background: that path answers a run and its messages, with no single document behind them.',
+      ),
+  });
 }
 
 /**
@@ -387,6 +379,41 @@ function startGroupActivation(
   );
 }
 
+/**
+ * A group activation on a system whose discovery lists no
+ * `/activation/runs` (SAP_BASIS 751 and 7.40): the one synchronous
+ * `POST /sap/bc/adt/activation` of the same references (`activateObjects`),
+ * judged by `analyseActivation` — the answer is in its body, as a single
+ * object's is.
+ */
+function activateSynchronously(
+  context: HandlerContext,
+  group: GroupActivation,
+  preaudit: boolean,
+) {
+  const { connection, logger } = context;
+  return withAdtHeaders(context, 'utils.activateObjects', (headers) =>
+    group.variant === 'onprem'
+      ? createOnPremAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .activateObjects(group.references, preaudit, {
+            headers,
+            analyse: analyseActivation,
+          })
+      : createAdtClient(connection, logger)
+          .getUtils(ourUtils)
+          .activateObjects(group.references, preaudit, {
+            headers,
+            analyse: analyseActivation,
+          }),
+  );
+}
+
+/** What a group activation answered: a run, or the synchronous document. */
+type GroupAnswer =
+  | { readonly runs: ActivationRunOutcome }
+  | { readonly synchronous: AdtReading<unknown> };
+
 interface ActivateObjectArgs {
   objects: ActivationObject[];
   preaudit?: boolean;
@@ -398,6 +425,7 @@ function activateFamily(
   client: IServerAdtClient,
   api: SingleActivationApi,
   name: string,
+  preauditRequested: boolean,
 ) {
   switch (api) {
     case 'class':
@@ -406,7 +434,7 @@ function activateFamily(
           .getClass(resultsFor(classDocuments))
           .activate(
             { className: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'program':
@@ -416,7 +444,7 @@ function activateFamily(
           .getProgram(resultsFor(programDocuments))
           .activate(
             { programName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'interface':
@@ -425,7 +453,7 @@ function activateFamily(
           .getInterface(resultsFor(interfaceDocuments))
           .activate(
             { interfaceName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'functionGroup':
@@ -434,7 +462,7 @@ function activateFamily(
           .getFunctionGroup(resultsFor(functionGroupDocuments))
           .activate(
             { functionGroupName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'table':
@@ -443,7 +471,7 @@ function activateFamily(
           .getTable(resultsFor(tableDocuments))
           .activate(
             { tableName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'structure':
@@ -452,14 +480,17 @@ function activateFamily(
           .getStructure(resultsFor(structureDocuments))
           .activate(
             { structureName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'ddl':
       return withAdtHeaders(context, 'ddl.activate', (headers) =>
         client
           .getDdl(resultsFor(ddlDocuments))
-          .activate({ ddlName: name }, { headers, analyse: analyseActivation }),
+          .activate(
+            { ddlName: name },
+            { headers, preauditRequested, analyse: analyseActivation },
+          ),
       );
     case 'domain':
       return withAdtHeaders(context, 'domain.activate', (headers) =>
@@ -467,7 +498,7 @@ function activateFamily(
           .getDomain(resultsFor(domainDocuments))
           .activate(
             { domainName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'dataElement':
@@ -476,41 +507,58 @@ function activateFamily(
           .getDataElement(resultsFor(dataElementDocuments))
           .activate(
             { dataElementName: name },
-            { headers, analyse: analyseActivation },
+            { headers, preauditRequested, analyse: analyseActivation },
           ),
       );
     case 'behaviorDefinition':
       return withAdtHeaders(context, 'behaviorDefinition.activate', (headers) =>
         client
           .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-          .activate({ name }, { headers, analyse: analyseActivation }),
+          .activate(
+            { name },
+            { headers, preauditRequested, analyse: analyseActivation },
+          ),
       );
     case 'metadataExtension':
       return withAdtHeaders(context, 'metadataExtension.activate', (headers) =>
         client
           .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-          .activate({ name }, { headers, analyse: analyseActivation }),
+          .activate(
+            { name },
+            { headers, preauditRequested, analyse: analyseActivation },
+          ),
       );
   }
 }
 
-/** One object activated through its own API's `activate()`: its verdict. */
+/**
+ * One object activated through its own API's `activate()`, `preaudit` sent as
+ * its `preauditRequested`: its verdict.
+ */
 function activateSingle(
   context: HandlerContext,
   single: { readonly api: SingleActivationApi; readonly name: string },
   detail: 'terse' | 'full' | 'raw',
+  preaudit: boolean,
+  tool: string,
 ) {
   const client = createAdtClient(context.connection, context.logger);
   return answer(
-    { tool: 'ActivateObjectLow', detail },
-    () => activateFamily(context, client, single.api, single.name),
-    project(detail, terseActivation),
+    { tool, detail },
+    () => activateFamily(context, client, single.api, single.name, preaudit),
+    projectActivation(detail),
   );
 }
 
+/**
+ * `tool`: the name of the tool that was called, which every answer names —
+ * this handler serves `ActivateObjectLow` (its own definition) and
+ * `ActivateObjects` (`handleActivateObjects`).
+ */
 export async function handleActivateObject(
   context: HandlerContext,
   params: ActivateObjectArgs,
+  tool: string = TOOL_DEFINITION.name,
 ) {
   const { connection, logger } = context;
   const args = params;
@@ -565,102 +613,151 @@ export async function handleActivateObject(
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
 
-  if ('single' in plan) return activateSingle(context, plan.single, detail);
+  if ('single' in plan)
+    return activateSingle(context, plan.single, detail, preaudit, tool);
 
-  // Fallback: multiple objects, or a single object of a type this dispatcher
-  // does not map to a family client. See the module doc comment: ADT's
-  // answer here is acceptance, not completion, and this path is honest about
-  // that rather than inventing a verdict it does not have.
-  // **Three requests, because only the third says what happened.** The POST
+  // Group activation: multiple objects, or a single object of a type this
+  // dispatcher does not map to a family client. The endpoint is the system's
+  // to offer: its discovery, read first, lists `/activation/runs` or not. A
+  // system without runs (SAP_BASIS 751 and 7.40) is answered by the one
+  // synchronous `POST /activation`, whose document says what happened.
+  // Where runs are offered — **three requests, because only the third says
+  // what happened.** The POST
   // answers `202` with the run id in `Location` and a body that carries
   // nothing, so a handler that stopped there had acceptance and no verdict —
   // and the empty body parses to zero messages, which reads exactly like "no
   // errors". `getActivationRun` then says whether the run is still going, and
   // `getActivationResults` carries the `chkl:messages` the single-object
   // endpoint answers inline. See `lib/strategies/activationRun.ts`.
-  const utils = client.getUtils(ourUtils);
+  // The inactive list read after a silent results checklist is judged on
+  // the wire as it came (`stillInactiveAmong`).
+  const utils = client.getUtils({ ...ourUtils, inactive: wireItself });
   return answer(
-    { tool: 'ActivateObjectLow', detail: 'terse' },
+    { tool, detail },
     async () => {
+      // SAP ignores the group of a module's address (#2): each module
+      // reference's group is checked before the run starts.
+      const refused = await checkModuleReferences(
+        context,
+        plan.group.references,
+      );
+      if (refused !== undefined) return refused;
+      // Which endpoint the system offers is in its discovery, read on every
+      // group activation; a failed read sends nothing more.
+      const offered = await activationRunsOffered(context);
+      if (!offered.ok) return failedWith<GroupAnswer>(offered.getError());
+      if (!offered.getResult().value) {
+        const done = await activateSynchronously(context, plan.group, preaudit);
+        if (!done.ok) return failedWith<GroupAnswer>(done.getError());
+        return succeededWith<GroupAnswer>({
+          synchronous: done.getResult().value,
+        });
+      }
       const started = await startGroupActivation(context, plan.group, preaudit);
-      if (!started.ok) return started as never;
+      if (!started.ok) return failedWith<GroupAnswer>(started.getError());
       const runId = started.getResult().value;
       const outcome = await awaitActivationRun(
-        utils as unknown as ActivationRunSource,
+        utils,
         runId,
         analyseException,
+        plan.group.references.map((reference) =>
+          buildObjectUri(reference.name, reference.type, reference.parentName),
+        ),
       );
       // Reading the run failed: the method's error as it is, with its step.
       if (outcome.failure !== undefined)
-        return failedWith<ActivationRunOutcome>(outcome.failure);
-      return succeededWith(outcome);
+        return failedWith<GroupAnswer>(outcome.failure);
+      // A silent results checklist with run references still listed: not
+      // activated, those entries named.
+      if (
+        outcome.stillInactive !== undefined &&
+        outcome.stillInactive.length > 0
+      )
+        return failedWith<GroupAnswer>(notActivatedRun(outcome));
+      return succeededWith<GroupAnswer>({ runs: outcome });
     },
-    (outcome: ActivationRunOutcome) => {
-      // A run id is the only evidence that anything was accepted —
-      // `utilActivationRunId` answers `''` when no `Location` header carried
-      // one. `accepted` says so rather than being hardcoded true.
-      const accepted = outcome.runId !== '';
-      const refusals = outcome.messages.filter(isRefusal);
-      // `activated` is a verdict now, and `null` only where there genuinely is
-      // none: a run that has not settled within the bounded wait. A settled
-      // run's verdict is SAP's own: its results' `activationExecuted` (false
-      // for a run SAP cancelled, "Activation was cancelled.", whatever the
-      // messages' severity) and no error-severity message; where the results
-      // state no `activationExecuted`, the messages alone decide — the errata
-      // is explicit that only such a message is a failure.
-      const activated = !outcome.settled
-        ? null
-        : outcome.status !== 'failed' &&
-          activationVerdict(outcome.executed, outcome.messages);
-      // As the single-object answer says it: SAP ran no activation and gave
-      // no message to explain it — nothing to activate.
-      const nothingToActivate =
-        outcome.executed === false && outcome.messages.length === 0;
-      return {
-        accepted,
-        run_id: accepted ? outcome.runId : null,
-        run_status: outcome.status || null,
-        activated,
-        messages: outcome.messages,
-        ...(nothingToActivate ? { nothing_to_activate: true } : {}),
-        objects_count: activationObjects.length,
-        objects: activationObjects,
-        message: !accepted
-          ? `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
-            'object(s) — no run id came back, so there is no evidence a run was ' +
-            'queued at all.'
-          : activated === null
-            ? `Activation run ${outcome.runId} was accepted for ${activationObjects.length} object(s) and ` +
-              `has not settled yet (runs:status "${outcome.status || 'unknown'}"). Its results carry no ` +
-              'verdict while it runs; ask again, or read GetInactiveObjects — an object still ' +
-              'listed there did not activate.'
-            : activated
-              ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
-                'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
-                'now": an object can stay listed for scope rather than for failure — activating a ' +
-                "function group clears the regenerated include, not the group's own entry."
-              : refusals.length > 0
-                ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
-                  `${activationObjects.length} object(s): ` +
-                  refusals
-                    .map(
-                      (m) =>
-                        `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                    )
-                    .join('; ')
-                : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
-                  'object(s): its results say activationExecuted="false"' +
-                  (outcome.messages.length === 0
-                    ? ', with no message: nothing to activate.'
-                    : `: ${outcome.messages
-                        .map(
-                          (m) =>
-                            `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                        )
-                        .join('; ')}`),
-      };
-    },
+    (answered: GroupAnswer) =>
+      'synchronous' in answered
+        ? projectActivation(detail)(answered.synchronous)
+        : runAnswer(answered.runs, activationObjects),
   );
+}
+
+/**
+ * A run whose results said no activation ran, with no message, and whose
+ * references the inactive list still names: a failure carrying them, rendered
+ * as `still_inactive`.
+ */
+function notActivatedRun(outcome: ActivationRunOutcome) {
+  const stillInactive = outcome.stillInactive ?? [];
+  return {
+    origin: 'refusal' as const,
+    message: `Activation run ${outcome.runId} finished without activating: its results say no activation ran and give no message, and the inactive list still names ${stillInactive.length} object(s) of the run.`,
+    stillInactive,
+  };
+}
+
+/** A finished run, as `ActivateObjectLow` answers it. */
+function runAnswer(
+  outcome: ActivationRunOutcome,
+  activationObjects: readonly ActivationObject[],
+) {
+  // A run id is the only evidence that anything was accepted —
+  // `utilActivationRunId` answers `''` when no `Location` header carried
+  // one. `accepted` says so rather than being hardcoded true.
+  const accepted = outcome.runId !== '';
+  const refusals = outcome.messages.filter(isRefusal);
+  // `activated` is a verdict, and `null` only where there genuinely is
+  // none: no run id came back, so no run was read. A run is waited for
+  // until it ends, and its verdict is SAP's own: its results'
+  // `activationExecuted` (false for a run SAP cancelled, "Activation was
+  // cancelled.", whatever the messages' severity) and no error-severity
+  // message; where the results state no `activationExecuted`, the
+  // messages alone decide — the errata is explicit that only such a
+  // message is a failure.
+  const activated = !accepted
+    ? null
+    : outcome.status !== 'failed' &&
+      activationVerdict(outcome.executed, outcome.messages);
+  // As the single-object answer says it: SAP ran no activation and gave
+  // no message to explain it — nothing to activate.
+  const nothingToActivate =
+    outcome.executed === false && outcome.messages.length === 0;
+  return {
+    accepted,
+    run_id: accepted ? outcome.runId : null,
+    run_status: outcome.status || null,
+    activated,
+    messages: outcome.messages,
+    ...(nothingToActivate ? { nothing_to_activate: true } : {}),
+    objects_count: activationObjects.length,
+    objects: activationObjects,
+    message: !accepted
+      ? `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
+        'object(s) — no run id came back, so there is no evidence a run was ' +
+        'queued at all.'
+      : activated
+        ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
+          'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
+          'now": an object can stay listed for scope rather than for failure — activating a ' +
+          "function group clears the regenerated include, not the group's own entry."
+        : refusals.length > 0
+          ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
+            `${activationObjects.length} object(s): ` +
+            refusals
+              .map((m) => `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`)
+              .join('; ')
+          : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
+            'object(s): its results say activationExecuted="false"' +
+            (outcome.messages.length === 0
+              ? ', with no message: nothing to activate.'
+              : `: ${outcome.messages
+                  .map(
+                    (m) =>
+                      `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                  )
+                  .join('; ')}`),
+  };
 }
 
 /**
@@ -728,11 +825,23 @@ export async function activatePlanOnce(
   plan: ActivationPlan,
   preauditRequested?: boolean,
 ) {
-  if ('single' in plan) return activateSingle(context, plan.single, 'terse');
   const preaudit = preauditRequested !== false;
+  if ('single' in plan)
+    return activateSingle(
+      context,
+      plan.single,
+      'terse',
+      preaudit,
+      'HandlerActivate',
+    );
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
     async () => {
+      const refused = await checkModuleReferences(
+        context,
+        plan.group.references,
+      );
+      if (refused !== undefined) return refused;
       const started = await startGroupActivation(context, plan.group, preaudit);
       if (!started.ok) {
         return failedWith<string>(
@@ -745,7 +854,7 @@ export async function activatePlanOnce(
       if (runId === '') {
         return failedWith<string>(
           withStep(
-            { message: RUN_START_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            { message: RUN_START_WITHOUT_ID, origin: 'refusal' },
             START_ACTIVATION_RUN,
           ),
         );

@@ -38,6 +38,7 @@
  * sent by the drop. An end that keeps the map never aborts the signal, so
  * an executed part reaches the handler, when read, as it came.
  */
+
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
@@ -46,6 +47,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { batchOtherKindWords, ServerRefusal } from '../auth/serverRefusal';
 import { raceRequestSignal } from '../requestSignal';
+import { child, entries, isList } from '../xml/tree';
 import type { InstanceBatch, PartSettlement, RawPart } from './InstanceBatch';
 import { requestKind, sessionKindLabel } from './sessionKind';
 
@@ -82,22 +84,15 @@ export interface Recorder extends IAbapConnection {
 
 /** The raw part of a settled request: the inner response, or a failure's `response`. */
 function rawOf(response: unknown): RawPart | undefined {
-  if (response === null || typeof response !== 'object') return undefined;
-  const r = response as {
-    status?: unknown;
-    statusText?: unknown;
-    headers?: unknown;
-    data?: unknown;
-  };
-  if (typeof r.status !== 'number') return undefined;
+  const status = child(response, 'status');
+  if (typeof status !== 'number') return undefined;
   const headers: Record<string, string> = {};
-  if (r.headers !== null && typeof r.headers === 'object') {
-    for (const [name, value] of Object.entries(r.headers)) {
-      if (value === undefined || value === null) continue;
-      headers[name] = Array.isArray(value) ? value.join(', ') : String(value);
-    }
+  for (const [name, value] of entries(child(response, 'headers'))) {
+    if (value === undefined || value === null) continue;
+    headers[name] = isList(value) ? value.join(', ') : String(value);
   }
-  const data = r.data;
+  const statusText = child(response, 'statusText');
+  const data = child(response, 'data');
   const body =
     data === undefined || data === null
       ? ''
@@ -105,8 +100,8 @@ function rawOf(response: unknown): RawPart | undefined {
         ? data
         : JSON.stringify(data);
   return {
-    status: r.status,
-    status_text: typeof r.statusText === 'string' ? r.statusText : '',
+    status,
+    status_text: typeof statusText === 'string' ? statusText : '',
     headers,
     body,
   };
@@ -135,7 +130,7 @@ export function createRecorder(
   const listeners: Array<() => void> = [];
   const raw: Array<RawPart | undefined> = [];
   const settled: PartSettlement[] = [];
-  let release!: () => void;
+  let release: () => void = () => {};
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -147,7 +142,8 @@ export function createRecorder(
     Promise.reject<T>(new ServerRefusal('batch_ended'));
   const recorder: Recorder = {
     connect: () => (ended() ? endedRefusal<void>() : batch.connect()),
-    getBaseUrl: () => (ended() ? endedRefusal<string>() : batch.getBaseUrl()),
+    getBaseUrl: () =>
+      ended() ? endedRefusal<string | undefined>() : batch.getBaseUrl(),
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type) => batch.setSessionType(type),
     getSessionType: () => batch.getSessionType(),
@@ -214,11 +210,7 @@ export function createRecorder(
             raw[index] = rawOf(response);
           },
           (error: unknown) => {
-            raw[index] = rawOf(
-              error !== null && typeof error === 'object'
-                ? (error as { response?: unknown }).response
-                : undefined,
-            );
+            raw[index] = rawOf(child(error, 'response'));
           },
         );
       }

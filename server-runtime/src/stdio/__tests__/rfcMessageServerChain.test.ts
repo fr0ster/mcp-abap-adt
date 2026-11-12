@@ -1,10 +1,13 @@
 /**
- * The stdio chain of the message server's fields: launcher settings →
- * `IAuthBrokerFactoryConfig` → the broker factory's `SapConfig` → the
+ * The stdio chain of an RFC destination's address: launcher settings →
+ * `IAuthBrokerFactoryConfig` → the broker factory's `ISapRfcConfig` → the
  * connection born at start, whose `createConnection` is recorded. For each
  * input — the process environment, the destination's `.env` file, the CLI,
- * YAML — what `createConnection` receives carries the five fields as given;
- * an absent field stays absent: no key, not `undefined` as a default.
+ * YAML — what `createConnection` receives carries the message server's five
+ * fields (and an application server's two) as given, the client and the
+ * language beside them and no URL; an absent optional field stays absent:
+ * no key, not `undefined` as a default. An incomplete address is refused
+ * before anything is built.
  */
 
 import { EventEmitter } from 'node:events';
@@ -29,11 +32,10 @@ import { createConnection } from '@mcp-abap-adt/connection';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import { readConfigFile } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { AuthBrokerFactory } from '../auth/brokerFactory';
 import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
 import { launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
-
-const SYSTEM_URL = 'https://system.example.test';
 
 const FIELDS = {
   mshost: { cli: '--mshost', env: 'SAP_MSHOST', yaml: 'mshost' },
@@ -87,14 +89,14 @@ const noLogin = (): IAuthorizationStrategy<string> => ({
   },
 });
 
-/** The destination's `.env`, basic over RFC, plus `extra` lines. */
+/** The destination's `.env`, basic over RFC with no address, plus `extra` lines. */
 function envFile(extra: string[] = []): string {
   const file = path.join(root, 'dest.env');
   fs.writeFileSync(
     file,
     `${[
-      `SAP_URL=${SYSTEM_URL}`,
       'SAP_CLIENT=100',
+      'SAP_LANGUAGE=EN',
       'SAP_AUTH_TYPE=basic',
       'SAP_USERNAME=placeholder-user',
       'SAP_PASSWORD=placeholder-password-long',
@@ -169,7 +171,11 @@ function expectAll(config: Record<string, unknown>, given = GIVEN): void {
   for (const field of Object.keys(FIELDS) as Field[]) {
     expect(config[field]).toBe(given[field]);
   }
-  expect(config.url).toBe(SYSTEM_URL);
+  expect(config.client).toBe('100');
+  expect(config.language).toBe('EN');
+  for (const key of ['url', 'ashost', 'sysnr']) {
+    expect(Object.hasOwn(config, key)).toBe(false);
+  }
 }
 
 const fields = Object.keys(FIELDS) as Field[];
@@ -235,57 +241,96 @@ describe('the settings handed to createConnection carry the five fields as given
   });
 });
 
-describe('an absent field stays absent (no key, not undefined-as-default)', () => {
-  it.each(fields)('%s absent, the others given', async (absent) => {
-    const given = fields.filter((f) => f !== absent);
-    // A message server needs msserv or sysid: both absent never happens here.
-    const file = envFile(given.map((f) => `${FIELDS[f].env}=${GIVEN[f]}`));
+describe('an absent optional field stays absent (no key, not undefined-as-default)', () => {
+  const REQUIRED = [`SAP_MSHOST=${GIVEN.mshost}`, `SAP_GROUP=${GIVEN.group}`];
+  it.each([
+    ['msserv', [`SAP_SYSID=${GIVEN.sysid}`]],
+    ['sysid', [`SAP_MSSERV=${GIVEN.msserv}`]],
+    ['saprouter', [`SAP_SYSID=${GIVEN.sysid}`]],
+  ] as const)('%s absent', async (absent, service) => {
+    const file = envFile([...REQUIRED, ...service]);
     const config = await handedToCreateConnection([`--env-path=${file}`]);
     expect(Object.hasOwn(config, absent)).toBe(false);
-    for (const f of given) expect(config[f]).toBe(GIVEN[f]);
-  });
-
-  it('none given: no key of them', async () => {
-    const config = await handedToCreateConnection([`--env-path=${envFile()}`]);
-    for (const f of fields) expect(Object.hasOwn(config, f)).toBe(false);
+    expect(config.mshost).toBe(GIVEN.mshost);
+    expect(config.group).toBe(GIVEN.group);
   });
 });
 
-describe("mshost without msserv and sysid: connection's refusal reaches the start's caller as it came", () => {
-  it('the start stops with connection’s own words, naming msserv and sysid', async () => {
-    const actual = jest.requireActual('@mcp-abap-adt/connection');
-    // connection's own words for this config, read from connection itself.
-    let words = '';
-    try {
-      actual.rfcParamsFrom({ url: SYSTEM_URL, mshost: GIVEN.mshost });
-    } catch (error) {
-      words = (error as Error).message;
+describe("an application server's address reaches createConnection as stated", () => {
+  it.each([
+    [
+      "the destination's .env file",
+      ['SAP_ASHOST=host.example.test', 'SAP_SYSNR=00'],
+      [],
+    ],
+    ['the CLI', [], ['--ashost=host.example.test', '--sysnr=00']],
+  ] as const)('from %s', async (_from, lines, argv) => {
+    const file = envFile([...lines]);
+    const config = await handedToCreateConnection([
+      `--env-path=${file}`,
+      ...argv,
+    ]);
+    expect(config.ashost).toBe('host.example.test');
+    expect(config.sysnr).toBe('00');
+    for (const key of ['url', 'mshost', 'group']) {
+      expect(Object.hasOwn(config, key)).toBe(false);
     }
-    expect(words).toContain('msserv');
-    expect(words).toContain('sysid');
+  });
+});
 
-    // This start's build is connection's real one.
-    (createConnection as unknown as jest.Mock).mockImplementationOnce(
-      (spec: unknown) => actual.createConnection(spec),
-    );
+describe('an incomplete address is refused before anything is built', () => {
+  it('mshost without msserv and sysid: the start stops naming them, nothing built', async () => {
     const file = envFile([`SAP_MSHOST=${GIVEN.mshost}`, 'SAP_GROUP=SPACE']);
     const { stderr, exits } = await start([`--env-path=${file}`]);
-
-    expect(createConnection).toHaveBeenCalledTimes(1);
+    expect(createConnection).not.toHaveBeenCalled();
     expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain(words);
+    expect(stderr.join('\n')).toContain(
+      'Destination "default" is RFC and its address lacks: SAP_MSSERV or SAP_SYSID',
+    );
   });
 
   it('any other failure of the build is still named by its class only, never its message', async () => {
     (createConnection as unknown as jest.Mock).mockImplementationOnce(() => {
       throw new Error('placeholder words that must not be shown');
     });
-    const file = envFile([`SAP_MSHOST=${GIVEN.mshost}`, 'SAP_SYSID=XYZ']);
+    const file = envFile([
+      `SAP_MSHOST=${GIVEN.mshost}`,
+      'SAP_SYSID=XYZ',
+      'SAP_GROUP=SPACE',
+    ]);
     const { stderr, exits } = await start([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stderr.join('\n')).toContain(
       'could not be connected at start: Error',
     );
     expect(stderr.join('\n')).not.toContain('placeholder words');
+  });
+});
+
+describe('the start over RFC', () => {
+  it('the summary shows the address where HTTP shows the URL', async () => {
+    const file = envFile(fields.map((f) => `${FIELDS[f].env}=${GIVEN[f]}`));
+    const { stderr } = await start([`--env-path=${file}`]);
+    const said = stderr.join('\n');
+    expect(said).toContain(`RFC mshost:    ${GIVEN.mshost}`);
+    expect(said).toContain(`RFC msserv:    ${GIVEN.msserv}`);
+    expect(said).toContain(`RFC sysid:     ${GIVEN.sysid}`);
+    expect(said).toContain(`RFC group:     ${GIVEN.group}`);
+    expect(said).toContain('RFC saprouter:');
+    expect(said).toContain('Language:      EN');
+    expect(said).not.toContain('SAP URL:');
+  });
+
+  it('no connection type: refused before the settings are read', async () => {
+    const file = path.join(root, 'untyped.env');
+    fs.writeFileSync(
+      file,
+      `${['SAP_AUTH_TYPE=basic', 'SAP_USERNAME=u', 'SAP_PASSWORD=p'].join('\n')}\n`,
+    );
+    const settingsFor = jest.spyOn(AuthBrokerFactory.prototype, 'settingsFor');
+    const { stderr, exits } = await start([`--env-path=${file}`]);
+    expect(exits).toEqual([1]);
+    expect(settingsFor).not.toHaveBeenCalled();
+    expect(stderr.join('\n')).toContain('the SAP connection type is required');
   });
 });

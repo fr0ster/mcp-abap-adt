@@ -1,19 +1,33 @@
+import type { SapConfig } from '@mcp-abap-adt/connection';
+
 /**
- * The key of the system a connection's settings point at: its URL (without
- * trailing slashes, trimmed), its client and its connection type. The
- * server keys the corrected header pairs (`AdtHeaderPairs.forSystem`) and the
- * system information by it; two destinations to the same system share it,
- * whatever their credentials.
+ * The key of the system a connection's settings point at, by its wire:
+ * HTTP `["http", <URL without trailing slashes, trimmed>, <client>]`, RFC
+ * `["rfc", ashost, sysnr, mshost, msserv, sysid, group, saprouter, client]`
+ * (an absent field `''`). The server keys the corrected header pairs
+ * (`AdtHeaderPairs.forSystem`), the system information and the
+ * background-run identity by it; two destinations to the same system share
+ * it, whatever their credentials.
  */
-export function adtSystemKey(settings: {
-  url?: string;
-  client?: string;
-  connectionType?: string;
-}): string {
+export function adtSystemKey(settings: SapConfig): string {
+  const client = (settings.client ?? '').trim();
+  if (settings.connectionType === 'rfc') {
+    return JSON.stringify([
+      'rfc',
+      settings.ashost ?? '',
+      settings.sysnr ?? '',
+      settings.mshost ?? '',
+      settings.msserv ?? '',
+      settings.sysid ?? '',
+      settings.group ?? '',
+      settings.saprouter ?? '',
+      client,
+    ]);
+  }
   return JSON.stringify([
-    withoutTrailingSlashes((settings.url ?? '').trim()),
-    (settings.client ?? '').trim(),
-    settings.connectionType ?? 'http',
+    'http',
+    withoutTrailingSlashes(settings.url.trim()),
+    client,
   ]);
 }
 

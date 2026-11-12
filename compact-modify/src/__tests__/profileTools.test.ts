@@ -18,6 +18,7 @@ import {
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
+import { declaredRequired } from '../../../src/__tests__/helpers/listedJson';
 import { SCHEDULE_WITHOUT_ID } from '../../../src/handlers/system/high/handleRuntimeCreateProfilerTraceParameters';
 import {
   handleHandlerProfileRun,
@@ -225,15 +226,9 @@ describe('compact HandlerProfileRun', () => {
   );
 
   it('declares profiler_id optional and the profiling flags on the schedule', () => {
-    expect([...runTool.inputSchema.required]).toEqual(['target_type']);
-    expect(Object.keys(runTool.inputSchema.properties)).toContain(
-      'profiler_id',
-    );
-    expect(Object.keys(runTool.inputSchema.properties)).not.toContain(
-      'sql_trace',
-    );
-    expect(Object.keys(scheduleTool.inputSchema.properties)).toContain(
-      'sql_trace',
-    );
+    expect(declaredRequired(runTool.inputSchema)).toEqual(['target_type']);
+    expect(Object.keys(runTool.inputSchema.shape)).toContain('profiler_id');
+    expect(Object.keys(runTool.inputSchema.shape)).not.toContain('sql_trace');
+    expect(Object.keys(scheduleTool.inputSchema.shape)).toContain('sql_trace');
   });
 });

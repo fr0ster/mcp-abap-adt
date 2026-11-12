@@ -21,11 +21,17 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { DestinationSystemContext } from '../../../lib/auth/destinationSystemContext';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
+import type { BackgroundRunOwner } from '../../../lib/backgroundRuns/owner';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { RuntimeRunHandlersGroup } from '../../../lib/handlers/groups/RuntimeRunHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -96,9 +102,12 @@ const placeholderContext = {
 export function shippedGroups(): CompositeHandlersRegistry {
   return new CompositeHandlersRegistry([
     new SystemHandlersGroup(placeholderContext),
+    new DataHandlersGroup(placeholderContext),
     new RuntimeRunHandlersGroup(placeholderContext),
     new BackgroundRunHandlersGroup(placeholderContext),
     new CompactModifyHandlersGroup(placeholderContext),
+    new CompactReadOnlyHandlersGroup(placeholderContext),
+    new CompactDataHandlersGroup(placeholderContext),
     new CompactBackgroundRunHandlersGroup(placeholderContext),
   ]);
 }
@@ -129,12 +138,14 @@ function answerOf(raw: unknown): Answer {
 /** An MCP client on `server`. */
 export async function clientOf(server: BaseMcpServer): Promise<{
   call: Caller['call'];
+  list: () => ReturnType<Client['listTools']>;
   close: () => Promise<void>;
 }> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'background', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
   return {
+    list: () => client.listTools(),
     call: async (name, args = {}) =>
       answerOf(
         await client.callTool({ name, arguments: args }, undefined, {
@@ -155,12 +166,14 @@ export async function callerOn(
   standIn: AdtStandIn,
   strategy: IBackgroundRuns | undefined,
   who: { user: string } | { tokenUser: string },
+  owner?: BackgroundRunOwner,
 ): Promise<Caller> {
   const server = new StandServer({
     name: 'background-stand',
     logger: silent,
     systemType: 'onprem',
     ...(strategy !== undefined ? { backgroundRuns: strategy } : {}),
+    ...(owner !== undefined ? { backgroundRunOwner: owner } : {}),
   });
   if ('user' in who) {
     // The system names the session's user (systeminformation), as a session
@@ -201,15 +214,16 @@ export async function callerOn(
 
 export interface BackgroundStand {
   standIn: AdtStandIn;
-  strategy: InMemoryBackgroundRuns;
+  strategy: IBackgroundRuns;
   /** The first caller (`RUN_USER`). */
   a: Caller;
   close(): Promise<void>;
 }
 
-export async function backgroundStand(): Promise<BackgroundStand> {
+export async function backgroundStand(
+  strategy: IBackgroundRuns = new InMemoryBackgroundRuns(),
+): Promise<BackgroundStand> {
   const standIn = await adtStandIn();
-  const strategy = new InMemoryBackgroundRuns();
   const a = await callerOn(standIn, strategy, { user: 'RUN_USER' });
   return {
     standIn,

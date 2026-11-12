@@ -1,5 +1,7 @@
 /** Memory snapshot documents, and any document without a reading of its own. */
+
 import { XMLParser } from 'fast-xml-parser';
+import { child, childAt, type Element, isElement, listOf } from '../xml/tree';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -28,18 +30,14 @@ const field = (v: unknown): string =>
   v === undefined || v === null || typeof v === 'object' ? '' : String(v);
 
 export function readSnapshotList(xml: string): SnapshotReading[] {
-  const snapshots = (readXmlDocument(xml) as any)?.snapshotsList?.snapshots;
-  const list: any[] =
-    snapshots && typeof snapshots === 'object'
-      ? (snapshots.snapshot ?? [])
-      : [];
-  return list.map((s) => ({
-    id: field(s.id),
-    user: field(s.user),
-    timestamp: field(s.timestamp),
-    size: Number(field(s.size) || 0),
-    programName: field(s.programName),
-    fileName: field(s.fileName),
+  const snapshots = childAt(readXmlDocument(xml), 'snapshotsList', 'snapshots');
+  return listOf(child(snapshots, 'snapshot')).map((s) => ({
+    id: field(child(s, 'id')),
+    user: field(child(s, 'user')),
+    timestamp: field(child(s, 'timestamp')),
+    size: Number(field(child(s, 'size')) || 0),
+    programName: field(child(s, 'programName')),
+    fileName: field(child(s, 'fileName')),
   }));
 }
 
@@ -62,13 +60,10 @@ export interface MemorySizesReading {
 }
 
 const count = (v: unknown): number => Number(field(v).trim() || 0);
-const group = (node: unknown): Record<string, unknown> =>
-  node && typeof node === 'object' ? (node as Record<string, unknown>) : {};
+const group = (node: unknown): Element => (isElement(node) ? node : {});
 
 export function readMemorySizes(xml: string): MemorySizesReading {
-  const doc = group(
-    (readXmlDocument(xml) as { memorySizes?: unknown })?.memorySizes,
-  );
+  const doc = group(child(readXmlDocument(xml), 'memorySizes'));
   const abap = group(doc.abap);
   const internal = group(doc.internal);
   const external = group(doc.external);

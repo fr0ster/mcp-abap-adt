@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * LockObject Handler - Lock ABAP object for modification via ADT API
  *
@@ -40,6 +41,7 @@ import {
 } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import {
   analyseLock,
   analysePublicationLockAnswer,
@@ -52,43 +54,35 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Lock an ABAP object for modification. Returns the lock handle the update and the unlock take; the lock stays in the instance’s session until the unlock or the instance’s end.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description:
-          'Object name. For function modules, use format GROUP|FM_NAME',
-      },
-      object_type: {
-        type: 'string',
-        description: 'Object type',
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'behavior_implementation',
-          'metadata_extension',
-          'service_definition',
-          'service_binding',
-        ],
-      },
-      super_package: {
-        type: 'string',
-        description: 'Super package (required for package locking)',
-      },
-    },
-    required: ['object_name', 'object_type'],
-  },
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .describe('Object name. For function modules, use format GROUP|FM_NAME'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'behavior_implementation',
+        'metadata_extension',
+        'service_definition',
+        'service_binding',
+      ])
+      .describe('Object type'),
+    super_package: z
+      .string()
+      .optional()
+      .describe('Super package (required for package locking)'),
+  }),
 } as const;
 
 interface LockObjectArgs {
@@ -138,8 +132,9 @@ export async function lockObject(
   // Two request-shape checks that stay ahead of the client call, exactly
   // where they lived before this migration: `lock()`'s config does not
   // itself enforce either.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (objectType === 'function_module') {
     if (!object_name.toUpperCase().includes('|')) {
       return return_error(
@@ -170,7 +165,8 @@ export async function lockObject(
         .lock(
           {
             packageName: objectName,
-            superPackage: (super_package as string).toUpperCase(),
+            // Required for a package, refused above when absent.
+            superPackage: (super_package ?? '').toUpperCase(),
           },
           { analyse: analyseLock },
         );
@@ -214,15 +210,23 @@ export async function lockObject(
             .getFunctionGroup(resultsFor(functionGroupDocuments))
             .lock({ functionGroupName: objectName }, { analyse: analyseLock });
         case 'function_module':
-          return client
-            .getFunctionModule(resultsFor(functionModuleDocuments))
-            .lock(
-              {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
-              },
-              { analyse: analyseLock },
-            );
+          // SAP ignores the group of the address (#2): the lock is taken
+          // after the module's metadata names the group given.
+          return inCheckedGroupOn(
+            client,
+            functionGroupName,
+            functionModuleName,
+            () =>
+              client
+                .getFunctionModule(resultsFor(functionModuleDocuments))
+                .lock(
+                  {
+                    functionGroupName,
+                    functionModuleName,
+                  },
+                  { analyse: analyseLock },
+                ),
+          );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))

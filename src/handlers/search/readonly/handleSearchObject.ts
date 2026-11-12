@@ -1,18 +1,23 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import {
   notASearchType,
   SEARCH_TYPE_DESCRIPTION,
   searchNameOf,
 } from '../../../lib/searchTypes';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { attr, child, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
@@ -20,34 +25,31 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      object_name: {
-        type: 'string',
-        description: "[read-only] Object name or mask (e.g. 'MARA*')",
-      },
-      object_type: {
-        type: 'string',
-        description: `[read-only] ${SEARCH_TYPE_DESCRIPTION}`,
-      },
-      maxResults: {
-        type: 'number',
-        description: '[read-only] Maximum number of results to return',
-        default: 100,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['object_name'],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    object_name: z
+      .string()
+      .describe("[read-only] Object name or mask (e.g. 'MARA*')"),
+    object_type: z
+      .string()
+      .optional()
+      .describe(`[read-only] ${SEARCH_TYPE_DESCRIPTION}`),
+    maxResults: z
+      .number()
+      .default(100)
+      .optional()
+      .describe('[read-only] Maximum number of results to return'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface SearchHit {
+export interface SearchHit {
   name: string;
   type: string;
   description: string;
   packageName?: string;
+  /** The object's address (`adtcore:uri`), when the hit names one. */
+  uri?: string;
 }
 
 /**
@@ -58,24 +60,28 @@ interface SearchHit {
  * `structured` parse (`resultSets.ts`'s `READING_BY_SLOT`), so this walks that
  * tree directly rather than re-running a parser of its own.
  */
-function parseSearchHits(value: unknown): SearchHit[] {
+export function parseSearchHits(value: unknown): SearchHit[] {
   const root =
-    (value as any)?.['adtcore:objectReferences'] ??
-    (value as any)?.objectReferences;
+    child(value, 'adtcore:objectReferences') ??
+    child(value, 'objectReferences');
   if (!root) return [];
-  const refsRaw = root['adtcore:objectReference'] ?? root.objectReference;
-  const refs = Array.isArray(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : [];
+  const refsRaw =
+    child(root, 'adtcore:objectReference') ?? child(root, 'objectReference');
+  const refs = isList(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : [];
   const hits: SearchHit[] = [];
   for (const ref of refs) {
-    const a = (ref as any)?.['@'] ?? {};
-    const name = a['adtcore:name'] ?? a.name;
-    const type = a['adtcore:type'] ?? a.type;
+    const a = child(ref, '@');
+    const name = attr(a, 'adtcore:name') ?? attr(a, 'name');
+    const type = attr(a, 'adtcore:type') ?? attr(a, 'type');
     if (!name || !type) continue;
+    const uri = attr(a, 'adtcore:uri') ?? attr(a, 'uri');
     hits.push({
       name,
       type,
-      description: a['adtcore:description'] ?? a.description ?? '',
-      packageName: a['adtcore:packageName'] ?? a.packageName ?? undefined,
+      description:
+        attr(a, 'adtcore:description') ?? attr(a, 'description') ?? '',
+      packageName: attr(a, 'adtcore:packageName') ?? attr(a, 'packageName'),
+      ...(uri === undefined ? {} : { uri }),
     });
   }
   return hits;

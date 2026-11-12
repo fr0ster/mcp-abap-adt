@@ -9,6 +9,8 @@
  * with the same fields is not one.
  */
 
+import type { ConnectionCauseCode } from './connectionCause';
+
 /** The codes of the server's own refusals, as the answer's `error` names them. */
 export type ServerRefusalCode =
   | 'inspection_only'
@@ -33,12 +35,13 @@ export type ServerRefusalCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout'
+  | 'batch_no_background'
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
   | 'long_session_unavailable'
-  | 'connection_provider_failed';
+  | 'connection_provider_failed'
+  | 'no_connection';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -80,6 +83,14 @@ export const BACKGROUND_RUNS_UNAVAILABLE_WORDS =
   'background runs are not available here: the host gave this server no store for them';
 
 /**
+ * `background_runs_unavailable` on an injected connection that answers no
+ * URL (RFC) when the host stated no `system`: a run is kept only for a
+ * caller whose system is known.
+ */
+export const BACKGROUND_RUNS_NO_SYSTEM_WORDS =
+  'background runs are not available here: the connection the host gave answers no URL, and the host stated no `system` (EmbeddableMcpServerOptions.system) to identify the system a run is kept for';
+
+/**
  * A `run_handle` that names no background run of the caller's: unknown or
  * someone else's — the same words for each.
  */
@@ -88,7 +99,7 @@ export const BACKGROUND_RUN_NOT_AVAILABLE_WORDS =
 
 /** A discard of a run still running: it cannot be stopped. */
 export const BACKGROUND_RUN_RUNNING_WORDS =
-  'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
+  'this background run is still running and cannot be discarded here: a started code run runs to its end; discard it once it has finished';
 
 /**
  * A call whose system gave no information where it must (ABAP Cloud, which
@@ -196,9 +207,9 @@ export const BATCH_MODE_OTHER_WORDS =
 export const BATCH_MODE_OFF_WORDS =
   'no batch of this kind is open on this server: begin one first';
 
-/** A long read given `timeout` in batch mode: refused before anything is recorded. */
-export const BATCH_NO_TIMEOUT_WORDS =
-  'in batch mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline';
+/** A long read given `background: true` in batch mode: refused before anything is recorded. */
+export const BATCH_NO_BACKGROUND_WORDS =
+  'in batch mode a read takes no background: it is recorded, and the batch is sent at BatchEnd';
 
 /**
  * A request of a recorded call after its batch ended: a handler resumed when
@@ -277,7 +288,21 @@ type WordedCode =
   | 'batch_parts_mismatch';
 
 /** The refusals whose words are fixed. */
-type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
+type FixedCode = Exclude<ServerRefusalCode, WordedCode | 'no_connection'>;
+
+/** `no_connection`'s words, built from `cause` alone. */
+function noConnectionText(cause: string): string {
+  return `no connection to the SAP system: the connection failed (${cause}); the next tool call tries again`;
+}
+
+/**
+ * stdio with `--deferred-logon` (#353): the instance's connection could not
+ * be built because the system cannot be reached. The words name the cause
+ * code only — never the address, the error's message or a credential.
+ */
+export function noConnectionWords(cause: ConnectionCauseCode): string {
+  return noConnectionText(cause);
+}
 
 const WORDS: Readonly<Record<FixedCode, string>> = {
   inspection_only: INSPECTION_ONLY_WORDS,
@@ -298,7 +323,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_mode_on: BATCH_MODE_ON_WORDS,
   batch_mode_other: BATCH_MODE_OTHER_WORDS,
   batch_mode_off: BATCH_MODE_OFF_WORDS,
-  batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
+  batch_no_background: BATCH_NO_BACKGROUND_WORDS,
   batch_ended: BATCH_ENDED_WORDS,
   batch_unsplit: BATCH_UNSPLIT_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
@@ -327,15 +352,25 @@ export class ServerRefusal extends Error {
    * `batchMorePartsWords`.
    */
   constructor(code: WordedCode, words: string);
+  /** `background_runs_unavailable` for an injected connection with no system known. */
+  constructor(
+    code: 'background_runs_unavailable',
+    words: typeof BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+  );
+  /** `no_connection`, its words built from the listed `cause` (`noConnectionWords`). */
+  constructor(code: 'no_connection', cause: ConnectionCauseCode);
   constructor(code: ServerRefusalCode, words?: string) {
     const text =
-      code === 'destination_refused' ||
-      code === 'background_run_limit' ||
-      code === 'batch_not_recordable' ||
-      code === 'batch_other_kind' ||
-      code === 'batch_parts_mismatch'
-        ? (words ?? '')
-        : WORDS[code];
+      code === 'no_connection'
+        ? noConnectionText(words ?? '')
+        : (code === 'background_runs_unavailable' && words !== undefined) ||
+            code === 'destination_refused' ||
+            code === 'background_run_limit' ||
+            code === 'batch_not_recordable' ||
+            code === 'batch_other_kind' ||
+            code === 'batch_parts_mismatch'
+          ? (words ?? '')
+          : WORDS[code];
     super(text);
     this.name = 'ServerRefusal';
     this.serverRefusal = code;

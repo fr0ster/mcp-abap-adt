@@ -1,0 +1,24 @@
+{
+  "case": "system-description-751-partial",
+  "step": 1,
+  "stepTag": "discovery",
+  "capturedAt": "2026-11-09T00:00:00.000Z",
+  "note": "SAP_BASIS 751 SP02 (S/4HANA 1610), from fr0ster/mcp-abap-adt#351 (2026-11-09), not captured by this repository. A partial document: the issue lists the activation collections of the system's discovery — /sap/bc/adt/activation, /sap/bc/adt/activation/inactiveobjects and /sap/bc/adt/ddic/logs/activationgraph, and no /sap/bc/adt/activation/runs — and nothing else of it, so this document carries those three collections, their hrefs only, in one workspace.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/discovery",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/discovery",
+    "headers": {},
+    "headersNote": "The issue reports no request header.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/atomsvc+xml"
+    },
+    "bodyFile": "system-description-751-partial--01-discovery.body.xml"
+  }
+}

@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ActivateTableLow Handler - Activate ABAP Table
  *
@@ -10,8 +12,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -20,17 +22,10 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP table. Returns activation status and any warnings/errors.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_name: {
-        type: 'string',
-        description: 'Table name.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_name'],
-  },
+  inputSchema: z.object({
+    table_name: z.string().describe('Table name.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface ActivateTableArgs {
@@ -60,6 +55,6 @@ export async function handleActivateTable(
           .getTable(resultsFor(tableDocuments))
           .activate({ tableName }, { headers, analyse: analyseActivation }),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

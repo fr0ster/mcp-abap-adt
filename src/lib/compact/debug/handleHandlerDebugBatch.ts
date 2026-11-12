@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * `HandlerDebugBatch`: the debugger batch in the compact set, one tool for
  * the three actions — `begin`, `end`, `answers` — each as the full set's
@@ -10,7 +11,7 @@ import { TOOL_DEFINITION as DebugBatchBegin_Tool } from '../../../handlers/debug
 import { TOOL_DEFINITION as DebugBatchEnd_Tool } from '../../../handlers/debugger/debug/handleDebugBatchEnd';
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginDebugBatch, endDebugBatch } from '../../batch/tools';
-import type { ArgsOf, HandlerContext } from '../../handlers/index';
+import type { HandlerContext } from '../../handlers/index';
 import { NUMBER_WITHOUT_ANSWERS_WORDS } from '../batch/handleHandlerBatch';
 
 const READ_ONLY_TAG = '[read-only] ';
@@ -38,33 +39,29 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDebugBatch',
   available_in: ['onprem', 'cloud'] as const,
   description: HANDLER_DEBUG_BATCH_DESCRIPTION,
-  inputSchema: {
-    type: 'object',
-    properties: {
-      action: {
-        type: 'string',
-        enum: ['begin', 'end', 'answers'],
-        description:
-          "begin starts the debugger batch on the stopped ABAP debuggee or at the AMDP break; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.",
-      },
-      number: {
-        type: 'integer',
-        minimum: 1,
-        description: 'answers: one batch number to read, at least 1.',
-      },
-      numbers: {
-        type: 'array',
-        items: { type: 'integer', minimum: 1 },
-        minItems: 1,
-        description:
-          'answers: several batch numbers to read, each at least 1, answered in the order given.',
-      },
-    },
-    required: ['action'],
-  },
+  inputSchema: z.object({
+    action: z
+      .enum(['begin', 'end', 'answers'])
+      .describe(
+        "begin starts the debugger batch on the stopped ABAP debuggee or at the AMDP break; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.",
+      ),
+    number: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe('answers: one batch number to read, at least 1.'),
+    numbers: z
+      .array(z.number().int().min(1))
+      .min(1)
+      .optional()
+      .describe(
+        'answers: several batch numbers to read, each at least 1, answered in the order given.',
+      ),
+  }),
 } as const;
 
-type DebugBatchArgs = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
+type DebugBatchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerDebugBatch(
   context: HandlerContext,

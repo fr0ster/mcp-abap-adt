@@ -7,12 +7,16 @@
  * own `finally`, `logOffLeft` ends every connection owned since that is
  * still open and names how many there were: a stop and a shutdown that
  * did their work leave none, so any is a problem of the case.
+ *
+ * Once the run's credential-refusal marker exists it sends nothing: the
+ * logoffs are refused before they start (`refusalGuard`).
  */
 import {
   endConnection,
   logoffsAnswered,
   ownedConnections,
 } from '../../../lib/ownedConnections';
+import { refuseAfterMarker } from './refusalGuard';
 
 /** The server's owned connections now. */
 export function ownedNow(): Set<object> {
@@ -27,6 +31,7 @@ export async function logOffLeft(
   before: ReadonlySet<object>,
   what: string,
 ): Promise<string[]> {
+  refuseAfterMarker(`${what}: the logoff of the connections left`);
   const left = ownedConnections().filter((c) => !before.has(c));
   await Promise.all(left.map((c) => endConnection(c)));
   // Each logoff finished — answered, or its transport failed — before the

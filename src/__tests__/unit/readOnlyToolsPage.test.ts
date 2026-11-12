@@ -10,6 +10,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { LONG_TOOLS } from '../../lib/longTools';
 import { fullReadOnlyToolSet } from '../../lib/toolSet';
 
 const PAGE = path.join(
@@ -42,7 +43,9 @@ function documented(): Map<string, string[]> {
 }
 
 const served = fullReadOnlyToolSet
-  .groups({ connection: undefined as never, logger: undefined }, 'stdio')
+  .groups({ connection: undefined as never, logger: undefined }, 'stdio', {
+    dataTools: true,
+  })
   .flatMap((group) => group.getHandlers());
 
 describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', () => {
@@ -54,22 +57,22 @@ describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', ()
     expect(page).toContain(`- Total tools: ${served.length}\n`);
   });
 
-  it('no background-run tool and no resume', () => {
+  it('the background-run tools of the long reads, and no resume', () => {
     const names = [...documented().keys()];
     for (const name of [
       'GetBackgroundRun',
       'ListBackgroundRuns',
       'DiscardBackgroundRun',
-      'ResumeLeftoverSession',
     ]) {
       expect({ name, listed: names.includes(name) }).toEqual({
         name,
-        listed: false,
+        listed: true,
       });
     }
+    expect(names.includes('ResumeLeftoverSession')).toBe(false);
   });
 
-  it('no run tool, no trace schedule, no logoff, and no tool takes background', () => {
+  it('no run tool, no trace schedule, no logoff; only the long reads take background', () => {
     const tools = documented();
     for (const name of [
       'RuntimeRunClass',
@@ -87,7 +90,9 @@ describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', ()
         params.some((p) => p.startsWith('- `background`')),
       )
       .map(([name]) => name);
-    expect(withBackground).toEqual([]);
-    expect(page).not.toContain('GetBackgroundRun');
+    expect(withBackground.filter((name) => !LONG_TOOLS.includes(name))).toEqual(
+      [],
+    );
+    expect(withBackground.length).toBeGreaterThan(10);
   });
 });

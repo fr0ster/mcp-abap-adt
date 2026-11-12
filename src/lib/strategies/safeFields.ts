@@ -6,6 +6,8 @@
  * its way there. Neither should hold its own copy of the rule.
  */
 
+import { child, isElement, isList } from '../xml/tree';
+
 /**
  * What a failed release adds to a payload — in two shapes, and which one it is
  * carries information of its own.
@@ -55,14 +57,36 @@ export interface LeftLocked {
 export function safeRequest(
   value: unknown,
 ): Record<string, string> | undefined {
-  const method = (value as { method?: unknown } | undefined)?.method;
-  const url = (value as { url?: unknown } | undefined)?.url;
+  const method = child(value, 'method');
+  const url = child(value, 'url');
   if (typeof method !== 'string' && typeof url !== 'string') return undefined;
 
   const out: Record<string, string> = {};
   if (typeof method === 'string') out.method = method;
-  if (typeof url === 'string') out.url = url;
+  if (typeof url === 'string') out.url = withoutLockHandle(url);
   return out;
+}
+
+/**
+ * `url` without its lock handle: every query parameter whose name, decoded by
+ * `URLSearchParams`, is `lockHandle` in any case is left out, the others kept
+ * as they were written, and the `?` with them when none is left. A write
+ * under a lock carries the handle in its url, and the failure's request is
+ * rendered into answers and logs, where a handle does not belong.
+ */
+function withoutLockHandle(url: string): string {
+  const at = url.indexOf('?');
+  if (at < 0) return url;
+  const kept = url
+    .slice(at + 1)
+    .split('&')
+    .filter((part) =>
+      [...new URLSearchParams(part).keys()].every(
+        (name) => name.toLowerCase() !== 'lockhandle',
+      ),
+    );
+  const path = url.slice(0, at);
+  return kept.length > 0 ? `${path}?${kept.join('&')}` : path;
 }
 
 /**
@@ -75,9 +99,8 @@ export function safeRequest(
 export function safeCleanup(
   value: unknown,
 ): Record<string, unknown> | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
-
-  const carrier = value as Record<string, unknown>;
+  if (!isElement(value)) return undefined;
+  const carrier = value;
   const out: Record<string, unknown> = {};
 
   if (typeof carrier.message === 'string') out.message = carrier.message;
@@ -89,9 +112,9 @@ export function safeCleanup(
 
   // What was left behind as failures of their own: entries already built in
   // the shape of every other failure (`failureEntry`, `thrownEntry`).
-  if (Array.isArray(carrier.failures) && carrier.failures.length > 0)
+  if (isList(carrier.failures) && carrier.failures.length > 0)
     out.failures = carrier.failures;
-  if (Array.isArray(carrier.notes) && carrier.notes.length > 0)
+  if (isList(carrier.notes) && carrier.notes.length > 0)
     out.notes = carrier.notes;
 
   // The lock that may be left behind: each field by its own type, the object
@@ -108,8 +131,8 @@ export function safeCleanup(
 
 /** `{ type, name }`, both non-empty strings, copied by name; anything else is absent. */
 function safeLockedObject(value: unknown): LockedObject | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
-  const { type, name } = value as { type?: unknown; name?: unknown };
+  const type = child(value, 'type');
+  const name = child(value, 'name');
   if (typeof type !== 'string' || type === '') return undefined;
   if (typeof name !== 'string' || name === '') return undefined;
   return { type, name };

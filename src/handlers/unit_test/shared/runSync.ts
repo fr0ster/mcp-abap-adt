@@ -60,14 +60,11 @@ export function runTestsSync(
       case 'program':
         return executor
           .getProgramTestRunner(ourUnitTest)
-          .runSync(run.programName.toUpperCase(), withAnalyse) as SyncAnswer;
+          .runSync(run.programName.toUpperCase(), withAnalyse);
       case 'functionGroup':
         return executor
           .getFunctionGroupTestRunner(ourUnitTest)
-          .runSync(
-            run.functionGroupName.toUpperCase(),
-            withAnalyse,
-          ) as SyncAnswer;
+          .runSync(run.functionGroupName.toUpperCase(), withAnalyse);
       case 'functionModule':
         return executor.getFunctionModuleTestRunner(ourUnitTest).runSync(
           {
@@ -75,14 +72,14 @@ export function runTestsSync(
             functionModuleName: run.functionModuleName.toUpperCase(),
           },
           withAnalyse,
-        ) as SyncAnswer;
+        );
       default:
         return executor
           .getClassTestRunner(ourUnitTest)
-          .runSync(run.target, withAnalyse) as SyncAnswer;
+          .runSync(run.target, withAnalyse);
     }
   };
-  return atStep('run', send)() as SyncAnswer;
+  return atStep('run', send)();
 }
 
 /** What a synchronous run tool answers: the finished result. */

@@ -56,9 +56,10 @@ export const HTTP_ROWS: readonly Parameter[] = [
     env: 'MCP_HTTP_PORT',
     yaml: 'http.port',
     kind: 'port',
+    ephemeral: true,
     default: 3000,
     section: HTTP,
-    help: 'Port to listen on, 1-65535 (default 3000)',
+    help: 'Port to listen on, 1-65535, or 0 for a free one the system chooses, announced on the listening line (default 3000)',
   },
   {
     key: 'httpPath',

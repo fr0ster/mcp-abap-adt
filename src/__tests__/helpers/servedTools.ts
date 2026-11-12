@@ -10,7 +10,6 @@
  * the two system kinds a live run reaches).
  */
 
-import * as net from 'node:net';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -105,16 +104,11 @@ const sapHeaders = (url: string): Record<string, string> => ({
   'x-sap-password': 'surface-password',
 });
 
-/** A port free on 127.0.0.1 now: a listener on port 0, closed again. */
-async function freePort(): Promise<number> {
-  const probe = net.createServer();
-  await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
-  const address = probe.address();
-  await new Promise<void>((resolve) => probe.close(() => resolve()));
-  if (address === null || typeof address === 'string') {
-    throw new Error('the probe listener has no port');
-  }
-  return address.port;
+/** The port a started server listens on: port 0 asked, the system's choice read back. */
+function boundPort(server: { listeningPort(): number | undefined }): number {
+  const port = server.listeningPort();
+  if (port === undefined) throw new Error('the server listens on no port');
+  return port;
 }
 
 async function listOver(
@@ -155,14 +149,14 @@ async function sseTools(
   standIn: AdtStandIn,
 ): Promise<ListedTool[]> {
   const toolSet = toolSets.sse[kind];
-  const port = await freePort();
   const sse = new SseServer(registryOf(toolSet, 'sse', { dataTools: true }), {
     host: '127.0.0.1',
-    port,
+    port: 0,
     batch: { keepRawParts: false },
     ...backgroundRunsOf(toolSet),
   });
   await sse.start();
+  const port = boundPort(sse);
   const headers = sapHeaders(standIn.url);
   try {
     return await listOver(
@@ -187,17 +181,17 @@ async function httpTools(
   standIn: AdtStandIn,
 ): Promise<ListedTool[]> {
   const toolSet = toolSets.http[kind];
-  const port = await freePort();
   const mcp = new StreamableHttpServer(
     registryOf(toolSet, 'http', { dataTools: true }),
     {
       host: '127.0.0.1',
-      port,
+      port: 0,
       batch: { keepRawParts: false },
       ...backgroundRunsOf(toolSet),
     },
   );
   await mcp.start();
+  const port = boundPort(mcp);
   try {
     return await listOver(
       new StreamableHTTPClientTransport(

@@ -84,6 +84,12 @@ export interface Parameter {
    * and used as it is never states it.
    */
   readonly unstatedInTemplate?: true;
+  /**
+   * A `port` that may be 0: a listener's port, where 0 is a free port the
+   * system chooses (announced by the listener). Absent: 1-65535 only — a
+   * port someone else must know in advance, such as a login callback.
+   */
+  readonly ephemeral?: true;
   /** The value placeholder of the help (`=<minutes>`); default by kind. */
   readonly valueHint?: string;
   /** The help section the row is listed under. */
@@ -309,9 +315,12 @@ function convert(
 
   if (p.kind === 'port') {
     const port = isDigits(text) ? Number.parseInt(text, 10) : Number.NaN;
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    const lowest = p.ephemeral === true ? 0 : 1;
+    if (!Number.isInteger(port) || port < lowest || port > 65535) {
       throw new ParameterRefusal(
-        `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,
+        p.ephemeral === true
+          ? `Invalid ${name}: "${text}". Must be a port between 0 and 65535 (0: one the system chooses)`
+          : `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,
       );
     }
     return port;

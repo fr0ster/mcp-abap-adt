@@ -38,7 +38,6 @@
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
@@ -163,15 +162,6 @@ function whereItRuns():
   };
 }
 
-async function freePort(): Promise<number> {
-  return new Promise((resolve) => {
-    const s = net.createServer().listen(0, '127.0.0.1', () => {
-      const port = (s.address() as net.AddressInfo).port;
-      s.close(() => resolve(port));
-    });
-  });
-}
-
 /** The HTTP server from source, with the session trace; its trace lines kept apart. */
 async function serveHttp(systemType: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'amdp-http-handle-'));
@@ -190,8 +180,6 @@ async function serveHttp(systemType: string) {
       '',
     ].join('\n'),
   );
-  const port = await freePort();
-  const url = new URL(`http://127.0.0.1:${port}/mcp/stream/http`);
   // Guarded: the parent logs on first, the child is ready at its listening
   // line, and every session's answers are read for a credential refusal
   // (launchHttpScript); no SDK client, no timer, no polling.
@@ -201,12 +189,13 @@ async function serveHttp(systemType: string) {
       '--tsconfig',
       path.join(REPO, 'tsconfig.test.json'),
       entry,
-      `--port=${port}`,
+      // Port 0: the server announces the port the system chose.
+      '--port=0',
       '--host=127.0.0.1',
       `--system-type=${systemType}`,
     ],
     env: environment(),
-    url,
+    path: '/mcp/stream/http',
     logOn: testConnectionLogOn,
   });
   // Its stderr for a failure, the configuration banner left out.

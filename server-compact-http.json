@@ -72,7 +72,7 @@
         },
         {
           "name": "MCP_HTTP_PORT",
-          "description": "Port to listen on, 1-65535.",
+          "description": "Port to listen on, 1-65535, or 0 for a free one the system chooses (announced on the listening line).",
           "format": "number",
           "default": "3000"
         },

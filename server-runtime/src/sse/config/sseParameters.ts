@@ -55,9 +55,10 @@ export const SSE_ROWS: readonly Parameter[] = [
     env: 'MCP_SSE_PORT',
     yaml: 'sse.port',
     kind: 'port',
+    ephemeral: true,
     default: 3001,
     section: SSE,
-    help: 'Port to listen on, 1-65535 (default 3001)',
+    help: 'Port to listen on, 1-65535, or 0 for a free one the system chooses, announced on the listening line (default 3001)',
   },
   {
     key: 'ssePath',

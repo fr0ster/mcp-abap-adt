@@ -53,7 +53,6 @@
 
 import { type ChildProcess, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
-import { createServer } from 'node:net';
 import * as os from 'node:os';
 import path from 'node:path';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -605,22 +604,6 @@ export function httpReady(child: Child): Promise<string> {
   return Promise.race([listening, child.exited]);
 }
 
-/** A port free on 127.0.0.1 now: a listener on port 0, closed again. */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      probe.close(() =>
-        address !== null && typeof address === 'object'
-          ? resolve(address.port)
-          : reject(new Error('the probe listener has no port')),
-      );
-    });
-  });
-}
-
 /** A session and the child it speaks to, as a server the tests call. */
 async function served(
   session: McpSession,
@@ -690,22 +673,22 @@ export interface HttpLaunch {
 
 /** The Streamable HTTP binary of `set` for `kind`, once it listens. Not exported: unguarded. */
 async function startHttp(spec: HttpLaunch): Promise<LaunchedServer> {
-  const port = await freePort();
   const child = startChild(
     binaryPath('http', spec.set),
     [
       `--system-type=${spec.kind}`,
       DATA_TOOLS_FLAG,
       '--host=127.0.0.1',
-      `--port=${port}`,
+      // Port 0: the server announces the port the system chose.
+      '--port=0',
     ],
     childEnvironment(),
   );
   try {
-    await httpReady(child);
+    const address = await httpReady(child);
     const session = new McpSession(
       new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
+        new URL(`http://${address}/mcp/stream/http`),
         { requestInit: { headers: spec.headers } },
       ),
     );
@@ -765,15 +748,20 @@ export interface GuardedHttpServer {
  * answers are read — a refusal on any stops the child and the sessions.
  */
 export async function launchHttpScript(
-  spec: ScriptLaunch & { url: URL },
+  spec: ScriptLaunch & {
+    /** The endpoint's path; its origin is the address the listening line names. */
+    path: string;
+  },
 ): Promise<GuardedHttpServer> {
   refuseAfterMarker('a launch');
   await spec.logOn();
   refuseAfterMarker('a launch');
   const [script, ...args] = spec.argv;
   const child = startChild(script, args, spec.env, spec.cwd);
+  let url: URL;
   try {
-    await httpReady(child);
+    // Started on port 0: the server announces the port the system chose.
+    url = new URL(spec.path, `http://${await httpReady(child)}`);
   } catch (error) {
     await child.stop();
     throw error;
@@ -789,7 +777,7 @@ export async function launchHttpScript(
     session: async (headers) => {
       refuseAfterMarker('a session');
       const session = new McpSession(
-        new StreamableHTTPClientTransport(spec.url, {
+        new StreamableHTTPClientTransport(url, {
           requestInit: { headers },
         }),
       );

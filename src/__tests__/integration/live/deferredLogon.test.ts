@@ -17,7 +17,9 @@
  *
  * **The real-system cases** run only where `MCP_LIVE_DEFERRED_ENV_PATH`
  * names one HTTP `.env` of a real on-premise system (and, for the take-up,
- * `MCP_LIVE_DEFERRED_LOCK_CLASS` a class of the test user's): the system
+ * `MCP_LIVE_DEFERRED_LOCK_CLASS` a class of the test user's — the shared
+ * `ZMCP_SHR_LOCK_CLS`, kept present by `npm run shared:setup` /
+ * `shared:check`, which the case only locks and unlocks): the system
  * becomes reachable mid-session (a TCP forwarder on a port of the case's,
  * closed, then opened), and the first call of a `--restore-session` process
  * takes up the session a killed process left, unlocking with its handle.
@@ -373,12 +375,18 @@ describe('the installed bin with --deferred-logon', () => {
     }
   }
 
-  /** The real `.env` copied into `dir`, its `SAP_URL` pointed at `url`. */
+  /**
+   * The real `.env` copied into `dir`, its `SAP_URL` pointed at `url`, and the
+   * connection type stated `http`: the variable names an HTTP `.env`, and the
+   * start refuses a destination that states none.
+   */
   function realEnvTo(dir: string, url: string): string {
     const stated = dotenv.parse(readFileSync(REAL_ENV, 'utf8'));
-    const lines = Object.entries({ ...stated, SAP_URL: url }).map(
-      ([key, value]) => `${key}=${value}`,
-    );
+    const lines = Object.entries({
+      ...stated,
+      SAP_URL: url,
+      SAP_CONNECTION_TYPE: 'http',
+    }).map(([key, value]) => `${key}=${value}`);
     const file = join(dir, 'real.env');
     writeFileSync(file, `${lines.join('\n')}\n`, { mode: 0o600 });
     return file;

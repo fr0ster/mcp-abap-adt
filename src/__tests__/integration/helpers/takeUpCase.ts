@@ -55,6 +55,16 @@ function fieldsOf(
   }
 }
 
+/**
+ * An answer's text for a failure message, so a failing run logs why (the
+ * tool's error: SAP's status, message id and words), with every occurrence
+ * of `hidden` (a lock handle) replaced: no handle reaches a log.
+ */
+function answerText(content: readonly { text: string }[], hidden = ''): string {
+  const text = content.map((part) => part.text).join('');
+  return hidden === '' ? text : text.split(hidden).join('<lock handle>');
+}
+
 /** Logs off every leftover session the cleaner's destination lists. */
 async function logOffLeftovers(cleaner: TakeUpServer): Promise<void> {
   const listed = await cleaner.call('ListLeftoverSessions', {});
@@ -86,6 +96,7 @@ export async function takeUpCase(
   let cleaned = false;
   try {
     let lockHandle = '';
+    let lockAnswer = '';
     try {
       const locked = await first.call('LockObjectLow', {
         object_name: lockClass,
@@ -93,12 +104,14 @@ export async function takeUpCase(
       });
       const handle = fieldsOf(locked.content).lock_handle;
       lockHandle = !locked.isError && typeof handle === 'string' ? handle : '';
+      if (lockHandle === '') lockAnswer = answerText(locked.content);
     } finally {
       // Killed: its session and its lock are left behind.
       first.kill();
       await first.close().catch(() => undefined);
     }
-    if (lockHandle === '') throw new Error('the lock answered no lock handle');
+    if (lockHandle === '')
+      throw new Error(`the lock answered no lock handle: ${lockAnswer}`);
     second = await launches.second();
     const answer = await second.call('UnlockObjectLow', {
       object_name: lockClass,
@@ -107,7 +120,9 @@ export async function takeUpCase(
     });
     unlocked = !answer.isError;
     if (!unlocked)
-      throw new Error('the unlock with the old handle was refused');
+      throw new Error(
+        `the unlock with the old handle was refused: ${answerText(answer.content, lockHandle)}`,
+      );
   } finally {
     if (second !== undefined) {
       secondExit = await second.stop();

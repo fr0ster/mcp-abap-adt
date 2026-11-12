@@ -85,6 +85,7 @@ import {
   NO_KIND_STATED,
   sessionVariables,
 } from '../configuredSystemKind';
+import { withoutConfigBanner } from '../failureText';
 import {
   guardedServer,
   type LaunchedServer,
@@ -455,7 +456,9 @@ export function childOf(child: ChildProcess): Child {
     child.once('close', (code, signal) => {
       reject(
         new Error(
-          `the child exited (${code ?? signal}) before it was stopped:\n${captured}`,
+          // Its stderr without the configuration banner (`withoutConfigBanner`):
+          // this message reaches a failure log.
+          `the child exited (${code ?? signal}) before it was stopped:\n${withoutConfigBanner(captured)}`,
         ),
       );
     });

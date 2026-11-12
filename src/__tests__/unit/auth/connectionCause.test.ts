@@ -23,6 +23,9 @@ describe('connectionCauseOf', () => {
     'ETIMEDOUT',
     'EHOSTUNREACH',
     'ENETUNREACH',
+    // The system cut the connection while the request was written: measured on
+    // macOS, a connection reset at accept fails the request's write so.
+    'EPIPE',
     'CERT_HAS_EXPIRED',
     'SELF_SIGNED_CERT_IN_CHAIN',
   ]) {

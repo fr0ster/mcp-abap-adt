@@ -411,15 +411,19 @@ describe('no connection: every failed build answers no_connection', () => {
     const s = await start();
     try {
       const first = await s.call('GetAdtTypes');
-      assert.equal(payloadOf(first.text).error, 'no_connection');
+      assert.equal(payloadOf(first.text).error, 'no_connection', first.text);
+      // The reset is read as ECONNRESET, or — measured on macOS, about one
+      // first call in eight — as EPIPE: the request's write failed first.
+      const message = String(payloadOf(first.text).message);
       assert.equal(
-        String(payloadOf(first.text).message).includes('(ECONNRESET)'),
+        message.includes('(ECONNRESET)') || message.includes('(EPIPE)'),
         true,
+        message,
       );
       const afterFirst = gate.resets;
       assert.equal(afterFirst > 0, true);
       const second = await s.call('GetAdtTypes');
-      assert.equal(payloadOf(second.text).error, 'no_connection');
+      assert.equal(payloadOf(second.text).error, 'no_connection', second.text);
       assert.equal(gate.resets, afterFirst * 2);
       assertNoAddress(first.text);
       assertNoAddress(second.text);
@@ -433,14 +437,14 @@ describe('no connection: every failed build answers no_connection', () => {
     const s = await start();
     try {
       const single = await s.call('GetAdtTypes');
-      assert.equal(payloadOf(single.text).error, 'no_connection');
+      assert.equal(payloadOf(single.text).error, 'no_connection', single.text);
       const one = gate.resets;
       const [a, b] = await Promise.all([
         s.call('GetAdtTypes'),
         s.call('GetAdtTypes'),
       ]);
-      assert.equal(payloadOf(a.text).error, 'no_connection');
-      assert.equal(payloadOf(b.text).error, 'no_connection');
+      assert.equal(payloadOf(a.text).error, 'no_connection', a.text);
+      assert.equal(payloadOf(b.text).error, 'no_connection', b.text);
       assert.equal(gate.resets, one * 2);
     } finally {
       await s.stop();
@@ -451,7 +455,11 @@ describe('no connection: every failed build answers no_connection', () => {
     const s = await start();
     try {
       const refused = await s.call('GetAdtTypes');
-      assert.equal(payloadOf(refused.text).error, 'no_connection');
+      assert.equal(
+        payloadOf(refused.text).error,
+        'no_connection',
+        refused.text,
+      );
       await gate.forward(standIn.url);
       const from = standIn.requests.length;
       const answered = await s.call('GetAdtTypes');
@@ -566,6 +574,28 @@ describe('no_connection: one condition at a time', () => {
       const answer = await s.call();
       assert.equal(payloadOf(answer.text).error, 'no_connection');
       assertNoAddress(answer.text);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('the system cut the connection while the request was written (EPIPE): no_connection, naming EPIPE', async () => {
+    // Measured on macOS: a connection reset at accept fails the request's
+    // write with `write EPIPE` (85 of 500 first calls on Node 22, 34 on 24).
+    const thrown = Object.assign(new Error('write EPIPE'), {
+      code: 'EPIPE',
+      errno: -32,
+      syscall: 'write',
+    });
+    const s = await serverOn(throwingDestination(thrown), true);
+    try {
+      const answer = await s.call();
+      const payload = payloadOf(answer.text);
+      assert.equal(payload.error, 'no_connection', answer.text);
+      assert.equal(
+        payload.message,
+        'no connection to the SAP system: the connection failed (EPIPE); the next tool call tries again',
+      );
     } finally {
       await s.close();
     }

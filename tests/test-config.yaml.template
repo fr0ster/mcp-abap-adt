@@ -609,6 +609,20 @@ shared_dependencies:
             RETURN SELECT n, square FROM :lt_rows;
           ENDMETHOD.
         ENDCLASS.
+    # Locked and unlocked by the deferred-logon live suite's take-up case
+    # (MCP_LIVE_DEFERRED_LOCK_CLASS=ZMCP_SHR_LOCK_CLS,
+    # src/__tests__/integration/live/deferredLogon.test.ts); never changed,
+    # used by no other test.
+    - name: "ZMCP_SHR_LOCK_CLS"
+      description: "Shared class the deferred-logon take-up locks and unlocks"
+      available_in: ["onprem"]
+      source: |
+        CLASS zmcp_shr_lock_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+        ENDCLASS.
+
+        CLASS zmcp_shr_lock_cls IMPLEMENTATION.
+        ENDCLASS.
 
   function_groups:
     - name: "ZMCP_BLD_SHR_FGR"

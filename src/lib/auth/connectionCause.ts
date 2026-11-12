@@ -3,8 +3,9 @@
  * stdio start line, and a tool call's `no_connection` answer.
  *
  * Only a listed code is named — Node's network codes a connection may fail
- * with (the system is not there, refused or cut the connection, its name
- * does not resolve, no route reaches it) and the TLS failure codes
+ * with (the system is not there, refused or cut the connection — `EPIPE`
+ * when it cut it while the request was written, measured on macOS —, its
+ * name does not resolve, no route reaches it) and the TLS failure codes
  * interfaces-auth allowlists. Never the error's message, the URL or the
  * host.
  */
@@ -15,6 +16,7 @@ import { child } from '../xml/tree';
 const NETWORK_CODES = [
   'ECONNREFUSED',
   'ECONNRESET',
+  'EPIPE',
   'ENOTFOUND',
   'EAI_AGAIN',
   'ETIMEDOUT',

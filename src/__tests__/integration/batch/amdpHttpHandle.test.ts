@@ -58,6 +58,7 @@ import {
   loadTestConfig,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
+import { stderrTail } from '../helpers/failureText';
 import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { skipRunningTest } from '../helpers/runningTest';
@@ -208,25 +209,12 @@ async function serveHttp(systemType: string) {
     url,
     logOn: testConnectionLogOn,
   });
-  const traced: string[] = [];
-  const tail: string[] = [];
-  let pending = '';
-  const keep = (text: string): void => {
-    const lines = (pending + text).split('\n');
-    pending = lines.pop() ?? '';
-    for (const line of lines)
-      if (line.startsWith('session-trace\t')) traced.push(line);
-      else tail.push(line);
-    if (tail.length > 200) tail.splice(0, tail.length - 200);
-  };
-  keep(server.child.stderr());
-  server.child.process.stderr?.on('data', (chunk: Buffer | string) =>
-    keep(chunk.toString()),
-  );
+  // Its stderr for a failure, the configuration banner left out.
+  const kept = stderrTail(server.child);
   return {
     session: (headers: Record<string, string>) => server.session(headers),
-    trace: () => [...traced],
-    tail: () => tail.join('\n'),
+    trace: () => kept.trace(),
+    tail: () => kept.text(),
     /** SIGTERM (tsx forwards it to the server): the graceful shutdown; the exit code. */
     stop: async (): Promise<number | null> => {
       const code = await server.close();

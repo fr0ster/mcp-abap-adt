@@ -48,8 +48,9 @@
  *    the second one on either transport (measured 2026-10-19): over HTTP a
  *    live session's cookie authenticates it, and a session that ended is
  *    answered `400` by the ICM (`ICMENOSESSION`) for the stateful request
- *    before any logon; over RFC a conversation logs on once and asks no
- *    password again. So the case measures the second `stopListener` failing
+ *    before any logon, which the connection (22) reads as the session gone:
+ *    its own `ADT_SESSION_REPLACED`, nothing resent (measured 2026-11-12);
+ *    over RFC a conversation logs on once and asks no password again. So the case measures the second `stopListener` failing
  *    for the ended session (HTTP) or answered with the password wrong (RFC),
  *    and that the stop then answers, sends nothing more, asks nothing of the
  *    credential and holds nothing. Then the held poll is released.
@@ -72,7 +73,10 @@ import { randomBytes } from 'node:crypto';
 import { describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type {
   AuthOutcome,
   IAuthProvider,
@@ -648,12 +652,13 @@ async function secondStopListenerOn(kind: Kind, testCase: any): Promise<void> {
     assert.ok(second !== undefined);
     if (kind === 'onprem-http') {
       // The ended session's answer, not the credential's: see the header.
-      // Measured: the ICM answers `400` `ICMENOSESSION`; any other failure
-      // (a credential refusal above all) is not what this case measures.
+      // Measured (2026-11-12): the ICM's `400` `ICMENOSESSION` reaches the
+      // caller as the connection's own verdict on it, the session gone
+      // (`ADT_SESSION_REPLACED`); any other failure (a credential refusal
+      // above all) is not what this case measures.
       assert.equal(second?.outcome.answered, undefined);
       assert.equal(second?.refused, false);
-      assert.equal(second?.outcome.status, 400);
-      assert.ok(JSON.stringify(second?.outcome).includes('ICMENOSESSION'));
+      assert.equal(second?.outcome.code, ADT_SESSION_ERROR.SESSION_REPLACED);
     } else {
       assert.equal(second?.outcome.answered, true);
     }

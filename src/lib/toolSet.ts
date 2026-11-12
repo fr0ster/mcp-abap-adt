@@ -44,9 +44,13 @@
  */
 
 import './instance.js';
+import type { IAccessChecks } from './access/accessChecks';
+import type { AccessRestrictions } from './access/accessLists';
 import { COMPACT_READ_ONLY_TOOL_NAMES } from './access/compactReadOnlyTools';
 import type { DeniedActions } from './access/deniedActions';
-import { withoutDenied } from './access/withoutDenied';
+import { accessChecksFor } from './access/packageTreeAccessChecks';
+import { accessStartLine } from './access/startLine';
+import { unmatchedEntries, withoutDenied } from './access/withoutDenied';
 
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactBatchHandlersGroup } from './compact/batch/group';
@@ -580,4 +584,44 @@ export function readOnlyToolNames(): ReadonlySet<string> {
     }
   }
   return names;
+}
+
+/** What a launcher serves under the restrictions its start read. */
+export interface RestrictedStart {
+  /** `registryOf` with the denied actions applied. */
+  readonly registry: CompositeHandlersRegistry;
+  /** The strategy for the call-time lists; `undefined` when none is configured. */
+  readonly accessChecks: IAccessChecks | undefined;
+  /** The start line (`accessStartLine`), written once per process. */
+  readonly startLine: string;
+}
+
+/**
+ * The registry, the strategy and the start line of a launcher serving
+ * `toolSet` on `transport` under `restrictions` (none: as without them).
+ */
+export function restrictedStart(
+  toolSet: ToolSet,
+  transport: ServedTransport,
+  served: ServedTools,
+  restrictions: AccessRestrictions = { deniedActions: [], lists: {} },
+): RestrictedStart {
+  const unmatched = unmatchedEntries(
+    toolSet.groups(noConnectionContext(), transport, served),
+    restrictions.deniedActions,
+  );
+  const tree =
+    restrictions.lists.allowedPackages?.some(
+      (entry) => entry.kind === 'subtree',
+    ) === true;
+  return {
+    registry: registryOf(
+      toolSet,
+      transport,
+      served,
+      restrictions.deniedActions,
+    ),
+    accessChecks: accessChecksFor(restrictions.lists),
+    startLine: accessStartLine(restrictions, unmatched, tree),
+  };
 }

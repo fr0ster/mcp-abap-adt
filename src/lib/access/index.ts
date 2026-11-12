@@ -27,4 +27,5 @@ export {
   accessChecksFor,
   packageTreeAccessChecks,
 } from './packageTreeAccessChecks.js';
+export { accessStartLine } from './startLine.js';
 export { unmatchedEntries, withoutDenied } from './withoutDenied.js';

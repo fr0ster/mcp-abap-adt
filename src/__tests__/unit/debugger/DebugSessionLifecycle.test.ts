@@ -206,6 +206,34 @@ describe('DebugSession lifecycle', () => {
     expect(session.failures()).toEqual([]);
   });
 
+  it('a caught debuggee whose release finds its connection spent is dropped without a request, reported, and nothing stays owed', async () => {
+    const { session, world } = await started();
+    world.stepAnswers.push(
+      refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionError: 'ADT_SESSION_REPLACED',
+      }),
+    );
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(LISTEN_CATCH());
+      return okResponse(undefined);
+    };
+    const notes = await session.stop();
+    const attaching = world.opened[world.opened.length - 1];
+    expect(world.dropped).toEqual([attaching]);
+    expect(world.closed).not.toContain(attaching);
+    expect(notes).toEqual([
+      expect.objectContaining({
+        step: expect.stringMatching(
+          /^release a debuggee caught during the stop \(/,
+        ),
+        cleanup: { message: expect.stringContaining('dropped') },
+      }),
+    ]);
+    expect(session.holdsState()).toBe(false);
+  });
+
   it('a caught debuggee whose release fails again stays owed, and is named by each stop', async () => {
     const { session, world } = await started();
     world.override.step = async () => refusedResponse('release refused');
@@ -553,6 +581,31 @@ describe('DebugSession lifecycle', () => {
       expect(world.closed).toContain(attaching);
       expect(session.holdsState()).toBe(false);
     });
+  });
+
+  it('an attach overtaken by a newer generation whose release finds its connection spent: dropped without a request, nothing owed', async () => {
+    const world = fakeWorld();
+    const attach = deferred<any>();
+    world.attachAnswers.push(() => attach.promise);
+    const { session } = await started(undefined, IDS, world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.some((c) => c.startsWith('attach:')));
+    (session as any).generation++; // the listener moved on while the attach ran
+    world.override.step = async () =>
+      refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionLost: 'ADT_SESSION_REPLACED',
+      });
+    attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(0);
+    const attaching = world.opened[world.opened.length - 1];
+    expect(world.dropped).toEqual([attaching]);
+    expect(world.closed).not.toContain(attaching);
+    expect(session.failures()).toEqual([]);
+    delete world.override.step;
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(session.holdsState()).toBe(false);
   });
 
   it('stated ids: a start that failed before reconciling reconciles on the next start', async () => {

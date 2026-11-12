@@ -26,7 +26,6 @@ import {
   readExceptionSubType,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
-  IAdtError,
   IAdtResponse,
   IDebuggeeIds,
   IDebuggerBreakpoint,
@@ -36,10 +35,7 @@ import type {
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
-import {
-  ADT_SESSION_ERROR,
-  type IAbapConnection,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type AdtHeadersContext,
@@ -51,6 +47,7 @@ import {
   isCredentialPayload,
   unlessCredentialFailure,
 } from '../answer';
+import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
   carryingPayload,
@@ -289,18 +286,13 @@ export const STOP_DROPPED_WORDS =
   "the debuggee's connection had lost its SAP session: the stop was dropped without a request, and SAP's logoff of that session freed what it held";
 
 /**
- * Whether a failed answer says its connection is spent: the connection's own
- * session error, `ADT_NOT_CONNECTED` or `ADT_SESSION_REPLACED`, or SAP's
- * answer marked `sessionLost` — read from the typed fields alone, never from
- * the message.
+ * A release's outcome: released; its connection spent (dropped without a
+ * request, the failed release a note); or failed, kept for the next stop.
  */
-function spentBy(error: IAdtError): boolean {
-  return (
-    error.sessionLost !== undefined ||
-    error.sessionError === ADT_SESSION_ERROR.NOT_CONNECTED ||
-    error.sessionError === ADT_SESSION_ERROR.SESSION_REPLACED
-  );
-}
+type ReleaseOutcome =
+  | { kind: 'released' }
+  | { kind: 'spent'; note?: DebugFailure }
+  | { kind: 'failed'; failure: DebugFailure };
 
 interface Listener {
   connection: IAbapConnection;
@@ -1168,12 +1160,15 @@ export class DebugSession<O = unknown> {
       if (generation !== this.generation) {
         // Overtaken while attaching: released at once. A release that fails is recorded,
         // and the debuggee is kept with its connection for the next stop to release.
-        const notReleased = await this.release(dbg, 'the debuggee');
-        if (notReleased) {
-          this.cleanupFailures.push(notReleased);
+        // A connection found spent is dropped without a request: its SAP
+        // session is gone, and SAP's logoff freed the debuggee; nothing is owed.
+        const outcome = await this.release(dbg, 'the debuggee');
+        if (outcome.kind === 'failed') {
+          this.cleanupFailures.push(outcome.failure);
           this.owed.add({ connection, debugger: dbg, what: 'the debuggee' });
-        } else
-          await this.closeOrRecord(connection, "the debuggee's connection");
+        } else if (outcome.kind === 'spent')
+          this.ports.dropConnection(connection);
+        else await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
       }
       const stack = await dbg.getStack();
@@ -1218,14 +1213,32 @@ export class DebugSession<O = unknown> {
   }
 
   /** Lets an attached debuggee run on. Never throws: answers why it was not released. */
-  private async release(
-    dbg: Debugger,
-    what: string,
-  ): Promise<DebugFailure | undefined> {
+  private async release(dbg: Debugger, what: string): Promise<ReleaseOutcome> {
     const released = await dbg
       .step('stepContinue', { analyse: analyseDebuggeeEnd })
       .catch(asFailure);
-    return released.ok ? undefined : failedEntry(released, `release ${what}`);
+    if (released.ok)
+      return released.getResult().sessionLost === undefined
+        ? { kind: 'released' }
+        : { kind: 'spent' };
+    const entry = failedEntry(released, `release ${what}`);
+    // Its connection spent (the owner's decision): the SAP session is gone,
+    // and SAP's logoff of it freed what it held — reported, no debt.
+    return spentBy(released.getError())
+      ? {
+          kind: 'spent',
+          note: { ...entry, cleanup: { message: STOP_DROPPED_WORDS } },
+        }
+      : { kind: 'failed', failure: entry };
+  }
+
+  /** A spent release: its connection taken out without a request, its note kept. */
+  private dropSpent(
+    connection: IAbapConnection,
+    outcome: { kind: 'spent'; note?: DebugFailure },
+  ): void {
+    this.ports.dropConnection(connection);
+    if (outcome.note !== undefined) this.cleanupNotes.push(outcome.note);
   }
 
   /**
@@ -1255,10 +1268,14 @@ export class DebugSession<O = unknown> {
         .catch(asFailure);
       if (!attached.ok) failures.push(failedEntry(attached, `attach ${what}`));
       else {
-        const notReleased = await this.release(dbg, what);
-        if (notReleased) {
+        const outcome = await this.release(dbg, what);
+        if (outcome.kind === 'spent') {
+          this.dropSpent(connection, outcome);
+          return;
+        }
+        if (outcome.kind === 'failed') {
           // Kept with the session that attached it: the next stop retries the release there.
-          failures.push(notReleased);
+          failures.push(outcome.failure);
           this.owed.add({ connection, debugger: dbg, what });
           return;
         }
@@ -2425,9 +2442,14 @@ export class DebugSession<O = unknown> {
       for (const owed of owedBefore) {
         if (skipped(`release ${owed.what}`)) continue;
         if (keptHeld(`release ${owed.what}`)) continue;
-        const notReleased = await this.release(owed.debugger, owed.what);
-        if (notReleased) {
-          failures.push(notReleased); // kept: a later stop retries
+        const outcome = await this.release(owed.debugger, owed.what);
+        if (outcome.kind === 'failed') {
+          failures.push(outcome.failure); // kept: a later stop retries
+          continue;
+        }
+        if (outcome.kind === 'spent') {
+          this.owed.delete(owed);
+          this.dropSpent(owed.connection, outcome);
           continue;
         }
         // Released: only its connection may be left, and a retry must not release twice.
@@ -2457,10 +2479,8 @@ export class DebugSession<O = unknown> {
         !skipped('release the debuggee') &&
         !keptHeld('release the debuggee')
       ) {
-        const released = await stop.debugger
-          .step('stepContinue', { analyse: analyseDebuggeeEnd })
-          .catch(asFailure);
-        if (released.ok && released.getResult().sessionLost === undefined) {
+        const outcome = await this.release(stop.debugger, 'the debuggee');
+        if (outcome.kind === 'released') {
           // Released: only its connection may be left, and a retry must not release twice.
           this.current = undefined;
           await this.closeOrKeep(
@@ -2468,21 +2488,13 @@ export class DebugSession<O = unknown> {
             "the debuggee's connection",
             failures,
           );
-        } else if (released.ok || spentBy(released.getError())) {
-          // Its connection is spent (the owner's decision): the SAP session
-          // is gone, and SAP's logoff of it freed what it held. The stop is
-          // dropped without a request — no logoff on the spent connection —
-          // and a failed release is reported, no debt.
+        } else if (outcome.kind === 'spent') {
+          // Its connection is spent: the stop is dropped without a request —
+          // no logoff on the spent connection.
           this.current = undefined;
-          this.ports.dropConnection(stop.connection);
-          if (!released.ok) {
-            this.cleanupNotes.push({
-              ...failedEntry(released, 'release the debuggee'),
-              cleanup: { message: STOP_DROPPED_WORDS },
-            });
-          }
+          this.dropSpent(stop.connection, outcome);
         } else {
-          failures.push(failedEntry(released, 'release the debuggee')); // kept: a later stop retries
+          failures.push(outcome.failure); // kept: a later stop retries
         }
       }
       // The one-request path's listener: its open listen answers once the

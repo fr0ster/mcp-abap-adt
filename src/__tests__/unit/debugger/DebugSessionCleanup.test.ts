@@ -231,6 +231,37 @@ describe('the cleanup', () => {
     expect(session.holdsState()).toBe(false);
   });
 
+  it('a release an earlier stop owed whose connection is spent is dropped without a request, reported, and owed no more', async () => {
+    const world = fakeWorld();
+    const attach = deferred<any>();
+    world.attachAnswers.push(() => attach.promise);
+    const { session } = await armed(world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.some((c) => c.startsWith('attach:')));
+    (session as any).generation++; // the listener moved on while the attach ran
+    world.override.step = async () => refusedResponse('work process busy');
+    attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(0);
+    // Owed now; its connection is spent by the time the stop releases it.
+    world.override.step = async () =>
+      refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionError: 'ADT_NOT_CONNECTED',
+      });
+    const closedBefore = world.closed.length;
+    const notes = await session.stop();
+    expect(world.dropped).toHaveLength(1);
+    expect(world.closed.slice(closedBefore)).not.toContain(world.dropped[0]);
+    expect(notes).toEqual([
+      expect.objectContaining({
+        cleanup: { message: expect.stringContaining('dropped') },
+      }),
+    ]);
+    expect(session.failures()).toEqual([]);
+    expect(session.holdsState()).toBe(false);
+  });
+
   it('a failed stopListener whose deletes by id all succeeded: the held debuggee is released, after the deletes', async () => {
     const world = fakeWorld();
     const { session } = await armed(world);

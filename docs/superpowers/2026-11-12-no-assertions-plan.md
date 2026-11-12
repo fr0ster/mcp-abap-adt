@@ -23,12 +23,27 @@ work (§7).
   revert. Each step below names its deliberate break.
 - **A defect the types reveal** is fixed in the step that reveals it, with a failing-first
   test, and named in the commit.
-- **Green before the next step:**
-  - lint, build and test:check;
-  - the root `npm test`;
-  - every package's `lint:check` and `test:check`;
-  - CI's own step list run locally, with the worktree's `tests/test-config.yaml` set aside;
-  - after each push, the PR's checks (`gh pr checks`).
+- **Green before the next step:** each repository's CI step list, read from its own workflow
+  and run locally, then the PR's checks after each push (`gh pr checks`).
+  - **This server:**
+    - `npm run lint:check`, `npm run build`, `npm run test:check`, `npm test`,
+      `npm run test:install`;
+    - `lint:check` of each of the 17 packages;
+    - `test:check` of the six that have one (background-runs-memory, http, responsible-rules,
+      server-runtime, server, sse);
+    - `npm audit`.
+
+    The worktree's `tests/test-config.yaml` is set aside for the run. The compact packages have
+    no `test:check`: their types are checked by the root `test:check`.
+  - **mcp-abap-adt-interfaces:** `npm run check` (lint, `test:check`, surface, graph) and
+    `npm run build`.
+  - **mcp-abap-adt-clients:** `npm run check`, `npm run build`, `npm test` (unit). adt-strategies
+    has no `lint:check` / `test:check` of its own; it is covered by the root `check`.
+  - **mcp-abap-connection:** `npm run lint:check`, `npm run build`, `npm test` and
+    `npm run check:docs`.
+- **Measurements made while a step runs** (the option's error list, the unknown inventory) are
+  hand scripts on the compiler API, run with `node` from the scratchpad and deleted after.
+  They are never committed and never run through `npx`.
 - **Commits** are made by path, ending with the two trailers:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` and
   `Claude-Session: https://claude.ai/code/session_013FwzVzuPQdYVh3bHZmipzj`. No
@@ -61,8 +76,14 @@ Releases already moving: interfaces-adt 27.3.0 is published. adt-clients 45.4.0
   The existing `connectionCapabilities.ts` typecheck loses its `as unknown as`.
 - **Deliberate break:** put the type parameters back, and the non-generic-conformance typecheck
   goes red.
-- **Docs:** the package's CHANGELOG 5.0.0 entry, and a MIGRATION-5.0 note saying what a caller
-  that passed type arguments changes.
+- **Docs:**
+  - the package's CHANGELOG 5.0.0 entry;
+  - a MIGRATION-5.0 note saying what a caller that passed type arguments changes;
+  - its README (line 14 recommends `makeAdtRequest<string>(…)`, which v5 removes).
+  - Before each upstream PR is ready, every README, guide and example of the three repositories
+    is searched for `makeAdtRequest<` and the widened fields, and updated. Known:
+    connection's `README.md:928` and `docs/USAGE.md:279` / `:998`. Historical MIGRATION notes
+    stay as they are.
 
 ### U2. interfaces-adt 27.4.0 (minor) — same repository, same PR as U1
 
@@ -106,8 +127,13 @@ Branched after 45.4.0 is merged and published.
 
 - **Change.** The range of interfaces-adt-connection moves to `^5.0.0`. The generic
   `makeAdtRequest` keeps its signature (spec §2).
-- **Tests first:** a typecheck that the connector is an `IAbapConnection` of v5.
-- **Deliberate break:** pin the range back to 4, and the typecheck goes red.
+- **Tests first,** typechecks:
+  - the connector is assignable to v5's `IAbapConnection` (compatibility);
+  - a call `makeAdtRequest<string>(…)` on a value typed as the installed `IAbapConnection` is
+    refused, marked `@ts-expect-error`. That holds only against v5, so it distinguishes the
+    dependency.
+- **Deliberate break:** pin the range back to 4. The `@ts-expect-error` is then unused, and the
+  typecheck goes red.
 - **Docs:** CHANGELOG 23.1.0. **Publish order:** after U1; independent of U2 and U3.
 
 ## S. The server (PR #346)
@@ -120,30 +146,42 @@ Branched after 45.4.0 is merged and published.
   - each package's `src`, `bin`, `scripts` and `tools`;
   - `.ts`, `.mts`, `.cts`, `.js`, `.mjs` and `.cjs`;
   - outside tests, fixtures and docs.
-- **Tests first:** new refused fixtures, each laid out as the real paths are:
-  - a `@ts-expect-error` directive in a `.mjs` under `tools`;
-  - a `biome-ignore` directive in a `.js` under a package `bin`;
-  - an assertion in a `.ts` under a package `scripts`.
-
-  Each must be reported under its rule; the clean fixture must not be.
-- **Deliberate break:** drop `tools` from the scan's set, and the fixture test goes red.
+- **Tests first:**
+  - `productionSources()` takes a root, defaulting to the repository, so discovery can run over
+    a fixture tree.
+  - A fixture tree laid out as a repository, with:
+    - a `@ts-expect-error` directive in a `.mjs` under `tools`;
+    - a `biome-ignore` directive in a `.mjs` under a package `bin`;
+    - an assertion in a `.ts` under a package `scripts`;
+    - a clean file.
+  - A test runs discovery and the scan over it: each refused file must be found by discovery
+    and reported under its rule, and the clean one must not be.
+- **Deliberate break:** drop `tools` (or `bin`) from discovery. The fixture is no longer found,
+  and the test goes red, which a direct `scanFile` test could not show.
 - **Acceptance:** the scan finds 0 escapes in the new places (Measured 0 today).
 
 ### S2. `exactOptionalPropertyTypes` (spec §3; order step 3)
 
-While S2 runs, the option is measured with a compiler-API script in the scratchpad (not
-committed). The committed configs keep it off until S2f, so every commit stays green.
+- **The exact gate.** `tsconfig.exact.json` extends the root config with the option on, and
+  includes only the files already converted, plus the `__typechecks__/exact/` typechecks. It
+  is run by a new script, `npm run test:check:exact`, which joins the build's checks. Each
+  batch below adds its files to it, so a converted file cannot regress.
+- The full measurement of what is left is a scratchpad hand script (see the rules). The other
+  configs keep the option off until S2f, so every commit stays green.
 
 - **S2a. Handler arguments from the schema.**
   - The 247 hand-declared `…Args` types that are a handler's `args` become `z.output<typeof …>`
     of their schema, by handler directory.
   - A key a handler reads that its schema does not declare is declared in the schema (spec §3,
     as in the earlier spec).
-  - **Tests first:** the listed-schema fixtures and surface fixtures, unchanged. A typecheck that
-    a handler whose `args` type differs from its schema's output is refused at registration
-    (`defineTool`).
-  - **Deliberate break:** declare one `args` type by hand with `prop?: T`, and the typecheck (run
-    under the option) goes red.
+  - **Tests first:**
+    - the listed-schema fixtures and surface fixtures, unchanged;
+    - a positive pairing per converted directory in `__typechecks__/exact/`: the real
+      `TOOL_DEFINITION` and handler, for example `defineTool(ActivateDomain.TOOL_DEFINITION,
+      handleActivateDomain)`, compile under the option.
+    - The existing negative test (`defineTool.test.ts`) stays.
+  - **Deliberate break:** restore `ActivateDomainArgs` with `detail?: …`, and its pairing fails
+    under `test:check:exact`.
   - **Acceptance:** the measurement shows the 223 TS2345 handler-group errors gone.
 - **S2b. The MCP SDK transport adapter** (spec §3), `SdkTransport implements Transport`, in
   server-runtime.
@@ -165,9 +203,23 @@ committed). The committed configs keep it off until S2f, so every commit stays g
   - **Tests first:** a typecheck per widened exported contract, under the option, passing
     `undefined`.
   - **Deliberate break:** narrow one back, and it goes red.
-- **S2d. The rest, by directory,** as the measurement lists it. Each site is narrowed in plain
-  code or typed by its contract. A `T | undefined` that reached a callee assuming `T` is a
-  revealed defect: a failing-first test first.
+- **S2d. The rest, in batches,** by the measured counts of the root project, then the packages.
+  1. `src/lib/debugger` (50) and `src/lib/compact/debug` (30 + 9);
+  2. `src/handlers/common` (50);
+  3. `src/handlers/system` (31) and `src/handlers/unit_test` (27);
+  4. `src/lib/strategies` (25);
+  5. the remaining `src/handlers/*` directories;
+  6. the rest of `src/lib` and `src/embeddable`;
+  7. server-runtime (37);
+  8. compact-readonly-entries (56), compact-modify (14) and responsible-rules (1).
+
+  For each batch:
+  - its files join `tsconfig.exact.json`;
+  - each site is narrowed in plain code or typed by its contract;
+  - a `T | undefined` that reached a callee assuming `T` is a revealed defect, with a
+    failing-first test first.
+  - **Deliberate break per batch:** pass one possibly absent value on again in the batch, and
+    `test:check:exact` goes red.
 - **S2e. Sites that meet upstream contracts** (the 126 sites against interfaces-adt and
   adt-clients, and the 102 TS2769 among them). These wait for U2 and U3's publication and are
   done in S5.
@@ -177,14 +229,23 @@ committed). The committed configs keep it off until S2f, so every commit stays g
   - In every `tsconfig.test.json` and in `tsconfig.node-test.json`. Test files' errors under
     the option (Measured: 247 in the root test project) are fixed in this step, with no
     config overriding the option.
-  - This step comes after S5, so the upstream sites compile.
+  - **When.** S2f is completed together with S5, as soon as U2 to U4 are published: the
+    upstream sites must compile. The spec lets step 3's upstream sites wait (spec §7). If the
+    releases are out before S3, S2f and S5 come before S3; otherwise S3 and S4 go on, and S2f
+    and S5 follow the publication.
+  - `tsconfig.exact.json` and `test:check:exact` go once every config carries the option.
+  - **The RFC hole.** A typecheck in the production project assigns `{ …rfcLogon, url:
+    undefined }` to `ISapRfcLogon`, marked `@ts-expect-error`.
+    - **Deliberate break:** take the option out of the root config. The assignment then
+      compiles, the directive is unused, and `test:check` goes red.
   - **The RFC construction scan** (`configConstructionScan.ts`) is re-measured under the
     production option: its "merged `never & undefined`" limit is either removed with its
     fixture, or kept and named.
 
 ### S3. The `unknown` audit (spec §4; order step 4)
 
-- **S3a. The provenance script as a source test** (`unknownSources.test.ts`). It runs over the
+- **S3a. The provenance script as a source test** (`unknownSources.test.ts`), written first
+  with its fixtures. It runs over the
   code as it is, with the language service and the type checker, following sources through
   `unknown` variables and parameters. It recognises:
   - boundaries, by their origin: `catch`, `JSON.parse`, the XML parser, `process.env`, file
@@ -205,6 +266,23 @@ committed). The committed configs keep it off until S2f, so every commit stays g
   - properties checked by their writers.
 
   Each retyping that changes behaviour gets a failing-first test.
+- **S3b in batches,** each verified by the hand-script run of the provenance script (its list
+  shrinks by the batch's sites):
+  1. the 33 typed parameters (the appendix);
+  2. the mixed parameters in `src/lib/strategies` (14);
+  3. `src/lib/xml` (8) and `src/lib/debugger` (7);
+  4. `src/lib/batch` (6) and `src/lib/backgroundRuns` (5);
+  5. `src/handlers/unit_test` (5), `src/handlers/system` (4), `src/handlers/common` (4) and the
+     rest;
+  6. the variables and returns of the appendix (6 typed, 5 boundary);
+  7. the 64 properties, by owner type;
+  8. the other projects' sites.
+
+  **Deliberate break per batch:** revert one retyped site of the batch to `unknown` with its
+  hand narrowing; the script lists it again.
+- **S3a's source test is added last in S3,** once nothing is refused. Its deliberate break (the
+  laundered fixture) is checked then, and again with one site of S3b reverted in the real
+  code.
 - **Acceptance:** the source test refuses nothing.
 
 ### S4. The test infrastructure's `any` (spec §5; order step 5)
@@ -215,7 +293,9 @@ committed). The committed configs keep it off until S2f, so every commit stays g
   `recordingConnection` (Measured: 80 + 22 `any`).
 - **Replacements:**
   - parsed YAML through a zod schema of the test config;
-  - a fake `IAbapConnection` that implements it (non-generic after S5);
+  - a fake `IAbapConnection` that implements it. Until S5 it implements v4's generic
+    `makeAdtRequest`, and the assertion that takes is allowed in tests (spec §5: only `any` goes
+    there). In S5 it becomes the plain non-generic method and the assertion goes;
   - fake clients that implement their contract, or the `Pick` the code under test takes;
   - one typed `HandlerContext` builder;
   - testers taking `z.output` of the handler they drive.

@@ -829,7 +829,6 @@ async function launchStdio(
     config.accessRestrictions,
   );
   const handlersRegistry = restricted.registry;
-  deps.stderr(restricted.startLine);
 
   // The browser of a login, mapped by the platform; a choice that
   // cannot be served stops the start before anything is read.
@@ -953,6 +952,8 @@ async function launchStdio(
     );
   }
 
+  // The start line, once the start's checks passed.
+  deps.stderr(restricted.startLine);
   const server = new StdioServer(
     handlersRegistry,
     destination ? factory : undefined,

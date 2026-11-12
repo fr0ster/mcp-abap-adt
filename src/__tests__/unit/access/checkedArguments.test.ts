@@ -7,6 +7,10 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactRoSet } from '../../../../compact-ro/src/launcher';
 import { readOnlyToolSet as coreRoSet } from '../../../../core-ro/src/launcher';
@@ -16,10 +20,12 @@ import {
   checkedArgumentsOf,
   isPackageCreate,
 } from '../../../lib/access/checkedArguments';
+import { COMPACT_READ_ONLY_TOOL_NAMES } from '../../../lib/access/compactReadOnlyTools';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import {
   fullToolSet,
+  readOnlyToolNames,
   type ServedTransport,
   type ToolSet,
 } from '../../../lib/toolSet';
@@ -328,5 +334,20 @@ describe('accessCallOf', () => {
       accessCallOf('CreateClass', checked, { package_name: '  ' }),
       undefined,
     );
+  });
+});
+
+describe('readOnlyToolNames', () => {
+  it('lists the compact read-only half and the data tool as their builders do', () => {
+    assert.deepEqual(
+      [...COMPACT_READ_ONLY_TOOL_NAMES].sort(),
+      [...compactReadOnlyEntries(), ...compactDataEntries()]
+        .map((entry) => entry.toolDefinition.name)
+        .sort(),
+    );
+  });
+
+  it('is exactly the tools the core-ro and compact-ro sets serve', () => {
+    assert.deepEqual([...readOnlyToolNames()].sort(), [...READ_ONLY].sort());
   });
 });

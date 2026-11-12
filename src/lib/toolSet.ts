@@ -44,6 +44,7 @@
  */
 
 import './instance.js';
+import { COMPACT_READ_ONLY_TOOL_NAMES } from './access/compactReadOnlyTools';
 import type { DeniedActions } from './access/deniedActions';
 import { withoutDenied } from './access/withoutDenied';
 
@@ -550,3 +551,33 @@ export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
 }
 
 export type { CompactEntryBuilder } from './compact/group';
+
+/**
+ * The tool names the `-ro` twins serve — the core-ro set's and the
+ * compact-ro set's, on every transport, the data tools included: the tools
+ * whose package and request arguments are not checked (spec §3.3). The
+ * compact read-only half comes from a constant (`COMPACT_READ_ONLY_TOOL_NAMES`):
+ * lib does not import the package that builds it.
+ */
+export function readOnlyToolNames(): ReadonlySet<string> {
+  const served: ServedTools = { dataTools: true };
+  const names = new Set<string>(COMPACT_READ_ONLY_TOOL_NAMES);
+  const compactReadOnly = compactReadOnlyToolSetOf({
+    readOnly: () => [],
+    data: () => [],
+  });
+  for (const set of [fullReadOnlyToolSet, compactReadOnly]) {
+    for (const transport of ['stdio', 'http', 'sse'] as const) {
+      for (const group of set.groups(
+        noConnectionContext(),
+        transport,
+        served,
+      )) {
+        for (const entry of group.getHandlers()) {
+          names.add(entry.toolDefinition.name);
+        }
+      }
+    }
+  }
+  return names;
+}

@@ -622,7 +622,7 @@ function throwingAt(
 ): RecordingConnection {
   return {
     ...inner,
-    async makeAdtRequest<T = unknown, D = unknown>(
+    async makeAdtRequest(
       options: Parameters<RecordingConnection['makeAdtRequest']>[0],
     ) {
       if (options.url === url) {
@@ -631,7 +631,7 @@ function throwingAt(
           response: { ...REFUSED, headers: {} },
         });
       }
-      return inner.makeAdtRequest<T, D>(options);
+      return inner.makeAdtRequest(options);
     },
   };
 }

@@ -91,9 +91,8 @@ function plainOver(inner: IAbapConnection): IAbapConnection {
     getBaseUrl: () => inner.getBaseUrl(),
     getSessionId: () => inner.getSessionId(),
     setSessionType: (type) => inner.setSessionType(type),
-    makeAdtRequest: <T = unknown, D = unknown>(
-      options: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> => inner.makeAdtRequest<T, D>(options),
+    makeAdtRequest: (options: IAbapRequestOptions): Promise<IAdtWireResponse> =>
+      inner.makeAdtRequest(options),
   };
 }
 

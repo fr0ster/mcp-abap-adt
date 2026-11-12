@@ -21,54 +21,13 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
 import { REPO, rel } from './helpers/failureScan';
 import { productionSources } from './helpers/regexScan';
 import {
-  type Escape,
   type EscapeRule,
   productionDirectories,
   scanFile,
 } from './helpers/typeEscapeScan';
-
-/**
- * The assertions that cannot go without a change in another package — the
- * only escapes allowed, each by file, line and exact text. The list may only
- * shrink: an entry no longer found fails, and so does any other escape, in
- * these files too.
- *
- * Upstream change that removes all three:
- * `IAbapConnection.makeAdtRequest<T = unknown, D = unknown>(…):
- * Promise<IAdtWireResponse<T, D>>` (`@mcp-abap-adt/interfaces-adt-connection`)
- * lets the caller choose `T`, so a connection that records or forwards a
- * request holds only `IAdtWireResponse<unknown>` and must assert the caller's
- * `T`. Once interfaces-adt-connection answers `data: unknown` (the caller reads
- * it) and adt-clients and connection follow, published first, these go — and
- * with them Biome's `noUnsafeTypeAssertion` override for their files in
- * `biome.json`, which must name exactly the files listed here.
- */
-const BLOCKED: ReadonlyArray<{ where: string; text: string }> = [
-  {
-    where: 'src/lib/batch/phases.ts:178',
-    text: 'correcting.record(request) as Promise<IAdtWireResponse<T, D>>',
-  },
-  {
-    where: 'src/lib/batch/phases.ts:181',
-    text: 'record(request) as Promise<IAdtWireResponse<T, D>>',
-  },
-  {
-    where: 'src/handlers/system/readonly/handleRuntimeListFeeds.ts:530',
-    text: 'ask(request) as Promise<IAdtWireResponse<T, D>>',
-  },
-];
-
-const isBlocked = (found: Escape) =>
-  found.rule === 'assertion' &&
-  BLOCKED.some(
-    (blocked) => blocked.where === found.where && blocked.text === found.text,
-  );
-
-const fileOf = (where: string) => where.slice(0, where.lastIndexOf(':'));
 
 /** A JSON value's member at `keys`, read by shape; absent when any step is not an object. */
 function member(value: unknown, keys: readonly string[]): unknown {
@@ -171,30 +130,13 @@ describe('production sources', () => {
     );
   });
 
-  it('holds no escape but the blocked assertions', () => {
-    assert.deepEqual(
-      escapes.filter((found) => !isBlocked(found)),
-      [],
-    );
+  it('holds no escape', () => {
+    assert.deepEqual(escapes, []);
   });
 
-  it('still finds every blocked assertion (a stale entry fails)', () => {
-    for (const blocked of BLOCKED) {
-      const wanted: Escape = { rule: 'assertion', ...blocked };
-      assert.ok(
-        escapes.some((found) => isDeepStrictEqual(found, wanted)),
-        `${blocked.where} ${blocked.text}`,
-      );
-    }
-  });
-
-  it("exempts from Biome's assertion rule exactly the tests and the blocked files", () => {
+  it("exempts from Biome's assertion rule exactly the tests", () => {
     const tests = ['**/__tests__/**', '**/*.test.ts', '**/*.spec.ts'];
-    const blockedFiles = BLOCKED.map((blocked) => fileOf(blocked.where));
-    assert.deepEqual(
-      biomeAssertionExemptions().sort(),
-      [...new Set([...tests, ...blockedFiles])].sort(),
-    );
+    assert.deepEqual(biomeAssertionExemptions().sort(), [...tests].sort());
   });
 
   for (const script of ['lint', 'lint:check', 'build']) {

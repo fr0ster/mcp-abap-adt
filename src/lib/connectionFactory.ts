@@ -239,9 +239,9 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   if (!logWire) return connection;
   const original = connection.makeAdtRequest.bind(connection);
   let n = 0;
-  connection.makeAdtRequest = async <R, D>(
+  connection.makeAdtRequest = async (
     options: IAbapRequestOptions,
-  ): Promise<IAdtWireResponse<R, D>> => {
+  ): Promise<IAdtWireResponse> => {
     n += 1;
     const id = n;
     process.stderr.write(
@@ -263,7 +263,7 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
       );
     }
     try {
-      const answer = await original<R, D>(options);
+      const answer = await original(options);
       process.stderr.write(
         `[WIRE ${id}] → ${String(answer.status ?? '?')} ${String(answer.statusText ?? '')}\n`,
       );

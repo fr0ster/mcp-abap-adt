@@ -524,10 +524,8 @@ export function roundConnection(
     // feed sets no session type of its own.
     setSessionType: (_type: 'stateful' | 'stateless') => undefined,
     getSessionType: (): 'stateful' | 'stateless' => 'stateless',
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
-      return ask(request) as Promise<IAdtWireResponse<T, D>>;
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
+      return ask(request);
     },
   };
   return withSystemKindOf(view, connection);

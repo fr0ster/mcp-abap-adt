@@ -45,7 +45,7 @@ const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 const get = async (item: string, connection: IAbapConnection) =>
   (
-    await connection.makeAdtRequest<string>({
+    await connection.makeAdtRequest({
       url: `/sap/bc/adt/probe/${item.toLowerCase()}`,
       method: 'GET',
       timeout: 0,

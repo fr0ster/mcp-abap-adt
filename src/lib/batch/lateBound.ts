@@ -88,9 +88,9 @@ export class LateBoundConnection implements IAbapConnection {
     return sessionOf(this.current, 'getSessionMode');
   }
 
-  async makeAdtRequest<T = unknown, D = unknown>(
+  async makeAdtRequest(
     options: IAbapRequestOptions,
-  ): Promise<IAdtWireResponse<T, D>> {
-    return this.target().makeAdtRequest<T, D>(options);
+  ): Promise<IAdtWireResponse> {
+    return this.target().makeAdtRequest(options);
   }
 }

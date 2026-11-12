@@ -52,19 +52,6 @@
 	},
 	"overrides": [
 		{
-			"includes": [
-				"src/lib/batch/phases.ts",
-				"src/handlers/system/readonly/handleRuntimeListFeeds.ts"
-			],
-			"linter": {
-				"rules": {
-					"nursery": {
-						"noUnsafeTypeAssertion": "off"
-					}
-				}
-			}
-		},
-		{
 			"includes": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
 			"linter": {
 				"rules": {

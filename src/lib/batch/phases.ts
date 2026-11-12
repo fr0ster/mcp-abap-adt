@@ -123,15 +123,13 @@ function outerStatusWatch(connection: IAbapConnection): {
       sessionOf(connection, 'getSessionType') ??
       sessionOf(connection, 'getSessionMode') ??
       'stateless',
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       sent += 1;
       if (sent > 1) {
         refused ??= new Error(MORE_ENVELOPES_WORDS);
         return Promise.reject(refused);
       }
-      return connection.makeAdtRequest<T, D>(request).then(
+      return connection.makeAdtRequest(request).then(
         (response) => {
           outer = statusOf(response);
           return response;
@@ -170,15 +168,13 @@ function itemView(
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type: Session) => batch.setSessionType(type),
     getSessionType: (): Session => batch.getSessionType(),
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       const correcting = adtCallScope.getStore()?.correcting;
       if (correcting !== undefined && correcting.phase === batch) {
-        return correcting.record(request) as Promise<IAdtWireResponse<T, D>>;
+        return correcting.record(request);
       }
       if (sealed()) return Promise.reject(new Error(LATE_RECORD_WORDS));
-      const answer = record(request) as Promise<IAdtWireResponse<T, D>>;
+      const answer = record(request);
       recorded();
       return answer;
     },

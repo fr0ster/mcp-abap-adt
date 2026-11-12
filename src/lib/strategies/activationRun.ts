@@ -86,7 +86,7 @@ export interface ActivationMessage {
 export interface ActivationRunSource {
   getActivationRun(
     runId: string,
-    options: { withLongPolling?: boolean; analyse?: unknown },
+    options: { withLongPolling?: boolean | undefined; analyse?: unknown },
   ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
   getActivationResults(
     runId: string,

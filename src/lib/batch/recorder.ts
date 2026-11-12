@@ -147,9 +147,7 @@ export function createRecorder(
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type) => batch.setSessionType(type),
     getSessionType: () => batch.getSessionType(),
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       // Of the batch's kind, or refused before anything is recorded: the
       // batch connection's session switch, scoped to this request, is
       // undone as its own recording would undo it. Once a part of the call
@@ -158,7 +156,7 @@ export function createRecorder(
       // The batch ended (or was dropped): nothing more is recorded or sent.
       if (ended()) {
         batch.setSessionType(unswitched);
-        const ended = Promise.reject<IAdtWireResponse<T, D>>(
+        const ended = Promise.reject<IAdtWireResponse>(
           new ServerRefusal('batch_ended'),
         );
         ended.catch(() => undefined);
@@ -177,7 +175,7 @@ export function createRecorder(
             taken,
           ),
         );
-        const rejected = Promise.reject<IAdtWireResponse<T, D>>(refused);
+        const rejected = Promise.reject<IAdtWireResponse>(refused);
         // A handler that never reads it leaves no unhandled rejection: the
         // dispatch answers the refusal (`otherKind()`).
         rejected.catch(() => undefined);
@@ -185,7 +183,7 @@ export function createRecorder(
       }
       // Recorded first: a call takes its number only once a request of it
       // is in the envelope — a batch connection that throws takes none.
-      const recorded = batch.makeAdtRequest<T, D>(request);
+      const recorded = batch.makeAdtRequest(request);
       owner.recorded(kind);
       if (taken === undefined) {
         taken = owner.nextNumber();

@@ -39,12 +39,10 @@ export class EnvelopeWatch {
       setSessionType: (type: Session) => connection.setSessionType(type),
       getSessionType: () => sessionOf(connection, 'getSessionType'),
       getSessionMode: () => sessionOf(connection, 'getSessionMode'),
-      makeAdtRequest<T = unknown, D = unknown>(
-        request: IAbapRequestOptions,
-      ): Promise<IAdtWireResponse<T, D>> {
-        let sending: Promise<IAdtWireResponse<T, D>>;
+      makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
+        let sending: Promise<IAdtWireResponse>;
         try {
-          sending = connection.makeAdtRequest<T, D>(request);
+          sending = connection.makeAdtRequest(request);
         } catch (error) {
           thrown.add(error);
           return Promise.reject(error);

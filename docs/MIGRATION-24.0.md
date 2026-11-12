@@ -14,13 +14,17 @@ ADT dependencies move to `@mcp-abap-adt/adt-clients` 45, `@mcp-abap-adt/adt-stra
 `@mcp-abap-adt/interfaces-adt` 27 (`@mcp-abap-adt/compact-modify` too): what that changes for a
 caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" and
 "Callers of the activation tools: an activation SAP did not carry out is an error" below (44
-adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 22,
-`@mcp-abap-adt/interfaces-auth-sap` 4, `@mcp-abap-adt/interfaces-adt-connection` 4.1 and the
+adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 23,
+`@mcp-abap-adt/interfaces-auth-sap` 4, `@mcp-abap-adt/interfaces-adt-connection` 4.2 and the
 optional `@mcp-abap-adt/sap-rfc-lite` 0.4, the
 destination path to `@mcp-abap-adt/auth-broker` 5.1, `@mcp-abap-adt/auth-stores` 5.1 and
 `@mcp-abap-adt/interfaces-auth-broker` 1.4: what that changes is under "RFC destinations: the
 address is stated" below. `@types/express` 5 is a dependency of `@mcp-abap-adt/lib` and
 `@mcp-abap-adt/server-runtime` now.
+Connection 23 keeps the answer of a stateless request whose session SAP replaced, marked
+`sessionLost`, where 22 rejected it `ADT_SESSION_REPLACED`: a tool call that reads in such a
+session answers SAP's answer, and the next call logs on again as before (a stateful request
+still rejects).
 Connection 21 asks for the CSRF token once per endpoint, with no retry and no delay, so a
 logon against a closed port fails at once; an embedder that calls `createConnection`, a
 connector or `makeAdtRequest` changes nothing (a wire or subclass of its own: connection's

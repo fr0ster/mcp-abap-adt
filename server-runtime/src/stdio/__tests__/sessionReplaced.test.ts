@@ -1,9 +1,10 @@
 /**
  * A session SAP ended, on stdio (#295): the connection the start made
  * (`connectAtStart`) is the one every tool call takes. When SAP answers a
- * request with another session's cookie — the old session idled out — the
- * real connection's own identity check answers that call
- * `SESSION_REPLACED`, nothing retried; the connection is spent from then on,
+ * stateless request with another session's cookie — the old session idled
+ * out — the real connection keeps SAP's answer, marked `sessionLost`
+ * (connection 23, #354; a stateful request still rejects `SESSION_REPLACED`),
+ * nothing retried; the connection is spent from then on,
  * so the next call logs on again and runs on the new session, and the
  * replaced connection is ended. The session that replaced the old one is
  * logged off before its cookies are dropped (connection 18.0.1), so SAP is
@@ -77,7 +78,7 @@ async function serveAtStart() {
 const sessionOfProbe = (id: string) =>
   standIn.requests.find((r) => r.url === `${PROBE_PATH}${id}`)?.session;
 
-it('stdio: a call that meets a session SAP replaced answers SESSION_REPLACED and logs off the replacing session; the next call logs on again, runs on the new session, and the replaced connection is ended', async () => {
+it("stdio: a stateless call that meets a session SAP replaced keeps SAP's answer and logs off the replacing session; the next call logs on again, runs on the new session, and the replaced connection is ended", async () => {
   // Every disconnect() of the real connector, with the instance it ended.
   const disconnect = jest.spyOn(AdtOnPremConnector.prototype, 'disconnect');
   const { server, client, call } = await serveAtStart();
@@ -95,11 +96,9 @@ it('stdio: a call that meets a session SAP replaced answers SESSION_REPLACED and
     // SAP ended the start's session: the next request on it lands in another.
     standIn.endSession(first as string);
     const replaced = await call('two');
-    expect(replaced.isError).toBe(true);
-    // The connection's own SESSION_REPLACED, as it is: nothing retried.
-    expect(replaced.text).toContain(
-      'The SAP session this connection was using is gone and the requests are now on a different one',
-    );
+    // connection 23 (#354): a stateless request keeps SAP's answer, marked
+    // `sessionLost`; the instance is spent, and nothing is sent again.
+    expect(replaced).toEqual({ text: 'two', isError: false });
     expect(
       standIn.requests.filter((r) => r.url === `${PROBE_PATH}two`),
     ).toHaveLength(1);

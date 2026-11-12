@@ -456,9 +456,15 @@ below is what it carries besides.
       `compactTransportRead.test.ts`,
       `batchedReadsTiming.test.ts:218`, `IncludeMainProgramsHandlers.test.ts:88`,
       `packageWalks.test.ts`, `projectionWalk.test.ts:423`, `projectionBoundary.test.ts`
-      (`:337`, `:558`, `:649`–`:719`), `IncludeHighHandlers.test.ts:482` and
+      (`:558`, `:649`–`:719`), `IncludeHighHandlers.test.ts:482` and
       `TableTypeHighHandlers.test.ts:647`. They compile unchanged once the builders are
       split (Inference: the key is then on the definition's one shape).
+    - **`projectionBoundary.test.ts:337`** does not: it passes the table helper's
+      `value: string` (`:81`) into HandlerActivate's `object_type` enum, TS2322 after the
+      split (Codex measured, round 6). Its HandlerActivate rows are adapted in batch 1, as
+      the string tables above: the values the schema accepts are typed by its members and
+      keep their assertions; the ones it refuses go through the entry and expect the
+      refusal, with no request.
   - **Batches,** each green under `npm run test:check` and CI's step list before the next.
     Each batch carries its own call fixes and test sites, so no commit breaks the normal
     build.
@@ -475,7 +481,8 @@ below is what it carries besides.
          4, compact-readonly-entries 10, `src/lib/compact` 6) and `handleHandlerGet`.
        - HandlerGet's local `args` typed by its definition's output.
        - The HandlerValidate narrowing, with its characterization tests first.
-       - The `compactActivateTypes.test.ts`, `routesParseTargets.test.ts` and
+       - The `compactActivateTypes.test.ts`, `projectionBoundary.test.ts:337`,
+         `routesParseTargets.test.ts` and
          `unknownReadPart.test.ts` adaptations; the last goes through HandlerGet's entry
          and expects the schema's refusal of each part, with no request.
     2. **Write-side directories:** behavior_definition 6, behavior_implementation 3,

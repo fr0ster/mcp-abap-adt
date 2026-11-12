@@ -149,6 +149,10 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
       fields so.
     - Widening breaks no caller: these are minors, and they ride in §2's interfaces-adt and
       adt-clients releases.
+    - As done (an owner-accepted deviation): interfaces-adt 27.4.0 widens 261 optional fields,
+      more than listed here. The extra fields are the runtime readers' options,
+      `IAdtClientOptions`, `IAdtSystemContext` and `IAdtOperationOptions.source`
+      (mcp-abap-adt-interfaces#188). adt-clients widens only what it declares itself.
   - The 14 sites that meet TypeScript's own library types (`Array.push`, `Promise`, `Set`) or
     `@types/node` pass a defined value, narrowed in plain code first.
   - **The MCP SDK's transports.** `server.connect(transport)` fails in `StreamableHttpServer.ts`

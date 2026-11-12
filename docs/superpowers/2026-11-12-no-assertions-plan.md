@@ -103,6 +103,17 @@ Releases already moving: interfaces-adt 27.3.0 is published. adt-clients 45.4.0
   undefined }` to each widened field.
 - **Deliberate break:** take `| undefined` off one field, and its typecheck goes red.
 - **Docs:** CHANGELOG 27.4.0. **Publish order:** U1, then U2.
+- **As done (an owner-accepted deviation).** U2 widened 261 optional fields in
+  interfaces-adt (mcp-abap-adt-interfaces#188, merged), more than the spec listed. The extra
+  fields:
+  - the runtime readers' options (`IFeedQueryOptions`, the profiler trace options,
+    `IClassUnitTestRunOptions` / `IUnitTestScope`, `IUnitTestResultOptions`);
+  - `IAdtClientOptions`;
+  - `IAdtSystemContext`;
+  - `IAdtOperationOptions.source`.
+
+  **Release order as accepted:** interfaces-adt-connection 5.0.0 is tagged at the merge commit
+  and published first; interfaces-adt 27.4.0 (`^5.0.0`) follows as a small release PR.
 
 ### U3. adt-clients 45.5.0 and adt-strategies (minor) — repository mcp-abap-adt-clients
 
@@ -111,6 +122,8 @@ Branched after 45.4.0 is merged and published.
 - **Change.**
   - The ranges move to interfaces-adt-connection `^5.0.0` and interfaces-adt `^27.4.0`; also
     in adt-clients-legacy, if it names them.
+  - It widens only the optional fields adt-clients itself declares. The interfaces-adt types
+    it uses were widened in U2.
   - `activationUtils.ts` and `tools/header-probe/capture.ts` drop their pass-through `<T, D>`.
   - `AdtBatchConnection.makeAdtRequest` keeps its signature.
   - These optional fields widen to `?: T | undefined` (spec §3):

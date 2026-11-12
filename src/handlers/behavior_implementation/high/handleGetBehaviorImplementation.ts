@@ -39,11 +39,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetBehaviorImplementationArgs extends SourceRangeArgs {
-  behavior_implementation_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetBehaviorImplementationArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleGetBehaviorImplementation(
   context: HandlerContext,

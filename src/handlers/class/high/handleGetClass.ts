@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetClassArgs extends SourceRangeArgs {
-  class_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetClass(
   context: HandlerContext,

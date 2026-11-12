@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetInterfaceArgs extends SourceRangeArgs {
-  interface_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetInterfaceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetInterface(
   context: HandlerContext,

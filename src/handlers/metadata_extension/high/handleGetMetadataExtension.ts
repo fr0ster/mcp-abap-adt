@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetMetadataExtensionArgs extends SourceRangeArgs {
-  metadata_extension_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetMetadataExtensionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetMetadataExtension(
   context: HandlerContext,

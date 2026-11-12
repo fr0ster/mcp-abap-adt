@@ -39,12 +39,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetIncludeArgs extends SourceRangeArgs {
-  /** Required by the schema; a call from outside it may leave it out. */
-  include_name?: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** How a source read is answered: the read's text, with what was asked. */
 type SourceAnswer = (

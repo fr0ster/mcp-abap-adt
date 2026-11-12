@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetTableArgs extends SourceRangeArgs {
-  table_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetTableArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetTable(
   context: HandlerContext,

@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetDdlArgs extends SourceRangeArgs {
-  ddl_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
   const { connection, logger } = context;

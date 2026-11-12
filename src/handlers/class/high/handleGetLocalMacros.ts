@@ -29,10 +29,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetLocalMacrosArgs extends SourceRangeArgs {
-  class_name: string;
-  version?: ReadVersion;
-}
+type GetLocalMacrosArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetLocalMacros(
   context: HandlerContext,

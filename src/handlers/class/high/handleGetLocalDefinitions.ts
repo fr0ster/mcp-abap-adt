@@ -29,10 +29,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetLocalDefinitionsArgs extends SourceRangeArgs {
-  class_name: string;
-  version?: ReadVersion;
-}
+type GetLocalDefinitionsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetLocalDefinitions(
   context: HandlerContext,

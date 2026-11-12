@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetStructureArgs extends SourceRangeArgs {
-  structure_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetStructure(
   context: HandlerContext,

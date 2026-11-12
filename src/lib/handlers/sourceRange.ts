@@ -55,11 +55,11 @@ export const SOURCE_RANGE_SHAPE = {
   end_line: END_LINE_FIELD,
 };
 
-/** The range a call gave, as its fields. */
-export interface SourceRangeArgs {
-  start_line?: number;
-  end_line?: number;
-}
+/** The range fields alone, as an object: the type of what a call gives. */
+const SOURCE_RANGE_SCHEMA = z.object(SOURCE_RANGE_SHAPE);
+
+/** The range a call gave, as its fields: the output of the shape every source read spreads. */
+export type SourceRangeArgs = z.output<typeof SOURCE_RANGE_SCHEMA>;
 
 /** A range the call asked for: each end, where given. */
 export interface SourceRange {

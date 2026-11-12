@@ -45,12 +45,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetFunctionModuleArgs extends SourceRangeArgs {
-  function_module_name: string;
-  function_group_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetFunctionModuleArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetFunctionModule(
   context: HandlerContext,

@@ -41,12 +41,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetFunctionIncludeArgs extends SourceRangeArgs {
-  function_group_name: string;
-  include_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetFunctionIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetFunctionInclude(
   context: HandlerContext,

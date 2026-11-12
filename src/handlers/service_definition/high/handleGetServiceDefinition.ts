@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetServiceDefinitionArgs extends SourceRangeArgs {
-  service_definition_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetServiceDefinitionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetServiceDefinition(
   context: HandlerContext,

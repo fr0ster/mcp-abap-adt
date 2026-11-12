@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetProgramArgs extends SourceRangeArgs {
-  program_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetProgram(
   context: HandlerContext,

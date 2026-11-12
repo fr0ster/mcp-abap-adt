@@ -139,6 +139,46 @@ describe('the take-up flow: the cleanup after the first process wrote its sessio
     ]);
   });
 
+  it('the lock is refused: the failure carries the answer, so the log says why', async () => {
+    const log: string[] = [];
+    await assert.rejects(
+      takeUpCase(
+        launches(log, {
+          lock: text({ error: 'Object ZCL_X is locked (EU/510)' }, true),
+        }),
+        'ZCL_X',
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.ok(error.message.includes('no lock handle'), error.message);
+        assert.ok(error.message.includes('(EU/510)'), error.message);
+        return true;
+      },
+    );
+  });
+
+  it('the unlock is refused: the failure carries the answer, never the lock handle', async () => {
+    const log: string[] = [];
+    await assert.rejects(
+      takeUpCase(
+        launches(log, {
+          lock: text({ lock_handle: 'SECRET-HANDLE' }),
+          unlock: text(
+            { error: 'Handle SECRET-HANDLE is not valid (EU/522)' },
+            true,
+          ),
+        }),
+        'ZCL_X',
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.ok(error.message.includes('(EU/522)'), error.message);
+        assert.equal(error.message.includes('SECRET-HANDLE'), false);
+        return true;
+      },
+    );
+  });
+
   it('the unlock succeeds: nothing is left to clean', async () => {
     const log: string[] = [];
     const result = await takeUpCase(

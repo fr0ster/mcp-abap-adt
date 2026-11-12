@@ -28,10 +28,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateBehaviorDefinitionArgs {
-  name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateBehaviorDefinitionArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleActivateBehaviorDefinition(
   context: HandlerContext,

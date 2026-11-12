@@ -78,13 +78,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateLocalTestClassArgs {
-  class_name: string;
-  test_class_code: string;
-  transport_request?: string;
-  activate_on_update?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateLocalTestClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateLocalTestClass(
   context: HandlerContext,

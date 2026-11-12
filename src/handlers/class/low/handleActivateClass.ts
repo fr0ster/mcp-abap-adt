@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateClassArgs {
-  class_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateClass(
   context: HandlerContext,

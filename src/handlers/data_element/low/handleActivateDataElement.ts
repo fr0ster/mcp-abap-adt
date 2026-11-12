@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateDataElementArgs {
-  data_element_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateDataElement(
   context: HandlerContext,

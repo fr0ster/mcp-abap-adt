@@ -68,17 +68,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateClassArgs {
-  class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  superclass?: string;
-  final?: boolean;
-  create_protected?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateClass(
   context: HandlerContext,

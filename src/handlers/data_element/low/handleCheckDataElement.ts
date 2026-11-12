@@ -34,11 +34,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckDataElementArgs {
-  data_element_name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckDataElement(
   context: HandlerContext,

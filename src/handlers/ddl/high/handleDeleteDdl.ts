@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteDdlArgs {
-  ddl_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteDdl(
   context: HandlerContext,

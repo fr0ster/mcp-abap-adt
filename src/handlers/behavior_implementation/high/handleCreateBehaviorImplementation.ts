@@ -62,14 +62,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateBehaviorImplementationArgs {
-  class_name: string;
-  behavior_definition: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateBehaviorImplementationArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleCreateBehaviorImplementation(
   context: HandlerContext,

@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckClass(
   context: HandlerContext,
-  args: { class_name: string; version?: string; source_code?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckClassLow(context, args);
   return normalizeCheckResponse(result, args.class_name?.toUpperCase());

@@ -57,14 +57,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateDdlArgs {
-  ddl_name: string;
-  package_name: string;
-  transport_request?: string;
-  description?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateDdl(
   context: HandlerContext,

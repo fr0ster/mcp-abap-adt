@@ -101,14 +101,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateBehaviorImplementationArgs {
-  class_name: string;
-  behavior_definition: string;
-  implementation_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateBehaviorImplementationArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleUpdateBehaviorImplementation(
   context: HandlerContext,

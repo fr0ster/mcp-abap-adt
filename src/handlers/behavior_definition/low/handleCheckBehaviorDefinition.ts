@@ -34,11 +34,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckBehaviorDefinitionArgs {
-  name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckBehaviorDefinitionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckBehaviorDefinition(
   context: HandlerContext,

@@ -60,13 +60,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateBehaviorDefinitionArgs {
-  name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateBehaviorDefinitionArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleUpdateBehaviorDefinition(
   context: HandlerContext,

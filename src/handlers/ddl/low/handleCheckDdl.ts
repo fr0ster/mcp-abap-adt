@@ -46,12 +46,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckDdlArgs {
-  ddl_name: string;
-  ddl_source?: string;
-  version?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckDdl(
   context: HandlerContext,

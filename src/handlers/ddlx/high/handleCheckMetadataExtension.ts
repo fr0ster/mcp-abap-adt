@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckMetadataExtension(
   context: HandlerContext,
-  args: { name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckMetadataExtensionLow(context, args);
   return normalizeCheckResponse(result, args.name?.toUpperCase());

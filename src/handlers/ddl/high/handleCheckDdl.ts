@@ -48,7 +48,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckDdl(
   context: HandlerContext,
-  args: { ddl_name: string; version?: string; ddl_source?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckDdlLow(context, args);
   return normalizeCheckResponse(result, args.ddl_name?.toUpperCase());

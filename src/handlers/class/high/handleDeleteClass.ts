@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteClassArgs {
-  class_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteClass(
   context: HandlerContext,

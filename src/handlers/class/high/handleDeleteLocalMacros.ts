@@ -51,12 +51,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteLocalMacrosArgs {
-  class_name: string;
-  transport_request?: string;
-  activate_on_delete?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteLocalMacrosArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteLocalMacros(
   context: HandlerContext,

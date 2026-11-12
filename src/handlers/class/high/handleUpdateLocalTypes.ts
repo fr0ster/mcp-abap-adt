@@ -62,13 +62,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateLocalTypesArgs {
-  class_name: string;
-  local_types_code: string;
-  transport_request?: string;
-  activate_on_update?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateLocalTypesArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateLocalTypes(
   context: HandlerContext,

@@ -75,17 +75,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateBehaviorDefinitionArgs {
-  name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  root_entity: string;
-  implementation_type: BehaviorDefinitionImplementationType;
-  activate?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateBehaviorDefinitionArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleCreateBehaviorDefinition(
   context: HandlerContext,

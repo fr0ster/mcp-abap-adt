@@ -60,13 +60,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateLocalMacrosArgs {
-  class_name: string;
-  macros_code: string;
-  transport_request?: string;
-  activate_on_update?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateLocalMacrosArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateLocalMacros(
   context: HandlerContext,

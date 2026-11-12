@@ -56,13 +56,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateMetadataExtensionArgs {
-  name: string;
-  source_code: string;
-  lock_handle: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateMetadataExtensionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateMetadataExtension(
   context: HandlerContext,

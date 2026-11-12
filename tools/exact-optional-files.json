@@ -2,8 +2,33 @@
   "projects": [
     {
       "tsconfig": "tsconfig.json",
-      "files": [],
-      "typechecks": []
+      "files": [
+        "src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts",
+        "src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts",
+        "src/handlers/behavior_definition/low/handleCheckBehaviorDefinition.ts",
+        "src/handlers/class/high/handleCheckClass.ts",
+        "src/handlers/class/low/handleActivateClass.ts",
+        "src/handlers/class/low/handleUpdateClass.ts",
+        "src/handlers/data_element/high/handleCheckDataElement.ts",
+        "src/handlers/data_element/high/handleGetDataElement.ts",
+        "src/handlers/data_element/low/handleActivateDataElement.ts",
+        "src/handlers/data_element/low/handleCheckDataElement.ts",
+        "src/handlers/ddl/high/handleCheckDdl.ts",
+        "src/handlers/ddl/low/handleActivateDdl.ts",
+        "src/handlers/ddl/low/handleUpdateDdl.ts",
+        "src/handlers/ddlx/high/handleCheckMetadataExtension.ts",
+        "src/handlers/ddlx/low/handleActivateMetadataExtension.ts",
+        "src/handlers/ddlx/low/handleCheckMetadataExtension.ts",
+        "src/handlers/ddlx/low/handleUpdateMetadataExtension.ts",
+        "src/handlers/domain/high/handleCheckDomain.ts",
+        "src/handlers/domain/high/handleGetDomain.ts",
+        "src/handlers/domain/low/handleActivateDomain.ts",
+        "src/handlers/domain/low/handleCheckDomain.ts",
+        "src/utils/transportValidation.ts"
+      ],
+      "typechecks": [
+        "src/__typechecks__/exact/writeSideHandlers.ts"
+      ]
     },
     {
       "tsconfig": "server-runtime/tsconfig.json",

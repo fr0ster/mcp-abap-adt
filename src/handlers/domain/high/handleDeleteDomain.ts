@@ -42,11 +42,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteDomainArgs {
-  domain_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteDomain(
   context: HandlerContext,

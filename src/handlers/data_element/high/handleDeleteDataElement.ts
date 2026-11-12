@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteDataElementArgs {
-  data_element_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteDataElement(
   context: HandlerContext,

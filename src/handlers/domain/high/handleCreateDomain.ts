@@ -136,24 +136,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DomainArgs {
-  domain_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  datatype?: string;
-  length?: number;
-  decimals?: number;
-  conversion_exit?: string;
-  lowercase?: boolean;
-  sign_exists?: boolean;
-  value_table?: string;
-  activate?: boolean;
-  fixed_values?: Array<{ low: string; text: string }>;
-  super_package?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateDomain(
   context: HandlerContext,
@@ -169,11 +152,7 @@ export async function handleCreateDomain(
     return return_error('Package name is required');
   }
 
-  validateTransportRequest(
-    packageName,
-    args.transport_request,
-    args.super_package,
-  );
+  validateTransportRequest(packageName, args.transport_request);
 
   const domainName = args.domain_name.toUpperCase();
   const shouldActivate = args.activate !== false;

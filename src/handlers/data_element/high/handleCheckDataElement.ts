@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckDataElement(
   context: HandlerContext,
-  args: { data_element_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckDataElementLow(context, args);
   return normalizeCheckResponse(result, args.data_element_name?.toUpperCase());

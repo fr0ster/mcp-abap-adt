@@ -42,11 +42,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteBehaviorImplementationArgs {
-  behavior_implementation_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteBehaviorImplementationArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleDeleteBehaviorImplementation(
   context: HandlerContext,

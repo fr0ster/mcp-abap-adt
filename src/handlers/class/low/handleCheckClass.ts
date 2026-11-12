@@ -42,12 +42,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckClassArgs {
-  class_name: string;
-  version?: string;
-  source_code?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckClass(
   context: HandlerContext,

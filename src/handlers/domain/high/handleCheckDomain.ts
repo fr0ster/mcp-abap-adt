@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckDomain(
   context: HandlerContext,
-  args: { domain_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckDomainLow(context, args);
   return normalizeCheckResponse(result, args.domain_name?.toUpperCase());

@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckBehaviorDefinition(
   context: HandlerContext,
-  args: { name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckBdefLow(context, args);
   return normalizeCheckResponse(result, args.name?.toUpperCase());

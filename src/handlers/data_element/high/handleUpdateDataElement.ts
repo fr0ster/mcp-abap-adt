@@ -142,26 +142,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DataElementArgs {
-  data_element_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  type_kind?: DataElementTypeKind;
-  type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  field_label_short?: string;
-  field_label_medium?: string;
-  field_label_long?: string;
-  field_label_heading?: string;
-  search_help?: string;
-  search_help_parameter?: string;
-  set_get_parameter?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 function changesOf(args: DataElementArgs): DataElementChanges {
   return {

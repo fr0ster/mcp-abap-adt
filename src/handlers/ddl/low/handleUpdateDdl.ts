@@ -51,13 +51,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateDdlArgs {
-  ddl_name: string;
-  ddl_source: string;
-  lock_handle: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateDdl(
   context: HandlerContext,

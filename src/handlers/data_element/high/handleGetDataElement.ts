@@ -21,10 +21,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetDataElementArgs {
-  data_element_name: string;
-  version?: ReadVersion;
-}
+type GetDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetDataElement(
   context: HandlerContext,

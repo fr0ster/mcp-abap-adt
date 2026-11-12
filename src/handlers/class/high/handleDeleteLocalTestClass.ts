@@ -55,12 +55,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteLocalTestClassArgs {
-  class_name: string;
-  transport_request?: string;
-  activate_on_delete?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteLocalTestClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteLocalTestClass(
   context: HandlerContext,

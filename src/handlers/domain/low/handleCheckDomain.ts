@@ -34,11 +34,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckDomainArgs {
-  domain_name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckDomain(
   context: HandlerContext,

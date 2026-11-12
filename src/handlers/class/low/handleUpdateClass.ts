@@ -53,13 +53,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateClassArgs {
-  class_name: string;
-  source_code: string;
-  lock_handle: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateClass(
   context: HandlerContext,

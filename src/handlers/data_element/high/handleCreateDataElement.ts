@@ -162,31 +162,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DataElementArgs {
-  data_element_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  short_label?: string;
-  medium_label?: string;
-  long_label?: string;
-  heading_label?: string;
-  type_kind?:
-    | 'domain'
-    | 'predefinedAbapType'
-    | 'refToPredefinedAbapType'
-    | 'refToDictionaryType'
-    | 'refToClifType';
-  type_name?: string;
-  search_help?: string;
-  search_help_parameter?: string;
-  set_get_parameter?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateDataElement(
   context: HandlerContext,

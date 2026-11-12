@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateDomainArgs {
-  domain_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateDomain(
   context: HandlerContext,

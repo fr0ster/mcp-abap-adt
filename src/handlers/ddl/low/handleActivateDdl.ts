@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateDdlArgs {
-  ddl_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateDdl(
   context: HandlerContext,

@@ -21,10 +21,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetDomainArgs {
-  domain_name: string;
-  version?: ReadVersion;
-}
+type GetDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetDomain(
   context: HandlerContext,

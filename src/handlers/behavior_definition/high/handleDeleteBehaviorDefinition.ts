@@ -38,11 +38,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteBehaviorDefinitionArgs {
-  behavior_definition_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteBehaviorDefinitionArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleDeleteBehaviorDefinition(
   context: HandlerContext,

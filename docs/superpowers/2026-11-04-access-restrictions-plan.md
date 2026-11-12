@@ -463,4 +463,36 @@ Open, decided after Task 2 (c) is measured: whether `lazyPackageReader` refuses 
 
 ## Measurement record
 
-(Filled by Tasks 1 and 2.)
+### Task 1: draft versions (Measured 2026-11-12)
+
+On premise: two users (the writing user, the reading user), each through its own connection, objects in `$TMP`. Trial: one user, objects in the cloud probe package, no request. Per type: (a) after activation, (b) after the writer's unactivated write, (c) after the writer activates again; each version read raw (`connection.makeAdtRequest` with the route's own URL and headers, `version` replaced) and through the production route (an adt-clients client with `wireItself` for the part read). Probe deleted after its run.
+
+- **The `wireItself` route's ETag equals the raw read's** for every type, version, user and point, on both systems.
+- **`workingArea` is the caller's working version.** Where `version=workspace` was accepted (program, include, interface, class main source, function group metadata, function group include, a behavior implementation's main source), `workingArea` answered the same ETag as `workspace`, for both users. Every other part answers `version=workspace` with `400`. Task 1a does not run.
+- **An include write does not move the main source's ETag.** A class's local types, local definitions, test classes and macros, each written alone (unactivated), left the class main source's three ETags unchanged (both systems); each include's own three ETags moved and told the states apart. A function group include written alone left the function module's ETags unchanged; the function group's metadata was already inactive after the include's creation and kept that ETag across the include's write (on premise and trial). A behavior implementation's write (its implementations include) left the class main source unchanged. **Plan Task 1 Step 6: the gate holds — Task 11 waits for the owner's decision on the per-part answer's shape.**
+
+Per type, whether the spec's rule (`none` when `active` = `inactive`; `own` when `workspace` = `inactive` ≠ `active`; `other` when `workspace` = `active` ≠ `inactive`; an ETag led by 14 digits) tells the three states apart:
+
+| Type (part read) | ETag shape | On premise | Trial |
+|---|---|---|---|
+| program (main source) | 14 digits + `0011` active / `0001` inactive draft | yes | not served |
+| include (source) | as program | yes | not served |
+| interface (main source) | as program | yes | yes |
+| class (main source) | on premise 23 digits, one ETag for every version (a write moves all three alike); trial as program | **no**: after an unactivated write all three are equal, read `none` | yes |
+| class include (implementations, definitions, test classes, macros) | as program | yes, each part | yes (macros: not allowed in ABAP Cloud) |
+| function module (source) | as program | yes | yes |
+| function group (metadata) | 14 digits + `0018` / `0008` (trial: + `89205`) | yes | yes |
+| function group include (source) | as program | yes | yes |
+| CDS view (DDL source) | 14 digits + `0011` active, `0001` inactive — **with no draft too** (same timestamp) | **no**: after activation `active` ≠ `inactive` and the working version = `active`, read `other` | no (same) |
+| behavior definition (source) | 14 digits + `001`/`000` + `text/plain_` + a hash | yes | yes |
+| behavior implementation (main source; implementations include) | main source as the class's; implementations include as program | main: **no**; implementations: yes | main: no (a write of the implementations does not move it); implementations: yes |
+| metadata extension (source) | `19710401000000` + `001`/`000` + `text/plain_` + a hash | states told apart; **the timestamp is a constant `1971-04-01 00:00:00`**, so `changed_at` / `age_seconds` would be wrong | same |
+| service definition (source) | as metadata extension | states told apart; timestamp constant | same |
+| table (source) | 14 digits + `001`/`000` + `text/plain2` | yes | yes |
+| structure (source) | as table | yes | yes |
+| domain, data element, table type (metadata) | 14 digits + `001` (`I` while an inactive version exists) / `000A` + the content type + a hash | yes | yes |
+| package (metadata) | `active` 14 digits + `001`, `inactive` + `000`, the same timestamp with no draft; a description change moves neither | **no** | not measured (the probe creates no package there) |
+| message class (metadata) | 40 hex digits, one ETag for every version | **no** | no |
+| service binding | not measured: its change is a publication, not an unactivated write the tools make | not offered | not offered |
+
+Questions for the owner before Task 11 (the plan decides none of them): the per-part answer's shape (the gate); whether a type whose rule fails on one part (class and behavior implementation on premise: the main source) is offered by its include parts; the CDS view's rule (its ETags tell the states apart by the 14-digit timestamp, not by the whole ETag); and whether metadata extension and service definition are offered with `changed_at` / `age_seconds` `null` (their timestamp is a constant).

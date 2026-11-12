@@ -7,6 +7,7 @@
  */
 
 import {
+  ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_KEY_ENV,
@@ -358,6 +359,7 @@ export function coreParameters(
       BATCH_KEEP_RAW_PARTS_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
       toolSet.expositionRemoved('stdio'),

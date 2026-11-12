@@ -17,6 +17,15 @@ export {
   packageManifestOf,
 } from '../packageManifest.js';
 export {
+  ACCESS_RESTRICTION_ROWS,
+  ALLOWED_PACKAGES_ROW,
+  ALLOWED_REQUESTS_ROW,
+  ALLOWED_TABLES_ROW,
+  DENIED_TABLES_ROW,
+  DENY_ACTIONS_ROW,
+  readAccessRestrictions,
+} from './accessRestrictions.js';
+export {
   BATCH_KEEP_RAW_PARTS_CLI,
   BATCH_KEEP_RAW_PARTS_ENV,
   BATCH_KEEP_RAW_PARTS_ROW,

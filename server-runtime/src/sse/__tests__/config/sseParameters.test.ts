@@ -438,6 +438,7 @@ describe('the YAML template and validation come from the table', () => {
         'batch',
         'enable-data-tools',
         'sse',
+        'restrictions',
         'shutdown-timeout',
         'state-idle-minutes',
         'system-type',

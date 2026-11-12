@@ -8,6 +8,7 @@
  */
 
 import {
+  ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
@@ -126,6 +127,7 @@ export function sseParameters(
       BATCH_KEEP_RAW_PARTS_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
       toolSet.expositionRemoved('sse'),

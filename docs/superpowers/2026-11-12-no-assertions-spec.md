@@ -151,6 +151,19 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
       adt-clients releases.
   - The 14 sites that meet TypeScript's own library types (`Array.push`, `Promise`, `Set`) or
     `@types/node` pass a defined value, narrowed in plain code first.
+  - **The MCP SDK's transports.** `server.connect(transport)` fails in `StreamableHttpServer.ts`
+    (327) and `SseServer.ts` (487): `StreamableHTTPServerTransport.onclose` is
+    `(() => void) | undefined`, while `Transport.onclose` is `?: () => void`. That is a third
+    party's object contract, so it cannot be fixed where it lives. Measured: the installed SDK
+    is 1.32.1, and 1.32.2, the latest, declares `Transport` the same way.
+    - Decision: one adapter of the server's, `class SdkTransport implements Transport`, wraps
+      the SDK's transport.
+    - It forwards `start`, `send`, `close` and `sessionId`.
+    - It holds the `onclose`, `onerror` and `onmessage` handlers the protocol sets, and exposes
+      them as getters that always return a function, which calls the stored handler if one is
+      set. It registers one forwarding function of its own on the SDK transport.
+    - So each side sees the type its contract states, without a cast. A later SDK whose
+      `Transport` declares `| undefined` lets the adapter go.
 - **The RFC `url?: never` hole closes.**
   - With the option on in the production compile, `{ …rfc, url: undefined }` no longer
     compiles against `ISapRfcLogon`.
@@ -290,7 +303,14 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     - `/utils`: `IAdtSystemContext`;
     - `/request-context`: `RequestContext`, `ResolvedSystemContext`, `SystemContextResolver`;
     - `/state`: `StateIdleBound`, `InstanceStateOptions`;
-    - `/handlers/write`: `ActivationObject`.
+    - `/handlers/write`: `ActivationObject`;
+    - `/utils`: also `AuthDisplayConfig` (met in server-runtime's project,
+      `server-runtime/src/stdio/launcher.ts:711`);
+    - `@mcp-abap-adt/server-runtime`: `CoreConfig` (`/stdio/server`), `HttpConfig` and
+      `StreamableHttpServerOptions` (`/http/server`), `SseConfig` and `SseServerOptions`
+      (`/sse/server`), `DestinationFailureOptions` (`/auth`). These were measured in
+      server-runtime's own project; compact-readonly-entries, compact-modify and
+      responsible-rules name none.
 
     Decision: their optional fields that a caller fills from a possibly absent value become
     `?: T | undefined` (for example `InstanceStateOptions.idleMinutes`, `BatchAnswer.raw`).
@@ -456,7 +476,7 @@ Each is split at the boundary, or typed by the union of the contract types it re
 | `src/lib/requestSystemResolution.ts:156 user` | string \| undefined | `ResolvedSystemContext.responsible`, a contract field | typed: read as `string \| undefined`, no re-narrowing |
 | `src/lib/credentialSources.ts:39 value` | string \| undefined | `SapConfig[field]`, the embedder's typed config | typed: read as the field's type |
 | `src/lib/credentialSources.ts:56 authType` | SapAuthType | `SapConfig.authType` | typed: switch on `SapAuthType`, exhaustive |
-| `src/embeddable/BaseMcpServer.ts:2836 register` | ("registerTool" extends keyof this ? this[keyof this & "regi | `Reflect.get` on a Proxy target | boundary: stays |
+| `src/embeddable/BaseMcpServer.ts:2836 register` | ("registerTool" extends keyof this ? this[keyof this & "regi | `this.registerTool` / `this.tool` read reflectively, the key narrowed to those two | typed: the wrapper is built from the SDK's `registerTool` / `tool` signatures; no reflection |
 | `src/lib/config/authParameters.ts:156 node` | Record<string, unknown> | parsed YAML | boundary: stays |
 | `server-runtime/src/stdio/auth/vocabulary.ts:70 authType` | "basic" \| "jwt" \| "saml" \| "snc" \| undefined | `IConnectionConfig.authType`, the broker's contract | typed: read as the contract's union |
 | `server-runtime/src/stdio/auth/vocabulary.ts:80 grantType` | DestinationGrant \| undefined | `IConnectionConfig.grantType` | typed: read as the contract's union |

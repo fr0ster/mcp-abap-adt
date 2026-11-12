@@ -1381,9 +1381,13 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=PACKAGE. It offers: metadata, contents."
   },
+  "onprem HandlerGet PACKAGE part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=PACKAGE. It offers: metadata, contents."
+  },
   "onprem HandlerGet DOMAIN part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=DOMAIN. It offers: metadata, draft."
   },
   "onprem HandlerGet DOMAIN part=metadata": {
     "requests": [
@@ -1399,19 +1403,45 @@
   },
   "onprem HandlerGet DOMAIN part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=DOMAIN. It offers: metadata, draft."
   },
   "onprem HandlerGet DOMAIN part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=DOMAIN. It offers: metadata, draft."
   },
   "onprem HandlerGet DOMAIN part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=DOMAIN. It offers: metadata, draft."
+  },
+  "onprem HandlerGet DOMAIN part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/domains/doma_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/domains/doma_a?version=inactive",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/domains/doma_a?version=workingArea",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet DATA_ELEMENT part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
   },
   "onprem HandlerGet DATA_ELEMENT part=metadata": {
     "requests": [
@@ -1427,15 +1457,41 @@
   },
   "onprem HandlerGet DATA_ELEMENT part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
   },
   "onprem HandlerGet DATA_ELEMENT part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
   },
   "onprem HandlerGet DATA_ELEMENT part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+  },
+  "onprem HandlerGet DATA_ELEMENT part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=inactive",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=workingArea",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet TABLE part=source": {
     "requests": [
@@ -1463,15 +1519,41 @@
   },
   "onprem HandlerGet TABLE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=TABLE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet TABLE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=TABLE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet TABLE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=TABLE. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet TABLE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet STRUCTURE part=source": {
     "requests": [
@@ -1499,19 +1581,45 @@
   },
   "onprem HandlerGet STRUCTURE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet STRUCTURE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet STRUCTURE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet STRUCTURE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet TABLE_TYPE part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
   },
   "onprem HandlerGet TABLE_TYPE part=metadata": {
     "requests": [
@@ -1527,15 +1635,41 @@
   },
   "onprem HandlerGet TABLE_TYPE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
   },
   "onprem HandlerGet TABLE_TYPE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
   },
   "onprem HandlerGet TABLE_TYPE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+  },
+  "onprem HandlerGet TABLE_TYPE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tabletypes/ttyp_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tabletypes/ttyp_a?version=inactive",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tabletypes/ttyp_a?version=workingArea",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet DDL part=source": {
     "requests": [
@@ -1563,15 +1697,41 @@
   },
   "onprem HandlerGet DDL part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DDL. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=DDL. It offers: source, metadata, draft."
   },
   "onprem HandlerGet DDL part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DDL. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=DDL. It offers: source, metadata, draft."
   },
   "onprem HandlerGet DDL part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DDL. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=DDL. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet DDL part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet SERVICE_DEFINITION part=source": {
     "requests": [
@@ -1599,15 +1759,41 @@
   },
   "onprem HandlerGet SERVICE_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet SERVICE_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet SERVICE_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet SERVICE_DEFINITION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/srvd/sources/srvd_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/srvd/sources/srvd_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/srvd/sources/srvd_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet SERVICE_BINDING part=source": {
     "requests": [
@@ -1672,6 +1858,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
   },
+  "onprem HandlerGet SERVICE_BINDING part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+  },
   "onprem HandlerGet CLASS part=source": {
     "requests": [
       {
@@ -1698,15 +1888,104 @@
   },
   "onprem HandlerGet CLASS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=CLASS. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=CLASS. It offers: source, metadata, draft."
   },
   "onprem HandlerGet CLASS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=CLASS. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=CLASS. It offers: source, metadata, draft."
   },
   "onprem HandlerGet CLASS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=CLASS. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=CLASS. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet CLASS part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/implementations?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/implementations?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/implementations?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/definitions?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/definitions?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/definitions?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/testclasses?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/testclasses?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/testclasses?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/macros?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/macros?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/macros?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet LOCAL_TEST_CLASS part=source": {
     "requests": [
@@ -1736,6 +2015,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
   },
+  "onprem HandlerGet LOCAL_TEST_CLASS part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+  },
   "onprem HandlerGet LOCAL_TYPES part=source": {
     "requests": [
       {
@@ -1763,6 +2046,10 @@
   "onprem HandlerGet LOCAL_TYPES part=main_programs": {
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TYPES. It offers: source."
+  },
+  "onprem HandlerGet LOCAL_TYPES part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_TYPES. It offers: source."
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=source": {
     "requests": [
@@ -1792,6 +2079,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
   },
+  "onprem HandlerGet LOCAL_DEFINITIONS part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+  },
   "onprem HandlerGet LOCAL_MACROS part=source": {
     "requests": [
       {
@@ -1820,6 +2111,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_MACROS. It offers: source."
   },
+  "onprem HandlerGet LOCAL_MACROS part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_MACROS. It offers: source."
+  },
   "onprem HandlerGet PROGRAM part=source": {
     "requests": [
       {
@@ -1846,15 +2141,41 @@
   },
   "onprem HandlerGet PROGRAM part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=PROGRAM. It offers: source, metadata, draft."
   },
   "onprem HandlerGet PROGRAM part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=PROGRAM. It offers: source, metadata, draft."
   },
   "onprem HandlerGet PROGRAM part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=PROGRAM. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet PROGRAM part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/programs/programs/prog_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/programs/programs/prog_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/programs/programs/prog_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet INCLUDE part=source": {
     "requests": [
@@ -1882,11 +2203,11 @@
   },
   "onprem HandlerGet INCLUDE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INCLUDE. It offers: source, metadata, main_programs."
+    "ended": "error answer: part=urls is not available for object_type=INCLUDE. It offers: source, metadata, main_programs, draft."
   },
   "onprem HandlerGet INCLUDE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INCLUDE. It offers: source, metadata, main_programs."
+    "ended": "error answer: part=contents is not available for object_type=INCLUDE. It offers: source, metadata, main_programs, draft."
   },
   "onprem HandlerGet INCLUDE part=main_programs": {
     "requests": [
@@ -1895,6 +2216,32 @@
         "url": "/sap/bc/adt/programs/includes/incl_a/mainprograms",
         "headers": {
           "Accept": "application/vnd.sap.adt.programs.includes.mainprograms+xml"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerGet INCLUDE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/programs/includes/incl_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/programs/includes/incl_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/programs/includes/incl_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
         }
       }
     ],
@@ -1926,19 +2273,45 @@
   },
   "onprem HandlerGet INTERFACE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INTERFACE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=INTERFACE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet INTERFACE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INTERFACE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=INTERFACE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet INTERFACE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet INTERFACE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet FUNCTION_GROUP part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
   },
   "onprem HandlerGet FUNCTION_GROUP part=metadata": {
     "requests": [
@@ -1954,15 +2327,41 @@
   },
   "onprem HandlerGet FUNCTION_GROUP part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
   },
   "onprem HandlerGet FUNCTION_GROUP part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
   },
   "onprem HandlerGet FUNCTION_GROUP part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+  },
+  "onprem HandlerGet FUNCTION_GROUP part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a?version=active",
+        "headers": {
+          "Accept": "*/*"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a?version=inactive",
+        "headers": {
+          "Accept": "*/*"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a?version=workingArea",
+        "headers": {
+          "Accept": "*/*"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet FUNCTION_MODULE part=source": {
     "requests": [
@@ -1997,15 +2396,41 @@
   },
   "onprem HandlerGet FUNCTION_MODULE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet FUNCTION_MODULE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
   },
   "onprem HandlerGet FUNCTION_MODULE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet FUNCTION_MODULE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=source": {
     "requests": [
@@ -2033,15 +2458,41 @@
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet BEHAVIOR_DEFINITION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=source": {
     "requests": [
@@ -2069,15 +2520,104 @@
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/definitions?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/definitions?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/definitions?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/testclasses?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/testclasses?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/testclasses?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/macros?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/macros?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/macros?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet METADATA_EXTENSION part=source": {
     "requests": [
@@ -2105,15 +2645,41 @@
   },
   "onprem HandlerGet METADATA_EXTENSION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet METADATA_EXTENSION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
   },
   "onprem HandlerGet METADATA_EXTENSION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+  },
+  "onprem HandlerGet METADATA_EXTENSION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "onprem HandlerGet UNIT_TEST part=source": {
     "requests": [
@@ -2143,6 +2709,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=UNIT_TEST. It offers: source."
   },
+  "onprem HandlerGet UNIT_TEST part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=UNIT_TEST. It offers: source."
+  },
   "onprem HandlerGet CDS_UNIT_TEST part=source": {
     "requests": [
       {
@@ -2171,6 +2741,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=CDS_UNIT_TEST. It offers: source."
   },
+  "onprem HandlerGet CDS_UNIT_TEST part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=CDS_UNIT_TEST. It offers: source."
+  },
   "onprem HandlerGet TRANSPORT part=source": {
     "requests": [
       {
@@ -2198,6 +2772,10 @@
   "onprem HandlerGet TRANSPORT part=main_programs": {
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=TRANSPORT. It offers: source."
+  },
+  "onprem HandlerGet TRANSPORT part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=TRANSPORT. It offers: source."
   },
   "onprem HandlerLock CLASS": {
     "requests": [
@@ -4840,9 +5418,13 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=PACKAGE. It offers: metadata, contents."
   },
+  "cloud HandlerGet PACKAGE part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=PACKAGE. It offers: metadata, contents."
+  },
   "cloud HandlerGet DOMAIN part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=DOMAIN. It offers: metadata, draft."
   },
   "cloud HandlerGet DOMAIN part=metadata": {
     "requests": [
@@ -4858,19 +5440,45 @@
   },
   "cloud HandlerGet DOMAIN part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=DOMAIN. It offers: metadata, draft."
   },
   "cloud HandlerGet DOMAIN part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=DOMAIN. It offers: metadata, draft."
   },
   "cloud HandlerGet DOMAIN part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DOMAIN. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=DOMAIN. It offers: metadata, draft."
+  },
+  "cloud HandlerGet DOMAIN part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/domains/doma_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/domains/doma_a?version=inactive",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/domains/doma_a?version=workingArea",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet DATA_ELEMENT part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
   },
   "cloud HandlerGet DATA_ELEMENT part=metadata": {
     "requests": [
@@ -4886,15 +5494,41 @@
   },
   "cloud HandlerGet DATA_ELEMENT part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
   },
   "cloud HandlerGet DATA_ELEMENT part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
   },
   "cloud HandlerGet DATA_ELEMENT part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+  },
+  "cloud HandlerGet DATA_ELEMENT part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=inactive",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/dataelements/dtel_a?version=workingArea",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet TABLE part=source": {
     "requests": [
@@ -4922,15 +5556,41 @@
   },
   "cloud HandlerGet TABLE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=TABLE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet TABLE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=TABLE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet TABLE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=TABLE. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet TABLE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tables/tab_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet STRUCTURE part=source": {
     "requests": [
@@ -4958,19 +5618,45 @@
   },
   "cloud HandlerGet STRUCTURE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet STRUCTURE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet STRUCTURE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet STRUCTURE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/structures/stru_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet TABLE_TYPE part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
   },
   "cloud HandlerGet TABLE_TYPE part=metadata": {
     "requests": [
@@ -4986,15 +5672,41 @@
   },
   "cloud HandlerGet TABLE_TYPE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
   },
   "cloud HandlerGet TABLE_TYPE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
   },
   "cloud HandlerGet TABLE_TYPE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+  },
+  "cloud HandlerGet TABLE_TYPE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tabletypes/ttyp_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tabletypes/ttyp_a?version=inactive",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/tabletypes/ttyp_a?version=workingArea",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.tabletype.v1+xml"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet DDL part=source": {
     "requests": [
@@ -5022,15 +5734,41 @@
   },
   "cloud HandlerGet DDL part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DDL. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=DDL. It offers: source, metadata, draft."
   },
   "cloud HandlerGet DDL part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DDL. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=DDL. It offers: source, metadata, draft."
   },
   "cloud HandlerGet DDL part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DDL. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=DDL. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet DDL part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddl/sources/ddl_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet SERVICE_DEFINITION part=source": {
     "requests": [
@@ -5058,15 +5796,41 @@
   },
   "cloud HandlerGet SERVICE_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet SERVICE_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet SERVICE_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet SERVICE_DEFINITION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/srvd/sources/srvd_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/srvd/sources/srvd_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/srvd/sources/srvd_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet SERVICE_BINDING part=source": {
     "requests": [
@@ -5131,6 +5895,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
   },
+  "cloud HandlerGet SERVICE_BINDING part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+  },
   "cloud HandlerGet CLASS part=source": {
     "requests": [
       {
@@ -5157,15 +5925,104 @@
   },
   "cloud HandlerGet CLASS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=CLASS. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=CLASS. It offers: source, metadata, draft."
   },
   "cloud HandlerGet CLASS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=CLASS. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=CLASS. It offers: source, metadata, draft."
   },
   "cloud HandlerGet CLASS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=CLASS. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=CLASS. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet CLASS part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/implementations?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/implementations?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/implementations?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/definitions?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/definitions?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/definitions?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/testclasses?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/testclasses?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/clas_a/includes/testclasses?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet LOCAL_TEST_CLASS part=source": {
     "requests": [
@@ -5195,6 +6052,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
   },
+  "cloud HandlerGet LOCAL_TEST_CLASS part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+  },
   "cloud HandlerGet LOCAL_TYPES part=source": {
     "requests": [
       {
@@ -5222,6 +6083,10 @@
   "cloud HandlerGet LOCAL_TYPES part=main_programs": {
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TYPES. It offers: source."
+  },
+  "cloud HandlerGet LOCAL_TYPES part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_TYPES. It offers: source."
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=source": {
     "requests": [
@@ -5251,6 +6116,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
   },
+  "cloud HandlerGet LOCAL_DEFINITIONS part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+  },
   "cloud HandlerGet LOCAL_MACROS part=source": {
     "requests": [
       {
@@ -5278,6 +6147,10 @@
   "cloud HandlerGet LOCAL_MACROS part=main_programs": {
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=LOCAL_MACROS. It offers: source."
+  },
+  "cloud HandlerGet LOCAL_MACROS part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=LOCAL_MACROS. It offers: source."
   },
   "cloud HandlerGet PROGRAM part=source": {
     "requests": [
@@ -5315,6 +6188,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=PROGRAM. It offers: source, metadata."
   },
+  "cloud HandlerGet PROGRAM part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=PROGRAM. It offers: source, metadata."
+  },
   "cloud HandlerGet INCLUDE part=source": {
     "requests": [
       {
@@ -5351,6 +6228,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=INCLUDE. It offers: source, metadata."
   },
+  "cloud HandlerGet INCLUDE part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=INCLUDE. It offers: source, metadata."
+  },
   "cloud HandlerGet INTERFACE part=source": {
     "requests": [
       {
@@ -5377,19 +6258,45 @@
   },
   "cloud HandlerGet INTERFACE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INTERFACE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=INTERFACE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet INTERFACE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INTERFACE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=INTERFACE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet INTERFACE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet INTERFACE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/interfaces/intf_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet FUNCTION_GROUP part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
   },
   "cloud HandlerGet FUNCTION_GROUP part=metadata": {
     "requests": [
@@ -5405,15 +6312,41 @@
   },
   "cloud HandlerGet FUNCTION_GROUP part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
   },
   "cloud HandlerGet FUNCTION_GROUP part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
   },
   "cloud HandlerGet FUNCTION_GROUP part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+  },
+  "cloud HandlerGet FUNCTION_GROUP part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a?version=active",
+        "headers": {
+          "Accept": "*/*"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a?version=inactive",
+        "headers": {
+          "Accept": "*/*"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a?version=workingArea",
+        "headers": {
+          "Accept": "*/*"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet FUNCTION_MODULE part=source": {
     "requests": [
@@ -5448,15 +6381,41 @@
   },
   "cloud HandlerGet FUNCTION_MODULE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet FUNCTION_MODULE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
   },
   "cloud HandlerGet FUNCTION_MODULE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet FUNCTION_MODULE part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/functions/groups/fugr_a/fmodules/fm_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=source": {
     "requests": [
@@ -5484,15 +6443,41 @@
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet BEHAVIOR_DEFINITION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/bo/behaviordefinitions/bdef_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=source": {
     "requests": [
@@ -5520,15 +6505,104 @@
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/implementations?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/definitions?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/definitions?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/definitions?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/testclasses?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/testclasses?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/oo/classes/bimp_a/includes/testclasses?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet METADATA_EXTENSION part=source": {
     "requests": [
@@ -5556,15 +6630,41 @@
   },
   "cloud HandlerGet METADATA_EXTENSION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata."
+    "ended": "error answer: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet METADATA_EXTENSION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata."
+    "ended": "error answer: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
   },
   "cloud HandlerGet METADATA_EXTENSION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata."
+    "ended": "error answer: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+  },
+  "cloud HandlerGet METADATA_EXTENSION part=draft": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?version=active",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?version=inactive",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/ddlx/sources/ddlx_a/source/main?version=workingArea",
+        "headers": {
+          "Accept": "text/plain"
+        }
+      }
+    ],
+    "ended": "answered"
   },
   "cloud HandlerGet UNIT_TEST part=source": {
     "requests": [
@@ -5594,6 +6694,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=UNIT_TEST. It offers: source."
   },
+  "cloud HandlerGet UNIT_TEST part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=UNIT_TEST. It offers: source."
+  },
   "cloud HandlerGet CDS_UNIT_TEST part=source": {
     "requests": [
       {
@@ -5622,6 +6726,10 @@
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=CDS_UNIT_TEST. It offers: source."
   },
+  "cloud HandlerGet CDS_UNIT_TEST part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=CDS_UNIT_TEST. It offers: source."
+  },
   "cloud HandlerGet TRANSPORT part=source": {
     "requests": [
       {
@@ -5649,6 +6757,10 @@
   "cloud HandlerGet TRANSPORT part=main_programs": {
     "requests": [],
     "ended": "error answer: part=main_programs is not available for object_type=TRANSPORT. It offers: source."
+  },
+  "cloud HandlerGet TRANSPORT part=draft": {
+    "requests": [],
+    "ended": "error answer: part=draft is not available for object_type=TRANSPORT. It offers: source."
   },
   "cloud HandlerLock CLASS": {
     "requests": [

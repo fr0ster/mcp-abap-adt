@@ -82,6 +82,7 @@ import {
   handlerSessionDefinition,
   SESSION_ACTIONS,
 } from '../compact/longSession/handleHandlerSession';
+import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import type { VariantToolDefinition } from '../handlers/interfaces';
 
 /** How a deny list narrows one compact tool. */
@@ -205,6 +206,7 @@ const NARROWING_LIST: readonly Narrowing[] = [
           keptOf(COMPACT_MAIN_PROGRAMS[variant], values),
           codes,
           COMPACT_READ[variant],
+          keptOf(HANDLER_GET_DRAFT_TYPES[variant], values),
         ),
         members,
       };

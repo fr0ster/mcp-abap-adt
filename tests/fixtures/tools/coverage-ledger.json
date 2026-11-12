@@ -20,6 +20,116 @@
       "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
     }
   },
+  "GetObjectDraft#BEHAVIOR_DEFINITION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#BEHAVIOR_IMPLEMENTATION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#CLASS": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#DATA_ELEMENT": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#DDL": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#DOMAIN": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#FUNCTION_GROUP": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#FUNCTION_MODULE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#INCLUDE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#INTERFACE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#METADATA_EXTENSION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#PROGRAM": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#SERVICE_DEFINITION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#STRUCTURE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#TABLE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#TABLE_TYPE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
   "GetObjectOutline#CLAS/OC": {
     "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
     "live": {
@@ -73,6 +183,116 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/activate.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/activate.live.test.ts"
+    }
+  },
+  "HandlerGet#BEHAVIOR_DEFINITION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#BEHAVIOR_IMPLEMENTATION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#CLASS#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#DATA_ELEMENT#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#DDL#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#DOMAIN#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#FUNCTION_GROUP#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#FUNCTION_MODULE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#INCLUDE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#INTERFACE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#METADATA_EXTENSION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#PROGRAM#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#SERVICE_DEFINITION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#STRUCTURE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#TABLE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#TABLE_TYPE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
     }
   },
   "HandlerGetData": {

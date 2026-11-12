@@ -38,6 +38,7 @@ export {
   handleGetActivationResults,
   handleGetActivationStatus,
 } from '../../handlers/common/readonly/handleGetActivationRun.js';
+export { handleGetObjectDraft } from '../../handlers/common/readonly/handleGetObjectDraft.js';
 export { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement.js';
 export { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl.js';
 export { handleGetDomain } from '../../handlers/domain/high/handleGetDomain.js';

@@ -196,6 +196,12 @@
     ]
   },
   {
+    "tool": "GetObjectDraft",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectDraft.ts#handleGetObjectDraft",
+    "sends": "for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together"
+  },
+  {
     "tool": "GetObjectVersionSource",
     "set": "full",
     "handler": "src/handlers/common/readonly/handleGetObjectVersionSource.ts#handleGetObjectVersionSource",
@@ -588,6 +594,20 @@
       {
         "argument": "run_id",
         "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "as the full set's draft read: for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "draft"
+        ]
       }
     ]
   },

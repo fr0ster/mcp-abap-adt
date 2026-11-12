@@ -148,6 +148,19 @@ const FULL: BatchEntryCase[] = [
     tool: 'GetObjectVersions',
     args: { object_type, object_name: 'OBJ_A' },
   })),
+  // The draft reads: every part's three versions, sent together.
+  ...['CLASS', 'PROGRAM', 'DDL', 'DOMAIN'].map((object_type) => ({
+    tool: 'GetObjectDraft',
+    args: { object_type, object_name: 'OBJ_A' },
+  })),
+  {
+    tool: 'GetObjectDraft',
+    args: {
+      object_type: 'FUNCTION_MODULE',
+      object_name: 'Z_FM_A',
+      function_group_name: 'ZFG_A',
+    },
+  },
   {
     tool: 'GetObjectVersionSource',
     args: { object_type: 'class', content_uri: VERSION_URI },
@@ -347,6 +360,19 @@ const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
 
 /** The compact set's single-request calls. */
 const COMPACT: BatchEntryCase[] = [
+  {
+    tool: 'HandlerGet',
+    args: { object_type: 'CLASS', part: 'draft', class_name: 'CLAS_A' },
+  },
+  {
+    tool: 'HandlerGet',
+    args: {
+      object_type: 'FUNCTION_MODULE',
+      part: 'draft',
+      function_module_name: 'Z_FM_A',
+      function_group_name: 'ZFG_A',
+    },
+  },
   ...SOURCE_READS.map(([object_type, names]) => ({
     tool: 'HandlerGet',
     args: { object_type, ...names },

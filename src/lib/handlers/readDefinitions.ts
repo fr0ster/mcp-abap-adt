@@ -11,6 +11,7 @@ import { TOOL_DEFINITION as GetLocalDefinitions } from '../../handlers/class/hig
 import { TOOL_DEFINITION as GetLocalMacros } from '../../handlers/class/high/handleGetLocalMacros.js';
 import { TOOL_DEFINITION as GetLocalTestClass } from '../../handlers/class/high/handleGetLocalTestClass.js';
 import { TOOL_DEFINITION as GetLocalTypes } from '../../handlers/class/high/handleGetLocalTypes.js';
+import { TOOL_DEFINITION as GetObjectDraft } from '../../handlers/common/readonly/handleGetObjectDraft.js';
 import { TOOL_DEFINITION as GetDataElement } from '../../handlers/data_element/high/handleGetDataElement.js';
 import { TOOL_DEFINITION as GetDdl } from '../../handlers/ddl/high/handleGetDdl.js';
 import { TOOL_DEFINITION as GetDomain } from '../../handlers/domain/high/handleGetDomain.js';
@@ -55,6 +56,7 @@ export const READ_DEFINITIONS = {
   GetFunctionModule,
   GetInclude,
   GetMainPrograms,
+  GetObjectDraft,
   GetInterface,
   GetMetadataExtension,
   GetPackage,

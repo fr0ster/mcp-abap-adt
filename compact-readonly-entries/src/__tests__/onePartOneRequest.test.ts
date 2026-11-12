@@ -104,10 +104,10 @@ const SOURCE_ONLY: Array<[string, Record<string, unknown>]> = [
 
 /** The types without a source, and the parts each has. */
 const SOURCELESS: Array<[string, Record<string, unknown>, string]> = [
-  ['DOMAIN', { domain_name: 'DOM_A' }, 'metadata'],
-  ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }, 'metadata'],
-  ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }, 'metadata'],
-  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }, 'metadata'],
+  ['DOMAIN', { domain_name: 'DOM_A' }, 'metadata, draft'],
+  ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }, 'metadata, draft'],
+  ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }, 'metadata, draft'],
+  ['TABLE_TYPE', { table_type_name: 'TTYP_A' }, 'metadata, draft'],
   ['PACKAGE', { package_name: 'PKG_A' }, 'metadata, contents'],
 ];
 

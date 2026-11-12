@@ -6,6 +6,7 @@ import {
   COMPACT_READ,
   compactGetDescription,
   compactGetSchemaFor,
+  HANDLER_GET_DRAFT_TYPES,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import {
@@ -38,6 +39,9 @@ export const TOOL_DEFINITION = {
     inputSchema: compactGetSchemaFor(
       COMPACT_READ[variant],
       COMPACT_MAIN_PROGRAMS[variant],
+      undefined,
+      COMPACT_READ[variant],
+      HANDLER_GET_DRAFT_TYPES[variant],
     ),
     members: COMPACT_READ[variant],
   })),
@@ -61,6 +65,7 @@ const OBJECT_PARTS: readonly CompactReadPart[] = [
   'urls',
   'contents',
   'main_programs',
+  'draft',
 ];
 
 /** Whether `value` is a part read by object_type. */
@@ -222,7 +227,7 @@ export async function handleHandlerGet(
   let read = { ...args, object_type: args.object_type };
   if (
     args.object_type === 'FUNCTION_MODULE' &&
-    (part === 'source' || part === 'metadata')
+    (part === 'source' || part === 'metadata' || part === 'draft')
   ) {
     const named = functionModuleArgs(read);
     if (!named.ok) return named.refusal;

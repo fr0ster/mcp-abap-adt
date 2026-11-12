@@ -336,6 +336,7 @@ export const TOOLS_WITHOUT_NEED: ReadonlySet<string> = new Set([
   'GetEnhancements',
   'GetStructuresList',
   'GetObjectVersions',
+  'GetObjectDraft',
   'GetObjectVersionSource',
   'GetObjectVersionDiff',
   'ListFunctionGroupIncludes',

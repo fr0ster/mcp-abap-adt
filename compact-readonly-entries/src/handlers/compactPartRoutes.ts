@@ -19,6 +19,7 @@ import {
   type CompactObjectType,
   child,
   dispatchCompact,
+  HANDLER_GET_DRAFT_TYPES,
   isElement,
   isList,
   jsonOf,
@@ -30,6 +31,7 @@ import {
   variantOf,
 } from '@mcp-abap-adt/lib/handlers';
 import {
+  handleGetObjectDraft,
   handleGetPackageContents,
   handleGetServiceBindingPreviewUrl,
   READ_DEFINITIONS,
@@ -175,12 +177,66 @@ export function compactMainProgramsRoutes(
   return routes;
 }
 
+/** The argument that names the object, per type the draft part reads. */
+const DRAFT_NAME_ARGUMENT: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    PROGRAM: 'program_name',
+    INCLUDE: 'include_name',
+    INTERFACE: 'interface_name',
+    CLASS: 'class_name',
+    BEHAVIOR_IMPLEMENTATION: 'behavior_implementation_name',
+    FUNCTION_MODULE: 'function_module_name',
+    FUNCTION_GROUP: 'function_group_name',
+    DDL: 'ddl_name',
+    BEHAVIOR_DEFINITION: 'behavior_definition_name',
+    METADATA_EXTENSION: 'metadata_extension_name',
+    SERVICE_DEFINITION: 'service_definition_name',
+    TABLE: 'table_name',
+    STRUCTURE: 'structure_name',
+    DOMAIN: 'domain_name',
+    DATA_ELEMENT: 'data_element_name',
+    TABLE_TYPE: 'table_type_name',
+  } satisfies Partial<Record<CompactObjectType, string>>),
+);
+
+const objectDraft = defineTool(
+  READ_DEFINITIONS.GetObjectDraft,
+  handleGetObjectDraft,
+).call;
+
+/** `part: 'draft'`: the object's draft, read as the full set's draft tool reads it. */
+const readDraft: CompactHandler = (context, args) => {
+  const type = args.object_type;
+  const argument =
+    typeof type === 'string' ? DRAFT_NAME_ARGUMENT.get(type) : undefined;
+  const name = argument === undefined ? undefined : args[argument];
+  return objectDraft(context, {
+    object_type: type,
+    object_name: name,
+    ...(type === 'FUNCTION_MODULE'
+      ? { function_group_name: args.function_group_name }
+      : {}),
+  });
+};
+
+/** `part: 'draft'`, on the members the draft part reads on `variant`. */
+export function compactDraftRoutes(
+  variant: MainProgramsVariant,
+): Partial<Record<CompactObjectType, CompactHandler>> {
+  const routes: Partial<Record<CompactObjectType, CompactHandler>> = {};
+  for (const member of HANDLER_GET_DRAFT_TYPES[variant]) {
+    routes[member] = readDraft;
+  }
+  return routes;
+}
+
 export type CompactReadPart =
   | 'source'
   | 'metadata'
   | 'urls'
   | 'contents'
-  | 'main_programs';
+  | 'main_programs'
+  | 'draft';
 
 /**
  * The types with a metadata document and no source: their `Get<Type>` reads
@@ -216,6 +272,7 @@ export function partsFor(
   if (compactMainProgramsRoutes(variant)[objectType]) {
     parts.push('main_programs');
   }
+  if (compactDraftRoutes(variant)[objectType]) parts.push('draft');
   return parts;
 }
 
@@ -234,7 +291,9 @@ export async function routeCompactPart(
         ? compactContentsRoutes
         : part === 'main_programs'
           ? compactMainProgramsRoutes(variant)
-          : compactUrlRoutes;
+          : part === 'draft'
+            ? compactDraftRoutes(variant)
+            : compactUrlRoutes;
   const routed = routes[args.object_type];
   if (routed === undefined) {
     // Answered as a refusal rather than thrown, the way the router answers an

@@ -22,6 +22,7 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { jsonOf } from '../jsonText.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';

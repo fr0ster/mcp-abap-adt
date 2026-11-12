@@ -19,6 +19,7 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
+import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { createArguments } from '../handlers/createArguments';
 import { listedValues } from '../handlers/listedValues';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
@@ -585,17 +586,36 @@ export const COMPACT_MAIN_PROGRAMS = {
   cloud: [],
 } as const satisfies Record<ProjectionVariant, readonly ReadMember[]>;
 
-/** `HandlerGet`'s `part`, with `main_programs` where a member serves it. */
-function readPartFor(mainPrograms: readonly ReadMember[]) {
-  return mainPrograms.length === 0
-    ? readPartSchema
-    : z
-        .enum([...READ_PARTS, 'main_programs'])
-        .default('source')
-        .optional()
-        .describe(
-          `${READ_PART_WORDS} main_programs (${mainPrograms.join(', ')}): the include's main programs.`,
-        );
+/**
+ * `HandlerGet`'s `part`, with `main_programs` where a member serves it and
+ * `draft` for the members the draft part reads.
+ */
+function readPartFor(
+  mainPrograms: readonly ReadMember[],
+  draftTypes: readonly ReadMember[],
+) {
+  const extra = [
+    ...(mainPrograms.length > 0 ? ['main_programs'] : []),
+    ...(draftTypes.length > 0 ? ['draft'] : []),
+  ];
+  if (extra.length === 0) return readPartSchema;
+  const words = [
+    ...(mainPrograms.length > 0
+      ? [
+          `main_programs (${mainPrograms.join(', ')}): the include's main programs.`,
+        ]
+      : []),
+    ...(draftTypes.length > 0
+      ? [
+          `draft (${draftTypes.join(', ')}): whether each part of the object holds an unactivated change, and whose.`,
+        ]
+      : []),
+  ];
+  return z
+    .enum([...READ_PARTS, ...extra])
+    .default('source')
+    .optional()
+    .describe(`${READ_PART_WORDS} ${words.join(' ')}`);
 }
 
 /**
@@ -678,6 +698,7 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
   mainPrograms: readonly ReadMember[] = [],
   codes?: readonly string[],
   full: readonly ReadMember[] = members,
+  draftTypes: readonly ReadMember[] = [],
 ) {
   const left = leftOf(full, members);
   const properties = {
@@ -699,7 +720,7 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
       ...offeredProperties,
       background: properties.background,
       object_type: properties.object_type,
-      part: readPartFor(mainPrograms),
+      part: readPartFor(mainPrograms, draftTypes),
       ...codeArgument,
     });
   }
@@ -708,7 +729,7 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
   return z.object({
     ...rest,
     background: properties.background,
-    part: readPartFor(mainPrograms),
+    part: readPartFor(mainPrograms, draftTypes),
     ...codeArgument,
   });
 }
@@ -716,6 +737,9 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
 export const compactGetSchema = compactGetSchemaFor(
   COMPACT_READ.onprem,
   COMPACT_MAIN_PROGRAMS.onprem,
+  undefined,
+  COMPACT_READ.onprem,
+  HANDLER_GET_DRAFT_TYPES.onprem,
 );
 
 const UPDATE_PROPERTIES = {

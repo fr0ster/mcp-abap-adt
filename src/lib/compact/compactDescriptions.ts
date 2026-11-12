@@ -22,6 +22,7 @@ import {
   type ProjectionVariant,
 } from '../adtProjections';
 import { parentedCodesOf } from '../adtTypeCode';
+import { draftPartWords, HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { withLongToolAdvice } from '../longTools';
 import {
   either,
@@ -142,6 +143,17 @@ function partsPerType(left: Left): string {
     .join('');
 }
 
+/** The sentence on `part: 'draft'`, for the draft types left. */
+function draftPart(variant: ProjectionVariant, left: Left): string {
+  const types = left.of(HANDLER_GET_DRAFT_TYPES[variant]);
+  if (types.length === 0) return '';
+  const timeless = left.of<ReadMember>([
+    'METADATA_EXTENSION',
+    'SERVICE_DEFINITION',
+  ]);
+  return ` draft (${listed(types)}) reads the active, inactive and working versions of each part of the object together (${draftPartWords(variant, types)}) and answers { object_type, object_name, has_draft, parts }: per part draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other${when(timeless.length > 0, ` (null for ${listed(timeless)}, whose ETag carries a constant time)`)}, and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's.`;
+}
+
 /** The sentence on reading a unit-test run's result, for the run types left. */
 function unitTestRuns(left: Left): string {
   const runs = left.of<ReadMember>(['UNIT_TEST', 'CDS_UNIT_TEST']);
@@ -158,7 +170,7 @@ export function compactGetDescription(
 ): string {
   const left = leftOf(COMPACT_READ[variant], members);
   return withLongToolAdvice(
-    `[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls${when(left.has('SERVICE_BINDING'), ' (SERVICE_BINDING)')} the service URL, its $metadata and the browser preview, contents${when(left.has('PACKAGE'), ' (PACKAGE)')} the objects the package holds, its walk read level by level in ADT batch envelopes${when(left.has('PACKAGE'), '; package_names lists several packages, read together, one entry per package in the order given')}. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: ${partsPerType(left)}every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. ${when(members.length > 0, `Otherwise object_type required: ${named(members, READ_TOKENS)}.`)}${when(left.has('TRANSPORT'), " TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position.")}${unitTestRuns(left)}`,
+    `[read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls${when(left.has('SERVICE_BINDING'), ' (SERVICE_BINDING)')} the service URL, its $metadata and the browser preview, contents${when(left.has('PACKAGE'), ' (PACKAGE)')} the objects the package holds, its walk read level by level in ADT batch envelopes${when(left.has('PACKAGE'), '; package_names lists several packages, read together, one entry per package in the order given')}. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: ${partsPerType(left)}every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. ${when(members.length > 0, `Otherwise object_type required: ${named(members, READ_TOKENS)}.`)}${when(left.has('TRANSPORT'), " TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position.")}${unitTestRuns(left)}${draftPart(variant, left)}`,
   );
 }
 

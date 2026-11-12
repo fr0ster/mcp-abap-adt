@@ -60,6 +60,7 @@ describe('the parts a compact read can answer', () => {
     expect(partsFor('CLASS' as never, true, 'onprem')).toEqual([
       'source',
       'metadata',
+      'draft',
     ]);
     expect(partsFor('TRANSPORT' as never, true, 'onprem')).toEqual(['source']);
   });
@@ -69,6 +70,7 @@ describe('the parts a compact read can answer', () => {
       'source',
       'metadata',
       'main_programs',
+      'draft',
     ]);
     expect(partsFor('INCLUDE', true, 'cloud')).toEqual(['source', 'metadata']);
   });
@@ -101,7 +103,7 @@ describe('the parts a compact read can answer', () => {
         table_type_name: 'X',
       }),
     ).toBe(
-      'part=source is not available for object_type=TABLE_TYPE. It offers: metadata.',
+      'part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft.',
     );
   });
 

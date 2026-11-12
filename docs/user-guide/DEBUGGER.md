@@ -595,7 +595,8 @@ ends by:
   stop, whatever it is: measured on premise (2026-10-19, `refusalFollowUps.test.ts`), with
   the listener's poll held so that the second stop is sent and the password made wrong
   between the two, over HTTP with the session ended between them the second stop was
-  answered `400` (`ICMENOSESSION`) and over RFC it was answered `200`; each time the stop
+  answered `400` (`ICMENOSESSION`), which the connection reports as the session gone
+  (`ADT_SESSION_REPLACED`, measured again 2026-11-12), and over RFC it was answered `200`; each time the stop
   answered `stopped`, sent nothing more, asked nothing more of the credential and held
   nothing. A wrong password brings no credential refusal to the second stop on either
   transport — a live session's cookie, or the RFC conversation's one logon, authenticates

@@ -104,14 +104,15 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
        `src/utils/requestTrace.ts`, drops its `<T, D>` too, and `IMessageClassChanges` is
        widened as well (the owner's decision).
      - `AdtBatchConnection.makeAdtRequest` keeps its signature.
-     - This fits the adt-clients / interfaces-adt minors already coming into this release
-       (verdict-session, mcp-abap-adt-clients#310, not merged). The change goes into that PR's
-       release.
+     - Planned at first to ride in the verdict-session release (mcp-abap-adt-clients#310).
+       As done, it is a release of its own after that one: #311, adt-clients 45.5.0.
   4. **connection 23.1.0** (minor), the release after 23.0.0, which is published: the range
      moves to `^5.0.0`.
      - As done (owner-accepted): released as **24.0.0**, a major, because the exported
        `AbapConnection` alias changed incompatibly. It is published.
-     - Its generic `makeAdtRequest` keeps its signature, so no caller of connection breaks.
+     - Its generic `makeAdtRequest` keeps its signature, so no caller of `makeAdtRequest`
+       breaks. A caller of the exported `AbapConnection` alias does (the reason it is a
+       major).
      - The `as unknown as` inside it is connection's own code, outside this goal (the server's).
   5. **This server** takes the four from the registry.
      - It drops the `<T, D>` of its five pass-throughs.
@@ -363,6 +364,11 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     - So an embedder that calls an exported handler with raw arguments parses them with the
       tool's schema first, or calls the tool's entry. `MIGRATION-24.0.md` says so. It is a
       break for those callers only, inside the 24.0.0 major.
+    - Whether a direct call's answers past the schema stay as they are (the dead fallbacks and
+      re-checks) is open for the owner (plan S2a, "direct calls").
+  - **`/compact-shared` additions.** `compactActivateSchemaFor`, `compactGetSchemaFor` and
+    `handlerGetDataDefinition` keep their names and signatures. The two halves each is split
+    into (plan S2a) are new exports, a compatible addition.
   - **Shared contracts that §3's sites meet and that a package entry exports** (Measured: the
     types the root project's diagnostics name, matched against the exports of every
     `package.json` `exports` entry, by the type checker):
@@ -390,8 +396,8 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     Noted in `MIGRATION-24.0.md`.
 - **Upstream:**
   - interfaces-adt-connection 5.0.0 (major);
-  - interfaces-adt and adt-strategies minors, adt-clients minor in #310's release (ranges and
-    §3's widening);
+  - interfaces-adt 27.4.0 (minor); adt-clients 45.5.0, adt-strategies 0.23.0 and
+    adt-clients-legacy 0.9.4 (minors, mcp-abap-adt-clients#311: ranges and §3's widening);
   - connection 23.1.0 (minor) as planned; released as 24.0.0, a major (owner-accepted, §2).
     The server's CHANGELOG names the range move, and `MIGRATION-24.0.md` connection's
     `AbapConnection` change where an exported signature of the server names it.

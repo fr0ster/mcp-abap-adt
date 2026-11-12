@@ -274,6 +274,12 @@ below is what it carries besides.
         The handler's definition uses the first, so its schema type has one shape. The
         narrowing picks between the two in plain code, as it picks a branch today. The
         schemas built are the same ones, so no listed schema changes.
+      - **Exported API.** All three are exported through `/compact-shared`
+        (`src/lib/compact/index.ts:58`, `:73`, `:101`).
+        - Each keeps its name and signature: it becomes the chooser between its two halves,
+          so an embedder's call compiles and builds the same schema.
+        - The two halves of each are added to `/compact-shared` as new exports, a compatible
+          addition. They are listed in spec §8 and the CHANGELOG.
     - **The other 10.** Measured: each compiles as derived here.
       - Typed by the schema whose output their one caller hands them:
         - `StartUnitTestRunArgs`: the output of `compactUnitTestRunSchema`;
@@ -300,13 +306,34 @@ below is what it carries besides.
     tools/list stays byte for byte. No CHANGELOG fix entry follows from this step. The tool
     description guard, the pinned renderings (`fixtureRenderings.ts`, the `fixtureBytes` and
     `rebuiltDescriptions` pins) and `changedHandlerRequests.test.ts` then require nothing,
-    and staying unchanged is their proof that no schema moved. None is a defect: no call can
-    deliver the key to the handler.
+    and staying unchanged is their proof that no schema moved. None is a defect: no call
+    through the schema can deliver the key to the handler.
+  - **Open for the owner: direct calls of an exported handler past its schema** (goal-changing,
+    Codex round 1).
+    - The handlers that `/handlers`, `/read` and `/write` export can be called directly,
+      without the schema. The code supports this in places: `unknownReadPart.test.ts` tests
+      HandlerGet refusing a part "reaching the handler past its schema, as an embedder's call
+      can", and GetObjectStructure reads fallbacks no schema passes.
+    - Typing `args` by the schema already narrows what a direct caller may pass (spec §8). The
+      dead reads and checks then remain reachable only by a JavaScript caller, or one that
+      casts.
+    - The goal says "every other answer stays as it is". Two readings:
+      - **(a)** it binds the model's calls, which always pass the schema. S2a then drops the
+        GetObjectStructure fallback; `unknownReadPart.test.ts` goes through HandlerGet's entry
+        and asserts the schema's refusal; S3b removes the dead re-checks. A direct caller
+        follows `MIGRATION-24.0.md`: it parses with the tool's schema or calls the entry.
+      - **(b)** it binds direct calls too. Then the fallback, HandlerGet's own part check and
+        every handler re-check stay, with their tests as they are. Exported handlers whose
+        refusal a direct caller relies on keep a boundary of their own: a value from outside
+        the type system, read in plain code.
+    - The plan is written for **(a)**, the reading S2a's type change already implies. The
+      three items that depend on it (the fallback, `unknownReadPart.test.ts`, S3b's dead
+      re-checks) wait for the owner's answer; nothing else in S2a does.
 
     | Key | Read at | The schema | Decision |
     |---|---|---|---|
     | `super_package` | `handleCreateDomain.ts:158`, handed to `validateTransportRequest`, which ignores that parameter (`_superPackage`) | CreateDomain is a strict object (`createArguments`): the key is refused by name | dead: stop reading it; `validateTransportRequest` (not exported) loses the unused parameter, which no other caller passes |
-    | `object_type`, `object_name` | `handleGetObjectStructure.ts:197-198`, as fallbacks for `objecttype` / `objectname` | a plain object requiring `objecttype` and `objectname`; undeclared keys are stripped | dead: stop reading them. The refusal words, which name the fallback, stay as they are (an answer); rewording them is an open point for the owner |
+    | `object_type`, `object_name` | `handleGetObjectStructure.ts:197-198`, as fallbacks for `objecttype` / `objectname` | a plain object requiring `objecttype` and `objectname`; undeclared keys are stripped | unreachable through the schema, but the handler is exported (`/handlers/read`) and a direct call reaches the fallback: the owner's decision on direct calls (below). The refusal words, which name the fallback, stay as they are |
     | `object_type` | HandlerActivate, HandlerGet | declared; absent only in the deny list's every-name-denied branch | the builder split above |
     | `sql_query` | HandlerGetData | declared; absent only in the branch without SQL | the builder split above |
 
@@ -326,8 +353,20 @@ below is what it carries besides.
         its words exported from the callee so they have one source, and nothing is sent.
         Then it passes `string`.
       - The answer is the same as today: the callee refuses an absent value with those words
-        now. `compactRequiredArguments.test.ts:314` already drives this path. It stays and
-        passes before and after, so the step adds a characterization test, not a fix.
+        now. So these are characterization tests, not a fix. Written first in batch 1, through
+        HandlerValidate's entry with `object_type` SERVICE_BINDING, they pass before and after:
+        - `service_definition_name` absent;
+        - `package_name` absent;
+        - both absent: `service_definition_name` is named, as the callee checks it first
+          (`handleValidateServiceBinding.ts:100`, before `:105`);
+        - each case sends nothing.
+      - `compactRequiredArguments.test.ts:312`-`:327` calls the callee directly, with
+        `package_name` left out (`{}`), empty and blank. Once the callee is typed by its schema
+        (batch 4):
+        - the `{}` case goes through ValidateServiceBinding's entry and expects the schema's
+          refusal naming `package_name`, which is what the model gets;
+        - the empty and blank cases stay direct calls (a `string`) and keep "package_name is
+          required".
   - **The test sites** (Measured with every handler converted; assertions in tests stay
     allowed by the goal, but none is added here).
     - **Values the tool's schema refuses, handed to the handler directly.** These test a
@@ -345,11 +384,13 @@ below is what it carries besides.
         typed `string | number` (`unknownReadPart.test.ts:20`).
       - Probed on this branch's build: the schemas refuse `'prog/p'`, `'ZZZZ/ZZ'` and
         `'not_a_type'`.
+      - Except where the owner's decision on direct calls (below) keeps them.
       - **They go through the boundary the model's arguments take:** the tool's entry
         (`defineTool(TOOL_DEFINITION, handler).call(context, raw)`). `raw` is `ToolArgs`, the
         type of the arguments before the schema, so a wrong value needs no cast.
-      - Each test asserts what the model gets. Where the schema refuses, that is the
-        refusal naming the issue, and no request is recorded. Where the schema accepts and
+      - Each test asserts what the model gets. Where the schema refuses, the entry's `call`
+        throws the refusal naming the issue, and no request is recorded. The test makes its
+        rejection expectation before it triggers the call. Where the schema accepts and
         the handler refuses (a member outside the connection's variant), it is the handler's
         refusal, as today.
       - A test whose assertion was a handler refusal that the schema now comes before is
@@ -365,7 +406,7 @@ below is what it carries besides.
       `TableContentsHandlers.test.ts:70`, `:110` and `readonlySingleCall.test.ts:328`. Each
       parses its arguments with the tool's schema (`TOOL_DEFINITION.inputSchema.parse`), which
       yields the output type with the defaults the server applies.
-    - **The dead GetObjectStructure fallback.** Sites: `caseRule.test.ts:105`,
+    - **The GetObjectStructure fallback** (reading (a) above). Sites: `caseRule.test.ts:105`,
       `dbviewName.test.ts:67`, `mainTypeBoundary.test.ts:65`,
       `projectionBoundary.test.ts:162` and `readonlySingleCall.test.ts:305`. Each passes the
       declared `objecttype` / `objectname`; its assertions stay.
@@ -380,27 +421,48 @@ below is what it carries besides.
   - **Batches,** each green under `npm run test:check` and CI's step list before the next.
     Each batch carries its own call fixes and test sites, so no commit breaks the normal
     build.
+    - **The ordering rule:** a caller converts in the same batch as its callee, or later.
+      Each inline literal, spread definition and caller-typed contract goes in its
+      directory's batch, so each high check wrapper goes with its low callee. Codex measured
+      the break otherwise: low CheckClass and CheckDdl converted in batch 2 with their
+      wrappers left behind fail at `handleCheckClass.ts:51` and `handleCheckDdl.ts:53`.
+    - A compact facade may go before its callee: its own type is no looser than the callee's
+      hand type today, and the full conversion compiles (Measured).
     1. **The splits and the compact handlers.**
        - The three builder splits.
        - The 12 compact spread definitions, the 20 mechanical compact types (compact-modify
          4, compact-readonly-entries 10, `src/lib/compact` 6) and `handleHandlerGet`.
-       - The other 10 and `ScheduleProfilerTraceArgs`.
-       - The HandlerValidate narrowing, with its characterization test first.
-    2. **Mechanical, write-side directories** (48): behavior_definition 6,
-       behavior_implementation 3, class 14, data_element 7, ddl 6, ddlx 5, domain 7, with
-       the CreateDomain `super_package` read removed.
-    3. **Mechanical** (49): function 9, function_group 2, function_include 3,
-       function_module 1, include 6, interface 6, message_class 8, metadata_extension 1,
-       package 7, program 6.
-    4. **Mechanical** (49): service_binding 7, service_definition 4, structure 6, table 6,
-       table_type 7, transport 10, enhancement 1, atc 4, common 4.
-    5. **Mechanical** (35): system 14 (its fifteenth, `ScheduleProfilerTraceArgs`, is in
-       batch 1), unit_test 21.
-    6. **The 17 source readers** and `SourceRangeArgs`.
-    7. **The 27 inline literals**, the five check wrappers among them, the GetObjectStructure
-       fallback dropped, and the seven other spread definitions in `src` (RunATC,
-       GetObjectDraft, the three version reads, GetObjectOutline, GetWhereUsed) and
-       `handleRunAbapUnit`.
+       - The HandlerValidate narrowing, with its characterization tests first.
+    2. **Write-side directories:** behavior_definition 6, behavior_implementation 3,
+       class 14, data_element 7, ddl 6, ddlx 5, domain 7 (48 mechanical).
+       - Their inline literals: the check wrappers of class, ddl, behavior_definition,
+         data_element, ddlx and domain.
+       - The CreateDomain `super_package` read removed.
+    3. **function 9, function_group 2, function_include 3, function_module 1, include 6,
+       interface 6, message_class 8, metadata_extension 1, package 7, program 6** (49
+       mechanical).
+       - Their inline literals: the check wrappers of function (CheckFunctionModule,
+         CheckFunctionGroup), interface, package and program, and the two function_include
+         lists.
+       - `IncludesListArgs`.
+    4. **service_binding 7, service_definition 4, structure 6, table 6, table_type 7,
+       transport 10, enhancement 1, atc 4, common 4** (49 mechanical).
+       - Their inline literals: CheckStructure, CheckTable, GetStructuresList and
+         GetTableContents.
+       - RunATC.
+       - From common: GetObjectDraft and the three version reads; `handleDeletionCheck`'s
+         `Args`, `ActivateObjectArgs` and `ActivationRunArgs` / `ActivationStatusArgs`.
+       - The `compactRequiredArguments.test.ts:314` adaptation (below), with
+         ValidateServiceBinding's conversion.
+    5. **system 14, unit_test 21, and search** (35 mechanical).
+       - `ScheduleProfilerTraceArgs` from the compact schema; `StartUnitTestRunArgs`.
+       - The inline literals of system and search (GetSqlQuery, GetTransaction,
+         GetObjectInfo, GetInactiveObjects, GetAdtTypes, GetObjectStructure,
+         GetServiceBindingPreviewUrl, SearchObject, GetObjectsList, GetObjectsByType).
+       - GetObjectOutline, GetWhereUsed and `handleRunAbapUnit`.
+       - The GetObjectStructure fallback, as the owner decides (below).
+    6. **The 17 source readers** and `SourceRangeArgs`. Batches 2 to 5 leave both as they are,
+       and no other conversion depends on them.
 
     For each batch:
     - **Tests first:**
@@ -423,8 +485,11 @@ below is what it carries besides.
         `ActivateDomainArgs` with `detail?: …`), and its pairing fails under
         `test:check:exact`;
       - batch 1: merge one split builder back into its union, and the handler's read of the
-        key fails `test:check`; type `ScheduleProfilerTraceArgs` from the high tool's
-        schema again, and `compact-modify/src/group.ts` fails `test:check`;
+        key fails `test:check`;
+      - batch 5: type `ScheduleProfilerTraceArgs` from the high tool's schema again, and
+        `compact-modify/src/group.ts` fails `test:check`;
+      - batches 2 to 4: leave one check wrapper on its inline `version?: string` while its
+        low callee is converted, and the wrapper's call fails `test:check`;
       - for a spread definition: narrow its handler's `object_type` to the cloud members,
         and the on-premise variant's typecheck fails.
   - **Acceptance:**
@@ -525,7 +590,8 @@ below is what it carries besides.
   - properties checked by their writers;
   - the handler checks S2a lists as dead: a runtime check of a value the handler's `args`
     type now proves (a code the schema's enum already holds, case-folded again), each
-    removed with the boundary test S2a points at it kept green.
+    removed with the boundary test S2a points at it kept green. This item waits for the
+    owner's answer on direct calls (S2a); under reading (b) the checks stay.
 
   Each retyping that changes behaviour gets a failing-first test.
 - **S3b in batches,** each verified by `npm run measure:unknown` (its list shrinks by the
@@ -619,6 +685,7 @@ After U1 to U4 are published.
     (now their compact caller's schema output);
   - the widened contracts;
   - `IAbapConnection` v5;
+  - the new `/compact-shared` exports, the halves of the three split builders;
   - the connection range moving to 24.0.0 (U4 as done), named with what changed for an
     embedder if any exported signature of the server names connection's `AbapConnection`;
   - `SdkTransport`, if exported.

@@ -5,10 +5,7 @@
 The server's code is checked by the compiler with nothing taken on the author's word. No value
 is forced into a type, no optional property hides an `undefined` its type does not declare, and
 no input is read with a regular expression. A gate keeps it so: none of these can come back.
-
-This continues `2026-11-03-static-types-goal.md`, which took `any` and `as unknown as` out of
-production code. This goal widens it to every assertion, to `exactOptionalPropertyTypes`, to
-regular expressions, and to the test infrastructure.
+It holds for the mcp-abap-adt server (not its libraries) in its 24.0.0 release.
 
 Production code is every package's `src`, `bin` and `scripts`, and the root's `src`, `scripts`
 and `tools`. Test code is every `__tests__` tree, its helpers and its testers. Fixtures that are
@@ -25,8 +22,7 @@ wrong on purpose, for a scan to refuse, stay wrong.
 - **Runtime checks only for data from outside the type system.** Tool arguments from the model,
   SAP's answers, parsed documents, the environment and files are checked at run time, in plain
   code. Nothing else is.
-- **No regex in production code.** Input is read with plain string code, `URL` /
-  `URLSearchParams`, character tests and the XML parser.
+- **No regex in production code.**
 - **`exactOptionalPropertyTypes` is on** in every TypeScript project of the repository. It also
   closes the hole of the RFC configuration's `url?: never`, which the runtime guard today only
   approximates.
@@ -37,8 +33,7 @@ wrong on purpose, for a scan to refuse, stay wrong.
   is fixed in that package, which is released first; this server then takes it from the
   registry.
 - **Exported types that change are listed**, for the semver of the server's release.
-- **A gate keeps all of it**: the lint, a source test over the syntax tree, or both, with no
-  allow-list once the change is done, and fixtures that prove each refusal.
+- **A gate keeps all of it**: the lint, a source test, or both, so none of it comes back.
 
 ## What there is today (Measured)
 
@@ -140,10 +135,10 @@ project has 0 errors without it.
   `?: T | undefined`.
 - Which `unknown` in production holds a value that has a contract type, and how each is typed
   instead.
-- The test infrastructure: typed stand-ins for the connection, the client and the handler
-  context, so tests need no assertion; whether test code joins the assertion gate in full or
-  only for `any`, and what stays for fixtures that are wrong on purpose.
-- The gate: the Biome rules and the source test over `tools` and `bin` too; the option in every
-  `tsconfig`; the scan's allow-list emptied.
+- The test infrastructure: how its `any` is replaced (typed stand-ins for the connection, the
+  client and the handler context, or another way); whether the other assertions in test code
+  go too, and what stays for fixtures that are wrong on purpose.
+- The gate: lint, a source test or both; whether it covers `tools` and `bin` too; the option in
+  every `tsconfig`; the `BLOCKED` list emptied; how each refusal is proved.
 - The semver of the server's release: which exported types change (handler argument types,
   options turning `?: T | undefined`).

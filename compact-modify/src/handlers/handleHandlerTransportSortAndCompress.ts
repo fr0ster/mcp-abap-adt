@@ -1,6 +1,7 @@
 import { compactTransportSortAndCompressSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleSortAndCompressTransportTask } from '@mcp-abap-adt/lib/handlers/write';
+import type * as z from 'zod';
 import { namingHandlerGet } from './compactConfirmWith';
 
 export const TOOL_DEFINITION = {
@@ -11,9 +12,9 @@ export const TOOL_DEFINITION = {
   inputSchema: compactTransportSortAndCompressSchema,
 } as const;
 
-type HandlerTransportSortAndCompressArgs = {
-  transport_number: string;
-};
+type HandlerTransportSortAndCompressArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleHandlerTransportSortAndCompress(
   context: HandlerContext,

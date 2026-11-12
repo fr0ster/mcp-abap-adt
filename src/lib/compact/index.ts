@@ -56,6 +56,8 @@ export {
   COMPACT_MAIN_PROGRAMS,
   compactActivateSchema,
   compactActivateSchemaFor,
+  compactActivateSchemaWithNamesFor,
+  compactActivateSchemaWithoutNamesFor,
   compactCdsUnitTestResultSchema,
   compactCdsUnitTestStatusSchema,
   compactCheckRunSchema,
@@ -71,6 +73,8 @@ export {
   compactGetDataSchema,
   compactGetSchema,
   compactGetSchemaFor,
+  compactGetSchemaWithNamesFor,
+  compactGetSchemaWithoutNamesFor,
   compactLockSchema,
   compactLockSchemaFor,
   compactProfileListSchema,
@@ -99,6 +103,8 @@ export {
   DELETION_CHECK_TYPES,
   EMPTIED_INCLUDE_TYPES,
   handlerGetDataDefinition,
+  handlerGetDataWithoutSqlDefinition,
+  handlerGetDataWithSqlDefinition,
 } from './compactSchemas.js';
 export { handlerDebugBatchDefinition } from './debug/handleHandlerDebugBatch.js';
 export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBreakpoints.js';

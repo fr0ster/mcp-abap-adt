@@ -10,15 +10,42 @@
  * Each case runs the tool's own handler over a recording connection declared
  * the variant — real adt-clients code, no SAP.
  */
-import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
-import { handleHandlerCreate } from '../../../../compact-modify/src/handlers/handleHandlerCreate';
-import { handleHandlerLock } from '../../../../compact-modify/src/handlers/handleHandlerLock';
-import { handleHandlerUnlock } from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
-import { handleHandlerUpdate } from '../../../../compact-modify/src/handlers/handleHandlerUpdate';
-import { handleHandlerCheckRun } from '../../../../compact-readonly-entries/src/handlers/handleHandlerCheckRun';
-import { handleHandlerDeletionCheck } from '../../../../compact-readonly-entries/src/handlers/handleHandlerDeletionCheck';
-import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
-import { handleHandlerValidate } from '../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
+import {
+  TOOL_DEFINITION as HandlerActivate,
+  handleHandlerActivate,
+} from '../../../../compact-modify/src/handlers/handleHandlerActivate';
+import {
+  TOOL_DEFINITION as HandlerCreate,
+  handleHandlerCreate,
+} from '../../../../compact-modify/src/handlers/handleHandlerCreate';
+import {
+  TOOL_DEFINITION as HandlerLock,
+  handleHandlerLock,
+} from '../../../../compact-modify/src/handlers/handleHandlerLock';
+import {
+  TOOL_DEFINITION as HandlerUnlock,
+  handleHandlerUnlock,
+} from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
+import {
+  TOOL_DEFINITION as HandlerUpdate,
+  handleHandlerUpdate,
+} from '../../../../compact-modify/src/handlers/handleHandlerUpdate';
+import {
+  TOOL_DEFINITION as HandlerCheckRun,
+  handleHandlerCheckRun,
+} from '../../../../compact-readonly-entries/src/handlers/handleHandlerCheckRun';
+import {
+  TOOL_DEFINITION as HandlerDeletionCheck,
+  handleHandlerDeletionCheck,
+} from '../../../../compact-readonly-entries/src/handlers/handleHandlerDeletionCheck';
+import {
+  TOOL_DEFINITION as HandlerGet,
+  handleHandlerGet,
+} from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import {
+  TOOL_DEFINITION as HandlerValidate,
+  handleHandlerValidate,
+} from '../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleCheckObject } from '../../../handlers/common/low/handleCheckObject';
 import { handleDeleteOnly } from '../../../handlers/common/low/handleDeleteOnly';
@@ -40,6 +67,7 @@ import {
   sourceUriOf,
 } from '../../../lib/debugger/objectUri';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { defineTool } from '../../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -64,6 +92,12 @@ interface Case {
 
 const sent: Expected = 'sent';
 const refused = (words: string): Expected => ({ refused: words });
+/**
+ * A value the tool's schema refuses: the model's call is refused at the
+ * boundary, before the handler, naming the argument.
+ */
+const schemaRefused = (tool: string): Expected =>
+  refused(`Invalid arguments for tool ${tool}: `);
 
 /** The four cases of one argument on one variant: valid, lower, name, wrong. */
 function family(
@@ -72,8 +106,10 @@ function family(
   send: (context: HandlerContext, value: string) => Promise<unknown>,
   values: {
     readonly valid: string;
+    /** What a lower-case value answers; sent when absent. */
+    readonly lower?: Expected;
     readonly name: readonly [string, Expected];
-    readonly wrong: readonly [string, string];
+    readonly wrong: readonly [string, string] | readonly [string, Expected];
   },
 ): Case[] {
   const at = (what: string, value: string, expected: Expected): Case => ({
@@ -85,9 +121,15 @@ function family(
   });
   return [
     at('valid', values.valid, sent),
-    at('lower-case', values.valid.toLowerCase(), sent),
+    at('lower-case', values.valid.toLowerCase(), values.lower ?? sent),
     at('friendly name', values.name[0], values.name[1]),
-    at('wrong', values.wrong[0], refused(values.wrong[1])),
+    at(
+      'wrong',
+      values.wrong[0],
+      typeof values.wrong[1] === 'string'
+        ? refused(values.wrong[1])
+        : values.wrong[1],
+    ),
   ];
 }
 
@@ -329,69 +371,65 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
     },
   ),
   // The compact tools' names: a code is no compact name.
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerActivate.object_type',
     variant,
     (context, value) =>
-      handleHandlerActivate(context, {
+      defineTool(HandlerActivate, handleHandlerActivate).call(context, {
         object_type: value,
         object_name: 'ZA',
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('cannot turn object_type "CLAS/OC" into an ADT type code'),
-      ],
-      wrong: [
-        'UNIT_TEST',
-        'cannot turn object_type "UNIT_TEST" into an ADT type code',
-      ],
+      lower: schemaRefused('HandlerActivate'),
+      name: ['CLAS/OC', schemaRefused('HandlerActivate')],
+      wrong: ['UNIT_TEST', schemaRefused('HandlerActivate')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerCreate.object_type',
     variant,
     (context, value) =>
-      handleHandlerCreate(context, {
+      defineTool(HandlerCreate, handleHandlerCreate).call(context, {
         object_type: value,
         class_name: 'ZA',
         package_name: 'ZPKG',
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Unsupported create for object_type: CLAS/OC. Supported:'),
-      ],
-      wrong: [
-        'RUNTIME_DUMP',
-        'Unsupported create for object_type: RUNTIME_DUMP. Supported:',
-      ],
+      lower: schemaRefused('HandlerCreate'),
+      name: ['CLAS/OC', schemaRefused('HandlerCreate')],
+      wrong: ['RUNTIME_DUMP', schemaRefused('HandlerCreate')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerGet.object_type',
     variant,
     (context, value) =>
-      handleHandlerGet(context, { object_type: value, class_name: 'ZA' }),
+      defineTool(HandlerGet, handleHandlerGet).call(context, {
+        object_type: value,
+        class_name: 'ZA',
+      }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Unsupported read for object_type: CLAS/OC. Supported:'),
-      ],
-      wrong: [
-        'RUNTIME_DUMP',
-        'Unsupported read for object_type: RUNTIME_DUMP. Supported:',
-      ],
+      lower: schemaRefused('HandlerGet'),
+      name: ['CLAS/OC', schemaRefused('HandlerGet')],
+      wrong: ['RUNTIME_DUMP', schemaRefused('HandlerGet')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerUpdate.object_type',
     variant,
     (context, value) =>
-      handleHandlerUpdate(context, {
+      defineTool(HandlerUpdate, handleHandlerUpdate).call(context, {
         object_type: value,
         class_name: 'ZA',
         source_code: 'X',
@@ -399,95 +437,78 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Unsupported update for object_type: CLAS/OC. Supported:'),
-      ],
-      wrong: [
-        'TRANSPORT',
-        'Unsupported update for object_type: TRANSPORT. Supported:',
-      ],
+      lower: schemaRefused('HandlerUpdate'),
+      name: ['CLAS/OC', schemaRefused('HandlerUpdate')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerUpdate')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerCheckRun.object_type',
     variant,
     (context, value) =>
-      handleHandlerCheckRun(context, {
+      defineTool(HandlerCheckRun, handleHandlerCheckRun).call(context, {
         object_type: value,
         object_name: 'ZA',
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('CheckRun is not supported for object_type: CLAS/OC'),
-      ],
-      wrong: [
-        'TRANSPORT',
-        'CheckRun is not supported for object_type: TRANSPORT. Supported: CLASS',
-      ],
+      lower: schemaRefused('HandlerCheckRun'),
+      name: ['CLAS/OC', schemaRefused('HandlerCheckRun')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerCheckRun')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerLock.object_type',
     variant,
     (context, value) =>
-      handleHandlerLock(context, {
+      defineTool(HandlerLock, handleHandlerLock).call(context, {
         object_type: value,
         object_name: 'ZA',
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Lock is not supported for object_type: CLAS/OC'),
-      ],
-      wrong: [
-        'TRANSPORT',
-        'Lock is not supported for object_type: TRANSPORT. Supported: CLASS',
-      ],
+      lower: schemaRefused('HandlerLock'),
+      name: ['CLAS/OC', schemaRefused('HandlerLock')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerLock')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerUnlock.object_type',
     variant,
     (context, value) =>
-      handleHandlerUnlock(context, {
+      defineTool(HandlerUnlock, handleHandlerUnlock).call(context, {
         object_type: value,
         object_name: 'ZA',
         lock_handle: 'LOCKHANDLE',
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Unlock is not supported for object_type: CLAS/OC'),
-      ],
-      wrong: [
-        'TRANSPORT',
-        'Unlock is not supported for object_type: TRANSPORT. Supported: CLASS',
-      ],
+      lower: schemaRefused('HandlerUnlock'),
+      name: ['CLAS/OC', schemaRefused('HandlerUnlock')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerUnlock')],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerValidate.object_type',
     variant,
     (context, value) =>
-      handleHandlerValidate(context, {
+      defineTool(HandlerValidate, handleHandlerValidate).call(context, {
         object_type: value,
         object_name: 'ZA',
       }),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Validate is not supported for object_type: CLAS/OC'),
-      ],
-      wrong: [
-        'TRANSPORT',
-        'Validate is not supported for object_type: TRANSPORT. Supported: CLASS',
-      ],
+      lower: schemaRefused('HandlerValidate'),
+      name: ['CLAS/OC', schemaRefused('HandlerValidate')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerValidate')],
     },
   ),
   ...family(
@@ -510,26 +531,24 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
       ],
     },
   ),
+  // Through the tool's entry, as the model's call: a value outside its
+  // schema's members is refused there, before the handler.
   ...family(
     'HandlerDeletionCheck.object_type',
     variant,
     (context, value) =>
-      handleHandlerDeletionCheck(context, {
-        object_type: value,
-        object_name: 'ZA',
-      }),
+      defineTool(HandlerDeletionCheck, handleHandlerDeletionCheck).call(
+        context,
+        {
+          object_type: value,
+          object_name: 'ZA',
+        },
+      ),
     {
       valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused(
-          'Unsupported deletion check for object_type: CLAS/OC. Supported:',
-        ),
-      ],
-      wrong: [
-        'TRANSPORT',
-        'Unsupported deletion check for object_type: TRANSPORT. Supported:',
-      ],
+      lower: schemaRefused('HandlerDeletionCheck'),
+      name: ['CLAS/OC', schemaRefused('HandlerDeletionCheck')],
+      wrong: ['TRANSPORT', schemaRefused('HandlerDeletionCheck')],
     },
   ),
 ]);

@@ -6,13 +6,17 @@
  * taken — a refusal sends nothing.
  */
 
-import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
+import {
+  TOOL_DEFINITION as HandlerUnitTestRun,
+  handleHandlerUnitTestRun,
+} from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
 import { TOOL_DEFINITION as RUN_ABAP_UNIT } from '../../handlers/unit_test/high/handleRunAbapUnit';
 import {
   RUN_TARGET_FIELD,
   RUN_TARGET_OPTIONAL,
 } from '../../handlers/unit_test/shared/runTarget';
 import { compactUnitTestRunSchema } from '../../lib/compact/compactSchemas';
+import { defineTool } from '../../lib/handlers/interfaces';
 import { declaredRequired, jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
@@ -49,7 +53,7 @@ describe('HandlerUnitTestRun with target: started by target, answered with its r
     '%s: an object target (PROG/P) goes as an osl:flatObjectSet with one osl:object',
     async (_case, extra) => {
       const { connection, result } = await start({
-        target: { kind: 'object', name: 'zreport', type: 'prog/p' },
+        target: { kind: 'object', name: 'zreport', type: 'PROG/P' },
         title: 'Nightly',
         context: 'Suite',
         ...extra,
@@ -144,11 +148,6 @@ describe('HandlerUnitTestRun: refused before anything is sent', () => {
       'exactly one of tests and target is required',
     ],
     [
-      'a target type outside the run registry',
-      { target: { kind: 'object', name: 'zcl_a', type: 'ZZZZ/ZZ' } },
-      'target.type "ZZZZ/ZZ" is not one of: CLAS, CLAS/OC',
-    ],
-    [
       'a target with runner sync',
       {
         target: { kind: 'object', name: 'zcl_a', type: 'CLAS/OC' },
@@ -157,6 +156,20 @@ describe('HandlerUnitTestRun: refused before anything is sent', () => {
       'runner sync takes tests only: a target run is asynchronous',
     ],
   ];
+  it('a target type outside the run registry: refused by the schema, nothing sent', async () => {
+    const connection = recordingConnection([STARTED]);
+    const refused = expect(
+      defineTool(HandlerUnitTestRun, handleHandlerUnitTestRun).call(
+        { connection },
+        { target: { kind: 'object', name: 'zcl_a', type: 'ZZZZ/ZZ' } },
+      ),
+    ).rejects.toThrow(
+      'Invalid arguments for tool HandlerUnitTestRun: Invalid option',
+    );
+    await refused;
+    expect(connection.requests).toEqual([]);
+  });
+
   it.each(refusals)('%s', async (_case, args, words) => {
     const { connection, result } = await start(args);
 

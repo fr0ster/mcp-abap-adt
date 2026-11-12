@@ -14,7 +14,7 @@ import { handleHandlerGet } from '../handlers/handleHandlerGet';
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 /** object_type, part, the target tool, the argument it requires. */
-const CASES: ReadonlyArray<[string, string, string, string]> = [
+const CASES = [
   ['PACKAGE', 'metadata', 'GetPackage', 'package_name'],
   ['DOMAIN', 'metadata', 'GetDomain', 'domain_name'],
   ['DATA_ELEMENT', 'metadata', 'GetDataElement', 'data_element_name'],
@@ -98,7 +98,7 @@ const CASES: ReadonlyArray<[string, string, string, string]> = [
     'GetMetadataExtension',
     'metadata_extension_name',
   ],
-];
+] as const;
 
 describe('a compact read route parses with its target tool’s schema', () => {
   it.each(CASES)(

@@ -1,7 +1,11 @@
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { declareSystemKind } from '../../../src/lib/systemKind';
-import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
+import {
+  handleHandlerActivate,
+  TOOL_DEFINITION,
+} from '../handlers/handleHandlerActivate';
 
 /**
  * What `HandlerActivate` does with an `object_type` it cannot translate.
@@ -82,7 +86,7 @@ describe('HandlerActivate and the type it was given', () => {
   it.each([
     ['INCLUDE', 'ZINCL_X', 'PROG/I'],
     ['TABLE_TYPE', 'ZTTYP_X', 'TTYP/DA'],
-  ])(
+  ] as const)(
     'activates %s alone in a group activation, by its code',
     async (object_type, object_name, type) => {
       await handleHandlerActivate(context, { object_name, object_type });
@@ -133,53 +137,45 @@ describe('HandlerActivate and the type it was given', () => {
   });
 
   /**
-   * **The case this file exists for.** `UNIT_TEST` is in the schema, has no
-   * friendly name in the map and no measured ADT code here. Lowercased and
-   * handed on it would have reached the server as `unit_test`.
+   * **The case this file exists for.** `UNIT_TEST` has no friendly name in
+   * the map and no measured ADT code here. Lowercased and handed on it would
+   * have reached the server as `unit_test`. The model's call names it
+   * through the tool's schema, which refuses it before the handler runs.
    */
   it('refuses a type it cannot translate, rather than inventing one', async () => {
     sent = undefined;
+    const entry = defineTool(TOOL_DEFINITION, handleHandlerActivate);
 
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'ZCL_X',
-        object_type: 'UNIT_TEST',
-      }),
-    ).rejects.toThrow(/cannot turn object_type "UNIT_TEST"/);
+    const refused = expect(
+      entry.call(context, { object_name: 'ZCL_X', object_type: 'UNIT_TEST' }),
+    ).rejects.toThrow(
+      'Invalid arguments for tool HandlerActivate: Invalid option',
+    );
+    await refused;
 
     // And nothing was sent: the refusal is here, not at SAP.
     expect(sent).toBeUndefined();
   });
 
   it('names the field that settles it, and what it knows without it', async () => {
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'ZCL_X',
-        object_type: 'TRANSPORT',
-      }),
-    ).rejects.toThrow(/object_adt_type/);
-    // The types it names are what the variant's projection offers.
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'ZCL_X',
-        object_type: 'TRANSPORT',
-      }),
-    ).rejects.toThrow('Known without it: CLASS, PROGRAM, INCLUDE, INTERFACE');
+    const entry = defineTool(TOOL_DEFINITION, handleHandlerActivate);
+    // TRANSPORT is no member of the schema: refused at the boundary.
+    const outside = expect(
+      entry.call(context, { object_name: 'ZCL_X', object_type: 'TRANSPORT' }),
+    ).rejects.toThrow('Invalid arguments for tool HandlerActivate');
+    await outside;
+    // A member the declared variant does not activate by name reaches the
+    // handler, which names the field that settles it and what the variant's
+    // projection offers.
     declareSystemKind(connection, 'cloud');
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'ZCL_X',
-        object_type: 'TRANSPORT',
-      }),
-    ).rejects.toThrow(/Known without it: CLASS, INTERFACE/);
-    declareSystemKind(connection, 'onprem');
-
-    await expect(
-      handleHandlerActivate(context, {
-        object_name: 'ZCL_X',
-        object_type: 'TRANSPORT',
-      }),
-    ).rejects.toThrow(/PACKAGE/);
+    try {
+      const unnamed = expect(
+        entry.call(context, { object_name: 'ZCL_X', object_type: 'PROGRAM' }),
+      ).rejects.toThrow(/object_adt_type.*Known without it: CLASS, INTERFACE/);
+      await unnamed;
+    } finally {
+      declareSystemKind(connection, 'onprem');
+    }
   });
 
   /**

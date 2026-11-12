@@ -645,7 +645,7 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
   it.each([
     ['INCLUDE', 'ZINCL_A', '/sap/bc/adt/programs/includes/zincl_a'],
     ['TABLE_TYPE', 'ZTTYP_A', '/sap/bc/adt/ddic/tabletypes/zttyp_a'],
-  ])(
+  ] as const)(
     '%s: the lock is one LOCK, the unlock one UNLOCK',
     async (object_type, object_name, uri) => {
       const locked = await run('answered', (context) =>

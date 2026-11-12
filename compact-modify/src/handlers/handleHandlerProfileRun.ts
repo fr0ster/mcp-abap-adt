@@ -9,6 +9,7 @@ import {
   handleRuntimeRunClassUnderProfiler,
   handleRuntimeRunProgramUnderProfiler,
 } from '@mcp-abap-adt/lib/handlers/write';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
@@ -20,12 +21,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerProfileRunArgs = {
-  target_type: 'CLASS' | 'PROGRAM';
-  class_name?: string;
-  program_name?: string;
-  profiler_id?: string;
-};
+type HandlerProfileRunArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 const TOOL = 'HandlerProfileRun';
 

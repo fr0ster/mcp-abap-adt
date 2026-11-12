@@ -15,6 +15,7 @@ import {
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { unlockObject } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnlock',
@@ -26,11 +27,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerUnlockArgs = {
-  object_type: string;
-  object_name: string;
-  lock_handle: string;
-};
+type HandlerUnlockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerUnlock(
   context: HandlerContext,

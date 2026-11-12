@@ -95,6 +95,12 @@ interface ValidateServiceBindingArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
+/** The refusals of a call without one of its names, in the order they are checked. */
+export const SERVICE_BINDING_NAME_REQUIRED = 'service_binding_name is required';
+export const SERVICE_DEFINITION_NAME_REQUIRED =
+  'service_definition_name is required';
+export const PACKAGE_NAME_REQUIRED = 'package_name is required';
+
 export async function handleValidateServiceBinding(
   context: HandlerContext,
   args: ValidateServiceBindingArgs,
@@ -102,16 +108,16 @@ export async function handleValidateServiceBinding(
   const { connection, logger } = context;
 
   if (!args?.service_binding_name) {
-    return return_error(new Error('service_binding_name is required'));
+    return return_error(new Error(SERVICE_BINDING_NAME_REQUIRED));
   }
   if (!args?.service_definition_name) {
-    return return_error(new Error('service_definition_name is required'));
+    return return_error(new Error(SERVICE_DEFINITION_NAME_REQUIRED));
   }
   // The transport check names the binding's package: without one, adt-clients
   // fails on it before any request (a TypeError), so it is refused here.
   const packageName = args.package_name?.trim();
   if (!packageName) {
-    return return_error(new Error('package_name is required'));
+    return return_error(new Error(PACKAGE_NAME_REQUIRED));
   }
 
   const bindingName = args.service_binding_name.trim().toUpperCase();

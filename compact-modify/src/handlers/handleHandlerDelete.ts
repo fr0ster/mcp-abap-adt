@@ -6,6 +6,7 @@ import {
   compactDeleteSchemaFor,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import type * as z from 'zod';
 import { routeCompactWrite } from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {
@@ -18,10 +19,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerDeleteArgs = { object_type: CompactObjectType } & Record<
-  string,
-  unknown
->;
+type HandlerDeleteArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerDelete(
   context: HandlerContext,

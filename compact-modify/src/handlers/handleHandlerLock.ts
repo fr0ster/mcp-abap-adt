@@ -13,6 +13,7 @@ import {
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { lockObject } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',
@@ -28,11 +29,7 @@ export const TOOL_DEFINITION = {
 export const LOCKS_NOT_KEPT_WORDS =
   'locks are not kept by this server instance: its host gave it no held locks, so a lock taken here could not be written under or released';
 
-type HandlerLockArgs = {
-  object_type: string;
-  object_name: string;
-  super_package?: string;
-};
+type HandlerLockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerLock(
   context: HandlerContext,

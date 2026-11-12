@@ -1,6 +1,7 @@
 import { compactTransportCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleCreateTransport } from '@mcp-abap-adt/lib/handlers/write';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerTransportCreate',
@@ -10,12 +11,7 @@ export const TOOL_DEFINITION = {
   inputSchema: compactTransportCreateSchema,
 } as const;
 
-type HandlerTransportCreateArgs = {
-  transport_type?: 'workbench' | 'customizing';
-  description: string;
-  target_system?: string;
-  owner?: string;
-};
+type HandlerTransportCreateArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerTransportCreate(
   context: HandlerContext,

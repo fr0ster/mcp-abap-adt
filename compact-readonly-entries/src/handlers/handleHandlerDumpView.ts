@@ -1,6 +1,7 @@
 import { compactDumpViewSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleRuntimeGetDumpById } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpView',
@@ -10,10 +11,7 @@ export const TOOL_DEFINITION = {
   inputSchema: compactDumpViewSchema,
 } as const;
 
-type HandlerDumpViewArgs = {
-  dump_id: string;
-  view?: 'default' | 'summary' | 'formatted';
-};
+type HandlerDumpViewArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerDumpView(
   context: HandlerContext,

@@ -1,4 +1,4 @@
-import { handlerGetDataDefinition } from '@mcp-abap-adt/lib/compact-shared';
+import { handlerGetDataWithSqlDefinition } from '@mcp-abap-adt/lib/compact-shared';
 import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetSqlQuery,
@@ -6,11 +6,12 @@ import {
   READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerGetData',
   available_in: ['onprem', 'cloud'] as const,
-  ...handlerGetDataDefinition(true),
+  ...handlerGetDataWithSqlDefinition(),
 } as const;
 
 /** The two reads' entries: each one's schema parses its call. */
@@ -23,11 +24,7 @@ const tableContents = defineTool(
   handleGetTableContents,
 ).call;
 
-type HandlerGetDataArgs = {
-  object_name?: string;
-  sql_query?: string;
-  max_rows?: number;
-};
+type HandlerGetDataArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerGetData(
   context: HandlerContext,

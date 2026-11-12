@@ -1,9 +1,40 @@
 {
   "projects": [
-    { "tsconfig": "tsconfig.json", "files": [], "typechecks": [] },
-    { "tsconfig": "server-runtime/tsconfig.json", "files": [], "typechecks": [] },
-    { "tsconfig": "compact-readonly-entries/tsconfig.json", "files": [], "typechecks": [] },
-    { "tsconfig": "compact-modify/tsconfig.json", "files": [], "typechecks": [] },
-    { "tsconfig": "responsible-rules/tsconfig.json", "files": [], "typechecks": [] }
+    {
+      "tsconfig": "tsconfig.json",
+      "files": [],
+      "typechecks": []
+    },
+    {
+      "tsconfig": "server-runtime/tsconfig.json",
+      "files": [],
+      "typechecks": []
+    },
+    {
+      "tsconfig": "compact-readonly-entries/tsconfig.json",
+      "files": [
+        "compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts",
+        "compact-readonly-entries/src/handlers/handleHandlerDumpView.ts"
+      ],
+      "typechecks": [
+        "compact-readonly-entries/src/__typechecks__/exact/handlers.ts"
+      ]
+    },
+    {
+      "tsconfig": "compact-modify/tsconfig.json",
+      "files": [
+        "compact-modify/src/handlers/handleHandlerDelete.ts",
+        "compact-modify/src/handlers/handleHandlerTransportSortAndCompress.ts",
+        "compact-modify/src/handlers/handleHandlerUnlock.ts"
+      ],
+      "typechecks": [
+        "compact-modify/src/__typechecks__/exact/handlers.ts"
+      ]
+    },
+    {
+      "tsconfig": "responsible-rules/tsconfig.json",
+      "files": [],
+      "typechecks": []
+    }
   ]
 }

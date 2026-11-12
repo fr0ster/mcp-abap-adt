@@ -15,6 +15,7 @@ import {
   READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerWhereUsed',
@@ -26,12 +27,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerWhereUsedArgs = {
-  object_type: string;
-  object_name: string;
-  function_group_name?: string;
-  max_results?: number;
-};
+type HandlerWhereUsedArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** The compact object types, as the where-used tool names them. */
 const WHERE_USED_TYPE: Readonly<Record<string, string>> =

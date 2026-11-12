@@ -5,7 +5,7 @@ import {
   COMPACT_MAIN_PROGRAMS,
   COMPACT_READ,
   compactGetDescription,
-  compactGetSchemaFor,
+  compactGetSchemaWithNamesFor,
   HANDLER_GET_DRAFT_TYPES,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
@@ -23,6 +23,7 @@ import {
   READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 import {
   type CompactReadPart,
   hasSourcePart,
@@ -36,7 +37,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: compactGetDescription(variant),
-    inputSchema: compactGetSchemaFor(
+    inputSchema: compactGetSchemaWithNamesFor(
       COMPACT_READ[variant],
       COMPACT_MAIN_PROGRAMS[variant],
       undefined,
@@ -47,10 +48,13 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerGetArgs = { object_type?: CompactObjectType } & Record<
-  string,
-  unknown
->;
+/** The call's arguments, as HandlerGet's schema parses them. */
+type HandlerGetGiven = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** The arguments past the boundary of object_type: the member it names. */
+type HandlerGetArgs = Omit<HandlerGetGiven, 'object_type'> & {
+  object_type?: CompactObjectType | undefined;
+};
 
 /** The parts that read the repository by ADT address rather than by object_type. */
 const ADDRESS_PARTS = ['object_structure', 'node_structure', 'virtual_folders'];
@@ -178,7 +182,7 @@ function functionModuleArgs<A extends HandlerGetArgs>(
 
 export async function handleHandlerGet(
   context: HandlerContext,
-  given: Omit<HandlerGetArgs, 'object_type'> & { object_type?: string },
+  given: HandlerGetGiven,
 ) {
   // The boundary of object_type: one of the declared variant's members
   // (`COMPACT_READ`); past it, the type is typed by it.

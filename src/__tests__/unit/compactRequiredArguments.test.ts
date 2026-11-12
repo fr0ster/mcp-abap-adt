@@ -25,7 +25,7 @@ import {
   TOOL_DEFINITION as ValidateServiceBinding,
 } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import type { ProjectionVariant } from '../../lib/adtProjections';
-import type { HandlerContext } from '../../lib/handlers/interfaces';
+import { defineTool, type HandlerContext } from '../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -128,24 +128,17 @@ const NEEDS: readonly Need[] = [
   },
 ];
 
+/** Each tool's entry: the model's call, parsed with the tool's schema first. */
 const TOOLS = {
   HandlerLock: {
     definition: HandlerLock,
     send: (context: HandlerContext, args: Record<string, string>) =>
-      handleHandlerLock(context, {
-        object_type: '',
-        object_name: '',
-        ...args,
-      }),
+      defineTool(HandlerLock, handleHandlerLock).call(context, args),
   },
   HandlerValidate: {
     definition: HandlerValidate,
     send: (context: HandlerContext, args: Record<string, string>) =>
-      handleHandlerValidate(context, {
-        object_type: '',
-        object_name: '',
-        ...args,
-      }),
+      defineTool(HandlerValidate, handleHandlerValidate).call(context, args),
   },
 } as const;
 
@@ -335,5 +328,84 @@ describe('ValidateServiceBinding requires package_name', () => {
       },
     );
     expect(connection.requests.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * HandlerValidate's SERVICE_BINDING branch hands its arguments to
+ * ValidateServiceBinding's handler, which refuses a missing one in a fixed
+ * order: the binding's name, the service definition, the package. Through the
+ * tool's entry, as the model's call: each refusal names its argument, in that
+ * order, and nothing is sent.
+ */
+describe('HandlerValidate SERVICE_BINDING: the callee’s refusals, in its order', () => {
+  const cases: ReadonlyArray<
+    readonly [string, Readonly<Record<string, string>>, string]
+  > = [
+    [
+      'object_name empty',
+      { object_name: '' },
+      'service_binding_name is required',
+    ],
+    [
+      'object_name empty, the definition given',
+      { object_name: '', service_definition_name: 'ZSRVD_A' },
+      'service_binding_name is required',
+    ],
+    [
+      'service_definition_name absent',
+      { object_name: 'ZSRVB_A', package_name: 'ZPKG_A' },
+      'service_definition_name is required',
+    ],
+    [
+      'service_definition_name empty',
+      {
+        object_name: 'ZSRVB_A',
+        service_definition_name: '',
+        package_name: 'ZPKG_A',
+      },
+      'service_definition_name is required',
+    ],
+    [
+      'package_name absent',
+      { object_name: 'ZSRVB_A', service_definition_name: 'ZSRVD_A' },
+      'package_name is required',
+    ],
+    [
+      'package_name empty',
+      {
+        object_name: 'ZSRVB_A',
+        service_definition_name: 'ZSRVD_A',
+        package_name: '',
+      },
+      'package_name is required',
+    ],
+    [
+      'package_name blank',
+      {
+        object_name: 'ZSRVB_A',
+        service_definition_name: 'ZSRVD_A',
+        package_name: '  ',
+      },
+      'package_name is required',
+    ],
+    [
+      'the definition and the package both absent',
+      { object_name: 'ZSRVB_A' },
+      'service_definition_name is required',
+    ],
+  ];
+
+  it.each(cases)('%s: refused, nothing sent', async (_case, given, words) => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'onprem');
+    const answered = await defineTool(
+      HandlerValidate,
+      handleHandlerValidate,
+    ).call({ connection }, { object_type: 'SERVICE_BINDING', ...given });
+    expect(textOf(answered)).toContain(words);
+    expect(textOf(answered)).toContain('"isError":true');
+    expect(connection.requests).toEqual([]);
   });
 });

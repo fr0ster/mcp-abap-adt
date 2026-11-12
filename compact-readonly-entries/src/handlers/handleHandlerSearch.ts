@@ -8,6 +8,7 @@ import {
   READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerSearch',
@@ -24,11 +25,7 @@ const searchObject = defineTool(
   handleSearchObject,
 ).call;
 
-type HandlerSearchArgs = {
-  query: string;
-  object_type?: string;
-  max_results?: number;
-};
+type HandlerSearchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerSearch(
   context: HandlerContext,

@@ -4,6 +4,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleRuntimeListFeedPage } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
@@ -14,18 +15,7 @@ export const TOOL_DEFINITION = {
   inputSchema: compactDumpListSchema,
 } as const;
 
-type HandlerDumpListArgs = {
-  feed_type?: 'dumps' | 'system_messages' | 'gateway_errors';
-  user?: string;
-  runtime_error?: string;
-  exception?: string;
-  object_name?: string;
-  package?: string;
-  component?: string;
-  top?: number;
-  from?: string;
-  to?: string;
-};
+type HandlerDumpListArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerDumpList(
   context: HandlerContext,

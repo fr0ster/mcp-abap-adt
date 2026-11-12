@@ -693,12 +693,11 @@ function getTexts(left: Left) {
   };
 }
 
-export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
+/** HandlerGet's properties on `members`, and its `object_adt_type` when `codes` are given. */
+function getParts<const M extends readonly ReadMember[]>(
   members: M,
-  mainPrograms: readonly ReadMember[] = [],
-  codes?: readonly string[],
-  full: readonly ReadMember[] = members,
-  draftTypes: readonly ReadMember[] = [],
+  codes: readonly string[] | undefined,
+  full: readonly ReadMember[],
 ) {
   const left = leftOf(full, members);
   const properties = {
@@ -714,17 +713,55 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
             'ADT type code of the object (object_structure) or of the parent node (node_structure).',
           ),
         };
-  const offeredProperties = offered(properties, COMPACT_READ_TAKES, members);
-  if (members.length > 0) {
-    return z.object({
-      ...offeredProperties,
-      background: properties.background,
-      object_type: properties.object_type,
-      part: readPartFor(mainPrograms, draftTypes),
-      ...codeArgument,
-    });
-  }
-  // Every name denied: the parts that read no object are left.
+  return {
+    properties,
+    codeArgument,
+    offeredProperties: offered(properties, COMPACT_READ_TAKES, members),
+  };
+}
+
+/**
+ * HandlerGet's schema when the deny list leaves it names (`members`): it
+ * takes `object_type`. The definition's own schema is this one.
+ */
+export function compactGetSchemaWithNamesFor<
+  const M extends readonly ReadMember[],
+>(
+  members: M,
+  mainPrograms: readonly ReadMember[] = [],
+  codes?: readonly string[],
+  full: readonly ReadMember[] = members,
+  draftTypes: readonly ReadMember[] = [],
+) {
+  const { properties, codeArgument, offeredProperties } = getParts(
+    members,
+    codes,
+    full,
+  );
+  return z.object({
+    ...offeredProperties,
+    background: properties.background,
+    object_type: properties.object_type,
+    part: readPartFor(mainPrograms, draftTypes),
+    ...codeArgument,
+  });
+}
+
+/**
+ * HandlerGet's schema when the deny list denies every name: the parts that
+ * read no object are left, and it takes no `object_type`.
+ */
+export function compactGetSchemaWithoutNamesFor(
+  mainPrograms: readonly ReadMember[] = [],
+  codes?: readonly string[],
+  full: readonly ReadMember[] = [],
+  draftTypes: readonly ReadMember[] = [],
+) {
+  const { properties, codeArgument, offeredProperties } = getParts(
+    [],
+    codes,
+    full,
+  );
   const { object_type: _none, ...rest } = offeredProperties;
   return z.object({
     ...rest,
@@ -734,7 +771,26 @@ export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
   });
 }
 
-export const compactGetSchema = compactGetSchemaFor(
+/** HandlerGet's schema on `members`: with names, or without when none is left. */
+export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
+  members: M,
+  mainPrograms: readonly ReadMember[] = [],
+  codes?: readonly string[],
+  full: readonly ReadMember[] = members,
+  draftTypes: readonly ReadMember[] = [],
+) {
+  return members.length > 0
+    ? compactGetSchemaWithNamesFor(
+        members,
+        mainPrograms,
+        codes,
+        full,
+        draftTypes,
+      )
+    : compactGetSchemaWithoutNamesFor(mainPrograms, codes, full, draftTypes);
+}
+
+export const compactGetSchema = compactGetSchemaWithNamesFor(
   COMPACT_READ.onprem,
   COMPACT_MAIN_PROGRAMS.onprem,
   undefined,
@@ -1847,28 +1903,39 @@ export const COMPACT_ACTIVATE_TAKES = takesOf<
   members: { FUNCTION_MODULE: ['function_group_name'] },
 });
 
-export function compactActivateSchemaFor<
+/**
+ * HandlerActivate's schema when the deny list leaves it names (`members`):
+ * it takes `object_type`. The definition's own schema is this one.
+ */
+export function compactActivateSchemaWithNamesFor<
   const M extends readonly ActivateMember[],
 >(members: M, variant: ProjectionVariant, codes?: readonly string[]) {
   const properties = activateProperties(members, variant, codes);
-  const offeredProperties = offered(
+  return z.object({
+    ...offered(properties, COMPACT_ACTIVATE_TAKES, members),
+    object_type: properties.object_type,
+    object_name: properties.object_name,
+    object_adt_type: properties.object_adt_type,
+    parentName: properties.parentName,
+    objects: properties.objects,
+    preaudit: properties.preaudit,
+  });
+}
+
+/**
+ * HandlerActivate's schema when the deny list denies every name: the objects
+ * are named by their codes, and it takes no `object_type`.
+ */
+export function compactActivateSchemaWithoutNamesFor(
+  variant: ProjectionVariant,
+  codes?: readonly string[],
+) {
+  const properties = activateProperties([], variant, codes);
+  const { object_type: _none, ...rest } = offered(
     properties,
     COMPACT_ACTIVATE_TAKES,
-    members,
+    [],
   );
-  if (members.length > 0) {
-    return z.object({
-      ...offeredProperties,
-      object_type: properties.object_type,
-      object_name: properties.object_name,
-      object_adt_type: properties.object_adt_type,
-      parentName: properties.parentName,
-      objects: properties.objects,
-      preaudit: properties.preaudit,
-    });
-  }
-  // Every name denied: the objects are named by their codes.
-  const { object_type: _none, ...rest } = offeredProperties;
   return z.object({
     ...rest,
     object_name: properties.object_name,
@@ -1879,7 +1946,16 @@ export function compactActivateSchemaFor<
   });
 }
 
-export const compactActivateSchema = compactActivateSchemaFor(
+/** HandlerActivate's schema on `members`: with names, or without when none is left. */
+export function compactActivateSchemaFor<
+  const M extends readonly ActivateMember[],
+>(members: M, variant: ProjectionVariant, codes?: readonly string[]) {
+  return members.length > 0
+    ? compactActivateSchemaWithNamesFor(members, variant, codes)
+    : compactActivateSchemaWithoutNamesFor(variant, codes);
+}
+
+export const compactActivateSchema = compactActivateSchemaWithNamesFor(
   COMPACT_ACTIVATE.onprem,
   'onprem',
 );
@@ -1985,14 +2061,27 @@ export const compactGetDataSchema = z.object({
  * `sql_query`; without, the table read alone, `sql_query` named nowhere.
  */
 export function handlerGetDataDefinition(sql: boolean) {
+  return sql
+    ? handlerGetDataWithSqlDefinition()
+    : handlerGetDataWithoutSqlDefinition();
+}
+
+/** `HandlerGetData` with `sql_query`: the definition's own statement. */
+export function handlerGetDataWithSqlDefinition() {
   return {
     description: withLongToolAdvice(
-      sql
-        ? '[read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.'
-        : '[read-only] Reads the rows of the table or CDS view named by object_name: every column of object_name. Required: object_name. Optional: max_rows (default 100). Response: JSON.',
+      '[read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.',
     ),
-    inputSchema: sql
-      ? compactGetDataSchema
-      : z.object({ ...getDataProperties(false), ...MAX_ROWS }),
+    inputSchema: compactGetDataSchema,
+  };
+}
+
+/** `HandlerGetData` without `sql_query`: the table read alone. */
+export function handlerGetDataWithoutSqlDefinition() {
+  return {
+    description: withLongToolAdvice(
+      '[read-only] Reads the rows of the table or CDS view named by object_name: every column of object_name. Required: object_name. Optional: max_rows (default 100). Response: JSON.',
+    ),
+    inputSchema: z.object({ ...getDataProperties(false), ...MAX_ROWS }),
   };
 }

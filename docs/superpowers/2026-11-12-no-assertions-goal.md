@@ -5,7 +5,8 @@
 The server's code is checked by the compiler with nothing taken on the author's word. No value
 is forced into a type, no optional property hides an `undefined` its type does not declare, and
 no input is read with a regular expression. A gate keeps it so: none of these can come back.
-It holds for the mcp-abap-adt server (not its libraries) in its 24.0.0 release.
+It holds for every package of this repository in its 24.0.0 release; the separately published
+libraries it depends on (adt-clients, connection, the interfaces packages) are outside it.
 
 Production code is every package's `src`, `bin` and `scripts`, and the root's `src`, `scripts`
 and `tools`. Test code is every `__tests__` tree, its helpers and its testers. Fixtures that are
@@ -138,7 +139,7 @@ project has 0 errors without it.
 - The test infrastructure: how its `any` is replaced (typed stand-ins for the connection, the
   client and the handler context, or another way); whether the other assertions in test code
   go too, and what stays for fixtures that are wrong on purpose.
-- The gate: lint, a source test or both; whether it covers `tools` and `bin` too; the option in
+- The gate: lint, a source test or both; how it covers `tools` and `bin`, which the scans skip today; the option in
   every `tsconfig`; the `BLOCKED` list emptied; how each refusal is proved.
 - The semver of the server's release: which exported types change (handler argument types,
   options turning `?: T | undefined`).

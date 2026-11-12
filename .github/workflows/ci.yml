@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+  # Every pull request, whatever its base: a stacked PR into a feature branch
+  # gets the same jobs (the rulesets require them by name).
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   build-and-test:

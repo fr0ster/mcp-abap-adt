@@ -78,10 +78,7 @@ liveSuite(['onprem', 'cloud'], 'access restrictions', () => {
     {
       accessChecks: listedAccessChecks({
         allowedPackages: [
-          parsePackageEntry(
-            onprem() ? '$TMP' : resolvePackageName(),
-            'allowed-packages',
-          ),
+          parsePackageEntry(allowedPackage(), 'allowed-packages'),
           parsePackageEntry(requestPackage(), 'allowed-packages'),
         ],
         // With no request of the run's own (the cloud), a request no write
@@ -179,7 +176,13 @@ liveSuite(['onprem', 'cloud'], 'access restrictions', () => {
     }
     return above;
   };
-  const child = (): string => (onprem() ? localPackage : allowedPackage());
+  /**
+   * The package below the subtree: on premise with no parent configured a
+   * local package of the run's own, else the configured one.
+   */
+  const ownChild = (): boolean =>
+    onprem() && configText(config(), 'access', 'package_parent') === '';
+  const child = (): string => (ownChild() ? localPackage : allowedPackage());
 
   withRestriction(
     'the package tree',
@@ -192,10 +195,7 @@ liveSuite(['onprem', 'cloud'], 'access restrictions', () => {
     }),
     () => {
       it('a package below the allowed subtree is allowed, one outside refused', async () => {
-        if (
-          onprem() &&
-          configText(config(), 'access', 'package_parent') === ''
-        ) {
+        if (ownChild()) {
           // A package create: its parent is the call's super package.
           recordCreated('DeletePackage', { package_name: localPackage });
           succeeded(

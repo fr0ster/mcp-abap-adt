@@ -476,6 +476,10 @@ Consequences for Task 11: `DraftAnswer` becomes `{ has_draft: boolean; parts: re
 13. **The compact suites of Task 14** are two files: `compact/NarrowedCompactTools.test.ts` and `compact/CompactRestrictedTools.test.ts` (HandlerProfileRun, HandlerGetData, HandlerSession and the debugger tools), in place of five. Their calls go through `livePrepare`: a `liveCall` of a key without a ledger row is an orphan for the ledger guard, and these keys are in `coverage-debt.json`.
 14. **The draft unit pins** (`src/__tests__/unit/pins/draft.pins.test.ts`, Jest, as every pin file) take their literals from the base run's `changed-handler-requests.json`.
 
+### Held for the owner (Codex review, round 2)
+
+15. **An include with one or two of its three reads answering `404`.** As built, that version's ETag is `null` and the part answers `undetermined` (spec §5: "An ETag missing … answers `undetermined`, that version's ETag `null`"); only an include whose three reads all answer `404` has no entry, and an object none of whose parts answers is the read's `404`. Codex reads §5's "a read that fails answers as the tool's reads answer today" as requiring the failure there. An include that exists only inactive (a test-class include written and never activated) is a draft that a failure answer would hide. Not measured live. The owner decides.
+
 ## Measurement record
 
 ### Task 1: draft versions (Measured 2026-11-12)

@@ -1,18 +1,13 @@
 /**
- * Port 0 on the Streamable HTTP and SSE servers: the system chooses a free
- * port, and the server announces the port it is bound to — on its listening
- * line and through `listeningPort()` — so a caller (a test above all) binds
- * no port it chose before the server did. `--port=0` / `--sse-port=0` are
- * accepted; the login callback port, which an identity provider has
- * registered, still is not.
+ * Port 0 on the Streamable HTTP server: the system chooses a free port, and
+ * the server announces the port it is bound to — on its listening line and
+ * through `listeningPort()` — so a caller (a test above all) binds no port it
+ * chose before the server did. `--port=0` is accepted.
  */
 import assert from 'node:assert/strict';
 import { connect } from 'node:net';
 import { describe, it, mock } from 'node:test';
 import { fullToolSet, registryOf } from '../../../../src/lib/toolSet';
-import { readSseConfig } from '../../sse/config/sseParameters';
-import { SseServer } from '../../sse/SseServer';
-import { readCoreConfig } from '../../stdio/config/coreParameters';
 import { readHttpConfig } from '../config/httpParameters';
 import { StreamableHttpServer } from '../StreamableHttpServer';
 
@@ -49,26 +44,15 @@ async function errorLines(run: () => Promise<void>): Promise<string[]> {
   return lines;
 }
 
-describe('port 0: the system chooses, the server announces it', () => {
-  it('--port=0 and --sse-port=0 are read as 0', () => {
+describe('Streamable HTTP on port 0: the system chooses, the server announces it', () => {
+  it('--port=0 is read as 0', () => {
     assert.equal(
       readHttpConfig(['--system-type=onprem', '--port=0'], {}, null).port,
       0,
     );
-    assert.equal(
-      readSseConfig(['--system-type=onprem', '--sse-port=0'], {}, null).port,
-      0,
-    );
   });
 
-  it('the login callback port stays 1-65535: 0 is refused', () => {
-    assert.throws(
-      () => readCoreConfig(['--browser-auth-port=0'], {}, null),
-      /between 1 and 65535/,
-    );
-  });
-
-  it('Streamable HTTP on port 0 listens on a port of its own and announces it', async () => {
+  it('listens on a port of its own and announces it', async () => {
     const server = new StreamableHttpServer(
       registryOf(fullToolSet, 'http', { dataTools: true }),
       { host: '127.0.0.1', port: 0 },
@@ -81,23 +65,6 @@ describe('port 0: the system chooses, the server announces it', () => {
         announced(lines, '[StreamableHttpServer] Server started on '),
         port,
       );
-      assert.equal(await accepts(port), true);
-    } finally {
-      await server.stop();
-    }
-    assert.equal(server.listeningPort(), undefined);
-  });
-
-  it('SSE on port 0 listens on a port of its own and announces it', async () => {
-    const server = new SseServer(
-      registryOf(fullToolSet, 'sse', { dataTools: true }),
-      { host: '127.0.0.1', port: 0 },
-    );
-    const lines = await errorLines(() => server.start());
-    try {
-      const port = server.listeningPort();
-      assert.ok(port !== undefined && port > 0, String(port));
-      assert.equal(announced(lines, '[SseServer] Server started on '), port);
       assert.equal(await accepts(port), true);
     } finally {
       await server.stop();

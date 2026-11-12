@@ -245,6 +245,9 @@ async function serve(kind: Kind): Promise<Served> {
     /[\\/]/.test(envName) || envName.startsWith('.') || envName.startsWith('~')
       ? `--env-path=${path.resolve(envName)}`
       : `--env=${envName}`,
+    // The kind is stated, never read from credentials: a cloud session
+    // file need not name one, and the server refuses to start without it.
+    `--system-type=${kind === 'cloud' ? 'cloud' : 'onprem'}`,
     `--connection-type=${kind === 'onprem-rfc' ? 'rfc' : 'http'}`,
   );
 

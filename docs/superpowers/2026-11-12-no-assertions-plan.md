@@ -645,6 +645,18 @@ below is what it carries besides.
     type now proves (a code the schema's enum already holds, case-folded again), each
     removed with the boundary test S2a points at it kept green. This item waits for the
     owner's answer on direct calls (S2a); under reading (b) the checks stay.
+    - **HandlerGet's part check** (`handleHandlerGet.ts:212`) is not yet proved by the type.
+      `compactGetSchemaFor` builds `extra` as `string[]` (`compactSchemas.ts:597`), and
+      spreading it into `z.enum` (`:615`) widens `part`'s output to `string | undefined`.
+      The check is what narrows `part` for `routeCompactPart` today. Codex measured: with it
+      removed, the routing call fails TS2345.
+    - So, before that check goes:
+      - `readPartFor` keeps the literal union: `extra` typed as a list of read parts, not
+        `string[]`;
+      - the address-part and run-part dispatch narrows that union statically, a `switch` on
+        the literal where `ADDRESS_PARTS.includes` / `RUN_PARTS.includes` are today;
+      - a typecheck pins `part`'s output as the read-part union, written first.
+    - Neither needs a cast, and no listed schema changes (the enum's values stay).
 
   Each retyping that changes behaviour gets a failing-first test.
 - **S3b in batches,** each verified by `npm run measure:unknown` (its list shrinks by the

@@ -13,9 +13,11 @@ import { after, before, describe, it } from 'node:test';
 import { handleListTransports } from '../../../../handlers/transport/readonly/handleListTransports';
 
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+import { transportSearchMissing } from '../../helpers/transportSearch';
 
 function extractResultData(result: any): any {
   const textContent = result.content.find((c: any) => c.type === 'text') as any;
@@ -54,6 +56,11 @@ describe('ListTransports Handler Integration', () => {
   it('should list modifiable transports for current user', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
       const { connection } = context;
+      const missing = await transportSearchMissing(connection);
+      if (missing !== undefined) {
+        skipRunningTest(missing);
+        return;
+      }
 
       const result = await tester.invokeToolOrHandler(
         'ListTransports',
@@ -90,6 +97,11 @@ describe('ListTransports Handler Integration', () => {
   it('should list all transports (modifiable + released)', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
       const { connection } = context;
+      const missing = await transportSearchMissing(connection);
+      if (missing !== undefined) {
+        skipRunningTest(missing);
+        return;
+      }
 
       const result = await tester.invokeToolOrHandler(
         'ListTransports',

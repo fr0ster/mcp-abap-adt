@@ -70,6 +70,7 @@ import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
+import { transportSearchMissing } from '../helpers/transportSearch';
 
 const testLogger = createTestLogger('batched-reads-timing');
 
@@ -264,7 +265,12 @@ function sharedNames(kind: string): string[] {
 type Read = (context: HandlerContext) => Promise<unknown>;
 
 /** A tool of Tasks 25–27 on the shared objects: its read, or why there is none here. */
-type SharedCase = { tool: string; prepare: () => Read | string };
+type SharedCase = {
+  tool: string;
+  prepare: (
+    connection: IAbapConnection,
+  ) => Promise<Read | string> | Read | string;
+};
 
 /** Two names of `kind`, or why there are not two. */
 function two(kind: string): string[] | string {
@@ -314,8 +320,9 @@ const SHARED_CASES: SharedCase[] = [
   },
   {
     tool: 'ListTransports',
-    prepare: () => (context) =>
-      handleListTransports(context, { modifiable_only: true }),
+    prepare: async (connection) =>
+      (await transportSearchMissing(connection)) ??
+      ((context) => handleListTransports(context, { modifiable_only: true })),
   },
   {
     tool: 'DescribeByList',
@@ -529,7 +536,7 @@ describe('batched reads timed against the sequential path on the system the test
         );
         return;
       }
-      const read = shared.prepare();
+      const read = await shared.prepare(connection);
       if (typeof read === 'string') {
         skipRunningTest(`${shared.tool}: ${read}`);
         return;

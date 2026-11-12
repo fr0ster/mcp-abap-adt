@@ -64,6 +64,7 @@
   "src/__tests__/unit/access/accessLists.test.ts",
   "src/__tests__/unit/access/changedHandlerRequests.test.ts",
   "src/__tests__/unit/access/deniedActions.test.ts",
+  "src/__tests__/unit/access/rebuiltDescriptions.test.ts",
   "src/__tests__/unit/adtHeaders/headerCallSites.test.ts",
   "src/__tests__/unit/analyseOmissions.test.ts",
   "src/__tests__/unit/atc/atcPoll.test.ts",

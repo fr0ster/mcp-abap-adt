@@ -136,7 +136,9 @@
     },
     {
       "tsconfig": "server-runtime/tsconfig.json",
-      "files": [],
+      "files": [
+        "server-runtime/src/sdkTransport.ts"
+      ],
       "typechecks": []
     },
     {

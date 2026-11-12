@@ -47,6 +47,7 @@ import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express, { type Request, type Response } from 'express';
 import { RUNTIME_VERSION } from '../runtimeVersion.js';
+import { SdkTransport } from '../sdkTransport.js';
 
 export interface SseServerOptions {
   /**
@@ -496,7 +497,7 @@ export class SseServer {
     });
 
     try {
-      await server.connect(transport);
+      await server.connect(new SdkTransport(transport));
       this.logger.debug(`SSE GET: server connected for session ${sessionId}`);
     } catch (error) {
       this.logger.error(

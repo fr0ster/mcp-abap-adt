@@ -47,6 +47,7 @@ import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
 import { RUNTIME_VERSION } from '../runtimeVersion.js';
+import { SdkTransport } from '../sdkTransport.js';
 import {
   BATCH_WITH_HANDLE_WORDS,
   BatchWithHandleError,
@@ -332,7 +333,7 @@ export class StreamableHttpServer extends BaseMcpServer {
               // instance: its tool calls build their connections from them.
               if (context) server.useConnectionContext(context);
 
-              await server.connect(transport);
+              await server.connect(new SdkTransport(transport));
               // Scope what the request states — x-sap-language, x-sap-responsible,
               // x-sap-master-system — to this request's dispatch, so it cannot
               // leak into other requests/modes via a process-global cache (#110).

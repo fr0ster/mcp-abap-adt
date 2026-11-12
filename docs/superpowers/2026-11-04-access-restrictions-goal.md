@@ -33,8 +33,8 @@ When both lists are configured, each name the call gives is checked against its 
 ## What there is today (Measured)
 
 - The ceiling is the binary: the full one or a `-ro` one. Nothing narrows a binary further.
-- An object's three source versions, read through ADT (E19 on premise and the BTP trial, one
-  user; E19 with two users):
+- An object's three source versions, read through ADT (the onprem system and the cloud trial,
+  one user; the onprem system with two users):
   - After an activation, `active`, `inactive` and `workspace` answer the same text and one ETag
     (a UTC timestamp of 14 digits and `0011`).
   - A write gives the inactive version a new ETag (its write time, and `0001`). `active` stays
@@ -48,7 +48,7 @@ When both lists are configured, each name the call gives is checked against its 
     was held. Only one's own LOCK answers it.
   - SAP does not protect a draft whose lock was released: a second user locked, wrote over it
     and activated, with no warning. The first user's change was lost.
-- E19 and the trial send no HTTP `Date` header. The ETag timestamp matched UTC on both (offset
+- The onprem system and the cloud trial send no HTTP `Date` header. The ETag timestamp matched UTC on both (offset
   0 s).
 
 ## Invariants

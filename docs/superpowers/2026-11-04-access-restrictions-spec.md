@@ -1,7 +1,8 @@
 # Spec: access restrictions set when the server starts
 
 Goal: `2026-11-04-access-restrictions-goal.md`. This spec decides what the goal left open.
-Claims are marked **Measured** (read in the code at 23.1.0, or in a recorded run) or
+Claims are marked **Measured** (read in the code at 23.1.0, or in a recorded run; the file and
+line references re-read on `refactor/static-types` at `fd4a1882`, the base of this change) or
 **Inference** (not yet proven; the plan proves or drops it). A decision the owner left to the
 controller is marked **controller's call**.
 
@@ -12,7 +13,7 @@ controller is marked **controller's call**.
   beating YAML (`--conf`). The tables are `coreParameters` (stdio), `httpParameters` and
   `sseParameters` (`server-runtime/src/*/config/`), one per transport, each taking the binary's
   `ToolSet`; the `-ro` and compact binaries use the same table with their own set. Shared rows
-  (`BATCH_KEEP_RAW_PARTS_ROW`, `SHUTDOWN_TIMEOUT_ROW`) sit in all three. A row's reader throws a
+  (`BATCH_KEEP_RAW_PARTS_ROW`, `ENABLE_DATA_TOOLS_ROW`, `SHUTDOWN_TIMEOUT_ROW`) sit in all three. A row's reader throws a
   `ParameterRefusal`, and the start ends `1` with `[MCP] <words>`. (Measured)
 - **The launchers write their start lines through `deps.stderr`**, each prefixed `[MCP]`
   (`server-runtime/src/{stdio,http,sse}/launcher.ts`). (Measured)
@@ -23,26 +24,29 @@ controller is marked **controller's call**.
 - **A handler reaches a call by five paths.** (Measured)
   1. `BaseMcpServer.registerHandlers` with a `CompositeHandlersRegistry`: every entry wrapped
      in `runCall`, its arguments parsed by the SDK against the listed schema
-     (`src/embeddable/BaseMcpServer.ts`, from line 1363).
+     (`src/embeddable/BaseMcpServer.ts`, `runCall` from line 1597).
   2. A plain registration of groups on an embedder's `McpServer` (`registerAllTools`,
      `HandlerExporter.registerOnServer`): every entry wrapped in
      `BaseHandlerGroup.registerToolOnServer`, arguments parsed by the SDK.
-  3. `CompositeHandlersRegistry.registerTool(server, name, definition, handler)`
-     (`CompositeHandlersRegistry.ts:139`): the definition and handler are the embedder's own,
+  3. `CompositeHandlersRegistry.registerTool(server, entry)`
+     (`src/lib/handlers/registry/CompositeHandlersRegistry.ts:142`): the entry (its definition
+     and call) is the embedder's own,
      registered through the holding group's `registerOneTool`, so through path 2's wrapper,
      with the embedder's definition as the listed schema. A name no group's `getHandlers()`
      holds is refused (`REGISTER_TOOL_UNHELD_WORDS`).
   4. A registry that is not a `CompositeHandlersRegistry` given to `BaseMcpServer`
-     (`BaseMcpServer.ts:1731`): it registers its own tools on a proxy
+     (`BaseMcpServer.ts:1933`, `registerAllTools(this.trackingRegistrations())`): it registers
+     its own tools on a proxy
      (`trackingRegistrations`), which sees a name, a config and an opaque callback, and tracks
      the call; no handler group and no tool definition of ours is involved.
   5. `HandlerExporter.getHandlerEntries()`: raw entries, each handler wrapped in
      `inStatedScope` (`wrapEntry`); the embedder calls the handler itself, on the connection
      it gives, with arguments no SDK parsed.
-- **The listed schema is enforced before the handler on paths 1 and 2.** The SDK parses the
-  arguments with the zod object built from the listed schema. That object drops undeclared
-  keys, and an `enum` becomes `z.enum`. So a value removed from an enum, or a property removed
-  from a schema, never reaches the handler. (Measured: `schemaUtils.ts`)
+- **The listed schema is enforced before the handler on paths 1 and 2.** The listed schema is
+  the definition's own zod `inputSchema` (`listedTool`, `src/lib/listedTool.ts`; the JSON Schema
+  path is gone in 24.0.0), and the SDK parses the arguments with it. A zod object drops
+  undeclared keys, and an enum is a `z.enum`. So a value removed from an enum, or a property
+  removed from a schema, never reaches the handler. (Measured)
 - **A compact tool has one dispatching argument, but two of them name their target in other
   forms too** (Measured: a sweep of every handler in `compact-modify/src/handlers/` and
   `compact-readonly-entries/src/handlers/` for an argument other than the dispatching one that
@@ -55,7 +59,8 @@ controller is marked **controller's call**.
     either case, a main type, a search name or a friendly name (`TYPE_NAMES`: `class`,
     `func`, …). So `{ objects: [{ name: "ZCLASS", type: "CLAS/OC" }] }` activates a class
     whatever `object_type`'s enum holds.
-  - `HandlerGet` (`compact-readonly-entries/src/handlers/handleHandlerGet.ts:47-82`): the
+  - `HandlerGet` (`compact-readonly-entries/src/handlers/handleHandlerGet.ts`, `ADDRESS_PARTS`
+    at line 52 and `routeAddressPart` at lines 85-116): the
     parts `object_structure` and `node_structure` read an object by `object_adt_type` (a free
     string, read by `tableTypeOf`: any code of the variant's ADT type table) and
     `object_name`, without `object_type`. `virtual_folders` lists the repository by search
@@ -70,10 +75,10 @@ controller is marked **controller's call**.
   - `action` (`HandlerBatch`, `HandlerDebugBatch`, `HandlerSession`) and `operation`
     (`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugBreakpoints`,
     `HandlerDebugMaintain`): fixed enums written in the handlers' definitions
-    (`src/lib/compact/batch/handleHandlerBatch.ts:46`,
-    `src/lib/compact/longSession/handleHandlerSession.ts:23`, `src/lib/compact/debug/*.ts`),
+    (`src/lib/compact/batch/handleHandlerBatch.ts:34`,
+    `src/lib/compact/longSession/handleHandlerSession.ts:21`, `src/lib/compact/debug/*.ts`),
     with descriptions written as fixed text that names every value.
-  - `servedDefinition` (`src/lib/variantToolSet.ts:425-441`) picks the variant's stated
+  - `servedDefinition` (`src/lib/variantToolSet.ts:423-440`) picks the variant's stated
     definition; it takes no member set from outside.
   - So narrowing any of them by a deny list needs a builder that takes the remaining members
     (§3.1).
@@ -86,12 +91,13 @@ controller is marked **controller's call**.
   `wireItself` reading keeps the answer's status and headers. adt-clients' `AdtReadVersion` is
   `active | inactive | workingArea` and is sent verbatim as `?version=`; the probes used
   `workspace`. Whether `workingArea` answers as `workspace` does for a second user is not
-  known. (Measured: adt-clients 42.1.0 source; the equivalence is Inference)
+  known. (Measured: adt-clients 42.1.0 source; the base depends on adt-clients 45.3 and interfaces-adt
+  27.2, re-read in the plan's first task; the equivalence is Inference)
 - **A package's super package is in its metadata document**: `GetPackage` reads it with one
   request (`readPackageMetadata`) and its description names the super-package among the
   document's fields. (Measured; the element the reader takes is measured in plan step 1)
 - **The listed-schema fixture** (`tests/fixtures/tools/listed-schemas.json`) exists on the
-  static-types branch (PR #346), which this change builds on (§8). (Measured)
+  static-types branch (PR #346), which this change is part of (§8). (Measured)
 
 ## 2. The settings
 
@@ -300,10 +306,14 @@ One interface, given by the host, decides every call-time check:
 - **A package create** is a call whose handler creates the package `package_name` under
   `super_package`: `CreatePackage` (`src/handlers/package/high/handleCreatePackage.ts`, which
   requires `super_package` and sends it as the new package's `superPackage`) and
-  `HandlerCreate` with `object_type: 'PACKAGE'` (routed to the same create,
-  `compactWriteRoutes.ts:46`). These two only; the set is fixed by a test. Every other call
+  `HandlerCreate` with `object_type: 'PACKAGE'` (routed to the same create:
+  `compact-modify/src/handlers/compactWriteRoutes.ts` `create` (line 40) →
+  `handleCreateOnly`, whose `PACKAGE` case delegates to `handleCreatePackage`,
+  `src/handlers/common/low/handleCreateOnly.ts:192` and `:291`). These two only; the set is fixed by a test. Every other call
   naming both arguments is not one: `CheckPackage` declares `super_package` and never uses it
-  (`handleCheckPackage.ts:36-48`, Measured), so trusting it would let
+  (`src/handlers/package/high/handleCheckPackage.ts:32-47`, which hands the arguments to
+  `src/handlers/package/low/handleCheckPackage.ts`, whose check never sends it; Measured), so
+  trusting it would let
   `{ package_name: "ZOUTSIDE", super_package: "ZALLOWED" }` pass `ZALLOWED/**`.
 - **`IPackageReader`** is the one means a strategy has to read SAP. The wrapper creates it per
   checked call, holding no connection. Its first read takes the call's connection (and, on
@@ -493,13 +503,15 @@ draft, and no other tool reads it.
 - **The working version's name.** The probes sent `version=workspace`; adt-clients sends
   `workingArea` verbatim. The plan's first step measures whether `workingArea` answers as
   `workspace` did for a second user. If not, `interfaces-adt` and `adt-clients` add `workspace`
-  in a minor, published first.
+  in a minor, published before 24.0.0 is tagged.
 
 ## 6. Table data
 
 - **Tools that name a table whose rows they answer** (Measured): `GetTableContents`
-  (`table_name`) and compact `HandlerGetData` (`object_name`). Both are in every binary,
-  `-ro` included.
+  (`table_name`) and compact `HandlerGetData` (`object_name`). Since 24.0.0 both are data
+  tools (`DataHandlersGroup`, `CompactDataHandlersGroup`): every binary, `-ro` included, serves
+  them only when started with `--enable-data-tools` (`ENABLE_DATA_TOOLS_ROW`). A table list
+  configured while they are not served has no call to check.
 - **Not covered:** `GetSqlQuery` and `HandlerGetData`'s `sql_query` are free SQL, allowed or not
   by the deny list (`GetSqlQuery`, `HandlerGetData.sql`, §3.1). `AmdpDebugGetTable` and
   `HandlerDebugMaintain` `getDataPreview` read a debuggee's table variable, not a table by name;
@@ -575,14 +587,19 @@ draft, and no other tool reads it.
   the embeddable docs (`accessChecks`, the two shipped strategies, `IPackageReader`,
   `withoutDenied`, `HandlerExporter`'s `deniedActions`, paths 3 to 5); `README.md`; `SECURITY.md` (the checks are formal: SAP's
   authorization remains the boundary); `CHANGELOG.md`.
-- **Order and semver.** Built on top of the static-types change (PR #346) after it merges, and
-  released as **24.1.0**, a minor of the eighteen packages, versioned together. Everything is
-  additive: new rows, an optional option, new exported types and strategies, new refusal codes
-  that appear only when configured, one new read tool and one new `HandlerGet` part. With
-  nothing configured no existing answer changes. No migration note.
+- **Order and semver.** Part of the static-types release (PR #346): this PR is based on its
+  branch, `refactor/static-types`, merges into it, and ships in **24.0.0**, the eighteen
+  packages versioned together; the version, the publish order and the registry install are
+  #346's release steps. Everything this change adds is additive: new rows, an optional option,
+  new exported types and strategies, new refusal codes that appear only when configured, one
+  new read tool and one new `HandlerGet` part. With nothing configured no existing answer
+  changes. Its `CHANGELOG.md` lines go into the unreleased `[24.0.0]` entry, and
+  `docs/MIGRATION-24.0.md` describes the new optional configuration where it fits (nothing a
+  consumer of 23.x must change for it).
 - **Other packages.** None, unless the plan's first measurement finds that `workingArea` is not
   the caller's working version for another user's draft. Then `interfaces-adt` and
-  `adt-clients` add a `workspace` version in a minor, published first.
+  `adt-clients` add a `workspace` version in a minor, each published before 24.0.0 is tagged,
+  and 24.0.0 depends on those versions.
 
 ## 9. Order inside the PR
 

@@ -66,7 +66,10 @@ controller is marked **controller's call**.
     `object_name`, without `object_type`. `virtual_folders` lists the repository by search
     pattern and facets and reads no object.
   - Every other compact tool with a dispatching argument names its target only through it.
-- **Only `object_type` / `target_type` is projected per variant.** (Measured)
+- **Of the dispatching arguments, only `object_type` / `target_type` is projected per variant.**
+  (Measured) Beside them, `HandlerGet`'s `part` is projected too: `main_programs` is offered only
+  where a member serves it (on premise, `COMPACT_MAIN_PROGRAMS`, `src/lib/compact/compactSchemas.ts:507`,
+  `readPartFor`); `part` is not a deniable value (§3.1), so this changes nothing below.
   - `object_type` (eleven tools) and `target_type` (`HandlerProfileRun`): stated per variant
     through `byVariant` (`src/lib/variantDefinition.ts`), each variant's members, enum and
     description built by a builder that takes the variant (`compactDescriptions.ts`: twelve

@@ -84,11 +84,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UnlockObjectArgs {
-  object_name: string;
-  object_type: string;
-  lock_handle: string;
-}
+type UnlockObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The tool's boundary: `object_type` is one of the kinds the declared

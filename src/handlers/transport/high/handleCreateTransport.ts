@@ -66,13 +66,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateTransportArgs {
-  transport_type?: 'workbench' | 'customizing';
-  description: string;
-  target_system?: string;
-  owner?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateTransport(
   context: HandlerContext,

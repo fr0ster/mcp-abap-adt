@@ -37,11 +37,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface CheckTableTypeArgs {
-  table_type_name?: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckTableType(
   context: HandlerContext,

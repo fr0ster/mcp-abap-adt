@@ -9,10 +9,12 @@
  * deletion request removes (`deletionTargets.ts`). Nothing is changed.
  */
 
+import type * as z from 'zod';
 import { COMPACT_DELETION_CHECK, supported } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import type { compactDeletionCheckSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import {
@@ -23,7 +25,8 @@ import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { DELETION_TARGETS } from './deletionTargets';
 
-type Args = { object_type?: unknown; object_name?: unknown };
+/** HandlerDeletionCheck's arguments, as its schema parses them: the one caller's. */
+type Args = z.output<typeof compactDeletionCheckSchema>;
 
 const ANSWER = { tool: 'HandlerDeletionCheck', detail: 'terse' } as const;
 

@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteServiceDefinitionArgs {
-  service_definition_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteServiceDefinitionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteServiceDefinition(
   context: HandlerContext,

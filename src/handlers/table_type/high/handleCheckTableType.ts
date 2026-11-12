@@ -26,10 +26,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 /** What the caller sent: arguments from outside the type system. */
-interface CheckTableTypeArgs {
-  table_type_name?: string;
-  version?: 'active' | 'inactive';
-}
+type CheckTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckTableType(
   context: HandlerContext,

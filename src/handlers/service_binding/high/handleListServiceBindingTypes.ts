@@ -27,9 +27,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ListServiceBindingTypesArgs {
-  response_format?: ServiceBindingResponseFormat;
-}
+type ListServiceBindingTypesArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleListServiceBindingTypes(
   context: HandlerContext,

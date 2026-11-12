@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateStructureArgs {
-  structure_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateStructure(
   context: HandlerContext,

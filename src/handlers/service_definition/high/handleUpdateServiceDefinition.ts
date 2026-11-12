@@ -64,13 +64,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateServiceDefinitionArgs {
-  service_definition_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateServiceDefinitionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateServiceDefinition(
   context: HandlerContext,

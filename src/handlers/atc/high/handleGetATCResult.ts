@@ -33,10 +33,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetATCResultArgs {
-  display_id?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetATCResultArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetATCResult(
   context: HandlerContext,

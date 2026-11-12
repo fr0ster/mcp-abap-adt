@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckTable(
   context: HandlerContext,
-  args: { table_name: string; version?: string; ddl_code?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckTableLow(context, args);
   return normalizeCheckResponse(result, args.table_name?.toUpperCase());

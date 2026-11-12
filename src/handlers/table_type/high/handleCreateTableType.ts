@@ -173,22 +173,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface CreateTableTypeArgs {
-  table_type_name?: string;
-  package_name?: string;
-  description?: string;
-  transport_request?: string;
-  row_type_kind?: RowTypeKind;
-  row_type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  access_type?: AccessType;
-  key_definition?: KeyDefinition;
-  key_kind?: KeyKind;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateTableType(
   context: HandlerContext,

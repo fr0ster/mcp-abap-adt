@@ -65,14 +65,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface RemoveTransportObjectArgs {
-  transport_number: string;
-  object_name: string;
-  object_type: string;
-  position: string;
-  pgmid?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RemoveTransportObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRemoveTransportObject(
   context: HandlerContext,

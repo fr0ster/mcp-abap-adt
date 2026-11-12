@@ -57,7 +57,10 @@ import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/han
 import { handleGetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery';
 import { handleGetTable } from '../../handlers/table/high/handleGetTable';
-import { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents';
+import {
+  TOOL_DEFINITION as GetTableContents,
+  handleGetTableContents,
+} from '../../handlers/table/readonly/handleGetTableContents';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
 import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
 import { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult';
@@ -325,10 +328,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
   it('GetTableContents calls getSqlQuery({sql_query: SELECT * FROM <table>, row_number: max_rows}), never getTableContents', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleGetTableContents(context as any, {
-      table_name: 'ZT',
-      max_rows: 7,
-    });
+    await handleGetTableContents(
+      context as any,
+      GetTableContents.inputSchema.parse({ table_name: 'ZT', max_rows: 7 }),
+    );
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
     expect(call?.args).toEqual([
       { sql_query: 'SELECT * FROM ZT', row_number: 7 },

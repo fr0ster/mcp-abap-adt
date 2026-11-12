@@ -51,10 +51,7 @@ function objectVersionSourceSchema(variant: ProjectionVariant) {
   });
 }
 
-interface GetObjectVersionSourceArgs {
-  object_type: string;
-  content_uri: string;
-}
+type GetObjectVersionSourceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetObjectVersionSource(
   context: HandlerContext,

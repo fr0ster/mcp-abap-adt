@@ -37,9 +37,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetATCRunStatusArgs {
-  run_id?: string;
-}
+type GetATCRunStatusArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetATCRunStatus(
   context: HandlerContext,

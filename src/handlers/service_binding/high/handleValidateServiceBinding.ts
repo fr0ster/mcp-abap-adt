@@ -86,14 +86,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ValidateServiceBindingArgs {
-  service_binding_name: string;
-  description?: string;
-  service_definition_name?: string;
-  package_name?: string;
-  service_binding_version?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ValidateServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** The refusals of a call without one of its names, in the order they are checked. */
 export const SERVICE_BINDING_NAME_REQUIRED = 'service_binding_name is required';

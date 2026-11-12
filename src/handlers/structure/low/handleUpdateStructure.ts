@@ -49,13 +49,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateStructureArgs {
-  structure_name: string;
-  ddl_code: string;
-  lock_handle: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateStructure(
   context: HandlerContext,

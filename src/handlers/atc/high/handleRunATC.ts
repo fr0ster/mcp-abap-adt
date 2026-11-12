@@ -141,12 +141,7 @@ interface RunATCObjectArg {
   include_kind?: AtcClassIncludeKind;
 }
 
-interface RunATCArgs {
-  objects?: RunATCObjectArg[];
-  check_variant?: string;
-  max_findings?: number;
-  wait?: boolean;
-}
+type RunATCArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * **No `detail`.** The parameter shapes a document's answer, and there is no

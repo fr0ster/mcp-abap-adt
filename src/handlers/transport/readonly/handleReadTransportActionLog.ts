@@ -37,10 +37,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ReadTransportActionLogArgs {
-  transport_number: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ReadTransportActionLogArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The text of one `log:entry`, as `structured` parses it.

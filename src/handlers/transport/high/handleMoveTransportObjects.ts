@@ -79,12 +79,7 @@ interface MoveTransportObjectEntry {
   pgmid?: string;
 }
 
-interface MoveTransportObjectsArgs {
-  transport_number: string;
-  target_number: string;
-  objects: MoveTransportObjectEntry[];
-  detail?: 'terse' | 'full' | 'raw';
-}
+type MoveTransportObjectsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 const ENTRY_FIELDS = ['object_name', 'object_type', 'position'] as const;
 

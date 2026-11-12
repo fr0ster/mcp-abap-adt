@@ -6,7 +6,11 @@ import { handleActivateObject } from '../../handlers/common/low/handleActivateOb
 import { handleCheckObject } from '../../handlers/common/low/handleCheckObject';
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
-import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
+import {
+  handleValidateObject,
+  TOOL_DEFINITION as VALIDATE_OBJECT,
+} from '../../handlers/common/low/handleValidateObject';
+import { defineTool } from '../../lib/handlers/interfaces';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured } from '../../lib/strategies/reading';
@@ -178,13 +182,15 @@ describe('ValidateObjectLow', () => {
     });
   });
 
-  it('rejects an unsupported object_type before ever reaching the client', async () => {
+  it('rejects an unsupported object_type at the schema, before ever reaching the client', async () => {
     fakeClient = seen.client;
-    const result: any = await handleValidateObject(context as any, {
-      object_type: 'not_a_type',
-      object_name: 'ZX',
-    });
-    expect(result.isError).toBe(true);
+    const refused = expect(
+      defineTool(VALIDATE_OBJECT, handleValidateObject).call(context as any, {
+        object_type: 'not_a_type',
+        object_name: 'ZX',
+      }),
+    ).rejects.toThrow('Invalid arguments for tool ValidateObjectLow: ');
+    await refused;
     expect(seen.calls.length).toBe(0);
   });
 

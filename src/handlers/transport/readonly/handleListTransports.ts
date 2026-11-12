@@ -66,11 +66,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ListTransportsArgs {
-  user?: string;
-  modifiable_only?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ListTransportsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 interface TransportEntry {
   number: string;

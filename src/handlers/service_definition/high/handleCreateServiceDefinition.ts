@@ -84,16 +84,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateServiceDefinitionArgs {
-  service_definition_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  source_code?: string;
-  activate?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateServiceDefinitionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateServiceDefinition(
   context: HandlerContext,

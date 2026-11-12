@@ -162,17 +162,7 @@ interface StructureInclude {
   suffix?: string;
 }
 
-interface CreateStructureArgs {
-  structure_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  fields: StructureField[];
-  includes?: StructureInclude[];
-  activate?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateStructure(
   context: HandlerContext,

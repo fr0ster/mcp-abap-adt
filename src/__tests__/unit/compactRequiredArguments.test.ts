@@ -297,7 +297,25 @@ describe('ValidateServiceBinding requires package_name', () => {
     );
   });
 
-  it.each([{}, { package_name: '' }, { package_name: '  ' }])(
+  it('a call without it is refused at the schema, naming it, nothing sent', async () => {
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'onprem');
+    const refused = expect(
+      defineTool(ValidateServiceBinding, handleValidateServiceBinding).call(
+        { connection },
+        {
+          service_binding_name: 'ZSRVB_A',
+          service_definition_name: 'ZSRVD_A',
+        },
+      ),
+    ).rejects.toThrow(
+      'Invalid arguments for tool ValidateServiceBinding: Invalid input: expected string, received undefined at package_name',
+    );
+    await refused;
+    expect(connection.requests).toEqual([]);
+  });
+
+  it.each([{ package_name: '' }, { package_name: '  ' }])(
     'a call with %j is refused naming it, nothing sent',
     async (absent) => {
       const connection = recordingConnection();

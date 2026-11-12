@@ -28,10 +28,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateServiceDefinitionArgs {
-  name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateServiceDefinitionArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleActivateServiceDefinition(
   context: HandlerContext,

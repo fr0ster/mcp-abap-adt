@@ -28,10 +28,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateTableArgs {
-  table_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateTableArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateTable(
   context: HandlerContext,

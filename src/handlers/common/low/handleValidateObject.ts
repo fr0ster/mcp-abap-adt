@@ -121,18 +121,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ValidateObjectArgs {
-  object_name: string;
-  object_type: string;
-  package_name?: string;
-  description?: string;
-  super_package?: string;
-  superclass?: string;
-  behavior_definition?: string;
-  root_entity?: string;
-  implementation_type?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ValidateObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 type ImplementationType = 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
 const VALID_IMPLEMENTATION_TYPES: ImplementationType[] = [

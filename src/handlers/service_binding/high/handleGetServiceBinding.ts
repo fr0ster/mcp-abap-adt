@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetServiceBindingArgs {
-  service_binding_name: string;
-  part?: ReadPart;
-  response_format?: ServiceBindingResponseFormat;
-}
+type GetServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetServiceBinding(
   context: HandlerContext,

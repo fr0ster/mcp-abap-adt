@@ -32,10 +32,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ActivateServiceBindingArgs {
-  name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateServiceBinding(
   context: HandlerContext,

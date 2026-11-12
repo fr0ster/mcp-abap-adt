@@ -21,10 +21,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetTableTypeArgs {
-  table_type_name?: string;
-  version?: ReadVersion;
-}
+type GetTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetTableType(
   context: HandlerContext,

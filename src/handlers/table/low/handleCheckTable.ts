@@ -54,13 +54,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckTableArgs {
-  table_name: string;
-  ddl_code?: string;
-  version?: string;
-  reporter?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckTableArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckTable(
   context: HandlerContext,

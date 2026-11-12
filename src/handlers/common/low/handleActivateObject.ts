@@ -414,11 +414,7 @@ type GroupAnswer =
   | { readonly runs: ActivationRunOutcome }
   | { readonly synchronous: AdtReading<unknown> };
 
-interface ActivateObjectArgs {
-  objects: ActivationObject[];
-  preaudit?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 function activateFamily(
   context: HandlerContext,

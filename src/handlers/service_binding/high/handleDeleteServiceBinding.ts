@@ -55,12 +55,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteServiceBindingArgs {
-  service_binding_name: string;
-  transport_request?: string;
-  response_format?: ServiceBindingResponseFormat;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteServiceBinding(
   context: HandlerContext,

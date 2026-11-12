@@ -49,12 +49,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ListATCResultsArgs {
-  created_by?: string;
-  central_only?: boolean;
-  age_min?: number;
-  age_max?: number;
-}
+type ListATCResultsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** A day count the model gave: a whole number from 0 up, else the words. */
 function ageError(name: string, value: number | undefined): string | undefined {

@@ -48,7 +48,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleGetTableContents(
   context: HandlerContext,
-  args: { table_name: string; max_rows?: number; detail?: AnswerDetail },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   if (!args?.table_name) {

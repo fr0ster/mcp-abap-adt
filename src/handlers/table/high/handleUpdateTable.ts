@@ -68,13 +68,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateTableArgs {
-  table_name: string;
-  ddl_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateTableArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateTable(
   context: HandlerContext,

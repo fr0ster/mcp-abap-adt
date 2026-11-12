@@ -159,11 +159,7 @@ function objectVersionDiffSchema(variant: ProjectionVariant) {
   });
 }
 
-interface GetObjectVersionDiffArgs {
-  object_type: string;
-  content_uri_from: string;
-  content_uri_to: string;
-}
+type GetObjectVersionDiffArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetObjectVersionDiff(
   context: HandlerContext,

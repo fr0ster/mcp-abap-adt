@@ -46,11 +46,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetTransportArgs {
-  transport_number: string;
-  include_objects?: boolean;
-  include_tasks?: boolean;
-}
+type GetTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * Parse transport request XML response

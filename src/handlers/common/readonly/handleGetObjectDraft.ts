@@ -47,11 +47,7 @@ function objectDraftSchema(variant: ProjectionVariant) {
   });
 }
 
-interface GetObjectDraftArgs {
-  object_type: string;
-  object_name: string;
-  function_group_name?: string | undefined;
-}
+type GetObjectDraftArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 const CONTEXT = { tool: 'GetObjectDraft', detail: 'terse' } as const;
 

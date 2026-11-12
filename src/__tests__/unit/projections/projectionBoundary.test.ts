@@ -47,14 +47,35 @@ import {
   handleHandlerValidate,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
-import { handleCheckObject } from '../../../handlers/common/low/handleCheckObject';
+import {
+  TOOL_DEFINITION as CheckObjectLow,
+  handleCheckObject,
+} from '../../../handlers/common/low/handleCheckObject';
 import { handleDeleteOnly } from '../../../handlers/common/low/handleDeleteOnly';
-import { handleLockObject } from '../../../handlers/common/low/handleLockObject';
-import { handleUnlockObject } from '../../../handlers/common/low/handleUnlockObject';
-import { handleValidateObject } from '../../../handlers/common/low/handleValidateObject';
-import { handleGetObjectVersionDiff } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
-import { handleGetObjectVersionSource } from '../../../handlers/common/readonly/handleGetObjectVersionSource';
-import { handleGetObjectVersions } from '../../../handlers/common/readonly/handleGetObjectVersions';
+import {
+  handleLockObject,
+  TOOL_DEFINITION as LockObjectLow,
+} from '../../../handlers/common/low/handleLockObject';
+import {
+  handleUnlockObject,
+  TOOL_DEFINITION as UnlockObjectLow,
+} from '../../../handlers/common/low/handleUnlockObject';
+import {
+  handleValidateObject,
+  TOOL_DEFINITION as ValidateObjectLow,
+} from '../../../handlers/common/low/handleValidateObject';
+import {
+  TOOL_DEFINITION as GetObjectVersionDiff,
+  handleGetObjectVersionDiff,
+} from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
+import {
+  TOOL_DEFINITION as GetObjectVersionSource,
+  handleGetObjectVersionSource,
+} from '../../../handlers/common/readonly/handleGetObjectVersionSource';
+import {
+  TOOL_DEFINITION as GetObjectVersions,
+  handleGetObjectVersions,
+} from '../../../handlers/common/readonly/handleGetObjectVersions';
 import {
   TOOL_DEFINITION as GetIncludesList,
   handleGetIncludesList,
@@ -261,115 +282,117 @@ const CASES: readonly Case[] = VARIANTS.flatMap((variant) => [
       ],
     },
   ),
-  // The version tools' kinds.
+  // The version tools' kinds, through each tool's entry: its schema lists
+  // them in lower case and refuses anything else.
   ...family(
     'GetObjectVersions.object_type',
     variant,
     (context, value) =>
-      handleGetObjectVersions(context, {
+      defineTool(GetObjectVersions, handleGetObjectVersions).call(context, {
         object_type: value,
         object_name: 'ZA',
       }),
     {
-      valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Invalid object_type. Must be one of: class, program'),
-      ],
-      wrong: ['domain', 'Invalid object_type. Must be one of: class, program'],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('GetObjectVersions')],
+      wrong: ['domain', schemaRefused('GetObjectVersions')],
     },
   ),
   ...family(
     'GetObjectVersionSource.object_type',
     variant,
     (context, value) =>
-      handleGetObjectVersionSource(context, {
-        object_type: value,
-        content_uri:
-          '/sap/bc/adt/oo/classes/za/source/main/versions/00001/content',
-      }),
+      defineTool(GetObjectVersionSource, handleGetObjectVersionSource).call(
+        context,
+        {
+          object_type: value,
+          content_uri:
+            '/sap/bc/adt/oo/classes/za/source/main/versions/00001/content',
+        },
+      ),
     {
-      valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Invalid object_type. Must be one of: class, program'),
-      ],
-      wrong: ['domain', 'Invalid object_type. Must be one of: class, program'],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('GetObjectVersionSource')],
+      wrong: ['domain', schemaRefused('GetObjectVersionSource')],
     },
   ),
   ...family(
     'GetObjectVersionDiff.object_type',
     variant,
     (context, value) =>
-      handleGetObjectVersionDiff(context, {
-        object_type: value,
-        content_uri_from:
-          '/sap/bc/adt/oo/classes/za/source/main/versions/00001/content',
-        content_uri_to:
-          '/sap/bc/adt/oo/classes/za/source/main/versions/00002/content',
-      }),
+      defineTool(GetObjectVersionDiff, handleGetObjectVersionDiff).call(
+        context,
+        {
+          object_type: value,
+          content_uri_from:
+            '/sap/bc/adt/oo/classes/za/source/main/versions/00001/content',
+          content_uri_to:
+            '/sap/bc/adt/oo/classes/za/source/main/versions/00002/content',
+        },
+      ),
     {
-      valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Invalid object_type. Must be one of: class, program'),
-      ],
-      wrong: ['domain', 'Invalid object_type. Must be one of: class, program'],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('GetObjectVersionDiff')],
+      wrong: ['domain', schemaRefused('GetObjectVersionDiff')],
     },
   ),
-  // The low object tools' kinds.
+  // The low object tools' kinds, through each tool's entry: its schema
+  // lists the kinds in lower case and refuses anything else.
   ...family(
     'CheckObjectLow.object_type',
     variant,
     (context, value) =>
-      handleCheckObject(context, { object_type: value, object_name: 'ZA' }),
+      defineTool(CheckObjectLow, handleCheckObject).call(context, {
+        object_type: value,
+        object_name: 'ZA',
+      }),
     {
-      valid: 'CLASS',
-      name: [
-        'CLAS/OC',
-        refused('Invalid object_type. Must be one of: class, program'),
-      ],
-      wrong: [
-        'service_binding',
-        'Invalid object_type. Must be one of: class, program',
-      ],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('CheckObjectLow')],
+      wrong: ['service_binding', schemaRefused('CheckObjectLow')],
     },
   ),
   ...family(
     'LockObjectLow.object_type',
     variant,
     (context, value) =>
-      handleLockObject(context, { object_type: value, object_name: 'ZA' }),
+      defineTool(LockObjectLow, handleLockObject).call(context, {
+        object_type: value,
+        object_name: 'ZA',
+      }),
     {
-      valid: 'CLASS',
-      name: ['CLAS/OC', refused('Invalid object_type. Must be one of: class,')],
-      wrong: ['transport', 'Invalid object_type. Must be one of: class,'],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('LockObjectLow')],
+      wrong: ['transport', schemaRefused('LockObjectLow')],
     },
   ),
   ...family(
     'UnlockObjectLow.object_type',
     variant,
     (context, value) =>
-      handleUnlockObject(context, {
+      defineTool(UnlockObjectLow, handleUnlockObject).call(context, {
         object_type: value,
         object_name: 'ZA',
         lock_handle: 'LOCKHANDLE',
       }),
     {
-      valid: 'CLASS',
-      name: ['CLAS/OC', refused('Invalid object_type. Must be one of: class,')],
-      wrong: ['transport', 'Invalid object_type. Must be one of: class,'],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('UnlockObjectLow')],
+      wrong: ['transport', schemaRefused('UnlockObjectLow')],
     },
   ),
   ...family(
     'ValidateObjectLow.object_type',
     variant,
     (context, value) =>
-      handleValidateObject(context, { object_type: value, object_name: 'ZA' }),
+      defineTool(ValidateObjectLow, handleValidateObject).call(context, {
+        object_type: value,
+        object_name: 'ZA',
+      }),
     {
-      valid: 'CLASS',
-      name: ['CLAS/OC', refused('Invalid object_type. Must be one of: class,')],
-      wrong: ['transport', 'Invalid object_type. Must be one of: class,'],
+      valid: 'class',
+      name: ['CLAS/OC', schemaRefused('ValidateObjectLow')],
+      wrong: ['transport', schemaRefused('ValidateObjectLow')],
     },
   ),
   // The compact tools' names: a code is no compact name.

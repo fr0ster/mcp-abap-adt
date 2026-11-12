@@ -46,11 +46,7 @@ function objectVersionsSchema(variant: ProjectionVariant) {
   });
 }
 
-interface GetObjectVersionsArgs {
-  object_type: string;
-  object_name: string;
-  function_group_name?: string;
-}
+type GetObjectVersionsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetObjectVersions(
   context: HandlerContext,

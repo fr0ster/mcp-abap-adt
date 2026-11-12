@@ -85,11 +85,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface LockObjectArgs {
-  object_name: string;
-  object_type: string;
-  super_package?: string;
-}
+type LockObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The tool's boundary: `object_type` is one of the kinds the declared

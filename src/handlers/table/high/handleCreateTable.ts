@@ -60,14 +60,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateTableArgs {
-  table_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateTableArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateTable(
   context: HandlerContext,

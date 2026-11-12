@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteStructureArgs {
-  structure_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteStructure(
   context: HandlerContext,

@@ -36,11 +36,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface DeleteTableArgs {
-  table_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteTableArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteTable(
   context: HandlerContext,

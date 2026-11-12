@@ -119,20 +119,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateServiceBindingArgs {
-  service_binding_name: string;
-  service_definition_name: string;
-  package_name: string;
-  description?: string;
-  binding_variant?: ServiceBindingVariant;
-  service_name?: string;
-  service_version?: string;
-  transport_request?: string;
-  activate?: boolean;
-  response_format?: ServiceBindingResponseFormat;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateServiceBinding(
   context: HandlerContext,

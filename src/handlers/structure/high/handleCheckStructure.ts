@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckStructure(
   context: HandlerContext,
-  args: { structure_name: string; version?: string; ddl_code?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckStructureLow(context, args);
   return normalizeCheckResponse(result, args.structure_name?.toUpperCase());

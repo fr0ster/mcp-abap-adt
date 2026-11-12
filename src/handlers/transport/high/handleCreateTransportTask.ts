@@ -82,12 +82,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CreateTransportTaskArgs {
-  transport_number: string;
-  target_user: string;
-  task_type?: TaskType;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateTransportTaskArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The task number, read out of the parsed answer. It arrives the way a created

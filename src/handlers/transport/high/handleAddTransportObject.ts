@@ -53,13 +53,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface AddTransportObjectArgs {
-  transport_number: string;
-  object_name: string;
-  object_type: string;
-  pgmid?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type AddTransportObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleAddTransportObject(
   context: HandlerContext,

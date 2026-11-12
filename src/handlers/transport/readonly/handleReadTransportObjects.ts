@@ -59,10 +59,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface ReadTransportObjectsArgs {
-  transport_number: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ReadTransportObjectsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** One entry, as this tool answers it. */
 interface Entry {

@@ -31,10 +31,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface ActivateTableTypeArgs {
-  table_type_name?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateTableType(
   context: HandlerContext,

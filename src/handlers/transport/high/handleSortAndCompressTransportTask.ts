@@ -40,10 +40,9 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface SortAndCompressTransportTaskArgs {
-  transport_number: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type SortAndCompressTransportTaskArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleSortAndCompressTransportTask(
   context: HandlerContext,

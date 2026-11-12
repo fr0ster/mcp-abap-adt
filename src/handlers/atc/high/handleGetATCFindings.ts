@@ -40,10 +40,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface GetATCFindingsArgs {
-  worklist_id?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetATCFindingsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetATCFindings(
   context: HandlerContext,

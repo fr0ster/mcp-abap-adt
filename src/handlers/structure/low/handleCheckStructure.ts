@@ -46,12 +46,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckStructureArgs {
-  structure_name: string;
-  ddl_code?: string;
-  version?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckStructure(
   context: HandlerContext,

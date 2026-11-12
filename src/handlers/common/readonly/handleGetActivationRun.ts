@@ -12,9 +12,12 @@
  * How often to ask, and which status ends the asking, is the caller's; a
  * status read with `with_long_polling` is held by SAP until the run ends.
  */
+
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import type { compactGetSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   activationExecutedOf,
@@ -26,14 +29,17 @@ import {
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
-interface ActivationRunArgs {
-  run_id?: unknown;
-}
+/** The run a read names: HandlerGet's `run_id`, as its schema parses it (the one caller). */
+type ActivationRunArgs = Pick<z.output<typeof compactGetSchema>, 'run_id'>;
 
-interface ActivationStatusArgs extends ActivationRunArgs {
-  /** `true`: SAP holds the read until the run ends (`?withLongPolling=true`). */
-  with_long_polling?: unknown;
-}
+/**
+ * The status read's arguments: with `with_long_polling` `true`, SAP holds
+ * the read until the run ends (`?withLongPolling=true`).
+ */
+type ActivationStatusArgs = Pick<
+  z.output<typeof compactGetSchema>,
+  'run_id' | 'with_long_polling'
+>;
 
 function runIdOf(args: ActivationRunArgs): string | undefined {
   return typeof args?.run_id === 'string' && args.run_id.trim() !== ''

@@ -1085,12 +1085,7 @@ function listAnswer(
 
 export async function handleGetStructuresList(
   context: HandlerContext,
-  args: {
-    structure_name?: string;
-    structure_names?: string[];
-    version?: ReadVersion;
-    include_extensions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const listed = args?.structure_names;
   const version = args?.version ?? 'active';

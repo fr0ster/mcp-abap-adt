@@ -87,13 +87,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface CheckObjectArgs {
-  object_name: string;
-  object_type: string;
-  version?: string;
-  source_code?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** The types whose check can take source that is not saved. */
 const SOURCE_TYPES = ['class', 'structure', 'ddl'];

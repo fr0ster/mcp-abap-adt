@@ -38,11 +38,7 @@ export const TOOL_DEFINITION = {
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface DeleteTableTypeArgs {
-  table_type_name?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteTableType(
   context: HandlerContext,

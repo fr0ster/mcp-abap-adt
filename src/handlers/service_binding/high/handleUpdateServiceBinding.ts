@@ -154,15 +154,7 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface UpdateServiceBindingArgs {
-  service_binding_name: string;
-  desired_publication_state: DesiredPublicationStateInput;
-  binding_variant?: ServiceBindingVariant;
-  service_name: string;
-  service_version?: string;
-  response_format?: ServiceBindingResponseFormat;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateServiceBinding(
   context: HandlerContext,

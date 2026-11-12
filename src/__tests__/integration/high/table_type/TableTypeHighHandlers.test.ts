@@ -50,7 +50,10 @@ import { handleHandlerGet } from '../../../../../compact-readonly-entries/src/ha
 import { handleHandlerValidate } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
 import { handleHandlerWhereUsed } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerWhereUsed';
 import { handleActivateObjects } from '../../../../handlers/common/high/handleActivateObjects';
-import { handleGetObjectVersionSource } from '../../../../handlers/common/readonly/handleGetObjectVersionSource';
+import {
+  TOOL_DEFINITION as GetObjectVersionSource,
+  handleGetObjectVersionSource,
+} from '../../../../handlers/common/readonly/handleGetObjectVersionSource';
 import { handleGetObjectVersions } from '../../../../handlers/common/readonly/handleGetObjectVersions';
 import {
   TOOL_DEFINITION as CreatePackage,
@@ -71,7 +74,10 @@ import {
 import { handleDeleteTableType } from '../../../../handlers/table_type/high/handleDeleteTableType';
 import { handleGetTableType } from '../../../../handlers/table_type/high/handleGetTableType';
 import { handleUpdateTableType } from '../../../../handlers/table_type/high/handleUpdateTableType';
-import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import {
+  defineTool,
+  type HandlerContext,
+} from '../../../../lib/handlers/interfaces';
 import { tableTypeChanges } from '../../../../lib/strategies/documentChanges';
 import {
   readTableTypeDefinition,
@@ -482,14 +488,19 @@ describe('TableType High-Level Handlers Integration', () => {
       const contentUri =
         field(firstVersion, 'contentUri') ?? field(firstVersion, 'content_uri');
       if (typeof contentUri === 'string') {
+        // The model's call, through the tool's entry: its schema refuses
+        // table_type before the handler, and that refusal is the answer.
         record(
           `GetObjectVersionSource ${TABLE_TYPE}`,
-          answerOf(
-            await handleGetObjectVersionSource(context, {
+          await defineTool(GetObjectVersionSource, handleGetObjectVersionSource)
+            .call(context, {
               object_type: 'table_type',
               content_uri: contentUri,
-            }),
-          ),
+            })
+            .then(answerOf, (refused: unknown) => ({
+              isError: true,
+              text: String(refused),
+            })),
         );
       } else {
         logger?.info(

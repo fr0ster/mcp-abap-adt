@@ -13,7 +13,10 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { handleGetTableContents } from '../../../../handlers/table/readonly/handleGetTableContents';
+import {
+  TOOL_DEFINITION as GetTableContents,
+  handleGetTableContents,
+} from '../../../../handlers/table/readonly/handleGetTableContents';
 
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -67,10 +70,13 @@ describe('GetTableContents Handler Integration', () => {
         { table_name: tableName, max_rows: maxRows },
         async () => {
           const handlerContext = createHandlerContext({ connection, logger });
-          return handleGetTableContents(handlerContext, {
-            table_name: tableName,
-            max_rows: maxRows,
-          });
+          return handleGetTableContents(
+            handlerContext,
+            GetTableContents.inputSchema.parse({
+              table_name: tableName,
+              max_rows: maxRows,
+            }),
+          );
         },
       );
 
@@ -107,7 +113,10 @@ describe('GetTableContents Handler Integration', () => {
         { table_name: '' },
         async () => {
           const handlerContext = createHandlerContext({ connection, logger });
-          return handleGetTableContents(handlerContext, { table_name: '' });
+          return handleGetTableContents(
+            handlerContext,
+            GetTableContents.inputSchema.parse({ table_name: '' }),
+          );
         },
       );
 

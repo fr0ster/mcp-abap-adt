@@ -26,6 +26,7 @@ import {
   readExceptionSubType,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
+  IAdtError,
   IAdtResponse,
   IDebuggeeIds,
   IDebuggerBreakpoint,
@@ -35,7 +36,10 @@ import type {
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type AdtHeadersContext,
@@ -279,6 +283,24 @@ const settledPolls = new WeakSet<Promise<IAdtResponse<string>>>();
  */
 export const DEBUGGEE_KEPT_WORDS =
   "not sent: the listener's stop failed and a breakpoint may still be set, where the debuggee would stop again. It stays held for the next stop.";
+
+/** The words a stop dropped with its spent connection is reported in. */
+export const STOP_DROPPED_WORDS =
+  "the debuggee's connection had lost its SAP session: the stop was dropped without a request, and SAP's logoff of that session freed what it held";
+
+/**
+ * Whether a failed answer says its connection is spent: the connection's own
+ * session error, `ADT_NOT_CONNECTED` or `ADT_SESSION_REPLACED`, or SAP's
+ * answer marked `sessionLost` — read from the typed fields alone, never from
+ * the message.
+ */
+function spentBy(error: IAdtError): boolean {
+  return (
+    error.sessionLost !== undefined ||
+    error.sessionError === ADT_SESSION_ERROR.NOT_CONNECTED ||
+    error.sessionError === ADT_SESSION_ERROR.SESSION_REPLACED
+  );
+}
 
 interface Listener {
   connection: IAbapConnection;
@@ -2438,7 +2460,7 @@ export class DebugSession<O = unknown> {
         const released = await stop.debugger
           .step('stepContinue', { analyse: analyseDebuggeeEnd })
           .catch(asFailure);
-        if (released.ok) {
+        if (released.ok && released.getResult().sessionLost === undefined) {
           // Released: only its connection may be left, and a retry must not release twice.
           this.current = undefined;
           await this.closeOrKeep(
@@ -2446,6 +2468,19 @@ export class DebugSession<O = unknown> {
             "the debuggee's connection",
             failures,
           );
+        } else if (released.ok || spentBy(released.getError())) {
+          // Its connection is spent (the owner's decision): the SAP session
+          // is gone, and SAP's logoff of it freed what it held. The stop is
+          // dropped without a request — no logoff on the spent connection —
+          // and a failed release is reported, no debt.
+          this.current = undefined;
+          this.ports.dropConnection(stop.connection);
+          if (!released.ok) {
+            this.cleanupNotes.push({
+              ...failedEntry(released, 'release the debuggee'),
+              cleanup: { message: STOP_DROPPED_WORDS },
+            });
+          }
         } else {
           failures.push(failedEntry(released, 'release the debuggee')); // kept: a later stop retries
         }

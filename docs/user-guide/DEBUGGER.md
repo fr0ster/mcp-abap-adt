@@ -575,7 +575,22 @@ ends by:
   (`release the debuggee`, `release <what>`) and the words "not sent: the listener's stop failed
   and a breakpoint may still be set, where the debuggee would stop again. It stays held for the
   next stop.", and the next stop releases it once the listener's stop or the deletes succeeded
-  (unit-tested, not measured: `DebugSessionCleanup.test.ts`). While a debuggee stays held — not
+  (unit-tested, not measured: `DebugSessionCleanup.test.ts`). A held debuggee whose connection is spent is
+  dropped instead. A connection is spent when the release's answer names the connection's own
+  session error (`sessionError` `ADT_NOT_CONNECTED` or `ADT_SESSION_REPLACED`), or is marked
+  `sessionLost`; this is read from those fields, never from the words.
+  - Its SAP session is gone, and SAP's logoff of it freed what it held. The stop takes the
+    connection out without a request (no logoff on it), as a freed debugger session is.
+  - A failed release is reported as a note in the shape of every other entry, its `cleanup`
+    saying the stop was dropped. It is no failure: the stop completes, and a new start is
+    accepted.
+  - Any other failure of the release, `ADT_RELEASE_PENDING` included, stays a failure kept for
+    the next stop.
+  - Unit-tested in `DebugSessionCleanup.test.ts`.
+  - Measured on premise over RFC (2026-11-12), with `RFC_CLOSED` sent down the release's
+    failure path by a local change, not committed. `DebugStop` answered `stopped`, with the
+    release's `ADT_NOT_CONNECTED` as a note; a new start answered `listening`, and its stop
+    succeeded. While a debuggee stays held — not
   released, or owed — the run's connection stays open with it: the run's request is the one held
   at the breakpoint, and its logoff would end that session. The stop that releases the debuggee
   closes the run's connection after the release; the instance's close and the process's shutdown

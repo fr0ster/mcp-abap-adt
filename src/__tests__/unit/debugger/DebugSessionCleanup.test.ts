@@ -570,6 +570,114 @@ describe('the cleanup', () => {
     for (const c of world.log) expect(served.has(c.connection)).toBe(false);
   });
 
+  // A stop whose connection is spent (the owner's decision): its SAP session
+  // is gone, and SAP's logoff freed what it held. Read from the typed
+  // verdict alone — `sessionError` (ADT_NOT_CONNECTED, ADT_SESSION_REPLACED)
+  // or `sessionLost` — never from the message: the stop is dropped without a
+  // request, reported, and a new start is accepted.
+  describe('the release of a held debuggee whose connection is spent', () => {
+    async function heldStop() {
+      const world = fakeWorld();
+      const { session } = await armed(world);
+      world.polls[1].resolve(LISTEN_CATCH());
+      await until(() => world.calls.includes('getStack'));
+      return { world, session };
+    }
+
+    async function startsAgain(
+      world: ReturnType<typeof fakeWorld>,
+      session: Awaited<ReturnType<typeof armed>>['session'],
+    ) {
+      world.breakpointAnswers.push(ROWS);
+      const polls = world.polls.length;
+      const again = session.start('refuse', { breakpoints: [A, EXC] });
+      await until(() => world.polls.length === polls + 1);
+      world.polls[polls].resolve(LISTEN_NOTHING());
+      await expect(again).resolves.toBeDefined();
+    }
+
+    it.each([
+      ['sessionError ADT_NOT_CONNECTED', { sessionError: 'ADT_NOT_CONNECTED' }],
+      [
+        'sessionError ADT_SESSION_REPLACED',
+        { sessionError: 'ADT_SESSION_REPLACED' },
+      ],
+      ['sessionLost on the refusal', { sessionLost: 'ADT_SESSION_REPLACED' }],
+    ] as const)(
+      '%s: the stop is dropped without a request, reported, and a start is accepted',
+      async (_name, extra) => {
+        const { world, session } = await heldStop();
+        world.override.step = async () =>
+          refusedResponse('words that are never read', {
+            origin: 'connection',
+            ...extra,
+          });
+        world.calls.length = 0;
+        const closedBefore = world.closed.length;
+        const notes = await session.stop();
+        // Dropped: no logoff on it, nothing sent after the release.
+        expect(world.dropped).toHaveLength(1);
+        expect(world.closed.slice(closedBefore)).not.toContain(
+          world.dropped[0],
+        );
+        expect(notes).toEqual([
+          expect.objectContaining({
+            step: 'release the debuggee',
+            cleanup: { message: expect.stringContaining('dropped') },
+          }),
+        ]);
+        expect(session.failures()).toEqual([]);
+        expect(session.holdsState()).toBe(false);
+        await startsAgain(world, session);
+      },
+    );
+
+    it('a released stop whose answer carries sessionLost is dropped, not logged off', async () => {
+      const { world, session } = await heldStop();
+      world.override.step = async () => ({
+        ok: true,
+        getResult: () => ({
+          value: undefined,
+          sessionLost: 'ADT_SESSION_REPLACED' as const,
+        }),
+        getError: () => {
+          throw new Error('asked for the error of a success');
+        },
+      });
+      const closedBefore = world.closed.length;
+      await expect(session.stop()).resolves.toEqual([]);
+      expect(world.dropped).toHaveLength(1);
+      expect(world.closed.slice(closedBefore)).not.toContain(world.dropped[0]);
+      expect(session.holdsState()).toBe(false);
+    });
+
+    it('a connection failure that names no session error stays a failure, kept for the next stop', async () => {
+      const { world, session } = await heldStop();
+      world.override.step = async () =>
+        refusedResponse('ADT_NOT_CONNECTED in the words only', {
+          origin: 'connection',
+        });
+      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+      expect(world.dropped).toEqual([]);
+      expect(session.failures()).toEqual([
+        expect.objectContaining({ step: 'release the debuggee' }),
+      ]);
+      expect(session.holdsState()).toBe(true);
+    });
+
+    it('ADT_RELEASE_PENDING is no spent connection: it stays a failure', async () => {
+      const { world, session } = await heldStop();
+      world.override.step = async () =>
+        refusedResponse('pending', {
+          origin: 'connection',
+          sessionError: 'ADT_RELEASE_PENDING',
+        });
+      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+      expect(world.dropped).toEqual([]);
+      expect(session.holdsState()).toBe(true);
+    });
+  });
+
   // Pins Task 3's counter across the cleanup: it passes once Task 3 is in, and fails if the cleanup resets it.
   it('a tag is never reused: the cleanup empties the lists, not the counter', async () => {
     const world = fakeWorld();

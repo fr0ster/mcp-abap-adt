@@ -41,9 +41,11 @@ work (§7).
     has no `lint:check` / `test:check` of its own; it is covered by the root `check`.
   - **mcp-abap-connection:** `npm run lint:check`, `npm run build`, `npm test` and
     `npm run check:docs`.
-- **Measurements made while a step runs** (the option's error list, the unknown inventory) are
-  hand scripts on the compiler API, run with `node` from the scratchpad and deleted after.
-  They are never committed and never run through `npx`.
+- **Measurements made while a step runs** go through npm scripts, never `npx`:
+  - `npm run measure:exact`: the option's remaining errors, per project;
+  - `npm run measure:unknown`: the provenance script in report mode.
+
+  Both are committed tools under `tools/`, and both are removed in S6 once their gates stand.
 - **Commits** are made by path, ending with the two trailers:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` and
   `Claude-Session: https://claude.ai/code/session_013FwzVzuPQdYVh3bHZmipzj`. No
@@ -162,12 +164,21 @@ Branched after 45.4.0 is merged and published.
 
 ### S2. `exactOptionalPropertyTypes` (spec §3; order step 3)
 
-- **The exact gate.** `tsconfig.exact.json` extends the root config with the option on, and
-  includes only the files already converted, plus the `__typechecks__/exact/` typechecks. It
-  is run by a new script, `npm run test:check:exact`, which joins the build's checks. Each
-  batch below adds its files to it, so a converted file cannot regress.
-- The full measurement of what is left is a scratchpad hand script (see the rules). The other
-  configs keep the option off until S2f, so every commit stays green.
+- **The exact gate: a filter over each project's own diagnostics, not a config of its own.**
+  - A `tsconfig.json` `include` cannot isolate a batch: TypeScript also checks what the
+    included files import. For example, `handleActivateDomain.ts` imports `utils.ts`, whose
+    line 663 fails under the option (Codex measured `npm run test:check --
+    --exactOptionalPropertyTypes`, exit 2). Each package also has its own compiler settings
+    (`rootDir` among them).
+  - So `tools/exact-optional.mjs` compiles each project with its own config plus the option,
+    on the compiler API. It reports the diagnostics whose file is listed in
+    `tools/exact-optional-files.json` (per project: the files converted so far, and the
+    `__typechecks__/exact/` typechecks), and fails on any.
+  - `npm run test:check:exact` runs it, and the build's checks run it too.
+  - `npm run measure:exact` runs the same tool unfiltered.
+  - Each batch below adds its files to the list, so a converted file cannot regress while its
+    imports wait for their own batch.
+- The other configs keep the option off until S2f, so every commit stays green.
 
 - **S2a. Handler arguments from the schema.**
   - The 247 hand-declared `…Args` types that are a handler's `args` become `z.output<typeof …>`
@@ -214,7 +225,7 @@ Branched after 45.4.0 is merged and published.
   8. compact-readonly-entries (56), compact-modify (14) and responsible-rules (1).
 
   For each batch:
-  - its files join `tsconfig.exact.json`;
+  - its files join `tools/exact-optional-files.json`;
   - each site is narrowed in plain code or typed by its contract;
   - a `T | undefined` that reached a callee assuming `T` is a revealed defect, with a
     failing-first test first.
@@ -233,7 +244,8 @@ Branched after 45.4.0 is merged and published.
     upstream sites must compile. The spec lets step 3's upstream sites wait (spec §7). If the
     releases are out before S3, S2f and S5 come before S3; otherwise S3 and S4 go on, and S2f
     and S5 follow the publication.
-  - `tsconfig.exact.json` and `test:check:exact` go once every config carries the option.
+  - `tools/exact-optional.mjs`, its list and `test:check:exact` go once every config carries
+    the option.
   - **The RFC hole.** A typecheck in the production project assigns `{ …rfcLogon, url:
     undefined }` to `ISapRfcLogon`, marked `@ts-expect-error`.
     - **Deliberate break:** take the option out of the root config. The assignment then
@@ -252,11 +264,20 @@ Branched after 45.4.0 is merged and published.
     reads, a network answer's `data`, tool arguments, third-party contracts typed `unknown`;
   - sinks named by their contract (`ILogger`, a serializer);
   - callbacks called only by an outside contract.
-  - **Fixtures first,** each reported or not by its class: a typed site; a value laundered
-    through an `unknown` variable; a boundary narrowed in plain code; a named sink; a library
-    callback; a mixed site.
-  - **Deliberate break:** stop following sources through `unknown` variables, and the laundered
-    fixture goes green when it must be red.
+  - **Fixtures first,** each reported or not by its class:
+    - a typed site;
+    - a value laundered through an `unknown` variable;
+    - a boundary narrowed in plain code;
+    - a named sink (an `ILogger` method);
+    - an unnamed sink: a function of the repository that accepts anything, named by no
+      contract in the sinks' fixture. It must be refused;
+    - a library callback;
+    - a mixed site.
+  - **Deliberate breaks:**
+    - stop following sources through `unknown` variables: the laundered fixture is no longer
+      refused;
+    - accept every sink without checking its contract name: the unnamed-sink fixture is no
+      longer refused.
 - **S3b. The sites,** per the spec's appendix and the script's output:
   - typed parameters retyped;
   - mixed ones split at the boundary or given a union;
@@ -266,8 +287,8 @@ Branched after 45.4.0 is merged and published.
   - properties checked by their writers.
 
   Each retyping that changes behaviour gets a failing-first test.
-- **S3b in batches,** each verified by the hand-script run of the provenance script (its list
-  shrinks by the batch's sites):
+- **S3b in batches,** each verified by `npm run measure:unknown` (its list shrinks by the
+  batch's sites):
   1. the 33 typed parameters (the appendix);
   2. the mixed parameters in `src/lib/strategies` (14);
   3. `src/lib/xml` (8) and `src/lib/debugger` (7);
@@ -279,7 +300,7 @@ Branched after 45.4.0 is merged and published.
   8. the other projects' sites.
 
   **Deliberate break per batch:** revert one retyped site of the batch to `unknown` with its
-  hand narrowing; the script lists it again.
+  hand narrowing; `measure:unknown` lists it again.
 - **S3a's source test is added last in S3,** once nothing is refused. Its deliberate break (the
   laundered fixture) is checked then, and again with one site of S3b reverted in the real
   code.
@@ -340,6 +361,8 @@ After U1 to U4 are published.
   - no allow-list;
   - fixtures per refusal.
 - **The unknown audit test** (S3a).
+- **The measurement tools go:** `measure:exact` (with `exact-optional.mjs`, already gone in
+  S2f) and `measure:unknown`. The source tests stand in their place.
 - **The goal's measurement,** rerun with the compiler API:
   - 0 in every production column;
   - 0 `any` in the test infrastructure;

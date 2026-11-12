@@ -459,7 +459,15 @@ Accepted deviations, as implemented:
 4. A variant with nothing left drops out of the tool's `available_in`.
 5. The debug texts read "The handle of this server's debug state; every operation takes it." and "the id of the debuggee attached".
 
-Open, decided after Task 2 (c) is measured: whether `lazyPackageReader` refuses while a batch is open.
+After the Task 1 and Task 2 measurements (the owner):
+
+6. **Per part.** The draft tool answers one entry per part (the main source or metadata, and each include) with its own state; `has_draft` when any part has one (spec §5, §5.1). `CLASS` and `BEHAVIOR_IMPLEMENTATION` are offered on premise through their include parts.
+7. **CDS view.** Offered with the 14-digit timestamps compared instead of the whole ETags: a failing-first unit test of the rule, then a live proof on both systems (no draft → `none`, a write → `own`, on premise another user's write → `other`) before it ships.
+8. **Metadata extension, service definition.** Offered with the state; `changed_at` and `age_seconds` `null`, documented as not known for these types.
+9. **Batch.** No refusal while a batch is open: `lazyPackageReader` as implemented (pinned by `accessWrappers.test.ts`).
+10. **Not offered**, documented why: package and message class (the ETag does not follow the version), service binding (not measurable).
+
+Consequences for Task 11: `DraftAnswer` becomes `{ has_draft: boolean; parts: readonly DraftPartAnswer[] }`, a `DraftPartAnswer` being `{ part, draft, changed_at, age_seconds, etags }`; `draftOf` takes the part's comparison (`etag` | `timestamp`) and whether its time is known; `readDraftEtags` reads each part of `DRAFT_PARTS[variant][type]`, an include whose three reads all answer `404` having no entry. `GetObjectDraft` and `HandlerGet` `part: 'draft'` get `tools/batch-handlers.json` entries (Task 2).
 
 ## Measurement record
 

@@ -455,26 +455,30 @@ draft, and no other tool reads it.
 - **What it sends.** Three reads of each source part at `version` `active`, `inactive` and the
   caller's working version, each answer's ETag taken through a client built with the
   `wireItself` reading (§1). The reads depend on nothing, and it is not a long tool.
-- **Multi-part objects. Controller's call:** plan step 1 measures whether an unactivated change
-  in a class include (local types, local definitions, test classes, macros) or a function
-  group include moves the main source's inactive ETag. If it does, the tool reads the main
-  source only. If not, the tool reads every source part of the object and answers per part;
-  the per-part answer's shape is then the owner's to decide, before the tool is built.
-- **Batch. Controller's call:** plan step 1 measures whether an ADT `$batch` response part keeps
-  the ETag header. If it does, the tool is recordable (an entry in `tools/batch-handlers.json`).
-  If not, it is not recordable: no batch entry, and in batch mode it is refused
-  `batch_not_recordable` like every tool without one.
-- **The answer** (per part when §5's multi-part rule reads every part):
-  - `draft`: `none` (`active` ETag = `inactive` ETag), `own` (`inactive` ≠ `active` and working
-    = `inactive`), `other` (working = `active` ≠ `inactive`), or `undetermined` (the three fit
-    none of these);
-  - `changed_at`: for `own` and `other`, the `inactive` ETag's first 14 digits as a UTC time
-    (ISO 8601), the draft's last write; `null` for `none` and `undetermined`;
-  - `age_seconds`: for `own` and `other`, now (UTC, the server's clock) minus `changed_at`, in
-    whole seconds (the floor; the ETag timestamp has second precision);
-    `null` for `none` and `undetermined`;
-  - `etags`: `active`, `inactive` and `workspace`, each the ETag of that version's answer as
-    read, `null` when that answer carried none.
+- **Multi-part objects (the owner's decision, after plan Task 1 measured that an include's
+  write does not move the main source's ETag).** The answer has one entry per part — the main
+  source (or the metadata, for a metadata type) and each include — each with its own state;
+  the object has a draft when any part has one. The parts read per type are in §5.1. An include
+  that does not exist (all three of its reads answer `404`) has no entry.
+- **Batch (Measured: a `$batch` part keeps its `ETag`).** The tool is recordable: an entry in
+  `tools/batch-handlers.json`.
+- **The answer:**
+  - `has_draft`: `true` when any part's `draft` is `own` or `other`;
+  - `parts`: one entry per part, in the order of §5.1, each `{ part, draft, changed_at,
+    age_seconds, etags }`:
+    - `draft`: `none` (`active` = `inactive`), `own` (`inactive` ≠ `active` and working =
+      `inactive`), `other` (working = `active` ≠ `inactive`), or `undetermined` (the three fit
+      none of these); compared by the whole ETag, except for a CDS view, whose ETags are
+      compared by their 14-digit timestamps alone (§5.1);
+    - `changed_at`: for `own` and `other`, the `inactive` ETag's first 14 digits as a UTC time
+      (ISO 8601), the draft's last write; `null` for `none` and `undetermined`, and always
+      `null` for a metadata extension and a service definition, whose ETag timestamp is a
+      constant (not known for these types);
+    - `age_seconds`: for `own` and `other`, now (UTC, the server's clock) minus `changed_at`,
+      in whole seconds (the floor; the ETag timestamp has second precision); `null` wherever
+      `changed_at` is;
+    - `etags`: `active`, `inactive` and `workspace` (the `workingArea` read), each the ETag of
+      that version's answer as read, `null` when that answer carried none.
   - No `detail` argument, on `GetObjectDraft` or on `HandlerGet` `part: 'draft'`: the answer
     always carries these fields, the same on both.
 - **Failures.** A read that fails answers as the tool's reads answer today: SAP's status and
@@ -489,24 +493,21 @@ draft, and no other tool reads it.
 
 ### 5.1 Which types have versions to compare
 
-- **Source-based types (Measured for programs and classes, on premise and cloud):** the three
-  versions of the main source answer the 14-digit ETag shape. The plan measures the others the
-  tool would offer before they are listed: interface, include, function module, CDS view,
-  behavior definition, behavior implementation, metadata extension, service definition, table
-  and structure (their source form).
-- **Metadata-only types** (domain, data element, function group, package, table type, message
-  class, service binding). Measured in code: the server sends `version` on the metadata reads
-  of domain, data element and function group (23.0.0), and a class's metadata answered its
-  inactive document to `inactive` and to `workingArea` (adt-clients' `readQuery`, on premise).
-  So `?version=` is accepted on those metadata reads. Not measured: whether their ETags tell
-  the three versions apart. The one metadata ETag seen, a class's on the cloud trial, had
-  another shape (40 digits, two timestamps). The plan measures each such type with two users;
-  a type is offered only where the three ETags tell `none`, `own` and `other` apart, and the
-  docs list the types not offered.
-- **The working version's name.** The probes sent `version=workspace`; adt-clients sends
-  `workingArea` verbatim. The plan's first step measures whether `workingArea` answers as
-  `workspace` did for a second user. If not, `interfaces-adt` and `adt-clients` add `workspace`
-  in a minor, published before 24.0.0 is tagged.
+Measured (plan Task 1, both systems; the owner's decisions on what is offered):
+
+| Type | Parts read | Rule |
+|---|---|---|
+| `PROGRAM`, `INCLUDE` (on premise) | the source | whole ETag |
+| `INTERFACE`, `FUNCTION_MODULE`, `BEHAVIOR_DEFINITION`, `TABLE`, `STRUCTURE` | the source | whole ETag |
+| `CLASS`, `BEHAVIOR_IMPLEMENTATION` | on premise the local implementations, local definitions, test classes and macros includes (the main source's ETag is one for every version there); on the cloud the main source and the implementations, definitions and test classes includes (macros are not ABAP Cloud) | whole ETag |
+| `FUNCTION_GROUP`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE` | the metadata | whole ETag |
+| `DDL` (CDS view) | the source | the 14-digit timestamps (the whole ETags differ with no draft); proven live before it ships |
+| `METADATA_EXTENSION`, `SERVICE_DEFINITION` | the source | whole ETag; `changed_at` and `age_seconds` `null` (the ETag timestamp is a constant) |
+
+Not offered, and documented why: a package and a message class (the ETag does not follow the
+version), a service binding (its change is a publication, not an unactivated write; not
+measurable). The working version is `workingArea` (Measured: it answers as `workspace` where
+ADT takes `workspace`); no other package changes.
 
 ## 6. Table data
 

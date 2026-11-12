@@ -45,14 +45,18 @@ const EXCLUDED_SEGMENTS = new Set([
 ]);
 const STRING_COMPILING = new Set(['match', 'matchAll', 'search']);
 
-/** Every production source on disk, git-tracked or new, relative to the repository. */
-export function productionSources(): string[] {
+/**
+ * Every production source on disk under `root` (the repository by default),
+ * git-tracked or new, relative to `root`. A fixture tree laid out as a
+ * repository is discovered the same way.
+ */
+export function productionSources(root: string = REPO): string[] {
   // Tracked files, and new ones not yet added that git does not ignore.
   const listed = execFileSync(
     'git',
     ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
     {
-      cwd: REPO,
+      cwd: root,
       encoding: 'utf8',
     },
   );
@@ -64,7 +68,7 @@ export function productionSources(): string[] {
         SOURCE_EXTENSIONS.some((extension) => file.endsWith(extension)) &&
         !TEST_SUFFIXES.some((suffix) => file.endsWith(suffix)) &&
         !file.split('/').some((segment) => EXCLUDED_SEGMENTS.has(segment)) &&
-        fs.existsSync(path.join(REPO, file)),
+        fs.existsSync(path.join(root, file)),
     )
     .sort();
 }

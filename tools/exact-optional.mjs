@@ -4,6 +4,7 @@
 //
 //   node tools/exact-optional.mjs          (npm run test:check:exact)
 //   node tools/exact-optional.mjs --all    (npm run measure:exact)
+//   npm run measure:exact -- --details     (every diagnostic, one per line)
 //
 // - The list, `tools/exact-optional-files.json`, names per project (its
 //   `tsconfig`) the files already converted and the typechecks that pin them.
@@ -65,6 +66,7 @@ function describe(d) {
 }
 
 const all = process.argv.includes('--all');
+const details = process.argv.includes('--details');
 const list = JSON.parse(
   readFileSync(join(REPO, 'tools', 'exact-optional-files.json'), 'utf8'),
 );
@@ -90,6 +92,7 @@ for (const project of list.projects) {
     console.log(`${project.tsconfig}: ${found.length} error(s)`);
     for (const [file, count] of [...perFile].sort((a, b) => b[1] - a[1]))
       console.log(`  ${count}\t${file}${listed.has(file) ? '\t(listed)' : ''}`);
+    if (details) for (const d of found) console.log(`    ${describe(d)}`);
     continue;
   }
   const mine = found.filter(

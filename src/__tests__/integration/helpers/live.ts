@@ -190,6 +190,11 @@ function current(): LiveRunner {
   return runner;
 }
 
+/** The running suite's own connection: the configured user's, for what no tool does. */
+export function liveConnection(): IAbapConnection {
+  return current().connection();
+}
+
 /** The tools the server dispatches, not their entry: every set tool outside the plain groups. */
 let serverDispatched: ReadonlySet<string> | undefined;
 
@@ -481,7 +486,7 @@ export function liveDescribe(
  */
 export function withRestriction(
   title: string,
-  restriction: ServerRestriction,
+  restriction: ServerRestriction | (() => Promise<ServerRestriction>),
   body: () => void,
 ): void {
   describe(title, () => {
@@ -489,11 +494,15 @@ export function withRestriction(
     before(async () => {
       const base = current();
       outer = base;
+      // A restriction that needs the system (a package's super package) is
+      // read here, on the suite's own runner.
+      const stated =
+        typeof restriction === 'function' ? await restriction() : restriction;
       const server = await inProcessServer(
         base.system,
         { injected: base.connection() },
         undefined,
-        restriction,
+        stated,
       );
       useLiveRunner({
         system: base.system,

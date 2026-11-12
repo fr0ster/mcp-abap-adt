@@ -52,8 +52,8 @@ export const RUN_KINDS = [
 export interface BreakpointTarget {
   object_type: string;
   object_name: string;
-  include?: string;
-  parent_name?: string;
+  include?: string | undefined;
+  parent_name?: string | undefined;
 }
 export interface ObjectAddress {
   object_type: string;

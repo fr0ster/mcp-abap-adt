@@ -54,9 +54,9 @@ export interface SseServerOptions {
    * The idle bound on held state, in minutes: each instance's state ends
    * after this long without a tool call. At least 30; default 30.
    */
-  stateIdleMinutes?: number;
+  stateIdleMinutes?: number | undefined;
   /** Where the state's lifecycle lines go; default stderr, always on. */
-  stateLogger?: StateLogger;
+  stateLogger?: StateLogger | undefined;
   /**
    * Batch mode: each SSE connection's instance gets an `InstanceBatch` of
    * its own, created with these settings (the launcher's). Absent: no
@@ -67,53 +67,53 @@ export interface SseServerOptions {
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
    */
-  host?: string;
+  host?: string | undefined;
   /**
    * Port to listen on (only used when no external app is provided)
    * @default 3001
    */
-  port?: number;
+  port?: number | undefined;
   /**
    * Path for SSE GET endpoint
    * @default "/sse"
    */
-  ssePath?: string;
+  ssePath?: string | undefined;
   /**
    * Path for POST messages endpoint
    * @default "/messages"
    */
-  postPath?: string;
+  postPath?: string | undefined;
   /**
    * Logger instance
    */
-  logger?: Logger;
+  logger?: Logger | undefined;
   /**
    * Server version
    */
-  version?: string;
+  version?: string | undefined;
   /**
    * External HTTP application to register routes on
    * When provided, start() will only register routes without creating a server
    * This enables integration with existing Express/CDS/CAP servers
    */
-  app?: IHttpApplication;
+  app?: IHttpApplication | undefined;
   /**
    * TLS configuration for HTTPS support
    */
-  tls?: TlsConfig;
+  tls?: TlsConfig | undefined;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | undefined;
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
-  enableDnsRebindingProtection?: boolean;
+  enableDnsRebindingProtection?: boolean | undefined;
   /**
    * Where background runs and their answers are kept, handed to every
    * instance (the launcher's `InMemoryBackgroundRuns` of
    * `@mcp-abap-adt/background-runs-memory`). Absent:
    * `background: true` is refused.
    */
-  backgroundRuns?: IBackgroundRuns;
+  backgroundRuns?: IBackgroundRuns | undefined;
   /**
    * The access checks every call of this server is checked by (spec
    * §3.2); one strategy for every instance it makes. Absent: none.
@@ -123,12 +123,12 @@ export interface SseServerOptions {
    * `SearchSource`'s SAP-answer strategy, handed to every instance (the
    * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
    */
-  sapAnswerStrategy?: SapAnswerStrategy;
+  sapAnswerStrategy?: SapAnswerStrategy | undefined;
   /**
    * `SearchSource`'s line-match strategy, handed to every instance (the
    * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
    */
-  lineMatchStrategy?: LineMatchStrategy;
+  lineMatchStrategy?: LineMatchStrategy | undefined;
 }
 
 type SessionEntry = {

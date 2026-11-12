@@ -64,6 +64,7 @@
         "src/handlers/interface/low/handleActivateInterface.ts",
         "src/handlers/interface/low/handleCheckInterface.ts",
         "src/handlers/interface/low/handleUpdateInterface.ts",
+        "src/handlers/interfaces.ts",
         "src/handlers/message_class/high/handleGetMessageClass.ts",
         "src/handlers/message_class/high/handleGetMessageClassMessage.ts",
         "src/handlers/metadata_extension/high/handleGetMetadataExtension.ts",
@@ -119,10 +120,19 @@
         "src/handlers/unit_test/high/handleRunCdsUnitTest.ts",
         "src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts",
         "src/handlers/unit_test/high/handleUpdateUnitTest.ts",
+        "src/lib/batch/InstanceBatch.ts",
         "src/lib/compact/compactSchemas.ts",
         "src/lib/compact/index.ts",
+        "src/lib/config/IServerConfig.ts",
+        "src/lib/debugger/objectUri.ts",
+        "src/lib/debugger/readings.ts",
+        "src/lib/handlers/HandlerExporter.ts",
         "src/lib/handlers/read.ts",
         "src/lib/handlers/sourceRange.ts",
+        "src/lib/requestContext.ts",
+        "src/lib/requestSystemResolution.ts",
+        "src/lib/state/InstanceState.ts",
+        "src/lib/systemContext.ts",
         "src/utils/transportValidation.ts"
       ],
       "typechecks": [
@@ -131,15 +141,21 @@
         "src/__typechecks__/exact/sourceReaders.ts",
         "src/__typechecks__/exact/systemUnitTestSearchHandlers.ts",
         "src/__typechecks__/exact/variantHandlers.ts",
+        "src/__typechecks__/exact/widenedContracts.ts",
         "src/__typechecks__/exact/writeSideHandlers.ts"
       ]
     },
     {
       "tsconfig": "server-runtime/tsconfig.json",
       "files": [
-        "server-runtime/src/sdkTransport.ts"
+        "server-runtime/src/http/config/httpParameters.ts",
+        "server-runtime/src/sdkTransport.ts",
+        "server-runtime/src/sse/config/sseParameters.ts",
+        "server-runtime/src/stdio/auth/destinationFailure.ts"
       ],
-      "typechecks": []
+      "typechecks": [
+        "server-runtime/src/__typechecks__/exact/widenedContracts.ts"
+      ]
     },
     {
       "tsconfig": "compact-readonly-entries/tsconfig.json",

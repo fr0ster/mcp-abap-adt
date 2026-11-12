@@ -106,7 +106,7 @@ export interface InstanceStateOptions {
    * else is refused. `NO_IDLE_BOUND` (stdio): none — no timer is ever armed,
    * and held state ends only by a stop, the host, the backend or shutdown.
    */
-  idleMinutes?: StateIdleBound;
+  idleMinutes?: StateIdleBound | undefined;
   /**
    * Run after the idle bound's stop, whatever its undo answered: the host's
    * terminal close of what the state owns. A failure is reported

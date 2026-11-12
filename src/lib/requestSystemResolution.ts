@@ -39,8 +39,8 @@ import type { AbapSystemKind } from './systemKind';
  * configured values then stand as they are.
  */
 export type ResolvedSystemContext = {
-  responsible?: string;
-  masterSystem?: string;
+  responsible?: string | undefined;
+  masterSystem?: string | undefined;
 } | null;
 
 /**

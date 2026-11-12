@@ -74,7 +74,7 @@ export interface HandlerExporterOptions {
    * Logger instance for handler context
    * @default defaultLogger
    */
-  logger?: Logger;
+  logger?: Logger | undefined;
 
   /**
    * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a

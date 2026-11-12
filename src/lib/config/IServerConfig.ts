@@ -33,7 +33,7 @@ export type HandlerSet = 'readonly' | 'high' | 'compact' | 'debug' | 'data';
 
 export interface IServerConfig {
   /** Path to YAML config file (`--conf`). */
-  configFile?: string;
+  configFile?: string | undefined;
 
   /**
    * SAP system type: onprem | cloud | legacy (`--system-type`, `SAP_SYSTEM_TYPE`).
@@ -41,19 +41,19 @@ export interface IServerConfig {
    * (`system_type_required`). It is never read from the credential (a JWT
    * reaches an on-premise system as well) nor guessed from the URL.
    */
-  systemType?: 'onprem' | 'cloud' | 'legacy';
+  systemType?: 'onprem' | 'cloud' | 'legacy' | undefined;
   /**
    * The form `systemType` came from: `--system-type`, `SAP_SYSTEM_TYPE`, or
    * `system-type (config file)`. Only the CLI form beats an `SAP_SYSTEM_TYPE`
    * a destination's env file brings (core).
    */
-  systemTypeSource?: string;
+  systemTypeSource?: string | undefined;
 
   /**
    * `--shutdown-timeout` in seconds (`MCP_SHUTDOWN_TIMEOUT`,
    * `shutdown-timeout`): the forced close after this long; absent: none.
    */
-  shutdownTimeout?: number;
+  shutdownTimeout?: number | undefined;
 
   /**
    * The idle bound on held state: it ends after this many minutes without a
@@ -62,25 +62,25 @@ export interface IServerConfig {
    * HTTP and SSE binaries only: stdio has no idle bound (core's `CoreConfig`
    * leaves this field out).
    */
-  stateIdleMinutes?: number;
+  stateIdleMinutes?: number | undefined;
 
   /**
    * Whether a batch's answers keep the raw part each came in
    * (`--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS`,
    * `batch.keepRawParts`). Default `false`.
    */
-  batchKeepRawParts?: boolean;
+  batchKeepRawParts?: boolean | undefined;
 
   /**
    * Whether the binary serves the data tools (`--enable-data-tools`,
    * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
    */
-  enableDataTools?: boolean;
+  enableDataTools?: boolean | undefined;
 
   /**
    * The access restrictions (`--deny-actions`, `--allowed-packages`,
    * `--allowed-requests`, `--denied-tables`, `--allowed-tables`, and their
    * environment and YAML forms; `readAccessRestrictions`). Absent: none.
    */
-  accessRestrictions?: AccessRestrictions;
+  accessRestrictions?: AccessRestrictions | undefined;
 }

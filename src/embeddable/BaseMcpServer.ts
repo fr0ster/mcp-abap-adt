@@ -407,7 +407,7 @@ export abstract class BaseMcpServer extends McpServer {
     name: string;
     version?: string;
     logger?: Logger;
-    systemType?: SapEnvironment;
+    systemType?: SapEnvironment | undefined;
     /** Asks a connection's system for its information; default none. */
     systemContextResolver?: SystemContextResolver | null;
     /** The rules that make a connection's parameters; default none. */
@@ -417,7 +417,7 @@ export abstract class BaseMcpServer extends McpServer {
      * `NO_IDLE_BOUND`: none — held state never ends on the server's clock
      * (stdio states it: the client governs the server's life).
      */
-    stateIdleMinutes?: StateIdleBound;
+    stateIdleMinutes?: StateIdleBound | undefined;
     /**
      * Where the state's lifecycle lines go (the bound's end of a state, a
      * failed cleanup, a failing observer). Default: the `logger` passed

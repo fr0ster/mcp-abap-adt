@@ -384,94 +384,94 @@ export const CORE_PARAMETERS: ParameterTable = coreParameters(fullToolSet);
  */
 export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   /** The env file, resolved (`--env` / `--env-path` / `MCP_ENV_PATH`). */
-  envFile?: string;
+  envFile?: string | undefined;
   /** Alias of `envFile`, kept for configs made by hand. */
-  envFilePath?: string;
+  envFilePath?: string | undefined;
   /** `--env` / `env` as the user gave it: a destination name or a path */
-  envDestination?: string;
+  envDestination?: string | undefined;
   /** `--env-path` / `MCP_ENV_PATH` / `env-path` as the user gave it */
-  envPath?: string;
+  envPath?: string | undefined;
   /**
    * The parameter `envFile` came from, as the user gave it: `--env`,
    * `--env-path`, `MCP_ENV_PATH`, `env (config file)`, or
    * `env-path (config file)`.
    */
-  envFileSource?: string;
+  envFileSource?: string | undefined;
   /** The stores' base directory */
-  authBrokerPath?: string;
+  authBrokerPath?: string | undefined;
   /** Default MCP destination from --mcp parameter */
-  mcpDestination?: string;
+  mcpDestination?: string | undefined;
   /** Write named sessions to disk (`--unsafe`) */
-  unsafe?: boolean;
+  unsafe?: boolean | undefined;
   /**
    * `--deferred-logon`: the start contacts no SAP system and the first tool
    * call logs on (#353); off, the start logs on and exits 1 when it fails.
    */
-  deferredLogon?: boolean;
+  deferredLogon?: boolean | undefined;
   /**
    * `--restore-session`: with `deferredLogon`, the first tool call takes up
    * the destination's one leftover session. `undefined` when no form states
    * it; stated without `deferredLogon` it is refused (`readCoreConfig`).
    */
-  restoreSession?: boolean;
+  restoreSession?: boolean | undefined;
   /**
    * The form `restoreSession` came from: `--restore-session`,
    * `MCP_RESTORE_SESSION`, or `restore-session (config file)`.
    */
-  restoreSessionSource?: string;
+  restoreSessionSource?: string | undefined;
   /**
    * The browser of a login (`--browser`): system (default), auto, chrome,
    * edge, firefox, none, headless — mapped by the platform to one of
    * auth-providers' browsers.
    */
-  browser?: string;
+  browser?: string | undefined;
   /** The program that opens the login URL (`--browser-program`); excludes `browser`. */
-  browserProgram?: string;
+  browserProgram?: string | undefined;
   /** How an expired session is renewed (`--renewal`); default `refresh-then-login`. */
-  renewal?: (typeof RENEWALS)[number];
+  renewal?: (typeof RENEWALS)[number] | undefined;
   /** Port for the login's callback (`--browser-auth-port`) */
-  browserAuthPort?: number;
+  browserAuthPort?: number | undefined;
   /** `--login-timeout` in seconds: the bound on each login; absent: none. */
-  loginTimeout?: number;
+  loginTimeout?: number | undefined;
   /**
    * The form `loginTimeout` came from: `--login-timeout`,
    * `MCP_LOGIN_TIMEOUT`, or `login-timeout (config file)`.
    */
-  loginTimeoutSource?: string;
+  loginTimeoutSource?: string | undefined;
   /** `--auth-debug`: the providers' debug lines on stderr, secrets in their prepared form. */
-  authDebug?: boolean;
+  authDebug?: boolean | undefined;
   /** SAP connection type: http or rfc; required for a destination, no default */
-  connectionType?: (typeof CONNECTION_TYPES)[number];
+  connectionType?: (typeof CONNECTION_TYPES)[number] | undefined;
   /**
    * The form `connectionType` came from: `--connection-type`,
    * `SAP_CONNECTION_TYPE`, or `connection-type (config file)`. Only the CLI
    * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
    */
-  connectionTypeSource?: string;
+  connectionTypeSource?: string | undefined;
   /** RFC: the application server host (`--ashost`, `SAP_ASHOST`, `ashost`). */
-  ashost?: string;
+  ashost?: string | undefined;
   /** RFC: the system number (`--sysnr`, `SAP_SYSNR`, `sysnr`). */
-  sysnr?: string;
+  sysnr?: string | undefined;
   /** RFC: the message server host (`--mshost`, `SAP_MSHOST`, `mshost`). */
-  mshost?: string;
+  mshost?: string | undefined;
   /** RFC: the message server service (`--msserv`, `SAP_MSSERV`, `msserv`). */
-  msserv?: string;
+  msserv?: string | undefined;
   /** RFC: the system id (`--sysid`, `SAP_SYSID`, `sysid`). */
-  sysid?: string;
+  sysid?: string | undefined;
   /** RFC: the logon group (`--group`, `SAP_GROUP`, `group`). */
-  group?: string;
+  group?: string | undefined;
   /** RFC: the SAProuter string (`--saprouter`, `SAP_SAPROUTER`, `saprouter`). */
-  saprouter?: string;
+  saprouter?: string | undefined;
   /** The client (`--client`, `SAP_CLIENT`, `client`). */
-  client?: string;
+  client?: string | undefined;
   /** The logon language (`--language`, `SAP_LANGUAGE`, `language`). */
-  language?: string;
+  language?: string | undefined;
   /**
    * The form each destination key came from (`--<key>`, `SAP_<KEY>`, or
    * `<key> (config file)`): the CLI and the environment rank above the
    * destination's own means, YAML below them.
    */
-  destinationKeySource?: Partial<Record<DestinationKey, string>>;
+  destinationKeySource?: Partial<Record<DestinationKey, string>> | undefined;
 }
 
 const str = textValue;

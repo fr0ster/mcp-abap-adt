@@ -883,11 +883,11 @@ export interface AuthDisplayConfig {
   serviceUrl?: string;
   /** Over RFC, where the summary shows the URL over HTTP: each address field, labelled, as stated. */
   rfcAddress?: ReadonlyArray<readonly [string, string]>;
-  sapClient?: string;
+  sapClient?: string | undefined;
   authType?: string;
-  username?: string;
-  password?: string;
-  jwtToken?: string;
+  username?: string | undefined;
+  password?: string | undefined;
+  jwtToken?: string | undefined;
   refreshToken?: string;
   uaaUrl?: string;
   uaaClientId?: string;

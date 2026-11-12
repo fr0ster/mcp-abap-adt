@@ -130,11 +130,13 @@ export const HINTS: Readonly<Record<string, string>> = {
 
 export interface DestinationFailureOptions {
   /** The destination the server serves: named by a refusal whose error does not carry it. */
-  readonly destination?: string;
+  readonly destination?: string | undefined;
   /** The platform a browser login found no browser on (default `process.platform`). */
-  readonly platform?: string;
+  readonly platform?: string | undefined;
   /** The server's own sentence beside a chain failure. */
-  readonly sentenceFor?: (error: IAuthProviderError) => string | undefined;
+  readonly sentenceFor?:
+    | ((error: IAuthProviderError) => string | undefined)
+    | undefined;
 }
 
 /** The headline of a destination refused for `fields`. */

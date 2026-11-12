@@ -49,7 +49,7 @@ export type BatchAnswer = {
   content: CallToolResult['content'];
   isError?: true;
   /** SAP's raw parts of the call's requests, in the order sent — only when `keepRawParts`. */
-  raw?: RawPart[];
+  raw?: RawPart[] | undefined;
 };
 
 /** `BatchEnd`'s own error, as it answered it: what every number of its batch answers. */

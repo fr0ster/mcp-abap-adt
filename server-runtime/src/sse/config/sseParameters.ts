@@ -145,20 +145,20 @@ export const SSE_PARAMETERS: ParameterTable = sseParameters(fullToolSet);
 
 /** What `mcp-abap-adt-sse` reads. */
 export interface SseConfig extends IServerConfig {
-  host?: string;
-  port?: number;
+  host?: string | undefined;
+  port?: number | undefined;
   /** The path of the GET that opens an SSE connection */
-  ssePath?: string;
+  ssePath?: string | undefined;
   /** The path of a connection's POST messages */
-  postPath?: string;
+  postPath?: string | undefined;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | undefined;
   /** Enable DNS-rebinding protection */
-  enableDnsRebindingProtection?: boolean;
+  enableDnsRebindingProtection?: boolean | undefined;
   /** TLS: cert and key start HTTPS */
-  tls?: TlsConfig;
+  tls?: TlsConfig | undefined;
 }
 
 /**

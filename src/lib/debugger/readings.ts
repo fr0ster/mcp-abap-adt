@@ -280,7 +280,7 @@ export function readDebuggeeEnd(body: string): DebuggeeEnd | undefined {
 }
 
 export interface PlaceReading {
-  address?: ObjectAddress;
+  address?: ObjectAddress | undefined;
   unit: string;
   program: string;
   include: string;

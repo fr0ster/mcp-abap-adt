@@ -24,7 +24,7 @@ import type { LongSessionPort } from '../lib/state/longSession';
  */
 export interface HandlerContext {
   connection: IAbapConnection;
-  logger?: ILogger;
+  logger?: ILogger | undefined;
   /** What the server instance holds between tool calls, and its handle; absent where no instance state is served. */
   state?: InstanceState;
   /** The instance's debugger, created on first use and attached to `state`. */

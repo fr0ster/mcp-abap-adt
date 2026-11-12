@@ -15,7 +15,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  */
 export interface RequestContext {
   /** Master/original language for created objects (adtcore:masterLanguage), from x-sap-language. */
-  masterLanguage?: string;
+  masterLanguage?: string | undefined;
   /**
    * Responsible person for created objects (adtcore:responsible), as stated:
    * `x-sap-responsible`, or `SAP_RESPONSIBLE` of the request's destination.
@@ -23,7 +23,7 @@ export interface RequestContext {
    * value (and the process login) for this request. When it is absent, the
    * process value stays.
    */
-  responsible?: string;
+  responsible?: string | undefined;
   /**
    * The login of this request — the destination's `SAP_USERNAME`, or the
    * `x-sap-login` of an `x-sap-*` basic connection (the server enters it; a
@@ -32,13 +32,13 @@ export interface RequestContext {
    * process one included); the process `SAP_USERNAME` never stands in. Not on a cloud connection, where the
    * login is the system's user.
    */
-  login?: string;
+  login?: string | undefined;
   /**
    * Master system for created objects (adtcore:masterSystem), e.g. from
    * `x-sap-master-system`. Same presence rule as `responsible`. When none is
    * known it is left out of the request.
    */
-  masterSystem?: string;
+  masterSystem?: string | undefined;
   /**
    * The debugger's terminal id, as stated: `x-sap-debug-terminal-id`, or
    * `SAP_DEBUG_TERMINAL_ID` of the request's destination. Same presence rule

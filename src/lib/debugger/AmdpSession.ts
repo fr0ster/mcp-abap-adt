@@ -270,7 +270,7 @@ export class AmdpSession<O = unknown> {
   start(options: {
     stopExisting: boolean;
     breakpoints: AmdpBreakpoint[];
-    run?: RunTarget;
+    run?: RunTarget | undefined;
   }): Promise<{ mainId: string; breakpoints: AmdpBreakpointState[] }> {
     return this.mutate(async () => {
       if (this.open || this.closing)

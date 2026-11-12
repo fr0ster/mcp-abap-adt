@@ -146,11 +146,11 @@ export interface StopView {
   attach: AttachReading;
   stack: StackReading;
   /** Reading the stack failed: the method's error as it is, with its step; the stop stands. */
-  stackError?: DebugFailure;
+  stackError?: DebugFailure | undefined;
   /** The settings in force after this attach applied the preferences. */
-  settings?: SettingsReading;
+  settings?: SettingsReading | undefined;
   /** Why applying them failed — the method's error as it is, with its step; the stop stands. */
-  settingsError?: DebugFailure;
+  settingsError?: DebugFailure | undefined;
   raw: { debuggee: string; attach: string; stack: string };
 }
 export type EndReason =
@@ -191,7 +191,7 @@ export type DebugSettings = Omit<IDebuggerSettings, 'showDataAging'>;
 export interface DebugStartOptions {
   /** At least one: a start with an empty list is refused before the wire. */
   breakpoints: IDebuggerBreakpoint[];
-  run?: RunTarget;
+  run?: RunTarget | undefined;
   /** User mode: whose requests are caught; the connected user when omitted. */
   requestUser?: string;
   /**

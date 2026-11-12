@@ -28,10 +28,16 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
-import { TOOL_SEARCH_META_KEY } from '../../../lib/toolSearch';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import {
-  type ListedTool,
+  field,
+  type Grouped,
+  grouped,
+  keysOf,
+  renderListedSchemas,
+  searchOf,
+} from '../../helpers/fixtureRenderings';
+import {
   type Listing,
   listBinaries,
   type SystemType,
@@ -50,72 +56,6 @@ const FIXTURE = path.join(
 const TOOL_SEARCH_FILE = path.join(REPO, 'tools', 'tool-search.json');
 
 const SYSTEM_TYPES: readonly SystemType[] = ['onprem', 'cloud', 'legacy'];
-
-/** One distinct listed value of a tool, and every `<system type> <binary>` listing it. */
-interface Listed {
-  readonly listedBy: string[];
-  readonly value: unknown;
-}
-
-/** Tool → its distinct listed values, in listing order. */
-type Grouped = Record<string, Listed[]>;
-
-/** `value[key]` when `value` is an object, read as data from outside the types. */
-function field(value: unknown, key: string): unknown {
-  return typeof value === 'object' && value !== null
-    ? Reflect.get(value, key)
-    : undefined;
-}
-
-/** The keys of `value` when it is an object, `[]` else. */
-const keysOf = (value: unknown): string[] =>
-  typeof value === 'object' && value !== null ? Object.keys(value) : [];
-
-const searchOf = (tool: ListedTool): unknown =>
-  tool._meta?.[TOOL_SEARCH_META_KEY];
-
-/**
- * Tool → each distinct value `pick` reads from it, with every listing that
- * lists that value: the listings of all binaries on all system types, each
- * tool's values once. Tools sorted by name; values in listing order.
- */
-function grouped(
-  listings: readonly Listing[],
-  pick: (tool: ListedTool) => unknown,
-): Grouped {
-  const byTool = new Map<string, Map<string, Listed>>();
-  for (const { systemType, bin, tools } of listings) {
-    for (const tool of tools) {
-      const value = pick(tool);
-      const key = JSON.stringify(value) ?? 'undefined';
-      const values = byTool.get(tool.name) ?? new Map<string, Listed>();
-      byTool.set(tool.name, values);
-      const known = values.get(key);
-      if (known === undefined) {
-        values.set(key, { listedBy: [`${systemType} ${bin}`], value });
-      } else {
-        known.listedBy.push(`${systemType} ${bin}`);
-      }
-    }
-  }
-  return Object.fromEntries(
-    [...byTool]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, values]) => [name, [...values.values()]]),
-  );
-}
-
-/** A fixture: one line per distinct value of a tool, so a change reads as that line. */
-function render(fixture: { schemas: Grouped; search: Grouped }): string {
-  const section = (values: Grouped): string =>
-    Object.entries(values)
-      .map(([name, listed]) => {
-        const lines = listed.map((each) => `      ${JSON.stringify(each)}`);
-        return `    ${JSON.stringify(name)}: [\n${lines.join(',\n')}\n    ]`;
-      })
-      .join(',\n');
-  return `{\n  "schemas": {\n${section(fixture.schemas)}\n  },\n  "search": {\n${section(fixture.search)}\n  }\n}\n`;
-}
 
 /** `tools/tool-search.json` as the file states it: tool → every keyword it names. */
 function fileKeywords(): Map<string, Set<string>> {
@@ -162,7 +102,7 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
       if (process.env.CI) {
         throw new Error('WRITE_LISTED_SCHEMAS is refused under CI');
       }
-      fs.writeFileSync(FIXTURE, render({ schemas, search }));
+      fs.writeFileSync(FIXTURE, renderListedSchemas({ schemas, search }));
     }
   });
 

@@ -106,5 +106,6 @@
   "src/__tests__/unit/sources/staticTypes.test.ts",
   "src/__tests__/unit/sources/typeCodeLiterals.test.ts",
   "src/__tests__/unit/sources/typeCodeScan.test.ts",
-  "src/__tests__/unit/toolSet/dataTools.test.ts"
+  "src/__tests__/unit/toolSet/dataTools.test.ts",
+  "src/__tests__/unit/toolSet/fixtureBytes.test.ts"
 ]

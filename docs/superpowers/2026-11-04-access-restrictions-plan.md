@@ -6,7 +6,7 @@
 
 **Architecture:** Denied actions are applied once, at registration: `withoutDenied` wraps the handler groups so a denied tool is absent and a denied compact value or ADT code is absent from the listed zod schema, which the SDK and `HandlerEntry.call` both parse. Package, request and table lists are a strategy (`IAccessChecks`) called once per call by each registration wrapper, before the call's connection is taken; a tree strategy reads the package tree through a lazy `IPackageReader`. The draft tool reads three versions of an object and compares their ETags.
 
-**Tech Stack:** TypeScript (strict, the static-types scan: no assertion but `as const`, no `any`, no `!`), zod `inputSchema`, `@modelcontextprotocol/sdk`, connection 22, adt-clients 45.3, interfaces-adt 27.2 (the base's ranges; `wireItself` and `AdtBatchConnection` imported from the package root `@mcp-abap-adt/adt-clients`, as the base does — Code: `src/handlers/common/low/handleActivateObject.ts`, `src/lib/batch/tools.ts`; adt-clients' exports and interfaces-adt's `AdtReadVersion` re-read in `node_modules` at Task 0), unit tests on Jest and live tests on node:test through the npm scripts (the base runs both: `tools/npm-test.mjs`, `tools/node-test-files.json`), Biome.
+**Tech Stack:** TypeScript (strict, the static-types scan: no assertion but `as const`, no `any`, no `!`), zod `inputSchema`, `@modelcontextprotocol/sdk`, connection 22, adt-clients 45.3, interfaces-adt 27.2 (the base's ranges; `wireItself` and `AdtBatchConnection` imported from the package root `@mcp-abap-adt/adt-clients`, as the base does — Code: `src/handlers/common/low/handleActivateObject.ts`, `src/lib/batch/tools.ts`; adt-clients' exports and interfaces-adt's `AdtReadVersion` re-read in `node_modules` at Task 0), every new test file on node:test, unit and live, through the npm scripts (the base runs Jest and node:test side by side: `tools/npm-test.mjs`, `tools/node-test-files.json`; the existing Jest suites this plan names stay where they are), Biome.
 
 **Spec:** `docs/superpowers/2026-11-04-access-restrictions-spec.md` (approved). Goal: `docs/superpowers/2026-11-04-access-restrictions-goal.md`.
 
@@ -18,7 +18,14 @@
 - Rows: CLI `--deny-actions` / `--allowed-packages` / `--allowed-requests` / `--denied-tables` / `--allowed-tables`; env `MCP_DENY_ACTIONS` / `MCP_ALLOWED_PACKAGES` / `MCP_ALLOWED_REQUESTS` / `MCP_DENIED_TABLES` / `MCP_ALLOWED_TABLES`; YAML `restrictions.deny-actions` / `restrictions.allowed-packages` / `restrictions.allowed-requests` / `restrictions.denied-tables` / `restrictions.allowed-tables`. No defaults. `custom` rows.
 - Refusal codes and words, verbatim: `package_not_allowed` "<argument> names a package outside the allowed packages: <value>"; `package_tree_unreadable` "the package tree above <value> could not be read, so <argument> is not checked against the allowed packages"; `request_not_allowed` "<argument> names a request outside the allowed requests: <value>"; `table_not_allowed` "the data of <value> is not readable through this server".
 - Start line, verbatim forms: `[MCP] Access restrictions: none`; `[MCP] Access restrictions: deny-actions 4 (matching nothing here: DebugStep), allowed-packages 3 (package tree read), allowed-requests 2`.
-- Tests: through npm scripts only. Unit tests are Jest files, run by `npm test -- <path>` (`tools/npm-test.mjs` gives Jest every path not on the node:test list). Live tests are node:test files (`node:test`, `node:assert/strict`, `liveSuite` / `liveCall` / `skipRunningTest` from `src/__tests__/integration/helpers/`), each added to `tools/node-test-files.json`, run by `npm run test:integration -- <file>` (one file at a time; variables with `--env NAME=VALUE`; the configuration by `MCP_TEST_CONFIG`). Never `npx`, `npm exec`, `node --test`, `node_modules/.bin` or `ts-node`. No regex in tests or in input-facing code. No timeouts or retries of the package's choosing. No casts.
+- Tests: through npm scripts only; never `npx`, `npm exec`, `node --test`, `node_modules/.bin` or `ts-node`. **Every test file this plan creates is a node:test file** (the owner's decision), written as the base's node:test files are (pattern: `src/__tests__/unit/toolSet/dataTools.test.ts`, `src/__tests__/unit/launchers/dataToolsAtStart.test.ts`, `src/__tests__/unit/atc/atcPoll.test.ts`):
+  - `import assert from 'node:assert/strict'` and `import { after, afterEach, before, beforeEach, describe, it, mock } from 'node:test'`; assertions `assert.equal`, `assert.deepEqual`, `assert.ok`, `assert.throws` / `assert.rejects` (the rejection expectation made before its trigger), no regex in an assertion; no Jest API (`jest.*`, `expect`, `toEqual`, `describe.each` / `it.each`, `beforeAll` / `afterAll`, `jest.setTimeout`): a parameterized case is a loop that creates `describe` / `it`.
+  - Mocks: `mock.fn()` for a function handed in (a strategy's `check`, a reader, a handler, a connection source), its calls read from `fn.mock.calls` / `fn.mock.callCount()`; `mock.method(object, name, impl?)` on an object the code reads at the call (`process.stderr`, a prototype, a module's exports object); `mock.timers` for a clock; `mock.restoreAll()` in `afterEach`. No `mock.module` (the base runs none and passes no module-mocks flag).
+  - Each new file is added to `tools/node-test-files.json` in the commit that creates it (a file is on the list or found by Jest, never both: `src/__tests__/unit/runner/partition.test.ts`).
+  - The node:test build (`npm run test:build`, `tsconfig.node-test.json`, `types: ["node"]`) compiles each listed file with what it imports, so a helper it imports must reach no Jest global; `src/__tests__/helpers/batchEnvelope.ts`, `batchStand.ts`, `nameTable.ts` and `pinCases.ts` name Jest and are checked before use; package names resolve through `tsconfig.paths.json`.
+  - A unit file runs by name: `npm test -- <file>.test.ts …` (`tools/npm-test.mjs` sends a listed `….test.ts` to the runner, every other path, a directory included, to Jest); variables with `--env NAME=VALUE`. An existing Jest suite named beside it runs on Jest in the same command.
+  - Live files: `liveSuite` / `liveCall` / `skipRunningTest` from `src/__tests__/integration/helpers/`, run one file at a time by `npm run test:integration -- <file>` (the configuration by `MCP_TEST_CONFIG`).
+  - Adding files to the list obliges the concurrency measurement of `docs/development/tests/TESTING_GUIDE.md` ("The node:test run's concurrency": "when files are added to it, measure again and update the setting"), done in Task 15. No regex in tests or in input-facing code. No timeouts or retries of the package's choosing. No casts.
 - Tool descriptions say what the tool does, its parameters and its answer; nothing else.
 - Live runs: a realm check without logon before each run (the on-premise system's expected `401` realm; the trial's `401` and the session JWT's `exp`, read locally and never printed) — under the live scripts `src/__tests__/integration/globalSetup.ts` runs it (`helpers/realmCheck.ts`) for the configured system, and a probe runs `realmCheck` itself for each session it opens; any credential refusal stops every run. Two-user measurements: the writing user and the reading user, each through its own connection. Temporary objects in `$TMP` on premise and in the cloud probe package on the trial, deleted after; never SM12, never release a transport, never delete an object this work did not create. Probes log off at their end, also on failure.
 - The legacy variant is not changed: `GetObjectDraft` is registered but not listed there.
@@ -108,7 +115,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Create: `src/lib/access/deniedActions.ts`, `src/lib/access/accessLists.ts`, `src/lib/config/accessRestrictions.ts`
 - Modify: `server-runtime/src/stdio/config/coreParameters.ts`, `server-runtime/src/http/config/httpParameters.ts`, `server-runtime/src/sse/config/sseParameters.ts` (add `...ACCESS_RESTRICTION_ROWS` beside `BATCH_KEEP_RAW_PARTS_ROW`), `src/lib/config/index.ts` (exports)
-- Test: `src/__tests__/unit/access/deniedActions.test.ts`, `src/__tests__/unit/access/accessLists.test.ts`, `src/__tests__/unit/config/accessRestrictions.test.ts`
+- Test (node:test, each added to `tools/node-test-files.json`): `src/__tests__/unit/access/deniedActions.test.ts`, `src/__tests__/unit/access/accessLists.test.ts`, `src/__tests__/unit/config/accessRestrictions.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -126,9 +133,9 @@ Same guards, connections, logoff and realm checks as Task 1.
   - `accessLists.test.ts`: packages `ZFOO` exact, `$TMP` exact, `Z*` prefix, `ZFOO/**` subtree name `ZFOO`, `/ABC/ZFOO/**` subtree name `/ABC/ZFOO`, `zfoo` → name `ZFOO`; refused `Z*O`, `ZFOO**`, `Z*/**`, `/**`, `ZF OO`; requests `A4HK900123` exact, `A4HK*` prefix, refused `A4HK/1`, `A*K`; tables `MARA` exact, `ZT*` prefix, refused `ZT/**`.
   - `accessRestrictions.test.ts`, for each row in each of CLI (`--deny-actions=a,b`), env and YAML (a sequence and one string): entries trimmed; `a,,b` and `a,` refused naming the form; `MCP_DENY_ACTIONS=` and `restrictions: { deny-actions: [] }` absent (`deniedActions: []`); a YAML item `42` or a mapping refused naming the row; `--denied-tables=X --allowed-tables=Y` refused (the words name both rows); CLI beats env beats YAML.
   - Matrices, in `accessRestrictions.test.ts`, each case through each of the three readers (CLI `--x=…`, env, YAML) and for each of the five rows: every malformed form of that row's grammar (above) stops with `ParameterRefusal` naming the form; the absent forms (no form at all; env `''`; YAML key absent; YAML `[]`) give the row absent; for denied actions, the code entries `HandlerActivate.CLAS/OC`, `HandlerGet.DDLS/DF` and `HandlerActivate.ENHO/XHH` read as one entry each in all three forms (YAML as the plain scalar `- HandlerActivate.CLAS/OC`).
-- [ ] **Step 2:** `npm test -- src/__tests__/unit/access src/__tests__/unit/config/accessRestrictions.test.ts`. Expected: FAIL (modules missing).
+- [ ] **Step 2:** `npm test -- src/__tests__/unit/access/deniedActions.test.ts src/__tests__/unit/access/accessLists.test.ts src/__tests__/unit/config/accessRestrictions.test.ts`. Expected: FAIL (the node:test build cannot resolve the missing modules).
 - [ ] **Step 3:** Implement the parsers in plain code (character checks, no regex); the rows; the tables list `ACCESS_RESTRICTION_ROWS` after `BATCH_KEEP_RAW_PARTS_ROW`. The both-table-lists refusal is raised by `readAccessRestrictions`.
-- [ ] **Step 4:** Run the tests again, then `npm test -- src/__tests__/unit/config`. Expected: PASS; the parameter-table help/template tests updated only by the new rows' lines (review the diff).
+- [ ] **Step 4:** Run the three files again, then the parameter-table tests: `npm test -- src/__tests__/unit/config server-runtime/src/stdio/__tests__/config/coreParameters.test.ts server-runtime/src/http/__tests__/config/httpParameters.test.ts server-runtime/src/sse/__tests__/config/sseParameters.test.ts src/__tests__/unit/config/enableDataTools.test.ts server-runtime/src/stdio/__tests__/config/deferredLogonParameters.test.ts` (the Jest suites and the named node:test ones). Expected: PASS; the parameter-table help/template tests updated only by the new rows' lines (review the diff).
 - [ ] **Step 5:** Commit `feat(access): the five restriction rows and their grammars`.
 
 ### Task 4: Description and schema builders take member sets
@@ -136,7 +143,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Modify: `src/lib/compact/compactDescriptions.ts` (twelve builders), `src/lib/compact/compactSchemas.ts` (`compactActivateSchemaFor`, `compactGetSchemaFor`, `compactGetDataSchema` → `compactGetDataSchemaFor`), `src/lib/compact/batch/handleHandlerBatch.ts`, `src/lib/compact/debug/handleHandlerDebugBatch.ts`, `src/lib/compact/longSession/handleHandlerSession.ts`, `src/lib/compact/debug/handleHandlerDebugSession.ts`, `handleHandlerDebugStep.ts`, `handleHandlerDebugBreakpoints.ts`, `handleHandlerDebugMaintain.ts`, `compact-readonly-entries/src/handlers/handleHandlerGetData.ts`
 - Create: `src/lib/access/narrowing.ts`
-- Test: `src/__tests__/unit/access/builders.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/builders.test.ts`, `src/__tests__/unit/access/rebuiltDescriptions.test.ts`, `src/__tests__/unit/toolSet/fixtureBytes.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -145,7 +152,7 @@ Same guards, connections, logoff and realm checks as Task 1.
   - `compactActivateSchemaFor(members, variant, codes?: readonly string[])` and `compactGetSchemaFor(members, mainPrograms, codes?: readonly string[])`: with `codes` given, `objects[].type` / `object_adt_type` are `z.enum(codes)`; without, free strings as today;
   - eight builders, all in lib: `handlerBatchDefinition(actions)`, `handlerDebugBatchDefinition(actions)`, `handlerSessionDefinition(actions)`, `handlerDebugSessionDefinition(operations)`, `handlerDebugStepDefinition(operations)`, `handlerDebugBreakpointsDefinition(operations)`, `handlerDebugMaintainDefinition(operations)` in their modules under `src/lib/compact/`, and `handlerGetDataDefinition(sql: boolean)` in `src/lib/compact/compactSchemas.ts` beside today's `compactGetDataSchema` (its description moved there from `compact-readonly-entries/src/handlers/handleHandlerGetData.ts`), exported through `src/lib/compact/index.ts` (`@mcp-abap-adt/lib/compact-shared`) and imported by the compact package; each `→ { description: string; inputSchema: z.ZodObject }`; each `TOOL_DEFINITION` is built from it with every value;
   - `interface Narrowing { readonly tool: string; values(variant: ProjectionVariant): readonly string[]; codes?(variant: ProjectionVariant): readonly string[]; definition(variant: ProjectionVariant, values: readonly string[], codes: readonly string[] | undefined): VariantToolDefinition }`; `NARROWINGS: ReadonlyMap<string, Narrowing>` in `src/lib/access/narrowing.ts` (lib imports no compact package) covering the twelve `object_type` / `target_type` tools, the seven `action` / `operation` tools and `HandlerGetData` (values `['sql']`); codes for `HandlerActivate` (`ACTIVATION_CODES[variant]`) and `HandlerGet` (`TABLE_CODES[variant]`).
-- Also: `src/__tests__/helpers/fixtureRenderings.ts` — the rendering each fixture's `WRITE_*` mode writes (`listed-schemas.json`, `variant-surface.json`, the transport surfaces), moved out of those tests so they and the byte test share it.
+- Also: `src/__tests__/helpers/fixtureRenderings.ts` — the rendering each fixture's `WRITE_*` mode writes (`listed-schemas.json`, `variant-surface.json`, the transport surfaces), moved out of those tests (Jest suites, otherwise unchanged) so they and the node:test byte test share it; it reaches no Jest global, since the node:test build compiles it.
 
 - [ ] **Step 0 (on the base, before any change of this task):** write `src/__tests__/unit/access/rebuiltDescriptions.test.ts`: for each of the eight tools whose definitions Task 4 rebuilds (`HandlerBatch`, `HandlerDebugBatch`, `HandlerSession`, `HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugBreakpoints`, `HandlerDebugMaintain`, `HandlerGetData`), the tool's description and every property's description with all values present, as exact string literals copied from the base code (no fixture stores them: `variant-surface.json` holds descriptions only for the twelve projected tools). Run it: PASS on the base. Commit `test(compact): the eight fixed-enum descriptions pinned`. After the refactor it must pass unchanged (Step 4).
 - [ ] **Step 1: Write the failing tests.**
@@ -155,9 +162,9 @@ Same guards, connections, logoff and realm checks as Task 1.
   - `HandlerActivate` codes without `CLAS/OC`: `objects[].type` and `object_adt_type` enums lack `CLAS/OC`, no description names it, the examples name codes still in the enum; `object_type` still lists `CLASS` and `BEHAVIOR_IMPLEMENTATION`; parsing `{ object_adt_type: 'clas/oc', object_name: 'Z' }` fails while any code is narrowed.
   - `HandlerGet` codes without `CLAS/OC`: `object_adt_type` enum lacks it; `part` keeps every value.
   - `handlerGetDataDefinition(false)`: no `sql_query` property, no `sql_query` in any description.
-- [ ] **Step 2:** `npm test -- src/__tests__/unit/access/builders.test.ts src/__tests__/unit/toolSet/fixtureBytes.test.ts`. Expected: `builders` FAIL; `fixtureBytes` PASS (it guards the refactor).
+- [ ] **Step 2:** `npm test -- src/__tests__/unit/access/builders.test.ts src/__tests__/unit/toolSet/fixtureBytes.test.ts`. Expected: `builders` FAIL; `fixtureBytes` PASS (it guards the refactor). The node:test build compiles every listed file at once, so while `builders.test.ts` cannot compile, run `fixtureBytes.test.ts` before adding `builders.test.ts` to the list, and record its PASS.
 - [ ] **Step 3:** Implement; the descriptions are assembled from per-value sentences so a removed value leaves no trace; today's text is the output for all values (the byte-identity test guards it).
-- [ ] **Step 4:** Run both tests and `rebuiltDescriptions.test.ts`, then `npm test -- src/__tests__/unit/toolSet`. Expected: PASS, every fixture byte-identical, the eight descriptions equal to their base literals.
+- [ ] **Step 4:** Run both tests and `rebuiltDescriptions.test.ts`, then `npm test -- src/__tests__/unit/toolSet src/__tests__/unit/toolSet/dataTools.test.ts` (the directory's Jest suites and its node:test file). Expected: PASS, every fixture byte-identical, the eight descriptions equal to their base literals.
 - [ ] **Step 5:** Commit `refactor(compact): definitions built from a member set`.
 
 ### Task 5: `withoutDenied` at registration
@@ -165,7 +172,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Create: `src/lib/access/withoutDenied.ts`
 - Modify: `src/lib/toolSet.ts` (`registryOf`)
-- Test: `src/__tests__/unit/access/withoutDenied.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/withoutDenied.test.ts`
 
 **Interfaces:**
 - Consumes: `DeniedActions` (Task 3), `NARROWINGS` (Task 4).
@@ -190,14 +197,14 @@ Same guards, connections, logoff and realm checks as Task 1.
   - `denied = []`: `withoutDenied(groups, [])` returns the same group objects.
 - [ ] **Step 2:** `npm test -- src/__tests__/unit/access/withoutDenied.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run; then `npm test -- src/__tests__/unit/toolSet`. Expected: PASS.
+- [ ] **Step 4:** Run; then `npm test -- src/__tests__/unit/toolSet src/__tests__/unit/toolSet/dataTools.test.ts src/__tests__/unit/toolSet/fixtureBytes.test.ts`. Expected: PASS.
 - [ ] **Step 5:** Commit `feat(access): denied actions removed at registration`.
 
 ### Task 6: `HandlerExporter` takes the denied actions
 
 **Files:**
 - Modify: `src/lib/handlers/HandlerExporter.ts` (`HandlerExporterOptions`, constructor)
-- Test: `src/__tests__/unit/access/exporterDenied.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/exporterDenied.test.ts`
 
 **Interfaces:**
 - Consumes: `withoutDenied`, `DeniedActions`.
@@ -214,7 +221,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Create: `src/lib/access/accessChecks.ts`, `src/lib/access/checkedArguments.ts`, `src/lib/access/listedAccessChecks.ts`
 - Modify: `src/lib/auth/serverRefusal.ts` (four codes and their words), `src/lib/toolSet.ts` (`readOnlyToolNames`)
-- Test: `src/__tests__/unit/access/checkedArguments.test.ts`, `src/__tests__/unit/access/listedAccessChecks.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/checkedArguments.test.ts`, `src/__tests__/unit/access/listedAccessChecks.test.ts`
 
 **Interfaces:**
 - Consumes: `AccessLists`, `PackageEntry`, `NameEntry` (Task 3).
@@ -235,7 +242,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 
 - [ ] **Step 1: Write the failing tests.**
   - `checkedArguments.test.ts`: over the full and compact sets as registered (data tools served), the tools with package or request arguments equal spec Appendix B exactly (Appendix B was listed at 23.1.0: before writing the expectation, list the base's sets and bring any difference to the owner; the test pins the base's list) (88 full: 25 package, 86 request; compact 6: `HandlerCreate`, `HandlerUpdate`, `HandlerDelete`, `HandlerLock`, `HandlerTransportMoveObjects`, `HandlerTransportSortAndCompress`); `GetPackage`, `GetTransport`, `HandlerGet`, `HandlerValidate` not checked; `package_type`, `transport_layer`, `transport_type`, `task_type`, `include_subpackages`, `include_tasks`, `packages`, `package_names` never checked; `isPackageCreate` true for exactly `CreatePackage` and `HandlerCreate`+`PACKAGE` (false for `CheckPackage`, `HandlerValidate`+`PACKAGE`, `HandlerCreate`+`CLASS`); `accessCallOf` with `package_name: 42` (Review Focus 3) and with `'  '` names nothing.
-  - `listedAccessChecks.test.ts`: allowed packages `ZFOO`, `Z*`: `ZFOO` and `ZBAR` allowed, `YFOO` → `{ allowed: false, code: 'package_not_allowed', argument: 'package_name', value: 'YFOO' }`; requests `A4HK*`: `A4HK900123` allowed, `B4HK1` refused `request_not_allowed`; tables denied `MARA`: `MARA` refused `table_not_allowed`, `MARC` allowed; allowed `ZT*`: `MARA` refused; both package and request lists: each name against its own; the reader is never called (a reader that throws); a subtree entry throws at construction; `refusalOf` words exactly as Global Constraints.
+  - `listedAccessChecks.test.ts`: allowed packages `ZFOO`, `Z*`: `ZFOO` and `ZBAR` allowed, `YFOO` → `{ allowed: false, code: 'package_not_allowed', argument: 'package_name', value: 'YFOO' }`; requests `A4HK*`: `A4HK900123` allowed, `B4HK1` refused `request_not_allowed`; tables denied `MARA`: `MARA` refused `table_not_allowed`, `MARC` allowed; allowed `ZT*`: `MARA` refused; both package and request lists: each name against its own; the reader is never called (a reader whose `superPackageOf` is a `mock.fn()` that throws, `callCount()` 0); a subtree entry throws at construction; `refusalOf` words exactly as Global Constraints.
 - [ ] **Step 2:** `npm test -- src/__tests__/unit/access/checkedArguments.test.ts src/__tests__/unit/access/listedAccessChecks.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run. Expected: PASS.
@@ -246,25 +253,25 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Modify: `src/embeddable/BaseMcpServer.ts` (options `accessChecks?: IAccessChecks | undefined`; `runCall`, line 1597), `src/lib/handlers/base/BaseHandlerGroup.ts` (`registerToolOnServer`, and the options path it takes the strategy from), `src/lib/handlers/HandlerExporter.ts` (`accessChecks?`, `wrapEntry`), `server-runtime/src/stdio/StdioServer.ts`, `server-runtime/src/http/StreamableHttpServer.ts`, `server-runtime/src/sse/SseServer.ts` (pass `accessChecks` through)
 - Create: `src/lib/access/packageReader.ts`
-- Test: `src/__tests__/unit/access/accessWrappers.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/accessWrappers.test.ts`
 
 **Interfaces:**
 - Consumes: Task 7's types; `checkedArgumentsOf` computed once per entry at registration with `readOnlyToolNames()`.
 - Produces: `lazyPackageReader(take: () => Promise<AbapConnection>, signal: AbortSignal, batchOpen: () => boolean): IPackageReader` — `take` is memoized by the wrapper and is the same acquisition the wrapper uses after an allowed verdict, including the scope a call's first send needs: on path 1 `systemBeforeTool` and `declareSystemKind(connection, this.systemType)` run inside `take`; on paths 2/3 the read runs inside the `inStatedScope` the call gets; on path 5 inside the exporter's `inStatedScope`; each `superPackageOf` is one `readPackageMetadata` on that connection, the super package read from the element Task 2 recorded; rejects while `batchOpen()` only if Task 2 (c) found the read could not be sent.
 - Placement (spec §3.2): path 1 in `runCall` after the SDK's parse and before `getConnection` — before the background decision too, so a refused long read (`GetTableContents`, `HandlerGetData`) starts no background run — the connection-and-turn steps (`getConnection`, `enterMainFlow`, the stale-connection refresh) moved into the memoized `take`; paths 2 and 3 in `registerToolOnServer` beside the argument refusals before `callContext()`, `take` asking `callContext()` once; path 5 in `wrapEntry` before the original handler, `take` answering the connection the embedder gave; path 4 not called.
 
-- [ ] **Step 1: Write the failing tests** (`accessWrappers.test.ts`, a recording connection and a counting connection source):
+- [ ] **Step 1: Write the failing tests** (`accessWrappers.test.ts`, a recording connection (`src/__tests__/helpers/recordingConnection.ts`) and a connection source that is a `mock.fn()`, counted by `callCount()`):
   - path 1, simple strategy, refused `CreateClass` with `package_name: 'YFOO'`: the answer `isError` with `error: 'package_not_allowed'` and the words; no request recorded; the connection source never asked;
   - path 1, allowed: the handler's requests recorded as without a strategy;
   - path 1, a strategy reading through the reader: the reader's read and the handler's requests on the same connection object; the connection source asked once;
-  - path 1, no strategy: the strategy spy never called and `checkedArgumentsOf` results unused (no `AccessCall` built: a spy on `accessCallOf`);
+  - path 1, no strategy: no `AccessCall` built — `mock.method` on the exports object of `src/lib/access/checkedArguments.ts` (`import * as checked from …`), `accessCallOf`'s `callCount()` 0. Inference: the compiled CommonJS callers read the export at each call, so the replacement is seen; prove it load-bearing by building one `AccessCall` deliberately and watching the case fail;
   - batch mode open, refused call: no batch number taken (the next recorded call takes number 1);
   - path 2 (`registerAllTools` on an `McpServer`) and path 3 (`registerTool(server, entry)`): the same refused case answers the same refusal and `callContext` is never asked;
   - path 3 with a group wrapped by `withoutDenied` denying `DeleteClass`: `registerTool(server, deleteClassEntry)` throws `REGISTER_TOOL_UNHELD_WORDS('DeleteClass')`;
   - path 5 (`getHandlerEntries()` with `accessChecks`): the refused call never reaches the original handler; `CreateClass` with `package_name: 42` is refused by the entry's own schema, as without a strategy, and the handler is not called;
   - background: a long read refused (`GetTableContents` with denied tables `MARA`, `background` absent and `true`) answers the refusal, starts no run and lists none;
   - scope: an `EmbeddableMcpServer` given a plain injected connection and `systemType: 'cloud'` only, the tree strategy reading `ZCHILD`: at the reader's first request `variantOf(connection)` is `'cloud'` and the request is the cloud client's;
-  - refusal matrix, each through path 1 with a recording connection and a spy handler — `CreateClass` `{ class_name: 'ZC', package_name: 'YFOO', transport_request: 'A4HK900123' }` with allowed packages `Z*` → `package_not_allowed`; the same with allowed requests `B4HK*` and `package_name: 'ZFOO'` → `request_not_allowed`; `GetTableContents` `{ table_name: 'MARA' }` with denied tables `MARA` → `table_not_allowed`; `CreatePackage` `{ package_name: 'ZNEW', super_package: 'YROOT' }` with `ZFOO/**` and a reader that rejects → `package_tree_unreadable`; for each: the words exactly as Global Constraints, the spy never called, zero requests but the tree reader's own.
+  - refusal matrix, each through path 1 with a recording connection and a handler that is a `mock.fn()` — `CreateClass` `{ class_name: 'ZC', package_name: 'YFOO', transport_request: 'A4HK900123' }` with allowed packages `Z*` → `package_not_allowed`; the same with allowed requests `B4HK*` and `package_name: 'ZFOO'` → `request_not_allowed`; `GetTableContents` `{ table_name: 'MARA' }` with denied tables `MARA` → `table_not_allowed`; `CreatePackage` `{ package_name: 'ZNEW', super_package: 'YROOT' }` with `ZFOO/**` and a reader that rejects → `package_tree_unreadable`; for each: the words exactly as Global Constraints, the handler's `callCount()` 0, zero requests but the tree reader's own.
 - [ ] **Step 2:** `npm test -- src/__tests__/unit/access/accessWrappers.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run; then `npm test` (full unit suite). Expected: PASS.
@@ -275,20 +282,20 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Create: `src/lib/access/packageTreeAccessChecks.ts`, `src/lib/access/index.ts`
 - Modify: `src/index.ts`, `src/lib/config/index.ts` (the exports below)
-- Test: `src/__tests__/unit/access/packageTreeAccessChecks.test.ts`, `src/__tests__/unit/access/publicExports.test.ts` (each name imported from `@mcp-abap-adt/lib`, `@mcp-abap-adt/lib/config`, `@mcp-abap-adt/lib/tool-set` as the jest module map resolves them, `unmatchedEntries` and `accessStartLine` included — the server-runtime launchers import them from `@mcp-abap-adt/lib` only)
+- Test (node:test, listed): `src/__tests__/unit/access/packageTreeAccessChecks.test.ts`, `src/__tests__/unit/access/publicExports.test.ts` (each name imported from `@mcp-abap-adt/lib`, `@mcp-abap-adt/lib/config`, `@mcp-abap-adt/lib/tool-set` as `tsconfig.paths.json` resolves them for the node:test build, `unmatchedEntries` and `accessStartLine` included — the server-runtime launchers import them from `@mcp-abap-adt/lib` only)
 
 **Interfaces:**
 - Consumes: Task 7's types, `IPackageReader`.
 - Produces: the public access API through the published entry points — `src/lib/access/index.ts` re-exported from `src/index.ts` (`@mcp-abap-adt/lib`): `IAccessChecks`, `IPackageReader`, `AccessCall`, `AccessVerdict`, `AccessRefusalCode`, `listedAccessChecks`, `packageTreeAccessChecks`, `accessChecksFor`, `withoutDenied`, `unmatchedEntries`, `accessStartLine` (Task 10 adds it to this index), `parseDeniedEntry`, `DeniedActions`, `AccessLists`, `AccessRestrictions`; `ACCESS_RESTRICTION_ROWS` and `readAccessRestrictions` from `src/lib/config/index.ts` (`@mcp-abap-adt/lib/config`); `registryOf` with `denied` from `@mcp-abap-adt/lib/tool-set` — checked by `node tools/check-exports.js` and a test importing each name from its entry point; `packageTreeAccessChecks(lists: AccessLists): IAccessChecks`; `accessChecksFor(lists: AccessLists): IAccessChecks | undefined` — `undefined` when no call-time list is given; `packageTreeAccessChecks` when an allowed-packages entry is a subtree; else `listedAccessChecks`.
 
-- [ ] **Step 1: Write the failing tests** (a recording reader answering from a map):
+- [ ] **Step 1: Write the failing tests** (a reader whose `superPackageOf` is a `mock.fn()` answering from a map, its reads counted by `callCount()`):
   - exact `ZBAR` and prefix `Z*` matched with no read (reader calls `0`);
   - `ZFOO/**`, package `ZFOO`: allowed, no read; `ZCHILD` (parent `ZFOO`): allowed, one read; `ZGRAND` (→ `ZCHILD` → `ZFOO`): allowed, two reads; `YTOP` (parent `undefined`): `package_not_allowed`;
   - a package create (`isPackageCreate`) `package_name: 'ZNEW'`, `super_package: 'ZFOO'`: allowed, `ZNEW` never read;
   - `CheckPackage` `package_name: 'ZOUTSIDE'` (parent `YROOT`), `super_package: 'ZFOO'`: `package_not_allowed` for `package_name`; `ZOUTSIDE` read;
   - reader rejects: `package_tree_unreadable`, `argument`, `value`; a cycle (`ZA` → `ZB` → `ZA`) and a self-parent (`ZA` → `ZA`, Review Focus 4): `package_tree_unreadable`;
   - `accessChecksFor`: `{}` → `undefined`; `{ allowedPackages: [Z*] }` → the simple one (a subtree entry absent); with `ZFOO/**` → the tree one; `{ deniedTables: [...] }` → a strategy.
-- [ ] **Step 2:** `npm test -- src/__tests__/unit/access/packageTreeAccessChecks.test.ts`. Expected: FAIL.
+- [ ] **Step 2:** `npm test -- src/__tests__/unit/access/packageTreeAccessChecks.test.ts src/__tests__/unit/access/publicExports.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Implement: exact and prefix entries first; then, for each subtree entry, walk with a seen-set.
 - [ ] **Step 4:** Run. Expected: PASS.
 - [ ] **Step 5:** Commit `feat(access): the package-tree strategy`.
@@ -298,16 +305,16 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Create: `src/lib/access/startLine.ts`
 - Modify: `server-runtime/src/stdio/launcher.ts`, `server-runtime/src/http/launcher.ts`, `server-runtime/src/sse/launcher.ts`
-- Test: `src/__tests__/unit/access/startLine.test.ts`; `server-runtime/src/stdio/__tests__/accessRestrictions.test.ts`, `server-runtime/src/http/__tests__/accessRestrictions.test.ts`, `server-runtime/src/sse/__tests__/accessRestrictions.test.ts`; the parameter-table tests `server-runtime/src/stdio/__tests__/config/coreParameters.test.ts`, `server-runtime/src/http/__tests__/config/httpParameters.test.ts`, `server-runtime/src/sse/__tests__/config/sseParameters.test.ts` (the new rows in help and template)
+- Test (node:test, listed): `src/__tests__/unit/access/startLine.test.ts`; `server-runtime/src/stdio/__tests__/accessRestrictions.test.ts`, `server-runtime/src/http/__tests__/accessRestrictions.test.ts`, `server-runtime/src/sse/__tests__/accessRestrictions.test.ts` (each launcher started in-process as `src/__tests__/unit/launchers/dataToolsAtStart.test.ts` does, `deps.stderr` a `mock.fn()`); and the existing (Jest) the parameter-table tests `server-runtime/src/stdio/__tests__/config/coreParameters.test.ts`, `server-runtime/src/http/__tests__/config/httpParameters.test.ts`, `server-runtime/src/sse/__tests__/config/sseParameters.test.ts` (the new rows in help and template)
 
 **Interfaces:**
 - Consumes: `readAccessRestrictions`, `registryOf(toolSet, transport, served, denied)`, `unmatchedEntries`, `accessChecksFor`.
 - Produces: `accessStartLine(restrictions: AccessRestrictions, unmatched: readonly string[], tree: boolean): string`, exported from `src/lib/access/index.ts` (`@mcp-abap-adt/lib`).
 
-- [ ] **Step 1: Write the failing tests:** `accessStartLine` with nothing → `[MCP] Access restrictions: none`; with four deny entries of which `DebugStep` unmatched, three packages with a subtree, two requests → `[MCP] Access restrictions: deny-actions 4 (matching nothing here: DebugStep), allowed-packages 3 (package tree read), allowed-requests 2`; denied tables → clause `denied-tables N`; allowed tables → `allowed-tables N`; under the simple strategy the packages clause carries no strategy words (`allowed-packages 2`); `(package tree read)` appears only for the tree strategy. Launcher tests (stdio, http, sse): the line written once through `deps.stderr`; an http pool's second instance writes none; `--deny-actions=DeleteClass` leaves `DeleteClass` out of `tools/list`; `--allowed-packages=Z*` gives every instance the same strategy object; a malformed entry ends the start `1` with `[MCP] <words>`.
+- [ ] **Step 1: Write the failing tests:** `accessStartLine` with nothing → `[MCP] Access restrictions: none`; with four deny entries of which `DebugStep` unmatched, three packages with a subtree, two requests → `[MCP] Access restrictions: deny-actions 4 (matching nothing here: DebugStep), allowed-packages 3 (package tree read), allowed-requests 2`; denied tables → clause `denied-tables N`; allowed tables → `allowed-tables N`; under the simple strategy the packages clause carries no strategy words (`allowed-packages 2`); `(package tree read)` appears only for the tree strategy. Launcher tests (stdio, http, sse): the line written once through `deps.stderr` (its `mock.calls`); an http pool's second instance writes none; `--deny-actions=DeleteClass` leaves `DeleteClass` out of `tools/list`; `--allowed-packages=Z*` gives every instance the same strategy object; a malformed entry ends the start `1` with `[MCP] <words>`.
 - [ ] **Step 2:** Run them. Expected: FAIL.
 - [ ] **Step 3:** Implement; read the rows with the table, pass `denied` to `registryOf` and the strategy through the server options.
-- [ ] **Step 4:** `npm test -- src/__tests__/unit/access server-runtime/src/stdio/__tests__ server-runtime/src/http/__tests__ server-runtime/src/sse/__tests__`. Expected: PASS.
+- [ ] **Step 4:** `npm test -- src/__tests__/unit/access/startLine.test.ts server-runtime/src/stdio/__tests__/accessRestrictions.test.ts server-runtime/src/http/__tests__/accessRestrictions.test.ts server-runtime/src/sse/__tests__/accessRestrictions.test.ts server-runtime/src/stdio/__tests__ server-runtime/src/http/__tests__ server-runtime/src/sse/__tests__` (the named node:test files and the three directories' Jest suites, the parameter-table ones among them), then every file of `src/__tests__/unit/access/` by name. Expected: PASS.
 - [ ] **Step 5:** Commit `feat(access): the launchers apply the restrictions and name them at start`.
 
 ### Task 11: The draft tool
@@ -315,7 +322,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 **Files:**
 - Create: `src/lib/draft/draftOf.ts`, `src/lib/draft/readDraftEtags.ts`, `src/handlers/common/readonly/handleGetObjectDraft.ts`
 - Modify: `src/lib/handlers/groups/ReadOnlyHandlersGroup.ts` (beside `GetObjectVersions`, line 218), `src/lib/compact/compactSchemas.ts` (`READ_PARTS` gains `'draft'`, offered for `HANDLER_GET_DRAFT_TYPES[variant]` only; `HandlerGet`'s `object_type` enum is not widened), `compact-readonly-entries/src/handlers/handleHandlerGet.ts` and `compactPartRoutes.ts` (the `draft` route), `src/lib/compact/compactDescriptions.ts` (`compactGetDescription` names the part), `tools/batch-handlers.json` (per Task 2), `src/lib/variantToolSet.ts` (`GetObjectDraft` added to `TOOLS_WITHOUT_NEED`, where `GetObjectVersions` is; its definition states `available_in: ['onprem', 'cloud']`, which keeps it unlisted on legacy, as `GetObjectVersions` — Measured in the static-types worktree), `src/lib/longTools.ts` (`NOT_A_READ.HandlerGet` gains `{ argument: 'part', equals: ['DRAFT'] }`: the draft part is an ordinary call on the instance's connection), `src/lib/handlers/read.ts` (exports `handleGetObjectDraft`) and `src/lib/handlers/readDefinitions.ts` (`GetObjectDraft`'s definition, for the compact route), `tools/tool-search.json` (`GetObjectDraft`'s search texts), `src/__tests__/helpers/batchEntryCases.ts` (the draft cases, only if Task 2 found the ETag kept)
-- Test: `src/__tests__/unit/draft/draftOf.test.ts`, `src/__tests__/unit/draft/getObjectDraft.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/draft/draftOf.test.ts`, `src/__tests__/unit/draft/getObjectDraft.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -333,7 +340,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 - [ ] **Step 1: Write the failing tests.**
   - `draftOf.test.ts` (ETag shape from the spec, `20261104101500` + `0011` / `0001`): `active = inactive = workspace = '202611041015000011'` → `none`, `changed_at: null`, `age_seconds: null`; `active '…0011'`, `inactive = workspace = '202611041030000001'` → `own`, `changed_at: '2026-11-04T10:30:00Z'`, `age_seconds` against a fixed `now` of `2026-11-04T10:31:00Z` → `60`; `workspace = active ≠ inactive` → `other`, same time fields; three distinct → `undetermined`, both `null`; `inactive: null` → `undetermined`, `etags.inactive: null`; an ETag `'W/"abc"'` → `undetermined`.
   - `getObjectDraft.test.ts` (recording connection answering three reads with ETag headers): the three requests carry `version=active`, `version=inactive` and the settled working version; for each member of `HANDLER_GET_DRAFT_TYPES[variant]` (both variants), the answer of `GetObjectDraft` and of `HandlerGet` `{ part: 'draft' }` for the same object deep-equal; `HANDLER_GET_DRAFT_TYPES[variant]` is exactly `DRAFT_TYPES[variant]` ∩ `COMPACT_READ[variant]`, and `HandlerGet`'s `object_type` enum equals the base's (byte test, Task 4); a `404` on the active read answers as `GetClass` answers a `404` (Review Focus 5); in batch mode: recorded in one batch with three parts (ETag kept) or refused `batch_not_recordable` (lost), per Task 2; `listedTool` of `GetObjectDraft` on `legacy`: `listed: false`; `isLongRead('HandlerGet', { object_type: 'CLASS', object_name: 'ZC', part: 'draft' })` is `false`, a `background` with it is refused `BACKGROUND_NOT_FOR_RUN_WORDS` before anything is sent, and the call runs on the instance's connection (the connection source asked for no connection of its own); `handlerBarrels.test.ts` passes with `handleGetObjectDraft` in the read barrel; `tools/tool-search.json` has `GetObjectDraft` (the listed-schemas test reads it); a fixed `now` of `2026-11-04T10:31:00.900Z` gives `age_seconds: 60` (floor).
-- [ ] **Step 2:** `npm test -- src/__tests__/unit/draft`. Expected: FAIL.
+- [ ] **Step 2:** `npm test -- src/__tests__/unit/draft/draftOf.test.ts src/__tests__/unit/draft/getObjectDraft.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run. Expected: PASS.
 - [ ] **Step 5:** Commit `feat(draft): GetObjectDraft and HandlerGet part 'draft'`.
@@ -342,12 +349,12 @@ Same guards, connections, logoff and realm checks as Task 1.
 
 **Files:**
 - Modify: `tests/fixtures/tools/surface.json`, `variant-surface.json`, `listed-schemas.json` (the two reviewed additions only), `http-surface.json` / `stdio-sse-surface.json` if they list tool names
-- Test: `src/__tests__/unit/access/nothingConfigured.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/nothingConfigured.test.ts`
 
-- [ ] **Step 1:** Run `npm test -- src/__tests__/unit/toolSurface.test.ts src/__tests__/unit/toolSet`. Expected: FAIL only on the additions, `fixtureBytes.test.ts` included.
+- [ ] **Step 1:** Run `npm test -- src/__tests__/unit/toolSurface.test.ts src/__tests__/unit/toolSet src/__tests__/unit/toolSet/fixtureBytes.test.ts src/__tests__/unit/toolSet/dataTools.test.ts`. Expected: FAIL only on the additions, `fixtureBytes.test.ts` included.
 - [ ] **Step 2:** Write the additions (the only fixture change of the whole PR): `WRITE_LISTED_SCHEMAS=1 npm test -- src/__tests__/unit/toolSet/listedSchemas.test.ts`, `WRITE_VARIANT_SURFACE=1 …variantSurface.test.ts`, `WRITE_TRANSPORT_SURFACE=1 …transportSurface.test.ts`; `surface.json` gets the `GetObjectDraft` row as `scripts/list-tools.ts` prints it. `git diff tests/fixtures tools/tool-search.json` shows only `GetObjectDraft` and `HandlerGet`'s `draft` (enum value and description mention); `fixtureBytes.test.ts` passes against the new committed bytes.
-- [ ] **Step 3: Write the test** `nothingConfigured.test.ts`: `readAccessRestrictions([], {}, null)` → `{ deniedActions: [], lists: {} }`; `accessChecksFor({})` → `undefined`; `registryOf(set, transport, served)` and `registryOf(set, transport, served, [])` list deep-equal definitions for every set, with the data tools served and not; a server started from the stdio launcher's path with no rows never builds an `AccessCall` (a spy on `accessCallOf`) across one call of each tool in `src/__tests__/helpers/batchEntryCases.ts`. Today's requests stay pinned by the existing request suites, which must pass with no change to their expectations: `src/__tests__/unit/lowToCompact.test.ts` (the low set's compact calls), `src/__tests__/unit/sources/batchHandlers.test.ts` and `src/__tests__/unit/batch/oneRequestPerEntry.test.ts` (every `tools/batch-handlers.json` entry's `sends`), and the handler unit tests on recording connections. No new request harness is built. The PR description lists the tools those suites do not pin **among the tools this PR does not change**; every tool this PR adds or changes is pinned by Task 12a.
-- [ ] **Step 4:** Run the tool-surface tests, this test, and `npm test -- src/__tests__/unit/lowToCompact.test.ts`. Expected: PASS with no change to their expectations.
+- [ ] **Step 3: Write the test** `nothingConfigured.test.ts`: `readAccessRestrictions([], {}, null)` → `{ deniedActions: [], lists: {} }`; `accessChecksFor({})` → `undefined`; `registryOf(set, transport, served)` and `registryOf(set, transport, served, [])` list deep-equal definitions for every set, with the data tools served and not; a server started from the stdio launcher's path with no rows never builds an `AccessCall` (`mock.method` on `accessCallOf`'s exports object, as Task 8; `callCount()` 0) across one call of each tool in `src/__tests__/helpers/batchEntryCases.ts`. Today's requests stay pinned by the existing request suites, which must pass with no change to their expectations: `src/__tests__/unit/lowToCompact.test.ts` (the low set's compact calls), `src/__tests__/unit/sources/batchHandlers.test.ts` and `src/__tests__/unit/batch/oneRequestPerEntry.test.ts` (every `tools/batch-handlers.json` entry's `sends`), and the handler unit tests on recording connections. No new request harness is built. The PR description lists the tools those suites do not pin **among the tools this PR does not change**; every tool this PR adds or changes is pinned by Task 12a.
+- [ ] **Step 4:** Run the tool-surface tests, this test, and `npm test -- src/__tests__/unit/access/nothingConfigured.test.ts src/__tests__/unit/lowToCompact.test.ts`. Expected: PASS with no change to their expectations.
 - [ ] **Step 5:** Commit `test(access): nothing configured changes nothing`.
 
 ### Task 12a: The requests of every added or changed handler are pinned
@@ -355,7 +362,7 @@ Same guards, connections, logoff and realm checks as Task 1.
 The handlers this PR adds or changes (a definition rebuilt or narrowable): `GetObjectDraft`; the twelve `object_type` / `target_type` tools (`HandlerActivate`, `HandlerCheckRun`, `HandlerCreate`, `HandlerDelete`, `HandlerDeletionCheck`, `HandlerGet`, `HandlerLock`, `HandlerUnlock`, `HandlerUpdate`, `HandlerValidate`, `HandlerWhereUsed`, `HandlerProfileRun`); the seven `action` / `operation` tools (`HandlerBatch`, `HandlerDebugBatch`, `HandlerSession`, `HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugBreakpoints`, `HandlerDebugMaintain`); `HandlerGetData`. Each has exact request assertions — method, URL with its query, `Accept` and `Content-Type`, and the body where it names the object — in an existing suite that already asserts them, else in `src/__tests__/unit/access/changedHandlerRequests.test.ts` on a recording connection. Expected values are literals in the test, taken from a run of the base code on the parity stand-in (`parityConnection`, `src/__tests__/helpers/lowToCompact.ts`) and reviewed in the diff; `{name}` stands for the case's object name. The table below summarizes those requests, with every per-value exception the base run showed (Measured: each value run on the stand-in on the static-types base); **where the table and the reviewed base-run literals differ, the literals are authoritative**.
 
 **Files:**
-- Test: `src/__tests__/unit/access/changedHandlerRequests.test.ts`
+- Test (node:test, listed): `src/__tests__/unit/access/changedHandlerRequests.test.ts` (the parity stand-in from `src/__tests__/helpers/lowToCompact.ts`, which reaches no Jest global)
 
 | Handler | Where pinned | What is asserted (per value of its dispatching argument) |
 |---|---|---|
@@ -425,6 +432,7 @@ The owner's rule: every handler this PR adds or changes is pinned by unit tests 
 ### Task 15: Close
 
 - [ ] **Step 1:** CI's step list locally, as `.github/workflows/ci.yml` names it: `npm ci --ignore-scripts`; the root `lint:check` and each package's `lint:check` it lists; `npm run build`; the root `test:check`; `npm test -- --concurrency 2`; `npm run test:install`; the `test:check` of the six packages it lists (`server-runtime`, `server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`); `npm audit --audit-level=moderate`; and its remaining jobs (packaging and install verification, images) as the workflow runs them, or left to CI with that said. Expected: green.
+- [ ] **Step 1a:** The node:test list grew: measure the run's concurrency again as `docs/development/tests/TESTING_GUIDE.md` ("The node:test run's concurrency") does, and update its figures and the setting if they move.
 - [ ] **Step 2:** The full integration suite on premise and on the trial (`npm run test:integration`, after the realm checks). Every failure fixed before going on.
 - [ ] **Step 3:** Push; Codex review of the PR; fix findings; CI green.
 - [ ] **Step 4:** Owner review.

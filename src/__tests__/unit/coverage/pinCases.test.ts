@@ -211,17 +211,24 @@ describe('pinCases', () => {
   it('a stand case runs while a port of the old fixed pin range is taken', async () => {
     // 47100: the port this file's stand-in listened on, inside Linux's
     // ephemeral range; held here as any socket of the machine may hold it
-    // (this file is the guard's one exception, below).
+    // (this file is the guard's one exception, below). The port itself is
+    // what the case is about, so it stays fixed; when another socket of the
+    // machine already holds it, the condition already holds and the case
+    // runs with that holder (EADDRINUSE is not a failure here).
     const holder = net.createServer();
-    await new Promise<void>((resolve) =>
-      holder.listen(47100, '127.0.0.1', resolve),
-    );
+    const held = await new Promise<boolean>((resolve, reject) => {
+      holder.once('error', (error: NodeJS.ErrnoException) =>
+        error.code === 'EADDRINUSE' ? resolve(false) : reject(error),
+      );
+      holder.listen(47100, '127.0.0.1', () => resolve(true));
+    });
     try {
       const onStand: PinCase = { ...getProgram, stand: 'adtStandIn' };
       const recorded = await recordCase(onStand);
       expect(recorded.requests.length).toBeGreaterThan(0);
     } finally {
-      await new Promise<void>((resolve) => holder.close(() => resolve()));
+      if (held)
+        await new Promise<void>((resolve) => holder.close(() => resolve()));
     }
   });
 

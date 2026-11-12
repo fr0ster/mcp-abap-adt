@@ -30,6 +30,7 @@ function world() {
   const reads: Array<ReturnType<typeof deferred<any>>> = [];
   const opened: object[] = [];
   const closed: object[] = [];
+  const dropped: object[] = [];
   const run = deferred<any>();
   let syncN = 0;
   const dbg: Record<string, any> = {
@@ -64,7 +65,9 @@ function world() {
     closeConnection: async (c) => {
       closed.push(c);
     },
-    dropConnection: () => {},
+    dropConnection: (c) => {
+      dropped.push(c);
+    },
     amdpDebugger: () => dbg as never,
     requestUser: async () => 'SAPUSER01',
     run: async () => run.promise,
@@ -73,7 +76,7 @@ function world() {
   const balanced = () =>
     closed.length === opened.length &&
     opened.every((c) => closed.filter((d) => d === c).length === 1);
-  return { session, reads, opened, closed, dbg, run, balanced };
+  return { session, reads, opened, closed, dropped, dbg, run, balanced };
 }
 
 /** Started, stopped at a break, its run in flight. */
@@ -167,6 +170,21 @@ describe('every connection an AMDP session opens is closed once', () => {
     await stopped.session.stop();
     expect(stopped.opened).toHaveLength(2);
     expect(stopped.balanced()).toBe(true);
+  });
+
+  it('the one-request session whose stop finds its connection spent: both dropped, none closed, the stop completes', async () => {
+    const w = world();
+    await w.session.startOnce(false);
+    w.dbg.stop = async () =>
+      refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionError: 'ADT_SESSION_REPLACED',
+      });
+    await expect(w.session.stop()).resolves.toBeUndefined();
+    expect(w.opened).toHaveLength(2);
+    expect(w.dropped).toHaveLength(2);
+    expect(w.closed).toHaveLength(0);
+    expect(w.session.holdsState()).toBe(false);
   });
 
   it("the debugger's dispose and the instance's shutdown", async () => {

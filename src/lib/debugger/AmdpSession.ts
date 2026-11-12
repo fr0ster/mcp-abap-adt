@@ -1097,12 +1097,24 @@ export class AmdpSession<O = unknown> {
           .stop(once.mainId)
           .catch(asFailure);
         if (stopped.ok) once.stopped = true;
-        else failures.push(failedEntry(stopped, 'stop'));
+        else if (spentBy(stopped.getError())) {
+          // The commands connection spent: the AMDP debug session went with
+          // its SAP session. Both connections are dropped without a request.
+          this.once = undefined;
+          this.ports.dropConnection(once.commands);
+          this.ports.dropConnection(once.events);
+          return this.closeRetiredOnce(failures);
+        } else failures.push(failedEntry(stopped, 'stop'));
       }
       this.once = undefined;
       this.retiredOnce.add(once.events);
       this.retiredOnce.add(once.commands);
     }
+    await this.closeRetiredOnce(failures);
+  }
+
+  /** The one-request sessions' retired connections, each closed; a close that throws is kept. */
+  private async closeRetiredOnce(failures: DebugFailure[]): Promise<void> {
     for (const c of [...this.retiredOnce]) {
       const before = failures.length;
       await this.closeOrKeep(c, 'a connection', failures);

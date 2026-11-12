@@ -590,7 +590,8 @@ ends by:
   - **AMDP** works the same way. A cancel, a breakpoint clear, a release or the stop that finds
     the commands connection spent means the AMDP debug session went with its SAP session.
     Nothing more is sent, both connections are dropped without a request, and the stop
-    completes.
+    completes. The one-request path (the compact debugger) does the same when its stop finds
+    the commands connection spent.
   - Any other failure of the release, `ADT_RELEASE_PENDING` included, stays a failure kept for
     the next stop.
   - Unit-tested in `DebugSessionCleanup.test.ts`.

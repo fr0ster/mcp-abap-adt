@@ -511,6 +511,18 @@ Inline comments are not parsed, so keep comments on separate lines.
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
 
+#### Access restrictions
+
+Every binary takes optional start-time restrictions: `--deny-actions` (tools and values not
+registered), `--allowed-packages`, `--allowed-requests`, `--denied-tables` / `--allowed-tables`
+(each also an `MCP_*` variable and a `restrictions.*` key of the `--conf` file). None is set by
+default, and with none the server behaves as without them. They are formal checks of a call's
+arguments; SAP's authorization remains the boundary. The server names what it read in one start
+line (`[MCP] Access restrictions: …`). See
+[Access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md), which also describes
+`GetObjectDraft` (compact: `HandlerGet` `part: 'draft'`): whether an object holds an
+unactivated change, and whose.
+
 #### The data tools: off unless enabled
 
 `GetSqlQuery` (a freestyle ABAP SQL `SELECT`) and `GetTableContents` (the rows of a table or CDS

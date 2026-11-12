@@ -85,6 +85,12 @@
   },
   {
     "group": "readonly",
+    "name": "GetObjectDraft",
+    "inputs": "object_type*, object_name*, function_group_name",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
     "name": "GetObjectVersionSource",
     "inputs": "object_type*, content_uri*",
     "available_in": "cloud, onprem"

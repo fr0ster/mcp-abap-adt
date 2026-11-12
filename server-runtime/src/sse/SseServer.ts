@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
+import type { IAccessChecks } from '@mcp-abap-adt/lib';
 import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
@@ -113,6 +114,11 @@ export interface SseServerOptions {
    */
   backgroundRuns?: IBackgroundRuns;
   /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
+  /**
    * `SearchSource`'s SAP-answer strategy, handed to every instance (the
    * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
    */
@@ -175,6 +181,7 @@ export class SseServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
+  private readonly accessChecks: IAccessChecks | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   /** The running background runs' owner: this server's, shared by every stream's instance. */
@@ -206,6 +213,7 @@ export class SseServer {
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
+    this.accessChecks = opts?.accessChecks;
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
@@ -400,6 +408,7 @@ export class SseServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
+          accessChecks?: IAccessChecks;
           backgroundRunOwner?: BackgroundRunOwner;
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
@@ -438,6 +447,9 @@ export class SseServer {
         }),
         ...(this.lineMatchStrategy !== undefined && {
           lineMatchStrategy: this.lineMatchStrategy,
+        }),
+        ...(this.accessChecks !== undefined && {
+          accessChecks: this.accessChecks,
         }),
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,

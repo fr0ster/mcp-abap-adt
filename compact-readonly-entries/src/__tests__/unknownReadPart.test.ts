@@ -26,7 +26,7 @@ describe('HandlerGet: a part it does not read', () => {
         `part=${String(part)} is not a part HandlerGet reads`,
       );
       expect(words).toContain(
-        'source, metadata, urls, contents, main_programs, object_structure',
+        'source, metadata, urls, contents, main_programs, draft, object_structure',
       );
       expect(words).not.toContain('No connection');
     },

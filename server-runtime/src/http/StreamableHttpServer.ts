@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
+import type { IAccessChecks } from '@mcp-abap-adt/lib';
 import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
@@ -123,6 +124,11 @@ export interface StreamableHttpServerOptions {
    */
   backgroundRuns?: IBackgroundRuns;
   /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
+  /**
    * `SearchSource`'s SAP-answer strategy, handed to every instance (the
    * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
    */
@@ -200,6 +206,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
+  private readonly instanceAccessChecks: IAccessChecks | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
@@ -223,6 +230,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
+    this.instanceAccessChecks = opts?.accessChecks;
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
@@ -557,6 +565,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
+          accessChecks?: IAccessChecks;
           backgroundRunOwner?: BackgroundRunOwner;
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
@@ -621,6 +630,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         }),
         ...(this.lineMatchStrategy !== undefined && {
           lineMatchStrategy: this.lineMatchStrategy,
+        }),
+        ...(this.instanceAccessChecks !== undefined && {
+          accessChecks: this.instanceAccessChecks,
         }),
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,

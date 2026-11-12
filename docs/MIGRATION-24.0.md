@@ -903,6 +903,18 @@ What a consumer that used one of them does now:
 The handlers themselves (`handleGetSqlQuery`, `handleGetTableContents`) and their definitions
 (`READ_DEFINITIONS`) are exported as before.
 
+## New, optional: access restrictions and the draft tool
+
+Nothing a consumer of 23.x must change. Every binary takes five optional start-time rows —
+`--deny-actions`, `--allowed-packages`, `--allowed-requests`, `--denied-tables`,
+`--allowed-tables` (each also an `MCP_*` variable and a `restrictions.*` key) — and an embedder
+may give `accessChecks` (`BaseMcpServer`, `EmbeddableMcpServer`, `HandlerExporter`) and
+`deniedActions` (`HandlerExporter`). With none of them configured nothing changes: every tool,
+answer and listed schema is as without them. The one addition every binary lists is the read
+`GetObjectDraft` (compact: `HandlerGet` `part: 'draft'`); a `HandlerGet` refusal of a part now
+names `draft` among the parts a type offers. See
+[Access restrictions](user-guide/ACCESS_RESTRICTIONS.md).
+
 ## Contributors: `test-config.yaml` carries no time key
 
 The live tests no longer read a bound, a delay or a poll limit from `tests/test-config.yaml`.

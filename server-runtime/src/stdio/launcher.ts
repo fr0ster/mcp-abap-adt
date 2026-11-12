@@ -36,7 +36,7 @@ import {
 } from '@mcp-abap-adt/lib/state';
 import {
   fullToolSet,
-  registryOf,
+  restrictedStart,
   type ToolSet,
 } from '@mcp-abap-adt/lib/tool-set';
 import {
@@ -820,9 +820,15 @@ async function launchStdio(
   // The command's tool set: fixed by the command, but for the data tools,
   // which --enable-data-tools adds.
   // The data tools only when the configuration turns them on.
-  const handlersRegistry = registryOf(options.toolSet, 'stdio', {
-    dataTools: config.enableDataTools === true,
-  });
+  // The access restrictions: the denied actions applied to the registry,
+  // the strategy for the call-time lists, and the start line, once.
+  const restricted = restrictedStart(
+    options.toolSet,
+    'stdio',
+    { dataTools: config.enableDataTools === true },
+    config.accessRestrictions,
+  );
+  const handlersRegistry = restricted.registry;
 
   // The browser of a login, mapped by the platform; a choice that
   // cannot be served stops the start before anything is read.
@@ -946,6 +952,8 @@ async function launchStdio(
     );
   }
 
+  // The start line, once the start's checks passed.
+  deps.stderr(restricted.startLine);
   const server = new StdioServer(
     handlersRegistry,
     destination ? factory : undefined,
@@ -965,6 +973,9 @@ async function launchStdio(
       // SearchSource's strategies: the shipped ones (DO22, DO24).
       sapAnswerStrategy: skipSapAnswers,
       lineMatchStrategy: substringLineMatch,
+      ...(restricted.accessChecks !== undefined && {
+        accessChecks: restricted.accessChecks,
+      }),
       // Batch mode: the one instance's batch state, owned here.
       batch: new InstanceBatch({
         keepRawParts: config.batchKeepRawParts === true,

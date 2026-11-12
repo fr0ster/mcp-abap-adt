@@ -69,7 +69,10 @@ const NOT_A_READ: Readonly<
 > = {
   HandlerGet: [
     { argument: 'object_type', equals: ['UNIT_TEST', 'CDS_UNIT_TEST'] },
-    { argument: 'part', equals: ['ACTIVATION_STATUS', 'ACTIVATION_RESULTS'] },
+    {
+      argument: 'part',
+      equals: ['ACTIVATION_STATUS', 'ACTIVATION_RESULTS', 'DRAFT'],
+    },
   ],
 };
 

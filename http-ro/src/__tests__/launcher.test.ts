@@ -70,9 +70,9 @@ describe('mcp-abap-adt-http-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set without the data tools: 74 tools (the three batch tools, SessionOpen and SessionClose among them), the background-run tools, none of a run or a leftover session', () => {
+  it('serves the read-only set without the data tools: 75 tools (the three batch tools, SessionOpen and SessionClose among them), the background-run tools, none of a run or a leftover session', () => {
     expect(shape(readOnlyToolSet)).toEqual(shape(fullReadOnlyToolSet));
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(74);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(75);
     expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toEqual(
       expect.arrayContaining(['SessionOpen', 'SessionClose']),
     );

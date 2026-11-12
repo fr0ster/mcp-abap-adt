@@ -82,8 +82,9 @@ describe("lib's read and write handler barrels", () => {
     // TABLE_TYPE (55). An include's read of either part, for `HandlerGet`
     // INCLUDE (56). An include's main programs, for `HandlerGet` INCLUDE
     // part `main_programs` (57). 24.0.0: the read tools' definitions, so a
-    // compact read route is the target tool's entry (58).
-    expect(read).toHaveLength(58);
+    // compact read route is the target tool's entry (58); the draft read,
+    // for `HandlerGet` part `draft` (59).
+    expect(read).toHaveLength(59);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

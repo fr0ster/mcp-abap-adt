@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { RUN_TARGET_OPTIONAL } from '../../handlers/unit_test/shared/runTarget';
 import {
+  type ACTIVATION_CODES,
   COMPACT_ACTIVATE,
   COMPACT_CHECK,
   COMPACT_CREATE,
@@ -18,16 +19,19 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
+import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { createArguments } from '../handlers/createArguments';
 import { listedValues } from '../handlers/listedValues';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import {
   COMPACT_LONG_BACKGROUND_DESCRIPTION,
   COMPACT_LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
 } from '../longTools';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../masterLanguage';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
 import { DETAIL_SHAPE } from '../strategies/detail';
+import { exampleCodes, type Left, leftOf, listed, when } from './memberTexts';
 
 /**
  * A compact tool's `object_type`: the members it routes on its variant (a
@@ -37,6 +41,28 @@ const objectTypeOf = <const M extends readonly string[]>(
   members: M,
   description = 'ABAP object type for routed compact operation.',
 ) => listedValues(members).optional().describe(description);
+
+/**
+ * A code argument narrowed by the deny list: an enum of the codes left,
+ * taken as written (upper case) only.
+ */
+const codeEnum = (codes: readonly string[]) => listedValues(codes).optional();
+
+/**
+ * `properties` with the descriptions of `texts` in place of their own: the
+ * texts that name members, rendered from those the deny list left.
+ */
+function redescribed<P extends Record<string, z.ZodType>>(
+  properties: P,
+  texts: { readonly [K in keyof P]?: string },
+): P {
+  const out = { ...properties };
+  for (const key in texts) {
+    const text = texts[key];
+    if (text !== undefined) out[key] = out[key].describe(text);
+  }
+  return out;
+}
 
 /**
  * `field` required: its type without the optional wrapper, described as the
@@ -316,12 +342,32 @@ export const COMPACT_CREATE_TAKES = takesOf<
   },
 });
 
+/** HandlerCreate's texts that name more than one member. */
+function createTexts(left: Left) {
+  const groupOf = [
+    ...(left.has('FUNCTION_GROUP') ? ['FUNCTION_GROUP'] : []),
+    ...(left.has('FUNCTION_MODULE') ? ['the group of a FUNCTION_MODULE'] : []),
+  ];
+  const definitionOf = [
+    ...(left.has('SERVICE_DEFINITION') ? ['SERVICE_DEFINITION'] : []),
+    ...(left.has('SERVICE_BINDING')
+      ? ['the definition a SERVICE_BINDING binds']
+      : []),
+  ];
+  return {
+    class_name: `ABAP class name (${left.of<CreateMember>(['CLASS', 'BEHAVIOR_IMPLEMENTATION']).join(', ')}).`,
+    function_group_name: `ABAP function group name (${groupOf.join('; ')}).`,
+    service_definition_name: `Service definition name (${definitionOf.join('; ')}).`,
+  };
+}
+
 export function compactCreateSchemaFor<const M extends readonly CreateMember[]>(
   members: M,
+  full: readonly CreateMember[] = members,
 ) {
   const properties = {
     object_type: objectTypeOf(members),
-    ...CREATE_PROPERTIES,
+    ...redescribed(CREATE_PROPERTIES, createTexts(leftOf(full, members))),
   } as const;
   return createArguments('HandlerCreate', {
     ...offered(properties, COMPACT_CREATE_TAKES, members),
@@ -362,9 +408,40 @@ const readPartSchema = z
   .optional()
   .describe(READ_PART_WORDS);
 
-const GET_BACKGROUND = COMPACT_LONG_BACKGROUND_FIELD.describe(
-  `${COMPACT_LONG_BACKGROUND_DESCRIPTION} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
-);
+/** The read types a background read applies to, as its description lists them. */
+const BACKGROUND_READS = [
+  'PACKAGE',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'TABLE',
+  'STRUCTURE',
+  'TABLE_TYPE',
+  'DDL',
+  'SERVICE_DEFINITION',
+  'SERVICE_BINDING',
+  'CLASS',
+  'LOCAL_TEST_CLASS',
+  'LOCAL_TYPES',
+  'LOCAL_DEFINITIONS',
+  'LOCAL_MACROS',
+  'PROGRAM',
+  'INCLUDE',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'BEHAVIOR_DEFINITION',
+  'BEHAVIOR_IMPLEMENTATION',
+  'METADATA_EXTENSION',
+  'TRANSPORT',
+] as const;
+
+/** HandlerGet's `background`, listing the read types left. */
+function getBackground(left: Left) {
+  const types = left.of(BACKGROUND_READS);
+  return COMPACT_LONG_BACKGROUND_FIELD.describe(
+    `${COMPACT_LONG_BACKGROUND_DESCRIPTION} Applies to the repository reads: ${types.length > 0 ? `object_type ${types.join(', ')}, and ` : ''}the parts object_structure, node_structure, virtual_folders.`,
+  );
+}
 
 const GET_PROPERTIES = {
   part: readPartSchema,
@@ -509,17 +586,36 @@ export const COMPACT_MAIN_PROGRAMS = {
   cloud: [],
 } as const satisfies Record<ProjectionVariant, readonly ReadMember[]>;
 
-/** `HandlerGet`'s `part`, with `main_programs` where a member serves it. */
-function readPartFor(mainPrograms: readonly ReadMember[]) {
-  return mainPrograms.length === 0
-    ? readPartSchema
-    : z
-        .enum([...READ_PARTS, 'main_programs'])
-        .default('source')
-        .optional()
-        .describe(
-          `${READ_PART_WORDS} main_programs (${mainPrograms.join(', ')}): the include's main programs.`,
-        );
+/**
+ * `HandlerGet`'s `part`, with `main_programs` where a member serves it and
+ * `draft` for the members the draft part reads.
+ */
+function readPartFor(
+  mainPrograms: readonly ReadMember[],
+  draftTypes: readonly ReadMember[],
+) {
+  const extra = [
+    ...(mainPrograms.length > 0 ? ['main_programs'] : []),
+    ...(draftTypes.length > 0 ? ['draft'] : []),
+  ];
+  if (extra.length === 0) return readPartSchema;
+  const words = [
+    ...(mainPrograms.length > 0
+      ? [
+          `main_programs (${mainPrograms.join(', ')}): the include's main programs.`,
+        ]
+      : []),
+    ...(draftTypes.length > 0
+      ? [
+          `draft (${draftTypes.join(', ')}): whether each part of the object holds an unactivated change, and whose.`,
+        ]
+      : []),
+  ];
+  return z
+    .enum([...READ_PARTS, ...extra])
+    .default('source')
+    .optional()
+    .describe(`${READ_PART_WORDS} ${words.join(' ')}`);
 }
 
 /**
@@ -582,26 +678,68 @@ export const COMPACT_READ_TAKES = takesOf<
   },
 });
 
+/** HandlerGet's texts that name more than one member. */
+function getTexts(left: Left) {
+  const groupOf = [
+    ...(left.has('FUNCTION_GROUP') ? ['FUNCTION_GROUP'] : []),
+    ...(left.has('FUNCTION_MODULE')
+      ? ["FUNCTION_MODULE given as the module's name"]
+      : []),
+  ];
+  const runs = left.of<ReadMember>(['UNIT_TEST', 'CDS_UNIT_TEST']);
+  return {
+    function_group_name: `Function group name (${groupOf.join('; ')}).`,
+    run_id: `Run id: ${runs.length > 0 ? `a unit test run (${runs.join(', ')}) or ` : ''}an activation run (parts activation_status, activation_results).`,
+  };
+}
+
 export function compactGetSchemaFor<const M extends readonly ReadMember[]>(
   members: M,
   mainPrograms: readonly ReadMember[] = [],
+  codes?: readonly string[],
+  full: readonly ReadMember[] = members,
+  draftTypes: readonly ReadMember[] = [],
 ) {
+  const left = leftOf(full, members);
   const properties = {
-    background: GET_BACKGROUND,
+    background: getBackground(left),
     object_type: objectTypeOf(members),
-    ...GET_PROPERTIES,
+    ...redescribed(GET_PROPERTIES, getTexts(left)),
   } as const;
+  const codeArgument =
+    codes === undefined
+      ? {}
+      : {
+          object_adt_type: codeEnum(codes).describe(
+            'ADT type code of the object (object_structure) or of the parent node (node_structure).',
+          ),
+        };
+  const offeredProperties = offered(properties, COMPACT_READ_TAKES, members);
+  if (members.length > 0) {
+    return z.object({
+      ...offeredProperties,
+      background: properties.background,
+      object_type: properties.object_type,
+      part: readPartFor(mainPrograms, draftTypes),
+      ...codeArgument,
+    });
+  }
+  // Every name denied: the parts that read no object are left.
+  const { object_type: _none, ...rest } = offeredProperties;
   return z.object({
-    ...offered(properties, COMPACT_READ_TAKES, members),
+    ...rest,
     background: properties.background,
-    object_type: properties.object_type,
-    part: readPartFor(mainPrograms),
+    part: readPartFor(mainPrograms, draftTypes),
+    ...codeArgument,
   });
 }
 
 export const compactGetSchema = compactGetSchemaFor(
   COMPACT_READ.onprem,
   COMPACT_MAIN_PROGRAMS.onprem,
+  undefined,
+  COMPACT_READ.onprem,
+  HANDLER_GET_DRAFT_TYPES.onprem,
 );
 
 const UPDATE_PROPERTIES = {
@@ -777,12 +915,32 @@ export const COMPACT_UPDATE_TAKES = takesOf<
   },
 });
 
+/** HandlerUpdate's texts that name more than one member. */
+function updateTexts(left: Left) {
+  const metadata = [
+    ...left.of<UpdateMember>([
+      'PACKAGE',
+      'DOMAIN',
+      'DATA_ELEMENT',
+      'FUNCTION_GROUP',
+      'TABLE_TYPE',
+    ]),
+    ...(left.has('INCLUDE') ? ['INCLUDE with part metadata'] : []),
+  ];
+  return {
+    source_code: `The content written: the source${when(metadata.length > 0, `, or for ${listed(metadata)} the whole metadata document`)}.`,
+    ddl_code: `Complete DDL source code (for ${left.of<UpdateMember>(['TABLE', 'STRUCTURE']).join('/')} update).`,
+    test_class_source: `ABAP source of the local test classes (${listed(left.of<UpdateMember>(['UNIT_TEST', 'CDS_UNIT_TEST']))} update).`,
+  };
+}
+
 export function compactUpdateSchemaFor<const M extends readonly UpdateMember[]>(
   members: M,
+  full: readonly UpdateMember[] = members,
 ) {
   const properties = {
     object_type: objectTypeOf(members),
-    ...UPDATE_PROPERTIES,
+    ...redescribed(UPDATE_PROPERTIES, updateTexts(leftOf(full, members))),
   } as const;
   return z.object({
     ...offered(properties, COMPACT_UPDATE_TAKES, members),
@@ -949,14 +1107,22 @@ export const COMPACT_DELETE_TAKES = takesOf<
   },
 });
 
+/** HandlerDelete's texts that name more than one member. */
+function deleteTexts(left: Left) {
+  return {
+    lock_handle: `The lock handle of the class (${left.of(EMPTIED_INCLUDE_TYPES).join(', ')}): the include is written empty under it.`,
+  };
+}
+
 export function compactDeleteSchemaFor<const M extends readonly DeleteMember[]>(
   members: M,
+  full: readonly DeleteMember[] = members,
 ) {
   const properties = {
     object_type: listedValues(members)
       .optional()
       .describe(`Object type. ${supported(members)}`),
-    ...DELETE_PROPERTIES,
+    ...redescribed(DELETE_PROPERTIES, deleteTexts(leftOf(full, members))),
   } as const;
   return z.object({
     ...offered(properties, COMPACT_DELETE_TAKES, members),
@@ -1398,14 +1564,34 @@ export const COMPACT_VALIDATE_TAKES = takesOf<
   },
 });
 
+/** HandlerValidate's texts that name more than one member. */
+function validateTexts(left: Left) {
+  const packaged = left.of<ValidateMember>([
+    'BEHAVIOR_DEFINITION',
+    'BEHAVIOR_IMPLEMENTATION',
+    'METADATA_EXTENSION',
+    'SERVICE_BINDING',
+  ]);
+  const described = left.of<ValidateMember>([
+    'FUNCTION_MODULE',
+    'BEHAVIOR_DEFINITION',
+    'METADATA_EXTENSION',
+  ]);
+  return {
+    object_name: `Required object name.${when(left.has('SERVICE_BINDING'), ' For SERVICE_BINDING this is the service binding name;')} ${left.has('SERVICE_BINDING') ? 'a' : 'A'} function module is named GROUP|MODULE.`,
+    package_name: `Package of the object to validate.${when(packaged.length > 0, ` Required for ${listed(packaged)}.`)}`,
+    description: `Object description used during validation.${when(described.length > 0, ` Required for ${listed(described)}.`)}`,
+  };
+}
+
 export function compactValidateSchemaFor<
   const M extends readonly ValidateMember[],
->(members: M) {
+>(members: M, full: readonly ValidateMember[] = members) {
   const properties = {
     object_type: listedValues(members)
       .optional()
       .describe(`Object type to validate before create. ${supported(members)}`),
-    ...VALIDATE_PROPERTIES,
+    ...redescribed(VALIDATE_PROPERTIES, validateTexts(leftOf(full, members))),
   } as const;
   return z.object({
     ...offered(properties, COMPACT_VALIDATE_TAKES, members),
@@ -1547,12 +1733,19 @@ export const COMPACT_CHECK_TAKES = takesOf<
   },
 });
 
+/** HandlerCheckRun's texts that name more than one member. */
+function checkRunTexts(left: Left) {
+  return {
+    source_code: `Source to check instead of the saved one; nothing is saved. ${listed(left.of<CheckMember>(['CLASS', 'STRUCTURE', 'DDL']))} only.`,
+  };
+}
+
 export function compactCheckRunSchemaFor<
   const M extends readonly CheckMember[],
->(members: M) {
+>(members: M, full: readonly CheckMember[] = members) {
   const properties = {
     ...lifecycleObjectSchema(members),
-    ...CHECK_RUN_PROPERTIES,
+    ...redescribed(CHECK_RUN_PROPERTIES, checkRunTexts(leftOf(full, members))),
   } as const;
   return z.object({
     ...offered(properties, COMPACT_CHECK_TAKES, members),
@@ -1566,13 +1759,29 @@ export const compactCheckRunSchema = compactCheckRunSchemaFor(
   COMPACT_CHECK.onprem,
 );
 
+/** The codes `object_adt_type`'s description names as its examples. */
+const ADT_TYPE_EXAMPLES: readonly (typeof ACTIVATION_CODES.onprem)[number][] = [
+  'CLAS/OC',
+  'PROG/P',
+];
+
 /** A member of `HandlerActivate`'s `object_type`. */
 type ActivateMember = (typeof COMPACT_ACTIVATE.onprem)[number];
 
 function activateProperties<const M extends readonly ActivateMember[]>(
   members: M,
   variant: ProjectionVariant,
+  codes?: readonly string[],
 ) {
+  const parent = activationParentDescription(variant, codes);
+  const examples =
+    codes === undefined
+      ? 'CLAS/OC, PROG/P'
+      : exampleCodes(ADT_TYPE_EXAMPLES, codes, 2).join(', ');
+  const codeType =
+    codes === undefined
+      ? z.string().describe('ADT object type code.')
+      : listedValues(codes).describe('ADT object type code.');
   return {
     object_type: objectTypeOf(
       members,
@@ -1590,28 +1799,23 @@ function activateProperties<const M extends readonly ActivateMember[]>(
       .describe(
         "A function module's function group (single form, FUNCTION_MODULE).",
       ),
-    object_adt_type: z
-      .string()
-      .optional()
-      .describe(
-        'ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).',
-      ),
+    object_adt_type: (codes === undefined
+      ? z.string().optional()
+      : codeEnum(codes)
+    ).describe(
+      `ADT object type code (e.g. ${examples}) of the object (single form).`,
+    ),
     parentName: z
       .string()
       .optional()
-      .describe(
-        `With object_adt_type (single form): ${activationParentDescription(variant)}`,
-      ),
+      .describe(`With object_adt_type (single form): ${parent}`),
     objects: z
       .array(
         z.object({
           name: z.string().describe('Object name.'),
-          type: z.string().describe('ADT object type code.'),
+          type: codeType,
           uri: z.string().optional().describe('Optional ADT object URI.'),
-          parentName: z
-            .string()
-            .optional()
-            .describe(activationParentDescription(variant)),
+          parentName: z.string().optional().describe(parent),
         }),
       )
       .optional()
@@ -1645,11 +1849,28 @@ export const COMPACT_ACTIVATE_TAKES = takesOf<
 
 export function compactActivateSchemaFor<
   const M extends readonly ActivateMember[],
->(members: M, variant: ProjectionVariant) {
-  const properties = activateProperties(members, variant);
+>(members: M, variant: ProjectionVariant, codes?: readonly string[]) {
+  const properties = activateProperties(members, variant, codes);
+  const offeredProperties = offered(
+    properties,
+    COMPACT_ACTIVATE_TAKES,
+    members,
+  );
+  if (members.length > 0) {
+    return z.object({
+      ...offeredProperties,
+      object_type: properties.object_type,
+      object_name: properties.object_name,
+      object_adt_type: properties.object_adt_type,
+      parentName: properties.parentName,
+      objects: properties.objects,
+      preaudit: properties.preaudit,
+    });
+  }
+  // Every name denied: the objects are named by their codes.
+  const { object_type: _none, ...rest } = offeredProperties;
   return z.object({
-    ...offered(properties, COMPACT_ACTIVATE_TAKES, members),
-    object_type: properties.object_type,
+    ...rest,
     object_name: properties.object_name,
     object_adt_type: properties.object_adt_type,
     parentName: properties.parentName,
@@ -1726,24 +1947,52 @@ export const compactWhereUsedSchema = compactWhereUsedSchemaFor(
   COMPACT_WHERE_USED.onprem,
 );
 
+/** The properties of `HandlerGetData` beside its `sql_query`. */
+function getDataProperties(sql: boolean) {
+  return {
+    background: COMPACT_LONG_BACKGROUND_FIELD,
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        `Table or CDS view whose rows are read, all columns.${sql ? ' Used when sql_query is absent.' : ''}`,
+      ),
+  };
+}
+
+const MAX_ROWS = {
+  max_rows: z
+    .number()
+    .default(100)
+    .optional()
+    .describe('Maximum number of rows returned.'),
+};
+
 /** Rows of a table or CDS view, or of an SQL SELECT. */
 export const compactGetDataSchema = z.object({
-  background: COMPACT_LONG_BACKGROUND_FIELD,
-  object_name: z
-    .string()
-    .optional()
-    .describe(
-      'Table or CDS view whose rows are read, all columns. Used when sql_query is absent.',
-    ),
+  ...getDataProperties(true),
   sql_query: z
     .string()
     .optional()
     .describe(
       'ABAP SQL SELECT naming the columns, conditions and order to read.',
     ),
-  max_rows: z
-    .number()
-    .default(100)
-    .optional()
-    .describe('Maximum number of rows returned.'),
+  ...MAX_ROWS,
 });
+
+/**
+ * `HandlerGetData`'s description and schema: with `sql`, the table read and
+ * `sql_query`; without, the table read alone, `sql_query` named nowhere.
+ */
+export function handlerGetDataDefinition(sql: boolean) {
+  return {
+    description: withLongToolAdvice(
+      sql
+        ? '[read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.'
+        : '[read-only] Reads the rows of the table or CDS view named by object_name: every column of object_name. Required: object_name. Optional: max_rows (default 100). Response: JSON.',
+    ),
+    inputSchema: sql
+      ? compactGetDataSchema
+      : z.object({ ...getDataProperties(false), ...MAX_ROWS }),
+  };
+}

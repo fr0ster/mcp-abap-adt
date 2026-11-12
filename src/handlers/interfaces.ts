@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { IAccessChecks } from '../lib/access/accessChecks';
 import type { AdtHeaderPort } from '../lib/adtHeaders/AdtHeaderPairs';
 import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
 import type { BatchAvailability } from '../lib/batch/availability';
@@ -87,6 +88,16 @@ export interface HandlerContext {
    * no lock is taken, and nothing is sent under a `lock_handle`.
    */
   heldLocks?: HeldLockPort;
+  /**
+   * The access checks a plain registration of this group applies to every
+   * call (spec §3.2, path 2), with the tools the `-ro` twins serve
+   * (`readOnlyToolNames()`): set on the context a group is built with
+   * (`HandlerExporter`'s `accessChecks`, an embedder's own). Absent: none.
+   */
+  accessChecks?: {
+    readonly checks: IAccessChecks;
+    readonly readOnly: ReadonlySet<string>;
+  };
   /**
    * The instance's long session (`LongSession`), given by a host whose
    * instances last one request each (Streamable HTTP); absent on stdio and

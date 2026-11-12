@@ -2418,6 +2418,17 @@
     ],
     "semantic": "List the version history of a repository object of any type: who changed it, when, in which transport."
   },
+  "GetObjectDraft": {
+    "keywords": [
+      "draft",
+      "unactivated change",
+      "inactive version",
+      "who changed",
+      "pending change",
+      "working version"
+    ],
+    "semantic": "Tell whether a repository object holds an unactivated change and whose: the caller's or another user's, with its age."
+  },
   "GetObjectsByType": {
     "keywords": [
       "objects of one type",

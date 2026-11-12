@@ -11,6 +11,8 @@
  */
 
 /** TLS configuration for HTTPS server */
+import type { AccessRestrictions } from '../access/accessLists.js';
+
 export interface TlsConfig {
   /** Path to TLS certificate file (PEM) */
   cert: string;
@@ -74,4 +76,11 @@ export interface IServerConfig {
    * `MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`). Default `false`.
    */
   enableDataTools?: boolean;
+
+  /**
+   * The access restrictions (`--deny-actions`, `--allowed-packages`,
+   * `--allowed-requests`, `--denied-tables`, `--allowed-tables`, and their
+   * environment and YAML forms; `readAccessRestrictions`). Absent: none.
+   */
+  accessRestrictions?: AccessRestrictions;
 }

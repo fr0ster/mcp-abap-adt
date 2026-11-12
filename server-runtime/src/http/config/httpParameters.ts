@@ -7,6 +7,7 @@
  */
 
 import {
+  ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
@@ -18,6 +19,7 @@ import {
   type Parameter,
   type ParameterTable,
   parameterSource,
+  readAccessRestrictions,
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
@@ -130,6 +132,7 @@ export function httpParameters(
       BATCH_KEEP_RAW_PARTS_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
       toolSet.expositionRemoved('http'),
@@ -181,6 +184,7 @@ export function readHttpConfig(
     stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
     enableDataTools: values.enableDataTools === true,
+    accessRestrictions: readAccessRestrictions(argv, env, yaml),
     shutdownTimeout: numberValue(values.shutdownTimeout),
     host: textValue(values.host),
     port: numberValue(values.port),

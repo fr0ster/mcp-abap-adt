@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IAccessChecks } from '../lib/access/accessChecks.js';
 import type { AdtHeaderPairs } from '../lib/adtHeaders/AdtHeaderPairs.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
@@ -80,6 +81,11 @@ export interface EmbeddableMcpServerOptions {
    * long tool answers in the call.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
 
   /**
    * The system the injected connection reaches, as a key of your choosing,
@@ -295,6 +301,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       stateLogger: options.stateLogger,
       ...(options.transportCloseEndsSession !== undefined && {
         transportCloseEndsSession: options.transportCloseEndsSession,
+      }),
+      ...(options.accessChecks !== undefined && {
+        accessChecks: options.accessChecks,
       }),
       ...(options.backgroundRuns !== undefined && {
         backgroundRuns: options.backgroundRuns,

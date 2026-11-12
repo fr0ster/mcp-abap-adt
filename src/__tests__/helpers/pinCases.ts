@@ -45,6 +45,7 @@ import {
   type StandInRequest,
 } from './adtStandIn';
 import { holdingLockOf } from './heldLocks';
+import type { PinnedRequest } from './pinnedRequest';
 import { type PinSetup, pinServer } from './pinServer';
 import {
   type RecordedRequest,
@@ -84,13 +85,7 @@ function withPinHost(request: PinnedRequest, host: string): PinnedRequest {
   };
 }
 
-/** One request as sent: method, path with its query, every header, body. */
-export interface PinnedRequest {
-  method: string;
-  url: string;
-  headers: Readonly<Record<string, string>>;
-  body: string | undefined;
-}
+export type { PinnedRequest };
 
 /** An argument read from an earlier answer: `before[from]`'s field `field`. */
 export interface Binding {

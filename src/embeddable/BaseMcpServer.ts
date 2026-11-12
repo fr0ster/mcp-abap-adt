@@ -6,6 +6,13 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IAccessChecks } from '../lib/access/accessChecks.js';
+import {
+  accessCallOf,
+  checkedArgumentsOf,
+} from '../lib/access/checkedArguments.js';
+import { refusalOf } from '../lib/access/listedAccessChecks.js';
+import { lazyPackageReader } from '../lib/access/packageReader.js';
 import {
   registerActiveTool,
   shutdownRefusalAnswer,
@@ -176,6 +183,7 @@ import {
 } from '../lib/systemContext.js';
 import { declareSystemKind } from '../lib/systemKind.js';
 import { isErrorResult, normalizeToolContent } from '../lib/toolResult.js';
+import { readOnlyToolNames } from '../lib/toolSet.js';
 import { return_error } from '../lib/utils.js';
 import { child, isElement } from '../lib/xml/tree.js';
 import type {
@@ -287,6 +295,10 @@ export abstract class BaseMcpServer extends McpServer {
    * for `available_in` filtering at handler registration time.
    */
   protected readonly systemType?: SapEnvironment;
+  /** The access-check strategy the host gave; `undefined`: none. */
+  private readonly accessChecks: IAccessChecks | undefined;
+  /** The tools the `-ro` twins serve, read once when a strategy is given. */
+  private readonly readOnlyTools: ReadonlySet<string> | undefined;
 
   /**
    * Asks a connection's system for its information, when its parameters are
@@ -520,9 +532,18 @@ export abstract class BaseMcpServer extends McpServer {
      * Default `false`: such a birth is a logon.
      */
     restoreAtFirstBirth?: boolean;
+    /**
+     * The access checks (spec §3.2): decided once per call, after the SDK
+     * parsed the arguments and before the call takes its connection. Absent:
+     * no call is checked, and no `AccessCall` is built.
+     */
+    accessChecks?: IAccessChecks | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
+    this.accessChecks = options.accessChecks;
+    this.readOnlyTools =
+      options.accessChecks === undefined ? undefined : readOnlyToolNames();
     this.leftoverSessions = options.leftoverSessions;
     this.restoreAtFirstBirth = options.restoreAtFirstBirth === true;
     this.backgroundRuns = options.backgroundRuns;
@@ -1594,6 +1615,12 @@ export abstract class BaseMcpServer extends McpServer {
             );
             continue;
           }
+          // What the access checks read of this tool's calls, computed once
+          // here; nothing when the host gave no strategy.
+          const checked =
+            this.readOnlyTools === undefined
+              ? undefined
+              : checkedArgumentsOf(entry.toolDefinition, this.readOnlyTools);
           const runCall = async (args: ToolArgs, signal: AbortSignal) => {
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
@@ -1661,66 +1688,98 @@ export abstract class BaseMcpServer extends McpServer {
                 isBackgroundTool(entry.toolDefinition.name) || longTool
                   ? withoutBackground(args)
                   : args;
-              // Get connection from context (this.connectionContext), with
-              // the call's signal (the session's end).
-              let connection = await this.getConnection(signal);
-              inUse = connection;
-              // One instance, one connection, one main flow: a call that works
-              // on the instance's connection waits until the call before it
-              // settled, whatever the client sends at once. Entered after the
-              // connection is ready, so concurrent callers still share one
-              // connect(). A background run and a listed long read work
-              // on a connection of their own and take no place in it; so do the
-              // debugger tools whose SAP work is on the debugger's own
-              // connections — their sends on this one (`onMainConnection`)
-              // still take their turn.
-              // While a batch is open every call but a batch tool's takes its
-              // turn: a recorded call is recorded in call order, a refused one
-              // is refused there — a long read in batch mode gets no
-              // connection of its own. The debugger batch is the debugger
-              // tools': they keep working outside the flow, their numbers
-              // in record order (spec §7).
-              const ownConnection =
-                (!this.batchOpenFor(entry.toolDefinition.name) ||
-                  this.inDebuggerBatch(entry.toolDefinition.name)) &&
-                worksOnOwnConnection(
-                  entry.toolDefinition.name,
-                  args,
-                  runsInBackground,
+              // The call's connection and its turn, taken once: by the access
+              // checks' package reader when it reads first, else here.
+              const acquire = async () => {
+                // Get connection from context (this.connectionContext), with
+                // the call's signal (the session's end).
+                let connection = await this.getConnection(signal);
+                inUse = connection;
+                // One instance, one connection, one main flow: a call that works
+                // on the instance's connection waits until the call before it
+                // settled, whatever the client sends at once. Entered after the
+                // connection is ready, so concurrent callers still share one
+                // connect(). A background run and a listed long read work
+                // on a connection of their own and take no place in it; so do the
+                // debugger tools whose SAP work is on the debugger's own
+                // connections — their sends on this one (`onMainConnection`)
+                // still take their turn.
+                // While a batch is open every call but a batch tool's takes its
+                // turn: a recorded call is recorded in call order, a refused one
+                // is refused there — a long read in batch mode gets no
+                // connection of its own. The debugger batch is the debugger
+                // tools': they keep working outside the flow, their numbers
+                // in record order (spec §7).
+                const ownConnection =
+                  (!this.batchOpenFor(entry.toolDefinition.name) ||
+                    this.inDebuggerBatch(entry.toolDefinition.name)) &&
+                  worksOnOwnConnection(
+                    entry.toolDefinition.name,
+                    args,
+                    runsInBackground,
+                  );
+                if (!ownConnection) {
+                  leaveFlow = await this.enterMainFlow(signal);
+                  // The connection this call took before it waited may be one
+                  // whose session SAP already lost while the call ahead ran. It
+                  // is given back and the instance's connection taken again —
+                  // inside the flow, before the tool runs — so a queued batch
+                  // does not fail on the one lost session.
+                  if (this.isStaleBuilt(connection)) {
+                    inUse = undefined;
+                    this.connectionReleased(connection);
+                    connection = await this.getConnection(signal);
+                    inUse = connection;
+                  }
+                }
+                // The connection's system information, asked before the tool
+                // runs when it has none; its failure is this call's answer, and
+                // the tool never runs twice.
+                const before = await this.systemBeforeTool(
+                  connection,
+                  leaveFlow !== undefined,
+                  signal,
+                  (taken) => {
+                    inUse = taken;
+                  },
                 );
-              if (!ownConnection) {
-                leaveFlow = await this.enterMainFlow(signal);
-                // The connection this call took before it waited may be one
-                // whose session SAP already lost while the call ahead ran. It
-                // is given back and the instance's connection taken again —
-                // inside the flow, before the tool runs — so a queued batch
-                // does not fail on the one lost session.
-                if (this.isStaleBuilt(connection)) {
-                  inUse = undefined;
-                  this.connectionReleased(connection);
-                  connection = await this.getConnection(signal);
-                  inUse = connection;
+                connection = before.connection;
+                const system = before.system;
+                // The call's destination's port, whichever connection
+                // its reads go on (a long read's own one included).
+                const batchAvailability = this.batchAvailabilityOf(connection);
+                // The variant of the call's ADT client: the kind this server
+                // states, for a connection the factory did not build.
+                declareSystemKind(connection, this.systemType);
+                return { connection, system, batchAvailability };
+              };
+              let taken: ReturnType<typeof acquire> | undefined;
+              const take = () => {
+                taken ??= acquire();
+                return taken;
+              };
+              // The access checks (spec §3.2): once, before the call takes
+              // its connection; a refused call takes none, sends nothing and
+              // takes no batch number. A strategy that reads takes the call's
+              // connection through the reader, and the call goes on with it.
+              const accessCall =
+                this.accessChecks === undefined || checked === undefined
+                  ? undefined
+                  : accessCallOf(entry.toolDefinition.name, checked, args);
+              if (this.accessChecks !== undefined && accessCall !== undefined) {
+                const verdict = await this.accessChecks.check(
+                  accessCall,
+                  lazyPackageReader(
+                    async () => (await take()).connection,
+                    this.logger,
+                    signal,
+                  ),
+                );
+                if (!verdict.allowed) {
+                  return this.refusalAnswer(refusalOf(verdict));
                 }
               }
-              // The connection's system information, asked before the tool
-              // runs when it has none; its failure is this call's answer, and
-              // the tool never runs twice.
-              const before = await this.systemBeforeTool(
-                connection,
-                leaveFlow !== undefined,
-                signal,
-                (taken) => {
-                  inUse = taken;
-                },
-              );
-              connection = before.connection;
-              const system = before.system;
-              // The call's destination's port, whichever connection
-              // its reads go on (a long read's own one included).
-              const batchAvailability = this.batchAvailabilityOf(connection);
-              // The variant of the call's ADT client: the kind this server
-              // states, for a connection the factory did not build.
-              declareSystemKind(connection, this.systemType);
+              const { connection, system, batchAvailability } = await take();
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,

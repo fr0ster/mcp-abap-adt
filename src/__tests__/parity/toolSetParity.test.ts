@@ -916,7 +916,8 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // and the two debugger batch tools, always; on http SessionOpen and
       // SessionClose. Started without --enable-data-tools: the data tools
       // (GetSqlQuery, GetTableContents) are off, two fewer than with it.
-      expect(full.tools).toHaveLength(onStdio ? 268 : onHttp ? 268 : 266);
+      // 24.0.0: GetObjectDraft, one more.
+      expect(full.tools).toHaveLength(onStdio ? 269 : onHttp ? 269 : 267);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -934,7 +935,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // tools, the three background-run tools of the long reads (and, on
       // stdio, the leftover-session list; on http SessionOpen and
       // SessionClose); no write, run, debugger, logoff or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 73 : onHttp ? 74 : 72);
+      expect(fullRo.tools).toHaveLength(onStdio ? 74 : onHttp ? 75 : 73);
       for (const name of [
         'GetBackgroundRun',
         'ListBackgroundRuns',

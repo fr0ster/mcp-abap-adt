@@ -22,6 +22,7 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { jsonOf } from '../jsonText.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
@@ -34,6 +35,7 @@ export {
 export { DETAIL_SHAPE } from '../strategies/detail.js';
 export { byVariant } from '../variantDefinition.js';
 export { child, type Element, isElement, isList } from '../xml/tree.js';
+export { handlerBatchDefinition } from './batch/handleHandlerBatch.js';
 export * from './compactDescriptions.js';
 export {
   COMPACT_CRUD_MATRIX,
@@ -94,4 +96,20 @@ export {
   DELETABLE_TYPES,
   DELETION_CHECK_TYPES,
   EMPTIED_INCLUDE_TYPES,
+  handlerGetDataDefinition,
 } from './compactSchemas.js';
+export { handlerDebugBatchDefinition } from './debug/handleHandlerDebugBatch.js';
+export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBreakpoints.js';
+export { handlerDebugMaintainDefinition } from './debug/handleHandlerDebugMaintain.js';
+export { handlerDebugSessionDefinition } from './debug/handleHandlerDebugSession.js';
+export { handlerDebugStepDefinition } from './debug/handleHandlerDebugStep.js';
+export { handlerSessionDefinition } from './longSession/handleHandlerSession.js';
+export {
+  either,
+  exampleCodes,
+  type Left,
+  leftOf,
+  listed,
+  textsOf,
+  when,
+} from './memberTexts.js';

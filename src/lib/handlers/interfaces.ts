@@ -38,6 +38,12 @@ export interface ToolDefinition<S extends z.ZodObject = z.ZodObject> {
    * declared.
    */
   variants?: { readonly [V in AbapSystemKind]: VariantToolDefinition };
+  /**
+   * The members its `object_type` (or `target_type`) offers where no
+   * variant is stated: set only on a definition the deny list narrowed, so
+   * its search texts name only the members left.
+   */
+  members?: readonly string[];
 }
 
 /** A tool's description and input schema on one variant. */

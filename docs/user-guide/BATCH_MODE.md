@@ -405,12 +405,18 @@ whose `BatchEnd` failed answers that error alone, with no raw part.
 
 ## Which calls are recorded
 
+A call refused by the access restrictions ([Access restrictions](ACCESS_RESTRICTIONS.md)) is
+refused when it is recorded, before anything else: it takes no number. A package-tree read the
+check makes is sent on the instance's connection at once, not recorded. `GetObjectDraft` and
+`HandlerGet` `part: 'draft'` are recorded: each part's three version reads go into the envelope,
+and a `$batch` part keeps its `ETag` (measured).
+
 The data tools (`GetSqlQuery`, `GetTableContents`, compact `HandlerGetData`) are recorded as listed
 below where they are served: only by a binary started with `--enable-data-tools`.
 
 <!-- batch-handlers:start -->
 
-179 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+181 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -502,6 +508,7 @@ below where they are served: only by a binary started with `--enable-data-tools`
 | `GetMetadataExtensionVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetMetadataExtensionVersions` | every call | GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main/versions |
 | `GetMetadataExtensionVersionSource` | every call | GET the content_uri given |
+| `GetObjectDraft` | every call | for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together |
 | `GetObjectsByType` | every call | POST /sap/bc/adt/repository/nodestructure for the one node asked |
 | `GetObjectStructure` | every call | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
 | `GetObjectVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
@@ -577,6 +584,7 @@ below where they are served: only by a binary started with `--enable-data-tools`
 | `HandlerGet` | when part is activation_status and run_id is given | GET /sap/bc/adt/activation/runs/{run_id}; with with_long_polling true, GET /sap/bc/adt/activation/runs/{run_id}?withLongPolling=true, which SAP holds until the run ends |
 | `HandlerGet` | when part is activation_results and run_id is given | GET /sap/bc/adt/activation/results/{run_id} |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
+| `HandlerGet` | when part is draft | as the full set's draft read: for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle with sql_query, or with SELECT * FROM object_name, as the body |
 | `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, INCLUDE, TABLE_TYPE | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
 | `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |

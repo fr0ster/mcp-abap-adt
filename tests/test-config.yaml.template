@@ -1953,6 +1953,32 @@ debugger_handlers:
         # on that user. Empty: the another-user case is skipped.
         second_user_env: ""
 
+# The draft tool (src/__tests__/integration/high/draft/ObjectDraft.test.ts):
+# GetObjectDraft and HandlerGet part draft on objects the run creates and
+# deletes ($TMP on premise; environment.default_package on the cloud).
+draft:
+  # On premise: a session .env name (in the standard sessions folder) of a
+  # second SAP user with basic authentication, who reads the writer's draft
+  # as another user's. Empty skips only the "other" cases, naming the reason.
+  # On the cloud: empty (the trial has one user).
+  second_user_env: ""
+
+# The access restrictions (src/__tests__/integration/high/access/AccessRestrictions.test.ts):
+# an in-process server started with allowed packages and requests.
+access:
+  # On premise: an open request of the configured user, which the allowed
+  # write records into. On the cloud: empty (the case skips: the probe package
+  # takes no request).
+  transport_request: ""
+  # The package the allowed creates go into: $TMP on premise, the probe
+  # package on the cloud.
+  package: ""
+  # A package above `package` in its tree, allowed as `<package_parent>/**`
+  # for the tree case. Empty: on premise the case creates a local package of
+  # its own under $TMP and allows `$TMP/**`; on the cloud it reads the
+  # package's own super package.
+  package_parent: ""
+
 # Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
 # the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
 # HandlerUpdate, HandlerUnlock and HandlerActivate of three objects, each phase

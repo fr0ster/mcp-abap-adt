@@ -41,7 +41,18 @@ export type ServerRefusalCode =
   | 'batch_unsplit'
   | 'long_session_unavailable'
   | 'connection_provider_failed'
-  | 'no_connection';
+  | 'no_connection'
+  | AccessRefusalCode;
+
+/**
+ * The refusals of a call an access-check strategy refused (spec §3.4):
+ * named in the strategy's verdict, worded here from its argument and value.
+ */
+export type AccessRefusalCode =
+  | 'package_not_allowed'
+  | 'package_tree_unreadable'
+  | 'request_not_allowed'
+  | 'table_not_allowed';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -285,7 +296,29 @@ type WordedCode =
   | 'background_run_limit'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_parts_mismatch';
+  | 'batch_parts_mismatch'
+  | AccessRefusalCode;
+
+/**
+ * An access refusal's words: the argument the call named and its value, as
+ * given (a package, a request or a table name — no secret).
+ */
+export function accessRefusalWords(
+  code: AccessRefusalCode,
+  argument: string,
+  value: string,
+): string {
+  switch (code) {
+    case 'package_not_allowed':
+      return `${argument} names a package outside the allowed packages: ${value}`;
+    case 'package_tree_unreadable':
+      return `the package tree above ${value} could not be read, so ${argument} is not checked against the allowed packages`;
+    case 'request_not_allowed':
+      return `${argument} names a request outside the allowed requests: ${value}`;
+    case 'table_not_allowed':
+      return `the data of ${value} is not readable through this server`;
+  }
+}
 
 /** The refusals whose words are fixed. */
 type FixedCode = Exclude<ServerRefusalCode, WordedCode | 'no_connection'>;
@@ -349,7 +382,7 @@ export class ServerRefusal extends Error {
    * `batch_not_recordable` in `batchNotRecordableWords` or
    * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`;
    * `batch_parts_mismatch` in `batchPartsMismatchWords` or
-   * `batchMorePartsWords`.
+   * `batchMorePartsWords`; an access refusal in `accessRefusalWords`.
    */
   constructor(code: WordedCode, words: string);
   /** `background_runs_unavailable` for an injected connection with no system known. */
@@ -368,7 +401,11 @@ export class ServerRefusal extends Error {
             code === 'background_run_limit' ||
             code === 'batch_not_recordable' ||
             code === 'batch_other_kind' ||
-            code === 'batch_parts_mismatch'
+            code === 'batch_parts_mismatch' ||
+            code === 'package_not_allowed' ||
+            code === 'package_tree_unreadable' ||
+            code === 'request_not_allowed' ||
+            code === 'table_not_allowed'
           ? (words ?? '')
           : WORDS[code];
     super(text);

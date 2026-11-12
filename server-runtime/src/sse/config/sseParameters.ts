@@ -8,6 +8,7 @@
  */
 
 import {
+  ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
@@ -20,6 +21,7 @@ import {
   type Parameter,
   type ParameterTable,
   parameterSource,
+  readAccessRestrictions,
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   STATE_IDLE_ROW,
@@ -127,6 +129,7 @@ export function sseParameters(
       BATCH_KEEP_RAW_PARTS_ROW,
       ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
       toolSet.expositionRemoved('sse'),
@@ -178,6 +181,7 @@ export function readSseConfig(
     stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
     enableDataTools: values.enableDataTools === true,
+    accessRestrictions: readAccessRestrictions(argv, env, yaml),
     shutdownTimeout: numberValue(values.shutdownTimeout),
     host: textValue(values.host),
     port: numberValue(values.port),

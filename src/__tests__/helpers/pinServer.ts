@@ -30,6 +30,9 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { InMemoryBackgroundRuns } from '../../../background-runs-memory/src/InMemoryBackgroundRuns';
 import { compactToolSet } from '../../../compact/src/launcher';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
+import type { IAccessChecks } from '../../lib/access/accessChecks';
+import type { DeniedActions } from '../../lib/access/deniedActions';
+import { withoutDenied } from '../../lib/access/withoutDenied';
 import type { McpResult } from '../../lib/answer';
 import type {
   BackgroundRunAnswer,
@@ -64,8 +67,20 @@ const PIN_PID = 222;
 /** What must exist before the server starts. */
 export type PinSetup = 'leftover-session';
 
+/**
+ * What an in-process server is started with beyond the base's: the denied
+ * actions applied to its groups at registration and the access-check
+ * strategy given to the server. Both absent: the server is as before.
+ */
+export interface ServerRestriction {
+  readonly deniedActions?: DeniedActions | undefined;
+  readonly accessChecks?: IAccessChecks | undefined;
+}
+
 export interface PinServer {
   call(tool: string, args: ToolArgs): Promise<McpResult>;
+  /** The tool names the server lists (`tools/list`), in its order. */
+  listed(): Promise<string[]>;
   /**
    * Settles once every background run the server started has ended: its
    * answer handed to the store (`finish`). A run's end is waited for on
@@ -233,6 +248,7 @@ export async function inProcessServer(
   variant: SystemKind,
   source: ServerSource,
   setup?: PinSetup,
+  restriction: ServerRestriction = {},
 ): Promise<PinServer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pin-server-'));
   const runtime = path.join(dir, 'runtime');
@@ -262,13 +278,18 @@ export async function inProcessServer(
     backgroundRuns: runs,
     leftoverSessions,
     longSession: new LongSession(),
+    ...(restriction.accessChecks !== undefined
+      ? { accessChecks: restriction.accessChecks }
+      : {}),
   });
   server.use(source);
   server.register(
-    new CompositeHandlersRegistry([
-      ...groupsOf(fullToolSet),
-      ...groupsOf(compactToolSet),
-    ]),
+    new CompositeHandlersRegistry(
+      withoutDenied(
+        [...groupsOf(fullToolSet), ...groupsOf(compactToolSet)],
+        restriction.deniedActions ?? [],
+      ),
+    ),
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'pin', version: '1.0.0' });
@@ -276,6 +297,8 @@ export async function inProcessServer(
   return {
     call: async (tool, args) =>
       resultOf(await client.callTool({ name: tool, arguments: { ...args } })),
+    listed: async () =>
+      (await client.listTools()).tools.map((tool) => tool.name),
     runsEnded: () => runs.ended(),
     close: async () => {
       await client.close();

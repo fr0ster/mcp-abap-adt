@@ -550,6 +550,8 @@ function takesVersion(entry: HandlerEntry, args: Record<string, unknown>) {
     typeof member === 'string' &&
     (takes[member] ?? []).includes('version') &&
     args.part !== 'run' &&
+    // The draft part reads its own three versions, whatever is given.
+    args.part !== 'draft' &&
     args.part !== 'object_structure' &&
     args.part !== 'node_structure'
   );

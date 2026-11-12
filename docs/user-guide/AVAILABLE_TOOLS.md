@@ -4,8 +4,8 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 290
-- Read-only tools: 65
+- Total tools: 291
+- Read-only tools: 66
 - High-level tools: 188
 - Debug tools: 32
 - Session tools: 2
@@ -37,6 +37,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Class](#read-only-class)
     - [GetClass](#getclass-read-only-class)
   - [Common](#read-only-common)
+    - [GetObjectDraft](#getobjectdraft-read-only-common)
     - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
@@ -478,6 +479,19 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="read-only-common"></a>
 ### Read-Only / Common
+
+<a id="getobjectdraft-read-only-common"></a>
+#### GetObjectDraft (Read-Only / Common)
+**Description:** [read-only] Reads the active, inactive and working versions of each part of the object named by object_type and object_name, together, and tells whether it holds an unactivated change and whose. Answers { object_type, object_name, has_draft, parts }: per part (main, the source or metadata; for CLASS and BEHAVIOR_IMPLEMENTATION the includes implementations, definitions, testclasses, macros in place of the main source) draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's
+
+**Source:** `src/handlers/common/readonly/handleGetObjectDraft.ts`
+
+**Parameters:**
+- `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
+
+---
 
 <a id="getobjectversiondiff-read-only-common"></a>
 #### GetObjectVersionDiff (Read-Only / Common)
@@ -4666,4 +4680,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-10*
+*Last updated: 2026-11-12*

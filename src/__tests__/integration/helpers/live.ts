@@ -61,6 +61,7 @@ import { servedTools as plainEntries } from '../../helpers/batchHarness';
 import {
   inProcessServer,
   type PinServer,
+  type ServerRestriction,
   type ServerSource,
 } from '../../helpers/pinServer';
 import { repositoryRoot } from '../../helpers/repoRoot';
@@ -187,6 +188,11 @@ function current(): LiveRunner {
     throw new Error('no live runner: call liveCall inside a liveSuite');
   }
   return runner;
+}
+
+/** The running suite's own connection: the configured user's, for what no tool does. */
+export function liveConnection(): IAbapConnection {
+  return current().connection();
 }
 
 /** The tools the server dispatches, not their entry: every set tool outside the plain groups. */
@@ -466,6 +472,54 @@ export function liveDescribe(
       useCurrentTest(undefined);
     });
     describe('cases', body);
+  });
+}
+
+/**
+ * A suite's cases run on a server started with `restriction` (plan Task 14
+ * Step 1b): every call, a read-back and a cleanup included, goes through an
+ * in-process server carrying the denied actions and the access-check
+ * strategy, on the suite's own connection and as its user. In hard mode too:
+ * a launched binary takes no restriction from a test. Installed in the
+ * describe's `before` over the suite's runner, and the suite's runner
+ * restored and the server closed in its `after`; one server per describe.
+ */
+export function withRestriction(
+  title: string,
+  restriction: ServerRestriction | (() => Promise<ServerRestriction>),
+  body: () => void,
+): void {
+  describe(title, () => {
+    let outer: LiveRunner | undefined;
+    before(async () => {
+      const base = current();
+      outer = base;
+      // A restriction that needs the system (a package's super package) is
+      // read here, on the suite's own runner.
+      const stated =
+        typeof restriction === 'function' ? await restriction() : restriction;
+      const server = await inProcessServer(
+        base.system,
+        { injected: base.connection() },
+        undefined,
+        stated,
+      );
+      useLiveRunner({
+        system: base.system,
+        user: base.user,
+        connection: () => base.connection(),
+        call: async (tool, args) => liveAnswerOf(await server.call(tool, args)),
+        close: () => server.close(),
+      });
+    });
+    after(async () => {
+      const restricted = runner;
+      if (outer !== undefined) useLiveRunner(outer);
+      if (restricted !== undefined && restricted !== outer) {
+        await restricted.close();
+      }
+    });
+    body();
   });
 }
 

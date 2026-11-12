@@ -81,7 +81,7 @@ export function listedTool(
       listed: true,
       description: definition.description,
       inputSchema: definition.inputSchema,
-      search: searchMeta(definition.name),
+      search: searchMeta(definition.name, definition.members),
     };
   }
   const variant = variantOfEnvironment(environment);

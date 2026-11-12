@@ -11,6 +11,10 @@ import {
   handleGetClass,
 } from '../../../handlers/class/high/handleGetClass';
 import {
+  TOOL_DEFINITION as GetObjectDraft_Tool,
+  handleGetObjectDraft,
+} from '../../../handlers/common/readonly/handleGetObjectDraft';
+import {
   TOOL_DEFINITION as GetObjectVersionDiff_Tool,
   handleGetObjectVersionDiff,
 } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
@@ -216,6 +220,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       defineTool(ReadTransportActionLog_Tool, handleReadTransportActionLog),
       defineTool(GetStructuresList_Tool, handleGetStructuresList),
       defineTool(GetObjectVersions_Tool, handleGetObjectVersions),
+      defineTool(GetObjectDraft_Tool, handleGetObjectDraft),
       defineTool(GetObjectVersionSource_Tool, handleGetObjectVersionSource),
       defineTool(GetObjectVersionDiff_Tool, handleGetObjectVersionDiff),
       defineTool(

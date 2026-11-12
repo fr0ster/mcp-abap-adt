@@ -21,7 +21,11 @@ import type {
   AuthProviderErrorKind,
   IAuthProviderError,
 } from '@mcp-abap-adt/interfaces-auth';
-import { INSTANCE_CLOSED_WORDS, serverRefusalOf } from './serverRefusal';
+import {
+  type AccessRefusalCode,
+  INSTANCE_CLOSED_WORDS,
+  serverRefusalOf,
+} from './serverRefusal';
 
 export { INSTANCE_CLOSED_WORDS };
 
@@ -56,7 +60,8 @@ export type FailureCode =
   | 'batch_unsplit'
   | 'long_session_unavailable'
   | 'connection_provider_failed'
-  | 'no_connection';
+  | 'no_connection'
+  | AccessRefusalCode;
 
 /**
  * A failure as it was read: the fields of the failure answer, and the chain's

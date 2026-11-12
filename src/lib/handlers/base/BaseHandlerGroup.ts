@@ -1,6 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type * as z from 'zod';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import type { IAccessChecks } from '../../access/accessChecks.js';
+import {
+  accessCallOf,
+  type CheckedArguments,
+  checkedArgumentsOf,
+} from '../../access/checkedArguments.js';
+import { refusalOf } from '../../access/listedAccessChecks.js';
+import { lazyPackageReader } from '../../access/packageReader.js';
 import { ServerRefusal } from '../../auth/serverRefusal.js';
 import {
   BACKGROUND_INVALID_WORDS,
@@ -35,6 +43,15 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
   constructor(context: HandlerContext) {
     this.context = context;
   }
+  /**
+   * The context this group runs its calls in by default: a group that
+   * stands for this one (the deny list's `NarrowedHandlerGroup`) is built
+   * on it, so it states what this one states.
+   */
+  groupContext(): HandlerContext {
+    return this.context;
+  }
+
   /**
    * Gets the name of the handler group
    */
@@ -104,6 +121,9 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       this.statedSystemType(),
     );
     if (!listed.listed) return;
+    // What the access checks read of this tool's calls, computed once here;
+    // nothing when the group's context carries no strategy.
+    const access = this.context.accessChecks;
     this.registerToolOnServer(
       server,
       entry.toolDefinition.name,
@@ -112,6 +132,12 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       entry.call,
       listed.search,
       callContext,
+      access === undefined
+        ? undefined
+        : {
+            checks: access.checks,
+            checked: checkedArgumentsOf(entry.toolDefinition, access.readOnly),
+          },
     );
   }
 
@@ -130,6 +156,10 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     call: HandlerEntry['call'],
     search: { _meta?: Record<string, unknown> } = {},
     callContext: CallContext = () => Promise.resolve(this.context),
+    access?: {
+      readonly checks: IAccessChecks;
+      readonly checked: CheckedArguments | undefined;
+    },
   ): void {
     server.registerTool(
       toolName,
@@ -163,10 +193,35 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // A listed long tool is listed here without `background` (a group
           // registered on its own keeps no background runs): its read
           // answers in the call.
+          // The call's context, asked for once: by the access checks'
+          // package reader when it reads first, else here.
+          let asked: Promise<HandlerContext> | undefined;
+          const contextOnce = () => {
+            asked ??= callContext();
+            return asked;
+          };
+          // The access checks (spec §3.2), before the call's context: a
+          // refused call asks for none, and nothing is sent.
+          const accessCall =
+            access?.checked === undefined
+              ? undefined
+              : accessCallOf(toolName, access.checked, args);
+          if (access !== undefined && accessCall !== undefined) {
+            const verdict = await access.checks.check(
+              accessCall,
+              lazyPackageReader(
+                async () => (await contextOnce()).connection,
+                this.context.logger,
+                new AbortController().signal,
+                async (read) => inStatedScope(await contextOnce(), args, read),
+              ),
+            );
+            if (!verdict.allowed) return return_error(refusalOf(verdict));
+          }
           // The call's context, asked for now: the group's own, or one made
           // for this call (its provider's connection). Its rejection is
           // this call's answer (the catch below); the handler does not run.
-          const context = await callContext();
+          const context = await contextOnce();
           // The kind the context states on its connection (none stated,
           // none: SAP_SYSTEM_TYPE is not read), the call-transport scope,
           // and the connection's parameters when the context carries a

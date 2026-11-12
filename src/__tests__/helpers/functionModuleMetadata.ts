@@ -7,7 +7,7 @@
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { okResponse, reading } from './fakeClient';
-import type { PinnedRequest } from './pinCases';
+import type { PinnedRequest } from './pinnedRequest';
 
 /**
  * The metadata document of `module` in `group`, in the corpus shape

@@ -103,6 +103,38 @@ const noBrowser = (): IAuthorizationStrategy<string> => ({
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
+/** What a destination states: its kind and connection type, read before any launch. */
+interface StatedDestination {
+  stated: Record<string, string>;
+  kind: NonNullable<ReturnType<typeof statedSystemKind>>;
+  connectionType: 'http' | 'rfc';
+}
+
+/**
+ * The destination of `envPath` as the server reads it (`--env-path`). Its
+ * refusals are this test's own fixed words, naming the variable to state,
+ * so they are reported as they are (no value of the .env is in them).
+ */
+function statedDestination(envPath: string): StatedDestination {
+  const stated = dotenv.parse(readFileSync(envPath, 'utf8'));
+  const kind = statedSystemKind(
+    statedArg('system-type') ?? stated.SAP_SYSTEM_TYPE,
+  );
+  const connectionType =
+    statedArg('connection-type') ?? stated.SAP_CONNECTION_TYPE;
+  if (kind === undefined) {
+    throw new Error(
+      'the destination states no system kind (--system-type in MCP_LIVE_ARGS, or SAP_SYSTEM_TYPE)',
+    );
+  }
+  if (connectionType !== 'http' && connectionType !== 'rfc') {
+    throw new Error(
+      'the destination states no connection type (--connection-type in MCP_LIVE_ARGS, or SAP_CONNECTION_TYPE)',
+    );
+  }
+  return { stated, kind, connectionType };
+}
+
 /**
  * The parent's own logon with the destination of `envPath`, as the server
  * reads it (`--env-path`), on a guarded connection logged off again: a
@@ -110,26 +142,12 @@ const silent = { info() {}, debug() {}, warn() {}, error() {} };
  */
 function envFileLogOn(
   envPath: string,
+  destination: StatedDestination,
   expectedRealm: string,
   realmCheckUrl: string,
 ): () => Promise<void> {
   return async () => {
-    const stated = dotenv.parse(readFileSync(envPath, 'utf8'));
-    const kind = statedSystemKind(
-      statedArg('system-type') ?? stated.SAP_SYSTEM_TYPE,
-    );
-    const connectionType =
-      statedArg('connection-type') ?? stated.SAP_CONNECTION_TYPE;
-    if (kind === undefined) {
-      throw new Error(
-        'the destination states no system kind (--system-type in MCP_LIVE_ARGS, or SAP_SYSTEM_TYPE)',
-      );
-    }
-    if (connectionType !== 'http' && connectionType !== 'rfc') {
-      throw new Error(
-        'the destination states no connection type (--connection-type in MCP_LIVE_ARGS, or SAP_CONNECTION_TYPE)',
-      );
-    }
+    const { stated, kind, connectionType } = destination;
     // The realm check before anything logs on: the .env's SAP_URL over
     // HTTP, the destination's MCP_LIVE_REALM_CHECK_URLS entry over RFC.
     const url = realmCheckUrlOf(
@@ -235,6 +253,7 @@ if (ENV_PATHS.length === 0) {
         // Guarded: the parent logs on with the same destination first, and
         // every answer is read for a credential refusal; no SDK client, no
         // timer — Jest's test timeout is the only deadline.
+        const destination = statedDestination(envPath);
         const server = await step('initialize', () =>
           launchStdioScript({
             argv: [bin, `--env-path=${envPath}`, ...EXTRA_ARGS],
@@ -242,6 +261,7 @@ if (ENV_PATHS.length === 0) {
             cwd: workdir,
             logOn: envFileLogOn(
               envPath,
+              destination,
               EXPECTED_REALMS[index] ?? '',
               REALM_CHECK_URLS[index] ?? '',
             ),

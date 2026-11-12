@@ -72,7 +72,7 @@ export function refuseOtherKind(
  */
 export function debuggerFor(
   context: HandlerContext,
-  args: { state_handle?: string },
+  args: { state_handle?: string | undefined },
   kind: DebugKind,
   opens: boolean,
 ): DebuggerInstance {
@@ -96,8 +96,8 @@ export function debuggerFor(
 
 /** The identity a call states. */
 export function identityOf(args: {
-  request_user?: string;
-  debugging_mode?: 'user' | 'terminal';
+  request_user?: string | undefined;
+  debugging_mode?: 'user' | 'terminal' | undefined;
 }): OnceIdentity {
   if (args.request_user !== undefined && !args.request_user.trim())
     throw new Error('request_user is empty');
@@ -142,7 +142,7 @@ export function needed<T>(value: T | undefined, what: string): T {
  */
 export function onceAnswer<T>(
   context: HandlerContext,
-  args: { state_handle?: string },
+  args: { state_handle?: string | undefined },
   kind: DebugKind,
   opens: boolean,
   work: (d: DebuggerInstance) => Promise<DebugView<T>>,
@@ -176,7 +176,7 @@ export function refuseOperation(
  */
 export function endAnswer(
   context: HandlerContext,
-  args: { state_handle?: string },
+  args: { state_handle?: string | undefined },
 ): Promise<McpResult> {
   return debugAnswer(
     args,

@@ -20,7 +20,7 @@ export function requireDebugger(
 ): DebuggerInstance;
 export function requireDebugger(
   context: HandlerContext,
-  args: { state_handle?: string },
+  args: { state_handle?: string | undefined },
   mode: { create: 'abap' | 'amdp' } | 'use',
 ): DebuggerInstance {
   if (!context.state || !context.debugger) {

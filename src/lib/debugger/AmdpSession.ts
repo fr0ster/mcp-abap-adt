@@ -168,9 +168,9 @@ const wireOf = (a: IAdtResponse<unknown>): Wire => {
 export class AmdpSession<O = unknown> {
   private readonly serial = new Serial();
   private origin?: O;
-  private open?: Open;
-  private closing?: Open; // retired, its cleanup not finished
-  private debuggeeId?: string;
+  private open?: Open | undefined;
+  private closing?: Open | undefined; // retired, its cleanup not finished
+  private debuggeeId?: string | undefined;
   private breaks = 0; // counts ON_BREAK, to tell a break that came during a step
   private ends = 0;
   /** The session's end began (`endWaits`): no stop waits for a debuggee any more. */
@@ -179,13 +179,15 @@ export class AmdpSession<O = unknown> {
   private readonly syncs = new Map<string, AmdpEvent>(); // SYNC_BREAKPOINTS by request id, apart from the queue
   private readonly abandoned = new Set<string>(); // syncs no call waits for any more
   private notices: AmdpState[] = [];
-  private failure?: string;
+  private failure?: string | undefined;
   /** The failed event read behind `failure`: the method's error, and what was not undone. */
-  private failedRead?: {
-    error?: IAdtError;
-    thrown?: DebugFailure;
-    failures: DebugFailure[];
-  };
+  private failedRead?:
+    | {
+        error?: IAdtError;
+        thrown?: DebugFailure;
+        failures: DebugFailure[];
+      }
+    | undefined;
   private cleanupFailures: DebugFailure[] = [];
   /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
   private readonly runs = new Set<{ connection?: IAbapConnection }>();
@@ -888,7 +890,7 @@ export class AmdpSession<O = unknown> {
    * waits for its confirmation event. The two connections are opened by
    * `startOnce` (an open sends nothing) and closed by the cleanup.
    */
-  private once?: OnceAmdp;
+  private once?: OnceAmdp | undefined;
   /** Connections of an earlier one-request session: the cleanup closes them. */
   private readonly retiredOnce = new Set<IAbapConnection>();
 

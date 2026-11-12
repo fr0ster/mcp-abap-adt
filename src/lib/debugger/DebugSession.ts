@@ -166,7 +166,7 @@ export type DebugState =
   | {
       state: 'ended';
       reason: EndReason;
-      run?: RunOutcome;
+      run?: RunOutcome | undefined;
       message?: string;
       /** A refused attach: the method's error as it is, with its step. */
       failure?: DebugFailure;
@@ -298,7 +298,7 @@ interface Listener {
   connection: IAbapConnection;
   debugger: Debugger;
   /** The last poll, until its answer was handled: a stop waits for it and handles a catch in it. */
-  open?: Promise<IAdtResponse<string>>;
+  open?: Promise<IAdtResponse<string>> | undefined;
 }
 interface Stop {
   connection: IAbapConnection;
@@ -520,7 +520,7 @@ export class DebugSession<O = unknown> {
   protected readonly serial = new Serial();
   protected origin?: O;
   protected mode: IDebuggerListenerConflict = 'refuse';
-  protected control?: Listener;
+  protected control?: Listener | undefined;
   protected readonly armed = new Map<string, BreakpointReading>();
   /** The breakpoint definitions as the callers gave them, deduplicated and tagged: what every change sends again. */
   protected requested: RequestedBreakpoint[] = [];
@@ -528,15 +528,15 @@ export class DebugSession<O = unknown> {
   protected readonly pairedWith = new Map<string, string>();
   /** The last tag handed out. Never reset — not by a stop, not by a new start — so a tag is never reused. */
   private tags = 0;
-  protected listener?: Listener;
-  protected current?: Stop;
-  private failureWords?: string;
+  protected listener?: Listener | undefined;
+  protected current?: Stop | undefined;
+  private failureWords?: string | undefined;
   /**
    * The failed listen behind `failure`, carrying the method's error. Set
    * right after `failure`, whose every write drops it: it is never one
    * recorded for an earlier failure.
    */
-  private failedListen?: DebugListenerError;
+  private failedListen?: DebugListenerError | undefined;
   /** The failure the next report throws. */
   protected get failure(): string | undefined {
     return this.failureWords;
@@ -551,13 +551,13 @@ export class DebugSession<O = unknown> {
   private readonly closedConnections = new WeakSet<object>();
   protected readonly breakpointConflict: BreakpointConflict;
   /** The identity of this debug session: fixed by a start, kept until a cleanup succeeded completely. */
-  protected fixed?: IDebuggerIdentity;
+  protected fixed?: IDebuggerIdentity | undefined;
   /** True once something that changes the system was sent: the cleanup owes a stopListener. */
   protected changed = false;
   /** The settings the caller set; applied after each attach. */
   protected preferences: DebugSettings = {};
   /** The last answer of setDebuggerSettings. */
-  protected effective?: SettingsReading;
+  protected effective?: SettingsReading | undefined;
 
   constructor(
     protected readonly ports: DebugSessionPorts<O>,
@@ -1709,12 +1709,16 @@ export class DebugSession<O = unknown> {
    * other call sends a logoff.
    */
   /** The listener connection of the one-request path, and its listen while one is open. */
-  private onceListener?: {
-    connection: IAbapConnection;
-    open?: Promise<IAdtResponse<string>>;
-  };
+  private onceListener?:
+    | {
+        connection: IAbapConnection;
+        open?: Promise<IAdtResponse<string>> | undefined;
+      }
+    | undefined;
   /** The attaching session of the one-request path, opened by its first attach: every attach goes on it. */
-  private onceAttaching?: { connection: IAbapConnection; debugger: Debugger };
+  private onceAttaching?:
+    | { connection: IAbapConnection; debugger: Debugger }
+    | undefined;
 
   /**
    * The identity in force, or one fixed now from the call's arguments. A call
@@ -2131,7 +2135,9 @@ export class DebugSession<O = unknown> {
   }
 
   // --- lifecycle -------------------------------------------------------------
-  private run?: { generation: number; connection?: IAbapConnection };
+  private run?:
+    | { generation: number; connection?: IAbapConnection }
+    | undefined;
   private reconciled = false;
   private cleanupFailures: DebugFailure[] = [];
   /** What the current cleanup has to tell that is no debt: SAP's final refusal of the stopListener. */

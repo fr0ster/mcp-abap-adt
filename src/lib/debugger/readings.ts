@@ -444,7 +444,7 @@ const exceptionParser = new XMLParser({
  */
 export function failureText(error: {
   message: string;
-  response?: { data?: unknown };
+  response?: { data?: unknown } | undefined;
 }): string {
   const data = error.response?.data;
   if (typeof data !== 'string') return error.message;

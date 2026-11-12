@@ -41,13 +41,18 @@ export const TOOL_DEFINITION = {
 } as const;
 
 /** The key the children and references views need; the schema cannot tie it to the view. */
-export function requireKey(args: { key?: string; view?: string }): string {
+export function requireKey(args: {
+  key?: string | undefined;
+  view?: string | undefined;
+}): string {
   if (!args.key) throw new Error(`view ${args.view}: give key`);
   return args.key;
 }
 
 /** The limit of a view, or the default the schema states; its minimum is the schema's. */
-export function maxObjectsOf(args: { max_objects?: number }): number {
+export function maxObjectsOf(args: {
+  max_objects?: number | undefined;
+}): number {
   return args.max_objects ?? 50;
 }
 

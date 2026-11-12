@@ -486,8 +486,9 @@ draft, and no other tool reads it.
   other than with `404`; or no part of the object answers (every read `404`: the object does
   not exist). Otherwise a version is missing, not failed: an include whose three reads all
   answer `404` has no entry, and a version that answers `404` while another version of the
-  same include answers — like an answer that carries no ETag, or one not led by 14 digits —
-  gives that version's ETag `null` and the part `draft: 'undetermined'`.
+  same include answers gives that version's ETag `null` and the part `draft:
+  'undetermined'`, as an answer that carries no ETag does. An ETag not led by 14 digits is
+  kept as read and makes the part `undetermined`.
 - **The clock.** The age uses the server's clock against SAP's ETag time. Both systems measured
   an offset of 0 s; the description and the docs say a skewed server clock skews the age.
   Nothing is kept between calls.

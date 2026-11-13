@@ -38,7 +38,7 @@ export class SystemContextMissingError extends Error {
 }
 
 /** Whether a failure's words are this refusal's (adt-clients keeps only the message). */
-export function isSystemContextRefusal(message: unknown): boolean {
+export function isSystemContextRefusal(message: string): boolean {
   return message === MISSING_RESPONSIBLE;
 }
 

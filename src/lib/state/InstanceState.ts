@@ -189,9 +189,9 @@ export class InstanceState {
   }
 
   /** For a call on existing state: the handle must be this one and something must be held. */
-  check(handle: unknown): void {
+  check(handle: string | undefined): void {
     if (
-      typeof handle !== 'string' ||
+      handle === undefined ||
       handle !== this.current ||
       !this.holdsState() ||
       // A complete stop is disposing: no call runs on a session being stopped.

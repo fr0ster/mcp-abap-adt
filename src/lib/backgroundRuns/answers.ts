@@ -52,7 +52,7 @@ export function answerBackgroundStarted(
  */
 export async function answerBackgroundGet(
   context: HandlerContext,
-  handle: unknown,
+  handle: string,
 ): Promise<BackgroundAnswer> {
   const record = await portOf(context).get(handle);
   if (record.state === 'running') {
@@ -86,7 +86,7 @@ export async function answerBackgroundList(
 
 export async function answerBackgroundDiscard(
   context: HandlerContext,
-  handle: unknown,
+  handle: string,
 ): Promise<BackgroundAnswer> {
   return json(await portOf(context).discard(handle));
 }

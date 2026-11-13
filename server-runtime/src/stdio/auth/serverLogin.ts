@@ -113,9 +113,8 @@ export const WRITE_FAILED_WORDS = [
   '[refreshStatePersistence] Writing the tokens failed',
 ] as const;
 
-function isWriteFailed(message: unknown): boolean {
+function isWriteFailed(message: string): boolean {
   return (
-    typeof message === 'string' &&
     WRITE_FAILED_WORDS.some((words) => message.startsWith(words)) &&
     message.includes('fail')
   );

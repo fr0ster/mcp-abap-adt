@@ -183,8 +183,8 @@ export const RUNTIME_FILE_FAILED_WORDS =
 const HEX = '0123456789abcdef';
 
 /** A handle: 32 lower-case hex digits (128 bits). Plain code. */
-export function isHandle(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length !== 32) return false;
+export function isHandle(value: string): boolean {
+  if (value.length !== 32) return false;
   for (const c of value) if (!HEX.includes(c)) return false;
   return true;
 }
@@ -482,10 +482,7 @@ export class LeftoverSessions {
    * any dead process's file. Ends with `release` (the session stays a
    * leftover), `forget` (logged off) or `adopt` (resumed here).
    */
-  claim(
-    handle: unknown,
-    identity: SessionIdentity,
-  ): ClaimedSession | undefined {
+  claim(handle: string, identity: SessionIdentity): ClaimedSession | undefined {
     if (!isHandle(handle)) return undefined;
     const entry = this.available().find((e) => e.handle === handle);
     if (entry === undefined) return undefined;

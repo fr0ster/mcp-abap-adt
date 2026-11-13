@@ -68,6 +68,12 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(value.refused, false);
   });
 
+  it('a boundary value written by shorthand stays a boundary', () => {
+    const id = site('shorthand', 'id');
+    assert.equal(id.cls, 'boundary');
+    assert.equal(id.refused, false);
+  });
+
   it('a named sink passes', () => {
     const meta = sitesOf('namedSink').filter((entry) => entry.name === 'meta');
     assert.equal(meta.length, 1);

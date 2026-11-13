@@ -268,6 +268,17 @@ export class ProvenanceScan {
     else map.set(key, [value]);
   }
 
+  /**
+   * The symbol an expression reads: for the name of a shorthand property
+   * (`{ id }`), the value it writes, not the property.
+   */
+  private symbolOf(expression: ts.Node): ts.Symbol | undefined {
+    if (ts.isShorthandPropertyAssignment(expression.parent)) {
+      return this.checker.getShorthandAssignmentValueSymbol(expression.parent);
+    }
+    return this.checker.getSymbolAtLocation(expression);
+  }
+
   private declarationsOf(symbol: ts.Symbol | undefined): readonly ts.Node[] {
     if (!symbol) return [];
     const target =
@@ -629,7 +640,7 @@ export class ProvenanceScan {
     ) {
       return false;
     }
-    const symbol = this.checker.getSymbolAtLocation(expression);
+    const symbol = this.symbolOf(expression);
     if (!symbol?.valueDeclaration) return false;
     return this.contractless(this.checker.getTypeOfSymbol(symbol));
   }
@@ -716,7 +727,7 @@ export class ProvenanceScan {
     const target = ts.isCallExpression(expression)
       ? this.checker.getResolvedSignature(expression)?.declaration
       : this.declarationsOf(
-          this.checker.getSymbolAtLocation(
+          this.symbolOf(
             ts.isPropertyAccessExpression(expression)
               ? expression.name
               : expression,

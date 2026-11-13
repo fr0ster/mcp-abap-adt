@@ -22,7 +22,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
 import { REPO, rel } from './helpers/failureScan';
-import { productionSources } from './helpers/regexScan';
+import {
+  productionSources,
+  testInfrastructureSources,
+} from './helpers/regexScan';
 import {
   type EscapeRule,
   productionDirectories,
@@ -73,6 +76,77 @@ function biomeCheckPaths(script: string): string[] {
   if (words[0] !== 'biome' || words[1] !== 'check') return [];
   return words.slice(2).filter((word) => !word.startsWith('--'));
 }
+
+/** The `noExplicitAny` / `noImplicitAnyLet` levels the last override naming `glob` sets. */
+function biomeAnyRulesFor(glob: string): unknown[] {
+  const overrides = member(readJson('biome.json'), ['overrides']);
+  let levels: unknown[] = [];
+  for (const override of Array.isArray(overrides) ? overrides : []) {
+    const includes = member(override, ['includes']);
+    if (!Array.isArray(includes) || !includes.includes(glob)) continue;
+    levels = ['noExplicitAny', 'noImplicitAnyLet'].map((rule) =>
+      member(override, ['linter', 'rules', 'suspicious', rule]),
+    );
+  }
+  return levels;
+}
+
+/**
+ * The test infrastructure still holding `any`, by path prefix, while S4 of
+ * the no-assertions plan takes it out batch by batch.
+ */
+const PENDING = ['src/__tests__/integration/helpers/'];
+
+describe('test infrastructure', () => {
+  const files = testInfrastructureSources();
+  const gated = files.filter(
+    (file) => !PENDING.some((prefix) => file.startsWith(prefix)),
+  );
+  const anys = gated
+    .flatMap((file) => scanFile(path.join(REPO, file)))
+    .filter((one) => one.rule === 'any');
+
+  it('reads every helpers and testers directory of the __tests__ trees', () => {
+    assert.deepEqual(
+      [
+        'src/__tests__/helpers/fakeClient.ts',
+        'src/__tests__/helpers/recordingConnection.ts',
+        'src/__tests__/unit/sources/helpers/typeEscapeScan.ts',
+        'src/__tests__/unit/httpTransport/helpers/selfSignedCert.ts',
+        'src/__tests__/integration/helpers/configHelpers.ts',
+        'src/__tests__/integration/helpers/testers/LambdaTester.ts',
+        'server-runtime/src/stdio/__tests__/helpers/loginStand.ts',
+        'responsible-rules/src/__tests__/helpers/withRules.ts',
+      ].filter((file) => !files.includes(file)),
+      [],
+    );
+    assert.equal(
+      files.some((file) => file.endsWith('.test.ts')),
+      false,
+    );
+    assert.equal(
+      files.some((file) => file.includes('__fixtures__')),
+      false,
+    );
+  });
+
+  it('holds no any', () => {
+    assert.deepEqual(anys, []);
+  });
+
+  it("turns Biome's any rules on for it, as errors", () => {
+    for (const glob of INFRASTRUCTURE_GLOBS) {
+      assert.deepEqual(biomeAnyRulesFor(glob), ['error', 'error'], glob);
+    }
+  });
+});
+
+/** The globs `biome.json` names for the test infrastructure. */
+const INFRASTRUCTURE_GLOBS = [
+  '**/__tests__/helpers/**',
+  '**/__tests__/**/helpers/**',
+  '**/__tests__/**/testers/**',
+];
 
 describe('production sources', () => {
   const directories = productionDirectories();
@@ -199,6 +273,40 @@ describe('discovery reads every production source of a repository, tools and bin
     assert.deepEqual(rulesOf('pkg/bin/escape.mjs'), new Set(['biome-ignore']));
     assert.deepEqual(rulesOf('pkg/scripts/escape.ts'), new Set(['assertion']));
     assert.deepEqual(rulesOf('pkg/src/clean.ts'), new Set());
+  });
+});
+
+describe('discovery reads every helpers and testers source of a __tests__ tree', () => {
+  const tree = path.join(
+    REPO,
+    'src',
+    '__tests__',
+    'unit',
+    'sources',
+    '__fixtures__',
+    'typeEscapes',
+    'tree',
+  );
+  const found = testInfrastructureSources(tree);
+  const rulesOf = (file: string) =>
+    new Set(scanFile(path.join(tree, file)).map((one) => one.rule));
+
+  it('finds the helper and the tester, not the test file', () => {
+    assert.deepEqual(found, [
+      'pkg/src/__tests__/helpers/anyHelper.ts',
+      'pkg/src/__tests__/integration/testers/typedTester.ts',
+    ]);
+  });
+
+  it("refuses the helper's any, and nothing in the typed tester", () => {
+    assert.deepEqual(
+      rulesOf('pkg/src/__tests__/helpers/anyHelper.ts'),
+      new Set(['any']),
+    );
+    assert.deepEqual(
+      rulesOf('pkg/src/__tests__/integration/testers/typedTester.ts'),
+      new Set(),
+    );
   });
 });
 

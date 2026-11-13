@@ -69,6 +69,22 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": [
+				"**/__tests__/helpers/**",
+				"**/__tests__/**/helpers/**",
+				"**/__tests__/**/testers/**",
+				"!src/__tests__/integration/helpers/**"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "error",
+						"noImplicitAnyLet": "error"
+					}
+				}
+			}
 		}
 	]
 }

@@ -210,14 +210,17 @@ export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
           (_t, member: string) =>
           async (...args: unknown[]) => {
             const lastArg = args.at(-1);
-            const carriedAnalyse =
+            const carried =
               typeof lastArg === 'object' &&
               lastArg !== null &&
-              'analyse' in lastArg;
+              'analyse' in lastArg
+                ? { analyse: lastArg.analyse }
+                : undefined;
+            const carriedAnalyse = carried !== undefined;
             calls.push({
               member,
               factory,
-              analyse: carriedAnalyse ? (lastArg as any).analyse : undefined,
+              analyse: carried?.analyse,
               carriedAnalyse,
               args: ownArguments(args, carriedAnalyse),
             });

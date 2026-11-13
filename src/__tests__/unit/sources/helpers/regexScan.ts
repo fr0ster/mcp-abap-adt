@@ -73,6 +73,44 @@ export function productionSources(root: string = REPO): string[] {
     .sort();
 }
 
+const INFRASTRUCTURE_DIRECTORIES = new Set(['helpers', 'testers']);
+const NEVER_SCANNED = new Set(['__fixtures__', 'node_modules', 'dist']);
+
+/**
+ * Every source of the test infrastructure on disk under `root` (the
+ * repository by default), git-tracked or new, relative to `root`: a file in
+ * a `helpers` or `testers` directory inside a `__tests__` tree, outside
+ * fixtures; a test file there is a test, not infrastructure. A fixture tree
+ * laid out as a repository is discovered the same way.
+ */
+export function testInfrastructureSources(root: string = REPO): string[] {
+  const listed = execFileSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  );
+  return listed
+    .split('\0')
+    .filter((file) => {
+      const directories = file.split('/').slice(0, -1);
+      const tests = directories.indexOf('__tests__');
+      return (
+        tests >= 0 &&
+        directories
+          .slice(tests + 1)
+          .some((segment) => INFRASTRUCTURE_DIRECTORIES.has(segment)) &&
+        !directories.some((segment) => NEVER_SCANNED.has(segment)) &&
+        SOURCE_EXTENSIONS.some((extension) => file.endsWith(extension)) &&
+        !TEST_SUFFIXES.some((suffix) => file.endsWith(suffix)) &&
+        fs.existsSync(path.join(root, file))
+      );
+    })
+    .sort();
+}
+
 /** One program over `files`, JavaScript included, for the checker's types. */
 function programOver(files: readonly string[]): ts.Program {
   return ts.createProgram({

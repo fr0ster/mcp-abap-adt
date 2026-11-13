@@ -256,7 +256,17 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   | mixed | both | split: a reader for the boundary and a typed function for the rest, or a union of the contract types it really receives |
   | sink | a value of any type, by the contract that names it (the `ILogger` methods, a serializer of an arbitrary value) | stays `unknown`, named in the gate's fixture of sinks by its contract |
   | callback | called only by a contract outside the repository (a library hook, `catch`) | that contract's parameter type |
+  | reader | a caught value (a `catch` binding, or a value carrying one), with typed values too | stays `unknown`; a boundary site, named in the scan's list of readers |
 
+- **Readers of thrown values are boundary sites (the owner's decision).** A function that reads
+  a caught value takes `unknown` and narrows it in plain code. Whatever is thrown — by SAP's
+  answer, a library or our own code — reaches it through `catch` untyped, so a caller that
+  hands it one of our own errors directly takes the same path. Such a site is not split.
+  - A reader is a site one of whose sources, followed through `unknown` sites, is a `catch`
+    binding. With a typed source beside it, it would otherwise be `mixed`.
+  - The scan names every reader in an explicit list (`THROWN_READERS`, by file, function and
+    parameter, never by line). A reader not in the list is refused, and so is an entry of the
+    list that is no longer a reader: the set is gated both ways.
 - **Inventory** (Measured; the full lists are in the appendix).
   - Parameters, root project 342: 169 boundary by their immediate sources, 68 with no
     in-repository call (callbacks and entries), 32 typed, 73 mixed.
@@ -278,7 +288,7 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   - It refuses a site of the typed class, and a mixed site not yet split.
   - It refuses a sink not named in the fixture of sinks. Sinks are named by their contract
     (`ILogger`), not by site.
-  - Boundaries and callbacks pass.
+  - Boundaries, callbacks and the listed readers pass.
 
 ## 5. The test infrastructure
 

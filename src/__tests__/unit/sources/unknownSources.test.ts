@@ -16,6 +16,7 @@ import { REPO } from './helpers/failureScan';
 import {
   fixtureProgram,
   scanFiles,
+  staleReaders,
   type UnknownSite,
 } from './helpers/unknownProvenanceScan';
 
@@ -24,10 +25,16 @@ const FIXTURES = path.join(
   'src/__tests__/unit/sources/__fixtures__/unknownProvenance',
 );
 
-function sitesOf(fixture: string): UnknownSite[] {
+function sitesOf(
+  fixture: string,
+  readers: ReadonlySet<string> = new Set(),
+): UnknownSite[] {
   const file = path.join(FIXTURES, `${fixture}.ts`);
-  return scanFiles(fixtureProgram([file]), new Set([file]));
+  return scanFiles(fixtureProgram([file]), new Set([file]), readers);
 }
+
+const READER =
+  'src/__tests__/unit/sources/__fixtures__/unknownProvenance/thrownReader.ts#describeFailure(thrown)';
 
 function site(fixture: string, name: string): UnknownSite {
   const found = sitesOf(fixture).filter((entry) => entry.name === name);
@@ -95,6 +102,42 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     const sites = scanFiles(fixtureProgram([spelled]), new Set([spelled]));
     assert.deepEqual(
       sites.filter((entry) => entry.name === 'order').map((entry) => entry.cls),
+      ['typed'],
+    );
+  });
+
+  it('a listed reader of thrown values passes, though a typed value reaches it too', () => {
+    const sites = sitesOf('thrownReader', new Set([READER])).filter(
+      (entry) => entry.name === 'thrown',
+    );
+    assert.deepEqual(
+      sites.map((entry) => [entry.key, entry.cls, entry.refused]),
+      [[READER, 'reader', false]],
+    );
+  });
+
+  it('an unlisted reader of thrown values is refused', () => {
+    const sites = sitesOf('thrownReader').filter(
+      (entry) => entry.name === 'thrown',
+    );
+    assert.deepEqual(
+      sites.map((entry) => [entry.cls, entry.refused]),
+      [['reader', true]],
+    );
+    assert.deepEqual(sites[0]?.types, ['Error']);
+  });
+
+  it('a listed name no reader has is stale', () => {
+    const listed = new Set([READER, `${READER}x`]);
+    assert.deepEqual(staleReaders(sitesOf('thrownReader', listed), listed), [
+      `${READER}x`,
+    ]);
+    // A typed site is no reader, listed or not.
+    const typed = sitesOf('typed', listed).filter(
+      (entry) => entry.name === 'order',
+    );
+    assert.deepEqual(
+      typed.map((entry) => entry.cls),
       ['typed'],
     );
   });

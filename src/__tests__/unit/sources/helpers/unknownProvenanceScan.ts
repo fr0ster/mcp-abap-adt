@@ -18,10 +18,12 @@
  *
  * Classes: `boundary` (every source a boundary), `typed` (every source a
  * contract-typed value of the repository), `mixed` (both), `sink` (a member of
- * a contract named in `SINK_CONTRACTS`), `callback` (a function no code of the
- * repository calls, whose contract types the parameter `unknown`), `entry`
- * (a function nothing in the program calls or hands on). `typed` and `mixed`
- * are refused, and so is a callback whose contract types the parameter.
+ * a contract named in `SINK_CONTRACTS`), `reader` (a reader of thrown values:
+ * a `catch` binding among its sources, typed values beside it), `callback` (a
+ * function no code of the repository calls, whose contract types the
+ * parameter `unknown`), `entry` (a function nothing in the program calls or
+ * hands on). `typed` and `mixed` are refused, and so is a callback whose
+ * contract types the parameter, and a reader not named in `THROWN_READERS`.
  *
  * Report mode (`npm run measure:unknown`) runs this file after the node:test
  * build and lists every refused site with the types that reach it.
@@ -39,12 +41,56 @@ import { REPO, rel } from './failureScan';
  */
 export const SINK_CONTRACTS: readonly string[] = ['ILogger'];
 
+/**
+ * The readers of thrown values (spec §4, the owner's decision): whatever is
+ * thrown reaches them through `catch` untyped, so they take `unknown` and
+ * narrow it in plain code, even where a caller hands one of our own errors
+ * to them directly. Named `file#function(parameter)`, never by line; a reader
+ * missing here is refused, and an entry no reader has is stale.
+ */
+export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
+  'src/embeddable/BaseMcpServer.ts#refusalAnswer(error)',
+  'src/handlers/structure/readonly/handleGetStructuresList.ts#findExtensions(lastErr)',
+  'src/handlers/structure/readonly/handleGetStructuresList.ts#messageOf(thrown)',
+  'src/handlers/structure/readonly/handleGetStructuresList.ts#outcomeOf(lastErr)',
+  'src/handlers/system/readonly/handleRuntimeListFeeds.ts#end(error)',
+  'src/lib/answer.ts#isCredentialFailure(thrown)',
+  'src/lib/answer.ts#messageOf(thrown)',
+  'src/lib/answer.ts#requestErrorOf(thrown)',
+  'src/lib/answer.ts#thrownEntry(thrown)',
+  'src/lib/auth/failures.ts#chainErrorOf(thrown)',
+  'src/lib/auth/failures.ts#failureOf(thrown)',
+  'src/lib/auth/failures.ts#isClosedInstanceRefusal(value)',
+  'src/lib/auth/failures.ts#readGuarded(thrown)',
+  'src/lib/auth/failures.ts#readOwn(value)',
+  'src/lib/auth/serverRefusal.ts#serverRefusalOf(value)',
+  'src/lib/debugger/AmdpSession.ts#withNotUndone(withNotUndone)',
+  'src/lib/debugger/failures.ts#thrownFailure(thrown)',
+  'src/lib/logger.ts#createLogFn(data)',
+  'src/lib/logger.ts#spreadable(data)',
+  'src/lib/search-source/readFailure.ts#decidedFailure(decidedFailure)',
+  'src/lib/search-source/readFailure.ts#decidedFailure(failure)',
+  'src/lib/search-source/readFailure.ts#DecidedPrimitive(value)',
+  'src/lib/search-source/readFailure.ts#isCredential(failure)',
+  'src/lib/search-source/readFailure.ts#isObject(value)',
+  'src/lib/search-source/readFailure.ts#undecided(undecided)',
+  'src/lib/strategies/packageWalk.ts#endsTheCall(thrown)',
+  'src/lib/strategies/step.ts#methodFailureOf(thrown)',
+  'src/lib/strategies/step.ts#payloadCarriedBy(thrown)',
+  'src/lib/strategies/step.ts#stepOf(value)',
+  'src/lib/utils.ts#return_error(error)',
+  'src/lib/xml/tree.ts#childAt(value)',
+  'src/lib/xml/tree.ts#child(value)',
+  'src/lib/xml/tree.ts#isElement(value)',
+]);
+
 export type SiteKind = 'parameter' | 'variable' | 'return' | 'property';
 export type SiteClass =
   | 'boundary'
   | 'typed'
   | 'mixed'
   | 'sink'
+  | 'reader'
   | 'callback'
   | 'entry';
 
@@ -53,13 +99,16 @@ export interface UnknownSite {
   /** `file:line`, the file relative to the repository. */
   readonly where: string;
   readonly name: string;
+  /** `file#owner(name)`: the site by name, as `THROWN_READERS` lists it. */
+  readonly key: string;
   readonly cls: SiteClass;
   /** The static types of the typed sources that reach it. */
   readonly types: readonly string[];
   readonly refused: boolean;
 }
 
-type Origin = { readonly typed: string } | 'boundary' | 'opaque';
+/** `thrown`: a caught value, a boundary of its own kind. */
+type Origin = { readonly typed: string } | 'boundary' | 'thrown' | 'opaque';
 
 type Declaration =
   | ts.ParameterDeclaration
@@ -131,6 +180,48 @@ function nameOf(node: ts.Node): string {
   return '(anonymous)';
 }
 
+/** The name of the function or type a site belongs to. */
+function ownerOf(node: ts.Node): string {
+  let current: ts.Node | undefined = node.parent;
+  if (ts.isFunctionLike(node)) current = node;
+  while (current) {
+    if (
+      (ts.isFunctionDeclaration(current) ||
+        ts.isMethodDeclaration(current) ||
+        ts.isInterfaceDeclaration(current) ||
+        ts.isClassDeclaration(current) ||
+        ts.isTypeAliasDeclaration(current)) &&
+      current.name
+    ) {
+      return current.name.getText();
+    }
+    if (
+      (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) &&
+      (ts.isVariableDeclaration(current.parent) ||
+        ts.isPropertyAssignment(current.parent))
+    ) {
+      return current.parent.name.getText();
+    }
+    current = current.parent;
+  }
+  return '(module)';
+}
+
+function keyOf(node: ts.Node): string {
+  return `${rel(node.getSourceFile().fileName)}#${ownerOf(node)}(${nameOf(node)})`;
+}
+
+/** The entries of `readers` no site of `sites` is the reader of. */
+export function staleReaders(
+  sites: readonly UnknownSite[],
+  readers: ReadonlySet<string>,
+): string[] {
+  const found = new Set(
+    sites.filter((site) => site.cls === 'reader').map((site) => site.key),
+  );
+  return [...readers].filter((reader) => !found.has(reader));
+}
+
 function isUnknownNode(type: ts.TypeNode | undefined): boolean {
   return type !== undefined && type.kind === ts.SyntaxKind.UnknownKeyword;
 }
@@ -157,9 +248,15 @@ export class ProvenanceScan {
   private readonly handedOn = new Set<ts.Node>();
   private readonly memo = new Map<ts.Node, readonly Origin[]>();
   private readonly active = new Set<ts.Node>();
+  private readonly readers: ReadonlySet<string>;
 
-  constructor(program: ts.Program, own: (file: ts.SourceFile) => boolean) {
+  constructor(
+    program: ts.Program,
+    own: (file: ts.SourceFile) => boolean,
+    readers: ReadonlySet<string>,
+  ) {
     this.checker = program.getTypeChecker();
+    this.readers = readers;
     for (const file of program.getSourceFiles()) {
       if (own(file)) this.index(file);
     }
@@ -303,11 +400,15 @@ export class ProvenanceScan {
       ),
     ].sort();
     const hasBoundary = origins.some((origin) => typeof origin !== 'object');
+    const key = keyOf(node);
     let cls: SiteClass;
     let refused: boolean;
     if (types.length > 0 && this.inSinkContract(node)) {
       cls = 'sink';
       refused = false;
+    } else if (types.length > 0 && origins.includes('thrown')) {
+      cls = 'reader';
+      refused = !this.readers.has(key);
     } else if (types.length > 0) {
       cls = hasBoundary ? 'mixed' : 'typed';
       refused = true;
@@ -326,6 +427,7 @@ export class ProvenanceScan {
       kind,
       where: lineOf(node),
       name: nameOf(node),
+      key,
       cls,
       types,
       refused,
@@ -537,21 +639,23 @@ export class ProvenanceScan {
     return name !== undefined && DOM_TYPES.has(name);
   }
 
-  private boundaryExpression(expression: ts.Expression): boolean {
+  private boundaryOrigin(
+    expression: ts.Expression,
+  ): 'boundary' | 'thrown' | undefined {
     if (
       ts.isPropertyAccessExpression(expression) ||
       ts.isElementAccessExpression(expression)
     ) {
       const object = strip(expression.expression);
-      if (object.getText() === 'process.env') return true;
-      return this.boundaryExpression(object);
+      if (object.getText() === 'process.env') return 'boundary';
+      return this.boundaryOrigin(object);
     }
     if (ts.isCallExpression(expression)) {
       const callee = strip(expression.expression);
       const name = ts.isPropertyAccessExpression(callee)
         ? callee.name.text
         : callee.getText();
-      if (callee.getText() === 'JSON.parse') return true;
+      if (callee.getText() === 'JSON.parse') return 'boundary';
       const declaration =
         this.checker.getResolvedSignature(expression)?.declaration;
       if (
@@ -559,19 +663,20 @@ export class ProvenanceScan {
         FILE_READS.has(name) &&
         declaration.getSourceFile().fileName.includes('@types/node')
       ) {
-        return true;
+        return 'boundary';
       }
     }
-    if (ts.isIdentifier(expression)) {
-      return this.declarationsOf(
-        this.checker.getSymbolAtLocation(expression),
-      ).some(
+    if (
+      ts.isIdentifier(expression) &&
+      this.declarationsOf(this.checker.getSymbolAtLocation(expression)).some(
         (declaration) =>
           ts.isVariableDeclaration(declaration) &&
           ts.isCatchClause(declaration.parent),
-      );
+      )
+    ) {
+      return 'thrown';
     }
-    return false;
+    return undefined;
   }
 
   private originsOf(source: ts.Expression): readonly Origin[] {
@@ -588,7 +693,8 @@ export class ProvenanceScan {
         : [expression.left, expression.right];
       return parts.flatMap((part) => this.originsOf(part));
     }
-    if (this.boundaryExpression(expression)) return ['boundary'];
+    const boundary = this.boundaryOrigin(expression);
+    if (boundary) return [boundary];
     const type = this.checker.getTypeAtLocation(expression);
     if (this.absent(type)) return [];
     if (this.declaredContractless(expression)) return this.followed(expression);
@@ -622,14 +728,14 @@ export class ProvenanceScan {
         ts.isElementAccessExpression(expression)
       ) {
         return this.originsOf(expression.expression).map((origin) =>
-          origin === 'boundary' ? 'boundary' : 'opaque',
+          origin === 'boundary' || origin === 'thrown' ? origin : 'opaque',
         );
       }
       return ['opaque'];
     }
     if (external(target)) return ['boundary'];
     if (ts.isVariableDeclaration(target) && ts.isCatchClause(target.parent)) {
-      return ['boundary'];
+      return ['thrown'];
     }
     if (
       ts.isParameter(target) ||
@@ -657,10 +763,11 @@ export class ProvenanceScan {
 export function scanFiles(
   program: ts.Program,
   files: ReadonlySet<string>,
+  readers: ReadonlySet<string> = THROWN_READERS,
 ): UnknownSite[] {
   const own = new Set([...files].map(fileKey));
   const owned = (file: ts.SourceFile) => own.has(fileKey(file.fileName));
-  const scan = new ProvenanceScan(program, owned);
+  const scan = new ProvenanceScan(program, owned, readers);
   return program
     .getSourceFiles()
     .filter(owned)
@@ -742,9 +849,12 @@ if (require.main === module) {
   }
   const refused = sites.filter((site) => site.refused);
   process.stdout.write(`refused: ${refused.length}\n`);
+  for (const stale of staleReaders(sites, THROWN_READERS)) {
+    process.stdout.write(`stale reader: ${stale}\n`);
+  }
   for (const site of refused) {
     process.stdout.write(
-      `${site.where} ${site.kind} ${site.name} ${site.cls}: ${site.types.join(' | ')}\n`,
+      `${site.where} ${site.kind} ${site.key} ${site.cls}: ${site.types.join(' | ')}\n`,
     );
   }
 }

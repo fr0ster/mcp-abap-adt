@@ -618,7 +618,14 @@ below is what it carries besides.
   - boundaries, by their origin: `catch`, `JSON.parse`, the XML parser, `process.env`, file
     reads, a network answer's `data`, tool arguments, third-party contracts typed `unknown`;
   - sinks named by their contract (`ILogger`, a serializer);
-  - callbacks called only by an outside contract.
+  - callbacks called only by an outside contract;
+  - readers of thrown values (spec §4, the owner's decision): a site fed, through `unknown`
+    sites, by a `catch` binding is a boundary site even when typed values reach it too. Each
+    is named in the scan's `THROWN_READERS` (file, function, parameter); an unlisted reader is
+    refused, and so is a listed entry that is no longer a reader. Fixture: a reader fed by a
+    `catch` and by an `Error` of its own, passing when listed, refused when not; a listed name
+    that no reader has is reported. Deliberate break: read a `catch` binding as a plain
+    boundary, and the fixture's reader is `mixed` and refused.
   - **Fixtures first,** each reported or not by its class:
     - a typed site;
     - a value laundered through an `unknown` variable;
@@ -635,7 +642,8 @@ below is what it carries besides.
       longer refused.
 - **S3b. The sites,** per the spec's appendix and the script's output:
   - typed parameters retyped;
-  - mixed ones split at the boundary or given a union;
+  - mixed ones split at the boundary or given a union, but for readers of thrown values,
+    which are listed and stay `unknown`;
   - the decided variables and returns, among them `BaseMcpServer.ts:2836` (the registration
     wrapper, typed from the SDK's `registerTool` / `tool` signatures) and the `vocabulary.ts`
     reads;
@@ -644,6 +652,11 @@ below is what it carries besides.
     type now proves (a code the schema's enum already holds, case-folded again), each
     removed with the boundary test S2a points at it kept green (the owner's decision on
     direct calls, S2a).
+    - **Not dead, kept** (Measured): HandlerActivate's and RunATC's variant checks — the
+      entry parses with the on-premise schema, so a cloud connection reaches the handler's
+      refusal (`compactActivateTypes.test.ts`, `atcTools.test.ts` "cloud refuses %s naming
+      its kinds"); and the include writes' required-name checks — the schema accepts an
+      empty name (`includeWrites.test.ts`).
     - **HandlerGet's part check** (`handleHandlerGet.ts:212`) is not yet proved by the type.
       `compactGetSchemaFor` builds `extra` as `string[]` (`compactSchemas.ts:597`), and
       spreading it into `z.enum` (`:615`) widens `part`'s output to `string | undefined`.

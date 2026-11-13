@@ -41,7 +41,7 @@ function isLetterOrDigit(code: number): boolean {
 }
 
 /** Letters, digits, `_`, `/` and `$`: a package's or a table's characters. */
-function objectNameCharacters(text: string): boolean {
+export function objectNameCharacters(text: string): boolean {
   for (let i = 0; i < text.length; i += 1) {
     const code = text.charCodeAt(i);
     if (!isLetterOrDigit(code) && code !== 95 && code !== 47 && code !== 36) {

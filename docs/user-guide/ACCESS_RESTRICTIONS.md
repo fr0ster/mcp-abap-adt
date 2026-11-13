@@ -101,7 +101,9 @@ package (`package_name`, `super_package`) or a request (`transport_request`, `tr
 
 Apply to the data tools (`GetTableContents`, compact `HandlerGetData`'s table read), served
 only with `--enable-data-tools`. Either a list of tables whose data cannot be read, or a list of
-the only tables whose data can be: never both. Entries are exact names or prefixes. A free SQL
+the only tables whose data can be: never both. Entries are exact names or prefixes. While
+either list is configured, a table argument must be one table name (ASCII letters, digits, `_`,
+`/` and `$`): an alias, a join or a list of tables is refused `table_not_allowed`. A free SQL
 query (`GetSqlQuery`, `HandlerGetData`'s `sql_query`) is not analysed: deny it as an action
 (`GetSqlQuery`, `HandlerGetData.sql`).
 

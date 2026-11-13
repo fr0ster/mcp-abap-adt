@@ -129,6 +129,48 @@ describe('listedAccessChecks', () => {
     assert.equal((await allowed.check(tableCall('ZTAB'), sap)).allowed, true);
   });
 
+  // The table argument goes into `SELECT * FROM <table>`: with a table list
+  // configured, a value that is not one table name — an alias, a join, a list
+  // — would read a table the list does not admit.
+  it('refuses a table argument that is not one table name while a table list is configured', async () => {
+    const { sap } = reader();
+    const tableCall = (value: string) =>
+      call({ tables: [{ argument: 'table_name', value }] });
+    const denied = listedAccessChecks({
+      deniedTables: [parseTableEntry('SCARR', NAME)],
+    });
+    const allowed = listedAccessChecks({
+      allowedTables: [parseTableEntry('ZT*', NAME)],
+    });
+    for (const value of [
+      'SCARR AS S',
+      'SFLIGHT INNER JOIN SCARR ON SFLIGHT~CARRID = SCARR~CARRID',
+      'SFLIGHT, SCARR',
+    ]) {
+      assert.deepEqual(await denied.check(tableCall(value), sap), {
+        allowed: false,
+        code: 'table_not_allowed',
+        argument: 'table_name',
+        value,
+      });
+    }
+    const join = 'ZTAB INNER JOIN MARA ON ZTAB~K = MARA~K';
+    assert.deepEqual(await allowed.check(tableCall(join), sap), {
+      allowed: false,
+      code: 'table_not_allowed',
+      argument: 'table_name',
+      value: join,
+    });
+    assert.equal(
+      (await denied.check(tableCall('/ABC/ZTAB'), sap)).allowed,
+      true,
+    );
+    assert.equal(
+      (await allowed.check(tableCall('ZT/ABC/X$'), sap)).allowed,
+      true,
+    );
+  });
+
   it('checks each name against its own list', async () => {
     const checks = listedAccessChecks({
       allowedPackages: [parsePackageEntry('Z*', NAME)],

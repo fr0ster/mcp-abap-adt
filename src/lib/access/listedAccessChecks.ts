@@ -13,7 +13,12 @@ import {
   type IAccessChecks,
   type NamedValue,
 } from './accessChecks.js';
-import type { AccessLists, NameEntry, PackageEntry } from './accessLists.js';
+import {
+  type AccessLists,
+  type NameEntry,
+  objectNameCharacters,
+  type PackageEntry,
+} from './accessLists.js';
 
 /** Whether a name or prefix entry names `value`. */
 export function entryNames(
@@ -43,6 +48,17 @@ export function requestsAndTables(
     const outside = firstOutside(call.requests, lists.allowedRequests);
     if (outside !== undefined) {
       return { allowed: false, code: 'request_not_allowed', ...outside };
+    }
+  }
+  // A table argument is read as `SELECT * FROM <table>`: while a table list
+  // is configured, a value that is not one table name (an alias, a join, a
+  // list of tables) is refused, since the list cannot speak for it.
+  if (lists.deniedTables !== undefined || lists.allowedTables !== undefined) {
+    const notOneName = call.tables.find(
+      (named) => !objectNameCharacters(named.value),
+    );
+    if (notOneName !== undefined) {
+      return { allowed: false, code: 'table_not_allowed', ...notOneName };
     }
   }
   if (lists.deniedTables !== undefined) {

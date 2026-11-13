@@ -108,6 +108,16 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(meta[0]?.refused, false);
   });
 
+  it("an object literal's member typed by a named sink contract is a sink", () => {
+    const meta = sitesOf('literalSink').filter(
+      (entry) => entry.name === 'meta',
+    );
+    assert.deepEqual(
+      meta.map((entry) => [entry.cls, entry.refused]),
+      [['sink', false]],
+    );
+  });
+
   it('an answer serializer is a named sink', () => {
     const payload = sitesOf('answerSerializer').filter(
       (entry) => entry.name === 'payload',
@@ -215,6 +225,56 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(value.cls, 'mixed');
     assert.equal(value.refused, true);
     assert.deepEqual(value.types, ['Order']);
+  });
+
+  it('an unknown inside a container or behind an alias is read as a plain unknown, and refused when typed', () => {
+    // Arrays, tuples, Record, Map, Set, Promise, a member of an object type,
+    // a function type's return, and a function expression's parameter its
+    // function type writes `unknown`: each fed by an `Order` (spec §4, the
+    // audit's scope).
+    const sites = sitesOf('containers');
+    const by = (name: string) =>
+      sites
+        .filter((entry) => entry.name === name)
+        .map((entry) => [entry.cls, entry.refused, entry.types]);
+    assert.deepEqual(by('items'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('bag'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('pair'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('map'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('set'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('work'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('make'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('visited'), [['typed', true, ['Order']]]);
+    assert.deepEqual(by('held'), [['typed', true, ['Order']]]);
+  });
+
+  it('an alias of unknown is read as a plain unknown', () => {
+    const aliased = site('containers', 'aliased');
+    assert.deepEqual(
+      [aliased.cls, aliased.refused, aliased.types],
+      ['typed', true, ['Order']],
+    );
+  });
+
+  it('an unknown inside a container fed from outside the type system passes', () => {
+    const sites = sitesOf('containerBoundary').filter((entry) =>
+      ['items', 'bag', 'make', 'visited'].includes(entry.name),
+    );
+    assert.deepEqual(
+      sites.map((entry) => [entry.name, entry.cls, entry.refused]),
+      [
+        ['items', 'boundary', false],
+        ['bag', 'boundary', false],
+        ['make', 'boundary', false],
+        ['visited', 'boundary', false],
+      ],
+    );
+  });
+
+  it("a site declared with a tool's arguments before their schema is input", () => {
+    const args = site('toolInput', 'args');
+    assert.equal(args.cls, 'boundary');
+    assert.equal(args.refused, false);
   });
 
   it('a library call answering any is taken as unknown where it is made', () => {

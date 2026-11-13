@@ -3,7 +3,15 @@
  * production code comes from, decided by the compiler, site by site.
  *
  * A site is a parameter, a variable, a function's return or a property whose
- * declared type is `unknown`. Its sources are found in the program: a
+ * declared type is `unknown` or holds it: an element of an array or a tuple,
+ * a value of a `Record` or an index signature, a type argument of `Map`,
+ * `Set` or `Promise`, a function type's return, or an alias of `unknown`
+ * (`type V = unknown`). A function type's parameter written `unknown` is a
+ * parameter site of its own, fed by the calls of that type. Each position is
+ * read as a plain `unknown` is: by the values that reach it, the source's
+ * type projected to the position (an array literal's elements, an object
+ * literal's members, a function expression's returns are followed one by
+ * one). Its sources are found in the program: a
  * parameter's arguments at every call resolved to its function (or to the
  * contract member that function implements), a variable's initializer and
  * assignments, a function's return expressions, a property's writers (object
@@ -50,7 +58,12 @@ export const SINK_CONTRACTS: readonly string[] = [
  * missing here is refused, and an entry no reader has is stale.
  */
 export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
+  'src/embeddable/BaseMcpServer.ts#backgroundAnswer(t)',
+  'src/embeddable/BaseMcpServer.ts#readFailure(thrown)',
   'src/embeddable/BaseMcpServer.ts#refusalAnswer(error)',
+  'src/embeddable/BaseMcpServer.ts#refusalAnswer(t)',
+  'src/embeddable/BaseMcpServer.ts#runConnectionless(t)',
+  'src/embeddable/BaseMcpServer.ts#track(t)',
   'src/handlers/search/readonly/handleGetObjectsList.ts#Thrown(thrown)',
   'src/handlers/structure/readonly/handleGetStructuresList.ts#WhereUsedOutcome(lastErr)',
   'src/handlers/structure/readonly/handleGetStructuresList.ts#findExtensions(lastErr)',
@@ -58,7 +71,6 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/handlers/structure/readonly/handleGetStructuresList.ts#outcomeOf(lastErr)',
   'src/handlers/system/readonly/handleGetObjectInfo.ts#Thrown(thrown)',
   'src/handlers/system/readonly/handleRuntimeListFeeds.ts#end(error)',
-  'src/lib/adtHeaders/withAdtHeaders.ts#readSafely(value)',
   'src/lib/answer.ts#isCredentialFailure(thrown)',
   'src/lib/answer.ts#messageOf(thrown)',
   'src/lib/answer.ts#requestErrorOf(thrown)',
@@ -79,11 +91,20 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/logger.ts#createLogFn(data)',
   'src/lib/logger.ts#spreadable(data)',
   'src/lib/search-source/readFailure.ts#DecidedPrimitive(value)',
+  'src/lib/search-source/readFailure.ts#classify(failure)',
   'src/lib/search-source/readFailure.ts#decidedFailure(decidedFailure)',
   'src/lib/search-source/readFailure.ts#decidedFailure(failure)',
+  'src/lib/search-source/readFailure.ts#decisionOf(failure)',
   'src/lib/search-source/readFailure.ts#envelopeFailure(error)',
+  'src/lib/search-source/readFailure.ts#failedRead(failure)',
+  'src/lib/search-source/readFailure.ts#failedRead(key)',
   'src/lib/search-source/readFailure.ts#isCredential(failure)',
   'src/lib/search-source/readFailure.ts#isObject(value)',
+  'src/lib/search-source/readFailure.ts#isSapAnswer(failure)',
+  'src/lib/search-source/sourceReader.ts#readOne(failure)',
+  'src/lib/search-source/sourceReader.ts#readOne(key)',
+  'src/lib/search-source/sourceReader.ts#readSourceUnits(failure)',
+  'src/lib/search-source/sourceReader.ts#readSourceUnits(key)',
   'src/lib/strategies/packageWalk.ts#endsTheCall(thrown)',
   'src/lib/strategies/step.ts#methodFailureOf(thrown)',
   'src/lib/strategies/step.ts#payloadCarriedBy(thrown)',
@@ -106,6 +127,12 @@ export type SiteClass =
 
 export interface UnknownSite {
   readonly kind: SiteKind;
+  /**
+   * Where `unknown` stands in the declared type: `''` for the type itself,
+   * else each position, e.g. `[]` for an array's element, `{}` for a
+   * `Record`'s value, `Map<1>` for a type argument, `()` for a return.
+   */
+  readonly position: string;
   /** `file:line`, the file relative to the repository. */
   readonly where: string;
   readonly name: string;
@@ -119,6 +146,89 @@ export interface UnknownSite {
 
 /** `thrown`: a caught value, a boundary of its own kind. */
 type Origin = { readonly typed: string } | 'boundary' | 'thrown' | 'opaque';
+
+/**
+ * One step from a type to a position inside it: an array's or a tuple's
+ * element (`at` for one tuple member), a `Record`'s or an index signature's
+ * value, a type argument of a named generic, a function's return.
+ */
+type Step =
+  | { readonly kind: 'element'; readonly at?: number }
+  | { readonly kind: 'index' }
+  | { readonly kind: 'argument'; readonly of: string; readonly at: number }
+  | { readonly kind: 'return' };
+
+/** The path from a declared type to one `unknown` inside it. */
+type Path = readonly Step[];
+
+/**
+ * The generics whose type arguments are positions, each with its family: a
+ * value of one member of a family projects onto another's arguments
+ * (`Map` onto `ReadonlyMap`).
+ */
+const GENERIC_FAMILIES: ReadonlyMap<string, string> = new Map([
+  ['Map', 'Map'],
+  ['ReadonlyMap', 'Map'],
+  ['WeakMap', 'Map'],
+  ['Set', 'Set'],
+  ['ReadonlySet', 'Set'],
+  ['WeakSet', 'Set'],
+  ['Promise', 'Promise'],
+  ['PromiseLike', 'Promise'],
+]);
+
+/** Generics that keep the shape of their argument. */
+const SHAPE_KEEPING = new Set([
+  'Readonly',
+  'Partial',
+  'Required',
+  'NonNullable',
+]);
+
+function stepText(step: Step): string {
+  switch (step.kind) {
+    case 'element':
+      return step.at === undefined ? '[]' : `[${step.at}]`;
+    case 'index':
+      return '{}';
+    case 'argument':
+      return `${step.of}<${step.at}>`;
+    case 'return':
+      return '()';
+  }
+}
+
+function pathText(path: Path): string {
+  return path.map(stepText).join('');
+}
+
+/** A reference to a generic type, whose arguments the checker answers. */
+function isReference(type: ts.Type): type is ts.TypeReference {
+  return (type.flags & ts.TypeFlags.Object) !== 0 && 'target' in type;
+}
+
+/** The declared type of a site's declaration, when it writes one. */
+function declaredTypeOf(node: ts.Node): ts.TypeNode | undefined {
+  if (
+    ts.isParameter(node) ||
+    ts.isVariableDeclaration(node) ||
+    ts.isPropertySignature(node) ||
+    ts.isPropertyDeclaration(node) ||
+    ts.isFunctionLike(node)
+  ) {
+    return node.type;
+  }
+  return undefined;
+}
+
+function isAsync(node: ts.Node): boolean {
+  return (
+    ts.canHaveModifiers(node) &&
+    (ts.getModifiers(node) ?? []).some(
+      (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
+    )
+  );
+}
 
 type Declaration =
   | ts.ParameterDeclaration
@@ -139,11 +249,13 @@ const DOM_TYPES = new Set([
 const FILE_READS = new Set(['readFileSync', 'readFile']);
 
 /**
- * The types of the program's inputs: the environment (`NodeJS.ProcessEnv`)
- * and the program's arguments (`ProgramArguments`, a reader's parameter
- * declared so). A value read from one is a boundary, like `process.env`.
+ * The types of the program's inputs: the environment (`NodeJS.ProcessEnv`),
+ * the program's arguments (`ProgramArguments`, a reader's parameter declared
+ * so) and a tool's arguments before their schema (`ToolArgs`, what a tool
+ * entry's `call` parses). A value read from one is a boundary, like
+ * `process.env`, and so is a site declared with one.
  */
-const INPUT_TYPES = new Set(['ProcessEnv', 'ProgramArguments']);
+const INPUT_TYPES = new Set(['ProcessEnv', 'ProgramArguments', 'ToolArgs']);
 
 /**
  * A file's one spelling: TypeScript names a file with `/` on every platform,
@@ -424,26 +536,161 @@ export class ProvenanceScan {
   }
 
   private siteKind(node: ts.Node): SiteKind | undefined {
-    if (ts.isParameter(node) && isUnknownNode(node.type)) {
+    if (!this.holdsUnknown(node)) return undefined;
+    if (ts.isParameter(node)) {
       return hasBody(node.parent) ? 'parameter' : undefined;
     }
-    if (
-      ts.isVariableDeclaration(node) &&
-      isUnknownNode(node.type) &&
-      !ts.isCatchClause(node.parent)
-    ) {
+    if (ts.isVariableDeclaration(node) && !ts.isCatchClause(node.parent)) {
       return 'variable';
     }
-    if (ts.isFunctionLike(node) && isUnknownNode(node.type) && hasBody(node)) {
-      return 'return';
-    }
-    if (
-      (ts.isPropertySignature(node) || ts.isPropertyDeclaration(node)) &&
-      isUnknownNode(node.type)
-    ) {
+    if (ts.isFunctionLike(node) && hasBody(node)) return 'return';
+    if (ts.isPropertySignature(node) || ts.isPropertyDeclaration(node)) {
       return 'property';
     }
     return undefined;
+  }
+
+  /**
+   * The type written for a declaration: its own annotation, or — for a
+   * parameter of a function expression written without one — the parameter
+   * the expression's contextual function type writes in the repository
+   * (`(visited: unknown) => void`): where that `unknown` is read.
+   */
+  private writtenTypeOf(node: ts.Node): ts.TypeNode | undefined {
+    const own = declaredTypeOf(node);
+    if (own !== undefined || !ts.isParameter(node)) return own;
+    const fn = node.parent;
+    if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) {
+      return undefined;
+    }
+    const contract = this.contextualDeclaration(fn);
+    const parameter = contract?.parameters[fn.parameters.indexOf(node)];
+    return parameter === undefined ? undefined : declaredTypeOf(parameter);
+  }
+
+  /**
+   * The function type of the repository a function expression is written
+   * to (an argument's, a member's, an initializer's), when it has one.
+   */
+  private contextualDeclaration(
+    fn: ts.ArrowFunction | ts.FunctionExpression,
+  ): ts.SignatureDeclaration | undefined {
+    const declaration = this.checker
+      .getContextualType(fn)
+      ?.getCallSignatures()[0]?.declaration;
+    if (
+      declaration === undefined ||
+      ts.isJSDocSignature(declaration) ||
+      !fileKey(declaration.getSourceFile().fileName).startsWith(OWN_SOURCES)
+    ) {
+      return undefined;
+    }
+    return declaration;
+  }
+
+  /** Whether a declaration's written type is or holds `unknown`. */
+  private holdsUnknown(node: ts.Node): boolean {
+    const type = this.writtenTypeOf(node);
+    return type !== undefined && this.unknownPaths(type, new Set()).length > 0;
+  }
+
+  /**
+   * Every path from a written type to an `unknown` in it. A function type's
+   * parameters are sites of their own, and an object type's members too:
+   * neither is a position of the type that holds them.
+   */
+  private unknownPaths(
+    node: ts.TypeNode,
+    seen: ReadonlySet<ts.Node>,
+  ): readonly Path[] {
+    const under = (step: Step, inner: ts.TypeNode | undefined): Path[] =>
+      inner === undefined
+        ? []
+        : this.unknownPaths(inner, seen).map((path) => [step, ...path]);
+    if (isUnknownNode(node)) return [[]];
+    if (
+      ts.isParenthesizedTypeNode(node) ||
+      ts.isTypeOperatorNode(node) ||
+      ts.isOptionalTypeNode(node) ||
+      ts.isRestTypeNode(node)
+    ) {
+      return this.unknownPaths(node.type, seen);
+    }
+    if (ts.isNamedTupleMember(node)) return this.unknownPaths(node.type, seen);
+    if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
+      return node.types.flatMap((member) => this.unknownPaths(member, seen));
+    }
+    if (ts.isArrayTypeNode(node))
+      return under({ kind: 'element' }, node.elementType);
+    if (ts.isTupleTypeNode(node)) {
+      return node.elements.flatMap((element, at) =>
+        under({ kind: 'element', at }, element),
+      );
+    }
+    if (ts.isFunctionTypeNode(node))
+      return under({ kind: 'return' }, node.type);
+    if (ts.isMappedTypeNode(node)) return under({ kind: 'index' }, node.type);
+    if (ts.isTypeLiteralNode(node)) {
+      return node.members.flatMap((member) =>
+        ts.isIndexSignatureDeclaration(member)
+          ? under({ kind: 'index' }, member.type)
+          : [],
+      );
+    }
+    if (!ts.isTypeReferenceNode(node)) return [];
+    if (this.checker.getTypeFromTypeNode(node).flags & ts.TypeFlags.Unknown) {
+      return [[]];
+    }
+    const name = ts.isIdentifier(node.typeName)
+      ? node.typeName.text
+      : node.typeName.right.text;
+    const args = node.typeArguments ?? [];
+    if (name === 'Array' || name === 'ReadonlyArray') {
+      return under({ kind: 'element' }, args[0]);
+    }
+    if (name === 'Record') return under({ kind: 'index' }, args[1]);
+    if (SHAPE_KEEPING.has(name)) {
+      const [inner] = args;
+      return inner === undefined ? [] : this.unknownPaths(inner, seen);
+    }
+    if (GENERIC_FAMILIES.has(name)) {
+      return args.flatMap((arg, at) =>
+        under({ kind: 'argument', of: name, at }, arg),
+      );
+    }
+    // An alias of the repository's own, written without arguments: what it
+    // stands for.
+    const alias = this.declarationsOf(
+      this.checker.getSymbolAtLocation(node.typeName),
+    ).find(ts.isTypeAliasDeclaration);
+    if (
+      alias === undefined ||
+      alias.typeParameters !== undefined ||
+      seen.has(alias) ||
+      !fileKey(alias.getSourceFile().fileName).startsWith(OWN_SOURCES)
+    ) {
+      return [];
+    }
+    return this.unknownPaths(alias.type, new Set([...seen, alias]));
+  }
+
+  /**
+   * The paths a declaration's values are read along: each `unknown` in its
+   * written type, or the value itself (`[]`) when it writes none. An async
+   * function's returns are the values its `Promise` holds.
+   */
+  private pathsOf(node: ts.Node): readonly Path[] {
+    const type = this.writtenTypeOf(node);
+    const paths = type === undefined ? [] : this.unknownPaths(type, new Set());
+    if (paths.length === 0) return [[]];
+    if (!ts.isFunctionLike(node) || !isAsync(node)) return paths;
+    return paths.map((path) => {
+      const [first, ...rest] = path;
+      return first?.kind === 'argument' &&
+        GENERIC_FAMILIES.get(first.of) === 'Promise'
+        ? rest
+        : path;
+    });
   }
 
   private decide(node: ts.Node, kind: SiteKind): UnknownSite {
@@ -459,7 +706,13 @@ export class ProvenanceScan {
     const key = keyOf(node);
     let cls: SiteClass;
     let refused: boolean;
-    if (types.length > 0 && this.inSinkContract(node)) {
+    if (this.declaredInput(node)) {
+      cls = 'boundary';
+      refused = false;
+    } else if (
+      (types.length > 0 || (kind === 'parameter' && origins.length === 0)) &&
+      this.inSinkContract(node)
+    ) {
       cls = 'sink';
       refused = false;
     } else if (types.length > 0 && origins.includes('thrown')) {
@@ -479,8 +732,14 @@ export class ProvenanceScan {
       cls = 'boundary';
       refused = false;
     }
+    const type = this.writtenTypeOf(node);
+    const position =
+      type === undefined
+        ? ''
+        : this.unknownPaths(type, new Set()).map(pathText).join(' ');
     return {
       kind,
+      position,
       where: lineOf(node),
       name: nameOf(node),
       key,
@@ -520,6 +779,12 @@ export class ProvenanceScan {
         : undefined;
       out.push(...(member?.declarations ?? []));
     }
+    // A function expression handed to a function type of the repository:
+    // that type, whose calls hand it its arguments.
+    if (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) {
+      const contract = this.contextualDeclaration(fn);
+      if (contract !== undefined && contract !== fn) out.push(contract);
+    }
     if (
       ts.isVariableDeclaration(fn.parent) ||
       ts.isPropertyAssignment(fn.parent)
@@ -533,24 +798,41 @@ export class ProvenanceScan {
     return out;
   }
 
+  /**
+   * Whether a site is declared with an input type (`INPUT_TYPES`): a tool's
+   * arguments before their schema, the environment, the program's
+   * arguments. What reaches it is input, whoever hands it on.
+   */
+  private declaredInput(node: ts.Node): boolean {
+    const type = this.writtenTypeOf(node);
+    if (type === undefined || !ts.isTypeReferenceNode(type)) return false;
+    const name = ts.isIdentifier(type.typeName)
+      ? type.typeName.text
+      : type.typeName.right.text;
+    return INPUT_TYPES.has(name);
+  }
+
   /** The names of the interfaces and types a function's aliases belong to. */
   private inSinkContract(node: ts.Node): boolean {
     const fn = ts.isFunctionLike(node) ? node : this.parameterPlace(node)?.fn;
     if (!fn) return false;
     for (const alias of this.aliasesOf(fn)) {
       if (alias === fn) continue;
-      const owner = alias.parent;
-      if (
-        (ts.isInterfaceDeclaration(owner) || ts.isClassDeclaration(owner)) &&
-        owner.name &&
-        SINK_CONTRACTS.includes(owner.name.text)
+      // The contract the member belongs to: the interface, class or type
+      // alias that holds it, however deep (a function type of a member).
+      let owner: ts.Node | undefined = alias.parent;
+      while (
+        owner !== undefined &&
+        !ts.isInterfaceDeclaration(owner) &&
+        !ts.isClassDeclaration(owner) &&
+        !ts.isTypeAliasDeclaration(owner)
       ) {
-        return true;
+        owner = owner.parent;
       }
       if (
-        ts.isTypeLiteralNode(owner) &&
-        ts.isTypeAliasDeclaration(owner.parent) &&
-        SINK_CONTRACTS.includes(owner.parent.name.text)
+        owner !== undefined &&
+        owner.name !== undefined &&
+        SINK_CONTRACTS.includes(owner.name.text)
       ) {
         return true;
       }
@@ -576,9 +858,7 @@ export class ProvenanceScan {
       const parameter = signature.parameters[at];
       if (!parameter) return 'open';
       const type = this.checker.getTypeOfSymbol(parameter);
-      return type.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)
-        ? 'open'
-        : this.checker.typeToString(type);
+      return this.contractless(type) ? 'open' : this.checker.typeToString(type);
     }
     const handed =
       this.handedOn.has(fn) ||
@@ -630,8 +910,9 @@ export class ProvenanceScan {
     if (known) return known;
     if (this.active.has(node)) return [];
     this.active.add(node);
+    const paths = this.pathsOf(node);
     const origins = this.sourcesOf(node).flatMap((source) =>
-      this.originsOf(source),
+      paths.flatMap((path) => this.originsAt(source, path)),
     );
     this.active.delete(node);
     this.memo.set(node, origins);
@@ -639,36 +920,60 @@ export class ProvenanceScan {
   }
 
   /** No contract beyond "a value": unknown, any, or a bag of them. */
-  private contractless(type: ts.Type): boolean {
+  private contractless(
+    type: ts.Type,
+    seen: ReadonlySet<ts.Type> = new Set(),
+  ): boolean {
     if (type.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) return true;
-    if (type.flags & ts.TypeFlags.TypeParameter) {
+    // A recursive type (a JSON value, say) is read once.
+    if (seen.has(type)) return false;
+    const deeper = new Set([...seen, type]);
+    const inner = (t: ts.Type) => this.contractless(t, deeper);
+    // A type parameter, or a type computed from one (`Awaited<T>`, `T[K]`):
+    // what its constraint allows.
+    if (type.flags & ts.TypeFlags.Instantiable) {
       const constraint = this.checker.getBaseConstraintOfType(type);
-      return constraint === undefined || this.contractless(constraint);
+      return (
+        constraint === undefined || constraint === type || inner(constraint)
+      );
     }
-    if (type.isUnion()) return type.types.some((t) => this.contractless(t));
+    if (type.isUnion()) return type.types.some(inner);
+    if (this.checker.isTupleType(type) && isReference(type)) {
+      return this.checker.getTypeArguments(type).some(inner);
+    }
+    if (isReference(type)) {
+      const name = type.target.getSymbol()?.getName();
+      if (name !== undefined && GENERIC_FAMILIES.has(name)) {
+        return this.checker.getTypeArguments(type).some(inner);
+      }
+    }
     if (this.checker.isArrayType(type)) {
       const element = this.checker.getIndexTypeOfType(
         type,
         ts.IndexKind.Number,
       );
-      return element !== undefined && this.contractless(element);
+      return element !== undefined && inner(element);
     }
     if (type.getProperties().length > 0 || type.getCallSignatures().length) {
       return false;
     }
     const index = this.checker.getIndexInfosOfType(type);
-    return (
-      index.length > 0 && index.every((info) => this.contractless(info.type))
-    );
+    return index.length > 0 && index.every((info) => inner(info.type));
   }
 
-  /** `undefined`, `null` or `void` alone: no value, so no origin. */
+  /**
+   * `undefined`, `null`, `void` or `never` alone: no value, so no origin
+   * (an empty array literal holds `never`).
+   */
   private absent(type: ts.Type): boolean {
     const parts = type.isUnion() ? type.types : [type];
     return parts.every(
       (part) =>
         (part.flags &
-          (ts.TypeFlags.Undefined | ts.TypeFlags.Null | ts.TypeFlags.Void)) !==
+          (ts.TypeFlags.Undefined |
+            ts.TypeFlags.Null |
+            ts.TypeFlags.Void |
+            ts.TypeFlags.Never)) !==
         0,
     );
   }
@@ -811,7 +1116,75 @@ export class ProvenanceScan {
     );
   }
 
-  private originsOf(source: ts.Expression): readonly Origin[] {
+  /** The types at `step` inside `type`; `undefined` where it has no such position. */
+  private project(type: ts.Type, step: Step): ts.Type[] | undefined {
+    if (type.isUnion()) {
+      const parts = type.types
+        .filter((part) => !this.absent(part))
+        .map((part) => this.project(part, step));
+      return parts.every((part) => part === undefined)
+        ? undefined
+        : parts.flatMap((part) => part ?? []);
+    }
+    // A value that is no object holds no position: it is read whole.
+    if ((type.flags & ts.TypeFlags.Object) === 0) return undefined;
+    switch (step.kind) {
+      case 'element': {
+        if (this.checker.isTupleType(type) && isReference(type)) {
+          const members = this.checker.getTypeArguments(type);
+          const one = step.at === undefined ? undefined : members[step.at];
+          return one === undefined ? [...members] : [one];
+        }
+        const element = this.checker.getIndexTypeOfType(
+          type,
+          ts.IndexKind.Number,
+        );
+        return element === undefined ? undefined : [element];
+      }
+      case 'index': {
+        const index = this.checker.getIndexTypeOfType(
+          type,
+          ts.IndexKind.String,
+        );
+        const members = this.checker
+          .getPropertiesOfType(type)
+          .map((member) => this.checker.getTypeOfSymbol(member));
+        if (index === undefined && members.length === 0) {
+          return type.getCallSignatures().length > 0 ? undefined : [];
+        }
+        return index === undefined ? members : [index, ...members];
+      }
+      case 'argument': {
+        const family = GENERIC_FAMILIES.get(step.of);
+        if (family === 'Promise')
+          return [this.checker.getAwaitedType(type) ?? type];
+        if (!isReference(type)) return undefined;
+        const name = type.target.getSymbol()?.getName();
+        if (name === undefined || GENERIC_FAMILIES.get(name) !== family) {
+          return undefined;
+        }
+        const argument = this.checker.getTypeArguments(type)[step.at];
+        return argument === undefined ? undefined : [argument];
+      }
+      case 'return': {
+        const signatures = type.getCallSignatures();
+        return signatures.length === 0
+          ? undefined
+          : signatures.map((signature) => signature.getReturnType());
+      }
+    }
+  }
+
+  /**
+   * The origins of what `source` puts at `path`: an array literal's
+   * elements, an object literal's members and a function expression's
+   * returns one by one; any other value by its type at that position, typed
+   * where the position has a contract, else followed to where the value
+   * was made.
+   */
+  private originsAt(source: ts.Expression, path: Path): readonly Origin[] {
+    const [step, ...rest] = path;
+    if (step === undefined) return this.originsOf(source);
     const expression = strip(source);
     if (
       ts.isConditionalExpression(expression) ||
@@ -823,7 +1196,99 @@ export class ProvenanceScan {
       const parts = ts.isConditionalExpression(expression)
         ? [expression.whenTrue, expression.whenFalse]
         : [expression.left, expression.right];
-      return parts.flatMap((part) => this.originsOf(part));
+      return parts.flatMap((part) => this.originsAt(part, path));
+    }
+    if (step.kind === 'element' && ts.isArrayLiteralExpression(expression)) {
+      const spread = expression.elements.some(ts.isSpreadElement);
+      return expression.elements.flatMap((element, at) => {
+        if (ts.isSpreadElement(element)) {
+          return this.originsAt(element.expression, path);
+        }
+        if (ts.isOmittedExpression(element)) return [];
+        if (step.at !== undefined && !spread && at !== step.at) return [];
+        return this.originsAt(element, rest);
+      });
+    }
+    if (step.kind === 'index' && ts.isObjectLiteralExpression(expression)) {
+      return expression.properties.flatMap((member) => {
+        if (ts.isPropertyAssignment(member)) {
+          return this.originsAt(member.initializer, rest);
+        }
+        if (ts.isShorthandPropertyAssignment(member)) {
+          return this.originsAt(member.name, rest);
+        }
+        if (ts.isSpreadAssignment(member)) {
+          return this.originsAt(member.expression, path);
+        }
+        return [];
+      });
+    }
+    if (
+      step.kind === 'return' &&
+      (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression))
+    ) {
+      return this.returnsOf(expression).flatMap((value) =>
+        this.originsAt(value, rest),
+      );
+    }
+    const boundary = this.boundaryOrigin(expression);
+    if (boundary) return [boundary];
+    const type = awaits(source)
+      ? this.checker.getTypeAtLocation(source)
+      : this.checker.getTypeAtLocation(expression);
+    if (this.absent(type)) return [];
+    let at: ts.Type[] | undefined = [type];
+    for (const next of path) {
+      const reached: ts.Type[] = [];
+      for (const each of at ?? []) {
+        if (this.absent(each)) continue;
+        const projected = this.project(each, next);
+        if (projected === undefined) {
+          at = undefined;
+          break;
+        }
+        reached.push(...projected);
+      }
+      if (at === undefined) break;
+      at = reached;
+    }
+    // A value with no such position (a class that holds one, say): read
+    // whole, as a plain `unknown` reads it.
+    if (at === undefined) return this.originsOf(source);
+    const present = at.filter((each) => !this.absent(each));
+    if (present.length === 0) return [];
+    const typed = present.filter((each) => !this.contractless(each));
+    if (typed.length > 0) {
+      return typed.map((each) => ({
+        typed: this.checker.typeToString(
+          this.checker.getBaseTypeOfLiteralType(each),
+        ),
+      }));
+    }
+    return this.originsOf(source, true);
+  }
+
+  /**
+   * Where a value comes from. `contentless`: its own type has a contract
+   * (a `Map`, an object) but what it holds at the position read has none,
+   * so it is followed to where it was made rather than typed.
+   */
+  private originsOf(
+    source: ts.Expression,
+    contentless = false,
+  ): readonly Origin[] {
+    const expression = strip(source);
+    if (
+      ts.isConditionalExpression(expression) ||
+      (ts.isBinaryExpression(expression) &&
+        (expression.operatorToken.kind ===
+          ts.SyntaxKind.QuestionQuestionToken ||
+          expression.operatorToken.kind === ts.SyntaxKind.BarBarToken))
+    ) {
+      const parts = ts.isConditionalExpression(expression)
+        ? [expression.whenTrue, expression.whenFalse]
+        : [expression.left, expression.right];
+      return parts.flatMap((part) => this.originsOf(part, contentless));
     }
     const boundary = this.boundaryOrigin(expression);
     if (boundary) return [boundary];
@@ -849,7 +1314,7 @@ export class ProvenanceScan {
     if (this.absent(type)) return [];
     if (this.declaredContractless(expression)) return this.followed(expression);
     if (this.dom(type)) return ['boundary'];
-    if (!this.contractless(type)) {
+    if (!contentless && !this.contractless(type)) {
       return [
         {
           typed: this.checker.typeToString(

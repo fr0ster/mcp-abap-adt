@@ -24,9 +24,7 @@ import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { InMemoryBackgroundRuns } from '../../../background-runs-memory/src/InMemoryBackgroundRuns';
 import { compactToolSet } from '../../../compact/src/launcher';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
@@ -49,6 +47,7 @@ import { LeftoverSessions } from '../../lib/leftoverSessions/LeftoverSessions';
 import { defaultSystemContextResolver } from '../../lib/requestSystemResolution';
 import { LongSession } from '../../lib/state/longSession';
 import { fullToolSet, type ToolSet } from '../../lib/toolSet';
+import { McpSession } from '../integration/helpers/testers/hardMode';
 import type { AdtStandIn } from './adtStandIn';
 import { fakeProbe, killedProcessSession } from './leftoverSession';
 import type { SystemKind } from './servedTools';
@@ -196,24 +195,6 @@ function groupsOf(toolSet: ToolSet) {
   return [...stdio, ...httpOnly];
 }
 
-/** A tool call's answer as the MCP client declares it. */
-type CallAnswer = Awaited<ReturnType<Client['callTool']>>;
-
-/**
- * An answer in the tool's result shape, its text items. `callTool` declares
- * a union with the legacy `toolResult` form; the SDK's own
- * `CallToolResultSchema` reads it as the result it is.
- */
-function resultOf(answer: CallAnswer): McpResult {
-  const result = CallToolResultSchema.parse(answer);
-  return {
-    isError: result.isError === true,
-    content: result.content.flatMap((item) =>
-      item.type === 'text' ? [{ type: 'text' as const, text: item.text }] : [],
-    ),
-  };
-}
-
 /**
  * Where an in-process server's connection comes from: built from settings
  * and a credential, or a connection handed in and used as given (a live
@@ -301,13 +282,14 @@ export async function inProcessServer(
     ),
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'pin', version: '1.0.0' });
-  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+  // No SDK Client: it arms a request timer on every call, and a live step
+  // waits on SAP for as long as SAP takes (noSdkClientTimer.test.ts).
+  const client = new McpSession(clientSide);
+  await server.connect(serverSide);
+  await client.initialize();
   return {
-    call: async (tool, args) =>
-      resultOf(await client.callTool({ name: tool, arguments: { ...args } })),
-    listed: async () =>
-      (await client.listTools()).tools.map((tool) => tool.name),
+    call: (tool, args) => client.callTool(tool, args),
+    listed: async () => (await client.listTools()).map((tool) => tool.name),
     runsEnded: () => runs.ended(),
     close: async () => {
       await client.close();

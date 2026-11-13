@@ -14,7 +14,6 @@
  */
 import assert from 'node:assert/strict';
 import { type ChildProcess, spawn } from 'node:child_process';
-import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
@@ -42,32 +41,86 @@ const OWN_LIVE = path.join(
   'live.js',
 );
 
-/** What a fixture file shares: a record, and a wait for a file to exist. */
+/**
+ * What a fixture file shares: a record, kept in a file for the case's
+ * assertions and said, line by line, over a connection to the case; and a
+ * wait for the case's `go`, heard on that connection. A file watch is no
+ * signal: a write between its first check and the watch's start is missed,
+ * and the case waits for ever (a macOS run of CI hung so in the second
+ * case). The connection is unreferenced but while a wait holds it, so it
+ * keeps no fixture process alive by itself.
+ */
 const PRELUDE = [
-  "import { appendFileSync, existsSync, watch } from 'node:fs';",
-  "import { dirname } from 'node:path';",
-  "const record = (word: string) => appendFileSync(process.env.RECORD ?? '', `${word}\\n`);",
-  'const until = (file: string) => new Promise<void>((resolve) => {',
-  '  if (existsSync(file)) return resolve();',
-  '  const watcher = watch(dirname(file), () => {',
-  '    if (existsSync(file)) { watcher.close(); resolve(); }',
-  '  });',
+  "import { appendFileSync } from 'node:fs';",
+  "import { connect } from 'node:net';",
+  "const signal = connect(Number(process.env.SIGNAL_PORT), '127.0.0.1');",
+  "signal.on('error', () => undefined);",
+  'signal.unref();',
+  "let heard = '';",
+  'const waiting: (() => void)[] = [];',
+  "signal.on('data', (data) => {",
+  '  heard += String(data);',
+  "  if (heard.includes('go\\n')) for (const wake of waiting.splice(0)) wake();",
   '});',
-  "const GO = process.env.GO ?? '';",
+  'const record = (word: string) => {',
+  "  appendFileSync(process.env.RECORD ?? '', `${word}\\n`);",
+  '  signal.write(`${word}\\n`);',
+  '};',
+  'const untilGo = () => new Promise<void>((resolve) => {',
+  "  if (heard.includes('go\\n')) return resolve();",
+  '  signal.ref();',
+  '  waiting.push(() => { signal.unref(); resolve(); });',
+  '});',
 ];
 
-/** Resolves once `file` holds the line `word`. */
-function seen(file: string, word: string): Promise<void> {
-  return new Promise((resolve) => {
-    const check = () => recorded(file).includes(word);
-    if (check()) return resolve();
-    const watcher = fs.watch(path.dirname(file), () => {
-      if (check()) {
-        watcher.close();
-        resolve();
+/** The fixtures' connections to the case: what they said, and `go` to them. */
+async function signals(): Promise<{
+  port: number;
+  seen: (word: string) => Promise<void>;
+  go: () => void;
+  close: () => void;
+}> {
+  const server = net.createServer();
+  const sockets: net.Socket[] = [];
+  const lines: string[] = [];
+  let pending = '';
+  const waits: { word: string; resolve: () => void }[] = [];
+  server.on('connection', (socket) => {
+    sockets.push(socket);
+    socket.on('error', () => undefined);
+    socket.on('data', (data) => {
+      pending += String(data);
+      const parts = pending.split('\n');
+      pending = parts.pop() ?? '';
+      lines.push(...parts);
+      for (const wait of [...waits]) {
+        if (lines.includes(wait.word)) {
+          waits.splice(waits.indexOf(wait), 1);
+          wait.resolve();
+        }
       }
     });
   });
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  assert.ok(typeof address === 'object' && address !== null);
+  return {
+    port: address.port,
+    seen: (word) =>
+      new Promise((resolve) => {
+        if (lines.includes(word)) return resolve();
+        waits.push({ word, resolve });
+      }),
+    go: () => {
+      for (const socket of sockets) socket.write('go\n');
+    },
+    close: () => {
+      for (const socket of sockets) socket.destroy();
+      server.close();
+    },
+  };
 }
 
 /** The runner over `repo`, in a process group of its own. */
@@ -138,21 +191,25 @@ function built(
 describe('the first interrupt', {
   skip: POSIX ? false : 'POSIX only: process groups',
 }, () => {
-  it('a cleanup running at the first interrupt finishes before the run ends', async () => {
+  it('a cleanup running at the first interrupt finishes before the run ends', async (t) => {
     const file = 'src/__tests__/cleanup.test.ts';
     const repo = built('cleanup', {
       [file]: [
         ...PRELUDE,
         "import { after, it } from 'node:test';",
-        "after(async () => { record('cleanup started'); await until(GO); record('cleanup finished'); });",
+        "after(async () => { record('cleanup started'); await untilGo(); record('cleanup finished'); });",
         "it('runs', () => record('case'));",
         '',
       ].join('\n'),
     });
     const record = path.join(scratch.dir, 'cleanup.record');
-    const go = path.join(scratch.dir, 'cleanup.go');
-    const run = startRunner(repo, { RECORD: record, GO: go });
-    await seen(record, 'cleanup started');
+    const said = await signals();
+    t.after(said.close);
+    const run = startRunner(repo, {
+      RECORD: record,
+      SIGNAL_PORT: String(said.port),
+    });
+    await said.seen('cleanup started');
     interrupt(run.child);
     // The runner said it waits; the cleanup then goes on to its end.
     await new Promise<void>((resolve) => {
@@ -162,7 +219,7 @@ describe('the first interrupt', {
         if (check()) resolve();
       });
     });
-    fs.writeFileSync(go, 'go');
+    said.go();
     const code = await run.ended;
     assert.deepEqual(recorded(record), [
       'case',
@@ -173,7 +230,7 @@ describe('the first interrupt', {
     assert.equal(code, 1, run.output());
   });
 
-  it("a second interrupt ends every running file's process tree", async () => {
+  it("a second interrupt ends every running file's process tree", async (t) => {
     // The cleanup holds a connection to this test and echoes what it is
     // sent. Once the run has ended, a line sent to it is echoed only by a
     // process still running; a killed one (SIGKILL is delivered before it
@@ -191,7 +248,6 @@ describe('the first interrupt', {
     const repo = built('stuck', {
       [file]: [
         ...PRELUDE,
-        "import { connect } from 'node:net';",
         "import { after, it } from 'node:test';",
         'after(async () => {',
         "  const socket = connect(Number(process.env.HOLD_PORT), '127.0.0.1');",
@@ -199,7 +255,7 @@ describe('the first interrupt', {
         "  await new Promise((resolve) => socket.once('connect', resolve));",
         '  record(`pid ${process.pid}`);',
         "  record('cleanup started');",
-        '  await until(GO);',
+        '  await untilGo();',
         "  record('cleanup finished');",
         '});',
         "it('runs', () => record('case'));",
@@ -207,11 +263,12 @@ describe('the first interrupt', {
       ].join('\n'),
     });
     const record = path.join(scratch.dir, 'stuck.record');
-    // Never written: the cleanup waits until it is stopped.
-    const go = path.join(scratch.dir, 'stuck.never');
+    // Never told to go: the cleanup waits until it is stopped.
+    const said = await signals();
+    t.after(said.close);
     const run = startRunner(repo, {
       RECORD: record,
-      GO: go,
+      SIGNAL_PORT: String(said.port),
       HOLD_PORT: String(address.port),
     });
     const socket = await held;
@@ -219,7 +276,7 @@ describe('the first interrupt', {
     const closed = new Promise<string>((resolve) => {
       socket.once('close', () => resolve('closed'));
     });
-    await seen(record, 'cleanup started');
+    await said.seen('cleanup started');
     interrupt(run.child);
     await new Promise<void>((resolve) => {
       const check = () => run.output().includes('interrupted');
@@ -252,7 +309,7 @@ describe('the first interrupt', {
     assert.equal(recorded(record).includes('cleanup finished'), false);
   });
 
-  it('a live suite interrupted during its first case finishes it and its cleanup, skips the rest, and no further file starts', async () => {
+  it('a live suite interrupted during its first case finishes it and its cleanup, skips the rest, and no further file starts', async (t) => {
     const first = 'src/__tests__/a-live.test.ts';
     const second = 'src/__tests__/b-later.test.ts';
     const repo = built('suite', {
@@ -266,7 +323,7 @@ describe('the first interrupt', {
         "const runner = { system: 'onprem', user: 'U', call: async () => ({ isError: false, content: [], text: '' }), connection: () => { throw new Error('none'); }, close: async () => {} };",
         "Reflect.apply(liveDescribe, undefined, ['three cases', async () => runner, async () => {}, () => {",
         "  after(() => record('cleanup'));",
-        "  it('one', async () => { record('one started'); await until(GO); record('one finished'); });",
+        "  it('one', async () => { record('one started'); await untilGo(); record('one finished'); });",
         "  it('two', () => record('two ran'));",
         "  it('three', () => record('three ran'));",
         '}]);',
@@ -280,13 +337,14 @@ describe('the first interrupt', {
       ].join('\n'),
     });
     const record = path.join(scratch.dir, 'suite.record');
-    const go = path.join(scratch.dir, 'suite.go');
+    const said = await signals();
+    t.after(said.close);
     const run = startRunner(repo, {
       RECORD: record,
-      GO: go,
+      SIGNAL_PORT: String(said.port),
       LIVE_HELPERS: OWN_LIVE,
     });
-    await seen(record, 'one started');
+    await said.seen('one started');
     interrupt(run.child);
     await new Promise<void>((resolve) => {
       const check = () => run.output().includes('interrupted');
@@ -295,7 +353,7 @@ describe('the first interrupt', {
         if (check()) resolve();
       });
     });
-    fs.writeFileSync(go, 'go');
+    said.go();
     const code = await run.ended;
     assert.equal(code, 1, run.output());
     // The case running at the interrupt finished; the cleanup ran; the

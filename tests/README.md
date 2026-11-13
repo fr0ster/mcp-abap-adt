@@ -9,7 +9,6 @@ This directory contains test scripts for the MCP ABAP ADT server functionality.
 Including:
 - [Testing Guide](../docs/development/tests/TESTING_GUIDE.md) - Complete instructions
 - [Test Infrastructure](../docs/development/tests/TEST_INFRASTRUCTURE.md) - Technical overview
-- [CreateDomain Tool](../docs/development/tests/CREATE_DOMAIN_TOOL.md) - Handler documentation
 - [Config Template](../docs/development/tests/test-config.yaml.template) - YAML template
 
 ## 🎯 YAML-Based Testing (Recommended)

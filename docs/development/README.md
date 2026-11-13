@@ -29,5 +29,4 @@ The **[tests/](tests/)** subdirectory contains:
 - `ORGANIZATION.md` - Test organization
 - `TESTING_AUTH.md` - Testing the platform-specific auth stores
 - `DEBUGGING.md` - Debugging integration tests
-- `CREATE_DOMAIN_TOOL.md` - The CreateDomain tool
 - `test-config.yaml.template` - Test configuration template

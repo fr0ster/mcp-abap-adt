@@ -36,8 +36,8 @@ function required(
   authType: string,
   field: 'username' | 'password' | 'jwtToken' | 'sessionCookies',
 ): string {
-  const value: unknown = config[field];
-  if (typeof value !== 'string' || value === '') {
+  const value = config[field];
+  if (value === undefined || value === '') {
     throw new Error(
       `The SapConfig for ${authType} authentication has no \`${field}\``,
     );
@@ -53,8 +53,7 @@ function required(
  * token or cookies. A refusal names the field, never a value.
  */
 export function credentialFromSapConfig(config: SapConfig): IAuthProvider {
-  const authType: unknown = config.authType;
-  switch (authType) {
+  switch (config.authType) {
     case 'basic':
       return new BasicAuthProvider(
         required(config, 'basic', 'username'),

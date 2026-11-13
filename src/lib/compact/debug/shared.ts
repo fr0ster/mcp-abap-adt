@@ -8,6 +8,7 @@ import {
   requireDebugger,
 } from '../../debugger/index';
 import type { HandlerContext } from '../../handlers/index';
+import type { DetailArgs } from '../../strategies/detail';
 
 /**
  * The compact debugger: four tools, each covering ABAP and AMDP; every call is
@@ -142,7 +143,7 @@ export function needed<T>(value: T | undefined, what: string): T {
  */
 export function onceAnswer<T>(
   context: HandlerContext,
-  args: { state_handle?: string | undefined },
+  args: { state_handle?: string | undefined } & DetailArgs,
   kind: DebugKind,
   opens: boolean,
   work: (d: DebuggerInstance) => Promise<DebugView<T>>,
@@ -176,7 +177,7 @@ export function refuseOperation(
  */
 export function endAnswer(
   context: HandlerContext,
-  args: { state_handle?: string | undefined },
+  args: { state_handle?: string | undefined } & DetailArgs,
 ): Promise<McpResult> {
   return debugAnswer(
     args,

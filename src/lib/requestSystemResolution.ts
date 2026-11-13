@@ -152,9 +152,9 @@ export async function lookUpSystem(
 
 /** An answer that names no user (a non-blank string) is no information. */
 function withUser(system: ResolvedSystemContext): KnownSystemContext | null {
-  if (system === null || typeof system !== 'object') return null;
-  const user: unknown = system.responsible;
-  return typeof user === 'string' && user.trim() !== '' ? system : null;
+  if (system === null) return null;
+  const user = system.responsible;
+  return user !== undefined && user.trim() !== '' ? system : null;
 }
 
 /** A connection's parameters as made, and whether they are kept. */

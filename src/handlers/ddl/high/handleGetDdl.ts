@@ -45,7 +45,6 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
   const { ddl_name, version = 'active' } = args;
   if (!ddl_name) return return_error(new Error('ddl_name is required'));
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
   const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
 

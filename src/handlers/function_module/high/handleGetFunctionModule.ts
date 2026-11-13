@@ -62,7 +62,6 @@ export async function handleGetFunctionModule(
       new Error('function_module_name and function_group_name are required'),
     );
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
   const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
 

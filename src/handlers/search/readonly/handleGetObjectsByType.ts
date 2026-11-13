@@ -27,7 +27,10 @@ export const TOOL_DEFINITION = {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { objectsListCache } from '../../../lib/getObjectsListCache';
+import {
+  type CachedObject,
+  objectsListCache,
+} from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { NodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -54,7 +57,7 @@ function formatObjects(
   nodeId: string,
   parentType: string,
   parentName: string,
-): { text: string; cached: Array<Record<string, string>> } {
+): { text: string; cached: CachedObject[] } {
   const objects = level.objects;
   const cached = objects.map((o) => ({
     OBJECT_TYPE: o.type,
@@ -188,11 +191,12 @@ export async function handleGetObjectsByType(
         parent_type,
         parent_name,
       );
-      objectsListCache.setCache({
+      const listing = {
         isError: false,
         content: [{ type: 'text', text }],
         objects: cached,
-      });
+      };
+      objectsListCache.setCache(listing);
       return text;
     },
   );

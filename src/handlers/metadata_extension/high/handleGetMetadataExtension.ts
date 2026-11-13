@@ -49,7 +49,6 @@ export async function handleGetMetadataExtension(
   if (!metadata_extension_name)
     return return_error(new Error('metadata_extension_name is required'));
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
   const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
 

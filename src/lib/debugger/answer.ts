@@ -1,5 +1,5 @@
 import type { McpResult } from '../answer';
-import { detailOf } from '../strategies/detail';
+import { type DetailArgs, detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
 import type { DebugState, DebugView, OnceStep } from './DebugSession';
 import { terseSettings, terseStop } from './readings';
@@ -17,7 +17,7 @@ const asText = (value: unknown) => ({
  * failed but left something held answers the handle that stops it.
  */
 export async function debugAnswer<T>(
-  args: unknown,
+  args: DetailArgs,
   work: () => Promise<DebugView<T>>,
   terse: (v: T) => unknown,
   full: (v: T) => unknown = (v) => v,
@@ -57,7 +57,7 @@ export const terseOnceStep = (v: OnceStep) =>
 
 /** A debug state: under terse a stop is its place and the top frames; raw is SAP's documents of the stop. */
 export async function debugStateAnswer(
-  args: unknown,
+  args: DetailArgs,
   work: () => Promise<DebugState>,
   extraOf: () => Record<string, unknown> = () => ({}),
   failureExtraOf: () => Record<string, unknown> = () => ({}),

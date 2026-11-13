@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { child } from '../xml/tree';
 import type { AnswerDetail } from './projections';
 
 export type { AnswerDetail };
@@ -24,13 +23,12 @@ export const DETAIL_SHAPE = {
     .describe(DETAIL_WORDS),
 };
 
-/** Whether `value` is one of the three levels. */
-function isDetail(value: unknown): value is AnswerDetail {
-  return value === 'terse' || value === 'full' || value === 'raw';
+/** What a tool's arguments say of the detail: the field `DETAIL_SHAPE` adds. */
+export interface DetailArgs {
+  readonly detail?: AnswerDetail | undefined;
 }
 
-/** Read it out of `args`, defaulting to terse. An unknown value is terse too. */
-export function detailOf(args: unknown): AnswerDetail {
-  const value = child(args, 'detail');
-  return isDetail(value) ? value : 'terse';
+/** The detail `args` asked for, defaulting to terse. */
+export function detailOf(args: DetailArgs): AnswerDetail {
+  return args.detail ?? 'terse';
 }

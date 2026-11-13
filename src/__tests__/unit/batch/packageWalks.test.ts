@@ -1169,7 +1169,9 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
 
 describe('GetObjectsList: the cache', () => {
   it('a list call leaves it as it was; a single call writes it', async () => {
-    const before = { objects: [{ OBJECT_NAME: 'BEFORE' }] };
+    const before = {
+      objects: [{ OBJECT_TYPE: 'PROG/P', OBJECT_NAME: 'BEFORE' }],
+    };
     objectsListCache.setCache(before);
     await withinTurns(
       handleGetObjectsList(contextOn(system()), {

@@ -20,9 +20,7 @@ export const READ_PART_FIELD = z
   .optional()
   .describe(READ_PART_WORDS);
 
-/** The part a call asked for, or an error naming the two values. */
-export function readPartOf(part: unknown): ReadPart | Error {
-  if (part === undefined || part === 'source') return 'source';
-  if (part === 'metadata') return 'metadata';
-  return new Error('part must be "source" or "metadata"');
+/** The part a call asked for: `source` when it named none. */
+export function readPartOf(part: ReadPart | undefined): ReadPart {
+  return part ?? 'source';
 }

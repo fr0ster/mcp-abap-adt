@@ -271,7 +271,7 @@ export function breakpointKey(
   }
 }
 
-function isDebuggeeEnd(value: unknown): value is DebuggeeEnd {
+function isDebuggeeEnd(value: string | undefined): value is DebuggeeEnd {
   return value === 'debuggeeEnded' || value === 'terminateDebuggee';
 }
 export function readDebuggeeEnd(body: string): DebuggeeEnd | undefined {

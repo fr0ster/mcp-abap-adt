@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { child, type Element, isElement, isList } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
   available_in: ['onprem', 'cloud'] as const,
@@ -15,7 +14,10 @@ export const TOOL_DEFINITION = {
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
 import { answerRequestThrown } from '../../../lib/answer';
-import { objectsListCache } from '../../../lib/getObjectsListCache';
+import {
+  type CachedObject,
+  objectsListCache,
+} from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { makeAdtRequest } from '../../../lib/utils';
 
@@ -51,14 +53,13 @@ export async function handleGetObjectNodeFromCache(
     };
   }
   const cache = objectsListCache.getCache();
-  const cached = child(cache, 'objects');
-  const objects = isList(cached) ? cached : [];
-  const matches = (obj: unknown) =>
-    child(obj, 'OBJECT_TYPE') === object_type &&
-    child(obj, 'OBJECT_NAME') === object_name &&
-    child(obj, 'TECH_NAME') === tech_name;
+  const objects = cache !== null && 'objects' in cache ? cache.objects : [];
+  const matches = (obj: CachedObject) =>
+    obj.OBJECT_TYPE === object_type &&
+    obj.OBJECT_NAME === object_name &&
+    obj.TECH_NAME === tech_name;
   const found = objects.find(matches);
-  if (!isElement(found)) {
+  if (found === undefined) {
     logger?.debug(
       `Node ${object_type}/${object_name}/${tech_name} not found in cache`,
     );
@@ -67,7 +68,7 @@ export async function handleGetObjectNodeFromCache(
       content: [{ type: 'text', text: 'Node not found in cache' }],
     };
   }
-  let node: Element = found;
+  let node: CachedObject = found;
   const objectUri = node.OBJECT_URI;
   if (objectUri && !node.object_uri_response) {
     const buildEndpoint = (uri: string) => {
@@ -82,7 +83,7 @@ export async function handleGetObjectNodeFromCache(
       }
       return uri;
     };
-    const endpoint = atActiveVersion(buildEndpoint(String(objectUri)));
+    const endpoint = atActiveVersion(buildEndpoint(objectUri));
     let resp: Awaited<ReturnType<typeof makeAdtRequest>>;
     try {
       // No deadline of the server's: the request waits for SAP's answer.
@@ -104,13 +105,11 @@ export async function handleGetObjectNodeFromCache(
 
     // Persist the fetched OBJECT_URI payload back into the cache entry
     const idx = objects.findIndex(matches);
-    if (idx >= 0 && isElement(cache)) {
+    if (idx >= 0 && cache !== null && 'objects' in cache) {
       objectsListCache.setCache({
         ...cache,
         objects: objects.map((obj, at) =>
-          at === idx && isElement(obj)
-            ? { ...obj, object_uri_response: objectUriResponse }
-            : obj,
+          at === idx ? { ...obj, object_uri_response: objectUriResponse } : obj,
         ),
       });
     }

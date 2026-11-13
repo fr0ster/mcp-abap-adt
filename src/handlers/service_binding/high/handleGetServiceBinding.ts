@@ -49,7 +49,6 @@ export async function handleGetServiceBinding(
     return return_error(new Error('service_binding_name is required'));
   }
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
 
   // The config field is `bindingName`, not `serviceBindingName` — confirmed
   // against `IServiceBindingConfig`, and the pre-migration handler already

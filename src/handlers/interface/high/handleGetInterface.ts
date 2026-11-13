@@ -49,7 +49,6 @@ export async function handleGetInterface(
   if (!interface_name)
     return return_error(new Error('interface_name is required'));
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
   const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);
 

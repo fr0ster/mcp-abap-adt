@@ -63,7 +63,7 @@ describe('debug answers', () => {
   });
   it('the handle survives every detail: merged under terse and full, a block of its own under raw', async () => {
     const view = { value: { state: 'listening' }, raw: '<x/>' };
-    for (const detail of ['terse', 'full']) {
+    for (const detail of ['terse', 'full'] as const) {
       const r = await debugAnswer(
         { detail },
         async () => view,

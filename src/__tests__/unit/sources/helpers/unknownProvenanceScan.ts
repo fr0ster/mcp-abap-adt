@@ -958,10 +958,13 @@ export function untypedAnswers(
         ts.isCallExpression(node) &&
         checker.getTypeAtLocation(node).flags & ts.TypeFlags.Any
       ) {
+        // `satisfies` gives its operand a contextual type but leaves the
+        // expression's own type: what counts is where the whole lands.
         let outer: ts.Expression = node;
         while (
           ts.isParenthesizedExpression(outer.parent) ||
-          ts.isAwaitExpression(outer.parent)
+          ts.isAwaitExpression(outer.parent) ||
+          ts.isSatisfiesExpression(outer.parent)
         ) {
           outer = outer.parent;
         }
@@ -1001,9 +1004,17 @@ export function fixtureProgram(files: readonly string[]): ts.Program {
   });
 }
 
-/** Every production project: its configuration and the files it owns. */
+/**
+ * Every production project: its configuration and the files it owns. The
+ * root's TypeScript scripts are checked by `tsconfig.test.json`, the one
+ * project whose `include` reaches them. A JavaScript source (`bin`, the
+ * `.mjs` scripts and tools) carries no type for the audit to follow.
+ */
 export function productionProjects(): { tsconfig: string; dir: string }[] {
-  const out = [{ tsconfig: 'tsconfig.json', dir: 'src' }];
+  const out = [
+    { tsconfig: 'tsconfig.json', dir: 'src' },
+    { tsconfig: 'tsconfig.test.json', dir: 'scripts' },
+  ];
   for (const entry of fs.readdirSync(REPO, { withFileTypes: true })) {
     const tsconfig = path.join(entry.name, 'tsconfig.json');
     if (
@@ -1043,6 +1054,7 @@ function eachProductionProject<T>(
           (file) =>
             file.startsWith(dir) &&
             !file.includes(`${path.sep}__tests__${path.sep}`) &&
+            !file.includes(`${path.sep}__fixtures__${path.sep}`) &&
             !file.includes(`${path.sep}__typechecks__${path.sep}`),
         ),
     );

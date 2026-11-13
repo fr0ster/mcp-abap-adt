@@ -15,6 +15,7 @@ import { describe, it } from 'node:test';
 import { REPO } from './helpers/failureScan';
 import {
   fixtureProgram,
+  productionProjects,
   scanFiles,
   scanProduction,
   staleReaders,
@@ -223,7 +224,7 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     const found = untypedAnswers(fixtureProgram([file]), new Set([file]));
     assert.deepEqual(
       found.map((entry) => entry.where.split('/').pop()),
-      ['untypedAnswer.ts:9', 'untypedAnswer.ts:14'],
+      ['untypedAnswer.ts:9', 'untypedAnswer.ts:14', 'untypedAnswer.ts:35'],
     );
   });
 });
@@ -242,6 +243,16 @@ describe('production code holds as unknown only what comes from outside the type
             `${entry.where} ${entry.key} ${entry.cls}: ${entry.types.join(' | ')}`,
         ),
       [],
+    );
+  });
+
+  it("reads the root's TypeScript scripts too", () => {
+    assert.ok(
+      productionProjects().some(
+        (project) =>
+          project.dir === 'scripts' &&
+          project.tsconfig === 'tsconfig.test.json',
+      ),
     );
   });
 

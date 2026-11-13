@@ -21,7 +21,7 @@ against a `?: T`.
 
 | Rule | Refused | Gate |
 |---|---|---|
-| Type assertion | `x as T`, `<T>x`, `as unknown as T`, `as never` (only `as const` stays) | `staticTypes.test.ts`; Biome `noUnsafeTypeAssertion` |
+| Type assertion | `x as T`, `<T>x`, `as unknown as T`, `as never`, and in JavaScript `/** @type {T} */ (x)` (only `as const` and `@type {const}` stay) | `staticTypes.test.ts`; Biome `noUnsafeTypeAssertion` |
 | `any` | the `any` type anywhere a type is written | `staticTypes.test.ts`; Biome `noExplicitAny`, `noImplicitAnyLet`; `noImplicitAny` |
 | `!` | a non-null assertion (`x!`) and a definite assignment (`let x!: T`, `field!: T`) | `staticTypes.test.ts` |
 | Suppression | `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, `biome-ignore` in any comment | `staticTypes.test.ts` |
@@ -30,8 +30,9 @@ against a `?: T`.
 
 - **The scans read syntax trees, never text** (`src/__tests__/unit/sources/helpers/typeEscapeScan.ts`,
   `regexScan.ts`, `unknownProvenanceScan.ts`), over every git-tracked or new production source,
-  `.ts`, `.mts`, `.cts`, `.js`, `.mjs` and `.cjs`. There is no allow-list: a finding is fixed in
-  the code.
+  `.ts`, `.mts`, `.cts`, `.js`, `.mjs` and `.cjs`. The unknown audit follows types, so it reads
+  the TypeScript sources: every package's `src` and the root's `scripts`; a JavaScript source
+  carries no type for it to follow. There is no allow-list: a finding is fixed in the code.
 - **A value from outside the type system** — a tool's arguments from the model, SAP's answers, a
   parsed document, the environment, a file, a caught value — is checked at run time, in plain
   code, once, at the boundary where it enters; it is typed after. A value that has a contract type

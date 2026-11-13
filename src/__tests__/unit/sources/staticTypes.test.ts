@@ -311,12 +311,16 @@ describe('the scan refuses each escape, and only those', () => {
     '__fixtures__',
     'typeEscapes',
   );
-  const fixture = (kind: 'refused' | 'clean', name: string) =>
-    path.join(root, kind, `${name}.ts`);
+  // A fixture is `<name>.ts`, or `<name>.mjs` for a JavaScript-only form.
+  const fixture = (kind: 'refused' | 'clean', name: string) => {
+    const ts = path.join(root, kind, `${name}.ts`);
+    return fs.existsSync(ts) ? ts : path.join(root, kind, `${name}.mjs`);
+  };
   const REFUSED: ReadonlyArray<readonly [string, EscapeRule]> = [
     ['assertion', 'assertion'],
     ['angleBracketAssertion', 'assertion'],
     ['asUnknownAs', 'assertion'],
+    ['jsdocAssertion', 'assertion'],
     ['any', 'any'],
     ['nonNull', '!'],
     ['definiteAssignment', '!'],
@@ -329,7 +333,7 @@ describe('the scan refuses each escape, and only those', () => {
   it('has one fixture per way past it, every rule among them', () => {
     const onDisk = fs
       .readdirSync(path.join(root, 'refused'))
-      .map((name) => path.basename(name, '.ts'))
+      .map((name) => path.basename(path.basename(name, '.ts'), '.mjs'))
       .sort();
     assert.deepEqual(onDisk, REFUSED.map(([name]) => name).sort());
     const rules: EscapeRule[] = [
@@ -354,5 +358,9 @@ describe('the scan refuses each escape, and only those', () => {
 
   it('accepts as const, <const>, satisfies, the logical ! and the words in a string', () => {
     assert.deepEqual(scanFile(fixture('clean', 'allowed')), []);
+  });
+
+  it('accepts JSDoc that types a declaration, and a JSDoc const assertion', () => {
+    assert.deepEqual(scanFile(fixture('clean', 'allowedJs')), []);
   });
 });

@@ -29,3 +29,15 @@ function describe(value: unknown): string {
 export function handed(text: string): string {
   return describe(JSON.parse(text));
 }
+
+/** Refused: `satisfies` checks against `unknown` but leaves the parse `any`. */
+export function satisfied(text: string): string {
+  const parsed = JSON.parse(text) satisfies unknown;
+  return parsed.name;
+}
+
+/** Passes: `satisfies` inside a declaration typed `unknown`. */
+export function satisfiedAndTaken(text: string): string {
+  const parsed: unknown = JSON.parse(text) satisfies unknown;
+  return typeof parsed === 'string' ? parsed : '';
+}

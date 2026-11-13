@@ -123,13 +123,24 @@ function isConstAssertion(type: ts.TypeNode): boolean {
   );
 }
 
-function nodeRule(node: ts.Node): EscapeRule | undefined {
+/**
+ * A JSDoc type assertion of JavaScript, `/** @type {T} *\/ (value)`: a
+ * parenthesized expression carrying a `@type` tag, read as `as T` is.
+ */
+function isJsDocAssertion(node: ts.Node, javaScript: boolean): boolean {
+  if (!javaScript || !ts.isParenthesizedExpression(node)) return false;
+  const type = ts.getJSDocTypeTag(node)?.typeExpression.type;
+  return type !== undefined && !isConstAssertion(type);
+}
+
+function nodeRule(node: ts.Node, javaScript: boolean): EscapeRule | undefined {
   if (
     (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) &&
     !isConstAssertion(node.type)
   ) {
     return 'assertion';
   }
+  if (isJsDocAssertion(node, javaScript)) return 'assertion';
   if (node.kind === ts.SyntaxKind.AnyKeyword) return 'any';
   if (ts.isNonNullExpression(node)) return '!';
   if (
@@ -163,7 +174,7 @@ export function scanFile(file: string): Escape[] {
   };
 
   const visit = (node: ts.Node) => {
-    const rule = nodeRule(node);
+    const rule = nodeRule(node, scriptKind(file) === ts.ScriptKind.JS);
     if (rule !== undefined) {
       found.push({
         rule,

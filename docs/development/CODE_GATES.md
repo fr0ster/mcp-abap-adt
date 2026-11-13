@@ -22,10 +22,10 @@ against a `?: T`.
 | Rule | Refused | Gate |
 |---|---|---|
 | Type assertion | `x as T`, `<T>x`, `as unknown as T`, `as never`, and in JavaScript `/** @type {T} */ (x)` (only `as const` and `@type {const}` stay) | `staticTypes.test.ts`; Biome `noUnsafeTypeAssertion` |
-| `any` | the `any` type anywhere a type is written | `staticTypes.test.ts`; Biome `noExplicitAny`, `noImplicitAnyLet`; `noImplicitAny` |
+| `any` | the `any` type anywhere a type is written, JSDoc's `*` and `?` in JavaScript too | `staticTypes.test.ts`; Biome `noExplicitAny`, `noImplicitAnyLet`; `noImplicitAny` |
 | `!` | a non-null assertion (`x!`) and a definite assignment (`let x!: T`, `field!: T`) | `staticTypes.test.ts` |
 | Suppression | `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, `biome-ignore` in any comment | `staticTypes.test.ts` |
-| Regex | a regex literal, any reference to `RegExp`, `match` / `matchAll` / `search` on a string | `noRegexOverInput.test.ts` |
+| Regex | a regex literal, any reference to `RegExp`, `match` / `matchAll` / `search` on a string, called or taken off it (`call`, `bind`, `String.prototype`, destructuring) | `noRegexOverInput.test.ts` |
 | `unknown` | a value typed `unknown` whose origin has a contract type | `unknownSources.test.ts` |
 
 - **The scans read syntax trees, never text** (`src/__tests__/unit/sources/helpers/typeEscapeScan.ts`,

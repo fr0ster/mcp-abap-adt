@@ -141,7 +141,14 @@ function nodeRule(node: ts.Node, javaScript: boolean): EscapeRule | undefined {
     return 'assertion';
   }
   if (isJsDocAssertion(node, javaScript)) return 'assertion';
-  if (node.kind === ts.SyntaxKind.AnyKeyword) return 'any';
+  // JSDoc's `*` and `?` are `any` to the compiler, as the keyword is.
+  if (
+    node.kind === ts.SyntaxKind.AnyKeyword ||
+    node.kind === ts.SyntaxKind.JSDocAllType ||
+    node.kind === ts.SyntaxKind.JSDocUnknownType
+  ) {
+    return 'any';
+  }
   if (ts.isNonNullExpression(node)) return '!';
   if (
     (ts.isVariableDeclaration(node) || ts.isPropertyDeclaration(node)) &&

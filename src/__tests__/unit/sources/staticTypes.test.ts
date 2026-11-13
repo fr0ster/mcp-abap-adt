@@ -322,6 +322,7 @@ describe('the scan refuses each escape, and only those', () => {
     ['asUnknownAs', 'assertion'],
     ['jsdocAssertion', 'assertion'],
     ['any', 'any'],
+    ['jsdocAny', 'any'],
     ['nonNull', '!'],
     ['definiteAssignment', '!'],
     ['tsIgnore', '@ts-ignore'],

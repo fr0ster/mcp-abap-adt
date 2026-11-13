@@ -176,6 +176,45 @@ function isStringCompilingCall(
   return isStringOrAny(checker.getTypeAtLocation(callee.expression));
 }
 
+/** A string's own type, or the `String` interface (`String.prototype`). */
+function isStringReceiver(type: ts.Type): boolean {
+  return isStringOrAny(type) || type.getSymbol()?.getName() === 'String';
+}
+
+/**
+ * `match`, `matchAll` or `search` taken off a string without being called
+ * there — `value.match.call(…)`, `value.search.bind(…)`,
+ * `String.prototype.matchAll`, `const { match } = value` — compiles its
+ * argument all the same once called. A direct call is
+ * {@link isStringCompilingCall}'s.
+ */
+function isStringCompilingReference(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+): boolean {
+  if (ts.isBindingElement(node)) {
+    const key = node.propertyName ?? node.name;
+    if (!ts.isIdentifier(key) || !STRING_COMPILING.has(key.text)) return false;
+    const pattern = node.parent;
+    return (
+      ts.isObjectBindingPattern(pattern) &&
+      isStringReceiver(checker.getTypeAtLocation(pattern))
+    );
+  }
+  if (
+    !ts.isPropertyAccessExpression(node) &&
+    !ts.isElementAccessExpression(node)
+  ) {
+    return false;
+  }
+  const name = accessedName(node);
+  if (name === undefined || !STRING_COMPILING.has(name)) return false;
+  if (ts.isCallExpression(node.parent) && node.parent.expression === node) {
+    return false;
+  }
+  return isStringReceiver(checker.getTypeAtLocation(node.expression));
+}
+
 function isRegExpReference(node: ts.Node): boolean {
   if (ts.isIdentifier(node)) return node.text === 'RegExp';
   return ts.isElementAccessExpression(node) && accessedName(node) === 'RegExp';
@@ -199,7 +238,8 @@ export function regexSitesIn(
       if (
         node.kind === ts.SyntaxKind.RegularExpressionLiteral ||
         isRegExpReference(node) ||
-        isStringCompilingCall(node, checker)
+        isStringCompilingCall(node, checker) ||
+        isStringCompilingReference(node, checker)
       ) {
         const start = node.getStart(source);
         const line = source.getLineAndCharacterOfPosition(start).line + 1;

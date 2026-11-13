@@ -74,6 +74,12 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(id.refused, false);
   });
 
+  it('an awaited value is typed by what the promise holds, not the promise', () => {
+    const value = site('awaited', 'value');
+    assert.equal(value.cls, 'boundary');
+    assert.equal(value.refused, false);
+  });
+
   it('a named sink passes', () => {
     const meta = sitesOf('namedSink').filter((entry) => entry.name === 'meta');
     assert.equal(meta.length, 1);

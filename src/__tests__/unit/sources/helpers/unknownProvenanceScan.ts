@@ -172,6 +172,22 @@ function strip(expression: ts.Expression): ts.Expression {
   return current;
 }
 
+/** Whether an `await` is among the wrappers `strip` takes off. */
+function awaits(expression: ts.Expression): boolean {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isAwaitExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    if (ts.isAwaitExpression(current)) return true;
+    current = current.expression;
+  }
+  return false;
+}
+
 function nameOf(node: ts.Node): string {
   if (
     (ts.isParameter(node) ||
@@ -713,7 +729,10 @@ export class ProvenanceScan {
     }
     const boundary = this.boundaryOrigin(expression);
     if (boundary) return [boundary];
-    const type = this.checker.getTypeAtLocation(expression);
+    // An awaited source is what its promise holds, not the promise.
+    const type = awaits(source)
+      ? this.checker.getTypeAtLocation(source)
+      : this.checker.getTypeAtLocation(expression);
     if (this.absent(type)) return [];
     if (this.declaredContractless(expression)) return this.followed(expression);
     if (this.dom(type)) return ['boundary'];

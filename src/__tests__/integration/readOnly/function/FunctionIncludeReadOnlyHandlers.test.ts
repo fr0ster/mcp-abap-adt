@@ -45,19 +45,28 @@ import {
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
-/** What this file's cases state, as its tests read them. */
+/** What the include read's case states. */
 const FunctionIncludeReadParams = z.looseObject({
   function_group_name: z.string(),
   include_name: z.string(),
 });
 
-/** A case's parameters, read through FunctionIncludeReadParams. */
-const paramsOf = (testCase: TestCase) =>
+/** What the list cases state: the group alone. */
+const FunctionGroupListParams = z.looseObject({
+  function_group_name: z.string(),
+});
+
+/** The include read's case parameters, read through FunctionIncludeReadParams. */
+const includeParamsOf = (testCase: TestCase) =>
   readCaseParams(
     testCase.params,
     FunctionIncludeReadParams,
     'read_function_include_readonly',
   );
+
+/** A list case's parameters, read through FunctionGroupListParams. */
+const groupParamsOf = (testCase: TestCase, section: string) =>
+  readCaseParams(testCase.params, FunctionGroupListParams, section);
 
 const testLogger = createTestLogger('function-include-readonly');
 
@@ -141,8 +150,10 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = paramsOf(testCase).function_group_name;
-    const includeName = paramsOf(testCase).include_name;
+    const {
+      function_group_name: functionGroupName,
+      include_name: includeName,
+    } = includeParamsOf(testCase);
 
     testLogger?.info(
       `📖 Reading include ${includeName} of group ${functionGroupName}...`,
@@ -188,11 +199,8 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       response,
       z.looseObject({
         function_group_name: z.unknown(),
-        function_modules: z.unknown(),
         include_name: z.unknown(),
-        includes: z.unknown(),
         success: z.unknown(),
-        total: z.unknown(),
       }),
     );
     assert.equal(data.success, true);
@@ -222,7 +230,10 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = paramsOf(testCase).function_group_name;
+    const functionGroupName = groupParamsOf(
+      testCase,
+      'list_function_group_includes_readonly',
+    ).function_group_name;
 
     testLogger?.info(`📋 Listing includes of group ${functionGroupName}...`);
 
@@ -258,8 +269,6 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       response,
       z.looseObject({
         function_group_name: z.unknown(),
-        function_modules: z.unknown(),
-        include_name: z.unknown(),
         includes: z.unknown(),
         success: z.unknown(),
         total: z.unknown(),
@@ -304,7 +313,10 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = paramsOf(testCase).function_group_name;
+    const functionGroupName = groupParamsOf(
+      testCase,
+      'list_function_modules_readonly',
+    ).function_group_name;
     // The shared FM that lives in ZMCP_SHR_FGRP (see check_function_module_high).
     const expectedFm = 'Z_MCP_SHR_FM';
 
@@ -345,8 +357,6 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       z.looseObject({
         function_group_name: z.unknown(),
         function_modules: z.unknown(),
-        include_name: z.unknown(),
-        includes: z.unknown(),
         success: z.unknown(),
         total: z.unknown(),
       }),

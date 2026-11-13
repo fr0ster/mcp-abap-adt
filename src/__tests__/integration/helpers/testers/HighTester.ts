@@ -388,20 +388,20 @@ export class HighTester extends LambdaTester {
   private buildCreateArgs(context: LambdaTesterContext): ToolArgs {
     const { objectName, params, packageName, transportRequest } = context;
     const nameField = this.getCreateUpdateNameField();
-    return {
+    return this.declaredBy('create', {
       [nameField]: objectName,
       package_name: packageName,
       description: params.description || objectName,
       ...statedOf(params, CREATE_STATED),
       ...givenOf(params, GIVEN),
       ...(transportRequest && { transport_request: transportRequest }),
-    };
+    });
   }
 
   private buildUpdateArgs(context: LambdaTesterContext): ToolArgs {
     const { objectName, params, packageName, transportRequest } = context;
     const nameField = this.getCreateUpdateNameField();
-    return {
+    return this.declaredBy('update', {
       [nameField]: objectName,
       ...(packageName && { package_name: packageName }),
       ...(transportRequest && { transport_request: transportRequest }),
@@ -418,7 +418,25 @@ export class HighTester extends LambdaTester {
       ...statedOf(params, UPDATE_STATED),
       ...givenOf(params, GIVEN),
       ...firstStated(params, 'ddl_source', ['update_ddl_source', 'ddl_source']),
-    };
+    });
+  }
+
+  /**
+   * Of `args`, the ones the `step` tool's schema names: the stated keys are
+   * one list for every object type (a class's `source_code`, a table's
+   * `ddl_code`), and a model sends a tool only the arguments its schema
+   * offers, so a key another type's tool takes is not sent.
+   */
+  private declaredBy(
+    step: 'create' | 'update',
+    args: Record<string, unknown>,
+  ): ToolArgs {
+    const entry = this.workflowFunctions?.[step];
+    if (!entry) return args;
+    const shape = entry.toolDefinition.inputSchema.shape;
+    return Object.fromEntries(
+      Object.entries(args).filter(([key]) => Object.hasOwn(shape, key)),
+    );
   }
 
   private buildDeleteArgs(context: LambdaTesterContext): ToolArgs {

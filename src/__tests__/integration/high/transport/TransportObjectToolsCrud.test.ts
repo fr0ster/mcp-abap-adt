@@ -158,8 +158,8 @@ import {
 
 /** What the transport tools answer, as these tests read it. */
 const TransportAnswer = z.looseObject({
-  success: z.unknown(),
-  accepted: z.unknown(),
+  success: z.unknown().optional(),
+  accepted: z.unknown().optional(),
   count: z.number().optional(),
   entries: z.array(z.unknown()).optional(),
   objects: z
@@ -176,6 +176,15 @@ const TransportAnswer = z.looseObject({
   task_number: z.string().optional(),
   transport_number: z.string().optional(),
   transport: z.looseObject({ target_system: z.string().optional() }).optional(),
+});
+
+/**
+ * What MoveTransportObjects answers, as these tests read it: `accepted`, and
+ * an echo of the entries it was sent (`object`, `position`), not the
+ * `objects` a read lists.
+ */
+const MoveAnswer = z.looseObject({
+  accepted: z.unknown().optional(),
 });
 
 /** A transport tool's answer, read through TransportAnswer. */
@@ -844,7 +853,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       );
       expectOk(moveResponse, 'Step 11 MoveTransportObjects', logger);
       entryTask = secondTaskNumber;
-      const moveData = answerOf(moveResponse);
+      const moveData = handlerAnswer(moveResponse, MoveAnswer);
       assert.equal(moveData.accepted, true);
       assert.equal('success' in moveData, false);
 

@@ -14,7 +14,17 @@ type RouteHandler = (
   next?: NextFunction,
 ) => void | Promise<void>;
 
-function reject(message: string): { status: number; body: unknown } {
+/** The refusal a rebinding request is answered: a JSON-RPC error, no id. */
+export interface RebindingRefusal {
+  status: number;
+  body: {
+    jsonrpc: '2.0';
+    error: { code: number; message: string };
+    id: null;
+  };
+}
+
+function reject(message: string): RebindingRefusal {
   return {
     status: 403,
     body: { jsonrpc: '2.0', error: { code: -32000, message }, id: null },
@@ -25,7 +35,7 @@ function reject(message: string): { status: number; body: unknown } {
 export function checkDnsRebinding(
   headers: { host?: string | undefined; origin?: string | undefined },
   opts: DnsRebindingOptions,
-): { status: number; body: unknown } | null {
+): RebindingRefusal | null {
   if (opts.enable !== true) return null;
   const hosts = opts.allowedHosts ?? [];
   const origins = opts.allowedOrigins ?? [];

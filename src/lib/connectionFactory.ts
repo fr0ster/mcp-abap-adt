@@ -220,10 +220,9 @@ function clip(value: unknown, ceiling: number): string {
     : text;
 }
 
-function safeHeaders(headers: unknown): string {
-  if (headers === null || typeof headers !== 'object') return '';
-  const out: Record<string, unknown> = {};
-  for (const [name, value] of entries(headers)) {
+function safeHeaders(headers: Readonly<Record<string, string>>): string {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
     out[name] = isRedactedHeader(name) ? '[redacted]' : value;
   }
   return JSON.stringify(out);

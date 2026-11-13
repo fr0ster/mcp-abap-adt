@@ -69,9 +69,9 @@ const TERMINATION_RELATION =
  * Nothing when the document has no such root.
  */
 export function dumpSummaryOf(
-  raw: unknown,
+  raw: string,
 ): Record<string, unknown> | undefined {
-  if (typeof raw !== 'string' || !raw.trim().startsWith('<')) return undefined;
+  if (!raw.trim().startsWith('<')) return undefined;
   let parsed: unknown;
   try {
     parsed = dumpXmlParser.parse(raw);

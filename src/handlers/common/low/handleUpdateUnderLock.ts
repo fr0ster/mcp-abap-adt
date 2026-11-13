@@ -192,7 +192,8 @@ const text = (value: unknown): string | undefined =>
 const requiredText = (field: string, value: unknown): string | Error =>
   text(value) ?? new Error(`${field} is required`);
 
-const upper = (value: unknown): string => String(value ?? '').toUpperCase();
+const upper = (value: string | undefined): string =>
+  (value ?? '').toUpperCase();
 
 const ANSWER = { tool: 'HandlerUpdate', detail: 'terse' } as const;
 
@@ -283,7 +284,10 @@ export async function handleUpdateUnderLock(
     transport_request: args.transport_request,
   } as const;
   const client = () => createAdtClient(connection, logger);
-  const required = (field: string, value: unknown): Error | undefined =>
+  const required = (
+    field: string,
+    value: string | undefined,
+  ): Error | undefined =>
     text(value) === undefined ? new Error(`${field} is required`) : undefined;
   const transport = transportRequest ? { transportRequest } : {};
 

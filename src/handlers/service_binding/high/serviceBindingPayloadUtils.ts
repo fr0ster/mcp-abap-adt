@@ -15,7 +15,7 @@ export function resolveServiceBindingAcceptHeader(
 }
 
 export function parseServiceBindingPayload(
-  payload: unknown,
+  payload: string,
   format: ServiceBindingResponseFormat,
 ): unknown {
   if (format === 'plain') {
@@ -23,18 +23,11 @@ export function parseServiceBindingPayload(
   }
 
   if (format === 'json') {
-    if (typeof payload === 'string') {
-      try {
-        return JSON.parse(payload);
-      } catch {
-        return payload;
-      }
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return payload;
     }
-    return payload;
-  }
-
-  if (typeof payload !== 'string') {
-    return payload;
   }
 
   const trimmed = payload.trim();

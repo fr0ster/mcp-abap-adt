@@ -39,6 +39,7 @@ import {
   type ToolSetKind,
 } from '../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from './adtStandIn';
+import { clientTransport } from './clientTransport';
 
 /** The system kinds a live run reaches: the on-premise system and the BTP trial. */
 export type SystemKind = 'onprem' | 'cloud';
@@ -194,9 +195,11 @@ async function httpTools(
   const port = boundPort(mcp);
   try {
     return await listOver(
-      new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
-        { requestInit: { headers: sapHeaders(standIn.url) } },
+      clientTransport(
+        new StreamableHTTPClientTransport(
+          new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
+          { requestInit: { headers: sapHeaders(standIn.url) } },
+        ),
       ),
     );
   } finally {

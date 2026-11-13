@@ -17,18 +17,18 @@ export interface LambdaTesterContext {
   connection: IAbapConnection;
   session: SessionInfo;
   logger: LoggerWithExtras;
-  authType?: string;
-  connectionSource?: 'auth_broker' | 'env' | 'unknown';
+  authType?: string | undefined;
+  connectionSource?: 'auth_broker' | 'env' | 'unknown' | undefined;
   isCloudSystem: boolean;
-  objectName?: string | null;
+  objectName?: string | null | undefined;
   params: any;
   packageName: string;
-  transportRequest?: string;
-  lockHandle?: string | null;
-  lockSession?: SessionInfo | null;
+  transportRequest?: string | undefined;
+  lockHandle?: string | null | undefined;
+  lockSession?: SessionInfo | null | undefined;
   cleanupAfter: () => Promise<void>;
   // Common configuration parameters shared across all tests
-  defaultPackage?: string;
+  defaultPackage?: string | undefined;
   testCase: any; // Test case definition from YAML
 }
 

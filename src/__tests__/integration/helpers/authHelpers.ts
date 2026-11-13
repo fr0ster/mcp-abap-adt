@@ -212,17 +212,19 @@ export function createTestFactory(
     config?.auth_broker?.unsafe === true ||
     config?.auth_broker?.unsafe_session_store === true;
 
+  const logger = createBrokerLogger();
+  // The test config's browser word, mapped as the server maps --browser.
+  const browser = browserOf(
+    browserFor(
+      { browser: config?.auth_broker?.browser ?? 'system' },
+      process.platform,
+    ),
+  );
   return new AuthBrokerFactory({
     mcpDestination: destination,
-    authBrokerPath: basePath,
+    ...(basePath !== undefined && { authBrokerPath: basePath }),
     unsafe: useUnsafe,
-    // The test config's browser word, mapped as the server maps --browser.
-    browser: browserOf(
-      browserFor(
-        { browser: config?.auth_broker?.browser ?? 'system' },
-        process.platform,
-      ),
-    ),
+    ...(browser !== undefined && { browser }),
     ...(config?.auth_broker?.browser_auth_port !== undefined && {
       browserAuthPort: Number(config.auth_broker.browser_auth_port),
     }),
@@ -244,7 +246,7 @@ export function createTestFactory(
       debug: () => {},
     }),
     // Only when DEBUG_BROKER is set — no default logger
-    logger: createBrokerLogger(),
+    ...(logger !== undefined && { logger }),
   });
 }
 

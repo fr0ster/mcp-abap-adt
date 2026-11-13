@@ -74,6 +74,7 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { McpResult } from '../../../../lib/answer';
+import { clientTransport } from '../../../helpers/clientTransport';
 import { repositoryRoot } from '../../../helpers/repoRoot';
 import { getTestDestination } from '../authHelpers';
 import { loadTestConfig, testAuthBrokerPath } from '../configHelpers';
@@ -687,9 +688,11 @@ async function startHttp(spec: HttpLaunch): Promise<LaunchedServer> {
   try {
     const address = await httpReady(child);
     const session = new McpSession(
-      new StreamableHTTPClientTransport(
-        new URL(`http://${address}/mcp/stream/http`),
-        { requestInit: { headers: spec.headers } },
+      clientTransport(
+        new StreamableHTTPClientTransport(
+          new URL(`http://${address}/mcp/stream/http`),
+          { requestInit: { headers: spec.headers } },
+        ),
       ),
     );
     await session.initialize();
@@ -777,9 +780,11 @@ export async function launchHttpScript(
     session: async (headers) => {
       refuseAfterMarker('a session');
       const session = new McpSession(
-        new StreamableHTTPClientTransport(url, {
-          requestInit: { headers },
-        }),
+        clientTransport(
+          new StreamableHTTPClientTransport(url, {
+            requestInit: { headers },
+          }),
+        ),
       );
       sessions.push(session);
       await session.initialize();
@@ -954,9 +959,11 @@ export async function createHardModeClient(
     logOn,
     launch: async () => {
       const session = new McpSession(
-        hard.transport === 'http'
-          ? new StreamableHTTPClientTransport(new URL(hard.http_url), options)
-          : new SSEClientTransport(new URL(hard.sse_url), options),
+        clientTransport(
+          hard.transport === 'http'
+            ? new StreamableHTTPClientTransport(new URL(hard.http_url), options)
+            : new SSEClientTransport(new URL(hard.sse_url), options),
+        ),
       );
       await session.initialize();
       return served(session, undefined);

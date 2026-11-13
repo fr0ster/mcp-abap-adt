@@ -115,9 +115,7 @@ function foreignConn(url: string): IAbapConnection {
   return { getBaseUrl: async () => url } as unknown as IAbapConnection;
 }
 
-type Options =
-  | { responsible?: string; masterSystem?: string; masterLanguage?: string }
-  | undefined;
+type Options = ConstructorParameters<typeof AdtClientOnPrem>[2];
 
 /** The options of the last client built, of either variant. */
 function lastOptions(): Options {

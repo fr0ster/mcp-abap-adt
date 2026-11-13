@@ -444,10 +444,13 @@ class Observer {
   openPolls = 0;
   private opened = 0;
   private pollWaiters: Array<() => void> = [];
-  onStop?: (
-    connection: IAbapConnection,
-    send: () => Promise<unknown>,
-  ) => Promise<unknown>;
+  /** The hook on a stop, while one is set; `undefined` once a case clears it. */
+  onStop?:
+    | ((
+        connection: IAbapConnection,
+        send: () => Promise<unknown>,
+      ) => Promise<unknown>)
+    | undefined;
 
   instrument(connection: IAbapConnection): IAbapConnection {
     const label = `c${++this.opened}`;

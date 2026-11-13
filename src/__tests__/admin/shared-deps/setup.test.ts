@@ -590,7 +590,6 @@ describe('Admin: Setup shared dependencies', () => {
                 tableName: item.name,
                 packageName,
                 description: item.description || 'Shared test table',
-                source: item.source,
                 transportRequest,
               },
               {
@@ -834,7 +833,6 @@ describe('Admin: Setup shared dependencies', () => {
                 ddlName: item.name,
                 packageName,
                 description: item.description || 'Shared test view',
-                source: item.source,
                 transportRequest,
               },
               {
@@ -965,7 +963,6 @@ describe('Admin: Setup shared dependencies', () => {
                   rootEntity: item.root_entity || item.name,
                   implementationType: item.implementation_type || 'Managed',
                   description: item.description || 'Shared test BDEF',
-                  source: item.source,
                   transportRequest,
                 },
                 {
@@ -1512,7 +1509,6 @@ describe('Admin: Setup shared dependencies', () => {
                   packageName,
                   description:
                     item.description || 'Shared test service definition',
-                  source: item.source,
                   transportRequest,
                 },
                 {

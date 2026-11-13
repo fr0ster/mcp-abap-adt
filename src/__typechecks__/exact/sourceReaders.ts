@@ -1,8 +1,7 @@
 /**
  * The exact-optional pairing typecheck of the 17 source readers (their schemas spread SOURCE_RANGE_SHAPE) (no-assertions plan, S2a):
- * each handler takes its definition's schema output. Run by
- * `npm run test:check:exact` with `exactOptionalPropertyTypes`, and by
- * `test:check` without it; never emitted (excluded from the build).
+ * each handler takes its definition's schema output. Run by `test:check`, under `exactOptionalPropertyTypes` as every
+ * project is; never emitted (excluded from the build).
  */
 
 import {

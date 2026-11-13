@@ -212,7 +212,7 @@ export interface StandOptions {
   /** How SAP answers each inner request (and each request outside a batch). */
   part: (inner: InnerRequest) => PartAnswer;
   /** How each built connection answers an envelope; default part by part. */
-  envelope?: EnvelopeAnswer;
+  envelope?: EnvelopeAnswer | undefined;
   keepRawParts?: boolean;
   /** The instance's held locks, as the Streamable HTTP host gives them. */
   heldLocks?: HeldLocks;

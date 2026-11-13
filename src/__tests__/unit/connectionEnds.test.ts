@@ -21,7 +21,7 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 const built: Closable[] = [];
 const records = new WeakMap<
   object,
-  { settings: SapConfig; credential?: IAuthProvider }
+  { settings: SapConfig; credential?: IAuthProvider | undefined }
 >();
 jest.mock('../../lib/connectionFactory', () => {
   const actual = jest.requireActual('../../lib/connectionFactory');

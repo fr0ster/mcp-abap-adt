@@ -2,8 +2,8 @@
  * The per-variant typecheck of the definitions in `src` stated per variant
  * (`byVariant`; no-assertions plan, S2a): each variant's schema output is an
  * argument its handler takes, so a later `byVariant` with a schema type per
- * variant cannot pass unnoticed. Run by `npm run test:check:exact` with
- * `exactOptionalPropertyTypes`, and by `test:check` without it; never emitted.
+ * variant cannot pass unnoticed. Run by `test:check`, under `exactOptionalPropertyTypes` as every
+ * project is; never emitted.
  */
 import type * as z from 'zod';
 import type {

@@ -19,6 +19,7 @@ import {
   type AdtStandIn,
   adtStandIn,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import { clientTransport } from '../../../../src/__tests__/helpers/clientTransport';
 import { main } from '../launcher';
 
 const seen: HandlerContext[] = [];
@@ -79,18 +80,20 @@ it('the HTTP launcher passes the shipped strategies to its per-request server', 
   const client = new Client({ name: 'http-strategies', version: '1.0.0' });
   try {
     await client.connect(
-      new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
-        {
-          requestInit: {
-            headers: {
-              'x-sap-url': standIn.url,
-              'x-sap-client': '100',
-              'x-sap-login': 'STRATEGY_USER',
-              'x-sap-password': 'strategy-password',
+      clientTransport(
+        new StreamableHTTPClientTransport(
+          new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
+          {
+            requestInit: {
+              headers: {
+                'x-sap-url': standIn.url,
+                'x-sap-client': '100',
+                'x-sap-login': 'STRATEGY_USER',
+                'x-sap-password': 'strategy-password',
+              },
             },
           },
-        },
+        ),
       ),
     );
     await client.callTool({

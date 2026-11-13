@@ -204,17 +204,18 @@ async function setUp(globalConfig: SetupConfig): Promise<void> {
     : undefined;
   const callbackPort = memberOf(broker, 'browser_auth_port');
 
+  // The test config's browser word, mapped as the server maps --browser.
+  const browser = browserOf(
+    browserFor(
+      { browser: textAt(broker, 'browser') || 'system' },
+      process.platform,
+    ),
+  );
   const factory = new AuthBrokerFactory({
     mcpDestination: destination,
-    authBrokerPath: basePath,
+    ...(basePath !== undefined && { authBrokerPath: basePath }),
     unsafe: useUnsafe,
-    // The test config's browser word, mapped as the server maps --browser.
-    browser: browserOf(
-      browserFor(
-        { browser: textAt(broker, 'browser') || 'system' },
-        process.platform,
-      ),
-    ),
+    ...(browser !== undefined && { browser }),
     ...(callbackPort !== undefined && {
       browserAuthPort: Number(callbackPort),
     }),

@@ -36,7 +36,7 @@ async function call(
   tool: string,
   args: Record<string, unknown>,
   connection = recordingConnection(),
-): Promise<{ isError?: boolean; text: string; sent: number }> {
+): Promise<{ isError?: boolean | undefined; text: string; sent: number }> {
   const entry = tools().get(tool);
   if (!entry) throw new Error(tool);
   const context = { connection, logger: silentLogger } as HandlerContext;

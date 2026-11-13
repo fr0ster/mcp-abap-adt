@@ -70,6 +70,7 @@ import {
   basicOf,
   isLogoff,
 } from '../helpers/adtStandIn';
+import { clientTransport } from '../helpers/clientTransport';
 
 type TransportName = 'stdio' | 'http' | 'sse';
 type SetName = 'full' | 'full-ro' | 'compact' | 'compact-ro';
@@ -614,7 +615,7 @@ async function serveHttpLike(
         : new SSEClientTransport(new URL(url), {
             requestInit: { headers },
           });
-    await client.connect(transport);
+    await client.connect(clientTransport(transport));
     return client;
   };
 
@@ -1214,13 +1215,15 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
             : `http://127.0.0.1:${port}/sse`;
         const headers = basicHeaders();
         await client.connect(
-          transportName === 'http'
-            ? new StreamableHTTPClientTransport(new URL(url), {
-                requestInit: { headers },
-              })
-            : new SSEClientTransport(new URL(url), {
-                requestInit: { headers },
-              }),
+          clientTransport(
+            transportName === 'http'
+              ? new StreamableHTTPClientTransport(new URL(url), {
+                  requestInit: { headers },
+                })
+              : new SSEClientTransport(new URL(url), {
+                  requestInit: { headers },
+                }),
+          ),
         );
       }
       const listed = (await client.listTools()).tools.find(
@@ -1418,13 +1421,15 @@ describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
       const client = new Client({ name: 'parity', version: '1.0.0' });
       open.clients.push(client);
       await client.connect(
-        transportName === 'http'
-          ? new StreamableHTTPClientTransport(new URL(url), {
-              requestInit: { headers: basicHeaders() },
-            })
-          : new SSEClientTransport(new URL(url), {
-              requestInit: { headers: basicHeaders() },
-            }),
+        clientTransport(
+          transportName === 'http'
+            ? new StreamableHTTPClientTransport(new URL(url), {
+                requestInit: { headers: basicHeaders() },
+              })
+            : new SSEClientTransport(new URL(url), {
+                requestInit: { headers: basicHeaders() },
+              }),
+        ),
       );
       const isLookup = (r: { url: string }) =>
         r.url.includes('systeminformation');

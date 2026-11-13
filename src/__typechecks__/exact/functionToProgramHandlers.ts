@@ -1,8 +1,7 @@
 /**
  * The exact-optional pairing typecheck of the handlers of function, function_group, function_include, function_module, include, interface, message_class, metadata_extension, package and program (no-assertions plan, S2a):
- * each handler takes its definition's schema output. Run by
- * `npm run test:check:exact` with `exactOptionalPropertyTypes`, and by
- * `test:check` without it; never emitted (excluded from the build).
+ * each handler takes its definition's schema output. Run by `test:check`, under `exactOptionalPropertyTypes` as every
+ * project is; never emitted (excluded from the build).
  */
 
 import {

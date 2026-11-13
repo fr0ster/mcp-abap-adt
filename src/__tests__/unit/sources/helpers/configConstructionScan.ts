@@ -35,9 +35,15 @@
  *   config target;
  * - a forbidden key merged by an intersection (`ISapRfcApplicationServer &
  *   { url?: undefined }`, either order): the checker merges `never &
- *   undefined` to `never`, so the key reads as absent — while the production
- *   compile (without `exactOptionalPropertyTypes`) accepts a value with
- *   `url: undefined` of this type (pinned by `clean/mergedNeverUndefined*.ts`).
+ *   undefined` to `never`, so the key reads as absent (pinned by
+ *   `clean/mergedNeverUndefined*.ts`). The production compile, with
+ *   `exactOptionalPropertyTypes` (plan S2f), refuses to build a value with
+ *   `url: undefined` of this type, so only an assertion could make one.
+ *
+ * The production compile refuses the first three too, and every forbidden
+ * key this scan finds but a conditional's (`conditionalSource.ts`: the
+ * branches' union reduces to `url?: undefined`) — `rfcConfigConstruction.test.ts`,
+ * "the compiler closes what the construction scan cannot see".
  */
 
 import * as fs from 'node:fs';

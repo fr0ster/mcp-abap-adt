@@ -1,9 +1,8 @@
 /**
  * The exact-optional pairing typecheck of compact-readonly-entries's handlers (no-assertions plan,
  * S2a): each handler takes its definition's schema output, and a definition
- * stated per variant has each variant's output accepted by its handler. Run
- * by `npm run test:check:exact` with `exactOptionalPropertyTypes`, and by
- * `test:check` without it; never emitted (excluded from the package build).
+ * stated per variant has each variant's output accepted by its handler. Run by `test:check`, under `exactOptionalPropertyTypes` as every
+ * project is; never emitted (excluded from the package build).
  */
 import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import type * as z from 'zod';

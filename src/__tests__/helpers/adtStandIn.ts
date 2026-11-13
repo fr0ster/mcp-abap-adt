@@ -351,7 +351,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       answers.push({ match, status, once: true });
     },
     body: (match, text, headers) => {
-      bodies.push({ match, text, headers });
+      bodies.push({ match, text, ...(headers !== undefined && { headers }) });
     },
     systemInformation: (user, systemId = 'SID') => {
       systemInfo = user === undefined ? undefined : { user, systemId };

@@ -116,6 +116,7 @@
   "src/__tests__/unit/runner/runner.test.ts",
   "src/__tests__/unit/runner/runningTest.test.ts",
   "src/__tests__/unit/runner/separateRuns.test.ts",
+  "src/__tests__/unit/sources/exactOptional.test.ts",
   "src/__tests__/unit/sources/liveSkips.test.ts",
   "src/__tests__/unit/sources/noChainInstanceof.test.ts",
   "src/__tests__/unit/sources/noDerivationFromAuthorization.test.ts",

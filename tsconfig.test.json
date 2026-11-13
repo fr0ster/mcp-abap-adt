@@ -43,6 +43,19 @@
     "dist",
     // The coverage guard's refusal fixtures: source the guard reads as text
     // with the compiler API, each wrong on purpose — never compiled.
-    "src/__tests__/unit/coverage/__fixtures__/coverage"
+    "src/__tests__/unit/coverage/__fixtures__/coverage",
+    // The RFC construction scan's refused fixtures and its limits: each
+    // builds a config the compiler refuses under exactOptionalPropertyTypes,
+    // on purpose; the scan reads them in its own program.
+    "src/__tests__/unit/sources/__fixtures__/configConstruction/refused",
+    "src/__tests__/unit/sources/__fixtures__/configConstruction/limits",
+    // The analyse verdicts on an `analyse` key present as `undefined`: code
+    // the compiler refuses under exactOptionalPropertyTypes, kept for the
+    // analyser, which reads them in its own program.
+    "src/__tests__/fixtures/analyse/no-explicit-undefined.ts",
+    "src/__tests__/fixtures/analyse/no-shorthand-undefined.ts",
+    "src/__tests__/fixtures/analyse/unknown-conditional.ts",
+    "src/__tests__/fixtures/analyse/unknown-maybe-undefined.ts",
+    "scripts/lib/__fixtures__/analyseOmissions/passesUndefined.fixture.ts"
   ]
 }

@@ -53,8 +53,8 @@ export type SchemaOutputIsTheArguments = Assert<
     GetClassArgs,
     {
       class_name: string;
-      part?: 'source' | 'metadata';
-      version?: 'active' | 'inactive' | 'workingArea';
+      part?: 'source' | 'metadata' | undefined;
+      version?: 'active' | 'inactive' | 'workingArea' | undefined;
     }
   >
 >;
@@ -227,7 +227,7 @@ const LISTED_ON_HTTP = WITHOUT_BACKGROUND.extend({
 export type ExtendAddsTheStateHandle = Assert<
   Same<
     z.output<typeof WITH_STATE_HANDLE>,
-    z.output<typeof RUN_SCHEMA> & { state_handle?: string }
+    z.output<typeof RUN_SCHEMA> & { state_handle?: string | undefined }
   >
 >;
 export type OmitDropsBackgroundAndTimeout = Assert<

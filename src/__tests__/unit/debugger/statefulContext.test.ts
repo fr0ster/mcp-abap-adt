@@ -26,8 +26,8 @@ const CONTEXT = 'sap-contextid';
 
 interface Seen {
   url: string;
-  security?: string;
-  context?: string;
+  security?: string | undefined;
+  context?: string | undefined;
   stateful: boolean;
 }
 

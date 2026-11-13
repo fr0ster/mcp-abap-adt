@@ -17,6 +17,7 @@ import type { InstanceState, StatePart } from '@mcp-abap-adt/lib/state';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { clientTransport } from '../../../../src/__tests__/helpers/clientTransport';
 import { withSystemInformation } from '../../../../src/__tests__/helpers/systemInformationStandIn';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
@@ -170,11 +171,16 @@ describe.each([
     async function call(name: string, args: Args = {}, signal?: AbortSignal) {
       const transport = new StreamableHTTPClientTransport(url, {
         requestInit: { headers: CREDENTIALS },
-        fetch: (input, init) =>
-          fetch(input, { ...init, signal: signal ?? init?.signal }),
+        fetch: (input, init) => {
+          const own = signal ?? init?.signal;
+          return fetch(input, {
+            ...init,
+            ...(own !== undefined && { signal: own }),
+          });
+        },
       });
       const client = new Client({ name: 'pool-test', version: '1.0.0' });
-      await client.connect(transport);
+      await client.connect(clientTransport(transport));
       try {
         const result = (await client.callTool({ name, arguments: args })) as {
           content: Array<{ text: string }>;
@@ -283,7 +289,7 @@ describe.each([
         },
       });
       const client = new Client({ name: 'pool-test', version: '1.0.0' });
-      await client.connect(transport);
+      await client.connect(clientTransport(transport));
       try {
         const result = (await client.callTool({ name, arguments: args })) as {
           content: Array<{ text: string }>;
@@ -449,7 +455,7 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
       requestInit: { headers },
     });
     const client = new Client({ name: 'pool-test', version: '1.0.0' });
-    await client.connect(transport);
+    await client.connect(clientTransport(transport));
     try {
       const result = (await client.callTool({ name, arguments: args })) as {
         content: Array<{ text: string }>;

@@ -2,8 +2,8 @@
  * The exact-optional typecheck of server-runtime's exported contracts whose
  * optional fields a caller fills from a possibly absent value (no-assertions
  * plan, S2c; spec §8): each such field takes `undefined` under
- * `exactOptionalPropertyTypes`. Run by `npm run test:check:exact` with the
- * option, and by `test:check` without it; never emitted (excluded from the
+ * `exactOptionalPropertyTypes`. Run by `test:check`, under `exactOptionalPropertyTypes` as every
+ * project is; never emitted (excluded from the
  * build).
  */
 

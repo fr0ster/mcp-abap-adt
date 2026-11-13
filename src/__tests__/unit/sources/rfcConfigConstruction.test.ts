@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
+import * as ts from 'typescript';
 import {
   type ConstructionRule,
   optionsOf,
@@ -158,6 +159,49 @@ describe('the known limits of the construction scan', () => {
       assert.deepEqual(
         found.filter((each) => each.where.includes(`/limits/${file}:`)),
         [],
+      );
+    });
+  }
+});
+
+/**
+ * What the scan's limits let through, the compiler refuses: under the
+ * production options (`exactOptionalPropertyTypes`, spec §3) each limit's
+ * value, and each forbidden key the scan finds but one, is a type error. The merged
+ * `never & undefined` limit stays the scan's (a declared value of the merged
+ * type passes both), but no value with `url: undefined` can be built of that
+ * type without an assertion, which the scan refuses.
+ */
+/**
+ * The forbidden keys the compiler lets through (Measured): a conditional
+ * whose branches differ in `url` — the union is reduced to one object type
+ * with `url?: undefined`, which the option does not refuse. The scan's own.
+ */
+const COMPILER_PASSES: readonly string[] = ['conditionalSource.ts'];
+
+describe('the compiler closes what the construction scan cannot see', () => {
+  const refusedByCompiler = (file: string): boolean => {
+    const program = ts.createProgram([file], OPTIONS);
+    const source = program.getSourceFile(file);
+    return (
+      source !== undefined && program.getSemanticDiagnostics(source).length > 0
+    );
+  };
+  for (const file of KNOWN_LIMITS) {
+    it(`refuses the limit ${file}`, () => {
+      assert.equal(
+        refusedByCompiler(path.join(FIXTURES, 'limits', file)),
+        true,
+      );
+    });
+  }
+  for (const [file, rule] of REFUSED) {
+    if (rule !== 'forbidden-key') continue;
+    const passes = COMPILER_PASSES.includes(file);
+    it(`${passes ? 'lets through' : 'refuses'} the forbidden key of ${file}`, () => {
+      assert.equal(
+        refusedByCompiler(path.join(FIXTURES, 'refused', file)),
+        !passes,
       );
     });
   }

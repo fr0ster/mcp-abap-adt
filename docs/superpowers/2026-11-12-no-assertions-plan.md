@@ -609,6 +609,23 @@ below is what it carries besides.
     production option: its "merged `never & undefined`" limit is either removed with its
     fixture, or kept and named.
 
+- **S2f as done (Measured).** The option is on in the root `tsconfig.json` and the six
+  packages' `tsconfig.json` and `tsconfig.test.json`; every other config extends one of them
+  (`exactOptional.test.ts` reads each, `extends` followed). The test errors: the SDK's client
+  transports (`sessionId` a getter answering `string | undefined`) go through a test adapter
+  (`src/__tests__/helpers/clientTransport.ts`, as the server's `SdkTransport`); the rest by
+  conditional spreads or the tests' own types widened. Revealed in test code: the shared-deps
+  setup passed `source` to four creates whose contract declares `source?: never` (the source
+  is written by the update after); dropped. Fixtures the compiler now refuses on purpose (the
+  construction scan's `refused/` and `limits/`, four analyse verdicts, one analyse fixture of
+  `scripts/`) are excluded from `tsconfig.test.json`; their tools read them in programs of
+  their own. The construction scan re-measured: the compiler refuses its three limits and
+  every forbidden key it finds but a conditional's (`conditionalSource.ts`), which stays the
+  scan's; the merged `never & undefined` limit is kept and named (no value with
+  `url: undefined` of that type can be built without an assertion). The RFC typecheck is
+  `src/__typechecks__/rfcLogonUrl.ts`. `tools/exact-optional.mjs`, its list,
+  `test:check:exact` and `measure:exact` are gone.
+
 ### S3. The `unknown` audit (spec §4; order step 4)
 
 - **S3a. The provenance script as a source test** (`unknownSources.test.ts`), written first

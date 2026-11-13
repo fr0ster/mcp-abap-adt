@@ -1,8 +1,7 @@
 /**
  * The exact-optional pairing typecheck of the handlers of service_binding, service_definition, structure, table, table_type, transport, enhancement, atc and common (no-assertions plan, S2a):
- * each handler takes its definition's schema output. Run by
- * `npm run test:check:exact` with `exactOptionalPropertyTypes`, and by
- * `test:check` without it; never emitted (excluded from the build).
+ * each handler takes its definition's schema output. Run by `test:check`, under `exactOptionalPropertyTypes` as every
+ * project is; never emitted (excluded from the build).
  */
 
 import {

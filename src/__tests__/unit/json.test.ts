@@ -38,6 +38,15 @@ describe('a parsed value is checked once, where it is parsed', () => {
     expect(jsonOf({ a: 1, b: undefined })).toBeUndefined();
   });
 
+  // `JSON.parse` makes `__proto__` an own member; assigned as a key, it would
+  // set the copy's prototype instead and leave the answer's text.
+  it('keeps a member named __proto__ as a member', () => {
+    const text = '{"__proto__":{"flag":true},"a":1}';
+    const json = parseJson(text);
+    expect(JSON.stringify(json)).toBe(text);
+    expect(Object.getPrototypeOf(json)).toBe(Object.prototype);
+  });
+
   it('reads text as JSON, and answers undefined for text that is not', () => {
     expect(parseJson('{"a":1}')).toEqual({ a: 1 });
     expect(parseJson('null')).toBeNull();
@@ -58,5 +67,16 @@ describe('our own fields as a JSON object', () => {
     const json = jsonFields(fields);
     expect(Object.keys(json)).toEqual(['a', 'c', 'd']);
     expect(JSON.stringify(json)).toBe(JSON.stringify(fields));
+  });
+
+  it('keeps a member named __proto__ as a member', () => {
+    const fields: { [key: string]: string } = {};
+    Object.defineProperty(fields, '__proto__', {
+      value: 'x',
+      enumerable: true,
+    });
+    const json = jsonFields(fields);
+    expect(JSON.stringify(json)).toBe('{"__proto__":"x"}');
+    expect(Object.getPrototypeOf(json)).toBe(Object.prototype);
   });
 });

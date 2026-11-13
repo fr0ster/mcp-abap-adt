@@ -37,13 +37,15 @@ export function jsonOf(value: unknown): JsonValue | undefined {
     return items;
   }
   if (!isElement(value)) return undefined;
-  const members: { [key: string]: JsonValue } = {};
+  // Built by `Object.fromEntries`, which defines each member as its own: a
+  // member named `__proto__` stays a member, never the copy's prototype.
+  const members: [string, JsonValue][] = [];
   for (const [key, member] of Object.entries(value)) {
     const json = jsonOf(member);
     if (json === undefined) return undefined;
-    members[key] = json;
+    members.push([key, json]);
   }
-  return members;
+  return Object.fromEntries(members);
 }
 
 /** `text` read as JSON and checked ({@link jsonOf}); `undefined` when it is not JSON. */
@@ -70,9 +72,9 @@ export function jsonOrText(text: string): JsonValue {
 export function jsonFields(fields: {
   readonly [key: string]: JsonValue | undefined;
 }): { [key: string]: JsonValue } {
-  const members: { [key: string]: JsonValue } = {};
+  const members: [string, JsonValue][] = [];
   for (const [key, value] of Object.entries(fields)) {
-    if (value !== undefined) members[key] = value;
+    if (value !== undefined) members.push([key, value]);
   }
-  return members;
+  return Object.fromEntries(members);
 }

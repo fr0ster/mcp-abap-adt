@@ -173,7 +173,7 @@ function isStringCompilingCall(
   ) {
     return false;
   }
-  return isStringOrAny(checker.getTypeAtLocation(callee.expression));
+  return isStringReceiver(checker.getTypeAtLocation(callee.expression));
 }
 
 /** A string's own type, or the `String` interface (`String.prototype`). */

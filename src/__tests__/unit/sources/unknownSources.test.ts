@@ -97,6 +97,31 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     );
   });
 
+  it('a value a sink hands on is of any type, as the sink took it', () => {
+    const sites = sitesOf('sinkForward').filter(
+      (entry) => entry.name === 'meta',
+    );
+    assert.deepEqual(
+      sites.map((entry) => [entry.key.split('#')[1], entry.cls, entry.refused]),
+      [
+        ['line(meta)', 'boundary', false],
+        ['info(meta)', 'sink', false],
+      ],
+    );
+  });
+
+  it('a property its contract types unknown stays a boundary once narrowed', () => {
+    const value = site('narrowedProperty', 'value');
+    assert.equal(value.cls, 'boundary');
+    assert.equal(value.refused, false);
+  });
+
+  it('a property read of a thrown value stays a boundary, whatever its narrowed type', () => {
+    const name = site('thrownProperty', 'name');
+    assert.equal(name.cls, 'boundary');
+    assert.equal(name.refused, false);
+  });
+
   it('an unnamed sink is refused', () => {
     const value = site('unnamedSink', 'value');
     assert.equal(value.refused, true);

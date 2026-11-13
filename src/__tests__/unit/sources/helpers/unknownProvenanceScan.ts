@@ -84,7 +84,6 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/search-source/readFailure.ts#envelopeFailure(error)',
   'src/lib/search-source/readFailure.ts#isCredential(failure)',
   'src/lib/search-source/readFailure.ts#isObject(value)',
-  'src/lib/search-source/readFailure.ts#undecided(undecided)',
   'src/lib/strategies/packageWalk.ts#endsTheCall(thrown)',
   'src/lib/strategies/step.ts#methodFailureOf(thrown)',
   'src/lib/strategies/step.ts#payloadCarriedBy(thrown)',
@@ -172,6 +171,18 @@ function strip(expression: ts.Expression): ts.Expression {
     ts.isNonNullExpression(current)
   ) {
     current = current.expression;
+  }
+  return current;
+}
+
+/** The value a chain of property and element reads starts from. */
+function accessRoot(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isPropertyAccessExpression(current) ||
+    ts.isElementAccessExpression(current)
+  ) {
+    current = strip(current.expression);
   }
   return current;
 }
@@ -667,8 +678,12 @@ export class ProvenanceScan {
     ) {
       return false;
     }
+    // A property of a mapped type (`Omit<…>`) has no value declaration of
+    // its own; its declared type is the symbol's all the same.
     const symbol = this.symbolOf(expression);
-    if (!symbol?.valueDeclaration) return false;
+    if (!symbol?.valueDeclaration && !symbol?.declarations?.length) {
+      return false;
+    }
     return this.contractless(this.checker.getTypeOfSymbol(symbol));
   }
 
@@ -733,6 +748,15 @@ export class ProvenanceScan {
     }
     const boundary = this.boundaryOrigin(expression);
     if (boundary) return [boundary];
+    // A property read of a value declared without a contract (a thrown
+    // value narrowed by `instanceof`, say): its type is the narrowing's
+    // claim, its origin the value's.
+    const root = accessRoot(expression);
+    if (root !== expression && this.declaredContractless(root)) {
+      return this.followed(root).map((origin) =>
+        origin === 'boundary' || origin === 'thrown' ? origin : 'opaque',
+      );
+    }
     // An awaited source is what its promise holds, not the promise.
     const type = awaits(source)
       ? this.checker.getTypeAtLocation(source)
@@ -786,6 +810,11 @@ export class ProvenanceScan {
       ts.isFunctionLike(target)
     ) {
       if (ts.isParameter(target) && !hasBody(target.parent)) return ['opaque'];
+      // What a sink took is of any type by its contract, and so is what it
+      // hands on: not followed into every caller of the contract.
+      if (ts.isParameter(target) && this.inSinkContract(target)) {
+        return ['opaque'];
+      }
       const origins = this.originsOfSite(target);
       if (origins.length > 0) return origins;
       if (ts.isParameter(target)) {

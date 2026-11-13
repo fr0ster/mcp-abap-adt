@@ -20,6 +20,7 @@
  * Plain code over the arguments, no regular expression.
  */
 
+import { type JsonValue, jsonOf } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
@@ -74,7 +75,7 @@ export interface Parameter {
   /** An enum's words. */
   readonly values?: readonly string[];
   /** A custom row's reader: the typed value, or a throw in its own words. */
-  readonly parse?: (raw: unknown, name: string) => ParameterValue;
+  readonly parse?: (raw: JsonValue, name: string) => ParameterValue;
   /** The value when no form gives one; also the template's value. */
   readonly default?: ParameterValue;
   /**
@@ -151,14 +152,15 @@ function argName(arg: string): string {
 function yamlAt(
   yaml: Record<string, unknown> | null | undefined,
   dotted: string | undefined,
-): unknown {
+): JsonValue | undefined {
   if (!yaml || dotted === undefined) return undefined;
   let node: unknown = yaml;
   for (const segment of dotted.split('.')) {
     if (!isElement(node)) return undefined;
     node = node[segment];
   }
-  return node;
+  // The parsed document's value, checked once: JSON from here on.
+  return jsonOf(node);
 }
 
 /**
@@ -279,7 +281,7 @@ function splitList(text: string): string[] {
 function convert(
   p: Parameter,
   name: string,
-  raw: unknown,
+  raw: JsonValue | undefined,
 ): ParameterValue | undefined {
   if (raw === undefined || raw === null) return undefined;
 
@@ -381,16 +383,19 @@ function readRow(
   yaml?: Record<string, unknown> | null,
 ): { value: ParameterValue; source: string } | undefined {
   const cli = readCli(p, argv);
-  const sources: [Source, unknown, string | undefined][] = [
-    ['cli', cli?.raw, cli?.name],
-    ['env', p.env === undefined ? undefined : env[p.env], undefined],
-    ['yaml', yamlAt(yaml, p.yaml), undefined],
-  ];
-  for (const [source, raw, cliName] of sources) {
-    const name = nameIn(p, source, cliName);
-    const value = convert(p, name, raw);
-    if (value !== undefined) return { value, source: name };
-  }
+  const cliName = nameIn(p, 'cli', cli?.name);
+  const fromCli = convert(p, cliName, cli?.raw);
+  if (fromCli !== undefined) return { value: fromCli, source: cliName };
+  const envName = nameIn(p, 'env');
+  const fromEnv = convert(
+    p,
+    envName,
+    p.env === undefined ? undefined : env[p.env],
+  );
+  if (fromEnv !== undefined) return { value: fromEnv, source: envName };
+  const yamlName = nameIn(p, 'yaml');
+  const fromYaml = convert(p, yamlName, yamlAt(yaml, p.yaml));
+  if (fromYaml !== undefined) return { value: fromYaml, source: yamlName };
   return undefined;
 }
 

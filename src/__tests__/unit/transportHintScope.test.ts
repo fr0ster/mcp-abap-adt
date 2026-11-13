@@ -150,7 +150,6 @@ describe('runWithCallTransport', () => {
     ['blanks', { transport_request: '  ' }, undefined],
     ['a number', { transport_request: 7 }, undefined],
     ['no argument', {}, undefined],
-    ['no arguments object', undefined, undefined],
   ])('keeps %s as the call’s request: %p', (_label, args, expected) => {
     expect(runWithCallTransport(args, () => callTransportRequest())).toBe(
       expected,

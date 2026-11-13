@@ -69,5 +69,5 @@ export type ConnectionContext = Source & {
    */
   destination?: string;
   /** Optional metadata for additional context information. */
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, string>;
 };

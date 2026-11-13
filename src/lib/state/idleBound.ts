@@ -13,6 +13,7 @@
  * server's clock.
  */
 
+import type { JsonValue } from '../json';
 import { isAsciiDigits } from '../plainText';
 
 /**
@@ -50,7 +51,7 @@ function isDecimal(text: string): boolean {
   );
 }
 
-export function parseStateIdleMinutes(raw: unknown, name: string): number {
+export function parseStateIdleMinutes(raw: JsonValue, name: string): number {
   const text = typeof raw === 'string' ? raw.trim() : undefined;
   const value =
     typeof raw === 'number'

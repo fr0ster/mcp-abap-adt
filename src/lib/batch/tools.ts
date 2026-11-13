@@ -57,7 +57,7 @@ export function communicationBatch(logger?: ILogger): OpenBatch {
 export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   owner.begin('communication', communicationBatch(context.logger));
-  const answer: Record<string, unknown> = { batch: 'on' };
+  const answer: { batch: 'on'; state_handle?: string } = { batch: 'on' };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
@@ -104,7 +104,9 @@ export async function beginDebugBatch(
     debuggee = 'amdp';
   }
   owner.begin('debugger', { connection, envelopes, recorded: [], debuggee });
-  const answer: Record<string, unknown> = { debug_batch: 'on' };
+  const answer: { debug_batch: 'on'; state_handle?: string } = {
+    debug_batch: 'on',
+  };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,

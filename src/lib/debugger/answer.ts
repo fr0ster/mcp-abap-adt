@@ -2,6 +2,7 @@ import type { McpResult } from '../answer';
 import type { IAnswerSerializer } from '../answerSerializer';
 import { type DetailArgs, detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
+import type { DebugExtra } from './access';
 import type { DebugState, DebugView, OnceStep } from './DebugSession';
 import { terseSettings, terseStop } from './readings';
 
@@ -22,13 +23,13 @@ const textBlocks: IAnswerSerializer<{ type: 'text'; text: string }> = {
  * `failureExtraOf` joins an error answer as a block of its own: a start that
  * failed but left something held answers the handle that stops it.
  */
-export async function debugAnswer<T>(
+export async function debugAnswer<T, P, F = T>(
   args: DetailArgs,
   work: () => Promise<DebugView<T>>,
-  terse: (v: T) => unknown,
-  full: (v: T) => unknown = (v) => v,
-  extraOf: () => Record<string, unknown> = () => ({}),
-  failureExtraOf: () => Record<string, unknown> = () => ({}),
+  terse: (v: T) => P,
+  full?: (v: T) => F,
+  extraOf: () => DebugExtra = () => ({}),
+  failureExtraOf: () => DebugExtra = () => ({}),
 ): Promise<McpResult> {
   try {
     const view = await work();
@@ -44,7 +45,12 @@ export async function debugAnswer<T>(
         ],
       };
     }
-    const projected = detail === 'full' ? full(view.value) : terse(view.value);
+    const projected =
+      detail !== 'full'
+        ? terse(view.value)
+        : full === undefined
+          ? view.value
+          : full(view.value);
     const merged = !hasExtra
       ? projected
       : projected && typeof projected === 'object' && !Array.isArray(projected)
@@ -68,8 +74,8 @@ export const terseOnceStep = (v: OnceStep) =>
 export async function debugStateAnswer(
   args: DetailArgs,
   work: () => Promise<DebugState>,
-  extraOf: () => Record<string, unknown> = () => ({}),
-  failureExtraOf: () => Record<string, unknown> = () => ({}),
+  extraOf: () => DebugExtra = () => ({}),
+  failureExtraOf: () => DebugExtra = () => ({}),
 ): Promise<McpResult> {
   return debugAnswer(
     args,

@@ -35,7 +35,7 @@ export interface BackgroundRunTools {
    * The caller's run; refused `background_run_not_available` otherwise. A
    * read run's ended answer is removed once read.
    */
-  get(handle: unknown): Promise<BackgroundRunRecord>;
+  get(handle: string): Promise<BackgroundRunRecord>;
   /** The caller's runs, running, finished and cancelled; no output. */
   list(): Promise<BackgroundRunListing[]>;
   /**
@@ -43,7 +43,7 @@ export interface BackgroundRunTools {
    * answer removed; a running code run is refused.
    */
   discard(
-    handle: unknown,
+    handle: string,
   ): Promise<{ run_handle: string; state: 'discarded' | 'cancelled' }>;
 }
 
@@ -55,12 +55,8 @@ export interface BackgroundRunControls {
 /** The longest handle passed to a strategy: anything longer names no run. */
 const MAX_HANDLE = 512;
 
-function asHandle(value: unknown): string | undefined {
-  return typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= MAX_HANDLE
-    ? value
-    : undefined;
+function asHandle(value: string): string | undefined {
+  return value.length > 0 && value.length <= MAX_HANDLE ? value : undefined;
 }
 
 /** Whether a run of `tool` is a read run: a listed long tool's. */

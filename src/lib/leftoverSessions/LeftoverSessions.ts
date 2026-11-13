@@ -616,14 +616,17 @@ export class LeftoverSessions {
    */
   private watch(connection: object): void {
     if (!hasMethod(connection, 'makeAdtRequest')) return;
-    const original = connection.makeAdtRequest;
-    connection.makeAdtRequest = async (...args: unknown[]) => {
-      try {
-        return await original.apply(connection, args);
-      } finally {
-        this.refresh(connection);
-      }
-    };
+    // The request passes through as it was made, its arguments and answer
+    // untouched: the wrapper only reads the cookies once it settled.
+    connection.makeAdtRequest = new Proxy(connection.makeAdtRequest, {
+      apply: async (original, _this, args) => {
+        try {
+          return await Reflect.apply(original, connection, args);
+        } finally {
+          this.refresh(connection);
+        }
+      },
+    });
   }
 
   private write(entry: Tracked, cookies: string): boolean {

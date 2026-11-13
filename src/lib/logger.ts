@@ -38,7 +38,7 @@ function redactedHeaders(headers: unknown): Record<string, unknown> {
 }
 
 /** A log line's fields as JSON: circular and transport objects named, credentials redacted. */
-function safeStringify(obj: Readonly<Record<string, unknown>>): string {
+function safeStringify(obj: object): string {
   const seen = new WeakSet();
   return JSON.stringify(obj, (key: string, value: unknown) => {
     if (typeof value === 'object' && value !== null) {

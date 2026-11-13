@@ -14,13 +14,13 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { child } from './xml/tree';
+import type { ToolArgs } from './handlers/interfaces';
 
 const scope = new AsyncLocalStorage<{ transportRequest?: string }>();
 
 /** Runs `fn` with the `transport_request` of `args` as the call's request. */
-export function runWithCallTransport<T>(args: unknown, fn: () => T): T {
-  const value = child(args, 'transport_request');
+export function runWithCallTransport<T>(args: ToolArgs, fn: () => T): T {
+  const value = args.transport_request;
   return scope.run(
     typeof value === 'string' && value.trim() !== ''
       ? { transportRequest: value }

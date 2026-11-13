@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import type { McpResult } from '../../answer';
 import {
+  type DebugExtra,
   type DebuggerInstance,
   type DebugView,
   debugAnswer,
@@ -111,7 +112,7 @@ export function identityOf(args: {
 }
 
 /** The handle while the state holds something, and the ABAP identity once fixed. */
-function heldExtra(context: HandlerContext): Record<string, unknown> {
+function heldExtra(context: HandlerContext): DebugExtra {
   if (!context.state?.holdsState()) return {};
   const identity = context.debugger?.().abap.currentIdentity();
   return {
@@ -141,22 +142,26 @@ export function needed<T>(value: T | undefined, what: string): T {
  * the one request, the answer with the handle. Whatever is refused before the
  * request, or failed, is the tool error.
  */
-export function onceAnswer<T>(
+export function onceAnswer<T, P = T>(
   context: HandlerContext,
   args: { state_handle?: string | undefined } & DetailArgs,
   kind: DebugKind,
   opens: boolean,
   work: (d: DebuggerInstance) => Promise<DebugView<T>>,
-  terse: (v: T) => unknown = (v) => v,
+  terse?: (v: T) => P,
 ): Promise<McpResult> {
-  return debugAnswer(
-    args,
-    async () => work(debuggerFor(context, args, kind, opens)),
-    terse,
-    (v) => v,
-    () => heldExtra(context),
-    () => heldExtra(context),
-  );
+  const run = async () => work(debuggerFor(context, args, kind, opens));
+  const extra = () => heldExtra(context);
+  return terse === undefined
+    ? debugAnswer(
+        args,
+        run,
+        (v) => v,
+        (v) => v,
+        extra,
+        extra,
+      )
+    : debugAnswer(args, run, terse, (v) => v, extra, extra);
 }
 
 /** An operation the kind does not take, refused before any request. */

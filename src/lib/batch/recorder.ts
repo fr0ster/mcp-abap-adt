@@ -266,8 +266,8 @@ export function createRecorder(
  * whichever is first. No timer: a handler that neither records nor settles
  * keeps the call waiting, as it would outside batch mode.
  */
-export function untilSent(
-  handler: Promise<unknown>,
+export function untilSent<T>(
+  handler: Promise<T>,
   recorder: Recorder,
 ): Promise<'recorded' | 'settled'> {
   return new Promise((resolve) => {

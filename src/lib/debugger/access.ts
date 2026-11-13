@@ -47,20 +47,25 @@ export function debugState(
 }
 
 /**
+ * What a debugger answer states beside its reading (`debugAnswer`'s
+ * `extraOf` and `failureExtraOf`): the handle, the SAP ids, the identity in
+ * force, each a string; a member left `undefined` is left out of the text.
+ */
+export type DebugExtra = Readonly<Record<string, string | undefined>>;
+
+/**
  * For a start's error answer: the handle, while the state still holds
  * something (a start that could not undo everything) — the model stops it
  * with this handle. Nothing held: nothing to answer.
  */
-export function heldStateHandle(
-  context: HandlerContext,
-): Record<string, unknown> {
+export function heldStateHandle(context: HandlerContext): DebugExtra {
   return context.state?.holdsState()
     ? { state_handle: context.state.handle }
     : {};
 }
 
 /** What a start answers beside its state: the handle, the SAP ids, and the identity in force. */
-export function startedExtra(context: HandlerContext): Record<string, unknown> {
+export function startedExtra(context: HandlerContext): DebugExtra {
   const { debugger: debuggerOf, state } = context;
   if (debuggerOf === undefined || state === undefined) {
     throw new Error('A started debug session has no debugger or state here');

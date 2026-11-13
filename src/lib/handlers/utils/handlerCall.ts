@@ -2,6 +2,7 @@ import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { runWithCallTransport } from '../../callTransport.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
 import { stateSystemKind } from '../../systemKind.js';
+import type { ToolArgs } from '../interfaces.js';
 
 /**
  * The context one call of a registered tool runs in, asked for when the
@@ -30,7 +31,7 @@ export type StatedScope = Pick<
  */
 export function inStatedScope<T>(
   scope: StatedScope,
-  args: unknown,
+  args: ToolArgs,
   fn: () => Promise<T>,
 ): Promise<T> {
   const { connection } = scope;

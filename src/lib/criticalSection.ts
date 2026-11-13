@@ -20,6 +20,7 @@
  * IAbapConnection interface shape).
  */
 
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { hasMethod } from './capability';
 
 /**
@@ -32,7 +33,7 @@ import { hasMethod } from './capability';
  */
 export function withCriticalSection<A extends unknown[], R>(
   handler: (...args: A) => Promise<R>,
-  getConnection: () => unknown,
+  getConnection: () => IAbapConnection,
 ): (...args: A) => Promise<R> {
   return async (...args: A) => {
     const conn = getConnection();

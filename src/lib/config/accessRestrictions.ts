@@ -20,7 +20,7 @@ import {
   parseTableEntry,
 } from '../access/accessLists.js';
 import { type DeniedEntry, parseDeniedEntry } from '../access/deniedActions.js';
-import { isList } from '../xml/tree.js';
+import type { JsonValue } from '../json.js';
 import {
   type Parameter,
   ParameterRefusal,
@@ -33,8 +33,8 @@ import {
 const SECTION = 'ACCESS RESTRICTIONS';
 
 /** The entries of one form's value, each trimmed. */
-function entriesOf(raw: unknown, name: string): readonly string[] {
-  if (isList(raw)) {
+function entriesOf(raw: JsonValue, name: string): readonly string[] {
+  if (Array.isArray(raw)) {
     const entries: string[] = [];
     for (const item of raw) {
       if (typeof item !== 'string') {
@@ -68,8 +68,8 @@ function entriesOf(raw: unknown, name: string): readonly string[] {
 
 /** A row's reader: its entries, each checked by `check`, as given. */
 function listReader(
-  check: (text: string, name: string) => unknown,
-): (raw: unknown, name: string) => readonly string[] {
+  check: (text: string, name: string) => void,
+): (raw: JsonValue, name: string) => readonly string[] {
   return (raw, name) => {
     const entries = entriesOf(raw, name);
     for (const entry of entries) check(entry, name);
@@ -82,7 +82,7 @@ function row(
   cli: string,
   env: string,
   yaml: string,
-  check: (text: string, name: string) => unknown,
+  check: (text: string, name: string) => void,
   help: string,
 ): Parameter {
   return {

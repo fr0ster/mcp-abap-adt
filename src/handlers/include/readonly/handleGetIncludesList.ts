@@ -20,11 +20,7 @@ import {
   type ProjectionVariant,
   supported,
 } from '../../../lib/adtProjections';
-import {
-  acceptedCodeOf,
-  sharedMainType,
-  tableCodeOf,
-} from '../../../lib/adtTypeCode';
+import { acceptedCodeOf, tableCodeOf } from '../../../lib/adtTypeCode';
 import {
   answerCaught,
   failedPayloadOf,
@@ -153,8 +149,8 @@ type ParentKind = keyof typeof INCLUDES_PARENT_ROUTES;
  * The parent the caller named, past the boundary of `object_type`: one of
  * the declared variant's parents (`INCLUDES_PARENTS`), or the one parent
  * whose main type it names, either case; `undefined` for any other text,
- * which the tool refuses naming the list (or, for a main type two parents
- * share, those parents).
+ * which the tool refuses naming the list. A main type two parents share
+ * never reaches it: the schema of every variant leaves it out.
  */
 function parentOf(
   connection: object,
@@ -271,8 +267,7 @@ async function includesListOf(
     if (!parent) {
       const parents = INCLUDES_PARENTS[variantOf(connection)];
       return return_error(
-        sharedMainType('object_type', object_type, parents) ??
-          `Unsupported object_type "${object_type}": ${supported(parents)}`,
+        `Unsupported object_type "${object_type}": ${supported(parents)}`,
       );
     }
 

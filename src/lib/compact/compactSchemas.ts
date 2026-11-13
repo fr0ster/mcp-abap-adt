@@ -594,11 +594,10 @@ function readPartFor(
   mainPrograms: readonly ReadMember[],
   draftTypes: readonly ReadMember[],
 ) {
-  const extra = [
-    ...(mainPrograms.length > 0 ? ['main_programs'] : []),
-    ...(draftTypes.length > 0 ? ['draft'] : []),
+  const extra: ('main_programs' | 'draft')[] = [
+    ...(mainPrograms.length > 0 ? (['main_programs'] as const) : []),
+    ...(draftTypes.length > 0 ? (['draft'] as const) : []),
   ];
-  if (extra.length === 0) return readPartSchema;
   const words = [
     ...(mainPrograms.length > 0
       ? [
@@ -615,7 +614,11 @@ function readPartFor(
     .enum([...READ_PARTS, ...extra])
     .default('source')
     .optional()
-    .describe(`${READ_PART_WORDS} ${words.join(' ')}`);
+    .describe(
+      words.length === 0
+        ? READ_PART_WORDS
+        : `${READ_PART_WORDS} ${words.join(' ')}`,
+    );
 }
 
 /**

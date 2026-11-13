@@ -590,7 +590,7 @@ describe('GetPackageContents', () => {
 describe('HandlerGet part contents', () => {
   const contents = (extra: Record<string, unknown>) => ({
     object_type: 'PACKAGE' as const,
-    part: 'contents',
+    part: 'contents' as const,
     ...extra,
   });
 

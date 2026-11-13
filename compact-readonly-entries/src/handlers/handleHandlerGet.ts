@@ -24,12 +24,7 @@ import {
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import type * as z from 'zod';
-import {
-  type CompactReadPart,
-  hasSourcePart,
-  partsFor,
-  routeCompactPart,
-} from './compactPartRoutes';
+import { hasSourcePart, partsFor, routeCompactPart } from './compactPartRoutes';
 import { routeCompactRead } from './compactReadRoutes';
 
 export const TOOL_DEFINITION = {
@@ -55,27 +50,6 @@ type HandlerGetGiven = z.output<typeof TOOL_DEFINITION.inputSchema>;
 type HandlerGetArgs = Omit<HandlerGetGiven, 'object_type'> & {
   object_type?: CompactObjectType | undefined;
 };
-
-/** The parts that read the repository by ADT address rather than by object_type. */
-const ADDRESS_PARTS = ['object_structure', 'node_structure', 'virtual_folders'];
-
-/** The parts that read an activation run by its run_id. */
-const RUN_PARTS = ['activation_status', 'activation_results'];
-
-/** The parts that read an object by object_type. */
-const OBJECT_PARTS: readonly CompactReadPart[] = [
-  'source',
-  'metadata',
-  'urls',
-  'contents',
-  'main_programs',
-  'draft',
-];
-
-/** Whether `value` is a part read by object_type. */
-function isCompactReadPart(value: unknown): value is CompactReadPart {
-  return OBJECT_PARTS.some((part) => part === value);
-}
 
 /** The address parts' targets: each tool's entry, so its schema parses the call. */
 const virtualFolders = defineTool(
@@ -201,26 +175,20 @@ export async function handleHandlerGet(
   } else {
     args = { ...given, object_type: undefined };
   }
-  const requested = args.part ?? 'source';
-  if (typeof requested === 'string' && ADDRESS_PARTS.includes(requested)) {
-    return routeAddressPart(context, requested, args);
+  const part = args.part ?? 'source';
+  switch (part) {
+    case 'object_structure':
+    case 'node_structure':
+    case 'virtual_folders':
+      return routeAddressPart(context, part, args);
+    case 'activation_status':
+      return handleGetActivationStatus(context, {
+        run_id: args.run_id,
+        with_long_polling: args.with_long_polling,
+      });
+    case 'activation_results':
+      return handleGetActivationResults(context, { run_id: args.run_id });
   }
-  if (typeof requested === 'string' && RUN_PARTS.includes(requested)) {
-    return requested === 'activation_status'
-      ? handleGetActivationStatus(context, {
-          run_id: args.run_id,
-          with_long_polling: args.with_long_polling,
-        })
-      : handleGetActivationResults(context, { run_id: args.run_id });
-  }
-  if (!isCompactReadPart(requested)) {
-    return return_error(
-      new Error(
-        `part=${String(requested)} is not a part HandlerGet reads. Its parts: ${[...OBJECT_PARTS, ...ADDRESS_PARTS, ...RUN_PARTS].join(', ')}.`,
-      ),
-    );
-  }
-  const part = requested;
   // Every other part reads an object: without object_type the router
   // refuses it, in its own words and through its log, whatever the part.
   if (!args.object_type) {

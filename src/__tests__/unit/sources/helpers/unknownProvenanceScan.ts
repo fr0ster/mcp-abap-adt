@@ -79,10 +79,20 @@ const DOM_TYPES = new Set([
 
 const FILE_READS = new Set(['readFileSync', 'readFile']);
 
+/**
+ * A file's one spelling: TypeScript names a file with `/` on every platform,
+ * `path` with the platform's separator, so names are compared resolved.
+ */
+function fileKey(name: string): string {
+  return path.resolve(name);
+}
+
+const OWN_SOURCES = fileKey(path.join(REPO, 'src')) + path.sep;
+
 function external(node: ts.Node): boolean {
   const file = node.getSourceFile();
   return (
-    file.isDeclarationFile && !file.fileName.startsWith(path.join(REPO, 'src'))
+    file.isDeclarationFile && !fileKey(file.fileName).startsWith(OWN_SOURCES)
   );
 }
 
@@ -648,10 +658,12 @@ export function scanFiles(
   program: ts.Program,
   files: ReadonlySet<string>,
 ): UnknownSite[] {
-  const scan = new ProvenanceScan(program, (file) => files.has(file.fileName));
+  const own = new Set([...files].map(fileKey));
+  const owned = (file: ts.SourceFile) => own.has(fileKey(file.fileName));
+  const scan = new ProvenanceScan(program, owned);
   return program
     .getSourceFiles()
-    .filter((file) => files.has(file.fileName))
+    .filter(owned)
     .flatMap((file) => scan.sitesOf(file));
 }
 
@@ -698,14 +710,16 @@ export function scanProduction(): UnknownSite[] {
       { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined },
     );
     if (!parsed) continue;
-    const dir = path.join(REPO, project.dir) + path.sep;
+    const dir = fileKey(path.join(REPO, project.dir)) + path.sep;
     const own = new Set(
-      parsed.fileNames.filter(
-        (file) =>
-          file.startsWith(dir) &&
-          !file.includes(`${path.sep}__tests__${path.sep}`) &&
-          !file.includes(`${path.sep}__typechecks__${path.sep}`),
-      ),
+      parsed.fileNames
+        .map(fileKey)
+        .filter(
+          (file) =>
+            file.startsWith(dir) &&
+            !file.includes(`${path.sep}__tests__${path.sep}`) &&
+            !file.includes(`${path.sep}__typechecks__${path.sep}`),
+        ),
     );
     const program = ts.createProgram({
       rootNames: parsed.fileNames,

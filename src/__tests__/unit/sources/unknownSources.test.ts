@@ -87,6 +87,18 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     );
   });
 
+  it('a file is found however its name is spelled', () => {
+    // TypeScript names a file with `/` on every platform, `path.join` with
+    // the platform's separator: a Windows run found no site at all. A
+    // spelling with `..` differs from TypeScript's on every platform.
+    const spelled = `${FIXTURES}${path.sep}deeper${path.sep}..${path.sep}typed.ts`;
+    const sites = scanFiles(fixtureProgram([spelled]), new Set([spelled]));
+    assert.deepEqual(
+      sites.filter((entry) => entry.name === 'order').map((entry) => entry.cls),
+      ['typed'],
+    );
+  });
+
   it('a mixed site is refused', () => {
     const value = site('mixed', 'value');
     assert.equal(value.cls, 'mixed');

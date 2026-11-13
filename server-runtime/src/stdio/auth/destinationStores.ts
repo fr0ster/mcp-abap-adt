@@ -98,25 +98,34 @@ export function readDestinationSystemContext(
 }
 
 /**
+ * A parsed key with `url`, `clientid` and `clientsecret` at its root, and no
+ * `uaa` object: read in plain code, the file being outside the type system.
+ */
+function isXsuaaKey(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const uaa = 'uaa' in raw ? raw.uaa : undefined;
+  if (uaa && typeof uaa === 'object') return false;
+  return Boolean(
+    'url' in raw &&
+      raw.url &&
+      'clientid' in raw &&
+      raw.clientid &&
+      'clientsecret' in raw &&
+      raw.clientsecret,
+  );
+}
+
+/**
  * The shape of `keysDir/<name>.json`: `url` + `clientid` + `clientsecret` at
  * the root is an XSUAA key; anything else, or no readable key, is ABAP.
  */
 export function keyShapeOf(keysDir: string, name: string): 'abap' | 'xsuaa' {
   assertDestinationName(name, 'destination');
   try {
-    const raw = JSON.parse(
+    const raw: unknown = JSON.parse(
       fs.readFileSync(path.join(keysDir, `${name}.json`), 'utf8'),
     );
-    if (
-      raw &&
-      typeof raw === 'object' &&
-      !(raw.uaa && typeof raw.uaa === 'object') &&
-      raw.url &&
-      raw.clientid &&
-      raw.clientsecret
-    ) {
-      return 'xsuaa';
-    }
+    if (isXsuaaKey(raw)) return 'xsuaa';
   } catch {
     // no key, or not readable: read as ABAP
   }

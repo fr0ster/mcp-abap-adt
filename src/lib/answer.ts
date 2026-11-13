@@ -6,6 +6,7 @@
  * only this file's: a handler that did it itself would repeat four lines per tool and
  * throw away everything the error contract carries.
  */
+
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
   ADT_NO_FAILURE,
@@ -21,6 +22,7 @@ import {
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
+import type { JsonValue } from './json';
 import type { AnswerDetail } from './strategies/projections';
 import {
   type FailedRequest,
@@ -72,7 +74,7 @@ export type McpResult = {
  */
 export type JsonAnswer = {
   isError: boolean;
-  content: Array<{ type: 'json'; json: unknown }>;
+  content: Array<{ type: 'json'; json: JsonValue }>;
 };
 
 function text(value: string, isError = false): McpResult {

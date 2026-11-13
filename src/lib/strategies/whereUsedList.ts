@@ -107,14 +107,15 @@ export function whereUsedOn(
   };
 }
 
-export interface WhereUsedReference {
+/** One reference of a where-used list: a JSON object, as the tool answers it. */
+export type WhereUsedReference = {
   name: string;
   type: string;
   uri?: string | undefined;
   package_name?: string | undefined;
   responsible?: string | undefined;
   usage_information?: string | undefined;
-}
+};
 
 export interface WhereUsedListResult {
   totalReferences: number;

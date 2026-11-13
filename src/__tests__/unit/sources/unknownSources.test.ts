@@ -18,6 +18,7 @@ import {
   scanFiles,
   staleReaders,
   type UnknownSite,
+  untypedAnswers,
 } from './helpers/unknownProvenanceScan';
 
 const FIXTURES = path.join(
@@ -210,5 +211,16 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(value.cls, 'mixed');
     assert.equal(value.refused, true);
     assert.deepEqual(value.types, ['Order']);
+  });
+
+  it('a library call answering any is taken as unknown where it is made', () => {
+    // JSON.parse and the XML parsers answer `any`: typed by the declaration
+    // it lands in, the parse would skip its check (spec §4, JSON values).
+    const file = path.join(FIXTURES, 'untypedAnswer.ts');
+    const found = untypedAnswers(fixtureProgram([file]), new Set([file]));
+    assert.deepEqual(
+      found.map((entry) => entry.where.split('/').pop()),
+      ['untypedAnswer.ts:9', 'untypedAnswer.ts:14'],
+    );
   });
 });

@@ -272,6 +272,23 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   leftover-session answers) implement one small contract, `IAnswerSerializer`
   (`src/lib/answerSerializer.ts`), named in `SINK_CONTRACTS` beside `ILogger`. A fixture proves
   an implementation passes as a sink; removing the name from `SINK_CONTRACTS` refuses the three.
+- **JSON values are checked once, at the parse (the owner's decision).** What `JSON.parse` and
+  the XML-to-object parsers answer is data from outside the type system: a parse whose value
+  reaches an answer is checked once where it is made, in plain code (no regex, no cast), by
+  `jsonOf` (`src/lib/json.ts`), and typed `JsonValue` after (`string | number | boolean | null |
+  JsonValue[] | { [k: string]: JsonValue }`). Our own answer objects are built JSON-shaped
+  (`jsonFields` leaves an absent member out, as `JSON.stringify` does). The sites: the five
+  handlers' `payloadOfAnswer`, `parseRuntimePayloadToJson`, `parseServiceBindingPayload`,
+  `promised.ts`'s `answerRead` and `answer.ts`'s `JsonAnswer.json`.
+  - A library call answering `any` (`JSON.parse`, an XML parser's `parse`) is taken as `unknown`
+    where it is made, or handed to a contract of a third party typed `any`, or discarded: typed
+    by the declaration it lands in, the parse would skip its check. The scan refuses any other
+    (`untypedAnswers`).
+- **The program's inputs are boundaries (the owner's decision).** `process.argv`, like
+  `process.env` and files: a value read from either stays a boundary however typed the values it
+  passed through (a built-in method called on one, a variable or a parameter every source of
+  which is one), and so does a value read from a parameter declared with an input type
+  (`NodeJS.ProcessEnv`, `ProgramArguments`) for a reader whose caller is another project.
 - **Inventory** (Measured; the full lists are in the appendix).
   - Parameters, root project 342: 169 boundary by their immediate sources, 68 with no
     in-repository call (callbacks and entries), 32 typed, 73 mixed.

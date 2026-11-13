@@ -1,6 +1,21 @@
+import { type JsonValue, jsonOf } from '../json';
 import { type Terse, terseWrite } from './projections';
 import type { AdtReading } from './reading';
-import { statusOnly, structured, verbatim } from './reading';
+import {
+  parseStructure,
+  rawOf,
+  reading,
+  statusOnly,
+  verbatim,
+} from './reading';
+
+/**
+ * The structured reading of a tool that promised JSON: the document's parse,
+ * checked once ({@link jsonOf}); `null` for one that does not parse.
+ */
+const jsonReading = reading(
+  (answer): JsonValue => jsonOf(parseStructure(rawOf(answer))) ?? null,
+);
 
 /**
  * What the tool promised to return. That is what picks the strategy.
@@ -22,7 +37,7 @@ export type PromisedForm = 'text' | 'xml' | 'json';
  * will do with it. Parsing either would break the promise.
  */
 export function readingFor(form: PromisedForm) {
-  return form === 'json' ? structured : verbatim;
+  return form === 'json' ? jsonReading : verbatim;
 }
 
 /**
@@ -64,9 +79,9 @@ export const writeProjection: Terse<unknown> = terseWrite;
  */
 export function answerRead(
   form: PromisedForm,
-  reading: AdtReading<unknown>,
+  reading: AdtReading<JsonValue>,
   detail: 'terse' | 'full' | 'raw',
-): unknown {
+): JsonValue {
   if (form !== 'json') return reading.raw;
   if (detail === 'raw') return reading.raw;
   return reading.value;

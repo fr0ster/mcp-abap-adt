@@ -690,6 +690,15 @@ below is what it carries besides.
 
   **Deliberate break per batch:** revert one retyped site of the batch to `unknown` with its
   hand narrowing; `measure:unknown` lists it again.
+- **JSON values (the owner's decision, spec §4).** `src/lib/json.ts`: `JsonValue`, `jsonOf`
+  (the check, plain code), `parseJson`, `jsonOrText`, `jsonFields`; applied to the nine sites of
+  spec §4. Tests first (`json.test.ts`); the scan's `untypedAnswers` refuses a library `any`
+  not taken as `unknown`, with its fixture (`untypedAnswer.ts`). Deliberate breaks: `jsonOf`
+  skipping an object member's check (`json.test.ts` red); `parseJson` returning `JSON.parse`
+  unchecked (it compiles; `untypedAnswers` lists it).
+- **The program's arguments (the owner's decision, spec §4).** The scan reads `process.argv`
+  as a boundary, through typed values and the input types; fixture `programInput.ts`, two cases,
+  each with its break.
 - **S3a's source test is added last in S3,** once nothing is refused. Its deliberate break (the
   laundered fixture) is checked then, and again with one site of S3b reverted in the real
   code.

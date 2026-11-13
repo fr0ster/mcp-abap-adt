@@ -25,6 +25,7 @@ import {
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { type JsonValue, jsonOrText } from '../../../lib/json';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
@@ -645,13 +646,8 @@ async function feedsInRounds(
 }
 
 /** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): unknown {
-  const text = result.content[0]?.text ?? '';
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+function payloadOfAnswer(result: McpResult): JsonValue {
+  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several feeds. */

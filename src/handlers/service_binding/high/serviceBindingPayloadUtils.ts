@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { type JsonValue, jsonOf, parseJson } from '../../../lib/json';
 
 export type ServiceBindingResponseFormat = 'xml' | 'json' | 'plain';
 
@@ -14,20 +15,22 @@ export function resolveServiceBindingAcceptHeader(
   return 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml';
 }
 
+/**
+ * A service binding's answer in the format asked for: the text as it came
+ * (`plain`, or a document that does not parse), else its parse, checked once
+ * ({@link jsonOf}).
+ */
 export function parseServiceBindingPayload(
   payload: string,
   format: ServiceBindingResponseFormat,
-): unknown {
+): JsonValue {
   if (format === 'plain') {
     return payload;
   }
 
   if (format === 'json') {
-    try {
-      return JSON.parse(payload);
-    } catch {
-      return payload;
-    }
+    const json = parseJson(payload);
+    return json === undefined ? payload : json;
   }
 
   const trimmed = payload.trim();
@@ -35,13 +38,16 @@ export function parseServiceBindingPayload(
     return payload;
   }
 
+  let parsed: unknown;
   try {
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
     });
-    return parser.parse(trimmed);
+    parsed = parser.parse(trimmed);
   } catch {
     return payload;
   }
+  const json = jsonOf(parsed);
+  return json === undefined ? payload : json;
 }

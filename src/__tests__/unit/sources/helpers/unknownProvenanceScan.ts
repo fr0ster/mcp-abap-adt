@@ -93,7 +93,6 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/strategies/step.ts#stepOf(value)',
   'src/lib/utils.ts#return_error(error)',
   'src/lib/xml/tree.ts#child(value)',
-  'src/lib/xml/tree.ts#childAt(value)',
   'src/lib/xml/tree.ts#isElement(value)',
 ]);
 
@@ -932,6 +931,62 @@ export function scanFiles(
     .flatMap((file) => scan.sitesOf(file));
 }
 
+/** A library call answering `any`, not taken as `unknown` where it is made. */
+export interface UntypedAnswer {
+  /** `file:line`, the file relative to the repository. */
+  readonly where: string;
+  readonly text: string;
+}
+
+/**
+ * Every call in `files` whose answer is `any` (`JSON.parse`, an XML parser's
+ * `parse`, `Reflect.get`) and that lands neither where `unknown` is expected
+ * (a declaration, a parameter, a return so typed) nor where a contract of a
+ * third party types `any`, nor is discarded. Typed by the declaration it
+ * lands in, a parse would skip the check its values pass (spec §4, JSON
+ * values); held untyped, every read of it is `any`.
+ */
+export function untypedAnswers(
+  program: ts.Program,
+  files: ReadonlySet<string>,
+): UntypedAnswer[] {
+  const own = new Set([...files].map(fileKey));
+  const checker = program.getTypeChecker();
+  const out: UntypedAnswer[] = [];
+  for (const file of program.getSourceFiles()) {
+    if (!own.has(fileKey(file.fileName))) continue;
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        checker.getTypeAtLocation(node).flags & ts.TypeFlags.Any
+      ) {
+        let outer: ts.Expression = node;
+        while (
+          ts.isParenthesizedExpression(outer.parent) ||
+          ts.isAwaitExpression(outer.parent)
+        ) {
+          outer = outer.parent;
+        }
+        const expected = checker.getContextualType(outer);
+        const taken =
+          expected !== undefined &&
+          (expected.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) !== 0;
+        if (!taken && !ts.isExpressionStatement(outer.parent)) {
+          out.push({ where: lineOf(node), text: node.getText() });
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+  }
+  return out;
+}
+
+/** Every untyped answer of every production project. */
+export function untypedProductionAnswers(): UntypedAnswer[] {
+  return eachProductionProject((program, own) => untypedAnswers(program, own));
+}
+
 /** A program over `files` with the root project's options. */
 export function fixtureProgram(files: readonly string[]): ts.Program {
   const parsed = ts.getParsedCommandLineOfConfigFile(
@@ -967,7 +1022,14 @@ export function productionProjects(): { tsconfig: string; dir: string }[] {
 
 /** Every site of every production project. */
 export function scanProduction(): UnknownSite[] {
-  const out: UnknownSite[] = [];
+  return eachProductionProject((program, own) => scanFiles(program, own));
+}
+
+/** `scan` over each production project's program and the files it owns. */
+function eachProductionProject<T>(
+  scan: (program: ts.Program, own: ReadonlySet<string>) => T[],
+): T[] {
+  const out: T[] = [];
   for (const project of productionProjects()) {
     const parsed = ts.getParsedCommandLineOfConfigFile(
       path.join(REPO, project.tsconfig),
@@ -990,7 +1052,7 @@ export function scanProduction(): UnknownSite[] {
       rootNames: parsed.fileNames,
       options: parsed.options,
     });
-    out.push(...scanFiles(program, own));
+    out.push(...scan(program, own));
   }
   return out;
 }
@@ -1014,5 +1076,10 @@ if (require.main === module) {
     process.stdout.write(
       `${site.where} ${site.kind} ${site.key} ${site.cls}: ${site.types.join(' | ')}\n`,
     );
+  }
+  const untyped = untypedProductionAnswers();
+  process.stdout.write(`untyped answers: ${untyped.length}\n`);
+  for (const answer of untyped) {
+    process.stdout.write(`${answer.where} ${answer.text.split('\n')[0]}\n`);
   }
 }

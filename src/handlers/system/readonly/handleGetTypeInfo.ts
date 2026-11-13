@@ -27,6 +27,7 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { type JsonValue, jsonFields } from '../../../lib/json';
 import {
   readDataElementMetadata,
   readDomainMetadata,
@@ -109,21 +110,21 @@ function parseDataElement(xml: string) {
   const root = child(documentOf(xml), 'blue:wbobj');
   const dtel = child(root, 'dtel:dataElement');
   if (!dtel) return undefined;
-  return {
-    objectType: 'data_element' as const,
+  return jsonFields({
+    objectType: 'data_element',
     ...objectFacts(root),
     typeKind: textOf(child(dtel, 'dtel:typeKind')),
     domain: textOf(child(dtel, 'dtel:typeName')),
     dataType: textOf(child(dtel, 'dtel:dataType')),
     length: numberOf(child(dtel, 'dtel:dataTypeLength')),
     decimals: numberOf(child(dtel, 'dtel:dataTypeDecimals')),
-    labels: {
+    labels: jsonFields({
       short: textOf(child(dtel, 'dtel:shortFieldLabel')),
       medium: textOf(child(dtel, 'dtel:mediumFieldLabel')),
       long: textOf(child(dtel, 'dtel:longFieldLabel')),
       heading: textOf(child(dtel, 'dtel:headingFieldLabel')),
-    },
-  };
+    }),
+  });
 }
 
 function parseDomain(xml: string) {
@@ -134,31 +135,33 @@ function parseDomain(xml: string) {
   const output = child(content, 'doma:outputInformation');
   const values = child(content, 'doma:valueInformation');
   const fixed = listOf(childAt(values, 'doma:fixValues', 'doma:fixValue'));
-  return {
-    objectType: 'domain' as const,
+  return jsonFields({
+    objectType: 'domain',
     ...objectFacts(root),
     dataType: textOf(child(type, 'doma:datatype')),
     length: numberOf(child(type, 'doma:length')),
     decimals: numberOf(child(type, 'doma:decimals')),
-    output: {
+    output: jsonFields({
       length: numberOf(child(output, 'doma:length')),
       conversionExit: textOf(child(output, 'doma:conversionExit')),
       lowercase: child(output, 'doma:lowercase') === 'true',
       signExists: child(output, 'doma:signExists') === 'true',
-    },
+    }),
     valueTable: textOf(childAt(values, 'doma:valueTableRef', 'adtcore:name')),
-    fixedValues: fixed.map((entry) => ({
-      low: boundOf(child(entry, 'doma:low')),
-      high: boundOf(child(entry, 'doma:high')),
-      text: textOf(child(entry, 'doma:text')),
-    })),
-  };
+    fixedValues: fixed.map((entry) =>
+      jsonFields({
+        low: boundOf(child(entry, 'doma:low')),
+        high: boundOf(child(entry, 'doma:high')),
+        text: textOf(child(entry, 'doma:text')),
+      }),
+    ),
+  });
 }
 
 function parseStructure(xml: string) {
   const root = child(documentOf(xml), 'blue:blueSource');
   if (!root) return undefined;
-  return { objectType: 'structure' as const, ...objectFacts(root) };
+  return jsonFields({ objectType: 'structure', ...objectFacts(root) });
 }
 
 function parseTableType(xml: string) {
@@ -167,22 +170,22 @@ function parseTableType(xml: string) {
   const row = child(root, 'ttyp:rowType');
   const builtIn = child(row, 'ttyp:builtInType');
   const key = child(root, 'ttyp:primaryKey');
-  return {
-    objectType: 'table_type' as const,
+  return jsonFields({
+    objectType: 'table_type',
     ...objectFacts(root),
-    rowType: {
+    rowType: jsonFields({
       typeKind: textOf(child(row, 'ttyp:typeKind')),
       typeName: textOf(child(row, 'ttyp:typeName')),
       dataType: textOf(child(builtIn, 'ttyp:dataType')),
       length: numberOf(child(builtIn, 'ttyp:length')),
       decimals: numberOf(child(builtIn, 'ttyp:decimals')),
-    },
+    }),
     accessType: textOf(child(root, 'ttyp:accessType')),
-    primaryKey: {
+    primaryKey: jsonFields({
       definition: textOf(child(key, 'ttyp:definition')),
       kind: textOf(child(key, 'ttyp:kind')),
-    },
-  };
+    }),
+  });
 }
 
 /** Whether a refusal is SAP's `404`: the name is not of this kind. */
@@ -196,11 +199,11 @@ type Lookup = {
   /** The root element of the kind's document, named in a refusal to read one. */
   document: string;
   read: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
-  parse: (xml: string) => object | undefined;
+  parse: (xml: string) => JsonValue | undefined;
 };
 
 type LookupResult =
-  | { status: 'found'; payload: object }
+  | { status: 'found'; payload: JsonValue }
   | { status: 'absent' }
   /** SAP refused the read (not a 404): the call's answer. */
   | { status: 'failed'; answer: McpResult };
@@ -299,7 +302,7 @@ export async function handleGetTypeInfo(
     ];
 
     // One after another: the session's requests are sequential.
-    const types: object[] = [];
+    const types: JsonValue[] = [];
     for (const lookup of lookups) {
       logger?.debug(`Reading ${typeName} as ${lookup.kind}`);
       const result = await lookUp(lookup);

@@ -13,6 +13,14 @@ import { join } from 'node:path';
  * its own version through `main`, so `--version` and `serverInfo.version` stay
  * the binary's.
  */
-export const RUNTIME_VERSION: string = JSON.parse(
+const manifest: unknown = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
-).version;
+);
+
+export const RUNTIME_VERSION: string =
+  typeof manifest === 'object' &&
+  manifest !== null &&
+  'version' in manifest &&
+  typeof manifest.version === 'string'
+    ? manifest.version
+    : '';

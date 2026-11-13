@@ -53,6 +53,7 @@ import {
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { type JsonValue, jsonFields, jsonOrText } from '../../../lib/json';
 import { withLongToolAdvice } from '../../../lib/longTools';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { whereUsedScopeTypesOf } from '../../../lib/strategies/metadataFields';
@@ -251,7 +252,7 @@ async function whereUsedOf(
         disableTypes: typedArgs.disable_types,
       }),
     (result: WhereUsedListResult) => {
-      const formattedResponse = {
+      const formattedResponse = jsonFields({
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
         enable_all_types: typedArgs.enable_all_types || false,
@@ -259,8 +260,8 @@ async function whereUsedOf(
         disable_types: typedArgs.disable_types,
         total_references: result.totalReferences,
         result_description: result.resultDescription,
-        references: result.references,
-      };
+        references: result.references.map(jsonFields),
+      });
       objectsListCache.setCache({
         isError: false,
         content: [{ type: 'json', json: formattedResponse }],
@@ -371,7 +372,7 @@ async function whereUsedFromAnswers(
         },
       ),
     (result: WhereUsedListResult) => {
-      const formattedResponse = {
+      const formattedResponse = jsonFields({
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
         enable_all_types: typedArgs.enable_all_types || false,
@@ -379,8 +380,8 @@ async function whereUsedFromAnswers(
         disable_types: typedArgs.disable_types,
         total_references: result.totalReferences,
         result_description: result.resultDescription,
-        references: result.references,
-      };
+        references: result.references.map(jsonFields),
+      });
       objectsListCache.setCache({
         isError: false,
         content: [{ type: 'json', json: formattedResponse }],
@@ -576,13 +577,8 @@ async function whereUsedInEnvelopes(
 const WHERE_USED_CONTEXT = { tool: 'GetWhereUsed', detail: 'terse' } as const;
 
 /** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): unknown {
-  const text = result.content[0]?.text ?? '';
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+function payloadOfAnswer(result: McpResult): JsonValue {
+  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */

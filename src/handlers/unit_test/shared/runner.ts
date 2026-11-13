@@ -22,15 +22,14 @@ export const RUNNER_FIELD = z
   .optional()
   .describe(RUNNER_WORDS);
 
-/** The runner named by `args.runner`, `async` when none; an error for another value. */
-export function runnerOf(args: unknown): UnitTestRunner | Error {
-  const given = child(args, 'runner');
-  if (given === undefined) return 'async';
-  const runner = UNIT_TEST_RUNNERS.find((known) => known === given);
-  if (runner !== undefined) return runner;
-  return new Error(
-    `runner must be one of ${UNIT_TEST_RUNNERS.join(', ')}; got ${JSON.stringify(given)}`,
-  );
+/** What a run tool's arguments say of the runner. */
+export interface RunnerArgs {
+  readonly runner?: UnitTestRunner | undefined;
+}
+
+/** The runner `args.runner` names, `async` when none. */
+export function runnerOf(args: RunnerArgs): UnitTestRunner {
+  return args.runner ?? 'async';
 }
 
 /**
@@ -45,19 +44,14 @@ const WAIT_WORDS =
 /** The `wait` field of a run tool's zod input schema. */
 export const WAIT_FIELD = z.boolean().optional().describe(WAIT_WORDS);
 
-/**
- * Whether the call waits for the run (`wait`): `true` when absent; an error,
- * sent before any request, for a value that is not a boolean. The arguments
- * come from the caller, outside the type system, so the value is checked
- * here.
- */
-export function waitOf(args: unknown): boolean | Error {
-  const given = givenWait(args);
-  if (given === undefined) return true;
-  if (typeof given === 'boolean') return given;
-  return new Error(
-    `wait must be true or false; got ${JSON.stringify(given)}; nothing was sent`,
-  );
+/** What a run tool's arguments say of the wait. */
+export interface WaitArgs {
+  readonly wait?: boolean | undefined;
+}
+
+/** Whether the call waits for the run (`wait`): `true` when absent. */
+export function waitOf(args: WaitArgs): boolean {
+  return args.wait ?? true;
 }
 
 /**
@@ -66,22 +60,15 @@ export function waitOf(args: unknown): boolean | Error {
  * one request answered with the finished result.
  */
 export function runnerWaitOf(
-  args: unknown,
+  args: WaitArgs,
   runner: UnitTestRunner,
 ): boolean | Error {
-  if (runner === 'sync' && givenWait(args) !== undefined) {
+  if (runner === 'sync' && args.wait !== undefined) {
     return new Error(
       'wait goes with runner async: runner sync is one request that returns the finished result; nothing was sent',
     );
   }
   return waitOf(args);
-}
-
-/** The `wait` the call carries, as given; `undefined` when none. */
-function givenWait(args: unknown): unknown {
-  return args !== null && typeof args === 'object'
-    ? fieldOf(args, 'wait')
-    : undefined;
 }
 
 /** The `scope` argument, as compact `HandlerUnitTestRun` takes it. */

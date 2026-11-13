@@ -43,7 +43,6 @@ export async function handleRunProgramUnitTest(
     return return_error(new Error('program_name is required'));
   }
   const runner = runnerOf(args);
-  if (runner instanceof Error) return return_error(runner);
   const wait = runnerWaitOf(args, runner);
   if (wait instanceof Error) return return_error(wait);
   const detail = detailOf(args);

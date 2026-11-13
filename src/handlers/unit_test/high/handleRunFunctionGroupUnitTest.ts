@@ -45,7 +45,6 @@ export async function handleRunFunctionGroupUnitTest(
     return return_error(new Error('function_group_name is required'));
   }
   const runner = runnerOf(args);
-  if (runner instanceof Error) return return_error(runner);
   const wait = runnerWaitOf(args, runner);
   if (wait instanceof Error) return return_error(wait);
   const detail = detailOf(args);

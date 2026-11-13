@@ -35,7 +35,6 @@ export async function handleRunCdsUnitTest(
     return return_error(new Error('class_name is required'));
   }
   const wait = waitOf(args);
-  if (wait instanceof Error) return return_error(wait);
   const detail = detailOf(args);
   return answer(
     { tool: 'RunCdsUnitTest', detail },

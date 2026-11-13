@@ -13,20 +13,40 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleHandlerUnitTestRun } from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
+import {
+  TOOL_DEFINITION as HandlerUnitTestRun,
+  handleHandlerUnitTestRun,
+} from '../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
 import { handleCreateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest';
 import { handleCreateProgramUnitTest } from '../../handlers/unit_test/high/handleCreateProgramUnitTest';
 import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
-import { handleRunFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
-import { handleRunFunctionModuleUnitTest } from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
-import { handleRunProgramUnitTest } from '../../handlers/unit_test/high/handleRunProgramUnitTest';
-import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
+import {
+  handleRunFunctionGroupUnitTest,
+  TOOL_DEFINITION as RunFunctionGroupUnitTest,
+} from '../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
+import {
+  handleRunFunctionModuleUnitTest,
+  TOOL_DEFINITION as RunFunctionModuleUnitTest,
+} from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
+import {
+  handleRunProgramUnitTest,
+  TOOL_DEFINITION as RunProgramUnitTest,
+} from '../../handlers/unit_test/high/handleRunProgramUnitTest';
+import {
+  handleRunUnitTest,
+  TOOL_DEFINITION as RunUnitTest,
+} from '../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateProgramUnitTest } from '../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import {
   functionGroupMainProgram,
   functionGroupTestInclude,
   programTestInclude,
 } from '../../handlers/unit_test/shared/writeTests';
+import {
+  defineTool,
+  type HandlerContext,
+  type ToolArgs,
+} from '../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -294,32 +314,45 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
   });
 
   it.each([
-    ['RunUnitTest', handleRunUnitTest, { class_name: 'ZCL_X' }],
-    ['RunProgramUnitTest', handleRunProgramUnitTest, { program_name: 'ZR_X' }],
+    [
+      'RunUnitTest',
+      (c: HandlerContext, args: ToolArgs) =>
+        defineTool(RunUnitTest, handleRunUnitTest).call(c, args),
+      { class_name: 'ZCL_X' },
+    ],
+    [
+      'RunProgramUnitTest',
+      (c: HandlerContext, args: ToolArgs) =>
+        defineTool(RunProgramUnitTest, handleRunProgramUnitTest).call(c, args),
+      { program_name: 'ZR_X' },
+    ],
     [
       'RunFunctionGroupUnitTest',
-      handleRunFunctionGroupUnitTest,
+      (c: HandlerContext, args: ToolArgs) =>
+        defineTool(
+          RunFunctionGroupUnitTest,
+          handleRunFunctionGroupUnitTest,
+        ).call(c, args),
       { function_group_name: 'ZFG_X' },
     ],
     [
       'RunFunctionModuleUnitTest',
-      handleRunFunctionModuleUnitTest,
+      (c: HandlerContext, args: ToolArgs) =>
+        defineTool(
+          RunFunctionModuleUnitTest,
+          handleRunFunctionModuleUnitTest,
+        ).call(c, args),
       { function_module_name: 'Z_FM_X' },
     ],
   ] as const)(
-    '%s refuses another runner before any request',
-    async (_name, handler, args) => {
+    "%s: the tool's schema refuses another runner before any request",
+    async (_name, call, args) => {
       const connection = recordingConnection();
 
-      const result: any = await (handler as any)(ctx(connection), {
-        ...args,
-        runner: 'later',
-      });
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        'runner must be one of async, sync',
-      );
+      const refused = expect(
+        call(ctx(connection) as any, { ...args, runner: 'later' }),
+      ).rejects.toThrow('runner');
+      await refused;
       expect(connection.requests).toHaveLength(0);
     },
   );
@@ -476,18 +509,16 @@ describe('HandlerUnitTestRun: the runner the caller names, async by default', ()
     );
   });
 
-  it('another runner is refused before any request', async () => {
+  it("the tool's schema refuses another runner before any request", async () => {
     const connection = recordingConnection();
 
-    const result: any = await handleHandlerUnitTestRun(ctx(connection) as any, {
-      tests,
-      runner: 'later' as any,
-    });
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'runner must be one of async, sync',
-    );
+    const refused = expect(
+      defineTool(HandlerUnitTestRun, handleHandlerUnitTestRun).call(
+        ctx(connection) as any,
+        { tests, runner: 'later' },
+      ),
+    ).rejects.toThrow('runner');
+    await refused;
     expect(connection.requests).toHaveLength(0);
   });
 });

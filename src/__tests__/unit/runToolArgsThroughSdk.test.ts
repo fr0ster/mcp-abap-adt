@@ -17,7 +17,23 @@ import { TOOL_DEFINITION as RunFunctionGroupUnitTest } from '../../handlers/unit
 import { TOOL_DEFINITION as RunFunctionModuleUnitTest } from '../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { TOOL_DEFINITION as RunProgramUnitTest } from '../../handlers/unit_test/high/handleRunProgramUnitTest';
 import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
-import { runnerOf, runnerWaitOf } from '../../handlers/unit_test/shared/runner';
+import {
+  type RunnerArgs,
+  runnerOf,
+  runnerWaitOf,
+  type WaitArgs,
+} from '../../handlers/unit_test/shared/runner';
+import { child } from '../../lib/xml/tree';
+
+/** The runner and the wait a handler received, read as the SDK handed them. */
+function runArgs(given: unknown): RunnerArgs & WaitArgs {
+  const runner = child(given, 'runner');
+  const wait = child(given, 'wait');
+  return {
+    ...(runner === 'async' || runner === 'sync' ? { runner } : {}),
+    ...(typeof wait === 'boolean' ? { wait } : {}),
+  };
+}
 
 const RUNNER_TOOLS = [
   { tool: RunUnitTest, args: { class_name: 'ZCL_A' } },
@@ -62,8 +78,8 @@ describe.each(RUNNER_TOOLS)(
     it('a sync run without wait reaches the handler without wait, and is not refused', async () => {
       const given = await received(tool, { ...args, runner: 'sync' });
       expect(given).not.toHaveProperty('wait');
-      expect(runnerOf(given)).toBe('sync');
-      expect(runnerWaitOf(given, 'sync')).not.toBeInstanceOf(Error);
+      expect(runnerOf(runArgs(given))).toBe('sync');
+      expect(runnerWaitOf(runArgs(given), 'sync')).not.toBeInstanceOf(Error);
     });
 
     it('a sync run with wait is refused', async () => {
@@ -72,13 +88,13 @@ describe.each(RUNNER_TOOLS)(
         runner: 'sync',
         wait: true,
       });
-      expect(runnerWaitOf(given, 'sync')).toBeInstanceOf(Error);
+      expect(runnerWaitOf(runArgs(given), 'sync')).toBeInstanceOf(Error);
     });
 
     it('an async run without wait waits', async () => {
       const given = await received(tool, args);
-      expect(runnerOf(given)).toBe('async');
-      expect(runnerWaitOf(given, 'async')).toBe(true);
+      expect(runnerOf(runArgs(given))).toBe('async');
+      expect(runnerWaitOf(runArgs(given), 'async')).toBe(true);
     });
   },
 );

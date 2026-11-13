@@ -119,7 +119,6 @@ export async function handleRunAbapUnit(
   if (flags instanceof Error) return return_error(flags);
   const { scope, riskLevel, duration } = flags;
   const wait = waitOf(args);
-  if (wait instanceof Error) return return_error(wait);
   const detail = detailOf(args);
   const runner = new AdtExecutor(
     context.connection,

@@ -2892,8 +2892,7 @@ export abstract class BaseMcpServer extends McpServer {
     return new Proxy(this, {
       get: (target, property) => {
         if (property === 'registerTool' || property === 'tool') {
-          const register: unknown = Reflect.get(target, property);
-          if (typeof register !== 'function') return register;
+          const register = target[property];
           // Its search texts are attached whatever the batch owner, in
           // either form (`registerTool` or `tool`), once it is registered.
           return (...registerArgs: unknown[]) =>

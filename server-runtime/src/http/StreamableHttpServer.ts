@@ -155,9 +155,24 @@ function carriesToolCall(body: unknown): boolean {
   return Array.isArray(body) ? body.some(isCall) : isCall(body);
 }
 
+/** The tool error a request of the body is answered: its own `id`, as the client sent it. */
+interface NotAvailableAnswer {
+  readonly jsonrpc: '2.0';
+  readonly id: unknown;
+  readonly result: {
+    readonly content: readonly {
+      readonly type: 'text';
+      readonly text: string;
+    }[];
+    readonly isError: true;
+  };
+}
+
 /** One tool error per request (an element with an id), in the body's shape; none: nothing to answer. */
-function notAvailableAnswers(body: unknown): unknown {
-  const answerOf = (m: unknown) => {
+function notAvailableAnswers(
+  body: unknown,
+): NotAvailableAnswer | NotAvailableAnswer[] | undefined {
+  const answerOf = (m: unknown): NotAvailableAnswer | undefined => {
     const id = child(m, 'id');
     return id === undefined
       ? undefined
@@ -171,7 +186,9 @@ function notAvailableAnswers(body: unknown): unknown {
         };
   };
   if (!Array.isArray(body)) return answerOf(body);
-  const answers = body.map(answerOf).filter((a) => a !== undefined);
+  const answers = body
+    .map(answerOf)
+    .filter((a): a is NotAvailableAnswer => a !== undefined);
   return answers.length > 0 ? answers : undefined;
 }
 

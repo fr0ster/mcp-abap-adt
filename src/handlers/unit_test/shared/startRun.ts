@@ -63,7 +63,6 @@ export async function handleStartUnitTestRun(
     );
   }
   const runner = runnerOf(args);
-  if (runner instanceof Error) return return_error(runner);
   const definitions = tests.map((test) => ({
     containerClass: test.container_class.toUpperCase(),
     testClass: test.test_class.toUpperCase(),
@@ -119,7 +118,6 @@ async function startTargetRun(
   given: RunTargetArgs,
 ) {
   const runner = runnerOf(args);
-  if (runner instanceof Error) return return_error(runner);
   if (runner === 'sync') {
     return return_error(
       new Error(

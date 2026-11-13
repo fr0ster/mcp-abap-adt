@@ -50,6 +50,7 @@ import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../handlers/unit_test/high/handleRunUnitTest';
+import { defineTool } from '../../lib/handlers/interfaces';
 import { corpusBody } from '../helpers/adtCorpus';
 import { declaredRequired, listedJson } from '../helpers/listedJson';
 import {
@@ -342,8 +343,7 @@ describe('wait with runner sync', () => {
 
 /**
  * The arguments of a call as they arrive from a client: parsed JSON, outside
- * the type system — the only way a `wait` that is not a boolean reaches a
- * handler typed `wait?: boolean`.
+ * the type system, handed to the tool's entry, whose schema reads them first.
  */
 function fromClient(json: string) {
   return JSON.parse(json);
@@ -358,12 +358,15 @@ describe('a wait that is not a boolean, on each run tool', () => {
     '{"on":true}',
   ];
   const calls: ReadonlyArray<
-    readonly [string, (c: RecordingConnection, wait: string) => Promise<Answer>]
+    readonly [
+      string,
+      (c: RecordingConnection, wait: string) => Promise<unknown>,
+    ]
   > = [
     [
       'RunUnitTest',
       (connection, wait) =>
-        handleRunUnitTest(
+        defineTool(RunUnitTest_Tool, handleRunUnitTest).call(
           { connection },
           fromClient(`{"class_name":"zcl_x","wait":${wait}}`),
         ),
@@ -371,7 +374,7 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunCdsUnitTest',
       (connection, wait) =>
-        handleRunCdsUnitTest(
+        defineTool(RunCdsUnitTest_Tool, handleRunCdsUnitTest).call(
           { connection },
           fromClient(`{"class_name":"zcl_x","wait":${wait}}`),
         ),
@@ -379,7 +382,7 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunProgramUnitTest',
       (connection, wait) =>
-        handleRunProgramUnitTest(
+        defineTool(RunProgramUnitTest_Tool, handleRunProgramUnitTest).call(
           { connection },
           fromClient(`{"program_name":"zr_x","wait":${wait}}`),
         ),
@@ -387,7 +390,10 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunFunctionGroupUnitTest',
       (connection, wait) =>
-        handleRunFunctionGroupUnitTest(
+        defineTool(
+          RunFunctionGroupUnitTest_Tool,
+          handleRunFunctionGroupUnitTest,
+        ).call(
           { connection },
           fromClient(`{"function_group_name":"zfg_x","wait":${wait}}`),
         ),
@@ -395,7 +401,10 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunFunctionModuleUnitTest',
       (connection, wait) =>
-        handleRunFunctionModuleUnitTest(
+        defineTool(
+          RunFunctionModuleUnitTest_Tool,
+          handleRunFunctionModuleUnitTest,
+        ).call(
           { connection },
           fromClient(`{"function_module_name":"z_fm_x","wait":${wait}}`),
         ),
@@ -403,7 +412,7 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunAbapUnit',
       (connection, wait) =>
-        handleRunAbapUnit(
+        defineTool(RunAbapUnit_Tool, handleRunAbapUnit).call(
           { connection },
           fromClient(
             `{"target":{"kind":"object","name":"zcl_x","type":"CLAS/OC"},"wait":${wait}}`,
@@ -412,14 +421,15 @@ describe('a wait that is not a boolean, on each run tool', () => {
     ],
   ];
   describe.each(calls)('%s', (_name, call) => {
-    it.each(NOT_BOOLEAN)('refuses %s before anything is sent', async (wait) => {
-      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-      const result = await call(connection, wait);
-      expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('wait must be true or false');
-      expect(result.content[0]?.text).toContain('nothing was sent');
-      expect(connection.requests).toEqual([]);
-    });
+    it.each(NOT_BOOLEAN)(
+      "the tool's schema refuses %s before anything is sent",
+      async (wait) => {
+        const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+        const refused = expect(call(connection, wait)).rejects.toThrow('wait');
+        await refused;
+        expect(connection.requests).toEqual([]);
+      },
+    );
   });
 });
 

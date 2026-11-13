@@ -27,6 +27,8 @@ import { loadTestConfig } from './configHelpers';
 import { testDestinationName } from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
 import { guardedSend } from './refusalGuard';
+import type { TestConfig } from './testConfigSchema';
+import { thrownWords } from './thrownValue';
 
 const authLogger = createTestLogger('auth');
 
@@ -199,7 +201,7 @@ export function connectionTypeOf(stated: string | undefined): {
  * browser strategy (opened only when the destination needs a login).
  */
 export function createTestFactory(
-  config: any,
+  config: TestConfig,
   destination: string,
 ): AuthBrokerFactory {
   // service_keys_dir is ALWAYS a base path - factory adds service-keys/sessions
@@ -305,10 +307,8 @@ export async function setupAuthBrokerForTests(_options?: {
     }
     exportSettings(target.settings);
     return true;
-  } catch (error: any) {
-    authLogger?.warn(
-      `[setupAuthBrokerForTests] Failed: ${error?.message || String(error)}`,
-    );
+  } catch (error) {
+    authLogger?.warn(`[setupAuthBrokerForTests] Failed: ${thrownWords(error)}`);
     return false;
   }
 }

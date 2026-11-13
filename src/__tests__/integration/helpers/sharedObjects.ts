@@ -39,6 +39,7 @@ import {
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
 import { createTestConnectionAndSession } from './sessionHelpers';
+import { thrownWords } from './thrownValue';
 
 const logger = createTestLogger('shared-objects');
 
@@ -152,16 +153,12 @@ export async function ensureSharedPackage(
       throw new Error(createdPackage.getError().message);
     }
     log?.info?.(`Created shared package ${packageName}`);
-  } catch (error: any) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
+  } catch (error) {
+    const words = thrownWords(error);
+    if (words.includes('409') || words.includes('already exist')) {
       log?.info?.(`Shared package ${packageName} already exists`);
     } else {
-      log?.warn?.(
-        `Failed to create shared package ${packageName}: ${error.message}`,
-      );
+      log?.warn?.(`Failed to create shared package ${packageName}: ${words}`);
       throw error;
     }
   }
@@ -196,7 +193,7 @@ export async function ensureSharedDependency(
   }
 
   // Skip if not available for current system type
-  const availableIn = depConfig.available_in as string[] | undefined;
+  const availableIn = depConfig.available_in;
   if (availableIn && availableIn.length > 0) {
     const systemType = getSystemType();
     if (!availableIn.includes(systemType)) {
@@ -403,11 +400,9 @@ export async function ensureSharedDependency(
     log?.info?.(`Created shared ${type} ${name}`);
     _verifiedDependencies[cacheKey] = true;
     return { existed: false, created: true };
-  } catch (error: any) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
+  } catch (error) {
+    const words = thrownWords(error);
+    if (words.includes('409') || words.includes('already exist')) {
       log?.info?.(
         `Shared ${type} ${name} already exists (concurrent creation)`,
       );
@@ -437,7 +432,7 @@ export async function safeDelete(
     }
     log?.info?.(`Deleted ${label}`);
     return 'deleted';
-  } catch (error: any) {
+  } catch (error) {
     return classifyDeleteFailure(
       label,
       error instanceof Error ? error.message : String(error),
@@ -493,20 +488,20 @@ export async function ensureSharedObjects(
 
   // Ensure we have a real connection (not an empty stub from hard mode)
   let conn = connection;
-  if (!conn || typeof (conn as any).makeAdtRequest !== 'function') {
+  if (!conn || typeof conn.makeAdtRequest !== 'function') {
     try {
       const result = await createTestConnectionAndSession();
       conn = result.connection;
-    } catch (connError: any) {
+    } catch (connError) {
       logger?.warn?.(
-        `Cannot create connection for shared objects: ${connError.message}`,
+        `Cannot create connection for shared objects: ${thrownWords(connError)}`,
       );
       return [
         {
           success: false,
           name: '',
           action: 'skipped',
-          reason: `Cannot create connection: ${connError.message}`,
+          reason: `Cannot create connection: ${thrownWords(connError)}`,
         },
       ];
     }
@@ -518,7 +513,7 @@ export async function ensureSharedObjects(
   // Verify all shared deps exist (read-only check)
   const typeOrder: Array<{
     type: string;
-    readFn: (name: string) => Promise<any>;
+    readFn: (name: string) => Promise<unknown>;
   }> = [
     {
       type: 'tables',

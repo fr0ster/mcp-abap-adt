@@ -16,12 +16,13 @@
 
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/high/handleCreateMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/high/handleUpdateMetadataExtension';
 import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -29,6 +30,13 @@ import {
   extractErrorMessage,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const MetadataExtensionParams = z.looseObject({
+  description: z.string().optional(),
+  source_code: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
 
 describe('MetadataExtension High-Level Handlers Integration', () => {
   let tester: LambdaTester;
@@ -102,8 +110,12 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
 
   it('should test all MetadataExtension high-level handlers', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, objectName, params, packageName, transportRequest } =
-        context;
+      const { connection, objectName, packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        MetadataExtensionParams,
+        'create_metadata_extension',
+      );
 
       assert.ok(objectName !== undefined);
       assert.notEqual(objectName, '');

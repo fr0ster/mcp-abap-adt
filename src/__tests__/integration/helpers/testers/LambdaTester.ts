@@ -33,6 +33,8 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import type { CaseParams, TestCase } from '../testConfigSchema';
+import { thrownWords } from '../thrownValue';
 import {
   createHardModeClient,
   type HardModeClient,
@@ -40,6 +42,47 @@ import {
   parseToolText,
 } from './hardMode';
 import type { LambdaTesterContext } from './types';
+
+/** The parameters naming the object a case works on, in the order they are read. */
+const OBJECT_NAME_PARAMS = [
+  'name',
+  'class_name',
+  'interface_name',
+  'function_name',
+  'program_name',
+  'table_name',
+  'ddl_name',
+  'domain_name',
+  'data_element_name',
+  'structure_name',
+  'bdef_name',
+  'ddlx_name',
+  'bimp_name',
+  'metadata_extension_name',
+  'service_binding_name',
+  'service_definition_name',
+  'test_package',
+] as const;
+
+/** The first of `OBJECT_NAME_PARAMS` the case states as a non-empty string. */
+function objectNameOf(params: CaseParams): string | null {
+  for (const key of OBJECT_NAME_PARAMS) {
+    const value = params[key];
+    if (typeof value === 'string' && value !== '') return value;
+  }
+  return null;
+}
+
+/** The authentication a connection reports through a `getConfig()` beyond its contract, if any. */
+function reportedAuthType(connection: object): string | undefined {
+  if (!('getConfig' in connection)) return undefined;
+  const getConfig = connection.getConfig;
+  if (typeof getConfig !== 'function') return undefined;
+  const config: unknown = Reflect.apply(getConfig, connection, []);
+  if (typeof config !== 'object' || config === null) return undefined;
+  const authType: unknown = Reflect.get(config, 'authType');
+  return typeof authType === 'string' ? authType : undefined;
+}
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
 type HandlerLikeResponse = {
@@ -70,8 +113,8 @@ export class LambdaTester {
   protected readonly testCaseName: string;
   protected readonly logPrefix: string;
   protected readonly paramsGroupName: string | undefined;
-  protected testCase: any = null;
-  protected testParams: any = null;
+  protected testCase: TestCase | null = null;
+  protected testParams: CaseParams | null = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
   /**
@@ -118,8 +161,8 @@ export class LambdaTester {
     let connection: IAbapConnection | null = null;
     let session: SessionInfo | null = null;
     let logger: LoggerWithExtras | null = null;
-    let testCase: any = null;
-    let testParams: any = null;
+    let testCase: TestCase | null = null;
+    let testParams: CaseParams = {};
     let objectName: string | null = null;
     let packageName = '';
     let transportRequest: string | undefined;
@@ -158,20 +201,14 @@ export class LambdaTester {
       // Resolve parameters from group if paramsGroupName is provided
       if (this.paramsGroupName) {
         // Try structure 1: params_groups.groupName in test case
-        if (testCase.params_groups?.[this.paramsGroupName]) {
-          testParams = testCase.params_groups[this.paramsGroupName];
-        } else {
-          // Try structure 2: Global params_groups.groupName in config root
-          if (config.params_groups?.[this.paramsGroupName]) {
-            testParams = config.params_groups[this.paramsGroupName];
-          } else {
-            // Fallback to direct params
-            testParams = testCase.params;
-          }
-        }
+        const fromCase = testCase.params_groups?.[this.paramsGroupName];
+        // Try structure 2: Global params_groups.groupName in config root
+        const fromConfig = config.params_groups?.[this.paramsGroupName];
+        // Fallback to direct params
+        testParams = fromCase ?? fromConfig ?? testCase.params ?? {};
       } else {
         // Use params directly from test case
-        testParams = testCase.params;
+        testParams = testCase.params ?? {};
       }
 
       // Create logger for tests
@@ -187,74 +224,57 @@ export class LambdaTester {
         const suffixRaw = String(hardCfg.name_suffix || '').trim();
 
         // Resolve object name from params
-        const originalObjectName =
-          testParams.name ||
-          testParams.class_name ||
-          testParams.interface_name ||
-          testParams.function_name ||
-          testParams.program_name ||
-          testParams.table_name ||
-          testParams.ddl_name ||
-          testParams.domain_name ||
-          testParams.data_element_name ||
-          testParams.structure_name ||
-          testParams.bdef_name ||
-          testParams.ddlx_name ||
-          testParams.bimp_name ||
-          testParams.metadata_extension_name ||
-          testParams.service_binding_name ||
-          testParams.service_definition_name ||
-          testParams.test_package ||
-          null;
+        const originalObjectName = objectNameOf(testParams);
 
         objectName = originalObjectName;
         if (originalObjectName && suffixRaw) {
           const normalizedSuffix = `${suffixRaw}_${HARD_MODE_RUN_ID}`
             .toUpperCase()
             .replace(/[^A-Z0-9_]/g, '_');
-          const suffixed = `${String(originalObjectName).toUpperCase()}_${normalizedSuffix}`;
-          objectName = suffixed.slice(0, 30);
+          const suffixed = `${originalObjectName.toUpperCase()}_${normalizedSuffix}`;
+          const renamed = suffixed.slice(0, 30);
+          objectName = renamed;
 
           // Keep params in sync with object name for arg builders
-          if (testParams.program_name) testParams.program_name = objectName;
-          if (testParams.class_name) testParams.class_name = objectName;
-          if (testParams.interface_name) testParams.interface_name = objectName;
-          if (testParams.function_name) testParams.function_name = objectName;
-          if (testParams.table_name) testParams.table_name = objectName;
-          if (testParams.ddl_name) testParams.ddl_name = objectName;
-          if (testParams.domain_name) testParams.domain_name = objectName;
+          if (testParams.program_name) testParams.program_name = renamed;
+          if (testParams.class_name) testParams.class_name = renamed;
+          if (testParams.interface_name) testParams.interface_name = renamed;
+          if (testParams.function_name) testParams.function_name = renamed;
+          if (testParams.table_name) testParams.table_name = renamed;
+          if (testParams.ddl_name) testParams.ddl_name = renamed;
+          if (testParams.domain_name) testParams.domain_name = renamed;
           if (testParams.data_element_name)
-            testParams.data_element_name = objectName;
-          if (testParams.structure_name) testParams.structure_name = objectName;
+            testParams.data_element_name = renamed;
+          if (testParams.structure_name) testParams.structure_name = renamed;
           if (testParams.service_binding_name)
-            testParams.service_binding_name = objectName;
-          if (testParams.test_package) testParams.test_package = objectName;
-          if (testParams.name) testParams.name = objectName;
+            testParams.service_binding_name = renamed;
+          if (testParams.test_package) testParams.test_package = renamed;
+          if (testParams.name) testParams.name = renamed;
 
           // Adjust embedded source to avoid name mismatch in checks/update
           if (typeof testParams.source_code === 'string') {
             testParams.source_code = testParams.source_code.replace(
               new RegExp(String(originalObjectName), 'gi'),
-              String(objectName),
+              renamed,
             );
           }
           if (typeof testParams.update_source_code === 'string') {
             testParams.update_source_code =
               testParams.update_source_code.replace(
                 new RegExp(String(originalObjectName), 'gi'),
-                String(objectName),
+                renamed,
               );
           }
           if (typeof testParams.ddl_code === 'string') {
             testParams.ddl_code = testParams.ddl_code.replace(
               new RegExp(String(originalObjectName), 'gi'),
-              String(objectName),
+              renamed,
             );
           }
           if (typeof testParams.update_ddl_code === 'string') {
             testParams.update_ddl_code = testParams.update_ddl_code.replace(
               new RegExp(String(originalObjectName), 'gi'),
-              String(objectName),
+              renamed,
             );
           }
         }
@@ -299,31 +319,11 @@ export class LambdaTester {
       }
       // Populate system context cache so createAdtClient() picks it up
       await primeSystemContext(connection);
-      authType =
-        connectionResult.authType ||
-        ((connection as any)?.getConfig?.()?.authType as string | undefined);
+      authType = connectionResult.authType || reportedAuthType(connection);
       connectionSource = connectionResult.connectionSource || 'unknown';
 
       // Resolve object name from params
-      objectName =
-        testParams.name ||
-        testParams.class_name ||
-        testParams.interface_name ||
-        testParams.function_name ||
-        testParams.program_name ||
-        testParams.table_name ||
-        testParams.ddl_name ||
-        testParams.domain_name ||
-        testParams.data_element_name ||
-        testParams.structure_name ||
-        testParams.bdef_name ||
-        testParams.ddlx_name ||
-        testParams.bimp_name ||
-        testParams.metadata_extension_name ||
-        testParams.service_binding_name ||
-        testParams.service_definition_name ||
-        testParams.test_package ||
-        null;
+      objectName = objectNameOf(testParams);
 
       // Resolve package name and transport request
       // Create testCase object with resolved params for resolve functions
@@ -354,12 +354,10 @@ export class LambdaTester {
 
       this.testCase = testCase;
       this.testParams = testParams;
-    } catch (error: any) {
+    } catch (error) {
       // If initialization failed, create minimal context
       const errorLogger = createTestLogger(this.logPrefix);
-      errorLogger?.warn(
-        `⚠️ Failed to initialize tester: ${error?.message || String(error)}`,
-      );
+      errorLogger?.warn(`⚠️ Failed to initialize tester: ${thrownWords(error)}`);
 
       this.context = {
         hasConfig: false,
@@ -436,10 +434,10 @@ export class LambdaTester {
       this.context.logger?.info?.('🧹 Running cleanup...');
       await this.cleanupAfterLambda(this.context);
       this.context.logger?.success?.('✅ Cleanup completed successfully');
-    } catch (error: any) {
+    } catch (error) {
       // Log cleanup errors but don't throw - cleanup should not fail the test suite
       this.context.logger?.error?.(
-        `⚠️ Cleanup error: ${error?.message || String(error)}. Object left in SAP system.`,
+        `⚠️ Cleanup error: ${thrownWords(error)}. Object left in SAP system.`,
       );
     }
   }
@@ -523,10 +521,10 @@ export class LambdaTester {
       if (lambda) {
         await lambda(this.context);
       }
-    } catch (error: any) {
+    } catch (error) {
       // Log custom lambda errors but continue with cleanup
       this.context.logger?.warn?.(
-        `⚠️ Custom afterEach lambda error (continuing with cleanup): ${error?.message || String(error)}`,
+        `⚠️ Custom afterEach lambda error (continuing with cleanup): ${thrownWords(error)}`,
       );
     }
 
@@ -535,10 +533,10 @@ export class LambdaTester {
     // Jest guarantees afterEach runs regardless of test outcome
     try {
       await this.cleanupAfter();
-    } catch (error: any) {
+    } catch (error) {
       // Cleanup errors are already handled in cleanupAfter(), but log here for visibility
       this.context.logger?.warn?.(
-        `⚠️ Cleanup process error: ${error?.message || String(error)}`,
+        `⚠️ Cleanup process error: ${thrownWords(error)}`,
       );
     }
   }
@@ -568,9 +566,7 @@ export class LambdaTester {
    * Logs the skip itself, so a caller only has to decide whether to return.
    */
   protected skipsOnThisSystem(): boolean {
-    const availableIn = this.context?.testCase?.available_in as
-      | string[]
-      | undefined;
+    const availableIn = this.context?.testCase?.available_in;
     if (!availableIn || availableIn.length === 0) {
       return false;
     }
@@ -624,17 +620,18 @@ export class LambdaTester {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers
       await testFunc(this.context);
-    } catch (error: any) {
+    } catch (error) {
       // Check if error is a skip condition
-      if (error.message?.startsWith('SKIP:')) {
-        const skipReason = error.message.replace(/^SKIP:\s*/, '');
+      const words = thrownWords(error);
+      if (words.startsWith('SKIP:')) {
+        const skipReason = words.replace(/^SKIP:\s*/, '');
         skipRunningTest(`${skipReason}`);
         this.testSkipped = true;
         return; // Don't throw, just skip the test
       }
 
       this.testFailed = true;
-      this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      this.context.logger?.error(`❌ Test failed: ${words}`);
       // afterEach() still runs, and cleanupAfter() sees testFailed: the
       // objects stay for analysis, and nothing but the delete is skipped.
       throw error;

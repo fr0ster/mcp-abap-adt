@@ -18,6 +18,7 @@
 
 import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionGroup } from '../../../../handlers/function/high/handleUpdateFunctionGroup';
@@ -42,12 +43,31 @@ import {
   updateSessionFromResponse,
 } from '../../helpers/sessionHelpers';
 import {
+  readCaseParams,
+  stated,
+  type TestCase,
+} from '../../helpers/testConfigSchema';
+import {
   callTool,
   createHardModeClient,
   type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
 import { debugLog, expectWriteAccepted } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const FunctionParams = z.looseObject({
+  function_group_description: z.string().optional(),
+  function_group_name: z.string(),
+  function_module_description: z.string().optional(),
+  function_module_name: z.string(),
+  update_function_group_description: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
+
+/** A case's parameters, read through FunctionParams. */
+const paramsOf = (testCase: TestCase) =>
+  readCaseParams(testCase.params, FunctionParams, 'create_function');
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -118,26 +138,29 @@ describe('Function High-Level Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = testCase.params.function_group_name;
-    const functionModuleName = testCase.params.function_module_name;
+    const functionGroupName = paramsOf(testCase).function_group_name;
+    const functionModuleName = paramsOf(testCase).function_module_name;
     const packageName = resolvePackageName(testCase);
     const transportRequest = resolveTransportRequest(testCase);
     const functionGroupDescription =
-      testCase.params.function_group_description ||
+      paramsOf(testCase).function_group_description ||
       `Test function group for high-level handler`;
     const functionModuleDescription =
-      testCase.params.function_module_description ||
+      paramsOf(testCase).function_module_description ||
       `Test function module for high-level handler`;
     const updateFunctionGroupDescription =
-      testCase.params.update_function_group_description;
+      paramsOf(testCase).update_function_group_description;
 
-    if (!testCase.params.update_source_code) {
+    if (!paramsOf(testCase).update_source_code) {
       throw new Error(
         'update_source_code is required in test configuration for create_function',
       );
     }
     // Remove comment blocks from update source code as SAP doesn't allow them in function modules
-    let updatedSourceCode = testCase.params.update_source_code;
+    let updatedSourceCode = stated(
+      paramsOf(testCase).update_source_code,
+      'update_source_code',
+    );
     // Remove comment blocks (lines starting with *")
     updatedSourceCode = updatedSourceCode
       .split('\n')

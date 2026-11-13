@@ -15,12 +15,18 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleGetPackageTree } from '../../../../handlers/system/high/handleGetPackageTree';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const SystemParams = z.looseObject({
+  test_package: z.string().optional(),
+});
 
 describe('System High-Level Handlers Integration', () => {
   let tester: LambdaTester;
@@ -54,7 +60,12 @@ describe('System High-Level Handlers Integration', () => {
   describe('GetPackageTree', () => {
     it('should fetch package tree without subpackages', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
+        const { connection } = context;
+        const params = readCaseParams(
+          context.params,
+          SystemParams,
+          'system_high_handlers',
+        );
         if (!params?.test_package) {
           throw new Error(
             'test_package parameter is required in test configuration',
@@ -119,7 +130,12 @@ describe('System High-Level Handlers Integration', () => {
 
     it('should fetch package tree with subpackages', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
+        const { connection } = context;
+        const params = readCaseParams(
+          context.params,
+          SystemParams,
+          'system_high_handlers',
+        );
         if (!params?.test_package) {
           throw new Error(
             'test_package parameter is required in test configuration',
@@ -179,7 +195,12 @@ describe('System High-Level Handlers Integration', () => {
 
     it('should fetch package tree with limited depth', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
+        const { connection } = context;
+        const params = readCaseParams(
+          context.params,
+          SystemParams,
+          'system_high_handlers',
+        );
         if (!params?.test_package) {
           throw new Error(
             'test_package parameter is required in test configuration',

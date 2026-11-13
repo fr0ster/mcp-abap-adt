@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Shared steps for the unit-test integration suites: call a tool (through MCP
  * in hard mode, the handler otherwise), fail on a refusal naming the tool, and
@@ -10,7 +11,7 @@ import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
-  parseHandlerResponse,
+  handlerAnswer,
 } from '../../helpers/testHelpers';
 
 type Response = {
@@ -72,7 +73,10 @@ export function stepsFor(tester: LambdaTester, context: LambdaTesterContext) {
  * its result, and no test raised an alert.
  */
 export function expectTestsRan(response: Response, expected: string[]): void {
-  const data = parseHandlerResponse(response);
+  const data = handlerAnswer(
+    response,
+    z.looseObject({ finished: z.unknown(), run_result: z.unknown() }),
+  );
   assert.equal(data.finished, true);
   const result = JSON.stringify(data.run_result ?? '').toUpperCase();
   for (const method of expected) {

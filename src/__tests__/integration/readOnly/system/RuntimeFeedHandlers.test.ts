@@ -11,14 +11,21 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleRuntimeGetGatewayErrorLog } from '../../../../handlers/system/readonly/handleRuntimeGetGatewayErrorLog';
 import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListSystemMessages } from '../../../../handlers/system/readonly/handleRuntimeListSystemMessages';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const RuntimeFeedParams = z.looseObject({
+  feed_user: z.string().optional(),
+  max_results: z.number().optional(),
+});
 
 function parseTextPayload(result: any): any {
   const textContent = result.content.find((c: any) => c.type === 'text') as any;
@@ -142,8 +149,18 @@ describe('Runtime Feed Handlers Integration', () => {
     await tester.run(async (context: LambdaTesterContext) => {
       // Known issue: FeedRepository XML parser entity expansion limit too low
       // See: https://github.com/fr0ster/mcp-abap-adt-clients/issues/13
-      const maxResults = context.params?.max_results ?? 10;
-      const user = context.params?.feed_user || undefined;
+      const maxResults =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).max_results ?? 10;
+      const user =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).feed_user || undefined;
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeListFeeds',
@@ -183,7 +200,12 @@ describe('Runtime Feed Handlers Integration', () => {
 
   it('should list system messages via RuntimeListSystemMessages', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const maxResults = context.params?.max_results ?? 10;
+      const maxResults =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).max_results ?? 10;
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeListSystemMessages',
@@ -209,7 +231,12 @@ describe('Runtime Feed Handlers Integration', () => {
 
   it('should read system messages feed via RuntimeListFeeds', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const maxResults = context.params?.max_results ?? 10;
+      const maxResults =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).max_results ?? 10;
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeListFeeds',
@@ -243,8 +270,18 @@ describe('Runtime Feed Handlers Integration', () => {
         );
       }
 
-      const maxResults = context.params?.max_results ?? 10;
-      const user = context.params?.feed_user || undefined;
+      const maxResults =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).max_results ?? 10;
+      const user =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).feed_user || undefined;
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeGetGatewayErrorLog',
@@ -278,7 +315,12 @@ describe('Runtime Feed Handlers Integration', () => {
         );
       }
 
-      const maxResults = context.params?.max_results ?? 10;
+      const maxResults =
+        readCaseParams(
+          context.params,
+          RuntimeFeedParams,
+          'runtime_feed_handlers',
+        ).max_results ?? 10;
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeListFeeds',

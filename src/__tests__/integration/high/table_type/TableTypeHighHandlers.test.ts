@@ -38,6 +38,7 @@
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
 import { patchTableTypeDocument } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
 import { handleHandlerDelete } from '../../../../../compact-modify/src/handlers/handleHandlerDelete';
@@ -90,9 +91,17 @@ import {
 } from '../../helpers/configHelpers';
 import { assertEquals, assertMatches } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const TableTypeParams = z.looseObject({
+  description: z.string().optional(),
+  row_type_name: z.string().optional(),
+  update_access_type: z.string().optional(),
+});
 
 /** A tool's answer as the model reads it: the error flag and the first text. */
 type Answer = { isError: boolean; text: string };
@@ -320,10 +329,14 @@ describe('TableType High-Level Handlers Integration', () => {
       const context = handlerContext;
       if (context === undefined) throw new Error('No handler context');
       ran = true;
-      const params = ctx.params;
+      const params = readCaseParams(
+        ctx.params,
+        TableTypeParams,
+        'create_table_type',
+      );
       const description: string =
         params.description || 'Table type for the table type tests';
-      const rowTypeName: string = params.row_type_name;
+      const rowTypeName = params.row_type_name;
       const updateAccess = ACCESS_TYPES.find(
         (value) => value === params.update_access_type,
       );
@@ -342,7 +355,7 @@ describe('TableType High-Level Handlers Integration', () => {
       };
 
       if (getSystemType() === 'cloud') {
-        packageName = getSharedDependenciesConfig()?.package;
+        packageName = getSharedDependenciesConfig()?.package ?? '';
         transportRequest = resolveTransportRequest(ctx.testCase);
         if (!packageName) {
           throw new Error('shared_dependencies.package is required on cloud');

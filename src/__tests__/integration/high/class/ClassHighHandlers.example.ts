@@ -10,18 +10,28 @@
  * - Tester to provide all common infrastructure (connection, session, logger, params, etc.)
  */
 
+import * as z from 'zod';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const ClassParams = z.looseObject({
+  description: z.string().optional(),
+  superclass: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
 
 describe('Class High-Level Handlers Integration (Example with Workflow Functions)', () => {
   let tester: LambdaTester;
@@ -68,14 +78,13 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
 
   it('should test all Class high-level handlers', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const {
-        connection,
-        session,
-        objectName,
-        params,
-        packageName,
-        transportRequest,
-      } = context;
+      const { connection, session, objectName, packageName, transportRequest } =
+        context;
+      const params = readCaseParams(
+        context.params,
+        ClassParams,
+        'create_class',
+      );
 
       // Create
       logger?.info(`   • create: ${objectName}`);
@@ -99,7 +108,10 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         throw new Error(`Create failed: ${errorMsg}`);
       }
 
-      const createData = parseHandlerResponse(createResponse);
+      const createData = handlerAnswer(
+        createResponse,
+        z.looseObject({ success: z.unknown() }),
+      );
       if (!createData.success) {
         throw new Error(`Create failed: ${JSON.stringify(createData)}`);
       }
@@ -125,7 +137,10 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         throw new Error(`Update failed: ${errorMsg}`);
       }
 
-      const updateData = parseHandlerResponse(updateResponse);
+      const updateData = handlerAnswer(
+        updateResponse,
+        z.looseObject({ success: z.unknown() }),
+      );
       if (!updateData.success) {
         throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
       }

@@ -98,7 +98,9 @@ describe('Admin: Teardown shared dependencies', () => {
           client.getFunctionModule(functionModuleDocuments).delete(
             {
               functionModuleName: item.name,
-              functionGroupName: item.group,
+              ...(item.group !== undefined && {
+                functionGroupName: item.group,
+              }),
               transportRequest,
             },
             {
@@ -278,13 +280,14 @@ describe('Admin: Teardown shared dependencies', () => {
     }
 
     // 5. Package (last — after all contents removed)
-    if (sharedConfig.package) {
+    const sharedPackage = sharedConfig.package;
+    if (sharedPackage) {
       const status = await safeDelete(
-        `package ${sharedConfig.package}`,
+        `package ${sharedPackage}`,
         () =>
           client.getPackage(packageDocuments).delete(
             {
-              packageName: sharedConfig.package,
+              packageName: sharedPackage,
               transportRequest,
             },
             {
@@ -296,7 +299,7 @@ describe('Admin: Teardown shared dependencies', () => {
       );
       results.push({
         type: 'package',
-        name: sharedConfig.package,
+        name: sharedPackage,
         status,
       });
     }

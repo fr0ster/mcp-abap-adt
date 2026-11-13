@@ -28,6 +28,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleCreateFunctionInclude } from '../../../../handlers/function_include/high/handleCreateFunctionInclude';
@@ -50,13 +51,23 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import {
   callTool,
   createHardModeClient,
   type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
-import { parseHandlerResponse } from '../../helpers/testHelpers';
+import { handlerAnswer } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const FunctionIncludeParams = z.looseObject({
+  function_group_name: z.string(),
+  include_name: z.string(),
+  description: z.string().optional(),
+  function_group_description: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
 
 const testLogger = createTestLogger('function-include-high');
 
@@ -114,24 +125,28 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = testCase.params.function_group_name;
+    const params = readCaseParams(
+      testCase.params,
+      FunctionIncludeParams,
+      'function_include_high',
+    );
+    const functionGroupName = params.function_group_name;
     // This test creates the group and deletes it again: never a shared one.
     assertNotSharedDependency('function group', functionGroupName);
-    const includeName = testCase.params.include_name;
+    const includeName = params.include_name;
     const description =
-      testCase.params.description || 'Custom include for lifecycle test';
+      params.description || 'Custom include for lifecycle test';
     const transportRequest = resolveTransportRequest(testCase);
     const packageName = resolvePackageName(testCase);
     const groupDescription =
-      testCase.params.function_group_description ||
-      'FG for the function include test';
+      params.function_group_description || 'FG for the function include test';
 
-    if (!testCase.params.update_source_code) {
+    if (!params.update_source_code) {
       throw new Error(
         'update_source_code is required in test configuration for function_include_high',
       );
     }
-    const updatedSourceCode: string = testCase.params.update_source_code;
+    const updatedSourceCode = params.update_source_code;
 
     const invoke = async (
       toolName: string,
@@ -294,7 +309,14 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
           `GetFunctionInclude failed: ${readResponse.content[0]?.text || 'Unknown error'}`,
         );
       }
-      const readData = parseHandlerResponse(readResponse);
+      const readData = handlerAnswer(
+        readResponse,
+        z.looseObject({
+          success: z.unknown(),
+          include_name: z.unknown(),
+          source: z.unknown(),
+        }),
+      );
       assert.equal(readData.success, true);
       assert.equal(readData.include_name, includeName.toUpperCase());
       // Source should round-trip: assert a stable token from the snippet survives.

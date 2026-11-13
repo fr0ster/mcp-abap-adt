@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { stated } from '../../helpers/testConfigSchema';
 /**
  * Integration test: the five PR227 transport-object tools, end to end
  * (GitHub #221)
@@ -122,6 +123,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
@@ -150,8 +152,35 @@ import {
 } from '../../helpers/sessionHelpers';
 import {
   createHandlerContext,
-  parseHandlerResponse,
+  handlerAnswer,
+  type parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What the transport tools answer, as these tests read it. */
+const TransportAnswer = z.looseObject({
+  success: z.unknown(),
+  accepted: z.unknown(),
+  count: z.number().optional(),
+  entries: z.array(z.unknown()).optional(),
+  objects: z
+    .array(
+      z.looseObject({
+        name: z.string(),
+        type: z.string(),
+        position: z.string().optional(),
+        pgmid: z.string().optional(),
+      }),
+    )
+    .default([]),
+  tasks: z.array(z.looseObject({})).default([]),
+  task_number: z.string().optional(),
+  transport_number: z.string().optional(),
+  transport: z.looseObject({ target_system: z.string().optional() }).optional(),
+});
+
+/** A transport tool's answer, read through TransportAnswer. */
+const answerOf = (response: Parameters<typeof parseHandlerResponse>[0]) =>
+  handlerAnswer(response, TransportAnswer);
 
 /** Asserts a handler response is not an error, logging its content first if it is. */
 function expectOk(
@@ -196,7 +225,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
   /** The tasks a request holds, by number, as GetTransport answers them. */
   const tasksOf = async (request: string): Promise<string[]> => {
-    const read = parseHandlerResponse(
+    const read = answerOf(
       await handleGetTransport(createHandlerContext({ connection, logger }), {
         transport_number: request,
         include_objects: false,
@@ -211,7 +240,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
   /** The test program's entries on one task. */
   const programEntriesOn = async (task: string): Promise<any[]> =>
     (
-      parseHandlerResponse(
+      answerOf(
         await handleReadTransportObjects(
           createHandlerContext({ connection, logger }),
           { transport_number: task },
@@ -386,7 +415,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     const tasks = [secondTaskNumber, taskNumber];
     if (secondRequestNumber) {
       try {
-        const request = parseHandlerResponse(
+        const request = answerOf(
           await handleGetTransport(
             createHandlerContext({ connection, logger }),
             {
@@ -424,7 +453,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         // ask for the task. `accepted` from a removal is not evidence — the
         // re-read is, exactly as the scenario above asserts it.
         const readCtx = createHandlerContext({ connection, logger });
-        const held = parseHandlerResponse(
+        const held = answerOf(
           await handleReadTransportObjects(readCtx, {
             transport_number: task,
           }),
@@ -449,7 +478,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           logger?.info(`Cleanup: detached ${entry.type} ${entry.name}`);
         }
 
-        const left = parseHandlerResponse(
+        const left = answerOf(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
             { transport_number: task },
@@ -534,7 +563,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(taskResponse, 'Step 1 CreateTransportTask', logger);
-      const taskData = parseHandlerResponse(taskResponse);
+      const taskData = answerOf(taskResponse);
       assert.equal(taskData.success, true);
       assert.ok(taskData.task_number);
       taskNumber = taskData.task_number;
@@ -594,7 +623,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
       expectOk(firstAddResponse, 'Step 2b AddTransportObject', logger);
       entryTask = taskNumber;
-      const firstAddData = parseHandlerResponse(firstAddResponse);
+      const firstAddData = answerOf(firstAddResponse);
       assert.equal(firstAddData.accepted, true);
       logger?.success('Step 2b: AddTransportObject accepted');
 
@@ -606,7 +635,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(readResponse1, 'Step 3 ReadTransportObjects', logger);
-      const readData1 = parseHandlerResponse(readResponse1);
+      const readData1 = answerOf(readResponse1);
       assert.equal(readData1.success, true);
       const entry1 = readData1.objects.find(
         (o: any) => o.name === programName && o.type === 'PROG',
@@ -627,7 +656,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(removeResponse, 'Step 4 RemoveTransportObject', logger);
-      const removeData = parseHandlerResponse(removeResponse);
+      const removeData = answerOf(removeResponse);
       assert.equal(removeData.accepted, true);
       logger?.success('Step 4: RemoveTransportObject accepted');
 
@@ -639,7 +668,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(readResponse2, 'Step 5 ReadTransportObjects', logger);
-      const readData2 = parseHandlerResponse(readResponse2);
+      const readData2 = answerOf(readResponse2);
       const entry2 = readData2.objects.find(
         (o: any) => o.name === programName && o.type === 'PROG',
       );
@@ -656,7 +685,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(addResponse, 'Step 6 AddTransportObject', logger);
-      const addData = parseHandlerResponse(addResponse);
+      const addData = answerOf(addResponse);
       assert.equal(addData.accepted, true);
       logger?.success('Step 6: AddTransportObject accepted');
 
@@ -668,7 +697,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(readResponse3, 'Step 7 ReadTransportObjects', logger);
-      const readData3 = parseHandlerResponse(readResponse3);
+      const readData3 = answerOf(readResponse3);
       const entry3 = readData3.objects.find(
         (o: any) => o.name === programName && o.type === 'PROG',
       );
@@ -683,9 +712,9 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       });
 
       expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
-      const logData = parseHandlerResponse(logResponse);
+      const logData = answerOf(logResponse);
       assert.equal(logData.success, true);
-      assert.ok(logData.count > 0);
+      assert.ok((logData.count ?? 0) > 0);
       assert.equal(Array.isArray(logData.entries), true);
       logger?.success(
         `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
@@ -700,11 +729,11 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         { transport_number: taskNumber },
       );
       expectOk(sortResponse, 'Step 9 SortAndCompressTransportTask', logger);
-      const sortData = parseHandlerResponse(sortResponse);
+      const sortData = answerOf(sortResponse);
       assert.equal(sortData.accepted, true);
       assert.equal('success' in sortData, false);
 
-      const sortedData = parseHandlerResponse(
+      const sortedData = answerOf(
         await handleReadTransportObjects(
           createHandlerContext({ connection, logger }),
           { transport_number: taskNumber },
@@ -736,7 +765,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       // `/<name>/`; CreateTransport's `target_system` takes the name, which
       // the client wraps in the slashes again.
       const keptTarget = String(
-        parseHandlerResponse(sourceResponse)?.transport?.target_system ?? '',
+        answerOf(sourceResponse)?.transport?.target_system ?? '',
       ).trim();
       const sourceTarget =
         keptTarget.length > 2 &&
@@ -757,10 +786,11 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         },
       );
       expectOk(secondRequestResponse, 'Step 10 CreateTransport', logger);
-      secondRequestNumber = parseHandlerResponse(
+      const answeredTransportNumber = answerOf(
         secondRequestResponse,
       ).transport_number;
-      assert.ok(secondRequestNumber);
+      assert.ok(answeredTransportNumber);
+      secondRequestNumber = answeredTransportNumber;
       logger?.success(`Step 10: request ${secondRequestNumber} created`);
 
       logger?.info(
@@ -771,8 +801,9 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         { transport_number: secondRequestNumber, target_user: targetUser },
       );
       expectOk(secondTaskResponse, 'Step 10 CreateTransportTask', logger);
-      secondTaskNumber = parseHandlerResponse(secondTaskResponse).task_number;
-      assert.ok(secondTaskNumber);
+      const answeredTaskNumber = answerOf(secondTaskResponse).task_number;
+      assert.ok(answeredTaskNumber);
+      secondTaskNumber = answeredTaskNumber;
       logger?.success(`Step 10: task ${secondTaskNumber} created`);
 
       // Step 10a: the program sits on one task only. SAP put it on a task of
@@ -793,6 +824,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
       // Step 11: move the entry to the second task, by its position
       const moving = afterSort[0];
+      assert.ok(moving?.position);
       logger?.info(
         `Step 11: MoveTransportObjects ${taskNumber} → ${secondTaskNumber} at position ${moving.position}`,
       );
@@ -812,13 +844,13 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       );
       expectOk(moveResponse, 'Step 11 MoveTransportObjects', logger);
       entryTask = secondTaskNumber;
-      const moveData = parseHandlerResponse(moveResponse);
+      const moveData = answerOf(moveResponse);
       assert.equal(moveData.accepted, true);
       assert.equal('success' in moveData, false);
 
       // The echo is not proof: re-read both tasks.
       const holds = async (task: string) =>
-        parseHandlerResponse(
+        answerOf(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
             { transport_number: task },
@@ -846,7 +878,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
             {
               object_name: programName,
               object_type: 'PROG',
-              position: onSecond[0].position,
+              position: stated(onSecond[0]?.position, 'position'),
             },
           ],
         },

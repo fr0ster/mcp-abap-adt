@@ -5,11 +5,14 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { ISapConfigBase } from '@mcp-abap-adt/interfaces-auth-sap';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders';
 import { withoutTrailingSlashes } from '../../../lib/adtHeaders/systemKey';
 import {
   DESTINATION_KEY_ENV,
@@ -21,6 +24,7 @@ import {
   destinationAddressWords,
   rfcConfigOf,
 } from '../../../lib/config/rfcDestination';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { setupAuthBrokerForTests } from './authHelpers';
@@ -32,13 +36,24 @@ import {
 } from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
 import { testConfigPathFromEnv } from './testConfigPath';
+import {
+  type CaseParams,
+  handlerTestCases,
+  parseTestConfig,
+  type SharedDependencies,
+  type SharedDependency,
+  sharedDependenciesOf,
+  type TestCase,
+  type TestConfig,
+} from './testConfigSchema';
+import { thrownStatus, thrownWords } from './thrownValue';
 
 export type { ConfiguredSystemKind };
 export { testConfigPathFromEnv };
 
 const configLogger = createTestLogger('config');
 
-let cachedConfig: any = null;
+let cachedConfig: TestConfig | null = null;
 let envLoaded = false;
 let envLoadError: Error | null = null;
 let brokerAttempted = false;
@@ -68,7 +83,7 @@ function resolveUseAuthBrokerFlag(): boolean {
  * `auth_broker.paths.service_keys_dir` (as the test auth-broker reads it),
  * else undefined — the platform directory.
  */
-export function testAuthBrokerPath(cfg: any): string | undefined {
+export function testAuthBrokerPath(cfg: TestConfig): string | undefined {
   const dir = cfg?.auth_broker?.paths?.service_keys_dir;
   return dir
     ? path.resolve(String(dir).replace(/^~/, require('node:os').homedir()))
@@ -152,9 +167,9 @@ export async function loadTestEnv(): Promise<void> {
         // Over RFC the destination has no URL: its set-up answers itself.
         brokerOk = await setupAuthBrokerForTests({ force: true });
         brokerSucceeded = brokerOk;
-      } catch (error: any) {
+      } catch (error) {
         configLogger?.warn(
-          `[loadTestEnv] Auth-broker failed: ${error?.message || String(error)}`,
+          `[loadTestEnv] Auth-broker failed: ${thrownWords(error)}`,
         );
       }
 
@@ -271,7 +286,7 @@ function logEnvLoaded(envPath: string): void {
  * Load test configuration from YAML
  * Uses test-config.yaml from mcp-abap-adt/tests, or the file MCP_TEST_CONFIG names
  */
-export function loadTestConfig(): any {
+export function loadTestConfig(): TestConfig {
   if (cachedConfig) {
     return cachedConfig;
   }
@@ -282,9 +297,10 @@ export function loadTestConfig(): any {
   // template and quietly disabling every test.
   const chosen = testConfigPathFromEnv();
   if (chosen) {
-    cachedConfig =
-      (yaml.load(fs.readFileSync(chosen, 'utf8')) as Record<string, unknown>) ||
-      {};
+    cachedConfig = parseTestConfig(
+      yaml.load(fs.readFileSync(chosen, 'utf8')),
+      chosen,
+    );
     return cachedConfig;
   }
 
@@ -302,7 +318,7 @@ export function loadTestConfig(): any {
 
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, 'utf8');
-    cachedConfig = (yaml.load(configContent) as Record<string, unknown>) || {};
+    cachedConfig = parseTestConfig(yaml.load(configContent), configPath);
     return cachedConfig;
   }
 
@@ -311,8 +327,7 @@ export function loadTestConfig(): any {
       '⚠️ tests/test-config.yaml not found. Using template (all integration tests will be disabled).',
     );
     const templateContent = fs.readFileSync(templatePath, 'utf8');
-    cachedConfig =
-      (yaml.load(templateContent) as Record<string, unknown>) || {};
+    cachedConfig = parseTestConfig(yaml.load(templateContent), templatePath);
     return cachedConfig;
   }
 
@@ -320,7 +335,7 @@ export function loadTestConfig(): any {
   configLogger?.error(
     'Please create tests/test-config.yaml with test parameters.',
   );
-  return {};
+  return parseTestConfig({}, 'no test config');
 }
 
 /**
@@ -331,9 +346,9 @@ export function loadTestConfig(): any {
 export function getEnabledTestCase(
   handlerName: string,
   testCaseName?: string,
-): any {
+): TestCase | null {
   const config = loadTestConfig();
-  const handlerTests = config[handlerName]?.test_cases || [];
+  const handlerTests = handlerTestCases(config, handlerName);
 
   if (handlerTests.length === 0) {
     configLogger?.debug(
@@ -342,9 +357,9 @@ export function getEnabledTestCase(
     return null;
   }
 
-  let enabledTest;
+  let enabledTest: TestCase | undefined;
   if (testCaseName) {
-    const testCase = handlerTests.find((tc: any) => tc.name === testCaseName);
+    const testCase = handlerTests.find((tc) => tc.name === testCaseName);
     if (!testCase) {
       configLogger?.debug(
         `[DEBUG] Test case "${testCaseName}" not found for handler: ${handlerName}`,
@@ -359,11 +374,9 @@ export function getEnabledTestCase(
     }
     enabledTest = testCase;
   } else {
-    enabledTest = handlerTests.find((tc: any) => tc.enabled === true);
+    enabledTest = handlerTests.find((tc) => tc.enabled === true);
     if (!enabledTest) {
-      const disabledTests = handlerTests.filter(
-        (tc: any) => tc.enabled === false,
-      );
+      const disabledTests = handlerTests.filter((tc) => tc.enabled === false);
       if (disabledTests.length > 0) {
         configLogger?.info(
           `All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`,
@@ -384,7 +397,7 @@ export function getEnabledTestCase(
  * Get shared object configuration from shared_objects section.
  * Shared objects are prerequisites used by multiple tests (e.g., BDEF for BehaviorImplementation).
  */
-export function getSharedObject(key: string): any {
+export function getSharedObject(key: string): CaseParams | null {
   const config = loadTestConfig();
   return config?.shared_objects?.[key] ?? null;
 }
@@ -394,7 +407,7 @@ export function getSharedObject(key: string): any {
  * Shared dependencies are persistent prerequisite objects (tables, views, BDEFs)
  * created once and reused across all tests.
  */
-export function getSharedDependenciesConfig(): any {
+export function getSharedDependenciesConfig(): SharedDependencies | null {
   const config = loadTestConfig();
   return config?.shared_dependencies ?? null;
 }
@@ -409,11 +422,10 @@ export function sharedDependencyKind(name: string): string | undefined {
   if (!shared || !name) return undefined;
   const wanted = String(name).toUpperCase();
   if (String(shared.package ?? '').toUpperCase() === wanted) return 'package';
-  for (const [kind, list] of Object.entries(shared)) {
-    if (!Array.isArray(list)) continue;
+  for (const kind of Object.keys(shared)) {
     if (
-      list.some(
-        (item: any) => String(item?.name ?? '').toUpperCase() === wanted,
+      sharedDependenciesOf(shared, kind).some(
+        (item) => item.name.toUpperCase() === wanted,
       )
     ) {
       return kind;
@@ -444,15 +456,12 @@ export function assertNotSharedDependency(what: string, name: string): void {
 export function resolveSharedDependency(
   type: string,
   name: string,
-): any | null {
+): SharedDependency | null {
   const sharedConfig = getSharedDependenciesConfig();
   if (!sharedConfig) return null;
-  const collection = sharedConfig[type];
-  if (!Array.isArray(collection)) return null;
   return (
-    collection.find(
-      (item: any) =>
-        String(item.name).toUpperCase() === String(name).toUpperCase(),
+    sharedDependenciesOf(sharedConfig, type).find(
+      (item) => item.name.toUpperCase() === name.toUpperCase(),
     ) ?? null
   );
 }
@@ -463,10 +472,9 @@ export function resolveSharedDependency(
 export function getTestCaseDefinition(
   handlerName: string,
   testCaseName: string,
-): any {
-  const config = loadTestConfig();
-  const handlerTests = config[handlerName]?.test_cases || [];
-  return handlerTests.find((tc: any) => tc.name === testCaseName) || null;
+): TestCase | null {
+  const handlerTests = handlerTestCases(loadTestConfig(), handlerName);
+  return handlerTests.find((tc) => tc.name === testCaseName) || null;
 }
 
 /** The authentications this helper builds a config for. */
@@ -590,8 +598,8 @@ export function getSapConfigFromEnv(): SapConfig {
  * Used by test infrastructure to populate system context before creating AdtClient.
  */
 export function resolveTestSystemContext(): {
-  masterSystem?: string;
-  responsible?: string;
+  masterSystem?: string | undefined;
+  responsible?: string | undefined;
 } {
   const config = loadTestConfig();
   return {
@@ -608,7 +616,7 @@ export function resolveTestSystemContext(): {
 /**
  * Resolve package name (from test case or default)
  */
-export function resolvePackageName(testCase?: any): string {
+export function resolvePackageName(testCase?: TestCase | null): string {
   let packageName: string;
 
   if (testCase?.params?.package_name) {
@@ -633,18 +641,17 @@ export function resolvePackageName(testCase?: any): string {
 /**
  * Resolve transport request (from test case or default)
  */
-export function resolveTransportRequest(testCase?: any): string | undefined {
+export function resolveTransportRequest(
+  testCase?: TestCase | null,
+): string | undefined {
   let transportRequest: string | undefined;
 
   // Check if transport_request key explicitly exists in test case params
   // This allows overriding to "no transport" by setting transport_request: "" or null in YAML
   // (e.g., for $TMP package which does not require a transport request)
-  const hasExplicitTransport =
-    testCase?.params != null &&
-    'transport_request' in (testCase.params as Record<string, unknown>);
-
-  if (hasExplicitTransport) {
-    const raw = testCase.params.transport_request;
+  const params = testCase?.params;
+  if (params != null && 'transport_request' in params) {
+    const raw = params.transport_request;
     transportRequest = raw ? String(raw).trim() : undefined;
   } else {
     const config = loadTestConfig();
@@ -680,7 +687,7 @@ export function resolveTransportRequest(testCase?: any): string | undefined {
  * @param testCase - Optional test case object (may have params.cleanup_after or params.skip_cleanup)
  * @returns true if cleanup should be performed, false otherwise
  */
-export function getCleanupAfter(testCase?: any): boolean {
+export function getCleanupAfter(testCase?: TestCase | null): boolean {
   const config = loadTestConfig();
 
   // Global skip flag has highest priority
@@ -720,7 +727,10 @@ export function getCleanupAfter(testCase?: any): boolean {
  * @param testCase - Test case object, as for {@link getCleanupAfter}
  * @param failed - Whether the test that just ran failed
  */
-export function getCleanupAfterRun(testCase: any, failed: boolean): boolean {
+export function getCleanupAfterRun(
+  testCase: TestCase | null | undefined,
+  failed: boolean,
+): boolean {
   if (failed && loadTestConfig().test_settings?.cleanup_on_failure !== true) {
     return false;
   }
@@ -793,14 +803,22 @@ export function statedKindWords(): string {
  * @returns Object with success flag and optional reason for skipping
  */
 export async function preCheckTestParameters(
-  client: any,
+  client: IServerAdtClient | null,
   packageName?: string,
   transportRequest?: string,
   superPackage?: string,
   testLabel: string = 'test',
 ): Promise<{ success: boolean; reason?: string }> {
-  const extractStatus = (checkState: any): number | undefined => {
-    return checkState?.checkResult?.status ?? checkState?.status;
+  // The check as the server sends it (CheckPackageLow): its status and its
+  // headers. 200 when it passed, else the HTTP status SAP answered, if any.
+  const checkStatus = async (name: string): Promise<number | undefined> => {
+    if (!client) return undefined;
+    const checked = await client
+      .getPackage(resultsFor(packageDocuments))
+      .check({ packageName: name }, 'active', {
+        headers: DEFAULT_ADT_HEADERS['package.check'],
+      });
+    return checked.ok ? 200 : checked.getError().response?.status;
   };
 
   // Pre-check: Verify super package exists (if specified - for package tests)
@@ -809,11 +827,7 @@ export async function preCheckTestParameters(
       configLogger?.debug(
         `[PRE_CHECK] Checking super package (parent) existence: ${superPackage}`,
       );
-      const superPackageCheck = await client.getPackage().check({
-        packageName: superPackage,
-        superPackage: undefined,
-      });
-      const superPackageStatus = extractStatus(superPackageCheck);
+      const superPackageStatus = await checkStatus(superPackage);
       if (
         superPackageStatus !== undefined &&
         superPackageStatus !== null &&
@@ -827,14 +841,14 @@ export async function preCheckTestParameters(
           `[PRE_CHECK] ✓ Super package (parent) ${superPackage} exists and is accessible`,
         );
       }
-    } catch (superPackageError: any) {
-      const status = superPackageError.response?.status;
+    } catch (superPackageError) {
+      const status = thrownStatus(superPackageError);
       if (status === 404) {
         const reason = `Super package (parent) ${superPackage} does not exist! Please create it before running the ${testLabel}.`;
         configLogger?.error(`❌ ${reason}`);
         return { success: false, reason };
       } else {
-        const reason = `Cannot verify super package (parent) ${superPackage} (HTTP ${status}): ${superPackageError.message}`;
+        const reason = `Cannot verify super package (parent) ${superPackage} (HTTP ${status}): ${thrownWords(superPackageError)}`;
         configLogger?.warn(`⚠️  ${reason}`);
         configLogger?.warn(
           `⚠️  Continuing ${testLabel}, but it may fail if parent package is not accessible.`,
@@ -853,11 +867,7 @@ export async function preCheckTestParameters(
       configLogger?.debug(
         `[PRE_CHECK] Checking package existence: ${packageName}`,
       );
-      const packageCheck = await client.getPackage().check({
-        packageName,
-        superPackage: undefined,
-      });
-      const packageStatus = extractStatus(packageCheck);
+      const packageStatus = await checkStatus(packageName);
       if (
         packageStatus !== undefined &&
         packageStatus !== null &&
@@ -871,15 +881,15 @@ export async function preCheckTestParameters(
           `[PRE_CHECK] ✓ Package ${packageName} exists and is accessible`,
         );
       }
-    } catch (packageError: any) {
-      const status = packageError.response?.status;
+    } catch (packageError) {
+      const status = thrownStatus(packageError);
       if (status === 404) {
         // For package creation tests, 404 is expected (package doesn't exist yet)
         configLogger?.debug(
           `[PRE_CHECK] ✓ Package ${packageName} does not exist (expected for creation test)`,
         );
       } else {
-        const reason = `Cannot verify package ${packageName} (HTTP ${status}): ${packageError.message}`;
+        const reason = `Cannot verify package ${packageName} (HTTP ${status}): ${thrownWords(packageError)}`;
         configLogger?.warn(`⚠️  ${reason}`);
         configLogger?.warn(
           `⚠️  Continuing ${testLabel}, but it may fail if package is not accessible.`,

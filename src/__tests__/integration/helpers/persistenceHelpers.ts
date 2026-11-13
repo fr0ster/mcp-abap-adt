@@ -1,8 +1,8 @@
 type SessionState = {
   cookies?: string;
   csrf_token?: string;
-  cookie_store?: any;
-  [key: string]: any;
+  cookie_store?: unknown;
+  [key: string]: unknown;
 };
 
 type SessionInfo = {
@@ -21,7 +21,7 @@ type SnapshotPaths = {
 export function saveSessionSnapshot(
   _testLabel: string,
   _session: SessionInfo,
-  _extra: Record<string, any> = {},
+  _extra: Record<string, unknown> = {},
 ): SnapshotPaths {
   return {};
 }
@@ -35,7 +35,7 @@ export function persistDiagnostics(
   _testLabel: string,
   _opts: {
     session?: SessionInfo | null;
-    extra?: Record<string, any>;
+    extra?: Record<string, unknown>;
   },
 ): SnapshotPaths {
   return {};
@@ -43,20 +43,20 @@ export function persistDiagnostics(
 
 export function cleanupDiagnostics(
   _paths: SnapshotPaths,
-  _testCase?: any,
+  _testCase?: unknown,
 ): void {}
 
 export function createDiagnosticsTracker(
   _testLabel: string,
-  testCase?: any,
+  testCase?: unknown,
   _session?: SessionInfo | null,
-  _extra: Record<string, any> = {},
+  _extra: Record<string, unknown> = {},
 ) {
   return {
     persistLock(
       _lockSession?: SessionInfo | null,
       _lockHandle?: string | null,
-      _objectInfo?: Record<string, any>,
+      _objectInfo?: Record<string, unknown>,
     ) {
       // no-op (lock persistence removed)
     },

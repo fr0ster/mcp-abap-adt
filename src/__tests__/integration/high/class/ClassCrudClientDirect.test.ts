@@ -22,6 +22,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import type { IServerAdtClient } from '../../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
@@ -48,7 +49,24 @@ import {
   guardedTestConnection,
 } from '../../helpers/refusalGuard';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { readCaseParams, type TestCase } from '../../helpers/testConfigSchema';
 import { DEBUG_TESTS, debugLog } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const ClassDirectParams = z.looseObject({
+  abstract: z.boolean().optional(),
+  class_name: z.string(),
+  create_protected: z.boolean().optional(),
+  description: z.string().optional(),
+  final: z.boolean().optional(),
+  package_name: z.string().optional(),
+  superclass: z.string().optional(),
+  transport_request: z.string().optional(),
+});
+
+/** A case's parameters, read through ClassDirectParams. */
+const paramsOf = (testCase: TestCase) =>
+  readCaseParams(testCase.params, ClassDirectParams, 'create_class_direct');
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -166,11 +184,11 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       return;
     }
 
-    const className = (testCase.params.class_name as string)
+    const className = (paramsOf(testCase).class_name as string)
       ?.trim()
       .toUpperCase();
     // Resolve package name exactly as in adt-clients tests
-    // In adt-clients: resolvePackageName(testCase.params.package_name)
+    // In adt-clients: resolvePackageName(paramsOf(testCase).package_name)
     // But our helper takes testCase, so we pass testCase
     const packageName = resolvePackageName(testCase);
     if (!packageName) {
@@ -185,29 +203,29 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       return;
     }
     // Resolve transport request exactly as in adt-clients tests
-    // In adt-clients: resolveTransportRequest(testCase.params.transport_request)
+    // In adt-clients: resolveTransportRequest(paramsOf(testCase).transport_request)
     // But our helper takes testCase, so we pass testCase
     const transportRequest = resolveTransportRequest(testCase);
     const description = (
-      testCase.params.description || `Test class ${className}`
+      paramsOf(testCase).description || `Test class ${className}`
     ).trim();
     logLine(`▶️ AdtClient direct test starting for ${className}`);
 
     // Log parameters read from test case (only if DEBUG_TESTS is enabled)
     if (process.env.DEBUG_TESTS === 'true') {
       testLogger?.debug(`[DEBUG] Test case parameters read:`, {
-        class_name: testCase.params.class_name,
+        class_name: paramsOf(testCase).class_name,
         className,
-        package_name: testCase.params.package_name,
+        package_name: paramsOf(testCase).package_name,
         packageName,
-        description: testCase.params.description,
+        description: paramsOf(testCase).description,
         resolvedDescription: description,
-        transport_request: testCase.params.transport_request,
+        transport_request: paramsOf(testCase).transport_request,
         resolvedTransportRequest: transportRequest,
-        superclass: testCase.params.superclass,
-        final: testCase.params.final,
-        abstract: testCase.params.abstract,
-        create_protected: testCase.params.create_protected,
+        superclass: paramsOf(testCase).superclass,
+        final: paramsOf(testCase).final,
+        abstract: paramsOf(testCase).abstract,
+        create_protected: paramsOf(testCase).create_protected,
       });
     }
 
@@ -338,12 +356,12 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         description,
         packageName,
         transportRequest: transportRequest || undefined,
-        superclass: testCase.params.superclass
-          ? String(testCase.params.superclass).trim()
+        superclass: paramsOf(testCase).superclass
+          ? String(paramsOf(testCase).superclass).trim()
           : undefined,
-        final: testCase.params.final as boolean | undefined,
-        abstract: testCase.params.abstract as boolean | undefined,
-        createProtected: testCase.params.create_protected as
+        final: paramsOf(testCase).final as boolean | undefined,
+        abstract: paramsOf(testCase).abstract as boolean | undefined,
+        createProtected: paramsOf(testCase).create_protected as
           | boolean
           | undefined,
       };
@@ -353,11 +371,11 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           JSON.stringify(createParams, null, 2),
         );
         testLogger?.debug(`[DEBUG] AdtClient.createClass - Test case params:`, {
-          superclass: testCase.params.superclass,
-          final: testCase.params.final,
-          abstract: testCase.params.abstract,
-          create_protected: testCase.params.create_protected,
-          transport_request: testCase.params.transport_request,
+          superclass: paramsOf(testCase).superclass,
+          final: paramsOf(testCase).final,
+          abstract: paramsOf(testCase).abstract,
+          create_protected: paramsOf(testCase).create_protected,
+          transport_request: paramsOf(testCase).transport_request,
         });
       }
 

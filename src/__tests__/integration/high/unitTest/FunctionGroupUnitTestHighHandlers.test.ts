@@ -8,6 +8,7 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionModule } from '../../../../handlers/function/high/handleUpdateFunctionModule';
@@ -16,11 +17,20 @@ import { handleCreateFunctionGroupUnitTest } from '../../../../handlers/unit_tes
 import { handleRunFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
 import { handleRunFunctionModuleUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { handleUpdateFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleUpdateFunctionGroupUnitTest';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { expectTestsRan, stepsFor } from './unitTestSteps';
+
+/** What this file's cases state, as its tests read them. */
+const FunctionGroupUnitTestParams = z.looseObject({
+  function_group_name: z.string().optional(),
+  function_module_name: z.string().optional(),
+  function_module_source: z.string().optional(),
+  test_class_source: z.string().optional(),
+  expected_test_methods: z.array(z.string()).optional(),
+});
 
 describe('Unit Test High-Level Handlers (function group)', () => {
   let tester: LambdaTester;
@@ -36,7 +46,11 @@ describe('Unit Test High-Level Handlers (function group)', () => {
     await tester.beforeAll(
       async (_context: LambdaTesterContext) => {},
       async (context: LambdaTesterContext) => {
-        const groupName = context.params?.function_group_name;
+        const groupName = readCaseParams(
+          context.params,
+          FunctionGroupUnitTestParams,
+          'function_group_unit_test',
+        ).function_group_name;
         if (!groupName) return;
         await stepsFor(tester, context).cleanup(
           'DeleteFunctionGroup',
@@ -64,7 +78,12 @@ describe('Unit Test High-Level Handlers (function group)', () => {
 
   it('Unit Test High-Level Handlers: create, run, update, run', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { params, packageName, transportRequest } = context;
+      const { packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        FunctionGroupUnitTestParams,
+        'function_group_unit_test',
+      );
       const groupName: string | undefined = params?.function_group_name;
       const moduleName: string | undefined = params?.function_module_name;
       if (

@@ -18,20 +18,30 @@
 
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const ClassParams = z.looseObject({
+  description: z.string().optional(),
+  source_code: z.string().optional(),
+  superclass: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
 
 describe('Class High-Level Handlers Integration', () => {
   let tester: LambdaTester;
@@ -106,14 +116,13 @@ describe('Class High-Level Handlers Integration', () => {
 
   it('should test all Class high-level handlers', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const {
-        connection,
-        session,
-        objectName,
-        params,
-        packageName,
-        transportRequest,
-      } = context;
+      const { connection, session, objectName, packageName, transportRequest } =
+        context;
+      const params = readCaseParams(
+        context.params,
+        ClassParams,
+        'create_class',
+      );
 
       assert.ok(objectName !== undefined);
       assert.notEqual(objectName, '');
@@ -269,7 +278,14 @@ describe('Class High-Level Handlers Integration', () => {
         throw new Error(`Get failed: ${errorMsg}`);
       }
 
-      const getData = parseHandlerResponse(getResponse);
+      const getData = handlerAnswer(
+        getResponse,
+        z.looseObject({
+          class_name: z.unknown(),
+          source: z.unknown(),
+          success: z.unknown(),
+        }),
+      );
       assert.equal(getData.success, true);
       assert.equal(getData.class_name, objectName);
       assert.ok(getData.source !== undefined);
@@ -304,7 +320,10 @@ describe('Class High-Level Handlers Integration', () => {
         logger?.warn(`Delete failed: ${errorMsg}`);
         // Don't fail test - object might already be deleted or cleanup will handle it
       } else {
-        const deleteData = parseHandlerResponse(deleteResponse);
+        const deleteData = handlerAnswer(
+          deleteResponse,
+          z.looseObject({ deleted: z.unknown(), object: z.unknown() }),
+        );
         // DeleteClass's terse projection is `terseDeletion`, which answers
         // `deleted`/`object` from ADT's own `del:deletionResult` document —
         // it never had `success`/`class_name` fields (projections.ts

@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleCheckBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckClass } from '../../../../handlers/class/high/handleCheckClass';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
@@ -29,12 +30,44 @@ import { handleCheckTable } from '../../../../handlers/table/high/handleCheckTab
 import { getSharedDependenciesConfig } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams, stated } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import {
-  createHandlerContext,
-  parseHandlerResponse,
-} from '../../helpers/testHelpers';
+import { createHandlerContext, handlerAnswer } from '../../helpers/testHelpers';
+
+/** What a check answers, as these tests read it. */
+const CheckAnswer = z.looseObject({
+  object_name: z.unknown(),
+  ran: z.unknown(),
+  status_text: z.unknown(),
+  messages: z
+    .array(
+      z.looseObject({
+        type: z.string().optional(),
+        text: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/** What this file's cases state, as its tests read them. */
+const CheckParams = z.looseObject({
+  class_name: z.string().optional(),
+  name: z.string().optional(),
+  ddl_name: z.string().optional(),
+  domain_name: z.string().optional(),
+  data_element_name: z.string().optional(),
+  table_name: z.string().optional(),
+  structure_name: z.string().optional(),
+  interface_name: z.string().optional(),
+  program_name: z.string().optional(),
+  function_group_name: z.string().optional(),
+  function_module_name: z.string().optional(),
+  package_name: z.string().optional(),
+  super_package: z.string().optional(),
+  description: z.string().optional(),
+  source_code: z.string().optional(),
+});
 
 /**
  * Assert the normalized check response contract.
@@ -118,8 +151,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing class and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.class_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.class_name, 'class_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-class');
@@ -139,7 +177,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -169,7 +207,12 @@ describe('Check High-Level Handlers Integration', () => {
       await tester.beforeAll(
         async () => {},
         async (context: LambdaTesterContext) => {
-          const { connection, params, transportRequest } = context;
+          const { connection, transportRequest } = context;
+          const params = readCaseParams(
+            context.params,
+            CheckParams,
+            'check_high',
+          );
           if (!params?.class_name) return;
           await handleDeleteClass(
             createHandlerContext({
@@ -197,9 +240,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('answers the keyword error as a finding, not as a failed call', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger, packageName, transportRequest } =
-          context;
-        const objectName = params.class_name;
+        const { connection, logger, packageName, transportRequest } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.class_name, 'class_name');
         const ctx = () =>
           createHandlerContext({
             connection,
@@ -237,16 +284,14 @@ describe('Check High-Level Handlers Integration', () => {
 
         // Reported, not raised: the finding is the answer.
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assert.equal(data.object_name, objectName.toUpperCase());
         assert.equal(data.ran, true);
-        const errors = (data.messages ?? []).filter(
-          (m: { type?: string }) => m.type === 'E',
-        );
+        const errors = (data.messages ?? []).filter((m) => m.type === 'E');
         assert.ok(errors.length > 0);
 
         logger?.success(
-          `✅ check: ${objectName} — ${errors.length} error(s): ${errors.map((e: { text?: string }) => e.text).join('; ')}`,
+          `✅ check: ${objectName} — ${errors.length} error(s): ${errors.map((e) => e.text).join('; ')}`,
         );
       });
     });
@@ -280,8 +325,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing behavior definition and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.name, 'name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-bdef');
@@ -305,7 +355,7 @@ describe('Check High-Level Handlers Integration', () => {
         // definition does not have ("Inactive version … does not exist").
         // It asks about the active one now, like every check here.
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -343,8 +393,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing CDS view and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.ddl_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.ddl_name, 'ddl_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-ddl');
@@ -364,7 +419,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -402,8 +457,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing domain and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.domain_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.domain_name, 'domain_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-domain');
@@ -423,7 +483,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -461,8 +521,16 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing data element and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.data_element_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(
+          params.data_element_name,
+          'data_element_name',
+        );
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-dtel');
@@ -482,7 +550,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -520,8 +588,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing table and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.table_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.table_name, 'table_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-table');
@@ -552,7 +625,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -590,8 +663,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing structure and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.structure_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.structure_name, 'structure_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-structure');
@@ -611,7 +689,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -649,8 +727,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing interface and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.interface_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.interface_name, 'interface_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-interface');
@@ -670,7 +753,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -708,12 +791,19 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing package and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
         // The case's package, else the shared package the shared-objects
         // setup creates (shared_dependencies.package): present on every
         // system that ran it, whatever the configuration names it.
-        const objectName =
-          params.package_name ?? getSharedDependenciesConfig()?.package;
+        const objectName = stated(
+          params.package_name ?? getSharedDependenciesConfig()?.package,
+          'package_name',
+        );
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-package');
@@ -736,7 +826,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -774,8 +864,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing program and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.program_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.program_name, 'program_name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-program');
@@ -795,7 +890,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -833,8 +928,16 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing function group and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.function_group_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(
+          params.function_group_name,
+          'function_group_name',
+        );
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-fgrp');
@@ -864,7 +967,7 @@ describe('Check High-Level Handlers Integration', () => {
         // definition, so this asserts the answer's shape, as CheckTable
         // does, and not a finding the shared object must not have.
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -902,8 +1005,16 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing function module and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.function_module_name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(
+          params.function_module_name,
+          'function_module_name',
+        );
 
         logger?.info(
           `   • check: ${objectName} (group: ${params.function_group_name})`,
@@ -922,7 +1033,10 @@ describe('Check High-Level Handlers Integration', () => {
               logger: checkLogger,
             });
             return handleCheckFunctionModule(ctx, {
-              function_group_name: params.function_group_name,
+              function_group_name: stated(
+                params.function_group_name,
+                'function_group_name',
+              ),
               function_module_name: objectName,
               version: 'active',
             });
@@ -930,7 +1044,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(
@@ -968,8 +1082,13 @@ describe('Check High-Level Handlers Integration', () => {
 
     it('should check existing metadata extension and return normalized response', async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger } = context;
-        const objectName = params.name;
+        const { connection, logger } = context;
+        const params = readCaseParams(
+          context.params,
+          CheckParams,
+          'check_high',
+        );
+        const objectName = stated(params.name, 'name');
 
         logger?.info(`   • check: ${objectName}`);
         const checkLogger = createTestLogger('check-ddlx');
@@ -989,7 +1108,7 @@ describe('Check High-Level Handlers Integration', () => {
         );
 
         expectAccepted(response, `check ${objectName}`);
-        const data = parseHandlerResponse(response);
+        const data = handlerAnswer(response, CheckAnswer);
         assertNormalizedCheckResponse(data, objectName);
 
         logger?.success(

@@ -90,6 +90,7 @@ import { primeSystemContext } from '../../integration/helpers/primeSystemContext
 import { stillInactive } from '../../integration/helpers/rapFixtures';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
 import { ensureSharedPackage } from '../../integration/helpers/sharedObjects';
+import { sharedDependenciesOf } from '../../integration/helpers/testConfigSchema';
 
 const testsLogger = createTestLogger('shared-setup');
 
@@ -1287,6 +1288,14 @@ describe('Admin: Setup shared dependencies', () => {
           );
           continue;
         }
+        // A module lives in its group: without one it can be neither read,
+        // created nor activated.
+        const group = item.group;
+        if (group === undefined) {
+          throw new Error(
+            `function module ${item.name} names no group in shared_dependencies`,
+          );
+        }
         try {
           let exists = false;
           try {
@@ -1295,7 +1304,7 @@ describe('Admin: Setup shared dependencies', () => {
               .read(
                 {
                   functionModuleName: item.name,
-                  functionGroupName: item.group,
+                  functionGroupName: group,
                 },
                 'workingArea',
                 { analyse: analyseException },
@@ -1316,7 +1325,7 @@ describe('Admin: Setup shared dependencies', () => {
               .create(
                 {
                   functionModuleName: item.name,
-                  functionGroupName: item.group,
+                  functionGroupName: group,
                   description:
                     item.description || 'Shared test function module',
                   transportRequest,
@@ -1340,7 +1349,7 @@ describe('Admin: Setup shared dependencies', () => {
               'functionModule',
               item.name,
               item.source,
-              item.group,
+              group,
             ))
           ) {
             try {
@@ -1349,7 +1358,7 @@ describe('Admin: Setup shared dependencies', () => {
                 .lock(
                   {
                     functionModuleName: item.name,
-                    functionGroupName: item.group,
+                    functionGroupName: group,
                   },
                   { analyse: analyseException },
                 );
@@ -1367,7 +1376,7 @@ describe('Admin: Setup shared dependencies', () => {
                   .update(
                     {
                       functionModuleName: item.name,
-                      functionGroupName: item.group,
+                      functionGroupName: group,
                       transportRequest,
                     },
                     {
@@ -1397,7 +1406,7 @@ describe('Admin: Setup shared dependencies', () => {
                   .unlock(
                     {
                       functionModuleName: item.name,
-                      functionGroupName: item.group,
+                      functionGroupName: group,
                     },
                     lockHandle,
                     { analyse: analyseException },
@@ -1438,7 +1447,7 @@ describe('Admin: Setup shared dependencies', () => {
             // A module is addressed through its group; without it the
             // activation URI is built with the module's name in the group's
             // place, and the whole batch answers 500 invalidFunctionGroup.
-            parentName: item.group.toUpperCase(),
+            parentName: group.toUpperCase(),
           });
         } catch (error: any) {
           const msg = error instanceof Error ? error.message : String(error);
@@ -1458,7 +1467,7 @@ describe('Admin: Setup shared dependencies', () => {
             toActivate.push({
               name: item.name.toUpperCase(),
               type: TYPE_CODES.function_modules,
-              parentName: item.group.toUpperCase(),
+              parentName: group.toUpperCase(),
             });
           } else {
             testsLogger?.error?.(
@@ -1781,7 +1790,7 @@ describe('Admin: Setup shared dependencies', () => {
       },
     ];
     for (const kind of viaHandlers) {
-      const items: any[] = sharedConfig[kind.section] || [];
+      const items: any[] = sharedDependenciesOf(sharedConfig, kind.section);
       if (items.length === 0) continue;
       testsLogger?.info?.(
         `Creating ${kind.label}s (${items.length}) without activation...`,

@@ -33,7 +33,7 @@ export async function connectionAs(envName: string): Promise<{
   connection: IAbapConnection;
   close: () => Promise<void>;
 }> {
-  const config: unknown = loadTestConfig();
+  const config = loadTestConfig();
   const file = resolveEnvFilePath({
     envDestination: envName,
     authBrokerPath: testAuthBrokerPath(config),

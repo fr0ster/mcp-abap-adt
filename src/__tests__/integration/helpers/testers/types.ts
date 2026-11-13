@@ -11,6 +11,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { LoggerWithExtras } from '../loggerHelpers';
 import type { SessionInfo } from '../sessionHelpers';
+import type { CaseParams, TestCase } from '../testConfigSchema';
 
 export interface LambdaTesterContext {
   hasConfig: boolean;
@@ -21,7 +22,8 @@ export interface LambdaTesterContext {
   connectionSource?: 'auth_broker' | 'env' | 'unknown' | undefined;
   isCloudSystem: boolean;
   objectName?: string | null | undefined;
-  params: any;
+  /** The case's parameters as the YAML states them: a test reads them through its schema (`readCaseParams`). */
+  params: CaseParams;
   packageName: string;
   transportRequest?: string | undefined;
   lockHandle?: string | null | undefined;
@@ -29,14 +31,16 @@ export interface LambdaTesterContext {
   cleanupAfter: () => Promise<void>;
   // Common configuration parameters shared across all tests
   defaultPackage?: string | undefined;
-  testCase: any; // Test case definition from YAML
+  testCase: TestCase | null; // Test case definition from YAML
 }
 
 /**
  * Workflow function that receives tester context and executes handler logic
  * Test defines how to call handlers, tester provides all infrastructure
  */
-export type WorkflowFunction = (context: LambdaTesterContext) => Promise<any>;
+export type WorkflowFunction = (
+  context: LambdaTesterContext,
+) => Promise<unknown>;
 
 export type HighWorkflowFunctions = {
   create: WorkflowFunction;

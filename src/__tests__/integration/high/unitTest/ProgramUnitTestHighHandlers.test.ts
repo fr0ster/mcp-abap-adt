@@ -1,5 +1,6 @@
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { includeDocuments } from '@mcp-abap-adt/adt-clients';
+
 /**
  * Integration tests for a report's ABAP Unit tools: CreateProgramUnitTest,
  * RunProgramUnitTest, UpdateProgramUnitTest. The suite builds its own report and
@@ -8,6 +9,7 @@ import { includeDocuments } from '@mcp-abap-adt/adt-clients';
  * Run: npm test -- --testPathPatterns=integration/high/unitTest/ProgramUnitTestHighHandlers
  */
 
+import * as z from 'zod';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
@@ -17,12 +19,20 @@ import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createOnPremAdtClient } from '../../../../lib/clients';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { expectTestsRan, stepsFor } from './unitTestSteps';
+
+/** What this file's cases state, as its tests read them. */
+const ProgramUnitTestParams = z.looseObject({
+  program_name: z.string().optional(),
+  program_source: z.string().optional(),
+  test_class_source: z.string().optional(),
+  expected_test_methods: z.array(z.string()).optional(),
+});
 
 describe('Unit Test High-Level Handlers (report)', () => {
   let tester: LambdaTester;
@@ -38,7 +48,11 @@ describe('Unit Test High-Level Handlers (report)', () => {
     await tester.beforeAll(
       async (_context: LambdaTesterContext) => {},
       async (context: LambdaTesterContext) => {
-        const programName = context.params?.program_name;
+        const programName = readCaseParams(
+          context.params,
+          ProgramUnitTestParams,
+          'program_unit_test',
+        ).program_name;
         if (!programName) return;
         const steps = stepsFor(tester, context);
         await steps.cleanup(
@@ -94,7 +108,12 @@ describe('Unit Test High-Level Handlers (report)', () => {
 
   it('Unit Test High-Level Handlers: create, run, update, run', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { params, packageName, transportRequest } = context;
+      const { packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        ProgramUnitTestParams,
+        'program_unit_test',
+      );
       const programName: string | undefined = params?.program_name;
       if (!programName || !params?.test_class_source || !packageName) {
         logger?.warn('program_unit_test not configured, skipping');

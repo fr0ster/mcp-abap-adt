@@ -38,6 +38,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerCreate } from '../../../../../compact-modify/src/handlers/handleHandlerCreate';
 import { handleHandlerDelete } from '../../../../../compact-modify/src/handlers/handleHandlerDelete';
@@ -69,10 +70,18 @@ import { getSystemType } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { withRootDescription } from '../../helpers/rootDescription';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const IncludeParams = z.looseObject({
+  description: z.string().optional(),
+  include_name: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
 
 /** A tool's answer as the model reads it: the error flag and the first text. */
 type Answer = { isError: boolean; text: string };
@@ -243,10 +252,14 @@ describe('Include High-Level Handlers Integration', () => {
       const context = handlerContext;
       if (context === undefined) throw new Error('No handler context');
       ran = true;
-      const params = ctx.params;
+      const params = readCaseParams(
+        ctx.params,
+        IncludeParams,
+        'create_include',
+      );
       const description: string =
         params.description || 'Include for the include high-level tests';
-      const source: string = params.update_source_code;
+      const source = params.update_source_code;
       if (!source) throw new Error('update_source_code is required');
 
       /** A step that must succeed: its answer, or the test ends with it. */
@@ -689,7 +702,9 @@ describe('Include on ABAP cloud: listed read-only, read', () => {
     await tester.run(async (ctx: LambdaTesterContext) => {
       const context = handlerContext;
       if (context === undefined) throw new Error('No handler context');
-      const includeName: string = ctx.params.include_name ?? '';
+      const includeName =
+        readCaseParams(ctx.params, IncludeParams, 'create_include')
+          .include_name ?? '';
       if (includeName === '') {
         throw new Error(
           'SKIP: include_cloud_read.include_name is empty: the configuration names no delivered include to read',

@@ -13,12 +13,19 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleGetSqlQuery } from '../../../../handlers/system/readonly/handleGetSqlQuery';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const SqlQueryParams = z.looseObject({
+  test_row_number: z.number().optional(),
+  test_sql_query: z.string().optional(),
+});
 
 function extractResultData(result: any): any {
   const textContent = result.content.find((c: any) => c.type === 'text') as any;
@@ -56,7 +63,12 @@ describe('GetSqlQuery Handler Integration', () => {
 
   it('should execute SQL query and return results', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, params } = context;
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        SqlQueryParams,
+        'get_sql_query',
+      );
       const sqlQuery =
         params?.test_sql_query || 'SELECT MANDT, MTEXT FROM T000';
       const rowNumber = params?.test_row_number || 10;

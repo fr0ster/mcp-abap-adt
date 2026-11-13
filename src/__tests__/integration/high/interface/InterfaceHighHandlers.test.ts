@@ -15,10 +15,20 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
-import { handleCreateInterface } from '../../../../handlers/interface/high/handleCreateInterface';
-import { handleDeleteInterface } from '../../../../handlers/interface/high/handleDeleteInterface';
-import { handleUpdateInterface } from '../../../../handlers/interface/high/handleUpdateInterface';
+import {
+  TOOL_DEFINITION as CreateInterfaceTool,
+  handleCreateInterface,
+} from '../../../../handlers/interface/high/handleCreateInterface';
+import {
+  TOOL_DEFINITION as DeleteInterfaceTool,
+  handleDeleteInterface,
+} from '../../../../handlers/interface/high/handleDeleteInterface';
+import {
+  handleUpdateInterface,
+  TOOL_DEFINITION as UpdateInterfaceTool,
+} from '../../../../handlers/interface/high/handleUpdateInterface';
 
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Interface High-Level Handlers Integration', () => {
@@ -30,9 +40,9 @@ describe('Interface High-Level Handlers Integration', () => {
       'builder_interface',
       'interface-high',
       {
-        create: handleCreateInterface,
-        update: handleUpdateInterface,
-        delete: handleDeleteInterface,
+        create: defineTool(CreateInterfaceTool, handleCreateInterface),
+        update: defineTool(UpdateInterfaceTool, handleUpdateInterface),
+        delete: defineTool(DeleteInterfaceTool, handleDeleteInterface),
       },
     );
     await tester.beforeAll();

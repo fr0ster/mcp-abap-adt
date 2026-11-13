@@ -16,6 +16,7 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
@@ -35,12 +36,31 @@ import {
   type ViewFixture,
 } from '../../helpers/rapFixtures';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
+import { readCaseParams, stated } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const BdefParams = z.looseObject({
+  class_name: z.string().optional(),
+  root_view_name: z.string().optional(),
+  root_view_source: z.string().optional(),
+  description: z.string().optional(),
+  root_entity: z.string().optional(),
+  implementation_type: z
+    .enum(['Managed', 'Unmanaged', 'Abstract', 'Projection'])
+    .optional(),
+  source_code: z.string().optional(),
+  update_source_code: z.string().optional(),
+  behavior_definition: z.string().optional(),
+  main_source: z.string().optional(),
+  implementation_code: z.string().optional(),
+  update_implementation_code: z.string().optional(),
+});
 
 const testLogger = createTestLogger('bdef-bimpl-high');
 
@@ -73,7 +93,13 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
           'create_behavior_implementation',
           'builder_behavior_implementation',
         );
-        const bimplClassName = bimplTestCase?.params?.class_name;
+        const bimplClassName = bimplTestCase
+          ? readCaseParams(
+              bimplTestCase.params,
+              BdefParams,
+              'create_behavior_implementation',
+            ).class_name
+          : undefined;
 
         // 1. Delete BIMPL class (must go first — depends on BDEF)
         if (bimplClassName) {
@@ -153,7 +179,11 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         }
 
         // 3. Delete the view this suite created.
-        const cleanupParams = context.params ?? {};
+        const cleanupParams = readCaseParams(
+          context.params,
+          BdefParams,
+          'create_behavior_definition',
+        );
         if (cleanupParams.root_view_name) {
           leftBehind.push(
             ...(await deleteView(
@@ -161,7 +191,10 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
               {
                 name: cleanupParams.root_view_name,
                 description: `Root view for ${objectName}`,
-                source: cleanupParams.root_view_source,
+                source: stated(
+                  cleanupParams.root_view_source,
+                  'root_view_source',
+                ),
               },
               transportRequest,
               testLogger,
@@ -192,8 +225,12 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
 
   it('should execute full workflow: Create BDEF -> Update BDEF -> Create BIMPL -> Update BIMPL -> Activate both', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, objectName, params, packageName, transportRequest } =
-        context;
+      const { connection, objectName, packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        BdefParams,
+        'create_behavior_definition',
+      );
 
       if (!objectName) throw new Error('BDEF name is required');
 
@@ -230,9 +267,9 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
       // ── Step 0: the view this BDEF is defined over — this suite's own, under
       // its own name, so nothing here can lock a shared name out.
       const rootView: ViewFixture = {
-        name: params.root_view_name,
+        name: stated(params.root_view_name, 'root_view_name'),
         description: `Root view for ${objectName}`,
-        source: params.root_view_source,
+        source: stated(params.root_view_source, 'root_view_source'),
       };
       await createView(
         handlerCtx,
@@ -252,8 +289,11 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
           object_name: objectName,
           package_name: packageName,
           description: params.description || objectName,
-          root_entity: params.root_entity,
-          implementation_type: params.implementation_type,
+          root_entity: stated(params.root_entity, 'root_entity'),
+          implementation_type: stated(
+            params.implementation_type,
+            'implementation_type',
+          ),
         }),
       );
       testLogger?.info?.(`   * create BDEF: ${objectName}`);
@@ -262,8 +302,11 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
           name: objectName,
           package_name: packageName,
           description: params.description || objectName,
-          root_entity: params.root_entity,
-          implementation_type: params.implementation_type,
+          root_entity: stated(params.root_entity, 'root_entity'),
+          implementation_type: stated(
+            params.implementation_type,
+            'implementation_type',
+          ),
           activate: false,
           ...(transportRequest && { transport_request: transportRequest }),
         }),
@@ -275,7 +318,10 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
       await mustSucceed(`Update BDEF ${objectName}`, () =>
         handleUpdateBehaviorDefinition(handlerCtx, {
           name: objectName,
-          source_code: params.update_source_code || params.source_code,
+          source_code: stated(
+            params.update_source_code || params.source_code,
+            'update_source_code',
+          ),
           activate: false,
           ...(transportRequest && { transport_request: transportRequest }),
         }),
@@ -294,8 +340,12 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         return;
       }
 
-      const bimplParams = bimplTestCase.params;
-      const bimplClassName = bimplParams.class_name;
+      const bimplParams = readCaseParams(
+        bimplTestCase.params,
+        BdefParams,
+        'create_behavior_implementation',
+      );
+      const bimplClassName = stated(bimplParams.class_name, 'class_name');
       const behaviorDefinition = bimplParams.behavior_definition || objectName;
 
       // ── Step 4: Create BIMPL (high-level handler auto-activates internally,
@@ -351,9 +401,11 @@ ENDCLASS.
         handleUpdateBehaviorImplementation(handlerCtx, {
           class_name: bimplClassName,
           behavior_definition: behaviorDefinition,
-          implementation_code:
+          implementation_code: stated(
             bimplParams.update_implementation_code ||
-            bimplParams.implementation_code,
+              bimplParams.implementation_code,
+            'implementation_code',
+          ),
           activate: false,
           ...(transportRequest && { transport_request: transportRequest }),
         }),

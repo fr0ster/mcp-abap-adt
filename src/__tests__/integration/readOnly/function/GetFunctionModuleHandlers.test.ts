@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { stated } from '../../helpers/testConfigSchema';
 /**
  * Integration tests for GetFunctionModule Handler (read-only)
  *
@@ -30,6 +32,7 @@ import {
 } from '../../helpers/testers/hardMode';
 import {
   createHandlerContext,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -89,7 +92,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
     }
 
     const functionModuleName = sharedFM.name;
-    const functionGroupName = sharedFM.group;
+    const functionGroupName = stated(sharedFM.group, 'group');
 
     testLogger?.info(
       `📖 Reading function module ${functionModuleName} from group ${functionGroupName}...`,
@@ -152,7 +155,15 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
       throw new Error(`GetFunctionModule failed: ${errorMsg}`);
     }
 
-    const data = parseHandlerResponse(response);
+    const data = handlerAnswer(
+      response,
+      z.looseObject({
+        function_group_name: z.unknown(),
+        function_module_name: z.unknown(),
+        source: z.unknown(),
+        success: z.unknown(),
+      }),
+    );
     assert.equal(data.success, true);
     assert.equal(data.function_module_name, functionModuleName.toUpperCase());
     assert.equal(data.function_group_name, functionGroupName.toUpperCase());

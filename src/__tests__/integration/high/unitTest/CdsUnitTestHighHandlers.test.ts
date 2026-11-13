@@ -7,15 +7,25 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleCreateCdsUnitTest } from '../../../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleDeleteCdsUnitTest } from '../../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleRunCdsUnitTest } from '../../../../handlers/unit_test/high/handleRunCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { expectTestsRan, stepsFor } from './unitTestSteps';
+
+/** What this file's cases state, as its tests read them. */
+const CdsUnitTestParams = z.looseObject({
+  class_name: z.string().optional(),
+  cds_view_name: z.string().optional(),
+  test_class_source: z.string().optional(),
+  update_test_class_source: z.string().optional(),
+  expected_test_methods: z.array(z.string()).optional(),
+});
 
 describe('Unit Test High-Level Handlers (CDS view)', () => {
   let tester: LambdaTester;
@@ -31,7 +41,11 @@ describe('Unit Test High-Level Handlers (CDS view)', () => {
     await tester.beforeAll(
       async (_context: LambdaTesterContext) => {},
       async (context: LambdaTesterContext) => {
-        const className = context.params?.class_name;
+        const className = readCaseParams(
+          context.params,
+          CdsUnitTestParams,
+          'cds_unit_test',
+        ).class_name;
         if (!className) return;
         await stepsFor(tester, context).cleanup(
           'DeleteCdsUnitTest',
@@ -59,7 +73,12 @@ describe('Unit Test High-Level Handlers (CDS view)', () => {
 
   it('Unit Test High-Level Handlers: create, run, update, run', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { params, packageName, transportRequest } = context;
+      const { packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        CdsUnitTestParams,
+        'cds_unit_test',
+      );
       const className: string | undefined = params?.class_name;
       if (
         !className ||

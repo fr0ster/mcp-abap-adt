@@ -91,18 +91,9 @@ function biomeAnyRulesFor(glob: string): unknown[] {
   return levels;
 }
 
-/**
- * The test infrastructure still holding `any`, by path prefix, while S4 of
- * the no-assertions plan takes it out batch by batch.
- */
-const PENDING = ['src/__tests__/integration/helpers/'];
-
 describe('test infrastructure', () => {
   const files = testInfrastructureSources();
-  const gated = files.filter(
-    (file) => !PENDING.some((prefix) => file.startsWith(prefix)),
-  );
-  const anys = gated
+  const anys = files
     .flatMap((file) => scanFile(path.join(REPO, file)))
     .filter((one) => one.rule === 'any');
 

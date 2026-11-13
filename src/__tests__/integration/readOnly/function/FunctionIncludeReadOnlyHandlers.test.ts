@@ -17,6 +17,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import { handleGetFunctionInclude } from '../../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import { handleListFunctionGroupIncludes } from '../../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../../handlers/function_include/readonly/handleListFunctionModules';
@@ -31,6 +32,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
+import { readCaseParams, type TestCase } from '../../helpers/testConfigSchema';
 import {
   callTool,
   createHardModeClient,
@@ -39,8 +41,23 @@ import {
 } from '../../helpers/testers/hardMode';
 import {
   createHandlerContext,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const FunctionIncludeReadParams = z.looseObject({
+  function_group_name: z.string(),
+  include_name: z.string(),
+});
+
+/** A case's parameters, read through FunctionIncludeReadParams. */
+const paramsOf = (testCase: TestCase) =>
+  readCaseParams(
+    testCase.params,
+    FunctionIncludeReadParams,
+    'read_function_include_readonly',
+  );
 
 const testLogger = createTestLogger('function-include-readonly');
 
@@ -124,8 +141,8 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = testCase.params.function_group_name;
-    const includeName = testCase.params.include_name;
+    const functionGroupName = paramsOf(testCase).function_group_name;
+    const includeName = paramsOf(testCase).include_name;
 
     testLogger?.info(
       `📖 Reading include ${includeName} of group ${functionGroupName}...`,
@@ -167,7 +184,17 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`GetFunctionInclude failed: ${errorMsg}`);
     }
 
-    const data = parseHandlerResponse(response);
+    const data = handlerAnswer(
+      response,
+      z.looseObject({
+        function_group_name: z.unknown(),
+        function_modules: z.unknown(),
+        include_name: z.unknown(),
+        includes: z.unknown(),
+        success: z.unknown(),
+        total: z.unknown(),
+      }),
+    );
     assert.equal(data.success, true);
     assert.equal(data.function_group_name, functionGroupName.toUpperCase());
     assert.equal(data.include_name, includeName.toUpperCase());
@@ -195,7 +222,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = testCase.params.function_group_name;
+    const functionGroupName = paramsOf(testCase).function_group_name;
 
     testLogger?.info(`📋 Listing includes of group ${functionGroupName}...`);
 
@@ -227,7 +254,17 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`ListFunctionGroupIncludes failed: ${errorMsg}`);
     }
 
-    const data = parseHandlerResponse(response);
+    const data = handlerAnswer(
+      response,
+      z.looseObject({
+        function_group_name: z.unknown(),
+        function_modules: z.unknown(),
+        include_name: z.unknown(),
+        includes: z.unknown(),
+        success: z.unknown(),
+        total: z.unknown(),
+      }),
+    );
     assert.equal(data.success, true);
     assert.equal(data.function_group_name, functionGroupName.toUpperCase());
     assert.equal(Array.isArray(data.includes), true);
@@ -267,7 +304,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const functionGroupName = testCase.params.function_group_name;
+    const functionGroupName = paramsOf(testCase).function_group_name;
     // The shared FM that lives in ZMCP_SHR_FGRP (see check_function_module_high).
     const expectedFm = 'Z_MCP_SHR_FM';
 
@@ -303,7 +340,17 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`ListFunctionModules failed: ${errorMsg}`);
     }
 
-    const data = parseHandlerResponse(response);
+    const data = handlerAnswer(
+      response,
+      z.looseObject({
+        function_group_name: z.unknown(),
+        function_modules: z.unknown(),
+        include_name: z.unknown(),
+        includes: z.unknown(),
+        success: z.unknown(),
+        total: z.unknown(),
+      }),
+    );
     assert.equal(data.success, true);
     assert.equal(data.function_group_name, functionGroupName.toUpperCase());
     assert.equal(Array.isArray(data.function_modules), true);

@@ -20,6 +20,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import { handleGetStructuresList } from '../../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   getEnabledTestCase,
@@ -32,6 +33,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
+import { readCaseParams, type TestCase } from '../../helpers/testConfigSchema';
 import {
   callTool,
   createHardModeClient,
@@ -40,8 +42,24 @@ import {
 } from '../../helpers/testers/hardMode';
 import {
   createHandlerContext,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const StructuresListParams = z.looseObject({
+  expected_append: z.string().optional(),
+  expected_include: z.string().optional(),
+  structure_name: z.string(),
+});
+
+/** A case's parameters, read through StructuresListParams. */
+const paramsOf = (testCase: TestCase) =>
+  readCaseParams(
+    testCase.params,
+    StructuresListParams,
+    'get_structures_list_readonly',
+  );
 
 const testLogger = createTestLogger('structure-list-readonly');
 
@@ -133,9 +151,9 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       return;
     }
 
-    const structureName = testCase.params.structure_name;
+    const structureName = paramsOf(testCase).structure_name;
     const expectedInclude = String(
-      testCase.params.expected_include,
+      paramsOf(testCase).expected_include,
     ).toUpperCase();
 
     testLogger?.info(`📋 Listing structures embedded in ${structureName}...`);
@@ -167,7 +185,10 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       throw new Error(`GetStructuresList failed: ${errorMsg}`);
     }
 
-    const data = parseHandlerResponse(response);
+    const data = handlerAnswer(
+      response,
+      z.looseObject({ success: z.unknown(), tree: z.unknown() }),
+    );
     assert.equal(data.success, true);
 
     const tree = data.tree as StructureNode;
@@ -196,8 +217,8 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
     // tree, say which of the two it is — an extension that is not on this
     // system, or a walk that lost one it should have found — by asking
     // whether the tool can see the object at all.
-    const expectedAppend = testCase.params.expected_append
-      ? String(testCase.params.expected_append).toUpperCase()
+    const expectedAppend = paramsOf(testCase).expected_append
+      ? String(paramsOf(testCase).expected_append).toUpperCase()
       : null;
     if (expectedAppend) {
       const appendChild = (tree.children ?? []).find(

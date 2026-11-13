@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { handleRuntimeRunClass } from '../../../../handlers/system/high/handleRuntimeRunClass';
 import { handleRuntimeRunProgram } from '../../../../handlers/system/high/handleRuntimeRunProgram';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
@@ -24,9 +25,31 @@ import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const RuntimeParams = z.looseObject({
+  dump_candidates_per_poll: z.number().optional(),
+  dump_class_name: z.string().optional(),
+  dump_feed_retries: z.number().optional(),
+  dump_feed_retry_delay_ms: z.number().optional(),
+  dump_feed_top: z.number().optional(),
+  dump_id: z.string().optional(),
+  dump_page_probe: z.number().optional(),
+  dumps_user: z.string().optional(),
+  dump_title_filter: z.string().optional(),
+  dump_view: z.enum(['default', 'summary', 'formatted']).optional(),
+  profiled_class_name: z.string().optional(),
+  profiled_program_name: z.string().optional(),
+  profiled_run_max_trace_attempts: z.number().optional(),
+  profiled_run_trace_retry_delay_ms: z.number().optional(),
+  trace_feed_retries: z.number().optional(),
+  trace_feed_retry_delay_ms: z.number().optional(),
+  trace_id_or_uri: z.string().optional(),
+});
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -154,7 +177,13 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
 
   it('runs the shared class under the profiler and gets the id of its trace', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const className = String(context.params?.profiled_class_name ?? '');
+      const className = String(
+        readCaseParams(
+          context.params,
+          RuntimeParams,
+          'runtime_readonly_handlers',
+        ).profiled_class_name ?? '',
+      );
       if (!className) {
         throw new Error('profiled_class_name is not configured');
       }
@@ -170,11 +199,23 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         profile: true,
         description: `MCP_RUNTIME_CLASS_${Date.now()}`,
         max_trace_attempts:
-          toPositiveInt(context.params?.profiled_run_max_trace_attempts, 0) ||
-          undefined,
+          toPositiveInt(
+            readCaseParams(
+              context.params,
+              RuntimeParams,
+              'runtime_readonly_handlers',
+            ).profiled_run_max_trace_attempts,
+            0,
+          ) || undefined,
         trace_retry_delay_ms:
-          toPositiveInt(context.params?.profiled_run_trace_retry_delay_ms, 0) ||
-          undefined,
+          toPositiveInt(
+            readCaseParams(
+              context.params,
+              RuntimeParams,
+              'runtime_readonly_handlers',
+            ).profiled_run_trace_retry_delay_ms,
+            0,
+          ) || undefined,
       };
       const run = await tester.invokeToolOrHandler(
         'RuntimeRunClass',
@@ -207,7 +248,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         );
       }
       const programName = String(
-        context.params?.profiled_program_name ?? '',
+        readCaseParams(
+          context.params,
+          RuntimeParams,
+          'runtime_readonly_handlers',
+        ).profiled_program_name ?? '',
       ).toUpperCase();
       if (!programName) {
         throw new Error('profiled_program_name is not configured');
@@ -235,10 +280,24 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
       assert.equal(data.success, true);
       assert.ok(data.profile?.profiler_id !== undefined);
 
-      const attempts = toPositiveInt(context.params?.trace_feed_retries, 6);
+      const attempts = toPositiveInt(
+        readCaseParams(
+          context.params,
+          RuntimeParams,
+          'runtime_readonly_handlers',
+        ).trace_feed_retries,
+        6,
+      );
       const waitMs = Math.max(
         100,
-        toPositiveInt(context.params?.trace_feed_retry_delay_ms, 1000),
+        toPositiveInt(
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).trace_feed_retry_delay_ms,
+          1000,
+        ),
       );
       let traceId: string | undefined;
       for (let attempt = 1; attempt <= attempts && !traceId; attempt += 1) {
@@ -264,12 +323,26 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
       // list: one of this run's if it has finished already, otherwise the
       // newest finished trace of the shared profiling objects, otherwise
       // any finished trace. `trace_id_or_uri`, when set, overrides.
-      const configured = String(context.params?.trace_id_or_uri ?? '').trim();
+      const configured = String(
+        readCaseParams(
+          context.params,
+          RuntimeParams,
+          'runtime_readonly_handlers',
+        ).trace_id_or_uri ?? '',
+      ).trim();
       let traceId = configured;
       if (!traceId) {
         const owners = [
-          context.params?.profiled_program_name,
-          context.params?.profiled_class_name,
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).profiled_program_name,
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).profiled_class_name,
         ]
           .filter(Boolean)
           .map((n) => String(n).toUpperCase());
@@ -374,7 +447,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
       // class each run, created and activated here — and its own dump never
       // showed up in the feed, so the test read someone else's.
       const dumpClassName = String(
-        context.params?.dump_class_name ?? '',
+        readCaseParams(
+          context.params,
+          RuntimeParams,
+          'runtime_readonly_handlers',
+        ).dump_class_name ?? '',
       ).toUpperCase();
       if (!dumpClassName) {
         throw new Error(
@@ -401,13 +478,25 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         // What the feed already shows, before the run. The class name is the
         // same every run, so a dump naming it proves nothing on its own —
         // this run's dump is a new one that names it.
-        const dumpsUserBefore = context.params?.dumps_user || undefined;
+        const dumpsUserBefore =
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dumps_user || undefined;
         const beforeRun = await handleRuntimeListFeeds(
           createHandlerContext({ connection: context.connection, logger }),
           {
             feed_type: 'dumps',
             user: dumpsUserBefore,
-            max_results: toPositiveInt(context.params?.dump_feed_top, 50),
+            max_results: toPositiveInt(
+              readCaseParams(
+                context.params,
+                RuntimeParams,
+                'runtime_readonly_handlers',
+              ).dump_feed_top,
+              50,
+            ),
           },
         );
         assert.equal(beforeRun.isError, false);
@@ -442,24 +531,56 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         }
 
         const maxAttempts = toPositiveInt(
-          context.params?.dump_feed_retries ??
-            context.params?.trace_feed_retries,
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_feed_retries ??
+            readCaseParams(
+              context.params,
+              RuntimeParams,
+              'runtime_readonly_handlers',
+            ).trace_feed_retries,
           8,
         );
         const retryDelayMs = Math.max(
           100,
           toPositiveInt(
-            context.params?.dump_feed_retry_delay_ms ??
-              context.params?.trace_feed_retry_delay_ms,
+            readCaseParams(
+              context.params,
+              RuntimeParams,
+              'runtime_readonly_handlers',
+            ).dump_feed_retry_delay_ms ??
+              readCaseParams(
+                context.params,
+                RuntimeParams,
+                'runtime_readonly_handlers',
+              ).trace_feed_retry_delay_ms,
             1500,
           ),
         );
-        const dumpFeedTop = toPositiveInt(context.params?.dump_feed_top, 50);
-        const dumpsUser = context.params?.dumps_user || undefined;
+        const dumpFeedTop = toPositiveInt(
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_feed_top,
+          50,
+        );
+        const dumpsUser =
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dumps_user || undefined;
         // How many title-matched candidates to open and content-check per
         // poll before giving up on this poll and waiting for the next one.
         const maxCandidatesPerPoll = toPositiveInt(
-          context.params?.dump_candidates_per_poll,
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_candidates_per_poll,
           5,
         );
         // The exception this run's own class dumps with — a cheap
@@ -468,7 +589,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         // divides an I by 0, which ADT titles this exact way; a caller
         // dumping some other way sets `params.dump_title_filter`.
         const dumpTitleFilter = (
-          context.params?.dump_title_filter ?? 'division by 0'
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_title_filter ?? 'division by 0'
         ).toLowerCase();
 
         // Whatever the feed showed on the last poll, newest first — the
@@ -593,14 +718,22 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         const fallbackDumpId = lastSeen[0]?.id;
         const dumpId =
           generatedDumpId ||
-          context.params?.dump_id ||
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_id ||
           fallbackDumpId ||
           undefined;
         if (!generatedDumpId) {
           logger?.warn?.(
             `this run's own dump (class ${dumpClassName}) did not appear in the feed after ${maxAttempts} polls — ` +
-              (context.params?.dump_id
-                ? `reading the configured params.dump_id ${context.params.dump_id} instead`
+              (readCaseParams(
+                context.params,
+                RuntimeParams,
+                'runtime_readonly_handlers',
+              ).dump_id
+                ? `reading the configured params.dump_id ${readCaseParams(context.params, RuntimeParams, 'runtime_readonly_handlers').dump_id} instead`
                 : fallbackDumpId
                   ? `reading the newest dump the feed shows instead: ${fallbackDumpId}`
                   : 'and the feed shows no dumps at all'),
@@ -618,10 +751,26 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           return;
         }
         const dumpView =
-          context.params?.dump_view === 'summary' ||
-          context.params?.dump_view === 'formatted' ||
-          context.params?.dump_view === 'default'
-            ? context.params?.dump_view
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_view === 'summary' ||
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_view === 'formatted' ||
+          readCaseParams(
+            context.params,
+            RuntimeParams,
+            'runtime_readonly_handlers',
+          ).dump_view === 'default'
+            ? readCaseParams(
+                context.params,
+                RuntimeParams,
+                'runtime_readonly_handlers',
+              ).dump_view
             : 'default';
 
         const dumpResult = await invoke(
@@ -840,7 +989,14 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
 
   it('should read past the 100 entries SAP answers per request', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const wanted = toPositiveInt(context.params?.dump_page_probe, 150);
+      const wanted = toPositiveInt(
+        readCaseParams(
+          context.params,
+          RuntimeParams,
+          'runtime_readonly_handlers',
+        ).dump_page_probe,
+        150,
+      );
       const args = { feed_type: 'dumps' as const, max_results: wanted };
       const result = await tester.invokeToolOrHandler(
         'RuntimeListFeeds',

@@ -94,6 +94,7 @@ import {
 import { endTestConnection } from '../openConnections';
 import { guardedTestConnection, refuseAfterMarker } from '../refusalGuard';
 import { createTestConnectionAndSession } from '../sessionHelpers';
+import type { TestConfig } from '../testConfigSchema';
 
 /** The repository root. */
 const REPO = repositoryRoot(__dirname);
@@ -808,7 +809,10 @@ export async function launchHttpScript(
  * the stores (`--unsafe`, `--auth-broker-path`), the destination, and the
  * connection type when stated.
  */
-export function destinationArgs(hard: HardModeConfig, cfg: unknown): string[] {
+export function destinationArgs(
+  hard: HardModeConfig,
+  cfg: TestConfig,
+): string[] {
   const broker = memberOf(cfg, 'auth_broker');
   const useUnsafe =
     process.env.MCP_UNSAFE === 'true' ||
@@ -936,7 +940,7 @@ function parentLogOn(kind: ConfiguredSystemKind): () => Promise<void> {
  */
 export async function createHardModeClient(
   set: HardModeSet,
-  cfg: unknown = loadTestConfig(),
+  cfg: TestConfig = loadTestConfig(),
 ): Promise<HardModeClient> {
   const hard = getHardModeConfig(cfg);
   const kind = launchKind(cfg);

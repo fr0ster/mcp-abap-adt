@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Integration test: CRUD on objects assigned to a transport request
  *
@@ -38,6 +39,7 @@ import {
 } from '../../helpers/sessionHelpers';
 import {
   createHandlerContext,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -180,7 +182,10 @@ ENDCLASS.`;
     });
 
     assert.equal(getResponse.isError, false);
-    const getData = parseHandlerResponse(getResponse);
+    const getData = handlerAnswer(
+      getResponse,
+      z.looseObject({ source: z.unknown(), success: z.unknown() }),
+    );
     assert.equal(getData.success, true);
     // The source the update wrote, not the shell the create made.
     assert.ok(
@@ -197,7 +202,10 @@ ENDCLASS.`;
     });
 
     assert.equal(readResponse.isError, false);
-    const readData = parseHandlerResponse(readResponse);
+    const readData = handlerAnswer(
+      readResponse,
+      z.looseObject({ metadata: z.unknown(), success: z.unknown() }),
+    );
     assert.equal(readData.success, true);
     assert.ok(readData.metadata !== undefined);
     logger?.success('Step 4: GetClass part metadata succeeded');

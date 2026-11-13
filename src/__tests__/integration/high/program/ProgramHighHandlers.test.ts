@@ -15,10 +15,20 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
-import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
-import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
-import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
+import {
+  TOOL_DEFINITION as CreateProgramTool,
+  handleCreateProgram,
+} from '../../../../handlers/program/high/handleCreateProgram';
+import {
+  TOOL_DEFINITION as DeleteProgramTool,
+  handleDeleteProgram,
+} from '../../../../handlers/program/high/handleDeleteProgram';
+import {
+  handleUpdateProgram,
+  TOOL_DEFINITION as UpdateProgramTool,
+} from '../../../../handlers/program/high/handleUpdateProgram';
 
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Program High-Level Handlers Integration', () => {
@@ -30,9 +40,9 @@ describe('Program High-Level Handlers Integration', () => {
       'builder_program',
       'program-high',
       {
-        create: handleCreateProgram,
-        update: handleUpdateProgram,
-        delete: handleDeleteProgram,
+        create: defineTool(CreateProgramTool, handleCreateProgram),
+        update: defineTool(UpdateProgramTool, handleUpdateProgram),
+        delete: defineTool(DeleteProgramTool, handleDeleteProgram),
       },
     );
     await tester.beforeAll();

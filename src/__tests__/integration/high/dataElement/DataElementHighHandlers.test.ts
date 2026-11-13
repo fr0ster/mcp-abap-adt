@@ -15,10 +15,20 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
-import { handleCreateDataElement } from '../../../../handlers/data_element/high/handleCreateDataElement';
-import { handleDeleteDataElement } from '../../../../handlers/data_element/high/handleDeleteDataElement';
-import { handleUpdateDataElement } from '../../../../handlers/data_element/high/handleUpdateDataElement';
+import {
+  TOOL_DEFINITION as CreateDataElementTool,
+  handleCreateDataElement,
+} from '../../../../handlers/data_element/high/handleCreateDataElement';
+import {
+  TOOL_DEFINITION as DeleteDataElementTool,
+  handleDeleteDataElement,
+} from '../../../../handlers/data_element/high/handleDeleteDataElement';
+import {
+  handleUpdateDataElement,
+  TOOL_DEFINITION as UpdateDataElementTool,
+} from '../../../../handlers/data_element/high/handleUpdateDataElement';
 
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('DataElement High-Level Handlers Integration', () => {
@@ -30,9 +40,9 @@ describe('DataElement High-Level Handlers Integration', () => {
       'builder_data_element',
       'dataelement-high',
       {
-        create: handleCreateDataElement,
-        update: handleUpdateDataElement,
-        delete: handleDeleteDataElement,
+        create: defineTool(CreateDataElementTool, handleCreateDataElement),
+        update: defineTool(UpdateDataElementTool, handleUpdateDataElement),
+        delete: defineTool(DeleteDataElementTool, handleDeleteDataElement),
       },
     );
     await tester.beforeAll();

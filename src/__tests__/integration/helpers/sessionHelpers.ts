@@ -29,6 +29,7 @@ import {
   refuseAfterMarker,
 } from './refusalGuard';
 import { extractSessionState } from './testHelpers';
+import { thrownWords } from './thrownValue';
 
 /**
  * The connection logger, with the `csrfToken` channel the connection expects.
@@ -83,7 +84,7 @@ async function createConnectionViaBroker(): Promise<GuardedConnection | null> {
         logger: connectionLoggerWithCsrf,
       }),
     );
-  } catch (error: any) {
+  } catch (error) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -107,9 +108,9 @@ export async function createTestConnectionAndSession(): Promise<{
   // Ensure environment and tokens are loaded (supports auth-broker fallback)
   try {
     await loadTestEnv();
-  } catch (error: any) {
+  } catch (error) {
     sessionLogger?.warn(
-      `[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`,
+      `[createTestConnectionAndSession] loadTestEnv failed: ${thrownWords(error)}`,
     );
   }
 
@@ -127,9 +128,9 @@ export async function createTestConnectionAndSession(): Promise<{
         if (connection) {
           connectionSource = 'auth_broker';
         }
-      } catch (brokerError: any) {
+      } catch (brokerError) {
         sessionLogger?.debug(
-          `[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`,
+          `[createTestConnectionAndSession] AuthBroker failed: ${thrownWords(brokerError)}`,
         );
       }
     }
@@ -188,11 +189,11 @@ export async function createTestConnectionAndSession(): Promise<{
       authType,
       connectionSource,
     };
-  } catch (error: any) {
+  } catch (error) {
     sessionLogger?.error(
-      `[createTestConnectionAndSession] Error caught: ${error?.message || String(error)}`,
+      `[createTestConnectionAndSession] Error caught: ${thrownWords(error)}`,
     );
-    if (process.env.DEBUG_TESTS === 'true' && error?.stack) {
+    if (process.env.DEBUG_TESTS === 'true' && error instanceof Error) {
       sessionLogger?.debug(
         `[createTestConnectionAndSession] Stack: ${error.stack}`,
       );
@@ -216,7 +217,7 @@ export async function getTestSession(): Promise<SessionInfo> {
  */
 export function updateSessionFromResponse(
   currentSession: SessionInfo | null,
-  handlerResponse: any,
+  handlerResponse: unknown,
 ): SessionInfo {
   const { session_id, session_state } = extractSessionState(handlerResponse);
 
@@ -239,7 +240,7 @@ export function updateSessionFromResponse(
 /**
  * Extract session from Lock response (CRITICAL: must be used for Update/Unlock)
  */
-export function extractLockSession(lockResponse: any): SessionInfo {
+export function extractLockSession(lockResponse: unknown): SessionInfo {
   const { session_id, session_state } = extractSessionState(lockResponse);
 
   if (!session_id || !session_state) {

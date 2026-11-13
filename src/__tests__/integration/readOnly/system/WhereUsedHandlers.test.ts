@@ -15,13 +15,20 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleGetWhereUsed';
-
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const WhereUsedParams = z.looseObject({
+  test_class: z.string().optional(),
+  test_table: z.string().optional(),
+});
 
 function extractResultData(result: any): any {
   const jsonContent = result.content.find((c: any) => c.type === 'json') as any;
@@ -66,7 +73,12 @@ describe('WhereUsed Handler Integration', () => {
 
   it('should find where-used references with default scope', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, params } = context;
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
       const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
 
       logger?.info('🔍 Testing where-used with default scope');
@@ -107,7 +119,12 @@ describe('WhereUsed Handler Integration', () => {
 
   it('should find where-used references with all types enabled', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, params } = context;
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
       const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
 
       logger?.info('🔍 Testing where-used with all types enabled');
@@ -148,7 +165,12 @@ describe('WhereUsed Handler Integration', () => {
 
   it('should find where-used references for a table', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, params } = context;
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
       const testTable = params?.test_table || 'SCARR';
 
       logger?.info('🔍 Testing where-used for table');
@@ -256,7 +278,12 @@ describe('WhereUsed Handler Integration', () => {
 
   it('should compare results between default and all-types scope', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, params } = context;
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
       const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
 
       logger?.info('🔍 Comparing default scope vs all-types scope');
@@ -321,7 +348,12 @@ describe('WhereUsed Handler Integration', () => {
 
   it('should restrict results to enable_only_types (server-side type filtering)', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, params } = context;
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        WhereUsedParams,
+        'whereused_readonly',
+      );
       const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
 
       const invoke = async (extra: Record<string, unknown>) =>

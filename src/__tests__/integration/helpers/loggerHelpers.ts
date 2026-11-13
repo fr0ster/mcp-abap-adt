@@ -153,7 +153,7 @@ export function logObjectAction(
   logger: Logger,
   action: string,
   objectName: string,
-  extra?: Record<string, any>,
+  extra?: Record<string, unknown>,
 ) {
   const payload = extra ? ` ${JSON.stringify(extra)}` : '';
   logger?.info(`${action} ${objectName}${payload}`);

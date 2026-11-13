@@ -1,5 +1,6 @@
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * Integration tests for ServiceDefinition High-Level Handlers
  *
@@ -17,20 +18,38 @@ import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
-import { handleCreateServiceDefinition } from '../../../../handlers/service_definition/high/handleCreateServiceDefinition';
-import { handleUpdateServiceDefinition } from '../../../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import {
+  TOOL_DEFINITION as CreateServiceDefinitionTool,
+  handleCreateServiceDefinition,
+} from '../../../../handlers/service_definition/high/handleCreateServiceDefinition';
+import {
+  handleUpdateServiceDefinition,
+  TOOL_DEFINITION as UpdateServiceDefinitionTool,
+} from '../../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
-import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import {
+  defineTool,
+  type HandlerContext,
+} from '../../../../lib/handlers/interfaces';
 
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 // Wrapper for delete since there's no handler for deleteServiceDefinition
+const DELETE_SERVICE_DEFINITION = {
+  name: 'DeleteServiceDefinitionWrapper',
+  description: 'Deletes the service definition the delete step names.',
+  inputSchema: z.object({
+    service_definition_name: z.string(),
+    transport_request: z.string().optional(),
+  }),
+};
+
 async function deleteServiceDefinitionWrapper(
   context: HandlerContext,
-  args: any,
-): Promise<any> {
+  args: z.output<typeof DELETE_SERVICE_DEFINITION.inputSchema>,
+) {
   try {
     const client = createAdtClient(context.connection);
     // The answer is read: since adt-clients 23 a refused delete answers
@@ -76,9 +95,18 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
       'builder_service_definition',
       'service-high',
       {
-        create: handleCreateServiceDefinition,
-        update: handleUpdateServiceDefinition,
-        delete: deleteServiceDefinitionWrapper,
+        create: defineTool(
+          CreateServiceDefinitionTool,
+          handleCreateServiceDefinition,
+        ),
+        update: defineTool(
+          UpdateServiceDefinitionTool,
+          handleUpdateServiceDefinition,
+        ),
+        delete: defineTool(
+          DELETE_SERVICE_DEFINITION,
+          deleteServiceDefinitionWrapper,
+        ),
       },
     );
     await tester.beforeAll();

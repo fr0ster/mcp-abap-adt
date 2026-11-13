@@ -15,10 +15,20 @@
  */
 
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
-import { handleCreateStructure } from '../../../../handlers/structure/high/handleCreateStructure';
-import { handleDeleteStructure } from '../../../../handlers/structure/high/handleDeleteStructure';
-import { handleUpdateStructure } from '../../../../handlers/structure/high/handleUpdateStructure';
+import {
+  TOOL_DEFINITION as CreateStructureTool,
+  handleCreateStructure,
+} from '../../../../handlers/structure/high/handleCreateStructure';
+import {
+  TOOL_DEFINITION as DeleteStructureTool,
+  handleDeleteStructure,
+} from '../../../../handlers/structure/high/handleDeleteStructure';
+import {
+  handleUpdateStructure,
+  TOOL_DEFINITION as UpdateStructureTool,
+} from '../../../../handlers/structure/high/handleUpdateStructure';
 
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Structure High-Level Handlers Integration', () => {
@@ -30,9 +40,9 @@ describe('Structure High-Level Handlers Integration', () => {
       'builder_structure',
       'structure-high',
       {
-        create: handleCreateStructure,
-        update: handleUpdateStructure,
-        delete: handleDeleteStructure,
+        create: defineTool(CreateStructureTool, handleCreateStructure),
+        update: defineTool(UpdateStructureTool, handleUpdateStructure),
+        delete: defineTool(DeleteStructureTool, handleDeleteStructure),
       },
     );
     await tester.beforeAll();

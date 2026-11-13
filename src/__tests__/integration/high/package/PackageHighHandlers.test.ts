@@ -16,14 +16,15 @@
 
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
 import {
   TOOL_DEFINITION as CreatePackage,
   handleCreatePackage,
 } from '../../../../handlers/package/high/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
-
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -31,6 +32,16 @@ import {
   extractErrorMessage,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const PackageParams = z.looseObject({
+  application_component: z.string().optional(),
+  description: z.string().optional(),
+  package_type: z.string().optional(),
+  record_changes: z.boolean().optional(),
+  software_component: z.string().optional(),
+  transport_layer: z.string().optional(),
+});
 
 describe('Package High-Level Handlers Integration', () => {
   let tester: LambdaTester;
@@ -104,8 +115,12 @@ describe('Package High-Level Handlers Integration', () => {
 
   it('should test all Package high-level handlers', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      const { connection, objectName, params, packageName, transportRequest } =
-        context;
+      const { connection, objectName, packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        PackageParams,
+        'create_package',
+      );
 
       assert.ok(objectName !== undefined);
       assert.notEqual(objectName, '');

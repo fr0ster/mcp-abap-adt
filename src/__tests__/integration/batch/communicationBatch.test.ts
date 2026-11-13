@@ -197,7 +197,7 @@ async function serve(kind: Kind): Promise<Served> {
     process.env.MCP_UNSAFE === 'true' ||
     cfg?.auth_broker?.unsafe === true ||
     cfg?.auth_broker?.unsafe_session_store === true;
-  const envName = String(cfg.environment.env);
+  const envName = String(cfg.environment?.env);
   const args = [
     path.join(REPO, 'node_modules/tsx/dist/cli.mjs'),
     '--tsconfig',

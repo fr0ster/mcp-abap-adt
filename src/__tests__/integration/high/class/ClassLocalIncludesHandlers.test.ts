@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Integration tests for Class Local Includes High-Level Handlers
  *
@@ -43,6 +44,7 @@ import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -446,7 +448,10 @@ END-OF-DEFINITION.`;
       }
       if (!getTestClassResponse.isError) {
         assert.equal(getTestClassResponse.isError, false);
-        const getTestClassData = parseHandlerResponse(getTestClassResponse);
+        const getTestClassData = handlerAnswer(
+          getTestClassResponse,
+          z.looseObject({ source: z.unknown() }),
+        );
         assert.ok(getTestClassData.source !== undefined);
       }
 
@@ -475,7 +480,10 @@ END-OF-DEFINITION.`;
         logger?.error(`GetLocalTypes failed: ${errorMsg}`);
       }
       assert.equal(getLocalTypesResponse.isError, false);
-      const getLocalTypesData = parseHandlerResponse(getLocalTypesResponse);
+      const getLocalTypesData = handlerAnswer(
+        getLocalTypesResponse,
+        z.looseObject({ source: z.unknown() }),
+      );
       assert.ok(getLocalTypesData.source !== undefined);
 
       // Get LocalDefinitions - read after update
@@ -503,7 +511,10 @@ END-OF-DEFINITION.`;
         logger?.error(`GetLocalDefinitions failed: ${errorMsg}`);
       }
       assert.equal(getLocalDefsResponse.isError, false);
-      const getLocalDefsData = parseHandlerResponse(getLocalDefsResponse);
+      const getLocalDefsData = handlerAnswer(
+        getLocalDefsResponse,
+        z.looseObject({ source: z.unknown() }),
+      );
       assert.ok(getLocalDefsData.source !== undefined);
 
       logger?.success(`✅ Get (read) operations completed`);

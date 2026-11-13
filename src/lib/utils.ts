@@ -170,29 +170,28 @@ export function logErrorSafely(
   let errorMessage = `[ERROR] ${operationName} failed`;
   const errorDetails: Record<string, unknown> = {};
 
-  if (error instanceof AxiosError && error.response) {
-    errorMessage += ` - Status: ${error.response.status}`;
-    if (error.response.statusText) {
-      errorMessage += ` - StatusText: ${error.response.statusText}`;
+  const response = httpFailureOf(error)?.response;
+  if (typeof response === 'object' && response !== null) {
+    const status = child(response, 'status');
+    const statusText = child(response, 'statusText');
+    const data = child(response, 'data');
+    errorMessage += ` - Status: ${String(status)}`;
+    if (statusText) {
+      errorMessage += ` - StatusText: ${String(statusText)}`;
     }
-    errorDetails.status = error.response.status;
-    errorDetails.statusText = error.response.statusText;
-    errorDetails.responseHeaders = error.response.headers;
+    errorDetails.status = status;
+    errorDetails.statusText = statusText;
+    errorDetails.responseHeaders = child(response, 'headers');
 
     // Safely extract response data
-    if (error.response.data) {
-      if (typeof error.response.data === 'string') {
-        errorDetails.responseData = error.response.data.substring(0, 500);
+    if (data) {
+      if (typeof data === 'string') {
+        errorDetails.responseData = data.substring(0, 500);
       } else {
         try {
-          errorDetails.responseData = JSON.stringify(
-            error.response.data,
-          ).substring(0, 500);
+          errorDetails.responseData = JSON.stringify(data).substring(0, 500);
         } catch (_e) {
-          errorDetails.responseData = String(error.response.data).substring(
-            0,
-            500,
-          );
+          errorDetails.responseData = String(data).substring(0, 500);
         }
       }
     }
@@ -285,6 +284,34 @@ function dnsFailureWords(hostname: string, errorMessage: string): string {
 }
 
 /**
+ * An HTTP request's failure as a thrown value says it, read by its facts: an
+ * `Error` with a string `code` or a `response` object — axios's error, and
+ * since @mcp-abap-adt/connection 25 the connection's own (SAP's answer as
+ * `response`, `status`, `code`; no `config`, `request` or `isAxiosError`).
+ * `undefined` for any other value. A thrown value is outside the type
+ * system, so it is read field by field.
+ */
+function httpFailureOf(error: unknown):
+  | {
+      readonly error: Error;
+      readonly code: unknown;
+      readonly message: string;
+      readonly response: unknown;
+    }
+  | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const code = child(error, 'code');
+  const response = child(error, 'response');
+  if (
+    typeof code !== 'string' &&
+    (typeof response !== 'object' || response === null)
+  ) {
+    return undefined;
+  }
+  return { error, code, message: error.message || '', response };
+}
+
+/**
  * An SDK `McpError`'s own words: its message without the `MCP error <code>: `
  * its constructor puts in front (`McpError` in @modelcontextprotocol/sdk),
  * cut by its length — recognised by the error's name and numeric code,
@@ -317,20 +344,22 @@ export function return_error(error: unknown): FailureAnswer {
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object
   let errorText: string;
+  const http = httpFailureOf(error);
 
   try {
     if (typeof error === 'string') {
       // Validation sites pass a ready message; this is the shortest path.
       errorText = error;
-    } else if (error instanceof AxiosError) {
+    } else if (http !== undefined) {
       // DNS and network errors first, by the error's code
-      const errorCode = error.code;
-      const errorMessage = error.message || '';
+      const errorCode = http.code;
+      const errorMessage = http.message;
+      const responseData = child(http.response, 'data');
 
       // Handle DNS resolution errors (common on Windows)
       if (errorCode === 'ENOTFOUND') {
         errorText = dnsFailureWords(
-          unresolvedHostOf(error) ?? 'unknown host',
+          unresolvedHostOf(http.error) ?? 'unknown host',
           errorMessage,
         );
       } else if (errorCode === 'ECONNREFUSED') {
@@ -343,15 +372,15 @@ export function return_error(error: unknown): FailureAnswer {
           `Connection timeout: The request took too long to complete. ` +
           `Please check your network connection and try again.\n` +
           `\nOriginal error: ${errorMessage}`;
-      } else if (error.response?.data) {
-        // For Axios errors with response data, safely extract response data
-        if (typeof error.response.data === 'string') {
-          errorText = error.response.data.substring(0, 2000); // Limit length
+      } else if (responseData) {
+        // SAP's answer, as it came: a body, safely extracted
+        if (typeof responseData === 'string') {
+          errorText = responseData.substring(0, 2000); // Limit length
         } else {
           try {
             // Use a replacer function to avoid circular references
             const seen = new WeakSet();
-            errorText = JSON.stringify(error.response.data, (key, value) => {
+            errorText = JSON.stringify(responseData, (key, value) => {
               if (typeof value === 'object' && value !== null) {
                 if (seen.has(value)) {
                   return '[Circular]';
@@ -370,12 +399,13 @@ export function return_error(error: unknown): FailureAnswer {
               return value;
             }).substring(0, 2000);
           } catch (_e) {
-            errorText = `HTTP ${error.response.status}: ${error.response.statusText || 'Error'}`;
+            errorText = `HTTP ${String(child(http.response, 'status'))}: ${String(child(http.response, 'statusText') || 'Error')}`;
           }
         }
       } else {
         errorText =
-          errorMessage || `HTTP ${error.response?.status || 'Unknown error'}`;
+          errorMessage ||
+          `HTTP ${String(child(http.response, 'status') || 'Unknown error')}`;
       }
     } else if (error instanceof Error) {
       // DNS errors in regular Error objects too, by the error's code

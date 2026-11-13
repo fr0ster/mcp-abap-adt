@@ -14,7 +14,8 @@ ADT dependencies move to `@mcp-abap-adt/adt-clients` 45.5, `@mcp-abap-adt/adt-st
 `@mcp-abap-adt/interfaces-adt` 27.4 (`@mcp-abap-adt/compact-modify` too): what that changes for a
 caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" and
 "Callers of the activation tools: an activation SAP did not carry out is an error" below (44
-adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 24,
+adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 25
+("Embedders: `@mcp-abap-adt/connection` 25", below),
 `@mcp-abap-adt/interfaces-auth-sap` 4, `@mcp-abap-adt/interfaces-adt-connection` 5 ("Embedders:
 `IAbapConnection` 5", below) and the
 optional `@mcp-abap-adt/sap-rfc-lite` 0.4, the
@@ -251,7 +252,8 @@ to have a debug session send the header pairs of its origin's system.
 
 ## Embedders: `IAbapConnection` 5
 
-The server takes `@mcp-abap-adt/interfaces-adt-connection` 5 and `@mcp-abap-adt/connection` 24.
+The server takes `@mcp-abap-adt/interfaces-adt-connection` 5 and `@mcp-abap-adt/connection` 24
+(25 since this release's last step: next section).
 `IAbapConnection.makeAdtRequest(options)` takes no type parameter and answers
 `Promise<IAdtWireResponse>`, whose `data` is `unknown`. Every exported signature of the server
 that names `IAbapConnection` names version 5's. Nothing changes at run time.
@@ -266,6 +268,33 @@ that names `IAbapConnection` names version 5's. Nothing changes at run time.
 - connection 24 changes none of the types the server's signatures name from it (`SapConfig`,
   `SapHttpConfig`, `ILogger`, `CreatedConnection`); its own migration note is connection's
   MIGRATION-24.0.
+
+## Embedders: `@mcp-abap-adt/connection` 25
+
+The server takes `@mcp-abap-adt/connection` `^25.0.0`. No error the connection hands out, and
+no line it logs, carries a thrown value's text or a request's config:
+
+- **An RFC call's failure** is `RFC call to SADT_REST_RFC_ENDPOINT failed: <codeString>` (or
+  `… failed: the SDK did not name the failure`), with `rfc` (`key`, `group`, `code`,
+  `codeString`) and `code`. The NW RFC SDK's own text — the gateway's address, the time, the
+  kernel's source module — is no longer in the message, so it no longer reaches a tool's answer.
+- **An HTTP failure** is an `Error` with SAP's answer as `response` (`status`, `statusText`,
+  `headers`, `data`), `status` and `code`; with no answer, `code` and the words
+  `The request failed: <code>`. It has no `config`, `request`, `isAxiosError` or `cause`:
+  `axios.isAxiosError(error)` and `instanceof AxiosError` are `false`.
+- **`AuthRefusedError.cause`** is a `WireFailure` copy (`code`, `status`, `rfc`, `response`);
+  `cause === original` no longer holds.
+
+The server's `return_error` and `logErrorSafely` (`@mcp-abap-adt/lib/utils`) read SAP's answer,
+a refused connection, a timeout and a DNS failure from such an `Error` by its `code` and
+`response`, as they did from axios's error.
+
+**What you do:**
+
+- Code that read `config`, `request` or `isAxiosError` off a connection's error, or tested
+  `instanceof AxiosError`, reads `code`, `status`, `response` and `rfc` instead.
+- Code that compared `AuthRefusedError.cause` with the error it expected reads the copy's facts.
+- connection's own migration note is its MIGRATION-25.0.
 
 ## Embedders: the answer helpers and the HTTP interfaces
 

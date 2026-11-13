@@ -204,8 +204,13 @@ const create = {
   ),
 } as const;
 
-const text = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.length > 0 ? value : undefined;
+const text = (value: string | undefined): string | undefined =>
+  value !== undefined && value.length > 0 ? value : undefined;
+
+/** The arguments of HandlerCreate whose value is text. */
+type TextField = {
+  [K in keyof Args]-?: Args[K] extends string | undefined ? K : never;
+}[keyof Args];
 
 /** The types whose create is a chain, each with the full set's tool that runs it. */
 const CHAIN_CREATES: Readonly<Record<string, string>> = {
@@ -257,7 +262,10 @@ function createAlone(
 }
 
 /** `${field} is required` when `args[field]` is not a non-empty string. */
-function missing(args: ToolArgs, fields: string[]): unknown | undefined {
+function missing(
+  args: Args,
+  fields: readonly TextField[],
+): ToolResultLike | undefined {
   for (const field of fields) {
     if (!text(args[field])) {
       return return_error(new Error(`${field} is required`));

@@ -56,7 +56,7 @@ type Args = Omit<z.output<typeof compactDeleteSchema>, 'object_type'> & {
   readonly object_type?: string;
 };
 
-const text = (value: unknown): string | undefined =>
+const text = (value: string | undefined): string | undefined =>
   typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 
 const ANSWER = { tool: 'HandlerDelete', detail: 'terse' } as const;
@@ -133,8 +133,7 @@ export async function handleDeleteOnly(
   }
   const target = DELETION_TARGETS[removed];
   const nameField = DELETION_NAME_FIELDS[removed];
-  const given: ToolArgs = args;
-  const name = text(given[nameField]);
+  const name = text(args[nameField]);
   if (name === undefined) {
     return return_error(new Error(`${nameField} is required`));
   }

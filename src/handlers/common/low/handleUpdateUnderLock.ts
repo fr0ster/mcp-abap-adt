@@ -183,15 +183,17 @@ const update = {
 } as const;
 
 /** `source_code` and the source fields some types name otherwise. */
-const source = (args: ToolArgs, field: string): unknown =>
+const source = (args: Args, field: TextField): string | undefined =>
   args[field] ?? args.source_code;
 
-const text = (value: unknown): string | undefined =>
-  typeof value === 'string' && value !== '' ? value : undefined;
+const text = (value: string | undefined): string | undefined =>
+  value !== undefined && value !== '' ? value : undefined;
 
 /** `value` when it is a non-empty string; else the error naming `field`. */
-const requiredText = (field: string, value: unknown): string | Error =>
-  text(value) ?? new Error(`${field} is required`);
+const requiredText = (
+  field: string,
+  value: string | undefined,
+): string | Error => text(value) ?? new Error(`${field} is required`);
 
 const upper = (value: string | undefined): string =>
   (value ?? '').toUpperCase();
@@ -216,9 +218,14 @@ export type IncludeWriter = {
  * the object type of its `update`, and the accessor that writes it, under
  * the class's lock.
  */
+/** The arguments of HandlerUpdate whose value is text. */
+type TextField = {
+  [K in keyof Args]-?: Args[K] extends string | undefined ? K : never;
+}[keyof Args];
+
 export const CLASS_INCLUDES: Record<
   string,
-  [string, AdtObjectWith<'update'>, (client: AdtClient) => IncludeWriter]
+  [TextField, AdtObjectWith<'update'>, (client: AdtClient) => IncludeWriter]
 > = {
   LOCAL_TEST_CLASS: [
     'test_class_code',

@@ -155,7 +155,6 @@
     "test:live-deferred-logon": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/integration/live/deferredLogon.test.ts",
     "test:high": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration/high",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
-    "measure:unknown": "npm run test:build && node .test-build/tree/src/__tests__/unit/sources/helpers/unknownProvenanceScan.js",
     "shared:setup": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/setup.test.ts",
     "shared:teardown": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/teardown.test.ts",
     "shared:check": "npm run test:build && node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/check.test.ts",

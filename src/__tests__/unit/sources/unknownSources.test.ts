@@ -3,7 +3,7 @@
  * is one from outside the type system, a sink a named contract types so, or a
  * library callback's — never a value the repository has a contract type for.
  * The scan is `helpers/unknownProvenanceScan.ts`, on the language service and
- * the type checker; `npm run measure:unknown` lists what it refuses.
+ * the type checker; a refusal lists each site with the types that reach it.
  *
  * Each fixture under `__fixtures__/unknownProvenance` is one class, reported
  * or not as its class is.
@@ -229,8 +229,8 @@ describe('the unknown audit refuses a value the repository has a type for', () =
 });
 
 describe('production code holds as unknown only what comes from outside the type system', () => {
-  // Every production project, as `npm run measure:unknown` reads it: a
-  // refusal is listed with the types that reach it.
+  // Every production project: a refusal is listed with the types that reach
+  // it.
   const sites = scanProduction();
 
   it('refuses no site', () => {

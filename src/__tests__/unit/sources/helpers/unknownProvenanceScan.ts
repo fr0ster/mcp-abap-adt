@@ -24,9 +24,6 @@
  * parameter `unknown`), `entry` (a function nothing in the program calls or
  * hands on). `typed` and `mixed` are refused, and so is a callback whose
  * contract types the parameter, and a reader not named in `THROWN_READERS`.
- *
- * Report mode (`npm run measure:unknown`) runs this file after the node:test
- * build and lists every refused site with the types that reach it.
  */
 
 import * as fs from 'node:fs';
@@ -1055,31 +1052,4 @@ function eachProductionProject<T>(
     out.push(...scan(program, own));
   }
   return out;
-}
-
-if (require.main === module) {
-  const sites = scanProduction();
-  const counts = new Map<string, number>();
-  for (const site of sites) {
-    const key = `${site.kind} ${site.cls}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  for (const [key, count] of [...counts].sort()) {
-    process.stdout.write(`${key}: ${count}\n`);
-  }
-  const refused = sites.filter((site) => site.refused);
-  process.stdout.write(`refused: ${refused.length}\n`);
-  for (const stale of staleReaders(sites, THROWN_READERS)) {
-    process.stdout.write(`stale reader: ${stale}\n`);
-  }
-  for (const site of refused) {
-    process.stdout.write(
-      `${site.where} ${site.kind} ${site.key} ${site.cls}: ${site.types.join(' | ')}\n`,
-    );
-  }
-  const untyped = untypedProductionAnswers();
-  process.stdout.write(`untyped answers: ${untyped.length}\n`);
-  for (const answer of untyped) {
-    process.stdout.write(`${answer.where} ${answer.text.split('\n')[0]}\n`);
-  }
 }

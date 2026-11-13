@@ -250,6 +250,17 @@ debugger's `BreakpointTarget`, `StopView`, `DebugStartOptions` and `PlaceReading
 embedder's own `DebugSessionPorts` / `AmdpSessionPorts` may add the optional `headersOf(origin)`
 to have a debug session send the header pairs of its origin's system.
 
+## Embedders: `AmdpSessionPorts` takes `dropConnection`
+
+`AmdpSessionPorts` (`@mcp-abap-adt/lib/debugger`) has a required
+`dropConnection(c: IAbapConnection): void`, as `DebugSessionPorts` already had. An AMDP stop
+whose commands connection is spent (its SAP session gone) takes both connections out through it,
+with no request: nothing more is sent on them, not even a logoff of the session that ended.
+
+**What you do:** an embedder's own `AmdpSessionPorts` adds `dropConnection`, taking the
+connection out of whatever holds it without sending anything; the shipped ports
+(`src/lib/debugger/ports.ts`) do so already.
+
 ## Embedders: `IAbapConnection` 5
 
 The server takes `@mcp-abap-adt/interfaces-adt-connection` 5 and `@mcp-abap-adt/connection` 24

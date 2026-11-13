@@ -57,6 +57,7 @@ A `.env` for basic authentication:
 
 ```env
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=<your ABAP user>

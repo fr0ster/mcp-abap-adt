@@ -130,6 +130,7 @@ For basic authentication:
 cd ~/my-project
 cat > .env << EOF
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -291,6 +292,7 @@ After installation, create a `.env` file with your SAP connection details:
 # of mcp-abap-adt-http / mcp-abap-adt-sse, never in a stdio .env)
 cat > .env << 'EOF'
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=<your ABAP user>

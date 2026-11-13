@@ -26,6 +26,7 @@ the sessions store, or `--mcp=<destination>` for a service key):
 ```bash
 cat > /path/to/<destination>.env << 'EOF'
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=<your ABAP user>

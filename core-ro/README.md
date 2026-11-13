@@ -9,8 +9,8 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 ## The tools
 
 - the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
-- the **system** tools — where-used, type and object information, the ABAP AST and semantic
-  analysis, SQL queries, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
+- the **system** tools — where-used, type and object information, the object outline and
+  structure, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
   (`RunATC`, `GetATCRunStatus`, `GetATCFindings`, and the stored results:
   `ListATCResults`, `GetATCResult`);
 - **search** (`SearchObject`);

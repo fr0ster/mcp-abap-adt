@@ -252,6 +252,7 @@ The connection lives in a `.env` file the server is told about (`--env-path`, `-
 **For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
 ```env
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=authorization_code
 SAP_UAA_URL=https://your-uaa.example
@@ -288,6 +289,7 @@ The same fields are `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` 
 **For basic authentication (on-premise):**
 ```env
 SAP_URL=https://your-onpremise-system.com:8000
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
@@ -412,6 +414,7 @@ With a resolver and no rules, the information is applied and no information leav
 **Example `.env` for on-premise:**
 ```env
 SAP_URL=http://your-sap-system:8000
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=JSMITH
 SAP_PASSWORD=secret

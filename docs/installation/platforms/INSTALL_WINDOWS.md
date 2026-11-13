@@ -168,6 +168,7 @@ server with `--env-path=<file>`:
 # Create .env file
 @"
 SAP_URL=https://your-sap-system.example:8000
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_LANGUAGE=en
 SAP_AUTH_TYPE=basic
@@ -184,8 +185,9 @@ mcp-abap-adt --env-path=C:\path\to\your\your-system.env --system-type=<onprem|cl
 > `.env` — setting them changes nothing. A client-side deadline closes the socket
 > under a request SAP is still running, and SAP then ends it: an aborted
 > `POST /deletion/delete` once left the lock alive and unreachable, the object
-> locked and inactive. The long reads that take a `timeout` of their own are listed
-> in [MIGRATION-19.0](../../MIGRATION-19.0.md).
+> locked and inactive. The long reads take no `timeout` either: since 24.0.0 they run in
+> the background by default, and a run is read, listed and cancelled by the background-run
+> tools ([MIGRATION-24.0](../../MIGRATION-24.0.md), "Callers of the long tools").
 
 ## 🔌 Step 5: Connect to AI Tools
 

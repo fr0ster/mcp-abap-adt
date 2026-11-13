@@ -38,7 +38,11 @@ Login Client). The `.env` carries no user and no password: the SAP system maps t
 SNC name to an ABAP user.
 
 ```bash
-SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=rfc
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 # Optional:
@@ -47,6 +51,8 @@ SAP_SNC_LIB=/path/to/the/snc/library
 SAP_SNC_MYNAME='p:CN=<client name>'
 ```
 
+An RFC destination states its address (here an application server; a message server is in
+[Client configuration](CLIENT_CONFIGURATION.md)), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 SNC needs RFC: `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env`, in the
 process environment, `--connection-type=rfc`, or YAML `connection-type: rfc` (precedence: CLI, environment
 including that `.env`, YAML).

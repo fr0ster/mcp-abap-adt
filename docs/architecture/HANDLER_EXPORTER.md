@@ -99,9 +99,7 @@ on a plain registration. For long reads in the background, an embedder serves it
 server instance with a strategy: an `EmbeddableMcpServer` given `backgroundRuns` serves the
 background-run tools beside every long tool its registry carries (`createRegistry()` included),
 whatever the exposition. Without a strategy, or on a plain registration, no background-run tool is
-listed. A server instance with a strategy that registers the exporter's registry
-(`createRegistry()`) without the background-run tools lists its long tools without `background`
-too: nothing there could read a run.
+listed.
 
 ### Async Connection Provider
 
@@ -177,10 +175,15 @@ const exporter = new HandlerExporter({
   systemType: "cloud",
   includeReadOnly: true,
   includeHighLevel: false,
-  includeSystem: true,
+  includeSystem: false, // the system group carries the class and program runs, which run code
   includeSearch: true,
 });
 ```
+
+`includeSystem` brings the system reads together with the runs (`RuntimeRunClass`,
+`RuntimeRunProgram` and the profiler's), which run code in the system, so a server that must
+change nothing leaves it off; the `-ro` binaries' set (`fullReadOnlyToolSet` of
+`@mcp-abap-adt/lib/tool-set`) serves the system reads without the runs.
 
 ## Inspecting Handlers
 

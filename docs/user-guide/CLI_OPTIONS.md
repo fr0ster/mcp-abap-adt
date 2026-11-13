@@ -288,8 +288,7 @@ never the URL, the host, the port or a credential. The next call tries once more
 retry, no polling and no timer. A refused credential, an answer of SAP and an RFC logon that
 fails (named by its RFC key) are answered as before. A request on a connection already made
 that reaches no answer — the system stopped after the logon — answers `no_connection` too, with
-the network code adt-clients names on its failure (one of the seven above but `EPIPE`, which
-adt-clients does not name; a TLS failure on a
+the network code adt-clients names on its failure (one of the seven above; a TLS failure on a
 connection already made is answered as before): one attempt, the next call sends again.
 
 The parameter beats the variable, and the variable beats the configuration file; the
@@ -694,6 +693,7 @@ mcp-abap-adt-http --port=9000 --system-type=<onprem|cloud>
 cd ~/dev/my-abap-project
 cat > .env << EOF
 SAP_URL=https://dev.sap.company.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_SYSTEM_TYPE=onprem

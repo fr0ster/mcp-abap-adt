@@ -126,6 +126,7 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       AbapDebugger.create(c, { onConflict }),
     requestUser: async () => requestUserOf(),
+    headersOf: (origin) => origin,
     run,
   };
 }
@@ -142,6 +143,7 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
     },
     amdpDebugger: (c) => AmdpDebugger.create(c),
     requestUser: async () => requestUserOf(),
+    headersOf: (origin) => origin,
     run,
   };
 }

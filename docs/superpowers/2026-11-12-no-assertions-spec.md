@@ -267,6 +267,11 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   - The scan names every reader in an explicit list (`THROWN_READERS`, by file, function and
     parameter, never by line). A reader not in the list is refused, and so is an entry of the
     list that is no longer a reader: the set is gated both ways.
+- **The answer serializer is a named sink (the owner's decision).** The helpers that turn a value
+  of any type into a tool answer's JSON text (`answer.ts`, the background-run and the
+  leftover-session answers) implement one small contract, `IAnswerSerializer`
+  (`src/lib/answerSerializer.ts`), named in `SINK_CONTRACTS` beside `ILogger`. A fixture proves
+  an implementation passes as a sink; removing the name from `SINK_CONTRACTS` refuses the three.
 - **Inventory** (Measured; the full lists are in the appendix).
   - Parameters, root project 342: 169 boundary by their immediate sources, 68 with no
     in-repository call (callbacks and entries), 32 typed, 73 mixed.

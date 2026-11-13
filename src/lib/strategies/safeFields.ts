@@ -7,6 +7,7 @@
  */
 
 import { child, isElement, isList } from '../xml/tree';
+import type { LeftBehind } from './step';
 
 /**
  * What a failed release adds to a payload — in two shapes, and which one it is
@@ -19,7 +20,7 @@ export type Cleanup =
   | ({
       message: string;
       origin?: string;
-      request?: unknown;
+      request?: FailedRequest | undefined;
       failures?: readonly unknown[];
     } & LeftLocked)
   | ({
@@ -46,6 +47,12 @@ export interface LeftLocked {
   warning?: string;
 }
 
+/** The request a failure names (`IAdtError.request`): its method and its url. */
+export interface FailedRequest {
+  readonly method?: string | undefined;
+  readonly url?: string | undefined;
+}
+
 /**
  * Two fields, copied by name.
  *
@@ -55,16 +62,26 @@ export interface LeftLocked {
  * cookies straight to the model.
  */
 export function safeRequest(
-  value: unknown,
+  value: FailedRequest | undefined,
 ): Record<string, string> | undefined {
-  const method = child(value, 'method');
-  const url = child(value, 'url');
-  if (typeof method !== 'string' && typeof url !== 'string') return undefined;
+  if (value === undefined) return undefined;
+  const { method, url } = value;
+  if (method === undefined && url === undefined) return undefined;
 
   const out: Record<string, string> = {};
-  if (typeof method === 'string') out.method = method;
-  if (typeof url === 'string') out.url = withoutLockHandle(url);
+  if (method !== undefined) out.method = method;
+  if (url !== undefined) out.url = withoutLockHandle(url);
   return out;
+}
+
+/** A request read from a value of no type (a thrown carrier's), its two fields by their own types. */
+function requestRead(value: unknown): FailedRequest | undefined {
+  const method = child(value, 'method');
+  const url = child(value, 'url');
+  return {
+    ...(typeof method === 'string' && { method }),
+    ...(typeof url === 'string' && { url }),
+  };
 }
 
 /**
@@ -97,6 +114,57 @@ function withoutLockHandle(url: string): string {
  * whole point.
  */
 export function safeCleanup(
+  value: Cleanup | LeftBehind | undefined,
+): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  const out: Record<string, unknown> = {};
+
+  if (value.message !== undefined) out.message = value.message;
+  if ('error' in value) out.error = value.error;
+  else if ('origin' in value && value.origin !== undefined)
+    out.origin = value.origin;
+
+  const request = 'request' in value ? safeRequest(value.request) : undefined;
+  if (request !== undefined) out.request = request;
+
+  // What was left behind as failures of their own: entries already built in
+  // the shape of every other failure (`failureEntry`, `thrownEntry`).
+  if (value.failures !== undefined && value.failures.length > 0)
+    out.failures = value.failures;
+  if ('notes' in value && value.notes !== undefined && value.notes.length > 0)
+    out.notes = value.notes;
+
+  // The lock that may be left behind: each field as its type says, the
+  // object rebuilt from its two strings — nothing else of it passes.
+  if ('left_locked' in value && value.left_locked === true)
+    out.left_locked = true;
+  if ('lock_handle' in value && value.lock_handle !== undefined) {
+    if (value.lock_handle !== '') out.lock_handle = value.lock_handle;
+  }
+  const object = 'object' in value ? lockedObject(value.object) : undefined;
+  if (object !== undefined) out.object = object;
+  if ('warning' in value && value.warning !== undefined)
+    out.warning = value.warning;
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** A locked object with both its names, copied by name; one with an empty name is absent. */
+function lockedObject(
+  value: LockedObject | undefined,
+): LockedObject | undefined {
+  if (value === undefined || value.type === '' || value.name === '') {
+    return undefined;
+  }
+  return { type: value.type, name: value.name };
+}
+
+/**
+ * The cleanup a thrown value carries, field by field: a value from outside
+ * the type system (whatever was thrown), each field read by its own type.
+ * The same fields as `safeCleanup`, in the same two exclusive shapes.
+ */
+export function thrownCleanup(
   value: unknown,
 ): Record<string, unknown> | undefined {
   if (!isElement(value)) return undefined;
@@ -107,18 +175,14 @@ export function safeCleanup(
   if (carrier.error === 'client_threw') out.error = 'client_threw';
   else if (typeof carrier.origin === 'string') out.origin = carrier.origin;
 
-  const request = safeRequest(carrier.request);
+  const request = safeRequest(requestRead(carrier.request));
   if (request !== undefined) out.request = request;
 
-  // What was left behind as failures of their own: entries already built in
-  // the shape of every other failure (`failureEntry`, `thrownEntry`).
   if (isList(carrier.failures) && carrier.failures.length > 0)
     out.failures = carrier.failures;
   if (isList(carrier.notes) && carrier.notes.length > 0)
     out.notes = carrier.notes;
 
-  // The lock that may be left behind: each field by its own type, the object
-  // rebuilt from its two strings — nothing else of it passes.
   if (carrier.left_locked === true) out.left_locked = true;
   if (typeof carrier.lock_handle === 'string' && carrier.lock_handle !== '')
     out.lock_handle = carrier.lock_handle;

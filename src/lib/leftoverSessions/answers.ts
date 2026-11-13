@@ -5,6 +5,7 @@
  */
 
 import type { HandlerContext } from '../../handlers/interfaces';
+import type { IAnswerSerializer } from '../answerSerializer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { LeftoverSessionTools } from './port';
 
@@ -13,10 +14,15 @@ export interface LeftoverAnswer {
   content: Array<{ type: 'text'; text: string }>;
 }
 
-const json = (payload: unknown, isError = false): LeftoverAnswer => ({
-  isError,
-  content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-});
+/** A value as a leftover-session answer's JSON text. */
+const answers: IAnswerSerializer<LeftoverAnswer> = {
+  json(payload: unknown, isError = false): LeftoverAnswer {
+    return {
+      isError,
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    };
+  },
+};
 
 function portOf(context: HandlerContext): LeftoverSessionTools {
   const port = context.leftoverSessions;
@@ -30,12 +36,12 @@ export async function answerLeftoverList(
   context: HandlerContext,
 ): Promise<LeftoverAnswer> {
   const sessions = await portOf(context).list();
-  return json({ sessions });
+  return answers.json({ sessions });
 }
 
 export async function answerLeftoverLogoff(
   context: HandlerContext,
   handle: string,
 ): Promise<LeftoverAnswer> {
-  return json(await portOf(context).logoff(handle));
+  return answers.json(await portOf(context).logoff(handle));
 }

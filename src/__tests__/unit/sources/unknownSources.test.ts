@@ -87,6 +87,16 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(meta[0]?.refused, false);
   });
 
+  it('an answer serializer is a named sink', () => {
+    const payload = sitesOf('answerSerializer').filter(
+      (entry) => entry.name === 'payload',
+    );
+    assert.deepEqual(
+      payload.map((entry) => [entry.cls, entry.refused]),
+      [['sink', false]],
+    );
+  });
+
   it('an unnamed sink is refused', () => {
     const value = site('unnamedSink', 'value');
     assert.equal(value.refused, true);

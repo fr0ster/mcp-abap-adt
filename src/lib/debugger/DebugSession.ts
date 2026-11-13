@@ -39,7 +39,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type AdtHeadersContext,
-  adtHeadersOf,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
 import {
@@ -131,6 +130,11 @@ export interface DebugSessionPorts<O = unknown> {
     onConflict: IDebuggerListenerConflict,
   ): Debugger;
   requestUser(origin: O): Promise<string>;
+  /**
+   * The header port of the origin's system (`withAdtHeaders`): the pair each
+   * header-taking call is sent with. Absent, the default pairs.
+   */
+  headersOf?(origin: O): AdtHeadersContext;
   /**
    * `debuggee` makes the run carry those ids, so a terminal-mode listener under
    * them catches it; without it only a user-mode listener does.
@@ -578,6 +582,14 @@ export class DebugSession<O = unknown> {
       throw new DebugStateError('the debugger has no connection yet');
     return this.origin;
   }
+
+  /** The header port of the bound origin's system, as the ports name it. */
+  protected headersContext(): AdtHeadersContext {
+    if (this.origin === undefined || this.ports.headersOf === undefined) {
+      return {};
+    }
+    return this.ports.headersOf(this.origin);
+  }
   /** The identity in force: undefined before a start and after a complete cleanup. */
   currentIdentity(): IDebuggerIdentity | undefined {
     return this.fixed;
@@ -757,7 +769,7 @@ export class DebugSession<O = unknown> {
     const changedBefore = this.changed;
     this.changed = true;
     const answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'debugger.setBreakpoints',
       (headers) => dbg.setBreakpoints(identity, sent.map(wireOf), { headers }),
     );
@@ -1541,12 +1553,12 @@ export class DebugSession<O = unknown> {
   }
   getVariables(names: string[]) {
     return this.variables('read variables', (d) =>
-      readVariablesOf(adtHeadersOf(this.origin), d, names),
+      readVariablesOf(this.headersContext(), d, names),
     );
   }
   getChildVariables(parents: string[]) {
     return this.variables('read child variables', (d) =>
-      readChildVariablesOf(adtHeadersOf(this.origin), d, parents),
+      readChildVariablesOf(this.headersContext(), d, parents),
     );
   }
   setVariable(name: string, value: string) {
@@ -1631,7 +1643,7 @@ export class DebugSession<O = unknown> {
   ): Promise<DebugView<VariablesReading>> {
     const { debugger: dbg } = this.batchDebugger(recorder);
     return variablesView(
-      await readVariablesOf(adtHeadersOf(this.origin), dbg, names),
+      await readVariablesOf(this.headersContext(), dbg, names),
       'read variables',
     );
   }
@@ -1642,7 +1654,7 @@ export class DebugSession<O = unknown> {
   ): Promise<DebugView<VariablesReading>> {
     const { debugger: dbg } = this.batchDebugger(recorder);
     return variablesView(
-      await readChildVariablesOf(adtHeadersOf(this.origin), dbg, parents),
+      await readChildVariablesOf(this.headersContext(), dbg, parents),
       'read child variables',
     );
   }
@@ -1783,7 +1795,7 @@ export class DebugSession<O = unknown> {
       const dbg = await this.onceControl(this.mode);
       this.changed = true;
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.setBreakpoints',
         (headers) => dbg.setBreakpoints(identity, list, { headers }),
       );
@@ -1811,7 +1823,7 @@ export class DebugSession<O = unknown> {
       const dbg = await this.onceControl(this.mode);
       this.changed = true;
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.syncBreakpoints',
         (headers) => dbg.syncBreakpoints(identity, sync, { headers }),
       );
@@ -2074,7 +2086,7 @@ export class DebugSession<O = unknown> {
     return this.mutate(async () => {
       const stop = this.requireStop();
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.setDebuggerSettings',
         (headers) => stop.debugger.setDebuggerSettings(settings, { headers }),
       );
@@ -2272,7 +2284,7 @@ export class DebugSession<O = unknown> {
   private async applySettings(stop: Stop): Promise<DebugView<SettingsReading>> {
     const first = !stop.settingsSent;
     let answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'debugger.setDebuggerSettings',
       (headers) =>
         stop.debugger.setDebuggerSettings(this.preferences, { headers }),
@@ -2289,7 +2301,7 @@ export class DebugSession<O = unknown> {
     stop.settingsSent = true;
     if (first && this.preferences.systemDebugging === false) {
       answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.setDebuggerSettings',
         (headers) =>
           stop.debugger.setDebuggerSettings(this.preferences, { headers }),

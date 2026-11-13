@@ -127,9 +127,7 @@ async function startTargetRun(
   }
   const target = runTargetOf(given);
   if (target instanceof Error) return return_error(target);
-  const flags = runFlagsOf(args);
-  if (flags instanceof Error) return return_error(flags);
-  const { scope, riskLevel, duration } = flags;
+  const { scope, riskLevel, duration } = runFlagsOf(args);
   const generic = new AdtExecutor(
     context.connection,
     context.logger,

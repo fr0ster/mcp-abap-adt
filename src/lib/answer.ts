@@ -13,6 +13,7 @@ import {
   type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { readAdtFailureInCall } from './adtFailureReading';
+import type { IAnswerSerializer } from './answerSerializer';
 import {
   answerRead,
   failurePayload as chainFailurePayload,
@@ -21,7 +22,12 @@ import {
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
 import type { AnswerDetail } from './strategies/projections';
-import { safeCleanup, safeRequest } from './strategies/safeFields';
+import {
+  type FailedRequest,
+  safeCleanup,
+  safeRequest,
+  thrownCleanup,
+} from './strategies/safeFields';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
 import { cleanupOf, type StepError } from './strategies/stepResponse';
 import {
@@ -73,17 +79,22 @@ function text(value: string, isError = false): McpResult {
   return { isError, content: [{ type: 'text', text: value }] };
 }
 
-function json(payload: unknown, isError = false): McpResult {
-  return text(JSON.stringify(payload, null, 2), isError);
-}
+/** A value as an answer's JSON text. */
+const answers: IAnswerSerializer<McpResult> = {
+  json(payload: unknown, isError = false): McpResult {
+    return text(JSON.stringify(payload, null, 2), isError);
+  },
+};
 
 /** A failure's payload as its answer: `isError` always. */
-function failedJson(payload: unknown): FailureAnswer {
-  return {
-    isError: true,
-    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-  };
-}
+const failures: IAnswerSerializer<FailureAnswer> = {
+  json(payload: unknown): FailureAnswer {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    };
+  },
+};
 
 /**
  * A failure of our own reading, which never borrows an `AdtFailureOrigin`:
@@ -106,7 +117,7 @@ function local(
   // A lock left held is a fact about SAP, not about the throw, and it must
   // survive it. Read structurally rather than by `instanceof`, so an error
   // built against a second copy of the module still renders.
-  const cleanup = safeCleanup(child(thrown, 'cleanup'));
+  const cleanup = thrownCleanup(child(thrown, 'cleanup'));
   if (cleanup !== undefined) payload.cleanup = cleanup;
   if (child(thrown, 'operation') === 'succeeded') {
     payload.operation = 'succeeded';
@@ -115,7 +126,7 @@ function local(
   const step = stepOf(thrown);
   if (step !== undefined) payload.step = step;
 
-  return failedJson(withBeside(payload, ctx));
+  return failures.json(withBeside(payload, ctx));
 }
 
 /**
@@ -198,7 +209,9 @@ export const TRANSPORT_ENTRY_HELD_WORDS =
  * client wrote it. Read by `URLSearchParams` over the text after the first
  * `?`; none, or more than one, is no request.
  */
-export function attemptedRequest(request: unknown): string | undefined {
+export function attemptedRequest(
+  request: FailedRequest | undefined,
+): string | undefined {
   const url = safeRequest(request)?.url;
   if (url === undefined) return undefined;
   const at = url.indexOf('?');
@@ -383,7 +396,7 @@ export function answerFailure(
   if (ctx !== undefined && isSystemContextRefusal(error.message)) {
     return local('system_context_missing', ctx, error.message);
   }
-  return failedJson(withBeside(failurePayload(error, ctx?.detail), ctx));
+  return failures.json(withBeside(failurePayload(error, ctx?.detail), ctx));
 }
 
 /**
@@ -534,7 +547,7 @@ export function return_answer<T>(
   const beside = ctx.beside?.();
   if (cleanup !== undefined || beside !== undefined) {
     const added = { ...(cleanup !== undefined ? { cleanup } : {}), ...beside };
-    return json(
+    return answers.json(
       typeof projected === 'string'
         ? { result: projected, ...added }
         : {
@@ -546,7 +559,9 @@ export function return_answer<T>(
     );
   }
 
-  return typeof projected === 'string' ? text(projected) : json(projected);
+  return typeof projected === 'string'
+    ? text(projected)
+    : answers.json(projected);
 }
 
 function messageOf(thrown: unknown): string {

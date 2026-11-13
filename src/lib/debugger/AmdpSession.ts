@@ -25,7 +25,10 @@ import {
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { adtHeadersOf, withAdtHeaders } from '../adtHeaders/withAdtHeaders';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../adtHeaders/withAdtHeaders';
 import { currentRequestSignal } from '../requestSignal';
 import { spentBy } from '../sessionLoss';
 import {
@@ -86,6 +89,11 @@ export interface AmdpSessionPorts<O = unknown> {
   dropConnection(c: IAbapConnection): void;
   amdpDebugger(c: IAbapConnection): AmdpDebuggerT;
   requestUser(origin: O): Promise<string>;
+  /**
+   * The header port of the origin's system (`withAdtHeaders`): the pair each
+   * header-taking call is sent with. Absent, the default pairs.
+   */
+  headersOf?(origin: O): AdtHeadersContext;
   run(c: IAbapConnection, target: RunTarget): Promise<RunOutcome>;
 }
 export interface AmdpBreakpoint {
@@ -211,6 +219,14 @@ export class AmdpSession<O = unknown> {
     if (this.origin === undefined)
       throw new DebugStateError('the debugger has no connection yet');
     return this.origin;
+  }
+
+  /** The header port of the bound origin's system, as the ports name it. */
+  private headersContext(): AdtHeadersContext {
+    if (this.origin === undefined || this.ports.headersOf === undefined) {
+      return {};
+    }
+    return this.ports.headersOf(this.origin);
   }
   private requireOpen(): Open {
     if (!this.open)
@@ -678,7 +694,7 @@ export class AmdpSession<O = unknown> {
     return this.mutate(async () => {
       const open = this.requireOpen();
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'amdpDebugger.getDataPreview',
         (headers) =>
           open.onCommands.getDataPreview({
@@ -809,7 +825,7 @@ export class AmdpSession<O = unknown> {
   > {
     const { open, debuggee, dbg } = this.batchSession(recorder);
     const answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'amdpDebugger.getDataPreview',
       (headers) =>
         dbg.getDataPreview({
@@ -858,7 +874,7 @@ export class AmdpSession<O = unknown> {
   > {
     const { once, dbg } = this.batchOnce(recorder);
     const answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'amdpDebugger.getDataPreview',
       (headers) =>
         dbg.getDataPreview({
@@ -1051,7 +1067,7 @@ export class AmdpSession<O = unknown> {
     return this.mutate(async () => {
       const once = this.requireOnce();
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'amdpDebugger.getDataPreview',
         (headers) =>
           once.onCommands.getDataPreview({

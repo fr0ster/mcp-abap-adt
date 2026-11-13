@@ -142,11 +142,7 @@ export function mergedLeftBehind(
  * field the `answer()` path already renders for a lock left held. The
  * method's error itself is untouched. Nothing when the throw carries none.
  */
-export function noteLeftBehind(
-  thrown: unknown,
-  note: string | LeftBehind,
-): void {
-  if (typeof thrown !== 'object' || thrown === null) return;
+export function noteLeftBehind(thrown: Error, note: string | LeftBehind): void {
   const carried = METHOD_FAILURE.get(thrown);
   if (carried === undefined) return;
   METHOD_FAILURE.set(thrown, {

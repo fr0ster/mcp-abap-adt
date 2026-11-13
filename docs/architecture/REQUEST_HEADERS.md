@@ -605,8 +605,10 @@ What the correction can and cannot do:
 - Seeding the kept pairs from a per-system header corpus (`header:discovery`) is planned after
   this release.
 
-Left internal: the batch-mode scope (`adtCallScope`, `asRecordedCall`), the correction's own
-reader (`correctedPair`) and the server's context reader (`adtHeadersOf`).
+Left internal: the batch-mode scope (`adtCallScope`, `asRecordedCall`) and the correction's own
+reader (`correctedPair`). A debug session sends with the pair of its bound origin's system, the
+header port its ports name for that origin (`headersOf`; the live ports name the call context's
+own `adtHeaders`).
 
 ## Direct adt-clients consumers
 

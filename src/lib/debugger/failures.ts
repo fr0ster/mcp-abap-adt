@@ -91,15 +91,14 @@ export function describeFailures(list: readonly DebugFailure[]): string {
  * method error gains them as `cleanup`; an error of ours carries its words
  * with them as its answer; a chain failure is answered as it came.
  */
-export function leaveBehind(error: unknown, left: LeftBehind): void {
+export function leaveBehind(error: Error, left: LeftBehind): void {
   if (methodFailureOf(error) !== undefined) {
     noteLeftBehind(error, left);
     return;
   }
   if (failureOf(error) !== undefined) return;
-  if (error === null || typeof error !== 'object') return;
   carryingPayload(error, {
-    message: messageOf(error),
+    message: error.message,
     cleanup: mergedLeftBehind(payloadCarriedBy(error)?.cleanup, left),
   });
 }

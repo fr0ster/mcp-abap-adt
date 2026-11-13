@@ -26,8 +26,6 @@ import {
   extractSupportedContentType,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
-import { hasMethod } from '../capability';
-import { child } from '../xml/tree';
 import type { AdtHeaderPort } from './AdtHeaderPairs';
 import { type AdtOperation, DEFAULT_ADT_HEADERS } from './defaultPairs';
 import { adtCallScope, type HeaderInvocation } from './scope';
@@ -96,9 +94,10 @@ export function correctedPair(
 
 /**
  * The failure a member's answer carries (`ok: false`, `getError()`), else
- * `undefined`.
+ * `undefined`. The answer is whatever the wrapped member answers, of the
+ * call's own type: read through `readSafely`, as a value of any shape.
  */
-function failureOfAnswer(answer: unknown): unknown {
+function failureOfAnswer<T>(answer: T): unknown {
   if (readSafely(answer, 'ok') !== false) return undefined;
   const getError = readSafely(answer, 'getError');
   if (typeof getError !== 'function') return undefined;
@@ -180,32 +179,4 @@ async function correctOnce<T>(
   if (corrected === undefined) return unwrap(first);
   port?.remember(operation, corrected);
   return call(corrected);
-}
-
-/**
- * The header pairs a value carries as a call's context (`adtHeaders`), read
- * safely: what a debug session bound to a call's context sends with.
- */
-export function adtHeadersOf(origin: unknown): AdtHeadersContext {
-  const port = readSafely(origin, 'adtHeaders');
-  if (!hasMethod(port, 'pairFor') || !hasMethod(port, 'remember')) return {};
-  // Read through its two members: what it answers is checked, not assumed.
-  const adtHeaders: AdtHeaderPort = {
-    pairFor: (operation) => {
-      const pair = port.pairFor(operation);
-      return isAdtHeaders(pair) ? pair : DEFAULT_ADT_HEADERS[operation];
-    },
-    remember: (operation, pair) => {
-      port.remember(operation, pair);
-    },
-  };
-  return { adtHeaders };
-}
-
-/** Whether `value` is a header pair: `accept` and `contentType`, both text. */
-function isAdtHeaders(value: unknown): value is IAdtHeaders {
-  return (
-    typeof child(value, 'accept') === 'string' &&
-    typeof child(value, 'contentType') === 'string'
-  );
 }

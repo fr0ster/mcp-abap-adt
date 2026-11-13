@@ -37,9 +37,13 @@ import { REPO, rel } from './failureScan';
 /**
  * Contracts whose members take a value of any type by design: a site in a
  * function that implements one of them is a sink. Named by contract, not by
- * site.
+ * site: the logger's (`ILogger`), and the serializer of a value into a tool
+ * answer's text (`IAnswerSerializer`, `src/lib/answerSerializer.ts`).
  */
-export const SINK_CONTRACTS: readonly string[] = ['ILogger'];
+export const SINK_CONTRACTS: readonly string[] = [
+  'ILogger',
+  'IAnswerSerializer',
+];
 
 /**
  * The readers of thrown values (spec §4, the owner's decision): whatever is

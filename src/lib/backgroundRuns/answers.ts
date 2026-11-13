@@ -5,6 +5,7 @@
  */
 
 import type { HandlerContext } from '../../handlers/interfaces';
+import type { IAnswerSerializer } from '../answerSerializer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { BackgroundRunTools } from './port';
 import type { StartedBackgroundRun } from './run';
@@ -15,9 +16,14 @@ export interface BackgroundAnswer {
   content: Array<{ type: 'text'; text: string }>;
 }
 
-const json = (payload: unknown): BackgroundAnswer => ({
-  content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-});
+/** A value as a background-run answer's JSON text. */
+const answers: IAnswerSerializer<BackgroundAnswer> = {
+  json(payload: unknown): BackgroundAnswer {
+    return {
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    };
+  },
+};
 
 function portOf(context: HandlerContext): BackgroundRunTools {
   const port = context.backgroundRuns;
@@ -32,7 +38,7 @@ export function answerBackgroundStarted(
   started: StartedBackgroundRun,
 ): BackgroundAnswer {
   const names = runToolsOf(started.tool);
-  return json({
+  return answers.json({
     run_handle: started.run_handle,
     state: 'running',
     tool: started.tool,
@@ -56,7 +62,7 @@ export async function answerBackgroundGet(
 ): Promise<BackgroundAnswer> {
   const record = await portOf(context).get(handle);
   if (record.state === 'running') {
-    return json({
+    return answers.json({
       run_handle: record.run_handle,
       state: 'running',
       tool: record.tool,
@@ -64,7 +70,7 @@ export async function answerBackgroundGet(
       started_at: record.started_at,
     });
   }
-  const header = json({
+  const header = answers.json({
     run_handle: record.run_handle,
     state: record.state,
     tool: record.tool,
@@ -81,12 +87,12 @@ export async function answerBackgroundGet(
 export async function answerBackgroundList(
   context: HandlerContext,
 ): Promise<BackgroundAnswer> {
-  return json({ runs: await portOf(context).list() });
+  return answers.json({ runs: await portOf(context).list() });
 }
 
 export async function answerBackgroundDiscard(
   context: HandlerContext,
   handle: string,
 ): Promise<BackgroundAnswer> {
-  return json(await portOf(context).discard(handle));
+  return answers.json(await portOf(context).discard(handle));
 }

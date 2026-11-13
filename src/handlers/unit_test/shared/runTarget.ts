@@ -30,14 +30,6 @@ const TARGET_KINDS: readonly AbapUnitRunTarget['kind'][] = [
   'package',
 ];
 
-/** The `target` argument as the schema below declares it. */
-export interface RunTargetArgs {
-  kind: AbapUnitRunTarget['kind'];
-  name: string;
-  type?: string | undefined;
-  include_subpackages?: boolean | undefined;
-}
-
 const RUN_TARGET_WORDS =
   'What the run covers: an object (kind object, name, type) or a package (kind package, name, include_subpackages).';
 
@@ -75,108 +67,92 @@ export function fieldOf(given: object, field: string): unknown {
     : undefined;
 }
 
+/** The `target` argument as the schema above declares it. */
+export type RunTargetArgs = z.output<typeof RUN_TARGET_OBJECT>;
+
 /**
- * The run target `given` names, as the runner takes it: the name and an
- * object's type upper-cased; an `Error` naming what is wrong, before anything
- * is sent.
+ * The run target `given` names, as the runner takes it: the name
+ * upper-cased; an `Error` naming what is wrong, before anything is sent. The
+ * schema has typed each field; what is checked here is what it cannot say:
+ * a non-blank name and the fields each kind reads.
  */
-export function runTargetOf(given: unknown): AbapUnitRunTarget | Error {
-  if (given === null || typeof given !== 'object') {
-    return new Error(
-      'target is required: { kind: "object", name, type } or { kind: "package", name, include_subpackages }; nothing was sent',
-    );
-  }
-  const kind = fieldOf(given, 'kind');
-  const name = fieldOf(given, 'name');
-  if (typeof name !== 'string' || name.trim() === '') {
+export function runTargetOf(given: RunTargetArgs): AbapUnitRunTarget | Error {
+  const runName = given.name.trim().toUpperCase();
+  if (runName === '') {
     return new Error('target.name is required; nothing was sent');
   }
-  const runName = name.trim().toUpperCase();
-  const type = fieldOf(given, 'type');
-  const includeSubpackages = fieldOf(given, 'include_subpackages');
-  if (kind === 'object') {
-    if (includeSubpackages !== undefined) {
+  if (given.kind === 'object') {
+    if (given.include_subpackages !== undefined) {
       return new Error(
         'target.include_subpackages is read for kind package only; nothing was sent',
       );
     }
-    if (typeof type !== 'string' || type.trim() === '') {
+    if (given.type === undefined) {
       return new Error(
         `target.type is required for kind object, one of: ${ABAP_UNIT_RUN_OBJECT_TYPES.join(', ')}; nothing was sent`,
       );
     }
-    const upper = type.trim().toUpperCase();
-    if (!isRunObjectType(upper)) {
-      return new Error(
-        `target.type "${type}" is not one of: ${ABAP_UNIT_RUN_OBJECT_TYPES.join(', ')}; nothing was sent`,
-      );
-    }
-    return { kind: 'object', name: runName, type: upper };
+    return { kind: 'object', name: runName, type: given.type };
   }
-  if (kind === 'package') {
-    if (type !== undefined) {
-      return new Error(
-        'target.type is read for kind object only; nothing was sent',
-      );
-    }
-    if (typeof includeSubpackages !== 'boolean') {
-      return new Error(
-        'target.include_subpackages (true or false) is required for kind package; nothing was sent',
-      );
-    }
-    return { kind: 'package', name: runName, includeSubpackages };
+  if (given.type !== undefined) {
+    return new Error(
+      'target.type is read for kind object only; nothing was sent',
+    );
   }
-  return new Error(
-    `target.kind ${JSON.stringify(kind)} is not one of: ${TARGET_KINDS.join(', ')}; nothing was sent`,
-  );
+  if (given.include_subpackages === undefined) {
+    return new Error(
+      'target.include_subpackages (true or false) is required for kind package; nothing was sent',
+    );
+  }
+  return {
+    kind: 'package',
+    name: runName,
+    includeSubpackages: given.include_subpackages,
+  };
 }
 
+/** Flags as a run tool's schema gives them, each `true`, `false` or left out. */
+export type FlagArgs<K extends string> = {
+  readonly [P in K]?: boolean | undefined;
+};
+
 /**
- * The flags `field` of `args` names, each `true`, `false` or left out (the
- * runner's default); an `Error` for any other value, before anything is sent.
+ * The flags `given` names, each present only when given: the runner's
+ * options declare their flags without `| undefined`.
  */
 export function flagsOf<K extends string>(
-  args: unknown,
-  field: string,
+  given: FlagArgs<K> | undefined,
   keys: readonly K[],
-): Partial<Record<K, boolean>> | undefined | Error {
-  const given =
-    args !== null && typeof args === 'object'
-      ? fieldOf(args, field)
-      : undefined;
+): Partial<Record<K, boolean>> | undefined {
   if (given === undefined) return undefined;
-  if (given === null || typeof given !== 'object') {
-    return new Error(`${field} must be an object; nothing was sent`);
-  }
   const flags: Partial<Record<K, boolean>> = {};
   for (const key of keys) {
-    const value = fieldOf(given, key);
-    if (value === undefined) continue;
-    if (typeof value !== 'boolean') {
-      return new Error(
-        `${field}.${key} must be true or false; nothing was sent`,
-      );
-    }
-    flags[key] = value;
+    const value = given[key];
+    if (value !== undefined) flags[key] = value;
   }
   return flags;
 }
 
-/** The run's flags `args` names — scope, risk levels, durations — checked; an `Error` for the first that is not. */
-export function runFlagsOf(args: unknown) {
-  const scope = flagsOf(args, 'scope', [
-    'own_tests',
-    'foreign_tests',
-    'add_foreign_tests_as_preview',
-  ]);
-  if (scope instanceof Error) return scope;
-  const riskLevel = flagsOf(args, 'risk_level', [
-    'harmless',
-    'dangerous',
-    'critical',
-  ]);
-  if (riskLevel instanceof Error) return riskLevel;
-  const duration = flagsOf(args, 'duration', ['short', 'medium', 'long']);
-  if (duration instanceof Error) return duration;
-  return { scope, riskLevel, duration };
+/** What a run tool's arguments say of the run's flags. */
+export interface RunFlagArgs {
+  readonly scope?:
+    | FlagArgs<'own_tests' | 'foreign_tests' | 'add_foreign_tests_as_preview'>
+    | undefined;
+  readonly risk_level?:
+    | FlagArgs<'harmless' | 'dangerous' | 'critical'>
+    | undefined;
+  readonly duration?: FlagArgs<'short' | 'medium' | 'long'> | undefined;
+}
+
+/** The run's flags `args` names: scope, risk levels, durations. */
+export function runFlagsOf(args: RunFlagArgs) {
+  return {
+    scope: flagsOf(args.scope, [
+      'own_tests',
+      'foreign_tests',
+      'add_foreign_tests_as_preview',
+    ]),
+    riskLevel: flagsOf(args.risk_level, ['harmless', 'dangerous', 'critical']),
+    duration: flagsOf(args.duration, ['short', 'medium', 'long']),
+  };
 }

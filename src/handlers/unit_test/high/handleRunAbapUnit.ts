@@ -36,7 +36,7 @@ import { detailOf } from '../../../lib/strategies/detail';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { scopeOf, waitOf } from '../shared/runner';
-import { fieldOf, runFlagsOf, runTargetOf } from '../shared/runTarget';
+import { runFlagsOf, runTargetOf } from '../shared/runTarget';
 import { projectRun, waitForRun } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
@@ -109,15 +109,9 @@ export async function handleRunAbapUnit(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const target = runTargetOf(
-    args !== null && typeof args === 'object'
-      ? fieldOf(args, 'target')
-      : undefined,
-  );
+  const target = runTargetOf(args.target);
   if (target instanceof Error) return return_error(target);
-  const flags = runFlagsOf(args);
-  if (flags instanceof Error) return return_error(flags);
-  const { scope, riskLevel, duration } = flags;
+  const { scope, riskLevel, duration } = runFlagsOf(args);
   const wait = waitOf(args);
   const detail = detailOf(args);
   const runner = new AdtExecutor(

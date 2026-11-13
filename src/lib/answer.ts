@@ -158,6 +158,8 @@ interface MessageCarrier {
     t100?: { id: string; no: string; values?: ReadonlyArray<string> };
     line?: string;
     uri?: string;
+    /** The object an activation run's message is about (`objName`). */
+    objectName?: string;
   }>;
 }
 
@@ -310,6 +312,7 @@ export function failurePayload(
       if (m.code !== undefined) out.code = m.code;
       if (m.line !== undefined) out.line = m.line;
       if (m.uri !== undefined) out.uri = m.uri;
+      if (m.objectName !== undefined) out.objectName = m.objectName;
       if (m.t100 !== undefined) {
         const t100: Record<string, unknown> = {
           id: m.t100.id,

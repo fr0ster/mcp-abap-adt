@@ -117,6 +117,7 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
+  type ActivationMessage,
   type ActivationRunOutcome,
   activationVerdict,
   awaitActivationRun,
@@ -129,6 +130,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { withStep } from '../../../lib/strategies/step';
+import type { StepError } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
 
@@ -170,7 +172,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description:
-      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages; objects SAP left inactive are an error naming them in still_inactive.',
+      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages; an error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
     inputSchema: activateObjectSchema(variant),
   })),
 } as const;
@@ -670,6 +672,10 @@ export async function handleActivateObject(
         outcome.stillInactive.length > 0
       )
         return failedWith<GroupAnswer>(notActivatedRun(outcome));
+      // A run whose results carry an error-severity message: refused, an
+      // error with SAP's messages, as a single object's refusal is.
+      const refusal = refusedRun(outcome, activationObjects.length);
+      if (refusal !== undefined) return failedWith<GroupAnswer>(refusal);
       return succeededWith<GroupAnswer>({ runs: outcome });
     },
     (answered: GroupAnswer) =>
@@ -693,6 +699,30 @@ function notActivatedRun(outcome: ActivationRunOutcome) {
   };
 }
 
+/**
+ * A run whose results carry an error-severity message: a refusal naming each
+ * refused object and SAP's words, with every message of the results as SAP
+ * listed them. `undefined` for a run with no such message, and for one that
+ * answered no run id (no run was read, so no message is SAP's).
+ */
+function refusedRun(
+  outcome: ActivationRunOutcome,
+  objects: number,
+): (StepError & { readonly messages: ActivationMessage[] }) | undefined {
+  if (outcome.runId === '') return undefined;
+  const refusals = outcome.messages.filter(isRefusal);
+  if (refusals.length === 0) return undefined;
+  return {
+    origin: 'refusal',
+    message:
+      `Activation run ${outcome.runId} finished and refused ${refusals.length} of ${objects} object(s): ` +
+      refusals
+        .map((m) => `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`)
+        .join('; '),
+    messages: outcome.messages,
+  };
+}
+
 /** A finished run, as `ActivateObjectLow` answers it. */
 function runAnswer(
   outcome: ActivationRunOutcome,
@@ -702,7 +732,6 @@ function runAnswer(
   // `utilActivationRunId` answers `''` when no `Location` header carried
   // one. `accepted` says so rather than being hardcoded true.
   const accepted = outcome.runId !== '';
-  const refusals = outcome.messages.filter(isRefusal);
   // `activated` is a verdict, and `null` only where there genuinely is
   // none: no run id came back, so no run was read. A run is waited for
   // until it ends, and its verdict is SAP's own: its results'
@@ -737,22 +766,16 @@ function runAnswer(
           'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
           'now": an object can stay listed for scope rather than for failure — activating a ' +
           "function group clears the regenerated include, not the group's own entry."
-        : refusals.length > 0
-          ? `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
-            `${activationObjects.length} object(s): ` +
-            refusals
-              .map((m) => `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`)
-              .join('; ')
-          : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
-            'object(s): its results say activationExecuted="false"' +
-            (outcome.messages.length === 0
-              ? ', with no message: nothing to activate.'
-              : `: ${outcome.messages
-                  .map(
-                    (m) =>
-                      `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
-                  )
-                  .join('; ')}`),
+        : `Activation run ${outcome.runId} finished without activating ${activationObjects.length} ` +
+          'object(s): its results say activationExecuted="false"' +
+          (outcome.messages.length === 0
+            ? ', with no message: nothing to activate.'
+            : `: ${outcome.messages
+                .map(
+                  (m) =>
+                    `${m.type} ${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                )
+                .join('; ')}`),
   };
 }
 

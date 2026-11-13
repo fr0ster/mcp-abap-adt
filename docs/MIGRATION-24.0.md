@@ -794,18 +794,21 @@ SAP_BASIS 751 answers an activation sent with `preauditRequested=true` with the 
 inactive (`ioc:inactiveObjects`) and activates nothing; S/4HANA 2025 answers a checklist saying no
 activation ran, with no message, both when there was nothing to do and when objects stayed
 inactive (both measured, [#351](https://github.com/fr0ster/mcp-abap-adt/issues/351)). 23.x answered
-the first as a success with `activation_not_stated: true` and the second as `nothing_to_activate`.
+the first as a success with `activation_not_stated: true` and the second as `nothing_to_activate`;
+a group activation on the activation runs answered a run whose results carry an error-severity
+message as a success with `activated: false`.
 
 | 23.x answered | 24.0 answers |
 |---|---|
 | success, `activation_not_stated: true`, `objects` | `isError`, `still_inactive: [{ name, type, uri, parent_uri? }]` |
 | success, `nothing_to_activate: true`, objects still inactive | `isError`, `still_inactive` (the inactive list is read once after such an answer) |
 | success, `nothing_to_activate: true`, nothing left inactive | the same |
+| a run whose results carry an error-severity message: success, `activated: false`, the refusal in `message` (`ActivateObjects`, `ActivateObjectLow`) | `isError`, `origin: "refusal"`, `message` naming each refused object, `messages: [{ type, text, objectName }]` |
 
 This holds for every tool that activates: the `Activate*` tools, `ActivateObjects`,
 `ActivateObjectLow`, compact `HandlerActivate`, and every create or update with an activate step.
 
-- **What you do:** read `isError` and `still_inactive`. To activate what is listed, send the
+- **What you do:** read `isError`, then `still_inactive` or `messages`. To activate what is listed, send the
   objects again with `preaudit: false` (`ActivateObjects`, `ActivateObjectLow`, `HandlerActivate`);
   one object of a type with a family now takes `preaudit` as given, where it always sent
   `preauditRequested=true`.

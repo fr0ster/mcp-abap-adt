@@ -60,6 +60,14 @@ const ACTIVATED =
   '<msg type="W" objName="ZMCPV"><shortText><txt>A warning beside the activation.</txt></shortText></msg>' +
   '</chkl:messages>';
 
+/** Refused: an error-severity message on one object of the run. */
+const REFUSED =
+  `<?xml version="1.0" encoding="utf-8"?><chkl:messages ${CHECKLIST}>` +
+  '<chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/>' +
+  '<msg objDescr="View ZMCPW" type="E" objName="ZMCPW"><shortText><txt>View ZMCPW refers to a field that does not exist.</txt></shortText></msg>' +
+  '<msg objDescr="View ZMCPV" type="W" objName="ZMCPV"><shortText><txt>Activation was cancelled.</txt></shortText></msg>' +
+  '</chkl:messages>';
+
 const RUN_ID = 'RUN0001';
 
 /**
@@ -90,7 +98,10 @@ function resultsOnly(results: string) {
   return recordingConnection([{ data: results }]);
 }
 
-type Answered = { content?: readonly { text?: string }[] };
+type Answered = {
+  isError?: boolean;
+  content?: readonly { text?: string }[];
+};
 
 /** The JSON payload a tool answered. */
 function payloadOf(answered: Answered): Record<string, unknown> {
@@ -144,10 +155,15 @@ describe('activation answers follow SAP’s verdict', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  async function full(activate: Activate, results: string) {
+  async function full(
+    activate: Activate,
+    results: string,
+    isError: boolean = false,
+  ) {
     const connection = finishedRun(results);
     declareSystemKind(connection, 'onprem');
     const answered = await activate({ connection });
+    expect(answered.isError).toBe(isError);
     const urls = connection.requests.map((request) => request.url);
     expect(urls.some((url) => url.includes('/activation/runs'))).toBe(true);
     expect(urls).toContain(`/sap/bc/adt/activation/results/${RUN_ID}`);
@@ -173,6 +189,29 @@ describe('activation answers follow SAP’s verdict', () => {
       expect(payload.nothing_to_activate).toBeUndefined();
       expect(payload.message).toContain('activationExecuted="false"');
       expect(payload.message).toContain('Activation was cancelled.');
+    },
+  );
+
+  it.each(FULL_FORMS)(
+    '%s: a run with an error-severity message is an error, naming the refusal, its messages returned',
+    async (_form, activate) => {
+      const payload = await full(activate, REFUSED, true);
+      expect(payload.origin).toBe('refusal');
+      expect(payload.message).toContain(
+        `Activation run ${RUN_ID} finished and refused 1 of `,
+      );
+      expect(payload.message).toContain(
+        'ZMCPW: View ZMCPW refers to a field that does not exist.',
+      );
+      expect(payload.messages).toEqual([
+        {
+          type: 'E',
+          text: 'View ZMCPW refers to a field that does not exist.',
+          objectName: 'ZMCPW',
+        },
+        { type: 'W', text: 'Activation was cancelled.', objectName: 'ZMCPV' },
+      ]);
+      expect(payload.activated).toBeUndefined();
     },
   );
 

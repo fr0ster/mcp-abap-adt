@@ -436,7 +436,7 @@ describe('ActivateObjectLow', () => {
     expect(payload.messages).toEqual([]);
   });
 
-  it('a finished run carrying an error names the object and answers activated: false', async () => {
+  it('a finished run carrying an error is an error naming the object', async () => {
     fakeClient = finishedRun(
       '<chkl:messages><msg type="E" objName="ZIF_MCP_SHARED">' +
         '<shortText><txt>Interface ZIF_MCP_SHARED is not active</txt></shortText>' +
@@ -448,8 +448,9 @@ describe('ActivateObjectLow', () => {
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
+    expect(result.isError).toBe(true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.activated).toBe(false);
+    expect(payload.origin).toBe('refusal');
     expect(payload.messages).toEqual([
       {
         type: 'E',

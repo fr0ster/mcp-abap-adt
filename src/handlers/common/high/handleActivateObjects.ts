@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description:
-      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages; objects SAP left inactive are an error naming them in still_inactive.',
+      'Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages; an error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
     inputSchema: activateObjectsSchema(variant),
   })),
 } as const;

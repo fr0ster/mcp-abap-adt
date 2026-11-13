@@ -316,7 +316,8 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     // A skip's reason is kept here; the case marks itself skipped with it
     // (`skipRunningTest`), so the run counts it skipped.
     if (!sapIsConfigured()) {
-      skipReason = 'no SAP_URL — there is no system to run against';
+      skipReason =
+        'no SAP_URL and no RFC address — there is no system to run against';
       logger?.warn(`No system to run against: ${skipReason}`);
       return;
     }

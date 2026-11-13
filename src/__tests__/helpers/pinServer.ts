@@ -58,6 +58,12 @@ export type { McpResult };
 /** The destination the pin server serves: who calls, for its leftover sessions. */
 export const PIN_DESTINATION = 'PIN_DEST';
 
+/**
+ * The key an injected connection's system is named by when it answers no
+ * URL (RFC), as a host states it (`EmbeddableMcpServerOptions.system`).
+ */
+const PIN_SYSTEM = 'pin-system';
+
 /** The SAP user the pin server logs on as. */
 export const PIN_USER = 'PIN_USER';
 
@@ -152,6 +158,9 @@ class PinMcpServer extends BaseMcpServer {
         ? {
             kind: 'injected',
             connection: source.injected,
+            // An injected RFC connection answers no URL: its background runs
+            // are kept under this key (one system per run).
+            system: PIN_SYSTEM,
             sessionId: 'pin-server',
             destination: PIN_DESTINATION,
           }

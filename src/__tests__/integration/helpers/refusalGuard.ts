@@ -29,6 +29,7 @@ import {
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { isCredentialFailure } from '../../../lib/answer';
+import { failureOf } from '../../../lib/auth/failures';
 import {
   createAbapConnection,
   systemKindOf,
@@ -59,12 +60,21 @@ export function refuseAfterMarker(what: string): void {
 }
 
 /**
+ * A chain error's kind that says the system, not the credential, refused:
+ * `system-refused` (a `403`, a `5xx`, a redirect; over RFC a key such as
+ * `RFC_COMMUNICATION_FAILURE` — a broken gateway).
+ */
+const NOT_THE_CREDENTIAL = 'system-refused';
+
+/**
  * Whether `thrown` ends a call refused for the credential: a chain failure
- * (`authentication_failed`), a `401` SAP answered, or a logon the system
- * refused `401` (the wire's `WireLogonError`, as a destination's basic
- * logon ends — measured on the stand-in).
+ * (`authentication_failed`) of any kind but `system-refused`, a `401` SAP
+ * answered, or a logon the system refused `401` (the wire's
+ * `WireLogonError`, as a destination's basic logon ends — measured on the
+ * stand-in).
  */
 export function isCredentialRefusal(thrown: unknown): boolean {
+  if (failureOf(thrown)?.kind === NOT_THE_CREDENTIAL) return false;
   return (
     isCredentialFailure(thrown) ||
     (thrown instanceof WireLogonError && thrown.status === 401)
@@ -79,8 +89,8 @@ export function latchOnRefusal(thrown: unknown): unknown {
 
 /**
  * Whether a tool's answer reports a credential refusal, as the server words
- * it: a failed answer whose JSON is `authentication_failed`, or a `401` SAP
- * answered.
+ * it: a failed answer whose JSON is `authentication_failed` of any kind but
+ * `system-refused`, or a `401` SAP answered.
  */
 export function refusalAnswered(isError: boolean, text: string): boolean {
   if (!isError) return false;
@@ -91,6 +101,12 @@ export function refusalAnswered(isError: boolean, text: string): boolean {
     return false;
   }
   if (typeof payload !== 'object' || payload === null) return false;
+  if (
+    Reflect.get(payload, 'error') === 'authentication_failed' &&
+    Reflect.get(payload, 'kind') === NOT_THE_CREDENTIAL
+  ) {
+    return false;
+  }
   return (
     Reflect.get(payload, 'error') === 'authentication_failed' ||
     Reflect.get(payload, 'status') === 401

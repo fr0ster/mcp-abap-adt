@@ -10,8 +10,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { authError } from '@mcp-abap-adt/auth-errors';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { openFreshConnection } from '../../../lib/packageSessions';
 import {
@@ -47,8 +48,11 @@ import {
   credentialRefused,
   type GuardedConnection,
   guardedTestConnection,
+  isCredentialRefusal,
+  latchOnRefusal,
   markCredentialRefused,
   REFUSED_AFTER_MARKER,
+  refusalAnswered,
 } from '../../integration/helpers/refusalGuard';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
 
@@ -215,6 +219,37 @@ describe('the refusal stop at the connection', () => {
     const sent = stand.requests.length;
     assert.throws(() => guarded(), REFUSED_AFTER_MARKER);
     assert.equal(stand.requests.length, sent);
+  });
+
+  it('a logon the system refuses, not for the credential, latches nothing', () => {
+    // Over RFC a broken gateway ends the logon as a chain failure of kind
+    // system-refused (rfc-failure, RFC_COMMUNICATION_FAILURE): it says
+    // nothing against the credential, so it latches nothing and the run goes
+    // on; the credential's own refusal still latches.
+    const broken = new AuthRefusedError(
+      authError['system-refused']({
+        verdict: 'rfc-failure',
+        rfcKey: 'RFC_COMMUNICATION_FAILURE',
+        at: 'logon',
+      }),
+      'logon',
+    );
+    assert.equal(isCredentialRefusal(broken), false);
+    latchOnRefusal(broken);
+    assert.equal(credentialRefused(), false);
+    const refused = new AuthRefusedError(
+      authError['credential-refused']({ credential: 'user-password' }),
+      'logon',
+    );
+    assert.equal(isCredentialRefusal(refused), true);
+    // A tool's answer reads alike.
+    const answered = (kind: string) =>
+      refusalAnswered(
+        true,
+        JSON.stringify({ error: 'authentication_failed', kind }),
+      );
+    assert.equal(answered('system-refused'), false);
+    assert.equal(answered('credential-refused'), true);
   });
 
   it('no connection is created after the marker', async () => {

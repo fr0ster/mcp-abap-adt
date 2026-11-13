@@ -6,6 +6,7 @@
  * interfere with MCP's JSON-RPC communication.
  */
 
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { entries } from './xml/tree';
 
 /**
@@ -36,7 +37,8 @@ function redactedHeaders(headers: unknown): Record<string, unknown> {
   return sanitizedHeaders;
 }
 
-function safeStringify(obj: unknown): string {
+/** A log line's fields as JSON: circular and transport objects named, credentials redacted. */
+function safeStringify(obj: Readonly<Record<string, unknown>>): string {
   const seen = new WeakSet();
   return JSON.stringify(obj, (key: string, value: unknown) => {
     if (typeof value === 'object' && value !== null) {
@@ -308,17 +310,17 @@ function createConnectionManagerLogFn(level: string) {
   };
 }
 
-export const connectionManagerLogger = {
-  debug: (message: string, data?: unknown) => {
+export const connectionManagerLogger: ILogger = {
+  debug(message: string, data?: unknown) {
     createConnectionManagerLogFn('DEBUG')(message, data);
   },
-  info: (message: string, data?: unknown) => {
+  info(message: string, data?: unknown) {
     createConnectionManagerLogFn('INFO')(message, data);
   },
-  warn: (message: string, data?: unknown) => {
+  warn(message: string, data?: unknown) {
     createConnectionManagerLogFn('WARN')(message, data);
   },
-  error: (message: string, data?: unknown) => {
+  error(message: string, data?: unknown) {
     createConnectionManagerLogFn('ERROR')(message, data);
   },
 };

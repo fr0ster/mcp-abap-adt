@@ -28,7 +28,10 @@ import { locationId, readAmdpPreview } from '../../lib/debugger/amdpReadings';
 import { addressOf } from '../../lib/debugger/objectUri';
 import { runtimeDirectory } from '../../lib/leftoverSessions/runtimeDirectory';
 import { scanLines } from '../../lib/search-source/lineScanner';
-import { parseStateIdleMinutes } from '../../lib/state/idleBound';
+import {
+  parseStateIdleMinutes,
+  stateIdleMinutesOf,
+} from '../../lib/state/idleBound';
 import { includeNameOf } from '../../lib/strategies/abapIncludeStatement';
 import { isRefusal } from '../../lib/strategies/activationRun';
 import {
@@ -313,6 +316,17 @@ describe('the state idle bound', () => {
     expect(() => parseStateIdleMinutes('3e2', 'x')).toThrow('x');
     expect(() => parseStateIdleMinutes('60.', 'x')).toThrow('x');
     expect(() => parseStateIdleMinutes('١٢٠', 'x')).toThrow('x');
+  });
+
+  it("a caller's number: a whole number of minutes in the same range", () => {
+    expect(stateIdleMinutesOf(45, 'x')).toBe(45);
+    expect(() => stateIdleMinutesOf(45.5, 'x')).toThrow(
+      'Invalid x: "45.5". Must be a whole number of minutes',
+    );
+    expect(() => stateIdleMinutesOf(1, 'x')).toThrow('at least');
+    expect(() => stateIdleMinutesOf(Number.MAX_SAFE_INTEGER, 'x')).toThrow(
+      'Must be at most',
+    );
   });
 });
 

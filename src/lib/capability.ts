@@ -12,11 +12,14 @@
 /** A method as JavaScript calls one: any arguments, an answer of unknown shape. */
 export type Method = (...args: unknown[]) => unknown;
 
-/** Whether `value` has a method `name`. */
-export function hasMethod<K extends string>(
-  value: unknown,
+/**
+ * Whether `value` has a method `name`: a value of any type, its own type
+ * kept beside the method found.
+ */
+export function hasMethod<T, K extends string>(
+  value: T,
   name: K,
-): value is Record<K, Method> {
+): value is T & Record<K, Method> {
   return (
     typeof value === 'object' &&
     value !== null &&

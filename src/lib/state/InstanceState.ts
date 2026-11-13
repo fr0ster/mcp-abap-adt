@@ -15,8 +15,8 @@ import { logger as processLogger } from '../logger';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   NO_IDLE_BOUND,
-  parseStateIdleMinutes,
   type StateIdleBound,
+  stateIdleMinutesOf,
 } from './idleBound';
 
 /**
@@ -144,7 +144,7 @@ export class InstanceState {
         ? DEFAULT_STATE_IDLE_MINUTES
         : options.idleMinutes === NO_IDLE_BOUND
           ? NO_IDLE_BOUND
-          : parseStateIdleMinutes(options.idleMinutes, 'stateIdleMinutes');
+          : stateIdleMinutesOf(options.idleMinutes, 'stateIdleMinutes');
   }
 
   private readonly parts: StatePart[] = [];

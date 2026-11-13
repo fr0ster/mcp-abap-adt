@@ -37,8 +37,8 @@ import {
 import {
   HeldLocks,
   isLatched,
-  parseStateIdleMinutes,
   type StateLogger,
+  stateIdleMinutesOf,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
 import { child } from '@mcp-abap-adt/lib/utils';
@@ -210,7 +210,7 @@ export class SseServer {
     this.stateIdleMinutes =
       opts?.stateIdleMinutes === undefined
         ? undefined
-        : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
+        : stateIdleMinutesOf(opts.stateIdleMinutes, 'stateIdleMinutes');
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;

@@ -58,18 +58,31 @@ export function parseStateIdleMinutes(raw: unknown, name: string): number {
       : text !== undefined && isDecimal(text)
         ? Number(text)
         : Number.NaN;
+  return idleMinutesWithin(value, String(raw), name);
+}
+
+/**
+ * A bound given as a number by a caller's options (`idleMinutes`,
+ * `stateIdleMinutes`): the same range as a written one.
+ */
+export function stateIdleMinutesOf(value: number, name: string): number {
+  return idleMinutesWithin(value, String(value), name);
+}
+
+/** `value` when it is a whole number of minutes in range; `shown` is the value as the refusal quotes it. */
+function idleMinutesWithin(value: number, shown: string, name: string): number {
   if (
     !Number.isFinite(value) ||
     !Number.isInteger(value) ||
     value < MIN_STATE_IDLE_MINUTES
   ) {
     throw new Error(
-      `Invalid ${name}: "${String(raw)}". Must be a whole number of minutes, at least ${MIN_STATE_IDLE_MINUTES}`,
+      `Invalid ${name}: "${shown}". Must be a whole number of minutes, at least ${MIN_STATE_IDLE_MINUTES}`,
     );
   }
   if (value > MAX_STATE_IDLE_MINUTES) {
     throw new Error(
-      `Invalid ${name}: "${String(raw)}". Must be at most ${MAX_STATE_IDLE_MINUTES} minutes, the longest a timer can hold`,
+      `Invalid ${name}: "${shown}". Must be at most ${MAX_STATE_IDLE_MINUTES} minutes, the longest a timer can hold`,
     );
   }
   return value;

@@ -43,6 +43,7 @@ import {
   terseWrite,
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
 import { DELETION_TARGETS } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
@@ -63,7 +64,7 @@ const ANSWER = { tool: 'HandlerDelete', detail: 'terse' } as const;
 export async function handleDeleteOnly(
   context: HandlerContext,
   args: Args,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const objectType = String(args.object_type ?? '');
   const { connection, logger } = context;
   const transportRequest = text(args.transport_request);

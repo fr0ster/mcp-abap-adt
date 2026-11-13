@@ -22,6 +22,7 @@
  * and forgets the map.
  */
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { StatePart } from '../state/InstanceState';
@@ -61,7 +62,7 @@ export type BatchFailure = {
 /** How one recorded request's part settled in `execute()`, as adt-clients settled it. */
 export type PartSettlement =
   | { state: 'pending' }
-  | { state: 'resolved'; value: unknown }
+  | { state: 'resolved'; value: IAdtWireResponse }
   | { state: 'rejected'; error: unknown };
 
 /**

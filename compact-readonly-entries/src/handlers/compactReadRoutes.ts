@@ -15,6 +15,7 @@ import {
   type CompactRouterMap,
   dispatchCompact,
 } from '@mcp-abap-adt/lib/compact-shared';
+import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import { defineTool, type ToolArgs } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetBehaviorDefinition,
@@ -157,6 +158,6 @@ export const compactReadRouterMap: CompactRouterMap = {
 export async function routeCompactRead(
   context: Parameters<typeof dispatchCompact>[0],
   args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   return dispatchCompact(context, compactReadRouterMap, 'get', args);
 }

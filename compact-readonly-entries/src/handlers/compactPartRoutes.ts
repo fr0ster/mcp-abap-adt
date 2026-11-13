@@ -24,6 +24,7 @@ import {
   isList,
   jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
+import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
   defineTool,
   type HandlerContext,
@@ -126,7 +127,7 @@ function contentsLines(items: readonly unknown[], max: number): string {
 async function packageContentsLines(
   context: HandlerContext,
   args: ToolArgs,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const answered = await packageContents(context, args);
   const text = answered.content[0]?.text;
   if (answered.isError || typeof text !== 'string') return answered;
@@ -282,7 +283,7 @@ export async function routeCompactPart(
   part: Exclude<CompactReadPart, 'source'>,
   args: { readonly object_type: CompactObjectType } & ToolArgs,
   hasSource: boolean,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const variant = variantOf(context.connection);
   const routes =
     part === 'metadata'

@@ -27,10 +27,15 @@
  * the run.
  */
 import {
+  type IAdtMessageFailure,
   type IAdtStillInactive,
   stillInactiveAmong,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { asciiLower, asciiUpper } from '../plainText';
 import { child, entries, listOf, text } from '../xml/tree';
@@ -82,19 +87,25 @@ export interface ActivationMessage {
   objectName?: string;
 }
 
+/** How each read of a run judges SAP's answer: adt-strategies' message-failure reading. */
+export type RunAnalyse = IAnalyse<IAdtMessageFailure>;
+
 /** The members this composite calls, structurally — no client needed to test it. */
 export interface ActivationRunSource {
   getActivationRun(
     runId: string,
-    options: { withLongPolling?: boolean | undefined; analyse?: unknown },
+    options: {
+      withLongPolling?: boolean | undefined;
+      analyse?: RunAnalyse | undefined;
+    },
   ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
   getActivationResults(
     runId: string,
-    options: { analyse?: unknown },
+    options: { analyse?: RunAnalyse | undefined },
   ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
   /** Read with `wireItself` in the `inactive` slot: the list as it came. */
   getInactiveObjects(options: {
-    analyse?: unknown;
+    analyse?: RunAnalyse | undefined;
   }): Promise<IAdtResponse<IAdtWireResponse, IAdtError>>;
 }
 
@@ -298,7 +309,7 @@ export function isRefusal(message: ActivationMessage): boolean {
 export async function awaitActivationRun(
   utils: ActivationRunSource,
   runId: string,
-  analyse: unknown,
+  analyse: RunAnalyse,
   named: readonly string[],
 ): Promise<ActivationRunOutcome> {
   if (runId === '') {

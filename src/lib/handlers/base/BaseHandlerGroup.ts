@@ -22,7 +22,7 @@ import { listedTool, statedEnvironment } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
 import { stateSystemKind } from '../../systemKind.js';
-import { normalizeToolContent } from '../../toolResult.js';
+import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import { child } from '../../xml/tree';
 import type {
@@ -229,7 +229,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // handler it hands out (`inStatedScope`).
           const withParameters = <T>(fn: () => Promise<T>) =>
             inStatedScope(context, args, fn);
-          let result: unknown;
+          let result: ToolResultLike;
           if (read) {
             // A listed long tool: a read on a connection of its own, in the
             // call, logged off after the answer.

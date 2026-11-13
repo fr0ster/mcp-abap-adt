@@ -75,6 +75,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
 import {
   TOOL_DEFINITION as CreateClass_Tool,
@@ -168,7 +169,7 @@ type Args = z.output<typeof compactCreateSchema>;
  * every type accepts but this create does not send). The target's schema is
  * strict, so it is handed only its own.
  */
-function delegate<S extends z.ZodObject, R>(
+function delegate<S extends z.ZodObject, R extends ToolResultLike>(
   definition: ToolDefinition<S>,
   handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
 ): (context: HandlerContext, args: ToolArgs) => Promise<R> {
@@ -246,7 +247,7 @@ function createAlone(
   args: Args,
   tool: string,
   create: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const detail = detailOf(args);
   return answer(
     { tool, detail },
@@ -268,7 +269,7 @@ function missing(args: ToolArgs, fields: string[]): unknown | undefined {
 export async function handleCreateOnly(
   context: HandlerContext,
   args: Args,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const { connection, logger } = context;
   const client = () => createAdtClient(connection, logger);
   const packageName = text(args.package_name) ?? '';

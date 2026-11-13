@@ -9,6 +9,7 @@ import {
   HANDLER_GET_DRAFT_TYPES,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
+import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
   defineTool,
   type HandlerContext,
@@ -69,7 +70,7 @@ function routeAddressPart(
   context: HandlerContext,
   part: string,
   args: Record<string, unknown>,
-): Promise<unknown> | unknown {
+): Promise<ToolResultLike> | ToolResultLike {
   if (part === 'virtual_folders') {
     return virtualFolders(context, {
       object_search_pattern: args.object_search_pattern,

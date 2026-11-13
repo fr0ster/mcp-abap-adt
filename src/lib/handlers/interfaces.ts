@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type * as z from 'zod';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import type { AbapSystemKind } from '../systemKind.js';
+import type { ToolResultLike } from '../toolResult';
 
 // Re-export HandlerContext for consumers
 export type { HandlerContext };
@@ -65,7 +66,7 @@ export type ToolArgs = Readonly<Record<string, unknown>>;
  * runs, given the call's context and its arguments. Every registration path
  * passes the call's context at the call.
  */
-export interface HandlerEntry<R = unknown> {
+export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
   readonly toolDefinition: ToolDefinition;
   /**
    * Runs one call: the arguments parsed with the definition's schema, the
@@ -97,7 +98,7 @@ export interface HandlerEntry<R = unknown> {
  * result; arguments that do not parse are refused, naming each issue, and
  * the handler does not run. The call answers what the handler answers.
  */
-export function defineTool<S extends z.ZodObject, R>(
+export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
   toolDefinition: ToolDefinition<S>,
   handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
 ): HandlerEntry<R> {

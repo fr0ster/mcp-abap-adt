@@ -15,6 +15,7 @@ import type {
   HandlerEntry,
   ToolArgs,
 } from '../../../lib/handlers/interfaces';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -44,7 +45,7 @@ const getProgram: PinCase = {
 /** A stub tool: `run` is its whole body. */
 function stub(
   name: string,
-  run: (context: HandlerContext, args: ToolArgs) => Promise<unknown>,
+  run: (context: HandlerContext, args: ToolArgs) => Promise<ToolResultLike>,
 ): HandlerEntry {
   return {
     toolDefinition: {

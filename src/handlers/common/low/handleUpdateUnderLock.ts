@@ -61,6 +61,7 @@ import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { lockHeldHere, lockNotHeldWords } from '../../../lib/state/heldLocks';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
 import {
   handleUpdateBehaviorDefinition,
@@ -259,7 +260,7 @@ export const CLASS_INCLUDES: Record<
 export async function handleUpdateUnderLock(
   context: HandlerContext,
   args: Args,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const partRefused = partRefusal(args);
   if (partRefused) return return_error(partRefused);
   // A service binding's lock may answer no handle (the binding open in an

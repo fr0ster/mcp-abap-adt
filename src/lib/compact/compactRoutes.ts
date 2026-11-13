@@ -12,6 +12,7 @@
  */
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { HandlerEntry, ToolArgs } from '../handlers/interfaces';
+import type { ToolResultLike } from '../toolResult';
 import { return_error } from '../utils';
 import type { CompactCrudOperation } from './compactMatrix';
 import type { CompactObjectType } from './compactObjectTypes';
@@ -40,7 +41,7 @@ export async function dispatchCompact(
   routes: Partial<CompactRouterMap>,
   operation: CompactCrudOperation,
   args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   context.logger?.info?.(
     `[compact-router] route operation=${operation} object_type=${args?.object_type ?? 'undefined'}`,
   );

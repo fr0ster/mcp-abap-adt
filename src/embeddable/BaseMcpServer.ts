@@ -182,7 +182,11 @@ import {
   systemContextFromConfiguration,
 } from '../lib/systemContext.js';
 import { declareSystemKind } from '../lib/systemKind.js';
-import { isErrorResult, normalizeToolContent } from '../lib/toolResult.js';
+import {
+  isErrorResult,
+  normalizeToolContent,
+  type ToolResultLike,
+} from '../lib/toolResult.js';
 import { readOnlyToolNames } from '../lib/toolSet.js';
 import { return_error } from '../lib/utils.js';
 import { child, isElement } from '../lib/xml/tree.js';
@@ -1851,7 +1855,7 @@ export abstract class BaseMcpServer extends McpServer {
                   signal,
                 });
               }
-              let handlerPromise: Promise<unknown>;
+              let handlerPromise: Promise<ToolResultLike>;
               if (runsInBackground) {
                 // A background run — a code run, or a listed long read — on
                 // its one connection of its own (the read's handler runs on
@@ -2163,8 +2167,9 @@ export abstract class BaseMcpServer extends McpServer {
     // taken at its first request, possibly before. Boxed: a promise resolved
     // with the handler's promise would adopt it, and a handler that throws
     // would then reject the answer instead of reaching `recordedAnswer`.
-    let started: (started: { handler: Promise<unknown> }) => void = () => {};
-    const handlerStarted = new Promise<{ handler: Promise<unknown> }>(
+    let started: (started: { handler: Promise<ToolResultLike> }) => void =
+      () => {};
+    const handlerStarted = new Promise<{ handler: Promise<ToolResultLike> }>(
       (resolve) => {
         started = resolve;
       },
@@ -2208,7 +2213,7 @@ export abstract class BaseMcpServer extends McpServer {
     };
     open.target?.point(connection);
     try {
-      let handler: Promise<unknown>;
+      let handler: Promise<ToolResultLike>;
       try {
         handler = Promise.resolve(
           this.inHeldFlow(call.holdsFlow, connection, () =>
@@ -2260,7 +2265,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async recordedAnswer(
     number: number,
-    handler: Promise<unknown>,
+    handler: Promise<ToolResultLike>,
     owner: InstanceBatch,
     rawParts: () => BatchAnswer['raw'],
     otherKind: () => ServerRefusal | undefined,
@@ -2392,7 +2397,7 @@ export abstract class BaseMcpServer extends McpServer {
     context: HandlerContext,
     args: ToolArgs,
     signal: AbortSignal,
-  ): Promise<unknown> {
+  ): Promise<ToolResultLike> {
     const strategy = this.backgroundRuns;
     if (strategy === undefined) {
       throw new ServerRefusal('background_runs_unavailable');
@@ -2920,7 +2925,7 @@ function callHandler(
   call: HandlerEntry['call'],
   context: HandlerContext,
   args: ToolArgs,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   return runWithCallTransport(args, () => call(context, args));
 }
 

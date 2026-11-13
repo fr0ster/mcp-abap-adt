@@ -22,6 +22,7 @@ import {
   terseDeletionCheck,
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
 import { DELETION_TARGETS } from './deletionTargets';
 
@@ -33,7 +34,7 @@ const ANSWER = { tool: 'HandlerDeletionCheck', detail: 'terse' } as const;
 export async function handleDeletionCheck(
   context: HandlerContext,
   args: Args,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const objectType = String(args?.object_type ?? '');
   // The boundary of object_type: one of the declared variant's members
   // (`COMPACT_DELETION_CHECK`); past it, the target is typed by it.

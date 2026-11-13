@@ -26,6 +26,7 @@ import {
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
+import type { IAnswerSerializer } from '../../../lib/answerSerializer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
   type PhaseResult,
@@ -1516,10 +1517,15 @@ function enhancementOptionsOf(args: GetEnhancementsArgs): EnhancementOptions {
   };
 }
 
-const answerText = (payload: unknown) => ({
-  isError: false,
-  content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
-});
+/** An enhancements answer: the payload as compact JSON text. */
+const answerText: IAnswerSerializer<McpResult> = {
+  json(payload: unknown): McpResult {
+    return {
+      isError: false,
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
+    };
+  },
+};
 
 /**
  * One object's answer from the phases' answers — the sequential version's
@@ -1543,7 +1549,7 @@ function enhancementsAnswerFrom(
       resolved,
     );
     if (!options.includeNested) {
-      return answerText(
+      return answerText.json(
         options.isDetailed
           ? { ...mainEnhancementResponse, detailed: true }
           : filterMinimalEnhancements(mainEnhancementResponse),
@@ -1620,7 +1626,7 @@ function enhancementsAnswerFrom(
       objects: allEnhancementResponses,
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
-    return answerText(
+    return answerText.json(
       options.isDetailed
         ? { ...combinedResponse, detailed: true }
         : filterMinimalNested(combinedResponse),

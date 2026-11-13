@@ -1,5 +1,9 @@
 import * as z from 'zod';
-import { answerCaught, thrownEntry } from '../../../lib/answer';
+import {
+  answerCaught,
+  type FailureEntry,
+  thrownEntry,
+} from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -14,6 +18,7 @@ import {
   type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
+  type PackageItem,
   readNode,
   rootByRoot,
   walkPackage,
@@ -58,6 +63,11 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type GetPackageContentsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** One package's listing among several: its objects, or the failure of its walk. */
+type PackageListing =
+  | { package_name: string; objects: PackageItem[] }
+  | { package_name: string; error: FailureEntry };
 
 export async function handleGetPackageContents(
   context: HandlerContext,
@@ -122,7 +132,7 @@ export async function handleGetPackageContents(
             },
           );
 
-    let answered: unknown;
+    let answered: PackageItem[] | PackageListing[];
     if (single) {
       const only = walked[0];
       if (!only.ok) throw only.error;

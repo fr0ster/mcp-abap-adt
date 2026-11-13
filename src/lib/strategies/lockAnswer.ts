@@ -28,9 +28,12 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { attr, child, childAt, isList, text } from '../xml/tree';
 import { parseStructure } from './reading';
 
-function headerValue(value: unknown): string {
-  if (isList(value)) return String(value[0] ?? '').trim();
-  return typeof value === 'string' ? value.trim() : '';
+/** A header's value as text: a string, or a list's first string; else empty. */
+function headerValue(value: IAdtWireResponse['headers'][string]): string {
+  if (typeof value === 'string') return value.trim();
+  if (!Array.isArray(value)) return '';
+  const [first] = value;
+  return typeof first === 'string' ? first.trim() : '';
 }
 
 /** Whether the answer names a lock handle, where adt-clients looks for one. */

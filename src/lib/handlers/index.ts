@@ -13,6 +13,7 @@ import '../instance.js';
 
 /** The variant declared for a connection: what a type argument is checked against. */
 export { variantOf } from '../clients.js';
+export type { ToolContentItem, ToolResultLike } from '../toolResult.js';
 // Base classes
 export { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 // Handler groups

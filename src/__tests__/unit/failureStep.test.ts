@@ -6,6 +6,7 @@
  * A source or level that is not there (`404`) stays what it was.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
@@ -708,7 +709,7 @@ describe('an activation run whose reading was refused', () => {
     const outcome = await awaitActivationRun(
       source(async () => forbidden()),
       'RUN-1',
-      undefined,
+      analyseException,
       [],
     );
     expect(outcome.messages).toEqual([]);
@@ -752,7 +753,7 @@ describe('an activation run whose reading was refused', () => {
         async () => forbidden(),
       ),
       'RUN-1',
-      undefined,
+      analyseException,
       [],
     );
     expect(outcome.messages).toEqual([]);

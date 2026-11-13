@@ -15,6 +15,8 @@ import type { HandlerContext } from '../../../handlers/interfaces';
 import { defineTool } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 
+const RAN = { content: [{ type: 'text', text: 'ran' }] };
+
 describe('defineTool', () => {
   it('answers the definition and the handler as an entry', () => {
     const entry = defineTool(Wait, handleDebugWait);
@@ -25,11 +27,11 @@ describe('defineTool', () => {
     const seen: unknown[] = [];
     const entry = defineTool(Wait, async (_context, args) => {
       seen.push(args);
-      return 'ran';
+      return RAN;
     });
     await expect(
       entry.call(noConnectionContext(), { state_handle: 'h', extra: 1 }),
-    ).resolves.toBe('ran');
+    ).resolves.toBe(RAN);
     expect(seen).toEqual([
       { state_handle: 'h', hold_seconds: 10, detail: 'terse' },
     ]);
@@ -39,7 +41,7 @@ describe('defineTool', () => {
     const seen: unknown[] = [];
     const entry = defineTool(Wait, async (_context, args) => {
       seen.push(args);
-      return 'ran';
+      return RAN;
     });
     await expect(
       entry.call(noConnectionContext(), { hold_seconds: 'long' }),
@@ -55,13 +57,19 @@ describe('defineTool', () => {
     defineTool(Wait, handleDebugSetVariable);
 
     // A declared type the handler does not take: value is a string.
-    const numeric = async (_c: HandlerContext, _a: { value: number }) =>
-      undefined;
+    const numeric = async (_c: HandlerContext, _a: { value: number }) => RAN;
     // @ts-expect-error the handler disagrees with the schema
     defineTool(SetVariable, numeric);
 
     // The right pairing compiles.
     defineTool(SetVariable, handleDebugSetVariable);
+    expect(true).toBe(true);
+  });
+
+  it('refuses, at compile time, a handler whose answer is not a tool result', () => {
+    // @ts-expect-error a handler answers a tool result, not a bare value
+    defineTool(Wait, async () => 'ran');
+    defineTool(Wait, async () => RAN);
     expect(true).toBe(true);
   });
 });

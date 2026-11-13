@@ -43,6 +43,7 @@ import {
   setSystemContext,
 } from '../../../src/lib/systemContext';
 import { readSystemInformation } from '../../../src/lib/systemInformation';
+import type { ToolResultLike } from '../../../src/lib/toolResult';
 
 import {
   BaseHandlerGroup,
@@ -807,6 +808,11 @@ describe('withResolvedSystemContext', () => {
   });
 });
 
+/** A handler's answer that reports what it saw beside its (empty) content. */
+function reported<F extends object>(facts: F): ToolResultLike & F {
+  return { content: [], ...facts };
+}
+
 /** A group whose handlers report the context they ran under. */
 function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
   context: HandlerContext;
@@ -819,14 +825,13 @@ function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
       return [
         {
           toolDefinition: { name: 'WithContext', description: 'd' } as never,
-          call: async (_context: HandlerContext, _args: unknown) => seen(),
+          call: async (_context: HandlerContext, _args: unknown) =>
+            reported(seen()),
         },
         {
           toolDefinition: { name: 'Closure', description: 'd' } as never,
-          call: async (context: HandlerContext, _args: unknown) => ({
-            ...seen(),
-            connection: context.connection,
-          }),
+          call: async (context: HandlerContext, _args: unknown) =>
+            reported({ ...seen(), connection: context.connection }),
         },
       ];
     },

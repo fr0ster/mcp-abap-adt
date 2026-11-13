@@ -88,8 +88,7 @@ export function parseCheckRunResponse(response: {
       childAt(checkReport, 'chkrun:messages', 'msg') ??
       childAt(checkReport, 'messages', 'msg') ??
       child(checkReport, 'chkrun:messages') ??
-      child(checkReport, 'messages') ??
-      [];
+      child(checkReport, 'messages');
 
     const messageArray = isList(messages)
       ? messages

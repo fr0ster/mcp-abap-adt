@@ -98,11 +98,11 @@ export interface ActivationRunSource {
       withLongPolling?: boolean | undefined;
       analyse?: RunAnalyse | undefined;
     },
-  ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   getActivationResults(
     runId: string,
     options: { analyse?: RunAnalyse | undefined },
-  ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   /** Read with `wireItself` in the `inactive` slot: the list as it came. */
   getInactiveObjects(options: {
     analyse?: RunAnalyse | undefined;
@@ -148,23 +148,12 @@ export class UnreadableRunStatus extends Error {
   }
 }
 
-/** A reading's parse and its document as it came, from a reading or a bare value. */
-export function readingOf(value: unknown): {
+/** A reading's parse and its document as it came. */
+export function readingOf(value: AdtReading<unknown>): {
   parsed: unknown;
   raw: string;
 } {
-  if (
-    value !== null &&
-    typeof value === 'object' &&
-    ('value' in value || 'raw' in value)
-  ) {
-    const raw = 'raw' in value ? value.raw : undefined;
-    return {
-      parsed: 'value' in value ? value.value : undefined,
-      raw: typeof raw === 'string' ? raw : '',
-    };
-  }
-  return { parsed: value, raw: typeof value === 'string' ? value : '' };
+  return { parsed: value.value, raw: value.raw };
 }
 
 /**
@@ -172,7 +161,7 @@ export function readingOf(value: unknown): {
  * its document kept as text, parsed (`parseStructure`) — a caller may hand a
  * set that keeps only the document.
  */
-function documentsOf(value: unknown): unknown[] {
+function documentsOf(value: AdtReading<unknown>): unknown[] {
   const { parsed, raw } = readingOf(value);
   return [parsed, parseStructure(raw)];
 }
@@ -189,7 +178,7 @@ function rootOf(document: unknown): unknown {
  * otherwise, because `run`'s reading is `structured` in `READING_BY_SLOT` but a
  * caller may hand this a set that keeps the document.
  */
-export function runStatusOf(value: unknown): string {
+export function runStatusOf(value: AdtReading<unknown>): string {
   for (const document of documentsOf(value)) {
     const root = rootOf(document);
     const stated =
@@ -224,7 +213,9 @@ function wordsOf(msg: unknown): string {
  * everything says nothing. `type` comes back as stated; the caller decides
  * what `E` means.
  */
-export function activationMessagesOf(value: unknown): ActivationMessage[] {
+export function activationMessagesOf(
+  value: AdtReading<unknown>,
+): ActivationMessage[] {
   for (const document of documentsOf(value)) {
     const messages = membersNamed(document, 'msg').map(({ node: msg }) => {
       const objectName =
@@ -247,7 +238,9 @@ export function activationMessagesOf(value: unknown): ActivationMessage[] {
  * where the document states none. Read from the parse, else from the
  * document kept as text, parsed — never from a message's words.
  */
-export function activationExecutedOf(value: unknown): boolean | undefined {
+export function activationExecutedOf(
+  value: AdtReading<unknown>,
+): boolean | undefined {
   for (const document of documentsOf(value)) {
     for (const { node } of membersNamed(document, 'chkl:properties')) {
       const stated = attributeOf(node, 'activationExecuted');

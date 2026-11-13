@@ -27,6 +27,14 @@ it('any document parses, its namespaces dropped', () => {
   });
 });
 
+it('a blank document reads as an empty one, whitespace or none', () => {
+  // The parser answers `{}` for a blank document itself: nothing of ours is
+  // made in its place.
+  expect(readXmlDocument('')).toEqual({});
+  expect(readXmlDocument(' \n\t ')).toEqual({});
+  expect(readSnapshotList('')).toEqual([]);
+});
+
 it('the memory sizes and a created snapshot, as recorded, read as their documents', () => {
   expect(
     readXmlDocument(corpusBody('debugger-memory--01-memory-sizes')),

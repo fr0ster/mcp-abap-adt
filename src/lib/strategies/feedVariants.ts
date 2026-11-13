@@ -34,7 +34,9 @@ function textOf(entry: unknown, name: string): string {
 
 export function feedVariantsOf(answer: { data?: unknown }): FeedVariants[] {
   const feeds: FeedVariants[] = [];
-  const document = parseStructure(answer?.data);
+  // The wire's body is a boundary: anything but text reads as no document.
+  const body = answer?.data;
+  const document = typeof body === 'string' ? parseStructure(body) : null;
   for (const entry of membersNamed(document, 'atom:entry')) {
     const variants = walkStructure(entry.node)
       .filter((visit) => localName(visit.name) === 'queryVariant')

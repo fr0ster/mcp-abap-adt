@@ -27,7 +27,8 @@ const parser = new XMLParser({
     ].includes(name),
 });
 
-const parse = (xml: string): unknown => (xml?.trim() ? parser.parse(xml) : {});
+/** A document's parse, from outside the type system; a blank one parses to `{}`. */
+const parse = (xml: string): unknown => parser.parse(xml);
 const text = (v: unknown): string =>
   v === undefined || v === null || typeof v === 'object' ? '' : String(v);
 const num = (v: unknown): number => Number(text(v).trim() || 0);

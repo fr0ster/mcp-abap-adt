@@ -24,6 +24,7 @@ import {
   activationMessagesOf,
   runStatusOf,
 } from '../../lib/strategies/activationRun';
+import type { AdtReading } from '../../lib/strategies/reading';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -31,6 +32,11 @@ import {
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
 import { recordingConnection } from '../helpers/recordingConnection';
+
+/** A run document kept as text: the reading a set that keeps it answers. */
+function kept(raw: string): AdtReading<unknown> {
+  return { value: raw, raw, status: 200 };
+}
 
 const CHECKLIST = 'xmlns:chkl="http://www.sap.com/abapxml/checklist"';
 
@@ -234,8 +240,10 @@ describe('activation answers follow SAP’s verdict', () => {
   ] as const)(
     'a results document kept as text states its verdict: %s → %s',
     (document, executed) => {
-      expect(activationExecutedOf(document)).toBe(executed);
-      expect(activationExecutedOf({ raw: document })).toBe(executed);
+      expect(activationExecutedOf(kept(document))).toBe(executed);
+      expect(
+        activationExecutedOf({ value: undefined, raw: document, status: 200 }),
+      ).toBe(executed);
     },
   );
 
@@ -250,7 +258,9 @@ describe('activation answers follow SAP’s verdict', () => {
           'chkl:properties': { '@': { activationExecuted: stated } },
         },
       };
-      expect(activationExecutedOf({ value: parsed, raw: '' })).toBe(executed);
+      expect(
+        activationExecutedOf({ value: parsed, raw: '', status: 200 }),
+      ).toBe(executed);
     },
   );
 });
@@ -265,22 +275,24 @@ describe('a run document kept as text, read through the XML parser', () => {
   const FAILED = corpusBody('refusal-activation-fails--01-activation');
 
   it('the recorded refusal: its message, type and words — tests/fixtures/adt/refusal-activation-fails--01-activation.body.xml', () => {
-    expect(activationMessagesOf(FAILED)).toEqual([
+    expect(activationMessagesOf(kept(FAILED))).toEqual([
       { type: 'E', text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.' },
     ]);
-    expect(activationExecutedOf(FAILED)).toBe(false);
+    expect(activationExecutedOf(kept(FAILED))).toBe(false);
   });
 
   it('the recorded success: no messages, activation executed — tests/fixtures/adt/activation-success-verdict--01-activation.body.xml', () => {
     const success = corpusBody('activation-success-verdict--01-activation');
-    expect(activationMessagesOf(success)).toEqual([]);
-    expect(activationExecutedOf(success)).toBe(true);
+    expect(activationMessagesOf(kept(success))).toEqual([]);
+    expect(activationExecutedOf(kept(success))).toBe(true);
   });
 
   it('a run status as the run answers it', () => {
     expect(
       runStatusOf(
-        '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+        kept(
+          '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+        ),
       ),
     ).toBe('finished');
   });
@@ -288,7 +300,9 @@ describe('a run document kept as text, read through the XML parser', () => {
   it('a run status quoted with apostrophes', () => {
     expect(
       runStatusOf(
-        '<runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status=\'finished\'/>',
+        kept(
+          '<runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status=\'finished\'/>',
+        ),
       ),
     ).toBe('finished');
   });
@@ -297,7 +311,7 @@ describe('a run document kept as text, read through the XML parser', () => {
     const document =
       `<chkl:messages ${CHECKLIST}><msg type='E' objName='ZMCP_X'>` +
       '<shortText><txt>A &lt; B</txt></shortText></msg></chkl:messages>';
-    expect(activationMessagesOf(document)).toEqual([
+    expect(activationMessagesOf(kept(document))).toEqual([
       { type: 'E', text: 'A < B', objectName: 'ZMCP_X' },
     ]);
   });
@@ -305,7 +319,9 @@ describe('a run document kept as text, read through the XML parser', () => {
   it('activationExecuted quoted with apostrophes', () => {
     expect(
       activationExecutedOf(
-        `<chkl:messages ${CHECKLIST}><chkl:properties activationExecuted='false'/></chkl:messages>`,
+        kept(
+          `<chkl:messages ${CHECKLIST}><chkl:properties activationExecuted='false'/></chkl:messages>`,
+        ),
       ),
     ).toBe(false);
   });

@@ -262,7 +262,12 @@ export interface NodeLevel {
 
 /** Our `node` strategy: one answer in, one level out, descriptions kept. */
 export function nodeLevel(answer: { readonly data?: unknown }): NodeLevel {
-  const xml = String(answer.data ?? '');
+  // The wire's body, from outside the type system, as text.
+  return nodeLevelOf(String(answer.data ?? ''));
+}
+
+/** One level of a node-structure document's text, descriptions kept. */
+export function nodeLevelOf(xml: string): NodeLevel {
   const data = childAt(parser.parse(xml), 'asx:abap', 'asx:values', 'DATA');
   return {
     objects: listOf(

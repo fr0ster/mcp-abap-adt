@@ -988,6 +988,19 @@ function xmlTextOf(value: unknown): string | Uint8Array {
   return String(value);
 }
 
+/**
+ * The text of an activation answer that is not text: its `data` member as
+ * fast-xml-parser reads it, else the whole answer written as JSON.
+ */
+function activationText(responseData: unknown): string | Uint8Array {
+  const data = child(responseData, 'data');
+  if (data) return xmlTextOf(data);
+  // No answer at all is refused in fast-xml-parser's own words.
+  return responseData === undefined
+    ? xmlTextOf(responseData)
+    : JSON.stringify(responseData);
+}
+
 /** An attribute that reads `true`, as text or as a parsed boolean. */
 function isTrue(value: unknown): boolean {
   return value === 'true' || value === true;
@@ -1001,11 +1014,11 @@ export function parseActivationResponse(responseData: unknown) {
   });
 
   try {
-    const data =
+    const result: unknown = parser.parse(
       typeof responseData === 'string'
         ? responseData
-        : child(responseData, 'data') || JSON.stringify(responseData);
-    const result: unknown = parser.parse(xmlTextOf(data));
+        : activationText(responseData),
+    );
     const properties = childAt(result, 'chkl:messages', 'chkl:properties');
     const activated = isTrue(child(properties, '@_activationExecuted'));
     const checked = isTrue(child(properties, '@_checkExecuted'));

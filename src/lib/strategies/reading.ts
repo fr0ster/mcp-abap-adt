@@ -95,9 +95,13 @@ const parser = new XMLParser({
   isArray: (name) => REPEATABLE.has(withoutNamePrefix(name)),
 });
 
-/** Parse a document into named structure with verbatim attributes. */
-export function parseStructure(document: unknown): unknown {
-  if (typeof document !== 'string' || document.trim() === '') return null;
+/**
+ * Parse a document into named structure with verbatim attributes; `null` for
+ * a blank document or one that does not parse. The parse comes from outside
+ * the type system.
+ */
+export function parseStructure(document: string): unknown {
+  if (document.trim() === '') return null;
   try {
     return parser.parse(document);
   } catch {

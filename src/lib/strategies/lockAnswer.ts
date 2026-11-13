@@ -42,8 +42,10 @@ export function carriesLockHandle(
 ): boolean {
   // The answer is optional (`IAnalyse`); a wire answer's `headers` are not.
   if (headerValue(answer?.headers['sap-adt-lm-handle'])) return true;
+  // The wire's body is a boundary: anything but text names no handle.
+  const body = answer?.data;
   const handle = childAt(
-    parseStructure(answer?.data),
+    typeof body === 'string' ? parseStructure(body) : null,
     'asx:abap',
     'asx:values',
     'DATA',

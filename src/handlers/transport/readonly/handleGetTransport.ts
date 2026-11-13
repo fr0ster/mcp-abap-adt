@@ -126,8 +126,8 @@ function parseTransportXml(
   let objects: Array<Record<string, unknown>> = [];
   const allObjects = ofRequest('tm:all_objects');
   if (includeObjects && allObjects) {
-    const objectList = child(allObjects, 'tm:abap_object') || [];
-    objects = repeated(objectList).map((obj) => ({
+    const objectList = child(allObjects, 'tm:abap_object');
+    objects = (objectList ? repeated(objectList) : []).map((obj) => ({
       name: child(obj, 'tm:name'),
       type: child(obj, 'tm:type'),
       wbtype: child(obj, 'tm:wbtype'),

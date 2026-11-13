@@ -68,7 +68,10 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
-import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
+import {
+  type NodeLevel,
+  nodeLevelOf,
+} from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
@@ -202,7 +205,7 @@ async function nodeStructure(
         ),
         async (rawXml) => {
           if (!isIndeterminateWalkAnswer(rawXml)) {
-            return succeededLevel(nodeLevel({ data: rawXml }));
+            return succeededLevel(nodeLevelOf(rawXml));
           }
 
           if (parentType !== 'DEVC/K') {

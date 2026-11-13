@@ -12,9 +12,12 @@ const parser = new XMLParser({
   isArray: (n) => n === 'snapshot',
 });
 
-/** Any document, its namespaces dropped — `full` for an answer without a reading of its own. */
+/**
+ * Any document, its namespaces dropped — `full` for an answer without a
+ * reading of its own. A blank document parses to `{}`.
+ */
 export function readXmlDocument(xml: string): unknown {
-  return xml?.trim() ? parser.parse(xml) : {};
+  return parser.parse(xml);
 }
 
 export interface SnapshotReading {

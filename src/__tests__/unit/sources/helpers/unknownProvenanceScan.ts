@@ -142,6 +142,13 @@ const DOM_TYPES = new Set([
 const FILE_READS = new Set(['readFileSync', 'readFile']);
 
 /**
+ * The types of the program's inputs: the environment (`NodeJS.ProcessEnv`)
+ * and the program's arguments (`ProgramArguments`, a reader's parameter
+ * declared so). A value read from one is a boundary, like `process.env`.
+ */
+const INPUT_TYPES = new Set(['ProcessEnv', 'ProgramArguments']);
+
+/**
  * A file's one spelling: TypeScript names a file with `/` on every platform,
  * `path` with the platform's separator, so names are compared resolved.
  */
@@ -735,6 +742,78 @@ export class ProvenanceScan {
     return undefined;
   }
 
+  /**
+   * Whether a value is read from the program's inputs, `process.argv` or
+   * `process.env` or a value of an input type (`INPUT_TYPES`), however typed
+   * the values it passed through: a read of
+   * one of them, a built-in method called on one (`slice`, `trim`), a
+   * variable every value written to which is one, a parameter every
+   * argument of which is one. A value of no type (`undefined`) adds nothing.
+   */
+  private fromProgramInput(
+    source: ts.Expression,
+    seen: ReadonlySet<ts.Node>,
+  ): boolean {
+    const expression = strip(source);
+    const text = expression.getText();
+    if (text === 'process.argv' || text === 'process.env') return true;
+    const type = this.checker.getTypeAtLocation(expression);
+    const typeName = (type.aliasSymbol ?? type.getSymbol())?.getName();
+    if (typeName !== undefined && INPUT_TYPES.has(typeName)) return true;
+    if (
+      ts.isConditionalExpression(expression) ||
+      (ts.isBinaryExpression(expression) &&
+        (expression.operatorToken.kind ===
+          ts.SyntaxKind.QuestionQuestionToken ||
+          expression.operatorToken.kind === ts.SyntaxKind.BarBarToken))
+    ) {
+      const parts = ts.isConditionalExpression(expression)
+        ? [expression.whenTrue, expression.whenFalse]
+        : [expression.left, expression.right];
+      return parts.every((part) => this.fromProgramInput(part, seen));
+    }
+    if (this.absent(this.checker.getTypeAtLocation(expression))) return true;
+    if (
+      ts.isPropertyAccessExpression(expression) ||
+      ts.isElementAccessExpression(expression)
+    ) {
+      return this.fromProgramInput(expression.expression, seen);
+    }
+    if (ts.isCallExpression(expression)) {
+      const callee = strip(expression.expression);
+      const declaration =
+        this.checker.getResolvedSignature(expression)?.declaration;
+      const builtIn =
+        declaration !== undefined &&
+        path
+          .basename(declaration.getSourceFile().fileName)
+          .startsWith('lib.') &&
+        declaration.getSourceFile().isDeclarationFile;
+      return (
+        builtIn &&
+        ts.isPropertyAccessExpression(callee) &&
+        this.fromProgramInput(callee.expression, seen)
+      );
+    }
+    if (!ts.isIdentifier(expression)) return false;
+    const [declaration] = this.declarationsOf(this.symbolOf(expression));
+    if (declaration === undefined || seen.has(declaration)) return false;
+    const deeper = new Set([...seen, declaration]);
+    let sources: ts.Expression[] = [];
+    if (ts.isVariableDeclaration(declaration)) {
+      sources = [...(this.writes.get(declaration) ?? [])];
+      if (declaration.initializer) sources.push(declaration.initializer);
+      const statement = declaration.parent.parent;
+      if (ts.isForOfStatement(statement)) sources.push(statement.expression);
+    } else if (ts.isParameter(declaration) && hasBody(declaration.parent)) {
+      sources = this.sourcesOf(declaration);
+    }
+    return (
+      sources.length > 0 &&
+      sources.every((part) => this.fromProgramInput(part, deeper))
+    );
+  }
+
   private originsOf(source: ts.Expression): readonly Origin[] {
     const expression = strip(source);
     if (
@@ -751,6 +830,12 @@ export class ProvenanceScan {
     }
     const boundary = this.boundaryOrigin(expression);
     if (boundary) return [boundary];
+    if (
+      !this.absent(this.checker.getTypeAtLocation(expression)) &&
+      this.fromProgramInput(expression, new Set())
+    ) {
+      return ['boundary'];
+    }
     // A property read of a value declared without a contract (a thrown
     // value narrowed by `instanceof`, say): its type is the narrowing's
     // claim, its origin the value's.

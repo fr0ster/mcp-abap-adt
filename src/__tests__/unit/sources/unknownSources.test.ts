@@ -74,6 +74,22 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.equal(id.refused, false);
   });
 
+  it("a value read from the program's arguments or environment stays a boundary", () => {
+    // `process.argv` and `process.env` handed down as typed parameters: what
+    // is read from them is the program's input, whatever its static type.
+    const value = site('programInput', 'value');
+    assert.equal(value.cls, 'boundary');
+    assert.equal(value.refused, false);
+  });
+
+  it("a value read from a parameter typed as the program's arguments stays a boundary", () => {
+    // An exported reader nothing in the program calls: its parameter's
+    // declared type (`ProgramArguments`, `NodeJS.ProcessEnv`) names the input.
+    const flag = site('programInput', 'flag');
+    assert.equal(flag.cls, 'boundary');
+    assert.equal(flag.refused, false);
+  });
+
   it('an awaited value is typed by what the promise holds, not the promise', () => {
     const value = site('awaited', 'value');
     assert.equal(value.cls, 'boundary');

@@ -161,8 +161,16 @@ function yamlAt(
   return node;
 }
 
+/**
+ * The program's arguments, by contract: what a reader of a removed
+ * parameter is handed (`process.argv.slice(2)`, by the embedder). A value
+ * read from it is the program's input, like one read from the environment.
+ */
+interface ProgramArguments extends ReadonlyArray<string> {}
+
 interface RemovedHit {
   readonly form: string;
+  /** The value given: the program's input (CLI, environment, YAML). */
   readonly value: unknown;
   readonly removed: RemovedParameter;
 }
@@ -190,7 +198,7 @@ function removedYamlHits(
 /** The first form of a removed parameter, as the user used it: CLI, then env, then YAML. */
 function removedHit(
   table: ParameterTable,
-  argv: readonly string[],
+  argv: ProgramArguments,
   env: NodeJS.ProcessEnv,
   yaml?: Record<string, unknown> | null,
 ): RemovedHit | undefined {

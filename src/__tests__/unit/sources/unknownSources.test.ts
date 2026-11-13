@@ -16,9 +16,12 @@ import { REPO } from './helpers/failureScan';
 import {
   fixtureProgram,
   scanFiles,
+  scanProduction,
   staleReaders,
+  THROWN_READERS,
   type UnknownSite,
   untypedAnswers,
+  untypedProductionAnswers,
 } from './helpers/unknownProvenanceScan';
 
 const FIXTURES = path.join(
@@ -221,6 +224,35 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.deepEqual(
       found.map((entry) => entry.where.split('/').pop()),
       ['untypedAnswer.ts:9', 'untypedAnswer.ts:14'],
+    );
+  });
+});
+
+describe('production code holds as unknown only what comes from outside the type system', () => {
+  // Every production project, as `npm run measure:unknown` reads it: a
+  // refusal is listed with the types that reach it.
+  const sites = scanProduction();
+
+  it('refuses no site', () => {
+    assert.deepEqual(
+      sites
+        .filter((entry) => entry.refused)
+        .map(
+          (entry) =>
+            `${entry.where} ${entry.key} ${entry.cls}: ${entry.types.join(' | ')}`,
+        ),
+      [],
+    );
+  });
+
+  it('lists every reader of thrown values, and no reader that is gone', () => {
+    assert.deepEqual(staleReaders(sites, THROWN_READERS), []);
+  });
+
+  it('takes every library answer of type any as unknown where it is made', () => {
+    assert.deepEqual(
+      untypedProductionAnswers().map((entry) => entry.where),
+      [],
     );
   });
 });

@@ -50,7 +50,7 @@ nothing in the system, so `mcp-abap-adt-compact-http-ro` serves it too; in batch
 once and is never recorded — open leaves the batch open, close drops it.
 
 **The tools are fixed by the binary**: all 29, the four debugger tools (`HandlerDebugBreakpoints`,
-`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools, `HandlerBatch` and the long session (`HandlerSession`) — 39. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the debugger batch (`HandlerDebugBatch`), the background-run tools, `HandlerBatch` and the long session (`HandlerSession`) — 38; `HandlerGetData`, one of the 29, only with `--enable-data-tools` (39). `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
 (`mcp-abap-adt-compact-http-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
 users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming

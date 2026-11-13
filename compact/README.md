@@ -77,25 +77,24 @@ mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 29, the debugger 
 mcp-abap-adt-compact --version
 
 npm install -g @mcp-abap-adt/compact-ro
-mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothing, the leftover-session list and logoff
+mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothing, the leftover-session list
 ```
 
 **The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 29 tools (every access, which
 is what a local server gives), the four debugger tools, the debugger batch (`HandlerDebugBatch`),
-the leftover-session list and logoff, the background-run tools and `HandlerBatch` — 40. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
+the leftover-session list and logoff, the background-run tools and `HandlerBatch` — 39; `HandlerGetData`, one of the 29, only with `--enable-data-tools` (40). `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
 where-used, checks and validations, the unit-test status and result reads, the profiler list and
 view, the dump list and view, the service-binding type list — with the background-run tools, `HandlerBatch` and the
-leftover-session list and logoff — 23; its tool list is exactly these, so a client calls only them. `--exposition`
+leftover-session list — 21, `HandlerGetData` (one of the 17) only with `--enable-data-tools` (22); its tool list is exactly these, so a client calls only them. `--exposition`
 (`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence
 naming the binary to install instead, e.g. *--exposition is gone (19.0.0): the binary fixes its tool
 set, so remove it; the compact tools that change nothing are served by `mcp-abap-adt-compact-ro`
 (`@mcp-abap-adt/compact-ro`)*.
 
-**Leftover sessions, in both.** `HandlerLeftoverSessionList` and
-`HandlerLeftoverSessionLogoff` are served by `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro`
-alike (a logoff is a system action, not a data change) — the SAP sessions a killed
-server process left open (and the locks in them), listed or logged off by the user, only
-the caller's own; no tool resumes one: a stdio server takes up the one leftover session of its
+**Leftover sessions.** `HandlerLeftoverSessionList` is served by `mcp-abap-adt-compact` and
+`mcp-abap-adt-compact-ro`; `HandlerLeftoverSessionLogoff` by `mcp-abap-adt-compact` alone (a logoff
+releases every lock a session holds) — the SAP sessions a killed server process left open (and
+the locks in them), listed or logged off by the user, only the caller's own; no tool resumes one: a stdio server takes up the one leftover session of its
 destination at its start:
 [Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). They are stdio's: `-compact-http` and `-compact-sse`
 (and their `-ro`) serve none and write no session file, since one such server holds the sessions of

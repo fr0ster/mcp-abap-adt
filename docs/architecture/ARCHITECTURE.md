@@ -405,9 +405,9 @@ main({ toolSet, program, version, packageName })
   ├── libInstances()                                 // more than one copy of lib: the guard line, exit 1
   ├── readStartupConfig(<binary>Parameters(toolSet))  // its own table; the set's removed --exposition
   │                                                   //   stops the start, naming the binary to use
-  ├── registryOf(toolSet)                             // full: ReadOnly, System, BackgroundRun, HighLevel,
+  ├── registryOf(toolSet, transport, served, denied)  // full: ReadOnly, System, BackgroundRun, HighLevel,
   │                                                   //   Debug, Search, LeftoverSession; ro: ReadOnly,
-  │                                                   //   System, Search, the list and logoff; compact:
+  │                                                   //   System, Search, the list;          compact:
   │                                                   //   both halves, debug tools, background runs, ...
   ├── a background-run store only if toolSet.backgroundRuns
   ├── core only: AuthBrokerFactory                    // the destination, the startup check
@@ -634,7 +634,7 @@ The system has three distinct IoC boundaries:
 3. Chooses the stores of a destination (`server-runtime/src/stdio/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 4. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
 5. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`. With `--deferred-logon` nothing is sent at the start: the transport opens, and the first tool call that needs the connection makes it (a failure is its answer — `no_connection`, naming the cause code only, when the system cannot be reached)
-6. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
+6. Assembles the registry of the tool set it is given (`registryOf(toolSet, transport, served, denied)`: the transport, whether the data tools are served, the denied actions)
 7. Starts `StdioServer` with `destinationSource`
 
 `server-runtime/src/http/launcher.ts` and `server-runtime/src/sse/launcher.ts` refuse a second copy of `lib` the same way, read their configuration, assemble the

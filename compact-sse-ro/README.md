@@ -17,7 +17,7 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
 - the **background-run tools** (`HandlerBackgroundRunGet`, `HandlerBackgroundRunList`, `HandlerBackgroundRunDiscard`): a long read runs in the background by default and is read, listed and cancelled by them;
 - **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode.
 
-21 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+20 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger tools — those are `mcp-abap-adt-compact-sse`'s ([`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)).
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many

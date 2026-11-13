@@ -21,7 +21,7 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
   bound ([compact-http](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)). Every tool
   declares the optional `state_handle` argument.
 
-22 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+21 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger tools — those are `mcp-abap-adt-compact-http`'s ([`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)).
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many

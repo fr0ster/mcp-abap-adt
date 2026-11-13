@@ -673,7 +673,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
   binary (there is no `--exposition`) but for the data tools: its groups, the TOOLS section of its help, its removed
   `--exposition` and whether it serves background runs. `fullToolSet` covers readonly, high, debug,
   search, background runs and, on stdio, the leftover sessions; `fullReadOnlyToolSet` readonly,
-  search and, on stdio, the leftover-session list and logoff; `compactToolSetOf({ readOnly, data, modify })`
+  search and, on stdio, the leftover-session list; `compactToolSetOf({ readOnly, data, modify })`
   is the compact facade's, `compactReadOnlyToolSetOf({ readOnly, data })` its read-only half's. The
   transport is a set's other dimension: `groups(context, transport, served)` builds the
   leftover-session group for `'stdio'` only, and `registryOf(toolSet, transport, served)` builds the

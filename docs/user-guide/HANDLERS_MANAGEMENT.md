@@ -30,10 +30,12 @@ run outside batch mode — see
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
 on premise, stdio / Streamable HTTP / SSE: core 269 / 269 / 267 (with the 3 batch tools and the
-debugger batch's 2); core-ro 74 / 75 / 73 (each with the 3 batch tools and the 3 background-run tools); compact 40 / 39 / 38 (29 +
-4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 22 / 22 / 21
-(17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
-premise only), core-ro 73, compact 40, compact-ro 22. stdio adds the leftover-session tools — list and logoff in the full sets, the
+debugger batch's 2); core-ro 74 / 75 / 73 (each with the 3 batch tools and the 3 background-run tools); compact 39 / 38 / 37 (28 of the 29 +
+4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 21 / 21 / 20
+(16 of the 17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
+premise only), core-ro 73, compact 39, compact-ro 21. Each count is without the data tools:
+`--enable-data-tools` adds `GetSqlQuery` and `GetTableContents` to core and core-ro, and
+`HandlerGetData` (the 29th, the 17th) to compact and compact-ro. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`
 in the compact ones — and declares an optional `state_handle` argument on every tool
@@ -346,10 +348,10 @@ the one input of each binary's launcher (`main({ toolSet, program, version })`):
   leftover-session group for `'stdio'` only.
 - `fullReadOnlyToolSet` — `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`: `readonly`, `system`,
   search, and on stdio the leftover-session list (`LeftoverSessionListHandlersGroup`).
-- `compactToolSetOf({ readOnly, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
+- `compactToolSetOf({ readOnly, data, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
   `-compact-sse`, with the two halves' entry builders: both halves, the four `HandlerDebug*`
   tools, the background-run tools, on stdio every leftover-session tool; no search.
-- `compactReadOnlyToolSetOf(readOnly)` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
+- `compactReadOnlyToolSetOf({ readOnly, data })` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
   `-compact-sse-ro`: the read-only half (`@mcp-abap-adt/compact-readonly-entries`), on stdio the
   leftover-session list.
 
@@ -360,7 +362,8 @@ hands the server a background-run store.
 ```typescript
 import { fullReadOnlyToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
 
-const registry = registryOf(fullReadOnlyToolSet); // a CompositeHandlersRegistry
+// The transport it serves, and whether the data tools are served (off by default).
+const registry = registryOf(fullReadOnlyToolSet, 'stdio', { dataTools: false }); // a CompositeHandlersRegistry
 ```
 
 ### The variant a plain registration lists

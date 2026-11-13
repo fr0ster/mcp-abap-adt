@@ -431,6 +431,30 @@ describe('AmdpSession', () => {
     expect(w.session.holdsState()).toBe(false);
   });
 
+  it('a cancel answered with a spent connection while the session is ending: nothing more is sent', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    w.dbg.deleteDebuggee = async (_m: string, d: string) => {
+      w.calls.push(`spent-delete:${d}`);
+      return refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionError: 'ADT_SESSION_REPLACED',
+      });
+    };
+    w.session.endWaits(); // a dispose, the instance's close
+    const before = w.calls.length;
+    const stopped = w.session.stop();
+    w.run.resolve({ ok: false, message: 'ended with its session' });
+    await expect(stopped).resolves.toBeUndefined();
+    const after = w.calls.slice(before);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatch(/^spent-delete:/);
+    expect(w.dropped).toHaveLength(2);
+    expect(w.session.holdsState()).toBe(false);
+  });
+
   it('a stop refused with ADT_RELEASE_PENDING is no spent connection: it fails and is kept', async () => {
     const w = await started();
     w.dbg.stop = async () => {

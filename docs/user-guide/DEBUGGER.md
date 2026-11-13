@@ -591,7 +591,8 @@ ends by:
     the commands connection spent means the AMDP debug session went with its SAP session.
     Nothing more is sent, both connections are dropped without a request, and the stop
     completes. The one-request path (the compact debugger) does the same when its stop finds
-    the commands connection spent.
+    the commands connection spent; its `stop` operation answers that failure as it came, and the
+    session goes with both connections.
   - Any other failure of the release, `ADT_RELEASE_PENDING` included, stays a failure kept for
     the next stop.
   - Unit-tested in `DebugSessionCleanup.test.ts`.

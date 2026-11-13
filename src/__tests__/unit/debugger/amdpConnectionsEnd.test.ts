@@ -187,6 +187,28 @@ describe('every connection an AMDP session opens is closed once', () => {
     expect(w.session.holdsState()).toBe(false);
   });
 
+  // The compact operation `stop` (stopOnce): a spent answer is answered as
+  // it came, and the session goes with it — both connections dropped, none
+  // closed, nothing more sent; a later DebugStop sends no stop again.
+  it('the compact one-request stop answered spent: answered as it came, both dropped, nothing sent again', async () => {
+    const w = world();
+    await w.session.startOnce(false);
+    let stops = 0;
+    w.dbg.stop = async () => {
+      stops += 1;
+      return refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionLost: 'ADT_SESSION_REPLACED',
+      });
+    };
+    await expect(w.session.stopOnce()).rejects.toThrow();
+    expect(w.dropped).toHaveLength(2);
+    expect(w.closed).toHaveLength(0);
+    expect(w.session.holdsState()).toBe(false);
+    await expect(w.session.stop()).resolves.toBeUndefined();
+    expect(stops).toBe(1);
+  });
+
   it("the debugger's dispose and the instance's shutdown", async () => {
     for (const end of ['dispose', 'shutdown'] as const) {
       const w = await atBreak();

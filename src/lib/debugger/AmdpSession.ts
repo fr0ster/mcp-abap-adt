@@ -1043,6 +1043,14 @@ export class AmdpSession<O = unknown> {
     return this.mutate(async () => {
       const once = this.requireOnce();
       const answer = await once.onCommands.stop(once.mainId);
+      // The commands connection spent: the AMDP debug session went with its
+      // SAP session. The answer stays as it came; the session goes with it,
+      // both connections dropped without a request, so nothing more is sent.
+      if (!answer.ok && spentBy(answer.getError())) {
+        this.once = undefined;
+        this.ports.dropConnection(once.commands);
+        this.ports.dropConnection(once.events);
+      }
       if (!answer.ok)
         throw failedAt(
           new DebugRequestError(messageOf(answer)),
@@ -1333,16 +1341,17 @@ export class AmdpSession<O = unknown> {
       .deleteDebuggee(open.mainId, debuggee)
       .catch(asFailure);
     if (!cancelled.ok) {
-      if (this.sessionEnding) return undefined;
       // The commands connection spent: the AMDP debug session went with its
       // SAP session, so there is nothing to cancel or wait for. The session
       // is retired and dropped here, so nothing more is sent on it; the stop
-      // goes on with what else it holds.
+      // goes on with what else it holds — whether the session is ending or
+      // not.
       if (spentBy(cancelled.getError())) {
         this.retire(open);
         this.dropSpent(open);
         return undefined;
       }
+      if (this.sessionEnding) return undefined;
       failures.push(failedEntry(cancelled, `release debuggee ${debuggee}`));
       return 'refused';
     }

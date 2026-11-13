@@ -254,12 +254,13 @@ to have a debug session send the header pairs of its origin's system.
 
 `AmdpSessionPorts` (`@mcp-abap-adt/lib/debugger`) has a required
 `dropConnection(c: IAbapConnection): void`, as `DebugSessionPorts` already had. An AMDP stop
-whose commands connection is spent (its SAP session gone) takes both connections out through it,
-with no request: nothing more is sent on them, not even a logoff of the session that ended.
+whose commands connection is spent (its SAP session gone) takes both connections out through it
+instead of closing them: no AMDP request follows on either.
 
 **What you do:** an embedder's own `AmdpSessionPorts` adds `dropConnection`, taking the
-connection out of whatever holds it without sending anything; the shipped ports
-(`src/lib/debugger/ports.ts`) do so already.
+connection out of whatever holds it; it must send nothing for a session that ended. The shipped
+ports (`src/lib/debugger/ports.ts`) end it with its one `disconnect()`, which sends a logoff only
+for a session the connection still holds.
 
 ## Embedders: `IAbapConnection` 5
 

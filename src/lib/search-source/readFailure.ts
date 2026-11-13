@@ -60,7 +60,7 @@ function isSapAnswer(failure: unknown): boolean {
   const carried = methodFailureOf(failure);
   if (carried !== undefined) {
     return (
-      statusOf(carried.response) !== undefined || carried.origin === 'refusal'
+      Number.isInteger(carried.response?.status) || carried.origin === 'refusal'
     );
   }
   return (

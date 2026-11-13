@@ -194,48 +194,61 @@ function compared(value: unknown): string | undefined {
 }
 
 /**
- * An argument as the rules read it: absent, its fallback (`ABSENT_READS_AS`).
- * An empty list is no argument: the handlers dispatch on a list only when it
- * holds an entry (`HandlerActivate`'s `objects: []` is its single form).
+ * An argument as the call states it, read from the arguments before the
+ * tool's schema. An empty list is no argument: the handlers dispatch on a
+ * list only when it holds an entry (`HandlerActivate`'s `objects: []` is its
+ * single form).
  */
-function argumentOf(tool: string, args: unknown, name: string): unknown {
+function statedArgument(args: unknown, name: string): unknown {
   const given = child(args, name);
-  const stated = isList(given) && given.length === 0 ? undefined : given;
-  return stated === undefined ? ABSENT_READS_AS[tool]?.[name] : stated;
+  return isList(given) && given.length === 0 ? undefined : given;
 }
 
 const among = (value: string | undefined, values: string[]) =>
   value !== undefined && values.some((v) => v.toUpperCase() === value);
 
-/** Whether `value` holds a rule's `equals` and `notEquals`. */
-function valueHolds(rule: WhenRule[number], value: unknown): boolean {
-  if (rule.equals !== undefined && !among(compared(value), rule.equals)) {
+/** Whether a compared value holds a rule's `equals` and `notEquals`. */
+function valueHolds(
+  rule: WhenRule[number],
+  value: string | undefined,
+): boolean {
+  if (rule.equals !== undefined && !among(value, rule.equals)) {
     return false;
   }
-  return !(
-    rule.notEquals !== undefined && among(compared(value), rule.notEquals)
-  );
+  return !(rule.notEquals !== undefined && among(value, rule.notEquals));
 }
 
-/** Whether every rule of `when` holds for `args`. */
+/**
+ * Whether every rule of `when` holds for `args`. An argument the call does
+ * not state reads as its fallback (`ABSENT_READS_AS`).
+ */
 export function whenHolds(
   tool: string,
   when: WhenRule | undefined,
   args: unknown,
 ): boolean {
   for (const rule of when ?? []) {
-    const value = argumentOf(tool, args, rule.argument);
-    if (rule.present !== undefined && (value !== undefined) !== rule.present) {
+    const given = statedArgument(args, rule.argument);
+    const assumed =
+      given === undefined ? absentReadsAs(tool, rule.argument) : undefined;
+    const present = given !== undefined || assumed !== undefined;
+    if (rule.present !== undefined && present !== rule.present) {
       return false;
     }
     if (rule.field !== undefined) {
       const field = rule.field;
-      const members = isList(value) ? value : [];
-      if (!members.every((member) => valueHolds(rule, child(member, field)))) {
+      const members = isList(given) ? given : [];
+      if (
+        !members.every((member) =>
+          valueHolds(rule, compared(child(member, field))),
+        )
+      ) {
         return false;
       }
       continue;
     }
+    const value =
+      given === undefined ? assumed?.toUpperCase() : compared(given);
     if (!valueHolds(rule, value)) return false;
   }
   return true;

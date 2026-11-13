@@ -16,6 +16,7 @@ import { failureOf } from '../auth/failures';
 import {
   carryingPayload,
   type LeftBehind,
+  leftBehindRead,
   mergedLeftBehind,
   methodFailureOf,
   noteLeftBehind,
@@ -99,7 +100,10 @@ export function leaveBehind(error: Error, left: LeftBehind): void {
   if (failureOf(error) !== undefined) return;
   carryingPayload(error, {
     message: error.message,
-    cleanup: mergedLeftBehind(payloadCarriedBy(error)?.cleanup, left),
+    cleanup: mergedLeftBehind(
+      leftBehindRead(payloadCarriedBy(error)?.cleanup),
+      left,
+    ),
   });
 }
 

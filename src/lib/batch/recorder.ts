@@ -82,8 +82,37 @@ export interface Recorder extends IAbapConnection {
   release(): void;
 }
 
-/** The raw part of a settled request: the inner response, or a failure's `response`. */
-function rawOf(response: unknown): RawPart | undefined {
+/** A part's body as text: a string as it is, anything else as JSON; none is empty. */
+function bodyText(data: unknown): string {
+  if (data === undefined || data === null) return '';
+  return typeof data === 'string' ? data : JSON.stringify(data);
+}
+
+/** A header's value as one line: a list joined, anything else as text. */
+function headerLine(value: IAdtWireResponse['headers'][string]): string {
+  return Array.isArray(value) ? value.join(', ') : String(value);
+}
+
+/** The raw part of a settled request: its inner response. */
+function rawPartOf(response: IAdtWireResponse): RawPart {
+  const headers: Record<string, string> = {};
+  for (const [name, value] of Object.entries(response.headers)) {
+    if (value === undefined || value === null) continue;
+    headers[name] = headerLine(value);
+  }
+  return {
+    status: response.status,
+    status_text: response.statusText,
+    headers,
+    body: bodyText(response.data),
+  };
+}
+
+/**
+ * The raw part of a request that threw: its `response`, read from a thrown
+ * value, field by field.
+ */
+function thrownRawPart(response: unknown): RawPart | undefined {
   const status = child(response, 'status');
   if (typeof status !== 'number') return undefined;
   const headers: Record<string, string> = {};
@@ -92,18 +121,11 @@ function rawOf(response: unknown): RawPart | undefined {
     headers[name] = isList(value) ? value.join(', ') : String(value);
   }
   const statusText = child(response, 'statusText');
-  const data = child(response, 'data');
-  const body =
-    data === undefined || data === null
-      ? ''
-      : typeof data === 'string'
-        ? data
-        : JSON.stringify(data);
   return {
     status,
     status_text: typeof statusText === 'string' ? statusText : '',
     headers,
-    body,
+    body: bodyText(child(response, 'data')),
   };
 }
 
@@ -205,10 +227,10 @@ export function createRecorder(
         raw.push(undefined);
         recorded.then(
           (response) => {
-            raw[index] = rawOf(response);
+            raw[index] = rawPartOf(response);
           },
           (error: unknown) => {
-            raw[index] = rawOf(child(error, 'response'));
+            raw[index] = thrownRawPart(child(error, 'response'));
           },
         );
       }

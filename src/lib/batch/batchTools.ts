@@ -45,16 +45,27 @@ export function runsBesideBatch(tool: string): boolean {
   return LISTED.has(tool) || SESSION_LISTED.has(tool);
 }
 
-/** Whether `args` ask for numbers: `number` or `numbers` given. */
-export function asksNumbers(args: unknown): boolean {
-  return (
-    child(args, 'number') !== undefined || child(args, 'numbers') !== undefined
-  );
+/** What a batch tool's parsed arguments say of the numbers asked. */
+export interface NumberArgs {
+  readonly number?: number | undefined;
+  readonly numbers?: readonly number[] | undefined;
 }
 
-/** Whether `args` name `action: 'end'` and ask for no numbers. */
+/** Whether `args` ask for numbers: `number` or `numbers` given. */
+export function asksNumbers(args: NumberArgs): boolean {
+  return args.number !== undefined || args.numbers !== undefined;
+}
+
+/**
+ * Whether a call's arguments, as the SDK hands them before the tool's
+ * schema, name `action: 'end'` and ask for no numbers.
+ */
 function endAction(args: unknown): boolean {
-  return child(args, 'action') === 'end' && !asksNumbers(args);
+  return (
+    child(args, 'action') === 'end' &&
+    child(args, 'number') === undefined &&
+    child(args, 'numbers') === undefined
+  );
 }
 
 /**

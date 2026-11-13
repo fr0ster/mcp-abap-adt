@@ -111,7 +111,11 @@ type BatchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  */
 export function batchActionIsConnectionless(args: unknown): boolean {
   const action = child(args, 'action');
-  return action !== 'end' || asksNumbers(args);
+  return (
+    action !== 'end' ||
+    child(args, 'number') !== undefined ||
+    child(args, 'numbers') !== undefined
+  );
 }
 
 export async function handleHandlerBatch(

@@ -6,7 +6,8 @@
  *
  * Each answer family implements it for its own answer type and layout
  * (`answer.ts`, the background-run and the leftover-session answers, two
- * spaces indented; GetEnhancements' compact text).
+ * spaces indented; GetEnhancements' compact text; the debugger's text
+ * blocks, a string as it is).
  */
 export interface IAnswerSerializer<A> {
   /** `payload` as the answer's text; `isError` where the answer says so. */

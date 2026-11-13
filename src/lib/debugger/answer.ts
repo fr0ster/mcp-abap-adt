@@ -1,13 +1,19 @@
 import type { McpResult } from '../answer';
+import type { IAnswerSerializer } from '../answerSerializer';
 import { type DetailArgs, detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
 import type { DebugState, DebugView, OnceStep } from './DebugSession';
 import { terseSettings, terseStop } from './readings';
 
-const asText = (value: unknown) => ({
-  type: 'text' as const,
-  text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
-});
+/** A debugger answer's text block: a string as it is, any other value as JSON. */
+const textBlocks: IAnswerSerializer<{ type: 'text'; text: string }> = {
+  json(value: unknown) {
+    return {
+      type: 'text',
+      text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+    };
+  },
+};
 
 /**
  * terse / full / raw of one reading. `extraOf` — the handle and the SAP ids a
@@ -32,7 +38,10 @@ export async function debugAnswer<T>(
     if (detail === 'raw') {
       return {
         isError: false,
-        content: [asText(view.raw), ...(hasExtra ? [asText(extra)] : [])],
+        content: [
+          textBlocks.json(view.raw),
+          ...(hasExtra ? [textBlocks.json(extra)] : []),
+        ],
       };
     }
     const projected = detail === 'full' ? full(view.value) : terse(view.value);
@@ -41,12 +50,12 @@ export async function debugAnswer<T>(
       : projected && typeof projected === 'object' && !Array.isArray(projected)
         ? { ...projected, ...extra }
         : { value: projected, ...extra };
-    return { isError: false, content: [asText(merged)] };
+    return { isError: false, content: [textBlocks.json(merged)] };
   } catch (error) {
     const failed = return_error(error);
     const extra = failureExtraOf();
     return Object.keys(extra).length > 0
-      ? { ...failed, content: [...failed.content, asText(extra)] }
+      ? { ...failed, content: [...failed.content, textBlocks.json(extra)] }
       : failed;
   }
 }

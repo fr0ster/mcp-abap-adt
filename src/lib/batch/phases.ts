@@ -131,7 +131,9 @@ function outerStatusWatch(connection: IAbapConnection): {
       }
       return connection.makeAdtRequest(request).then(
         (response) => {
-          outer = statusOf(response);
+          outer = Number.isInteger(response.status)
+            ? response.status
+            : undefined;
           return response;
         },
         (error: unknown) => {

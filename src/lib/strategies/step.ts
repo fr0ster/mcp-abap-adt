@@ -2,6 +2,7 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { failureOf } from '../auth/failures';
 import { SystemContextMissingError } from '../systemContextGuard';
 import { child, isList } from '../xml/tree';
+import type { Cleanup } from './safeFields';
 import { failed, type StepError, type StepResponse } from './stepResponse';
 
 /**
@@ -117,22 +118,35 @@ export interface LeftBehind {
 
 /** What was left behind before, with what is added now. */
 export function mergedLeftBehind(
-  prior: unknown,
+  prior: Cleanup | LeftBehind | undefined,
   added: LeftBehind,
 ): LeftBehind {
-  const listed = (name: string): readonly unknown[] => {
-    const value = child(prior, name);
-    return isList(value) ? value : [];
-  };
-  const message = [child(prior, 'message'), added.message]
-    .filter((m): m is string => typeof m === 'string' && m !== '')
+  const message = [prior?.message, added.message]
+    .filter((m): m is string => m !== undefined && m !== '')
     .join('; ');
-  const failures = [...listed('failures'), ...(added.failures ?? [])];
-  const notes = [...listed('notes'), ...(added.notes ?? [])];
+  const failures = [...(prior?.failures ?? []), ...(added.failures ?? [])];
+  const priorNotes = prior !== undefined && 'notes' in prior ? prior.notes : [];
+  const notes = [...(priorNotes ?? []), ...(added.notes ?? [])];
   return {
     ...(message ? { message } : {}),
     ...(failures.length ? { failures } : {}),
     ...(notes.length ? { notes } : {}),
+  };
+}
+
+/**
+ * What a thrown value's carried payload says was left behind (its
+ * `cleanup`), read field by field: a value from outside the type system.
+ */
+export function leftBehindRead(value: unknown): LeftBehind | undefined {
+  if (value === undefined) return undefined;
+  const message = child(value, 'message');
+  const failures = child(value, 'failures');
+  const notes = child(value, 'notes');
+  return {
+    ...(typeof message === 'string' && { message }),
+    ...(isList(failures) && { failures }),
+    ...(isList(notes) && { notes }),
   };
 }
 

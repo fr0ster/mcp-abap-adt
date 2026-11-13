@@ -418,10 +418,15 @@ describe('AmdpSession', () => {
         sessionError: 'ADT_SESSION_REPLACED',
       });
     };
+    const before = w.calls.length;
     const stopped = w.session.stop();
     w.run.resolve({ ok: false, message: 'ended with its session' });
     await expect(stopped).resolves.toBeUndefined();
-    expect(w.calls).not.toContain('stop');
+    // The spent cancel is the last call on the commands connection: no
+    // breakpoint clear, no second cancel, no stop.
+    const after = w.calls.slice(before);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatch(/^spent-delete:/);
     expect(w.dropped).toHaveLength(2);
     expect(w.session.holdsState()).toBe(false);
   });

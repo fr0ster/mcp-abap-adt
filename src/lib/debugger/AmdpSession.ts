@@ -1335,9 +1335,14 @@ export class AmdpSession<O = unknown> {
     if (!cancelled.ok) {
       if (this.sessionEnding) return undefined;
       // The commands connection spent: the AMDP debug session went with its
-      // SAP session, so there is nothing to cancel or wait for. The stop goes
-      // on; the cleanup finds it spent and drops the session.
-      if (spentBy(cancelled.getError())) return undefined;
+      // SAP session, so there is nothing to cancel or wait for. The session
+      // is retired and dropped here, so nothing more is sent on it; the stop
+      // goes on with what else it holds.
+      if (spentBy(cancelled.getError())) {
+        this.retire(open);
+        this.dropSpent(open);
+        return undefined;
+      }
       failures.push(failedEntry(cancelled, `release debuggee ${debuggee}`));
       return 'refused';
     }

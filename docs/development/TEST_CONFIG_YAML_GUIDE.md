@@ -2,14 +2,27 @@
 
 **Purpose:** Guidelines for preparing `test-config.yaml` to avoid common testing issues.
 
+## The config is parsed
+
+The harness reads the file once through a zod schema
+(`src/__tests__/integration/helpers/testConfigSchema.ts`). A key it does not read is kept as it is;
+a key written with no value reads as absent; a value of the wrong type for a key it reads refuses
+the whole run, as `<file> is not a test config: <path>: <issue>` (for example
+`environment.cleanup_after: Invalid input: expected boolean, received string`). Fix the value at
+that path; the template states each key's type.
+
 ## Common Issues and Solutions
 
 ### 1. Missing Required Parameters
 
-**Problem:** Test fails with error like `"parameter_name is required in test configuration"`
+**Problem:** Test fails with error like `"parameter_name is required in test configuration"`,
+`the test case states no parameter_name`, or
+`<case>: the test case's params are not what the test reads: <key>: …`
 
-**Solution:** Ensure all required parameters are present in test case `params` section:
-- Check test file for required parameters (usually validated with `if (!testCase.params.paramName)`)
+**Solution:** Ensure all required parameters are present in test case `params` section, with the
+type the test reads:
+- Check the test file's params schema (`readCaseParams(…, <Schema>, …)`, a `z.looseObject` near its
+  top) and the values it takes with `stated(…)`
 - Refer to `test-config.yaml.template` for complete parameter list
 - High-level handler tests may require additional parameters (e.g., `update_source_code` for update step)
 

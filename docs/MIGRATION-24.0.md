@@ -10,12 +10,13 @@ code. Go through the section that fits how you use the server; the [CHANGELOG](.
 every item.
 
 The packages are the eighteen of 23.1.x, all at **24.0.0**, every sibling range at `^24.0.0`. The
-ADT dependencies move to `@mcp-abap-adt/adt-clients` 45, `@mcp-abap-adt/adt-strategies` 0.22 and
-`@mcp-abap-adt/interfaces-adt` 27 (`@mcp-abap-adt/compact-modify` too): what that changes for a
+ADT dependencies move to `@mcp-abap-adt/adt-clients` 45.5, `@mcp-abap-adt/adt-strategies` 0.23 and
+`@mcp-abap-adt/interfaces-adt` 27.4 (`@mcp-abap-adt/compact-modify` too): what that changes for a
 caller is under "Creates, validations, checks and requests: what adt-clients 43 sends" and
 "Callers of the activation tools: an activation SAP did not carry out is an error" below (44
-adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 23,
-`@mcp-abap-adt/interfaces-auth-sap` 4, `@mcp-abap-adt/interfaces-adt-connection` 4.2 and the
+adds `getBaseUrl()` answering `undefined`). The connection moves to `@mcp-abap-adt/connection` 24,
+`@mcp-abap-adt/interfaces-auth-sap` 4, `@mcp-abap-adt/interfaces-adt-connection` 5 ("Embedders:
+`IAbapConnection` 5", below) and the
 optional `@mcp-abap-adt/sap-rfc-lite` 0.4, the
 destination path to `@mcp-abap-adt/auth-broker` 5.1, `@mcp-abap-adt/auth-stores` 5.1 and
 `@mcp-abap-adt/interfaces-auth-broker` 1.4: what that changes is under "RFC destinations: the
@@ -196,6 +197,75 @@ did. A tool's handler type is `Parameters<typeof handleX>[1]`.
 longer compiles — pass what the schema declares (the tool's listed schema, or its
 `TOOL_DEFINITION.inputSchema`). Calling through the tool's entry (`entry.call`) parses the
 arguments first.
+
+## Embedders: a handler takes its schema's output
+
+Every handler that `@mcp-abap-adt/lib/handlers`, `/handlers/read` and `/handlers/write` export
+takes `z.output<typeof TOOL_DEFINITION.inputSchema>` — the arguments as the tool's schema parses
+them — and `ScheduleProfilerTraceArgs` (`/handlers/write`) is that type. An optional field is
+`?: T | undefined`, so passing `undefined` compiles. Two things no longer compile on a direct
+call:
+
+- a field the schema defaults is present in the output, so the call gives it
+  (`CreatePackage`'s `package_type` and `detail`, `GetTableContents`' `detail`);
+- a field the schema types as an enum takes one of its values where the hand-written type took
+  any `string` (the check wrappers' `version`, the codes of `object_type`).
+
+A handler no longer answers values its schema refuses: the fallbacks and re-checks for them are
+gone (`GetObjectStructure`'s `object_type` / `object_name` fallback, `HandlerGet`'s unknown
+parts, the `IncludesListArgs` widening). Through the tool's entry such a value is refused before
+anything is sent.
+
+**What you do:** an embedder that calls an exported handler with raw arguments (from a model, a
+file, a request) parses them with the tool's schema first —
+`TOOL_DEFINITION.inputSchema.parse(raw)` — or calls the tool's entry,
+`defineTool(TOOL_DEFINITION, handleX).call(context, raw)`, which parses and refuses in the SDK's
+words. A call with typed literals adds the defaulted fields and uses the enum values.
+
+## Embedders: a handler answers a tool result
+
+`HandlerEntry<R extends ToolResultLike = ToolResultLike>` and `defineTool`'s `R` are constrained
+to `ToolResultLike` (`{ isError?: boolean; content?: ToolContentItem[] }`), new exports of
+`@mcp-abap-adt/lib` and `/handlers`. `dispatchCompact` (`/compact-shared`), `handleCreateOnly`,
+`handleUpdateUnderLock`, `handleDeleteOnly` (`/handlers/write`) and `handleDeletionCheck`
+(`/handlers/read`) answer `Promise<ToolResultLike>` where they answered `Promise<unknown>`.
+
+**What you do:** a handler of your own passed to `defineTool` answers a tool result; a caller of
+those functions reads `isError` and `content` without narrowing.
+
+## Embedders: optional fields read `?: T | undefined`
+
+The server compiles with `exactOptionalPropertyTypes`. The exported contracts a caller fills
+from a possibly absent value declare their optional fields `?: T | undefined`: `HandlerContext`,
+`BatchAnswer`, `HandlerExporterOptions`, the `BaseMcpServer` options, `IServerConfig`, the
+debugger's `BreakpointTarget`, `StopView`, `DebugStartOptions` and `PlaceReading`,
+`IAdtSystemContext`, `AuthDisplayConfig`, `RequestContext`, `ResolvedSystemContext`,
+`InstanceStateOptions`, and server-runtime's `CoreConfig`, `HttpConfig`,
+`StreamableHttpServerOptions`, `SseConfig`, `SseServerOptions` and `DestinationFailureOptions`
+(the CHANGELOG lists each field).
+
+**What you do:** nothing — this widens. A caller that compiles with
+`exactOptionalPropertyTypes` itself may now pass `undefined` where it had to leave a key out. An
+embedder's own `DebugSessionPorts` / `AmdpSessionPorts` may add the optional `headersOf(origin)`
+to have a debug session send the header pairs of its origin's system.
+
+## Embedders: `IAbapConnection` 5
+
+The server takes `@mcp-abap-adt/interfaces-adt-connection` 5 and `@mcp-abap-adt/connection` 24.
+`IAbapConnection.makeAdtRequest(options)` takes no type parameter and answers
+`Promise<IAdtWireResponse>`, whose `data` is `unknown`. Every exported signature of the server
+that names `IAbapConnection` names version 5's. Nothing changes at run time.
+
+**What you do:**
+
+- A call that passes type arguments — `connection.makeAdtRequest<string>(…)` — drops them and
+  narrows `data` (`typeof data === 'string'`).
+- A connection of your own that keeps a generic `makeAdtRequest<T, D>` still conforms, and so
+  does one that answers `IAdtWireResponse` without type parameters; a wrapper that forwards a
+  request no longer needs to assert the answer's type.
+- connection 24 changes none of the types the server's signatures name from it (`SapConfig`,
+  `SapHttpConfig`, `ILogger`, `CreatedConnection`); its own migration note is connection's
+  MIGRATION-24.0.
 
 ## Embedders: the answer helpers and the HTTP interfaces
 
@@ -965,3 +1035,17 @@ for now). What a contributor on 23.x runs differently:
   `node:test`'s outcomes through its own reporter.
 - A variable for a run, on every platform: `npm run <script> -- --env NAME=VALUE <file>`.
 
+## Contributors: the test config is parsed, the testers take typed parameters
+
+`tests/test-config.yaml` (or the file `MCP_TEST_CONFIG` names) is read through a zod schema
+(`src/__tests__/integration/helpers/testConfigSchema.ts`): every object is loose, so a key the
+harness does not read is kept, a key written with no value reads as absent, and a value of the
+wrong type for a key the harness reads is refused at load, naming the file and the key's path. A
+test reads its case's `params` through a schema of what it reads (`readCaseParams`), and a
+`HighTester` drives the tools' entries (`defineTool(TOOL_DEFINITION, handleX)`), so its
+arguments go through the tool's schema as a model's call does.
+
+**What you do:** if a run is refused with `… is not a test config: <path>: …`, fix the value at
+that path in your copy (the template states each key's type). A new live test reads its params
+with `readCaseParams(context.params, Schema, '<case>')` and passes entries, not bare handlers,
+to `HighTester`.

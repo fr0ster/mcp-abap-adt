@@ -7,6 +7,7 @@ Releasing: [docs/deployment/RELEASE.md](../deployment/RELEASE.md).
 ## Files
 
 - **[ASSISTANT_GUIDELINES.md](ASSISTANT_GUIDELINES.md)** - Guidelines for AI assistants working on this project
+- **[CODE_GATES.md](CODE_GATES.md)** - What the compiler, Biome and the source scans refuse, and the test infrastructure's conventions
 - **[TEST_CONFIG_YAML_GUIDE.md](TEST_CONFIG_YAML_GUIDE.md)** - Test configuration reference
 - **[TEST_SYSTEM_SETUP.md](TEST_SYSTEM_SETUP.md)** - Guide for setting up test systems
 

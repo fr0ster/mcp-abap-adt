@@ -461,9 +461,11 @@ export async function handleGetProgram(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const client = new AdtClient(context.connection, context.logger);
-  const result = await client.getProgram().read({ programName: args.program_name }, args.version || 'active');
-  return return_response(result);
+  const client = createAdtClient(context.connection, context.logger);
+  // The read's verdict becomes the tool result through an answer helper
+  // (`answer`, `answerSourceRead`): SAP's refusal an error answer, the source
+  // the success. The whole handler: src/handlers/program/high/handleGetProgram.ts.
+  return answerSourceRead(/* the tool, the range, the read, the success answer */);
 }
 ```
 

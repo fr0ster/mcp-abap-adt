@@ -321,11 +321,11 @@ npm run shared:check     # Config consistency; with a test config, also reads ev
 ## Debugging
 
 ```bash
-# Connection debug logs
-DEBUG_TESTS=true npm test -- --testPathPatterns=class
+# Connection debug logs, for one live file
+DEBUG_TESTS=true npm run test:integration -- src/__tests__/integration/<path>/<file>.test.ts
 
 # ADT operation logs
-DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=view
+DEBUG_ADT_TESTS=true npm run test:integration -- src/__tests__/integration/<path>/<file>.test.ts
 ```
 
 ## Troubleshooting

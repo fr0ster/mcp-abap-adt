@@ -9,7 +9,7 @@ This applies to both servers, `@mcp-abap-adt/core` (`mcp-abap-adt`) and `@mcp-ab
 The RFC module, `@mcp-abap-adt/sap-rfc-lite`, is an optional dependency with **no install script**: `npm install` compiles nothing and downloads nothing for it, and installs it with the server.
 
 - **A prebuilt binding** comes with it for **Linux x64 (glibc), Windows x64 and macOS ARM64**, loaded when the first RFC call needs it. No C++ toolchain and no `SAPNWRFC_HOME` are needed for the install.
-- **Anywhere else** — another platform or architecture, or Linux with musl (Alpine and the like) — there is no binding until you build one, as the [sap-rfc-lite README, "Installation"](https://github.com/fr0ster/sap-rfc-lite#installation) describes (a C++ toolchain and `SAPNWRFC_HOME`). Until then the server installs, starts and lists every tool, and the first RFC call is refused with `@mcp-abap-adt/sap-rfc-lite is not available`.
+- **Anywhere else** — another platform or architecture, or Linux with musl (Alpine and the like) — there is no binding until you build one, as the [sap-rfc-lite README, "Installation"](https://github.com/fr0ster/sap-rfc-lite#installation) describes (a C++ toolchain and `SAPNWRFC_HOME`). Until then the server installs, and its RFC logon is refused with `@mcp-abap-adt/sap-rfc-lite is not available`: at the start, which then exits `1`, or, with `--deferred-logon`, at the first tool call that needs the connection.
 
 The binding needs the **SAP NetWeaver RFC library** at run time, which SAP does not allow redistributing, so it never comes with the package:
 

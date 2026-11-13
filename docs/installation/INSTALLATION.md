@@ -71,7 +71,8 @@ npm ls -g @mcp-abap-adt/sap-rfc-lite
 **`(empty)` means the server was installed without RFC** (`--no-optional` / `--omit=optional`): run
 the install again without that option. On a platform with no prebuilt binding (another platform or
 architecture, Linux with musl), the module is installed but has no binding until you build one, and the
-server refuses the first RFC call with `@mcp-abap-adt/sap-rfc-lite is not available`. The runtime
+RFC logon is refused with `@mcp-abap-adt/sap-rfc-lite is not available` (at the start, or with
+`--deferred-logon` at the first tool call that needs the connection). The runtime
 settings per platform, building a binding and the SNC prerequisites: [RFC Setup](RFC_SETUP.md).
 
 ### Portable build (personal)

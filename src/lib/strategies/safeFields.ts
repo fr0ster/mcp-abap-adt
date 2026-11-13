@@ -6,6 +6,13 @@
  * its way there. Neither should hold its own copy of the rule.
  */
 
+import type { FailureEntry } from '../answer';
+import {
+  type AnswerObject,
+  type AnswerValue,
+  answerValueOf,
+  isAnswerList,
+} from '../json';
 import { child, isElement, isList } from '../xml/tree';
 import type { LeftBehind } from './step';
 
@@ -21,12 +28,12 @@ export type Cleanup =
       message: string;
       origin?: string;
       request?: FailedRequest | undefined;
-      failures?: readonly unknown[];
+      failures?: readonly FailureEntry[];
     } & LeftLocked)
   | ({
       error: 'client_threw';
       message: string;
-      failures?: readonly unknown[];
+      failures?: readonly FailureEntry[];
     } & LeftLocked);
 
 /** The object a lock was taken on: its type and its name, as the handler knows them. */
@@ -115,9 +122,9 @@ function withoutLockHandle(url: string): string {
  */
 export function safeCleanup(
   value: Cleanup | LeftBehind | undefined,
-): Record<string, unknown> | undefined {
+): AnswerObject | undefined {
   if (value === undefined) return undefined;
-  const out: Record<string, unknown> = {};
+  const out: { [key: string]: AnswerValue } = {};
 
   if (value.message !== undefined) out.message = value.message;
   if ('error' in value) out.error = value.error;
@@ -142,7 +149,8 @@ export function safeCleanup(
     if (value.lock_handle !== '') out.lock_handle = value.lock_handle;
   }
   const object = 'object' in value ? lockedObject(value.object) : undefined;
-  if (object !== undefined) out.object = object;
+  if (object !== undefined)
+    out.object = { type: object.type, name: object.name };
   if ('warning' in value && value.warning !== undefined)
     out.warning = value.warning;
 
@@ -164,12 +172,10 @@ function lockedObject(
  * the type system (whatever was thrown), each field read by its own type.
  * The same fields as `safeCleanup`, in the same two exclusive shapes.
  */
-export function thrownCleanup(
-  value: unknown,
-): Record<string, unknown> | undefined {
+export function thrownCleanup(value: unknown): AnswerObject | undefined {
   if (!isElement(value)) return undefined;
   const carrier = value;
-  const out: Record<string, unknown> = {};
+  const out: { [key: string]: AnswerValue } = {};
 
   if (typeof carrier.message === 'string') out.message = carrier.message;
   if (carrier.error === 'client_threw') out.error = 'client_threw';
@@ -178,16 +184,23 @@ export function thrownCleanup(
   const request = safeRequest(requestRead(carrier.request));
   if (request !== undefined) out.request = request;
 
-  if (isList(carrier.failures) && carrier.failures.length > 0)
-    out.failures = carrier.failures;
-  if (isList(carrier.notes) && carrier.notes.length > 0)
-    out.notes = carrier.notes;
+  const failures = isList(carrier.failures)
+    ? answerValueOf(carrier.failures)
+    : undefined;
+  if (failures !== undefined && isAnswerList(failures) && failures.length > 0)
+    out.failures = failures;
+  const notes = isList(carrier.notes)
+    ? answerValueOf(carrier.notes)
+    : undefined;
+  if (notes !== undefined && isAnswerList(notes) && notes.length > 0)
+    out.notes = notes;
 
   if (carrier.left_locked === true) out.left_locked = true;
   if (typeof carrier.lock_handle === 'string' && carrier.lock_handle !== '')
     out.lock_handle = carrier.lock_handle;
   const object = safeLockedObject(carrier.object);
-  if (object !== undefined) out.object = object;
+  if (object !== undefined)
+    out.object = { type: object.type, name: object.name };
   if (typeof carrier.warning === 'string') out.warning = carrier.warning;
 
   return Object.keys(out).length > 0 ? out : undefined;

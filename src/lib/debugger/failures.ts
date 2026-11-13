@@ -13,6 +13,7 @@ import {
   thrownEntry,
 } from '../answer';
 import { failureOf } from '../auth/failures';
+import type { AnswerObject } from '../json';
 import {
   carryingPayload,
   type LeftBehind,
@@ -127,7 +128,7 @@ export function cleanupPayload(
   failures: readonly DebugFailure[],
   notes: readonly DebugFailure[] = [],
   notAttempted: readonly string[] = [],
-): Record<string, unknown> {
+): AnswerObject {
   const refused = credentialRefusalIn(failures);
   const others = failures.filter((entry) => entry !== refused);
   const skipped = notAttempted.length

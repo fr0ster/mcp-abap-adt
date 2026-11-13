@@ -22,7 +22,12 @@ import {
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
-import type { JsonValue } from './json';
+import {
+  type AnswerObject,
+  type AnswerValue,
+  type JsonValue,
+  parseJson,
+} from './json';
 import type { AnswerDetail } from './strategies/projections';
 import {
   type FailedRequest,
@@ -51,14 +56,14 @@ export interface AnswerContext {
    * after a write): their fields ride along the way `cleanup` does. A
    * `string` answer becomes `{ result, … }`. `undefined`: nothing to add.
    */
-  beside?: () => Readonly<Record<string, unknown>> | undefined;
+  beside?: () => AnswerObject | undefined;
 }
 
 /** `payload` with the context's facts beside it (`AnswerContext.beside`). */
 function withBeside(
-  payload: Record<string, unknown>,
+  payload: AnswerObject,
   ctx: AnswerContext | undefined,
-): Record<string, unknown> {
+): AnswerObject {
   const beside = ctx?.beside?.();
   return beside === undefined ? payload : { ...payload, ...beside };
 }
@@ -109,7 +114,7 @@ function local(
   message: string,
   thrown?: unknown,
 ): FailureAnswer {
-  const payload: Record<string, unknown> = {
+  const payload: { [key: string]: AnswerValue } = {
     error: kind,
     tool: ctx.tool,
     detail: ctx.detail,
@@ -270,8 +275,8 @@ export function transportHint(
 export function failurePayload(
   error: StepError & MessageCarrier,
   detail?: AnswerDetail,
-): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
+): FailureEntry {
+  const payload: { [key: string]: AnswerValue } = {
     message: error.message,
     origin: error.origin,
   };
@@ -308,13 +313,16 @@ export function failurePayload(
   // sent — SADT_RESOURCE/26 is a key no system knows.
   if (error.messages !== undefined) {
     payload.messages = error.messages.map((m) => {
-      const out: Record<string, unknown> = { type: m.type, text: m.text };
+      const out: { [key: string]: AnswerValue } = {
+        type: m.type,
+        text: m.text,
+      };
       if (m.code !== undefined) out.code = m.code;
       if (m.line !== undefined) out.line = m.line;
       if (m.uri !== undefined) out.uri = m.uri;
       if (m.objectName !== undefined) out.objectName = m.objectName;
       if (m.t100 !== undefined) {
-        const t100: Record<string, unknown> = {
+        const t100: { [key: string]: AnswerValue } = {
           id: m.t100.id,
           no: String(m.t100.no),
         };
@@ -410,7 +418,7 @@ export function answerFailure(
  * failure alone, with its step. A chain failure is its own payload,
  * never the method's message.
  */
-export type FailureEntry = Record<string, unknown>;
+export type FailureEntry = AnswerObject;
 
 /** A method's failed answer as an entry: its error as it is, with the step. */
 export function failureEntry(
@@ -474,12 +482,7 @@ export function failedPayloadOf(
   if (result?.isError !== true || !isList(result.content)) return;
   const text = child(result.content[0], 'text');
   if (typeof text !== 'string') return;
-  let payload: unknown;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    return;
-  }
+  const payload = parseJson(text);
   if (!isElement(payload)) return;
   return 'step' in payload ? payload : { ...payload, step };
 }
@@ -518,9 +521,9 @@ export function failedAtStep(
   };
 }
 
-export function return_answer<T>(
+export function return_answer<T, R>(
   answer: IAdtResponse<T, IAdtError>,
-  project: (value: T) => unknown,
+  project: (value: T) => R,
   ctx: AnswerContext,
 ): McpResult {
   if (!answer.ok) return answerFailure(answer.getError(), ctx);
@@ -613,10 +616,10 @@ export function answerThrown(
  * neither borrows an `AdtFailureOrigin`: a parser defect reported as an expired
  * session sends a caller to reauthenticate over a bug in this process.
  */
-export async function answer<T>(
+export async function answer<T, R>(
   ctx: AnswerContext,
   call: () => Promise<IAdtResponse<T, IAdtError>>,
-  project: (value: T) => unknown,
+  project: (value: T) => R,
 ): Promise<McpResult> {
   let response: IAdtResponse<T, IAdtError>;
   try {

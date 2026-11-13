@@ -1,7 +1,14 @@
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { FailureEntry } from '../answer';
 import { failureOf } from '../auth/failures';
+import {
+  type AnswerObject,
+  type AnswerValue,
+  isAnswerList,
+  isAnswerObject,
+} from '../json';
 import { SystemContextMissingError } from '../systemContextGuard';
-import { child, isList } from '../xml/tree';
+import { child, isElement, isList } from '../xml/tree';
 import type { Cleanup } from './safeFields';
 import { failed, type StepError, type StepResponse } from './stepResponse';
 
@@ -110,11 +117,11 @@ export function carryingFailure<E extends Error>(
  * failures of their own — each as an entry in the shape of every other
  * failure (`failures`), with notes that are no debt (`notes`).
  */
-export interface LeftBehind {
+export type LeftBehind = {
   message?: string;
-  failures?: readonly unknown[];
-  notes?: readonly unknown[];
-}
+  failures?: readonly FailureEntry[];
+  notes?: readonly FailureEntry[];
+};
 
 /** What was left behind before, with what is added now. */
 export function mergedLeftBehind(
@@ -135,18 +142,20 @@ export function mergedLeftBehind(
 }
 
 /**
- * What a thrown value's carried payload says was left behind (its
- * `cleanup`), read field by field: a value from outside the type system.
+ * What a carried payload says was left behind (its `cleanup`, written by
+ * `leaveBehind` as a `LeftBehind`), read field by field: its words, and
+ * the entries of its two lists.
  */
-export function leftBehindRead(value: unknown): LeftBehind | undefined {
+export function leftBehindRead(value: AnswerValue): LeftBehind | undefined {
   if (value === undefined) return undefined;
-  const message = child(value, 'message');
-  const failures = child(value, 'failures');
-  const notes = child(value, 'notes');
+  if (!isAnswerObject(value)) return {};
+  const { message, failures, notes } = value;
   return {
     ...(typeof message === 'string' && { message }),
-    ...(isList(failures) && { failures }),
-    ...(isList(notes) && { notes }),
+    ...(isAnswerList(failures) && {
+      failures: failures.filter(isAnswerObject),
+    }),
+    ...(isAnswerList(notes) && { notes: notes.filter(isAnswerObject) }),
   };
 }
 
@@ -169,7 +178,7 @@ export function noteLeftBehind(thrown: Error, note: string | LeftBehind): void {
 }
 
 /** The whole answer each throw carries, by the thrown object. */
-const CARRIED_PAYLOAD = new WeakMap<object, Record<string, unknown>>();
+const CARRIED_PAYLOAD = new WeakMap<object, AnswerObject>();
 
 /**
  * A throw that carries its whole answer: a failure that is several failures
@@ -179,16 +188,14 @@ const CARRIED_PAYLOAD = new WeakMap<object, Record<string, unknown>>();
  */
 export function carryingPayload<E extends object>(
   thrown: E,
-  payload: Record<string, unknown>,
+  payload: AnswerObject,
 ): E {
   CARRIED_PAYLOAD.set(thrown, payload);
   return thrown;
 }
 
 /** The payload a throw carries, or `undefined`. */
-export function payloadCarriedBy(
-  thrown: unknown,
-): Record<string, unknown> | undefined {
+export function payloadCarriedBy(thrown: unknown): AnswerObject | undefined {
   if (thrown === null || typeof thrown !== 'object') return undefined;
   return CARRIED_PAYLOAD.get(thrown);
 }

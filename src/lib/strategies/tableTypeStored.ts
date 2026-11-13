@@ -33,7 +33,7 @@ import { type AdtReading, parseStructure } from './reading';
  * `000010`, as SAP answers it). An element the document does not hold is not
  * named.
  */
-export interface StoredTableTypeDefinition {
+export type StoredTableTypeDefinition = {
   row_type_kind?: string;
   row_type_name?: string;
   data_type?: string;
@@ -42,7 +42,7 @@ export interface StoredTableTypeDefinition {
   access_type?: string;
   key_definition?: string;
   key_kind?: string;
-}
+};
 
 /** `node`'s child `name`, when `node` is a parsed element that holds one. */
 function childOf(node: unknown, name: string): unknown {

@@ -36,7 +36,12 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
-import { type JsonValue, jsonOrText } from '../../../lib/json';
+import {
+  isAnswerList,
+  isAnswerObject,
+  type JsonValue,
+  jsonOrText,
+} from '../../../lib/json';
 import { includeContextUriOf } from '../../../lib/strategies/metadataFields';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import {
@@ -52,7 +57,7 @@ import {
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
-import { child, elements, entries, isList, text } from '../../../lib/xml/tree';
+import { child, entries, isList, text } from '../../../lib/xml/tree';
 
 /**
  * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
@@ -766,7 +771,7 @@ function filterMinimalEnhancements(response: EnhancementResponse) {
 /** The failures a throw carries as its payload's `failures`, when it carries a list. */
 function carriedFailures(error: unknown): FailureEntry[] | undefined {
   const failures = payloadCarriedBy(error)?.failures;
-  return isList(failures) ? elements(failures) : undefined;
+  return isAnswerList(failures) ? failures.filter(isAnswerObject) : undefined;
 }
 
 /**

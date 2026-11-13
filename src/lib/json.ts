@@ -78,3 +78,72 @@ export function jsonFields(fields: {
   }
   return Object.fromEntries(members);
 }
+
+/**
+ * A value an answer writes as JSON text: a JSON value whose lists may be
+ * read-only and whose members may be absent (`undefined`), which
+ * `JSON.stringify` leaves out of the text. What a payload built field by
+ * field holds (a failure's, a cleanup's, a projection's).
+ */
+export type AnswerValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly AnswerValue[]
+  | AnswerObject;
+
+/** An answer's JSON object ({@link AnswerValue}). */
+export type AnswerObject = { readonly [key: string]: AnswerValue };
+
+/**
+ * `value` as an answer's value, built afresh from what it holds, or
+ * `undefined` when it, or anything it holds, is not one: the one check of a
+ * value from outside the type system (a thrown carrier's) before it rides in
+ * a payload. An absent member stays absent.
+ */
+export function answerValueOf(value: unknown): AnswerValue | undefined {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    const items: AnswerValue[] = [];
+    for (const item of value) {
+      const read = answerValueOf(item);
+      if (read === undefined && item !== undefined) return undefined;
+      items.push(read);
+    }
+    return items;
+  }
+  return answerObjectOf(value);
+}
+
+/** `value` as an answer's JSON object ({@link answerValueOf}), or `undefined`. */
+export function answerObjectOf(value: unknown): AnswerObject | undefined {
+  if (!isElement(value)) return undefined;
+  const members: [string, AnswerValue][] = [];
+  for (const [key, member] of Object.entries(value)) {
+    const read = answerValueOf(member);
+    if (read === undefined && member !== undefined) return undefined;
+    members.push([key, read]);
+  }
+  return Object.fromEntries(members);
+}
+
+/** Whether an answer's value is an object: neither a list nor a scalar. */
+export function isAnswerObject(value: AnswerValue): value is AnswerObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Whether an answer's value is a list. */
+export function isAnswerList(
+  value: AnswerValue,
+): value is readonly AnswerValue[] {
+  return Array.isArray(value);
+}

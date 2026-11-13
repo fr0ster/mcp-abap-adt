@@ -2847,7 +2847,9 @@ export abstract class BaseMcpServer extends McpServer {
           }
         });
       };
-    const wrapLast = (registerArgs: unknown[]): unknown[] => {
+    const wrapLast = (
+      registerArgs: readonly RegistrationArg[],
+    ): readonly RegistrationArg[] => {
       const last = registerArgs[registerArgs.length - 1];
       const name =
         typeof registerArgs[0] === 'string' ? registerArgs[0] : 'a tool';
@@ -2863,7 +2865,9 @@ export abstract class BaseMcpServer extends McpServer {
     // A registry's own tool runs outside batch mode: where the instance has
     // a batch owner, its description says so (spec §3) — the same rule as a
     // handler group's tools the eligibility table does not list.
-    const described = (registerArgs: unknown[]): unknown[] => {
+    const described = (
+      registerArgs: readonly RegistrationArg[],
+    ): readonly RegistrationArg[] => {
       if (this.batch === undefined) return registerArgs;
       const name = registerArgs[0];
       if (typeof name !== 'string' || runsBesideBatch(name))
@@ -2878,11 +2882,7 @@ export abstract class BaseMcpServer extends McpServer {
         // `tool(name, description, …)`.
         return [name, appended(second), ...registerArgs.slice(2)];
       }
-      if (
-        second !== null &&
-        typeof second === 'object' &&
-        typeof second !== 'function'
-      ) {
+      if (typeof second === 'object') {
         // `registerTool(name, config, callback)`.
         const given = child(second, 'description');
         const description = typeof given === 'string' ? given : '';
@@ -2900,15 +2900,22 @@ export abstract class BaseMcpServer extends McpServer {
           const register = target[property];
           // Its search texts are attached whatever the batch owner, in
           // either form (`registerTool` or `tool`), once it is registered.
-          return (...registerArgs: unknown[]) =>
-            withSearchMeta(
+          return (...registerArgs: unknown[]) => {
+            // Read once: the SDK's forms take strings and objects (a config,
+            // a schema, annotations, the callback); a call holding anything
+            // else is passed on as it came.
+            const registration = registrationOf(registerArgs);
+            return withSearchMeta(
               registerArgs[0],
               Reflect.apply(
                 register,
                 target,
-                wrapLast(described(registerArgs)),
+                registration === undefined
+                  ? registerArgs
+                  : wrapLast(described(registration)),
               ),
             );
+          };
         }
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;
@@ -3042,6 +3049,29 @@ const stderrLogger: Logger = {
   warn: (msg: string) => process.stderr.write(`[WARN] ${msg}\n`),
   error: (msg: string) => process.stderr.write(`[ERROR] ${msg}\n`),
 };
+
+/**
+ * An argument of a tool's registration, as the SDK's forms take them
+ * (`registerTool(name, config, callback)`, `tool(name, …, callback)`): a
+ * string, or an object — a config, a schema, annotations, the callback.
+ */
+type RegistrationArg = string | object;
+
+/**
+ * The registration's arguments read once at the registry's proxy, which the
+ * compiler sees untyped: each a string or an object, else `undefined`.
+ */
+function registrationOf(
+  args: readonly unknown[],
+): RegistrationArg[] | undefined {
+  const read: RegistrationArg[] = [];
+  for (const arg of args) {
+    if (typeof arg === 'string' || typeof arg === 'function') read.push(arg);
+    else if (typeof arg === 'object' && arg !== null) read.push(arg);
+    else return undefined;
+  }
+  return read;
+}
 
 /**
  * A registry's own registered tool, given the `_meta` its name has in the

@@ -19,7 +19,7 @@ import {
   compactUpdateSchema,
   dispatchCompact,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
+import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import {
   handleCreateOnly,
@@ -203,10 +203,7 @@ export const compactWriteRouterMap: CompactRouterMap = {
 export async function routeCompactWrite(
   context: Parameters<typeof dispatchCompact>[0],
   operation: Exclude<CompactCrudOperation, 'get'>,
-  args: { object_type?: CompactObjectType | undefined } & Record<
-    string,
-    unknown
-  >,
+  args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
 ): Promise<ToolResultLike> {
   return dispatchCompact(context, compactWriteRouterMap, operation, args);
 }

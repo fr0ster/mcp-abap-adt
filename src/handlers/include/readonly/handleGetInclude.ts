@@ -42,22 +42,22 @@ export const TOOL_DEFINITION = {
 type GetIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** How a source read is answered: the read's text, with what was asked. */
-type SourceAnswer = (
+type SourceAnswer<R> = (
   includeName: string,
   version: ReadVersion | undefined,
   source: string,
   cut: SourceCut | undefined,
-) => unknown;
+) => R;
 
 /**
  * The one request a call sends: the source or the metadata document, at
  * `version` (active when none is given), answered as `GetProgram` answers it, the source as
  * `sourceAnswer` makes it.
  */
-async function readInclude(
+async function readInclude<R>(
   context: HandlerContext,
   args: GetIncludeArgs,
-  sourceAnswer: SourceAnswer,
+  sourceAnswer: SourceAnswer<R>,
 ) {
   const { connection, logger } = context;
   const { include_name, version } = args;

@@ -44,6 +44,16 @@ import { ourFeeds } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
+/** A page of a feed as answered, in this order. */
+type FeedPageAnswer<T> = {
+  success: true;
+  feed_type: string;
+  count: number;
+  entries: T[];
+  next_to?: string;
+  incomplete_second?: string;
+};
+
 export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
@@ -235,8 +245,8 @@ async function feedsOf(
     from: args?.from,
   };
   const paging = { maxResults: args?.max_results, to: args?.to };
-  const pageOf = (page: FeedPage<unknown>) => {
-    const answered: Record<string, unknown> = {
+  const pageOf = <T>(page: FeedPage<T>) => {
+    const answered: FeedPageAnswer<T> = {
       success: true,
       feed_type: feedType,
       count: page.entries.length,
@@ -429,8 +439,8 @@ export async function handleRuntimeListFeedPage(
   const page = { maxResults: top, to: args?.to };
   const feeds = pagedFeeds(connection, logger);
   const ctx = { tool, detail: 'terse' as const };
-  const shown = (read: FeedPage<unknown>) => {
-    const answered: Record<string, unknown> = {
+  const shown = <T>(read: FeedPage<T>) => {
+    const answered: FeedPageAnswer<T> = {
       success: true,
       feed_type: feedType,
       count: read.entries.length,
@@ -658,7 +668,7 @@ function endsList(result: McpResult): boolean {
 
 /** A list call's answer: one entry per feed, in the order asked. */
 function listAnswer(
-  feedTypes: readonly unknown[],
+  feedTypes: readonly string[],
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) =>

@@ -19,6 +19,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { answerCaught, answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { type AnswerObject, type JsonValue, jsonOf } from '../../../lib/json';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
@@ -47,6 +48,9 @@ export const TOOL_DEFINITION = {
 } as const;
 
 type GetTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** An object or a task of the request: its members as parsed, by name. */
+type TransportRow = AnswerObject;
 
 /**
  * Parse transport request XML response
@@ -122,48 +126,52 @@ function parseTransportXml(
   const repeated = (value: unknown): readonly unknown[] =>
     isList(value) ? value : [value];
 
+  /** A member of a parsed row, checked once: JSON, or absent. */
+  const field = (node: unknown, name: string): JsonValue | undefined =>
+    jsonOf(child(node, name));
+
   // Extract objects if requested
-  let objects: Array<Record<string, unknown>> = [];
+  let objects: TransportRow[] = [];
   const allObjects = ofRequest('tm:all_objects');
   if (includeObjects && allObjects) {
     const objectList = child(allObjects, 'tm:abap_object');
     objects = (objectList ? repeated(objectList) : []).map((obj) => ({
-      name: child(obj, 'tm:name'),
-      type: child(obj, 'tm:type'),
-      wbtype: child(obj, 'tm:wbtype'),
-      pgmid: child(obj, 'tm:pgmid'),
-      description: child(obj, 'tm:obj_desc'),
-      position: child(obj, 'tm:position'),
-      lock_status: child(obj, 'tm:lock_status'),
-      info: child(obj, 'tm:obj_info'),
+      name: field(obj, 'tm:name'),
+      type: field(obj, 'tm:type'),
+      wbtype: field(obj, 'tm:wbtype'),
+      pgmid: field(obj, 'tm:pgmid'),
+      description: field(obj, 'tm:obj_desc'),
+      position: field(obj, 'tm:position'),
+      lock_status: field(obj, 'tm:lock_status'),
+      info: field(obj, 'tm:obj_info'),
     }));
   }
 
   // Extract tasks if requested
-  let tasks: Array<Record<string, unknown>> = [];
+  let tasks: TransportRow[] = [];
   const taskMember = ofRequest('tm:task');
   if (includeTasks && taskMember) {
     tasks = repeated(taskMember).map((task) => {
       const taskObjects = child(task, 'tm:abap_object');
       return {
-        number: child(task, 'tm:number'),
-        parent: child(task, 'tm:parent'),
-        description: child(task, 'tm:desc'),
-        type: child(task, 'tm:type'),
-        status: child(task, 'tm:status'),
-        status_text: child(task, 'tm:status_text'),
-        owner: child(task, 'tm:owner'),
-        target: child(task, 'tm:target'),
-        target_desc: child(task, 'tm:target_desc'),
-        client: child(task, 'tm:source_client'),
-        created_at: child(task, 'tm:lastchanged_timestamp'),
+        number: field(task, 'tm:number'),
+        parent: field(task, 'tm:parent'),
+        description: field(task, 'tm:desc'),
+        type: field(task, 'tm:type'),
+        status: field(task, 'tm:status'),
+        status_text: field(task, 'tm:status_text'),
+        owner: field(task, 'tm:owner'),
+        target: field(task, 'tm:target'),
+        target_desc: field(task, 'tm:target_desc'),
+        client: field(task, 'tm:source_client'),
+        created_at: field(task, 'tm:lastchanged_timestamp'),
         objects: taskObjects
           ? repeated(taskObjects).map((obj) => ({
-              name: child(obj, 'tm:name'),
-              type: child(obj, 'tm:type'),
-              wbtype: child(obj, 'tm:wbtype'),
-              description: child(obj, 'tm:obj_desc'),
-              position: child(obj, 'tm:position'),
+              name: field(obj, 'tm:name'),
+              type: field(obj, 'tm:type'),
+              wbtype: field(obj, 'tm:wbtype'),
+              description: field(obj, 'tm:obj_desc'),
+              position: field(obj, 'tm:position'),
             }))
           : [],
       };

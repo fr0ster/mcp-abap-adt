@@ -33,10 +33,10 @@ export type Terse<T> = (value: T, status: number) => unknown;
  * adapter cannot tell a write with nothing to add from a read that found
  * nothing. So a terse projection that has nothing to say says `'SUCCESS'`.
  */
-export function project<T>(
+export function project<T, R>(
   detail: AnswerDetail,
-  terse: Terse<T>,
-): (reading: AdtReading<T>) => unknown {
+  terse: (value: T, status: number) => R,
+): (reading: AdtReading<T>) => T | string | R {
   return (reading) => {
     if (detail === 'raw') return reading.raw;
     if (detail === 'full') return reading.value ?? reading.raw;
@@ -112,10 +112,18 @@ export function activationAnswerOf(
   return checklist ? { form: 'checklist', checklist } : undefined;
 }
 
+/** What an activation answers under terse, in this order. */
+export type TerseActivationAnswer = {
+  activated: boolean;
+  generated?: boolean;
+  nothing_to_activate?: true;
+  messages?: { type: string | undefined; text: string | undefined }[];
+};
+
 /** The terse answer of each form; every form has one. */
 export function terseActivationAnswer(
   answer: ActivationAnswer,
-): Record<string, unknown> {
+): TerseActivationAnswer {
   switch (answer.form) {
     case 'checklist': {
       const root = answer.checklist;
@@ -158,9 +166,9 @@ export const terseActivation: Terse<unknown> = (value) => {
  * for an empty `200`), `full` the parse (for an empty `200`, which has none,
  * its terse answer), `terse` {@link terseActivationAnswer} of its form.
  */
-export function projectActivation(
+export function projectActivation<T>(
   detail: AnswerDetail,
-): (reading: AdtReading<unknown>) => unknown {
+): (reading: AdtReading<T>) => T | string | TerseActivationAnswer | undefined {
   return (reading) => {
     if (detail === 'raw') return reading.raw;
     const answer = activationAnswerOf(reading);

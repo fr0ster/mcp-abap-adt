@@ -4,6 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { JsonValue } from '../../../lib/json';
 import { afterLast, digitsAfter } from '../../../lib/plainText';
 import { return_error } from '../../../lib/utils';
 import { attr, child, childAt, isList } from '../../../lib/xml/tree';
@@ -59,6 +60,20 @@ export function dumpIdFrom(value: string): string {
 const TERMINATION_RELATION =
   'http://www.sap.com/adt/relations/runtime/dump/termination';
 
+/** The members of a dump's summary read from its root's attributes. */
+type DumpSummaryField =
+  | 'runtime_error'
+  | 'exception'
+  | 'title'
+  | 'terminated_program'
+  | 'datetime'
+  | 'user';
+
+/** What a dump is about ({@link dumpSummaryOf}), in this order. */
+export type DumpSummary = { [field in DumpSummaryField]?: string } & {
+  termination?: { uri: string; line?: number };
+};
+
 /**
  * What a dump is about, read from the default view's `dump:dump` root: its
  * attributes name the runtime error, the exception, the terminated program,
@@ -68,9 +83,7 @@ const TERMINATION_RELATION =
  * system part is dropped, so the URI is the ADT path any reader takes.
  * Nothing when the document has no such root.
  */
-export function dumpSummaryOf(
-  raw: string,
-): Record<string, unknown> | undefined {
+export function dumpSummaryOf(raw: string): DumpSummary | undefined {
   if (!raw.trim().startsWith('<')) return undefined;
   let parsed: unknown;
   try {
@@ -81,8 +94,8 @@ export function dumpSummaryOf(
   const root = child(parsed, 'dump');
   if (!root || typeof root !== 'object') return undefined;
 
-  const summary: Record<string, unknown> = {};
-  const take = (attribute: string, as: string) => {
+  const summary: DumpSummary = {};
+  const take = (attribute: string, as: DumpSummaryField) => {
     const value = child(root, attribute);
     if (typeof value === 'string' && value !== '') summary[as] = value;
   };
@@ -151,7 +164,13 @@ export async function handleRuntimeGetDumpById(
     () => dumps.getById(dumpId, { analyse: analyseException, view }),
     (raw) => {
       const parsedPayload = parseRuntimePayloadToJson(raw);
-      const result: Record<string, unknown> = {
+      const result: {
+        success: true;
+        dump_id: string;
+        view: typeof view;
+        summary?: DumpSummary;
+        payload?: JsonValue;
+      } = {
         success: true,
         dump_id: dumpId,
         view,

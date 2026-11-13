@@ -142,11 +142,11 @@ export function cutSource(
  * boundary on both paths, so a throw there is answered as any other; SAP's
  * refusal and a throw of the call as `answer()` gives them.
  */
-export async function answerSourceRead(
+export async function answerSourceRead<R>(
   ctx: AnswerContext,
   range: SourceRange | undefined,
   call: () => Promise<IAdtResponse<AdtReading<string>, IAdtError>>,
-  answerOf: (source: string, cut: SourceCut | undefined) => unknown,
+  answerOf: (source: string, cut: SourceCut | undefined) => R,
 ): Promise<McpResult> {
   let outside: Error | undefined;
   const answered = await answer(ctx, call, (reading) => {

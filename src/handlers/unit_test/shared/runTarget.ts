@@ -60,13 +60,6 @@ export const RUN_TARGET_FIELD = RUN_TARGET_OBJECT.describe(RUN_TARGET_WORDS);
 export const RUN_TARGET_OPTIONAL =
   RUN_TARGET_OBJECT.optional().describe(RUN_TARGET_WORDS);
 
-/** A field of a caller's object, as given. */
-export function fieldOf(given: object, field: string): unknown {
-  return Object.hasOwn(given, field)
-    ? Object.getOwnPropertyDescriptor(given, field)?.value
-    : undefined;
-}
-
 /** The `target` argument as the schema above declares it. */
 export type RunTargetArgs = z.output<typeof RUN_TARGET_OBJECT>;
 

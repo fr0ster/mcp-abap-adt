@@ -18,7 +18,7 @@ import { return_error } from '../../../lib/utils';
 import { testRunner } from './runTests';
 
 export interface ResultOnceArgs {
-  run_id?: unknown | undefined;
+  run_id?: string | undefined;
   with_navigation_uris?: boolean | undefined;
   format?: 'abapunit' | 'junit' | undefined;
   detail?: 'terse' | 'full' | 'raw' | undefined;

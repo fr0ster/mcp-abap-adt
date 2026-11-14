@@ -2787,8 +2787,11 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private trackingRegistrations(): McpServer {
     const track =
-      (name: string, callback: RegisteredToolCallback) =>
-      (...callbackArgs: unknown[]) => {
+      (
+        name: string,
+        callback: RegisteredToolCallback,
+      ): RegisteredToolCallback =>
+      (...callbackArgs) => {
         return this.trackCall(name, async (signal) => {
           // The SDK passes `extra` last: `(args, extra)` or `(extra)`. The
           // callback sees the call's own signal there — the session's end —
@@ -2910,7 +2913,7 @@ export abstract class BaseMcpServer extends McpServer {
           const register = target[property];
           // Its search texts are attached whatever the batch owner, in
           // either form (`registerTool` or `tool`), once it is registered.
-          return (...registerArgs: unknown[]) => {
+          const registerTracked: RegisteredToolCallback = (...registerArgs) => {
             // Read once: the SDK's forms take strings and objects (a config,
             // a schema, annotations, the callback); a call holding anything
             // else is passed on as it came.
@@ -2926,6 +2929,7 @@ export abstract class BaseMcpServer extends McpServer {
               ),
             );
           };
+          return registerTracked;
         }
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;

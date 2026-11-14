@@ -19,11 +19,18 @@ import {
   fixtureProgram,
   type ListedSites,
   ownFile,
+  PARSE_SITES,
+  PROGRAM_INPUT_SITES,
+  productionProjects,
+  productionSinkSlotReads,
+  SINK_SITES,
   SINK_SLOTS,
   type SweepSite,
   sinkSlotReads,
   staleEntries,
   sweepFiles,
+  sweepProduction,
+  THROWN_READERS,
 } from './helpers/unknownSweep';
 
 const FIXTURES = path.join(
@@ -620,6 +627,52 @@ describe("the type arguments we supply to a third party's generic type are ours"
         ['parameter', 'answer', 'IAdtResponse<0>{}'],
         ['variable', 'pending', 'Array<0>Promise<0>IAdtResponse<0>'],
       ],
+    );
+  });
+});
+
+describe('production code holds as unknown only what comes from outside the type system', () => {
+  const sites = sweepProduction();
+
+  it('refuses no site', () => {
+    assert.deepEqual(
+      sites
+        .filter((entry) => entry.refused)
+        .map(
+          (entry) =>
+            `${entry.where} ${entry.kind} ${entry.key} at '${entry.position}' ${entry.reason}: ${entry.types.join(' | ')}`,
+        ),
+      [],
+    );
+  });
+
+  it("reads the root's TypeScript scripts too", () => {
+    assert.ok(
+      productionProjects().some(
+        (project) =>
+          project.dir === 'scripts' &&
+          project.tsconfig === 'tsconfig.test.json',
+      ),
+    );
+  });
+
+  it('names no listed site that is gone', () => {
+    for (const listed of [
+      THROWN_READERS,
+      PARSE_SITES,
+      PROGRAM_INPUT_SITES,
+      SINK_SITES,
+    ]) {
+      assert.deepEqual(staleEntries(sites, listed), []);
+    }
+  });
+
+  it('reads every sink slot only in its own reader, and names no slot that is gone', () => {
+    const found = productionSinkSlotReads();
+    assert.deepEqual(found.reads, []);
+    assert.deepEqual(
+      [...SINK_SLOTS.keys()].filter((slot) => !found.declared.has(slot)),
+      [],
     );
   });
 });

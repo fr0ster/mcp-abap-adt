@@ -476,12 +476,12 @@ export function isCredentialPayload(payload: FailureEntry): boolean {
  * answer whose text is not a JSON object.
  */
 export function failedPayloadOf(
-  result: { isError?: boolean; content?: unknown } | undefined,
+  result: McpResult | undefined,
   step: string,
 ): FailureEntry | undefined {
-  if (result?.isError !== true || !isList(result.content)) return;
-  const text = child(result.content[0], 'text');
-  if (typeof text !== 'string') return;
+  if (result?.isError !== true) return;
+  const text = result.content[0]?.text;
+  if (text === undefined) return;
   const payload = parseJson(text);
   if (!isElement(payload)) return;
   return 'step' in payload ? payload : { ...payload, step };

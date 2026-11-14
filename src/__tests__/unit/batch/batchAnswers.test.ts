@@ -81,7 +81,8 @@ describe('BatchAnswers', () => {
   it('0, -1, 1.5 refused before anything runs; duplicates answered per occurrence', async () => {
     const owner = answered();
     const asked = jest.spyOn(owner, 'answer');
-    for (const bad of [0, -1, 1.5, Number.NaN, '1']) {
+    // A string is ruled out by the ask's type (the schema parses numbers).
+    for (const bad of [0, -1, 1.5, Number.NaN]) {
       expect(() => readAnswers(owner, { number: bad })).toThrow(
         ANSWERS_NUMBER_WORDS,
       );

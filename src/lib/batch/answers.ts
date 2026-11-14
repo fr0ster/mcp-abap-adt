@@ -26,21 +26,26 @@ export const ANSWERS_ASK_WORDS =
 export const ANSWERS_NUMBER_WORDS =
   'a batch answer number is an integer of at least 1';
 
-/** What `BatchAnswers` was asked: exactly one of `number` and `numbers`. */
-export type AnswersAsk = { number?: unknown; numbers?: unknown };
+/**
+ * What `BatchAnswers` was asked, as its schema parses it: exactly one of
+ * `number` and `numbers`, each an integer of at least 1.
+ */
+export type AnswersAsk = {
+  readonly number?: number | undefined;
+  readonly numbers?: readonly number[] | undefined;
+};
 
-const isNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 1;
+const isNumber = (value: number): boolean =>
+  Number.isInteger(value) && value >= 1;
 
 /** The numbers asked, in the order asked; throws its words for an ask it refuses — before anything is read. */
-function numbersAsked(ask: AnswersAsk): number[] {
-  const one = ask.number !== undefined;
-  const many = ask.numbers !== undefined;
-  if (one === many) throw new Error(ANSWERS_ASK_WORDS);
-  const asked = one ? [ask.number] : ask.numbers;
-  if (!Array.isArray(asked) || asked.length === 0) {
+function numbersAsked(ask: AnswersAsk): readonly number[] {
+  const { number, numbers } = ask;
+  if ((number === undefined) === (numbers === undefined)) {
     throw new Error(ANSWERS_ASK_WORDS);
   }
+  const asked = number !== undefined ? [number] : (numbers ?? []);
+  if (asked.length === 0) throw new Error(ANSWERS_ASK_WORDS);
   if (!asked.every(isNumber)) throw new Error(ANSWERS_NUMBER_WORDS);
   return asked;
 }

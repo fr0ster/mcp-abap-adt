@@ -66,18 +66,17 @@ function fieldOf(
 export async function readSystemInformation(
   connection: IAbapConnection,
 ): Promise<SystemInformation> {
-  const response: { status?: unknown; data?: unknown } =
-    await connection.makeAdtRequest({
-      url: SYSTEM_INFORMATION_URL,
-      method: 'GET',
-      timeout: 0,
-      headers: { Accept: SYSTEM_INFORMATION_ACCEPT },
-      params: { _: Date.now() },
-    });
+  const response = await connection.makeAdtRequest({
+    url: SYSTEM_INFORMATION_URL,
+    method: 'GET',
+    timeout: 0,
+    headers: { Accept: SYSTEM_INFORMATION_ACCEPT },
+    params: { _: Date.now() },
+  });
   // A connection that hands back a status other than a 2xx instead of
   // throwing it (an embedder's own) is read by that status all the same.
   const status = response.status;
-  if (typeof status === 'number' && (status < 200 || status > 299)) {
+  if (status < 200 || status > 299) {
     throw new SystemInformationStatusError(status);
   }
   const body = objectOf(response.data);

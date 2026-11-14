@@ -18,7 +18,11 @@ import {
   readBackground,
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
-import { listedTool, statedEnvironment } from '../../listedTool.js';
+import {
+  listedTool,
+  type SearchMeta,
+  statedEnvironment,
+} from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
 import { stateSystemKind } from '../../systemKind.js';
@@ -154,7 +158,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     description: string,
     inputSchema: z.ZodObject,
     call: HandlerEntry['call'],
-    search: { _meta?: Record<string, unknown> } = {},
+    search: { _meta?: SearchMeta } = {},
     callContext: CallContext = () => Promise.resolve(this.context),
     access?: {
       readonly checks: IAccessChecks;

@@ -1762,7 +1762,10 @@ function endsList(result: McpResult): boolean {
 
 /** A list call's answer: one entry per object, in the order asked. */
 function listAnswer(
-  objects: ReadonlyArray<{ object_name: unknown; object_type: unknown }>,
+  objects: ReadonlyArray<{
+    readonly object_name: string;
+    readonly object_type: string;
+  }>,
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) => {

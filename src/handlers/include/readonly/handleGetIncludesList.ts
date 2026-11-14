@@ -57,6 +57,7 @@ import {
   type NodeLevel,
   nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
@@ -201,20 +202,15 @@ export function includeStatementsOf(source: string): string[] {
   return found;
 }
 
-/** A source's or metadata's read, as this tool sends it. */
-type SourceAnswer = IAdtResponse<unknown, IAdtError>;
+/** A source's or metadata's read, as this tool sends it: a verbatim reading. */
+type SourceAnswer = IAdtResponse<AdtReading<string>, IAdtError>;
 
 /** A function group's node structure level, as this tool reads it. */
 type NodeAnswer = IAdtResponse<NodeLevel, IAdtError>;
 
-/** The text inside a source reading — a string, or `{value, raw}`. */
-function textOf(response: IAdtSuccess<unknown>): string {
-  const v = response.getResult().value;
-  if (typeof v === 'string') return v;
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) return '';
-  const value = 'value' in v ? v.value : undefined;
-  const raw = 'raw' in v ? v.raw : undefined;
-  return String(value ?? raw ?? '');
+/** The text inside a source reading: the verbatim reading's value. */
+function textOf(response: IAdtSuccess<AdtReading<string>>): string {
+  return response.getResult().value.value;
 }
 
 /**

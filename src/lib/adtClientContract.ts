@@ -173,7 +173,8 @@ interface StatedMetadataReadable<TConfig, TMetadata> {
  * reads an include's source through `readObjectSource`.
  */
 type ObjectAccess<TSource, TMetadata> = Omit<
-  IAdtObjectAccess<TSource, TMetadata, unknown>,
+  // `never`: the include it would type is `getInclude`'s, omitted here.
+  IAdtObjectAccess<TSource, TMetadata, never>,
   | 'readObjectSource'
   | 'readObjectMetadata'
   | 'getObjectSourceUri'
@@ -181,7 +182,7 @@ type ObjectAccess<TSource, TMetadata> = Omit<
 > & {
   readObjectSource<E extends IAdtError>(
     objectType: Parameters<
-      IAdtObjectAccess<TSource, TMetadata, unknown>['getObjectSourceUri']
+      IAdtObjectAccess<TSource, TMetadata, never>['getObjectSourceUri']
     >[0],
     objectName: string,
     functionGroup: string | undefined,
@@ -190,7 +191,7 @@ type ObjectAccess<TSource, TMetadata> = Omit<
   ): Promise<IAdtResponse<TSource, E>>;
   readObjectMetadata<E extends IAdtError>(
     objectType: Parameters<
-      IAdtObjectAccess<TSource, TMetadata, unknown>['supportsSourceCode']
+      IAdtObjectAccess<TSource, TMetadata, never>['supportsSourceCode']
     >[0],
     objectName: string,
     functionGroup: string | undefined,
@@ -200,7 +201,7 @@ type ObjectAccess<TSource, TMetadata> = Omit<
   ): Promise<IAdtResponse<TMetadata, E>>;
   getObjectSourceUri(
     objectType: Parameters<
-      IAdtObjectAccess<TSource, TMetadata, unknown>['getObjectSourceUri']
+      IAdtObjectAccess<TSource, TMetadata, never>['getObjectSourceUri']
     >[0],
     objectName: string,
     functionGroup: string | undefined,

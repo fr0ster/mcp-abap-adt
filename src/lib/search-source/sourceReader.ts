@@ -268,7 +268,7 @@ async function* readOne(
   unitName: string,
   last: boolean,
   member: GroupMember | undefined,
-): AsyncGenerator<SourceUnit> {
+): AsyncGenerator<SourceUnit, void, undefined> {
   const place: SapAnswerPlace = {
     kind: 'source',
     devclass: target.devclass,
@@ -439,7 +439,7 @@ export async function* readSourceUnits(
   target: EnumeratedObject,
   version: SourceVersion,
   sapAnswers: SapAnswerStrategy,
-): AsyncGenerator<SourceUnit> {
+): AsyncGenerator<SourceUnit, void, undefined> {
   const own = ownReaderOf(target.code);
   if (own !== undefined) {
     yield* readOne(

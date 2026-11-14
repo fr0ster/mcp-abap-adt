@@ -1676,9 +1676,14 @@ export class UnknownSweep {
         const declared = this.checker
           .getSignatureFromDeclaration(declaration)
           ?.getReturnType();
-        // The declaration's own return holds it: charged there (or the
-        // third party's contract).
-        if (declared !== undefined && this.held(declared).length > 0) return;
+        // The declaration's own return holds it: charged there, or, a
+        // declaration outside the repository, read where it is called.
+        if (declared !== undefined && this.held(declared).length > 0) {
+          if (!ownNode(declaration)) {
+            this.foreignSite(node, held, this.declarationText(declaration));
+          }
+          return;
+        }
       }
       const inputs: ts.Expression[] = [];
       if (!ts.isTaggedTemplateExpression(node) && !ts.isDecorator(node)) {
@@ -1692,8 +1697,14 @@ export class UnknownSweep {
         }
         // A class or a function the repository declares brings nothing in
         // by being named: its type parameters are bound at this call (a
-        // class's `prototype` is typed with `any` for them).
-        if (!this.declaredCallable(callee)) inputs.push(callee);
+        // class's `prototype` is typed with `any` for them). Nor does one
+        // declared outside: its signature is the contract instantiated.
+        if (
+          !this.declaredCallable(callee) &&
+          (declaration === undefined || ownNode(declaration))
+        ) {
+          inputs.push(callee);
+        }
       }
       if (
         inputs.some(
@@ -1702,6 +1713,21 @@ export class UnknownSweep {
         )
       ) {
         return;
+      }
+      // An instantiation of a declaration outside the repository that no
+      // input of ours brought `unknown` into: read off the third party —
+      // unless the slot it lands in supplied it (a type we wrote, bound by
+      // the caller) and only builds it.
+      if (declaration !== undefined && !ownNode(declaration)) {
+        const contextual = this.contextualOf(outermost(node));
+        if (
+          contextual === undefined ||
+          this.held(contextual).every((each) => each.owner !== undefined) ||
+          this.passesOn(this.awaitedOut(node)) !== undefined
+        ) {
+          this.foreignSite(node, held, this.declarationText(declaration));
+          return;
+        }
       }
     }
     this.report(

@@ -783,6 +783,26 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it("a call answering a third party's unknown, or instantiated with one, is refused unless it passes on", () => {
+    const listing = { parse: [key('thirdPartyCall', 'parseText', 'text')] };
+    assert.deepEqual(thirdPartyReads('thirdPartyCall', listing), [
+      [8, 'refused'],
+      [13, 'refused'],
+      [17, 'refused'],
+      [23, 'sink-contract'],
+      [27, 'sink-contract'],
+      [32, 'parse'],
+    ]);
+    // Keys alone read nothing, an `any` included; an argument of ours that
+    // brought the `unknown` in is charged where it is.
+    assert.deepEqual(
+      sitesOf('thirdPartyCall', listing)
+        .filter((site) => [22, 38].includes(lineOf(site)))
+        .map((site) => site.kind),
+      [],
+    );
+  });
+
   it("a settled promise's reason is a caught value: handed whole to a thrown-value reader it passes, inspected it is refused", () => {
     const listing = { thrown: [key('settledReason', 'describe', 'thrown')] };
     assert.deepEqual(thirdPartyReads('settledReason', listing), [

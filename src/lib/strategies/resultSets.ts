@@ -346,8 +346,7 @@ export function resultsFor(
 ): Record<string, object> {
   const kept = new Set<PropertyKey>(keep);
   const out: Record<string, object> = {};
-  const table: Readonly<Record<string, IResultStrategy<unknown>>> =
-    READING_BY_SLOT;
+  const table: Readonly<Record<string, object>> = READING_BY_SLOT;
   for (const slot of Object.keys(shipped)) {
     if (kept.has(slot)) {
       out[slot] = shipped[slot];

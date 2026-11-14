@@ -1,8 +1,8 @@
-// Round 9: a third party's `unknown` member a typed value is put into is
-// read back however it is read: by name, by a literal key, by destructuring
-// (renamed, with a default, nested, in a parameter, in an assignment, by a
-// rest), each refused where it reads. A read whose value only passes on
-// (where `unknown` or `any` is expected, or inspected) reads nothing back.
+// Round 9: a third party's `unknown` member is read however it is read: by
+// name, by a literal key, by destructuring (renamed, with a default, nested,
+// in a parameter, in an assignment, by a rest), each refused where it reads,
+// whatever was put into it; inspected too. A read whose value only passes
+// on (where `unknown` or `any` is expected) reads nothing.
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 
 export function built(body: string): IAbapRequestOptions {
@@ -53,12 +53,12 @@ export function rest(options: IAbapRequestOptions): number {
   return url.length + Object.keys(others).length;
 }
 
-// Passed on, or only inspected: no read-back.
+// Passed on whole: nothing read; inspected first: refused.
 export function passedOn(options: IAbapRequestOptions): string {
   return options.data === undefined ? '' : JSON.stringify(options['data']);
 }
 
-// Members no typed value was put into: no read-back.
+// Typed members: nothing read.
 export function urlOf(options: IAbapRequestOptions): string {
   const { url } = options;
   return `${url}${options.method}`;

@@ -1,8 +1,8 @@
-// Round 10: a value whose type holds a third party's `unknown` member a typed
-// value is put into is read back whole by the language's reflective and
-// whole-object reads as surely as by name: each is refused where it reads.
-// A `for … in` reads keys alone; a spread copy keeps the member's
-// declaration, so a read of the copy's member is the read-back.
+// Round 10: the language's reflective and whole-object reads of a value
+// holding a third party's `unknown` member: one answering `unknown` or `any`
+// is refused where it reads; one answering typed members reads nothing. A
+// `for … in` reads keys alone; a spread copy keeps the member's
+// declaration, so a read of the copy's member is refused.
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 
 export function built(body: string): IAbapRequestOptions {
@@ -43,7 +43,7 @@ export function spreadCopy(box: IAbapRequestOptions): boolean {
 }
 
 // Keys alone, a value whose type holds no such member, or a whole value
-// that passes on: nothing is read back.
+// that passes on: nothing is read.
 export function forIn(box: IAbapRequestOptions): number {
   let count = 0;
   for (const key in box) count += key.length;

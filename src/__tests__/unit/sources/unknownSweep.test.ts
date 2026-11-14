@@ -566,16 +566,16 @@ describe('the forms round 9 found the every-node sweep missing are refused', () 
     );
   });
 
-  it("a third party's member read back by a literal key or a destructuring, however nested", () => {
+  it("a third party's member read by a literal key or a destructuring, however nested, or inspected, is refused", () => {
     assert.deepEqual(
       sitesOf('readBackForms')
-        .filter((site) => site.kind === 'read-back')
+        .filter((site) => site.kind === 'third-party' && site.refused)
         .map((site) => Number(site.where.split(':').pop())),
-      [13, 18, 23, 28, 34, 39, 47, 52],
+      [13, 18, 23, 28, 34, 39, 47, 52, 58],
     );
   });
 
-  it('a container literal put where unknown is expected is charged to its slot, and read back', () => {
+  it("a container literal put where unknown is expected is charged to its slot, and a third party's member read is refused", () => {
     const sites = sitesOf('literalWidening', {
       parse: [key('literalWidening', 'parse', 'value')],
     });
@@ -592,7 +592,7 @@ describe('the forms round 9 found the every-node sweep missing are refused', () 
     );
     assert.deepEqual(
       sites
-        .filter((site) => site.kind === 'read-back')
+        .filter((site) => site.kind === 'third-party' && site.refused)
         .map((site) => Number(site.where.split(':').pop())),
       [18],
     );
@@ -602,21 +602,19 @@ describe('the forms round 9 found the every-node sweep missing are refused', () 
 describe('the forms round 10 found the every-node sweep missing are refused', () => {
   const readBacks = (fixture: string): number[] =>
     sitesOf(fixture)
-      .filter((site) => site.kind === 'read-back')
-      .map((site) => Number(site.where.split(':').pop()));
+      .filter((site) => site.kind === 'third-party' && site.refused)
+      .map((site) => Number(site.where.split(':').pop()))
+      .sort((a, b) => a - b);
 
-  it('a read handed to a type parameter of ours instantiated to unknown is a read-back', () => {
+  it('a read handed to a type parameter of ours instantiated to unknown is refused', () => {
     assert.deepEqual(readBacks('readBackGeneric'), [21, 25, 29]);
   });
 
-  it('a reflective or whole-object read of a value holding such a member is a read-back', () => {
-    assert.deepEqual(
-      readBacks('readBackReflective'),
-      [13, 17, 21, 26, 27, 32, 36, 41],
-    );
+  it("a reflective read answering a third party's unknown, and a spread copy's member, are refused", () => {
+    assert.deepEqual(readBacks('readBackReflective'), [13, 17, 21, 41]);
   });
 
-  it('a write by a computed key is charged to the member its literal type names', () => {
+  it('a member written by a computed key is refused where it is read', () => {
     assert.deepEqual(readBacks('computedKeyWrite'), [10, 19]);
   });
 });

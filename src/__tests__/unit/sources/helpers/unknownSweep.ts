@@ -27,15 +27,22 @@
  * boundaries (`BoundaryKind`): no flow is followed, so a form the sweep does
  * not know is refused, never passed.
  *
- * Three checks run beside the holding check:
+ * Four checks run beside the holding check:
+ * - **the closed rule** (the owner's decision, `third-party`): a value whose
+ *   type holds `unknown` or `any` that a declaration outside the repository
+ *   brings in — a member read by name or by a key, a call whose signature
+ *   answers it or is instantiated with it, a destructuring, a callback's
+ *   parameter the contract hands it — is read only at a boundary: inside a
+ *   listed function, whole into a sink or tool arguments, discarded, or for
+ *   its keys alone (`KEYS_ONLY`); inspecting it is reading it. What we
+ *   supplied (a type argument or a slot type we wrote) is ours, charged
+ *   where written. No write is tracked: the read is the site;
  * - **any**: an expression of type `any` (a library's answer) lands only
- *   where `unknown` or `any` is expected, is discarded or only inspected
- *   (`typeof`, a comparison); an `any` inside a type does not land where
- *   the contract has a type;
+ *   where `unknown` or `any` is expected, is discarded, only inspected
+ *   (`typeof`, a comparison) or read for its keys alone; an `any` inside a
+ *   type does not land where the contract has a type;
  * - **widening**: a typed value put where `unknown` is expected is charged
- *   to that slot (its `types`); into a listed parse site it is refused, into
- *   a third party's member it is remembered, and a read of that member back
- *   by the repository is refused (`read-back`);
+ *   to that slot (its `types`); into a listed parse site it is refused;
  * - **sink slots** (`sinkSlotReads`): a slot of `SINK_SLOTS` is read only by
  *   its one reader.
  */
@@ -346,7 +353,6 @@ export type SiteKind =
   | 'expression'
   | 'any'
   | 'widening'
-  | 'read-back'
   | 'third-party';
 
 export interface SweepSite {
@@ -363,7 +369,7 @@ export interface SweepSite {
   /** The typed values put where it holds `unknown`. */
   readonly types: readonly string[];
   readonly refused: boolean;
-  /** Why it is refused, in a word: `holds`, `any`, `widening`, `read-back`, `callback`. */
+  /** Why it is refused, in a word: `holds`, `any`, `widening`, `third-party`. */
   readonly reason: string;
 }
 
@@ -775,8 +781,6 @@ export class UnknownSweep {
   private readonly references = new Map<ts.Symbol, ts.Expression[]>();
   /** Slot declaration → the typed values put where it holds `unknown`. */
   private readonly putInto = new Map<ts.Node, Set<string>>();
-  /** A third party's member declarations a typed value was put into. */
-  private readonly putIntoThirdParty = new Set<ts.Node>();
   private readonly found: SweepSite[] = [];
   /** Expressions charged with the types written inside them. */
   private readonly writtenCharged = new Set<ts.Node>();
@@ -822,7 +826,6 @@ export class UnknownSweep {
     // Widening first: it charges the typed values to their slots.
     for (const expression of expressions) this.widening(expression);
     for (const node of declarations) this.declaration(node);
-    for (const node of declarations) this.readBack(node);
     for (const node of declarations) this.thirdPartyRead(node);
     for (const opening of jsxOpenings) this.writtenInExpression(opening);
     for (const expression of expressions) {
@@ -1932,8 +1935,8 @@ export class UnknownSweep {
 
   /**
    * A typed value put where `unknown` is expected: charged to the slot that
-   * writes it; refused into a listed parse site, remembered into a third
-   * party's member.
+   * writes it; refused into a listed parse site. A third party's slot is its
+   * contract.
    */
   private widening(node: ts.Expression): void {
     // A carrier's operands land one by one, and so do a literal's members
@@ -2137,15 +2140,9 @@ export class UnknownSweep {
     where: string,
     types: readonly string[],
   ): void {
-    if (!ownNode(slot)) {
-      if (
-        thirdParty(slot) &&
-        (ts.isPropertySignature(slot) || ts.isPropertyDeclaration(slot))
-      ) {
-        this.putIntoThirdParty.add(slot);
-      }
-      return;
-    }
+    // A third party's slot is its contract: what is read out of it is
+    // judged where it is read (the closed rule).
+    if (!ownNode(slot)) return;
 
     const into = this.putInto.get(slot) ?? new Set<string>();
     for (const text of types) into.add(text);
@@ -2593,41 +2590,13 @@ export class UnknownSweep {
   }
 
   /**
-   * A read back of a third party's member a typed value was put into, in
-   * every form `memberReads` knows: by name, by a key, by destructuring.
-   * By reading (the owner's rule): a read whose value only passes on —
-   * where `unknown` or `any` is expected (a parse site, a sink such as
-   * `JSON.stringify`), or discarded or only inspected — reads nothing back.
-   */
-  private readBack(node: ts.Node): void {
-    if (this.putIntoThirdParty.size === 0) return;
-    memberReads(this.checker, node, ({ at, members }) => {
-      if (
-        ts.isExpression(at) &&
-        (this.inspected(outermost(at)) ||
-          this.passesOn(outermost(at)) !== undefined)
-      ) {
-        return;
-      }
-      if (
-        members.some((member) =>
-          (member?.declarations ?? []).some((declaration) =>
-            this.putIntoThirdParty.has(declaration),
-          ),
-        )
-      ) {
-        this.report(at, 'read-back', "''", undefined, true, 'read-back');
-      }
-    });
-  }
-
-  /**
-   * Whether a value only passes on: inspected, or put where `unknown` or
-   * `any` is expected by its declaration — a parameter, a member or a return
-   * written `unknown` / `any` (a third party's sink such as `JSON.stringify`,
-   * a listed site). A type parameter instantiated to `unknown` is no sink:
-   * the function it belongs to uses the value, so the read is a read-back,
-   * checked like any other (bound by the caller).
+   * Where a value passes on whole, as the boundary it lands in: a slot
+   * written `ToolArgs` (`tool-args`, input until checked), or one whose
+   * declaration expects `unknown` or `any` — a parameter, a member or a
+   * return written so (`sink-contract`: a third party's sink such as
+   * `JSON.stringify`, a listed site). A type parameter instantiated to
+   * `unknown` is no sink: the function it belongs to uses the value, so the
+   * value is read (bound by the caller). Inspected is no passing on.
    */
   private passesOn(node: ts.Expression): BoundaryKind | undefined {
     const slot = this.slotOf(node);
@@ -3076,12 +3045,14 @@ const KEYS_ONLY: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The language's reflective and whole-object reads (a closed list): each
- * reads every member of the value it is given, the values whose arguments
- * it names — `first`, the first argument; `sources`, every argument after
- * the first (`Object.assign`'s sources); `keyed`, the first argument by the
- * key the second names. `Object.keys`, `Reflect.ownKeys` and `for … in`
- * read keys alone.
+ * The language's reflective and whole-object reads (a closed list), by
+ * which a sink slot is read (`sinkSlotReads`): each reads every member of
+ * the value it is given, the values whose arguments it names — `first`,
+ * the first argument; `sources`, every argument after the first
+ * (`Object.assign`'s sources); `keyed`, the first argument by the key the
+ * second names. `Object.keys`, `Reflect.ownKeys` and `for … in` read keys
+ * alone. The closed rule needs none: a reflective call answering a third
+ * party's `unknown` is a call of its own.
  */
 const REFLECTIVE_READS: ReadonlyMap<string, 'first' | 'sources' | 'keyed'> =
   new Map([

@@ -1,7 +1,7 @@
 // Round 10: a typed value written into a third party's `unknown` member by a
-// computed key is charged to the member the key's literal type names (each
-// member of a union of literals), so a later read of that member is a
-// read-back.
+// computed key (the member the key's literal type names, each member of a
+// union of literals): what was written does not matter, the later read of
+// that member is refused.
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 
 export function written(box: IAbapRequestOptions): boolean {

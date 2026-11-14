@@ -814,6 +814,27 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it('a callback parameter a contract hands its own unknown is refused unless every use passes it on, or it is inside a listed function', () => {
+    const listing = { parse: [key('thirdPartyCallback', 'listed', 'raw')] };
+    // The parse each reviver is handed to passes whole into a sink.
+    assert.deepEqual(thirdPartyReads('thirdPartyCallback', listing), [
+      [11, 'refused'],
+      [11, 'sink-contract'],
+      [18, 'parse'],
+      [22, 'refused'],
+      [28, 'sink-contract'],
+    ]);
+    const sites = sitesOf('thirdPartyCallback', listing);
+    assert.deepEqual(
+      sites
+        .filter((site) => site.name === 'value' && lineOf(site) === 28)
+        .map((site) => [site.boundary, site.refused]),
+      [['callback', false]],
+    );
+    // Instantiated with a type of ours: ours.
+    assert.deepEqual(judged(sites, 'reading'), [['callback', false, []]]);
+  });
+
   it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
     assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
     assert.deepEqual(

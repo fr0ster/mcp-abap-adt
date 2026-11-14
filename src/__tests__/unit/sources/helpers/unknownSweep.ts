@@ -1269,6 +1269,26 @@ export class UnknownSweep {
     const held = this.ownHeld(node);
     if (held.length === 0) return;
     const decided = this.boundaryOf(node, held);
+    if (
+      decided.kind === 'callback' &&
+      ts.isParameter(node) &&
+      this.contractsUnknown(held) &&
+      !this.usesPassOn(node)
+    ) {
+      // A third party's `unknown` handed to a callback of ours is read
+      // there: inside a listed function only.
+      const listed = this.listedOwner(node);
+      this.report(
+        node,
+        kind,
+        held.map((each) => pathText(each.path) || "''").join(' '),
+        listed,
+        listed === undefined,
+        'third-party',
+        ['callback'],
+      );
+      return;
+    }
     this.report(
       node,
       kind,
@@ -2542,6 +2562,34 @@ export class UnknownSweep {
       .getResolvedSignature(parent)
       ?.getDeclaration();
     return declaration !== undefined && languageFile(declaration);
+  }
+
+  /**
+   * Whether a callback's parameter holds the contract's own `unknown`: at
+   * the top, or inside the language's structure — not inside a type of the
+   * repository the contract was instantiated with (`Reading<unknown>`: bound
+   * by the caller, where it is written).
+   */
+  private contractsUnknown(held: readonly Held[]): boolean {
+    return held.some((each) =>
+      each.path.every((step) => step.kind !== 'member'),
+    );
+  }
+
+  /** Whether every use of a parameter passes it on whole, or reads its keys. */
+  private usesPassOn(node: ts.ParameterDeclaration): boolean {
+    if (!ts.isIdentifier(node.name)) return true;
+    const symbol = this.checker.getSymbolAtLocation(node.name);
+    const uses =
+      symbol === undefined ? [] : (this.references.get(symbol) ?? []);
+    return uses.every((use) => {
+      const outer = this.awaitedOut(use);
+      return (
+        this.discarded(outer) ||
+        this.keysOnly(outer) ||
+        this.passesOn(outer) !== undefined
+      );
+    });
   }
 
   /**

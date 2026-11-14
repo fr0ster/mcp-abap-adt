@@ -1,6 +1,7 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { withoutNamePrefix } from '../plainText';
+import { bodyTextOf } from '../wireValue';
 import { parseXml } from '../xml/node';
 import {
   attr,
@@ -176,5 +177,5 @@ export function parseSqlPreview(document: string): SqlPreview {
 
 /** The reading itself, for the `query` slot. */
 export const sqlPreview: IResultStrategy<AdtReading<SqlPreview>> = reading(
-  (answer) => parseSqlPreview(String(answer.data ?? '')),
+  (answer) => parseSqlPreview(bodyTextOf(answer)),
 );

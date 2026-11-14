@@ -7,7 +7,6 @@ import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
  * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   answerFailure,
   failureEntry,
@@ -27,6 +26,7 @@ import {
   batchReader,
   concurrentReader,
   endsTheCall,
+  type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
   readNode,
@@ -88,7 +88,8 @@ export const TOOL_DEFINITION = {
 
 type GetPackageTreeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-type Metadata = IAdtResponse<unknown, IAdtError>;
+/** A package's metadata read, as `readPackageMetadata` answers it. */
+type Metadata = Awaited<ReturnType<typeof readPackageMetadata>>;
 
 /** One package's metadata read and its walk. */
 interface TreeRead {
@@ -120,6 +121,31 @@ interface TreeOptions {
 
 /** An item of the first phase: a package's metadata, or a root node structure. */
 type FirstItem = { metadata: string } | { node: NodeRequest };
+
+/** The answer of a first-phase item, by what the item read. */
+type FirstAnswer =
+  | { of: 'metadata'; response: Metadata }
+  | { of: 'node'; response: NodeAnswer };
+
+/** A first-phase metadata item's answer. */
+function metadataOf(result: PhaseResult<FirstAnswer>): PhaseResult<Metadata> {
+  if (!result.ok) return result;
+  const answer = result.value;
+  if (answer.of !== 'metadata') {
+    throw new Error('a metadata item of the first phase answered a node');
+  }
+  return { ok: true, value: answer.response };
+}
+
+/** A first-phase root node structure item's answer. */
+function rootOf(result: PhaseResult<FirstAnswer>): PhaseResult<NodeAnswer> {
+  if (!result.ok) return result;
+  const answer = result.value;
+  if (answer.of !== 'node') {
+    throw new Error('a node item of the first phase answered metadata');
+  }
+  return { ok: true, value: answer.response };
+}
 
 // Verify package exists before building tree (fixes #38).
 // `IPackageContract` has no `.read()` — a package is a container with no
@@ -167,16 +193,21 @@ async function readTreesBatched(
   packageNames: readonly string[],
   options: TreeOptions,
 ): Promise<TreeRead[]> {
-  const read = batchReader<FirstItem, Metadata>(context, (item, c) =>
+  const readLevel = (request: NodeRequest, c: HandlerContext['connection']) =>
+    readNode(
+      nodeStructureOn(
+        context,
+        createAdtClient(c, context.logger).getUtils(ourUtils),
+      ),
+      request,
+    );
+  const read = batchReader<FirstItem, FirstAnswer>(context, async (item, c) =>
     'metadata' in item
-      ? readMetadata(context, c, item.metadata)
-      : readNode(
-          nodeStructureOn(
-            context,
-            createAdtClient(c, context.logger).getUtils(ourUtils),
-          ),
-          item.node,
-        ),
+      ? {
+          of: 'metadata',
+          response: await readMetadata(context, c, item.metadata),
+        }
+      : { of: 'node', response: await readLevel(item.node, c) },
   );
   const first = await read([
     ...packageNames.map((metadata) => ({ metadata })),
@@ -191,16 +222,16 @@ async function readTreesBatched(
     ),
   ]);
   const reads: TreeRead[] = packageNames.map((_, i) => ({
-    metadata: first[i],
+    metadata: metadataOf(first[i]),
   }));
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   // Walked further: the packages whose metadata was read.
   const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
-    (requests) => read(requests.map((node) => ({ node }))),
+    batchReader<NodeRequest, NodeAnswer>(context, readLevel),
     kept.map((i) => packageNames[i]),
     options,
-    kept.map((i) => first[packageNames.length + i]),
+    kept.map((i) => rootOf(first[packageNames.length + i])),
   );
   kept.forEach((i, k) => {
     reads[i].walked = walked[k];
@@ -230,7 +261,7 @@ async function readTreesConcurrent(
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
-    concurrentReader<NodeRequest, Metadata>(context, (request, c) =>
+    concurrentReader<NodeRequest, NodeAnswer>(context, (request, c) =>
       readNode(
         nodeStructureOn(
           context,

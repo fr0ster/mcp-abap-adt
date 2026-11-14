@@ -25,7 +25,7 @@ import {
   payloadCarriedBy,
 } from '../strategies/step';
 import { failed } from '../strategies/stepResponse';
-import { failureText } from './readings';
+import { bodyFailureText } from './readings';
 
 export type DebugFailure = FailureEntry;
 
@@ -76,10 +76,10 @@ export function describeFailures(list: readonly DebugFailure[]): string {
       const step = typeof entry.step === 'string' ? `${entry.step}: ` : '';
       const message =
         typeof entry.message === 'string'
-          ? failureText({
-              message: entry.message,
-              response: { data: entry.raw_body },
-            })
+          ? bodyFailureText(
+              entry.message,
+              typeof entry.raw_body === 'string' ? entry.raw_body : undefined,
+            )
           : JSON.stringify(entry);
       const left = child(entry.cleanup, 'message');
       return `${step}${message}${typeof left === 'string' ? `; ${left}` : ''}`;

@@ -6,6 +6,7 @@
 
 import { readExceptionSubType } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { parseXml } from '../xml/node';
 import {
@@ -454,16 +455,27 @@ const exceptionParser = new XMLParser({
  * no exception document adds nothing; neither text is searched.
  */
 export function failureText(error: {
-  message: string;
-  response?: { data?: unknown } | undefined;
+  readonly message: string;
+  readonly response?: Pick<IAdtWireResponse, 'data'> | undefined;
 }): string {
   const data = error.response?.data;
-  if (typeof data !== 'string') return error.message;
+  return bodyFailureText(
+    error.message,
+    typeof data === 'string' ? data : undefined,
+  );
+}
+
+/** {@link failureText} of a failure's message and the body it came with. */
+export function bodyFailureText(
+  message: string,
+  body: string | undefined,
+): string {
+  if (body === undefined) return message;
   let doc: XmlRead;
   try {
-    doc = child(parseXml(exceptionParser, data), 'exception');
+    doc = child(parseXml(exceptionParser, body), 'exception');
   } catch {
-    return error.message;
+    return message;
   }
   const properties = listOf(childAt(doc, 'properties', 'entry'));
   const entry = (key: string) =>
@@ -483,5 +495,5 @@ export function failureText(error: {
     .join(' ');
   const tags = [subType, t100].filter(Boolean).join(', ');
   const told = [said, tags && `[${tags}]`].filter(Boolean).join(' ');
-  return told ? `${error.message}: ${told}` : error.message;
+  return told ? `${message}: ${told}` : message;
 }

@@ -346,7 +346,8 @@ export type SiteKind =
   | 'expression'
   | 'any'
   | 'widening'
-  | 'read-back';
+  | 'read-back'
+  | 'third-party';
 
 export interface SweepSite {
   readonly kind: SiteKind;
@@ -567,6 +568,28 @@ function slotName(declaration: ts.Node): string | undefined {
   ) {
     const member = propertyName(declaration.name);
     return member === undefined ? undefined : `${owner.name.text}.${member}`;
+  }
+  return undefined;
+}
+
+/** The name a declaration of a member or a function writes, when it has one. */
+function declarationName(node: ts.Node): ts.Node | undefined {
+  if (
+    ts.isPropertySignature(node) ||
+    ts.isPropertyDeclaration(node) ||
+    ts.isMethodSignature(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isVariableDeclaration(node) ||
+    ts.isParameter(node) ||
+    ts.isPropertyAssignment(node) ||
+    ts.isShorthandPropertyAssignment(node) ||
+    ts.isBindingElement(node) ||
+    ts.isEnumMember(node)
+  ) {
+    return node.name;
   }
   return undefined;
 }
@@ -800,6 +823,7 @@ export class UnknownSweep {
     for (const expression of expressions) this.widening(expression);
     for (const node of declarations) this.declaration(node);
     for (const node of declarations) this.readBack(node);
+    for (const node of declarations) this.thirdPartyRead(node);
     for (const opening of jsxOpenings) this.writtenInExpression(opening);
     for (const expression of expressions) {
       this.writtenInExpression(expression);
@@ -1798,7 +1822,7 @@ export class UnknownSweep {
     const type = this.checker.getTypeAtLocation(node);
     const contextual = this.contextualOf(node);
     if (type.flags & ts.TypeFlags.Any) {
-      if (this.inspected(node)) return;
+      if (this.inspected(node) || this.keysOnly(node)) return;
       if (
         contextual !== undefined &&
         contextual.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)
@@ -2209,6 +2233,298 @@ export class UnknownSweep {
     return name !== undefined && PROGRAM_TYPES.has(name);
   }
 
+  // ── The closed rule: a third party's unknown is read only at a boundary ──
+
+  /**
+   * The boundary a function around `node` is listed as: a parse site, a
+   * reader of thrown values, a sink site — by the name the lists give it
+   * (`file#function(`), the innermost function first. A module is no
+   * reader.
+   */
+  private listedOwner(node: ts.Node): BoundaryKind | undefined {
+    const file = rel(node.getSourceFile().fileName);
+    for (
+      let current: ts.Node | undefined = node.parent;
+      current !== undefined;
+      current = current.parent
+    ) {
+      if (!ts.isFunctionLike(current)) continue;
+      const owner = ownerOf(current);
+      if (owner === '(module)') continue;
+      const prefix = `${file}#${owner}(`;
+      const has = (listed: ReadonlySet<string>): boolean =>
+        [...listed].some((entry) => entry.startsWith(prefix));
+      if (has(this.lists.parse)) return 'parse';
+      if (has(this.lists.thrown)) return 'thrown';
+      if (has(this.lists.sink)) return 'sink-contract';
+    }
+    return undefined;
+  }
+
+  /** `Holder.member` of a declaration, for a refusal's words. */
+  private declarationText(declaration: ts.Node): string {
+    // A function type is named by the member or the variable it types.
+    const own =
+      declarationName(declaration) ??
+      (ts.isFunctionTypeNode(declaration)
+        ? declarationName(declaration.parent)
+        : undefined);
+    const name = own?.getText() ?? '(anonymous)';
+    const holder = ts.findAncestor(
+      declaration.parent,
+      (each) =>
+        ts.isInterfaceDeclaration(each) ||
+        ts.isClassDeclaration(each) ||
+        ts.isTypeAliasDeclaration(each) ||
+        ts.isModuleDeclaration(each),
+    );
+    const named =
+      holder !== undefined &&
+      (ts.isInterfaceDeclaration(holder) ||
+        ts.isClassDeclaration(holder) ||
+        ts.isTypeAliasDeclaration(holder) ||
+        ts.isModuleDeclaration(holder)) &&
+      holder.name !== undefined
+        ? holder.name.getText()
+        : undefined;
+    return named === undefined ? name : `${named}.${name}`;
+  }
+
+  /**
+   * Whether a declaration outside the repository writes `unknown` or `any`
+   * into its own type: the type its symbol has before any instantiation (a
+   * member written `unknown`, a function returning `any`; not a type
+   * parameter, which its instantiation decides).
+   */
+  private declaredHolds(declaration: ts.Node): boolean {
+    const name = declarationName(declaration);
+    const symbol =
+      name === undefined ? undefined : this.checker.getSymbolAtLocation(name);
+    return (
+      symbol !== undefined &&
+      this.held(this.checker.getTypeOfSymbol(symbol)).length > 0
+    );
+  }
+
+  /**
+   * What a member read reads of a declaration outside the repository that
+   * holds `unknown` or `any`, by `Holder.member`; `undefined` when it reads
+   * nothing so: every member is the repository's, or the `unknown` is the
+   * instantiation's and an input of ours brought it in — a type argument of
+   * a language generic (`Map<string, unknown>`), or a name whose own
+   * written type holds it (bound by the caller: charged where written).
+   */
+  private foreignRead(found: MemberRead): string | undefined {
+    const { members, holder, value, receiver } = found;
+    const infos = this.checker.getIndexInfosOfType(
+      this.checker.getNonNullableType(holder),
+    );
+    if (
+      (found.byIndex === true && infos.length > 0) ||
+      (members.length > 0 && members.every((member) => member === undefined))
+    ) {
+      // A read through an index signature: the signature's declaration.
+      for (const info of infos) {
+        const declaration = info.declaration;
+        if (declaration === undefined || ownNode(declaration)) continue;
+        if (
+          this.held(this.checker.getTypeFromTypeNode(declaration.type)).length >
+          0
+        ) {
+          return this.declarationText(declaration);
+        }
+        if (
+          this.held(value).some((each) => each.owner === undefined) &&
+          !this.broughtIn(holder, receiver)
+        ) {
+          return this.declarationText(declaration);
+        }
+      }
+      return undefined;
+    }
+    const declarations = members.flatMap(
+      (member) => member?.declarations ?? [],
+    );
+    const foreign = declarations.filter((declaration) => !ownNode(declaration));
+    if (foreign.length === 0) return undefined;
+    // What reads no `unknown` reads nothing.
+    if (this.held(value).every((each) => each.owner !== undefined)) {
+      return undefined;
+    }
+    const direct = foreign.find((declaration) =>
+      this.declaredHolds(declaration),
+    );
+    if (direct !== undefined) return this.declarationText(direct);
+    if (
+      declarations.some(
+        (declaration) => ownNode(declaration) && this.ownsUnknown(declaration),
+      )
+    ) {
+      return undefined;
+    }
+    if (this.held(value).every((each) => each.owner !== undefined)) {
+      return undefined;
+    }
+    if (this.broughtIn(holder, receiver)) return undefined;
+    const first = foreign[0];
+    return first === undefined ? undefined : this.declarationText(first);
+  }
+
+  /**
+   * Whether the `unknown` of an instantiation came in with the value it is
+   * read off: a language generic's type argument (`Map<string, unknown>`,
+   * a list's element), or a name whose own written type holds it.
+   */
+  private broughtIn(
+    holder: ts.Type,
+    receiver: ts.Expression | undefined,
+  ): boolean {
+    if (
+      this.held(holder).some((each) => {
+        const first = each.path[0];
+        return (
+          first !== undefined &&
+          (first.kind === 'argument' ||
+            first.kind === 'element' ||
+            first.kind === 'index')
+        );
+      })
+    ) {
+      return true;
+    }
+    if (receiver === undefined || !ts.isIdentifier(receiver)) return false;
+    const declaration = this.valueSymbol(receiver)?.valueDeclaration;
+    return (
+      declaration !== undefined &&
+      ownNode(declaration) &&
+      this.ownsUnknown(declaration)
+    );
+  }
+
+  /** Whether an expression is called, not read: a callee, a tag. */
+  private called(node: ts.Expression): boolean {
+    const outer = outermost(node);
+    const parent = outer.parent;
+    return (
+      ((ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+        parent.expression === outer) ||
+      (ts.isTaggedTemplateExpression(parent) && parent.tag === outer)
+    );
+  }
+
+  /**
+   * The closed rule (the owner's decision): a member a declaration outside
+   * the repository types `unknown` or `any` is read — by name or by a
+   * key — only at a boundary.
+   */
+  private thirdPartyRead(node: ts.Node): void {
+    if (ts.isPartOfTypeNode(node) || typeHeritage(node)) return;
+    memberReads(
+      this.checker,
+      node,
+      (found) => {
+        const { at } = found;
+        if (
+          !ts.isPropertyAccessExpression(at) &&
+          !ts.isElementAccessExpression(at)
+        ) {
+          return;
+        }
+        if (this.called(at)) return;
+        if (ts.isDeleteExpression(at.parent)) return;
+        const read = this.foreignRead(found);
+        if (read === undefined) return;
+        const held = this.held(found.value).filter(
+          (each) => each.owner === undefined,
+        );
+        this.foreignSite(at, held, read);
+      },
+      false,
+    );
+  }
+
+  /**
+   * A read of a third party's `unknown` or `any` (`read` names what it
+   * reads): passing inside a listed function, whole into a sink or tool
+   * arguments, or keys alone; refused anywhere else, inspected included.
+   */
+  private foreignSite(
+    node: ts.Node,
+    held: readonly Held[],
+    read: string,
+  ): void {
+    const position =
+      held.map((each) => pathText(each.path) || "''").join(' ') || "''";
+    const listed = this.listedOwner(node);
+    if (listed !== undefined) {
+      this.report(node, 'third-party', position, listed, false, 'third-party', [
+        read,
+      ]);
+      return;
+    }
+    if (ts.isExpression(node)) {
+      const outer = this.awaitedOut(node);
+      if (this.discarded(outer) || this.keysOnly(outer)) return;
+      const lands = this.passesOn(outer);
+      if (lands !== undefined) {
+        this.report(
+          node,
+          'third-party',
+          position,
+          read === 'PromiseRejectedResult.reason' ? 'caught' : lands,
+          false,
+          'third-party',
+          [read],
+        );
+        return;
+      }
+    }
+    this.report(node, 'third-party', position, undefined, true, 'third-party', [
+      read,
+    ]);
+  }
+
+  /**
+   * The outermost expression a value is carried to unchanged, through an
+   * `await`, which hands on what it settles with as it is.
+   */
+  private awaitedOut(node: ts.Expression): ts.Expression {
+    let outer = outermost(node);
+    while (ts.isAwaitExpression(outer.parent)) outer = outermost(outer.parent);
+    return outer;
+  }
+
+  /** Discarded: a statement of its own, or `void`. */
+  private discarded(node: ts.Expression): boolean {
+    return (
+      ts.isExpressionStatement(node.parent) || ts.isVoidExpression(node.parent)
+    );
+  }
+
+  /**
+   * Read for its keys alone (a closed list, `KEYS_ONLY`): the argument of
+   * `Object.keys` or `Reflect.ownKeys`, the language's own, or what a
+   * `for … in` walks.
+   */
+  private keysOnly(node: ts.Expression): boolean {
+    const parent = node.parent;
+    if (ts.isForInStatement(parent) && parent.expression === node) return true;
+    if (!ts.isCallExpression(parent) || parent.arguments[0] !== node)
+      return false;
+    const callee = parent.expression;
+    if (
+      !ts.isPropertyAccessExpression(callee) ||
+      !ts.isIdentifier(callee.expression) ||
+      !KEYS_ONLY.has(`${callee.expression.text}.${callee.name.text}`)
+    ) {
+      return false;
+    }
+    const declaration = this.checker
+      .getResolvedSignature(parent)
+      ?.getDeclaration();
+    return declaration !== undefined && languageFile(declaration);
+  }
+
   /**
    * A read back of a third party's member a typed value was put into, in
    * every form `memberReads` knows: by name, by a key, by destructuring.
@@ -2218,8 +2534,14 @@ export class UnknownSweep {
    */
   private readBack(node: ts.Node): void {
     if (this.putIntoThirdParty.size === 0) return;
-    memberReads(this.checker, node, (at, members) => {
-      if (ts.isExpression(at) && this.passesOn(outermost(at))) return;
+    memberReads(this.checker, node, ({ at, members }) => {
+      if (
+        ts.isExpression(at) &&
+        (this.inspected(outermost(at)) ||
+          this.passesOn(outermost(at)) !== undefined)
+      ) {
+        return;
+      }
       if (
         members.some((member) =>
           (member?.declarations ?? []).some((declaration) =>
@@ -2240,20 +2562,23 @@ export class UnknownSweep {
    * the function it belongs to uses the value, so the read is a read-back,
    * checked like any other (bound by the caller).
    */
-  private passesOn(node: ts.Expression): boolean {
-    if (this.inspected(node)) return true;
+  private passesOn(node: ts.Expression): BoundaryKind | undefined {
+    const slot = this.slotOf(node);
+    if (slot !== undefined && ownNode(slot) && this.toolArgs(slot)) {
+      return 'tool-args';
+    }
     const contextual = this.contextualOf(node);
     if (
       contextual === undefined ||
       (contextual.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) === 0
     ) {
-      return false;
+      return undefined;
     }
-    const declared = this.declaredTypeOf(this.slotOf(node));
-    return (
-      declared !== undefined &&
+    const declared = this.declaredTypeOf(slot);
+    return declared !== undefined &&
       (declared.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) !== 0
-    );
+      ? 'sink-contract'
+      : undefined;
   }
 
   /**
@@ -2475,10 +2800,7 @@ export function sinkSlotReads(
   const declared = new Set<string>();
   for (const file of program.getSourceFiles()) {
     if (!own.has(fileKey(file.fileName))) continue;
-    const noteReads = (
-      node: ts.Node,
-      members: readonly (ts.Symbol | undefined)[],
-    ): void => {
+    const noteReads = ({ at: node, members }: MemberRead): void => {
       const reader = `${rel(file.fileName)}#${ownerOf(node)}`;
       for (const member of members) {
         for (const declaration of member?.declarations ?? []) {
@@ -2504,19 +2826,35 @@ export function sinkSlotReads(
   return { reads, declared };
 }
 
+/** A read of members, as `memberReads` hands it on. */
+interface MemberRead {
+  /** The node that reads. */
+  readonly at: ts.Node;
+  readonly members: readonly (ts.Symbol | undefined)[];
+  /** The type the members are read off. */
+  readonly holder: ts.Type;
+  /** The type of what is read. */
+  readonly value: ts.Type;
+  /** The expression read from, when it is one (`box` of `box.data`). */
+  readonly receiver?: ts.Expression;
+  /** A read by a key no literal names: through the holder's index signatures. */
+  readonly byIndex?: boolean;
+}
+
 /**
  * The members a node reads, handed to `read` with the node that reads
  * them: a member read (by name, by a computed key that may name it, never
  * the target of `=`), a destructuring in a declaration or a parameter
  * (renamed, with a default, nested, a rest reading every member) and in an
- * assignment or a `for … of` head, nested or by array pattern; and a call
- * of the language's reflective or whole-object reads (`REFLECTIVE_READS`),
- * reading every member of the value it is given.
+ * assignment or a `for … of` head, nested or by array pattern; and, when
+ * `reflective`, a call of the language's reflective or whole-object reads
+ * (`REFLECTIVE_READS`), reading every member of the value it is given.
  */
 function memberReads(
   checker: ts.TypeChecker,
   node: ts.Node,
-  read: (at: ts.Node, members: readonly (ts.Symbol | undefined)[]) => void,
+  read: (found: MemberRead) => void,
+  reflective = true,
 ): void {
   /** Each member an assignment pattern reads off `source`, at any depth. */
   const notePattern = (pattern: ts.Expression, source: ts.Type): void => {
@@ -2524,7 +2862,12 @@ function memberReads(
     if (ts.isObjectLiteralExpression(pattern)) {
       for (const element of pattern.properties) {
         if (ts.isSpreadAssignment(element)) {
-          read(element, checker.getPropertiesOfType(holder));
+          read({
+            at: element,
+            members: checker.getPropertiesOfType(holder),
+            holder,
+            value: checker.getTypeAtLocation(element.expression),
+          });
           continue;
         }
         if (
@@ -2538,10 +2881,16 @@ function memberReads(
           key === undefined
             ? undefined
             : checker.getPropertyOfType(holder, key);
-        read(
-          element,
-          key === undefined ? checker.getPropertiesOfType(holder) : [member],
-        );
+        read({
+          at: element,
+          members:
+            key === undefined ? checker.getPropertiesOfType(holder) : [member],
+          holder,
+          value:
+            member === undefined
+              ? checker.getTypeAtLocation(element)
+              : checker.getTypeOfSymbol(member),
+        });
         const inner = ts.isPropertyAssignment(element)
           ? element.initializer
           : undefined;
@@ -2581,18 +2930,37 @@ function memberReads(
       node.parent.left === node
     )
   ) {
-    const members = ts.isPropertyAccessExpression(node)
-      ? [checker.getSymbolAtLocation(node.name)]
-      : keyedMembers(
-          checker,
-          checker.getTypeAtLocation(node.expression),
-          checker.getTypeAtLocation(node.argumentExpression),
-        );
-    read(node, members);
+    const holder = checker.getTypeAtLocation(node.expression);
+    const key = ts.isPropertyAccessExpression(node)
+      ? undefined
+      : checker.getTypeAtLocation(node.argumentExpression);
+    const members =
+      key === undefined
+        ? [
+            ts.isPropertyAccessExpression(node)
+              ? checker.getSymbolAtLocation(node.name)
+              : undefined,
+          ]
+        : keyedMembers(checker, holder, key);
+    read({
+      at: node,
+      members,
+      holder,
+      value: checker.getTypeAtLocation(node),
+      receiver: node.expression,
+      byIndex: key !== undefined && !literalKey(key),
+    });
   }
-  if (ts.isCallExpression(node)) {
+  if (reflective && ts.isCallExpression(node)) {
     const members = reflectiveReads(checker, node);
-    if (members !== undefined && members.length > 0) read(node, members);
+    if (members !== undefined && members.length > 0) {
+      read({
+        at: node,
+        members,
+        holder: checker.getTypeAtLocation(node),
+        value: checker.getTypeAtLocation(node),
+      });
+    }
   }
   if (
     ts.isBinaryExpression(node) &&
@@ -2615,19 +2983,30 @@ function memberReads(
   }
   if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
     const source = checker.getTypeAtLocation(node.parent);
-    if (node.dotDotDotToken !== undefined) {
-      read(node, checker.getPropertiesOfType(source));
-    } else {
-      const key = propertyName(node.propertyName ?? node.name);
-      read(
-        node,
+    const key =
+      node.dotDotDotToken !== undefined
+        ? undefined
+        : propertyName(node.propertyName ?? node.name);
+    read({
+      at: node,
+      members:
         key === undefined
           ? checker.getPropertiesOfType(source)
           : [checker.getNonNullableType(source).getProperty(key)],
-      );
-    }
+      holder: source,
+      value: checker.getTypeAtLocation(node),
+    });
   }
 }
+
+/**
+ * The language's reads of keys alone (a closed list, with `for … in`): a
+ * third party's `unknown` or `any` value may be handed to them whole.
+ */
+const KEYS_ONLY: ReadonlySet<string> = new Set([
+  'Object.keys',
+  'Reflect.ownKeys',
+]);
 
 /**
  * The language's reflective and whole-object reads (a closed list): each
@@ -2690,6 +3069,13 @@ function reflectiveReads(
         checker.getTypeAtLocation(first),
         checker.getTypeAtLocation(second),
       );
+}
+
+/** Whether a key's type names members: a literal, or a union of literals. */
+function literalKey(key: ts.Type): boolean {
+  return (key.isUnion() ? key.types : [key]).every(
+    (each) => each.isStringLiteral() || each.isNumberLiteral(),
+  );
 }
 
 function keyedMembers(

@@ -709,6 +709,89 @@ describe("the type arguments we supply to a third party's generic type are ours"
   });
 });
 
+/** The line of a fixture's site. */
+function lineOf(site: SweepSite): number {
+  return Number(site.where.split(':').pop());
+}
+
+/** The closed rule's sites of a fixture: `[line, boundary or 'refused']`, by line. */
+function thirdPartyReads(
+  fixture: string,
+  listing: Listing = {},
+): [number, BoundaryKind | 'refused'][] {
+  return sitesOf(fixture, listing)
+    .filter((site) => site.reason === 'third-party')
+    .map((site): [number, BoundaryKind | 'refused'] => [
+      lineOf(site),
+      site.refused ? 'refused' : (site.boundary ?? 'refused'),
+    ])
+    .sort(([a], [b]) => a - b);
+}
+
+/** The lines `thirdPartyReads` refuses. */
+function refusedReads(fixture: string, listing: Listing = {}): number[] {
+  return thirdPartyReads(fixture, listing)
+    .filter(([, judged]) => judged === 'refused')
+    .map(([line]) => line);
+}
+
+describe("the closed rule: a third party's unknown is read only at a boundary (the owner's decision)", () => {
+  const member = { parse: [key('thirdPartyMember', 'parseBody', 'answer')] };
+
+  it('a member read by name, by a key, through an optional chain, or inspected is refused', () => {
+    assert.deepEqual(
+      refusedReads('thirdPartyMember', member),
+      [17, 22, 27, 33, 34, 35, 36, 37, 81],
+    );
+  });
+
+  it('a member read whole into a sink, as tool arguments or inside a listed function passes; discarded or for its keys alone it reads nothing', () => {
+    assert.deepEqual(
+      thirdPartyReads('thirdPartyMember', member).filter(
+        ([, judged]) => judged !== 'refused',
+      ),
+      [
+        [45, 'sink-contract'],
+        [45, 'sink-contract'],
+        [57, 'tool-args'],
+        [69, 'parse'],
+      ],
+    );
+    const keysOrDiscarded = [43, 44, 48, 49, 50];
+    assert.deepEqual(
+      sitesOf('thirdPartyMember', member).filter((site) =>
+        keysOrDiscarded.includes(lineOf(site)),
+      ),
+      [],
+    );
+  });
+
+  it('a whole third-party value held reads nothing; an unknown we wrote is charged where written, not read off the third party', () => {
+    const sites = sitesOf('thirdPartyMember', member);
+    assert.deepEqual(
+      sites.filter((site) => lineOf(site) >= 60 && lineOf(site) <= 64),
+      [],
+    );
+    assert.deepEqual(
+      sites
+        .filter((site) => lineOf(site) >= 75 && lineOf(site) <= 77)
+        .map((site) => [lineOf(site), site.kind, site.reason]),
+      [
+        [75, 'parameter', 'holds'],
+        [76, 'expression', 'holds'],
+      ],
+    );
+  });
+
+  it("a settled promise's reason is a caught value: handed whole to a thrown-value reader it passes, inspected it is refused", () => {
+    const listing = { thrown: [key('settledReason', 'describe', 'thrown')] };
+    assert.deepEqual(thirdPartyReads('settledReason', listing), [
+      [12, 'caught'],
+      [21, 'refused'],
+    ]);
+  });
+});
+
 describe('production code holds as unknown only what comes from outside the type system', () => {
   const sites = sweepProduction();
 

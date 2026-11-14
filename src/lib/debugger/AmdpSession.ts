@@ -166,14 +166,8 @@ const failedAt = <E extends Error>(
     : carryingFailure(error, a.getError(), step);
 /** The frame a start or a command answers, as the library's reading keeps it. */
 type Wire = Partial<Pick<IAdtWireResponse, 'headers' | 'data'>>;
-const wireOf = (a: IAdtResponse<IAdtWireResponse>): Wire => {
-  const value = a.ok ? a.getResult().value : undefined;
-  if (value === undefined) return {};
-  return {
-    headers: value.headers,
-    ...(value.data !== undefined ? { data: value.data } : {}),
-  };
-};
+const wireOf = (a: IAdtResponse<IAdtWireResponse>): Wire =>
+  (a.ok ? a.getResult().value : undefined) ?? {};
 
 export class AmdpSession<O = unknown> {
   private readonly serial = new Serial();

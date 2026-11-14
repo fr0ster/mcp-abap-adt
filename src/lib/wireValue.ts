@@ -6,6 +6,7 @@
  * handed on whole, to a sink that takes anything (`JSON.stringify`,
  * `String`).
  */
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { attr } from './thrownValue';
 
 /** What a wire value is, as its readers tell it apart. */
@@ -40,4 +41,18 @@ export function wireValueOf(value: unknown): WireValue {
     return { kind: 'object', attribute: (name) => attr(value, name) };
   }
   return { kind: 'other' };
+}
+
+/**
+ * An answer's body as text, the way `String` writes it; an absent one
+ * (`undefined`, `null`) is `''`. Told apart by {@link wireValueOf}, the body
+ * itself only handed on whole to `String`.
+ */
+export function bodyTextOf(
+  answer: Partial<Pick<IAdtWireResponse, 'data'>>,
+): string {
+  const body = wireValueOf(answer.data);
+  return body.kind === 'undefined' || body.kind === 'null'
+    ? ''
+    : String(answer.data);
 }

@@ -27,6 +27,7 @@ import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
+import { bodyTextOf } from '../wireValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
   childAt as nodeAt,
@@ -269,7 +270,7 @@ export function nodeLevel(
   answer: Partial<Pick<IAdtWireResponse, 'data'>>,
 ): NodeLevel {
   // The wire's body, from outside the type system, as text.
-  return nodeLevelOf(String(answer.data ?? ''));
+  return nodeLevelOf(bodyTextOf(answer));
 }
 
 /** One level of a node-structure document's text, descriptions kept. */

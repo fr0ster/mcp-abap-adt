@@ -31,21 +31,21 @@ export class EnvelopeWatch {
     const answered = () => {
       this.answers += 1;
     };
+    // The session members as the connection has them: each forwarded to
+    // the same-named one, absent when the connection lacks it.
+    const sessionType = connection.getSessionType;
+    const sessionMode = connection.getSessionMode;
     const forwarding = {
       connect: () => connection.connect(),
       getBaseUrl: () => connection.getBaseUrl(),
       getSessionId: () => connection.getSessionId(),
       setSessionType: (type: Session) => connection.setSessionType(type),
-      // Read as the batch connection reads a wrapped one: the contract's
-      // members answer a session, so none is no session stated.
-      getSessionType: (): Session =>
-        connection.getSessionType?.() ??
-        connection.getSessionMode?.() ??
-        'stateless',
-      getSessionMode: (): Session =>
-        connection.getSessionMode?.() ??
-        connection.getSessionType?.() ??
-        'stateless',
+      ...(sessionType === undefined
+        ? {}
+        : { getSessionType: () => sessionType.call(connection) }),
+      ...(sessionMode === undefined
+        ? {}
+        : { getSessionMode: () => sessionMode.call(connection) }),
       makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
         let sending: Promise<IAdtWireResponse>;
         try {

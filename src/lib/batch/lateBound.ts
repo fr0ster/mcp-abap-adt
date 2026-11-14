@@ -41,16 +41,37 @@ export class LateBoundConnection implements IAbapConnection {
   private current: IAbapConnection | undefined;
   private sealed = false;
 
+  /**
+   * The pointed connection's own session members, present only while it has
+   * them: the contract types their answer a session, so a member the
+   * connection lacks (or no connection) is absent here too, and a caller's
+   * `getSessionType?.()` answers nothing, as the members always did.
+   */
+  declare getSessionType?: () => Session;
+  declare getSessionMode?: () => Session;
+
   /** Points the target at `connection`; `undefined` clears it. Sealed, it stays cleared. */
   point(connection: IAbapConnection | undefined): void {
     if (this.sealed) return;
     this.current = connection;
+    this.forwardSession(connection);
   }
 
   /** The batch was dropped: the target is cleared for good. */
   seal(): void {
     this.sealed = true;
     this.current = undefined;
+    this.forwardSession(undefined);
+  }
+
+  /** The session members of `connection`, each forwarded to the same-named one. */
+  private forwardSession(connection: IAbapConnection | undefined): void {
+    const type = connection?.getSessionType;
+    if (type === undefined) delete this.getSessionType;
+    else this.getSessionType = () => type.call(connection);
+    const mode = connection?.getSessionMode;
+    if (mode === undefined) delete this.getSessionMode;
+    else this.getSessionMode = () => mode.call(connection);
   }
 
   private target(): IAbapConnection {
@@ -77,26 +98,6 @@ export class LateBoundConnection implements IAbapConnection {
 
   setSessionType(type: Session): void {
     this.target().setSessionType(type);
-  }
-
-  /**
-   * The pointed connection's session, read as the batch connection reads a
-   * wrapped one (`getSessionType`, else `getSessionMode`, else stateless):
-   * the contract's members answer a session, so none is no session stated.
-   */
-  getSessionType(): Session {
-    const current = this.current;
-    return (
-      current?.getSessionType?.() ?? current?.getSessionMode?.() ?? 'stateless'
-    );
-  }
-
-  /** The pointed connection's session, its `getSessionMode` read first. */
-  getSessionMode(): Session {
-    const current = this.current;
-    return (
-      current?.getSessionMode?.() ?? current?.getSessionType?.() ?? 'stateless'
-    );
   }
 
   async makeAdtRequest(

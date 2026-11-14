@@ -7,6 +7,7 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { digitsAfter } from '../plainText';
+import { bodyTextOf } from '../wireValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import { buildOrdered, ORDERED_ATTRIBUTES, parseOrdered } from '../xml/ordered';
 import {
@@ -243,7 +244,7 @@ function lastSegmentOf(location: string): string {
 export function readAmdpStart(
   wire: Partial<Pick<IAdtWireResponse, 'headers' | 'data'>>,
 ): { mainId: string; hanaSession: string } {
-  const body = String(wire.data ?? '');
+  const body = bodyTextOf(wire);
   // The start's parameters, read with this module's parser (no prefixes): the
   // one whose key is the HANA session names it in its value.
   const parameter = walk(parseOrEmpty(body)).find(

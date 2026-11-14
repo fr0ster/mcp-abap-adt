@@ -850,6 +850,17 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
       [21, 'refused'],
     ]);
   });
+
+  it('the forms round 11 found writing into a third party are each refused where they read', () => {
+    assert.deepEqual(
+      refusedReads('round11'),
+      [11, 12, 18, 23, 27, 37, 43, 49, 55],
+    );
+    assert.deepEqual(
+      sitesOf('round11').filter((site) => lineOf(site) >= 59),
+      [],
+    );
+  });
 });
 
 describe('production code holds as unknown only what comes from outside the type system', () => {

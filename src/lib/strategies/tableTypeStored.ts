@@ -16,6 +16,7 @@
  * empty body — the answer says the stored definition was not read, with
  * SAP's answer: never the values sent in its place.
  */
+
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
@@ -24,6 +25,13 @@ import {
   thrownEntry,
 } from '../answer';
 import type { ReadVersion } from '../handlers/readVersion';
+import {
+  child,
+  isElement,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import type { AnswerDetail } from './projections';
 import { type AdtReading, parseStructure } from './reading';
 
@@ -45,16 +53,15 @@ export type StoredTableTypeDefinition = {
 };
 
 /** `node`'s child `name`, when `node` is a parsed element that holds one. */
-function childOf(node: unknown, name: string): unknown {
-  if (typeof node !== 'object' || node === null || Array.isArray(node)) return;
-  return Reflect.get(node, name);
+function childOf(node: XmlRead, name: string): XmlRead {
+  return child(node, name);
 }
 
 /** A parsed element's text: a bare string, or `#text` beside its attributes. */
-function textOfElement(node: unknown): string | undefined {
+function textOfElement(node: XmlRead): string | undefined {
   if (typeof node === 'string') return node;
-  if (typeof node !== 'object' || node === null || Array.isArray(node)) return;
-  const text: unknown = Reflect.get(node, '#text');
+  if (!isElement(node)) return;
+  const text = node['#text'];
   if (typeof text === 'string') return text;
   // An element with attributes and no text (`<ttyp:x a="1"/>`): empty.
   return Object.keys(node).every((key) => key === '@') ? '' : undefined;
@@ -75,7 +82,7 @@ export function readTableTypeDefinition(
   const builtIn = childOf(rowType, 'ttyp:builtInType');
   const primaryKey = childOf(root, 'ttyp:primaryKey');
   const read: ReadonlyArray<
-    readonly [keyof StoredTableTypeDefinition, unknown]
+    readonly [keyof StoredTableTypeDefinition, XmlRead]
   > = [
     ['row_type_kind', childOf(rowType, 'ttyp:typeKind')],
     ['row_type_name', childOf(rowType, 'ttyp:typeName')],

@@ -11,7 +11,16 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { attr, child, entries, isList, listOf } from '../../../lib/xml/tree';
+import {
+  attr,
+  child,
+  entries,
+  isList,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetInactiveObjects',
@@ -33,7 +42,7 @@ interface InactiveObjectRef {
 }
 
 /** One entry's fields; `adtcore:parentUri`'s last segment is the owner's name. */
-function refOf(a: unknown): InactiveObjectRef {
+function refOf(a: XmlRead): InactiveObjectRef {
   const parentUri = attr(a, 'adtcore:parentUri');
   const parent = parentUri
     ? decodeURIComponent(parentUri.split('/').filter(Boolean).pop() ?? '')
@@ -54,7 +63,7 @@ function refOf(a: unknown): InactiveObjectRef {
  * of `structured`'s forced-array element names, so this holds regardless of
  * how many objects are inactive.
  */
-function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
+function extractInactiveObjects(value: XmlRead): InactiveObjectRef[] {
   // BASIS 7.40 answers another document: `adtcore:objectReferences`, one
   // `adtcore:objectReference` per object (measured 2026-10-01). Read as the
   // newer shape it gave `count: 0` over eight inactive objects.

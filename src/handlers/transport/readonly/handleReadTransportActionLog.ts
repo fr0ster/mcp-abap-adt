@@ -16,11 +16,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { child, childAt, isList } from '../../../lib/outsideValue';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { child, childAt, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportActionLog',

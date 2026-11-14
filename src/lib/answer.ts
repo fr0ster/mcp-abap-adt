@@ -28,6 +28,7 @@ import {
   type JsonValue,
   parseJson,
 } from './json';
+import { child, isElement, isList } from './outsideValue';
 import type { AnswerDetail } from './strategies/projections';
 import {
   type FailedRequest,
@@ -42,7 +43,6 @@ import {
   SystemContextMissingError,
 } from './systemContextGuard';
 import { wireResponseOf } from './wireResponse';
-import { child, isElement, isList } from './xml/tree';
 
 export type { AnswerDetail };
 

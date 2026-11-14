@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, isList } from './xml/tree';
+import { child, childAt, isList } from './outsideValue';
 
 export interface ParsedCheckRunResult {
   success: boolean;

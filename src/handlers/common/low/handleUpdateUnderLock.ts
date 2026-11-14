@@ -63,6 +63,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import {
   handleUpdateBehaviorDefinition,
   TOOL_DEFINITION as UpdateBehaviorDefinition_Tool,
@@ -202,7 +203,7 @@ const ANSWER = { tool: 'HandlerUpdate', detail: 'terse' } as const;
 
 /** The one write's answer, as every compact write answers it. */
 const written = (
-  call: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>,
+  call: () => Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>,
 ) => answer(ANSWER, call, project('terse', terseWrite));
 
 type AdtClient = IServerAdtClient;
@@ -210,7 +211,7 @@ export type IncludeWriter = {
   update(
     config: object,
     options: { headers: IAdtHeaders } & Record<string, unknown>,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 };
 
 /**

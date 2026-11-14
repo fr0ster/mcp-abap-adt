@@ -45,6 +45,7 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import { child } from '../../../lib/outsideValue';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
@@ -61,7 +62,6 @@ import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
-import { child } from '../../../lib/xml/tree';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,

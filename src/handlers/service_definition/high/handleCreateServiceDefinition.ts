@@ -44,6 +44,7 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree.js';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -107,7 +108,7 @@ export async function handleCreateServiceDefinition(
 
   return answer(
     { tool: 'CreateServiceDefinition', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getServiceDefinition(
         resultsFor(serviceDefinitionDocuments),
       );
@@ -134,7 +135,7 @@ export async function handleCreateServiceDefinition(
       // The shell was created empty. Write the body, under a lock this call
       // also releases, before any activation — an activated empty object is
       // the bug this write exists to avoid.
-      let written: IAdtResponse<AdtReading<unknown>, IAdtError> = created;
+      let written: IAdtResponse<AdtReading<XmlRead>, IAdtError> = created;
       if (args.source_code) {
         written = await withLock(
           () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),

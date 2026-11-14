@@ -46,6 +46,7 @@ import {
   isCredentialPayload,
   unlessCredentialFailure,
 } from '../answer';
+import { child } from '../outsideValue';
 import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
@@ -53,7 +54,6 @@ import {
   noteLeftBehind,
   payloadCarriedBy,
 } from '../strategies/step';
-import { child } from '../xml/tree';
 import {
   type BreakpointNotPlaced,
   mergeDefinitions,

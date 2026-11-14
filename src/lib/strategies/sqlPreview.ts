@@ -1,7 +1,17 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { withoutNamePrefix } from '../plainText';
-import { attr, child, childAt, isElement, isList } from '../xml/tree';
+import { parseXml } from '../xml/node';
+import {
+  attr,
+  child,
+  childAt,
+  isElement,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { type AdtReading, parseStructure, reading } from './reading';
 
 /**
@@ -72,7 +82,7 @@ export interface SqlPreview {
    * answers exactly what it answered then, and the rows are correct beside
    * it.
    */
-  document: unknown;
+  document: XmlRead;
 }
 
 const parser = new XMLParser({
@@ -88,11 +98,11 @@ const parser = new XMLParser({
 });
 
 /** One element or several, as a list; a single value that is not an element is none. */
-const asList = (value: unknown): readonly unknown[] =>
+const asList = (value: XmlRead): XmlList =>
   isList(value) ? value : isElement(value) ? [value] : [];
 
 /** The attribute `name` of `element`'s attribute group (`@`). */
-const at = (element: unknown, name: string): string | undefined =>
+const at = (element: XmlRead, name: string): string | undefined =>
   attr(child(element, '@'), name);
 
 /**
@@ -104,7 +114,7 @@ const at = (element: unknown, name: string): string | undefined =>
  * caller can tell "SAP sent nothing" from "SAP sent a blank string", which is
  * what the pre-migration answer did too.
  */
-const cell = (value: unknown): string | null => {
+const cell = (value: XmlRead): string | null => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'object') {
     const text = child(value, '#text');
@@ -114,14 +124,14 @@ const cell = (value: unknown): string | null => {
   return text === '' ? null : text;
 };
 
-const numberOf = (value: unknown): number | undefined => {
+const numberOf = (value: XmlRead): number | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 export function parseSqlPreview(document: string): SqlPreview {
-  const table = child(parser.parse(document), 'tableData');
+  const table = child(parseXml(parser, document), 'tableData');
   if (!table)
     return { columns: [], rows: [], document: parseStructure(document) };
 

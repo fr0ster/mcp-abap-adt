@@ -21,7 +21,7 @@
  * ({@link toolSearchText}); without, every word stays.
  */
 
-import { isList, entries as membersOf } from '../xml/tree';
+import { isList, entries as membersOf } from '../outsideValue';
 import '../instance.js';
 
 /** The search texts of one tool. */

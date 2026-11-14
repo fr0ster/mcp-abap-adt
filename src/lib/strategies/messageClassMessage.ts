@@ -1,4 +1,13 @@
-import { child, type Element, entries, isElement, isList } from '../xml/tree';
+import {
+  child,
+  type Element,
+  entries,
+  isElement,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { parseStructure } from './reading';
 
 /**
@@ -17,13 +26,13 @@ export interface ClassMessage {
   /** The element's attributes, each under its name without the prefix. */
   readonly fields: Record<string, string>;
   /** The element as parsed, attributes verbatim, children included. */
-  readonly element: unknown;
+  readonly element: XmlRead;
 }
 
-const asArray = (value: unknown): readonly unknown[] =>
+const asArray = (value: XmlNode | undefined): XmlList =>
   isList(value) ? value : value === undefined ? [] : [value];
 
-const attributesOf = (element: unknown): Element => {
+const attributesOf = (element: XmlRead): Element => {
   const group = child(element, '@');
   return isElement(group) ? group : {};
 };
@@ -47,7 +56,7 @@ function localFields(attributes: Element): Record<string, string> {
 }
 
 /** The value under the key whose local name (the part after any prefix) is `name`. */
-const byLocalName = (node: unknown, name: string): unknown =>
+const byLocalName = (node: XmlRead, name: string): XmlNode | undefined =>
   entries(node).find(([k]) => k.slice(k.indexOf(':') + 1) === name)?.[1];
 
 /**

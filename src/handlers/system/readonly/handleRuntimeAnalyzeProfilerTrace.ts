@@ -7,9 +7,9 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import { child, entries, isElement, isList } from '../../../lib/outsideValue';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { child, entries, isElement, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeProfilerTrace',

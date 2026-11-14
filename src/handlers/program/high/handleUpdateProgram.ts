@@ -36,6 +36,7 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
@@ -83,14 +84,14 @@ export async function handleUpdateProgram(
 
   return answer(
     { tool: 'UpdateProgram', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createOnPremAdtClient(connection, logger).getProgram(
         resultsFor(programDocuments),
       );
 
       const written = await withLock(
         () => obj.lock({ programName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
           const update = atStep('update', () =>
             withAdtHeaders(context, 'program.update', (headers) =>
               obj.update(

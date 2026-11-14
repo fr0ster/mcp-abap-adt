@@ -59,6 +59,7 @@ import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 type AdtClient = IServerAdtClient;
 
@@ -70,7 +71,7 @@ export interface DeletionName {
 
 /** What a deletion check or a deletion answers: a reading of the document. */
 export type DeletionAnswer = Promise<
-  IAdtResponse<AdtReading<unknown>, IAdtError>
+  IAdtResponse<AdtReading<XmlRead>, IAdtError>
 >;
 
 export interface DeletionTarget {
@@ -115,7 +116,7 @@ const withConfig =
  * each with the configuration `config` builds — the object's own type,
  * bound here once for both.
  */
-const boundTarget = <C, V extends AdtReading<unknown>>(
+const boundTarget = <C, V extends AdtReading<XmlRead>>(
   objectType: CheckedDeletableType,
   checked: (client: AdtClient) => Pick<CheckedDeletable<C, V>, 'checkDeletion'>,
   deleted: (
@@ -143,7 +144,7 @@ const boundTarget = <C, V extends AdtReading<unknown>>(
 });
 
 /** A type whose check and deletion are both sent on the variant's client. */
-const target = <C, V extends AdtReading<unknown>>(
+const target = <C, V extends AdtReading<XmlRead>>(
   objectType: CheckedDeletableType,
   object: (client: AdtClient) => CheckedDeletable<C, V>,
   config: (name: DeletionName) => C,

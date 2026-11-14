@@ -9,7 +9,15 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
-import { attr, child, childAt, listOf } from '../xml/tree';
+import {
+  attr,
+  child,
+  childAt,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
 import { succeeded } from './stepResponse';
@@ -28,7 +36,7 @@ import { succeeded } from './stepResponse';
 export interface WhereUsedSource {
   getWhereUsedScope(
     params: IAdtWhereUsedScopeParamsOf,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   /** Local — issues no request. */
   modifyWhereUsedScope(
     scopeXml: string,
@@ -41,7 +49,7 @@ export interface WhereUsedSource {
   ): string;
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 }
 
 /** What `modifyWhereUsedScope` takes: each option may be absent. */
@@ -77,12 +85,12 @@ export interface WhereUsedMembers {
   getWhereUsedScope(
     params: IAdtWhereUsedScopeParamsOf,
     options: { headers: IAdtHeaders },
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   modifyWhereUsedScope: WhereUsedSource['modifyWhereUsedScope'];
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
     options: { headers: IAdtHeaders },
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 }
 
 /**
@@ -130,7 +138,7 @@ export interface WhereUsedFilter {
 }
 
 /** The attribute `name` of `node`'s attribute group (`@`). */
-function attrOf(node: unknown, name: string): string | undefined {
+function attrOf(node: XmlRead, name: string): string | undefined {
   return attr(child(node, '@'), name);
 }
 
@@ -145,7 +153,7 @@ function attrOf(node: unknown, name: string): string | undefined {
  * `tests/fixtures/adt/read-where-used-list-structure--01-informationsystem-
  * usagereferences.body.xml`, the one captured fixture for this endpoint.
  */
-export function parseWhereUsedReferences(value: unknown): WhereUsedListResult {
+export function parseWhereUsedReferences(value: XmlRead): WhereUsedListResult {
   const root = child(value, 'usagereferences:usageReferenceResult');
   const rawRefs = childAt(
     root,

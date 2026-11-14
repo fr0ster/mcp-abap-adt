@@ -6,7 +6,7 @@
  * by its shape, never assumed: a manifest without a text `name` and a text
  * `version` stops the start in words.
  */
-import { child } from './xml/tree';
+import { child } from './outsideValue';
 
 /** What a launcher reads of its manifest. */
 export interface PackageManifest {

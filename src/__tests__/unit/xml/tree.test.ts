@@ -84,7 +84,7 @@ describe('elements', () => {
   });
 
   it('members that are not elements are left out', () => {
-    expect(elements([{ a: 1 }, 'x', null, [1]])).toEqual([{ a: 1 }]);
+    expect(elements([{ a: 1 }, 'x', [1]])).toEqual([{ a: 1 }]);
   });
 });
 
@@ -157,8 +157,7 @@ describe('attr', () => {
 
 describe('entries', () => {
   it("an element's members in their order; anything else has none", () => {
-    const parsed: unknown = JSON.parse('{"b":1,"a":"x"}');
-    expect(entries(parsed)).toEqual([
+    expect(entries({ b: 1, a: 'x' })).toEqual([
       ['b', 1],
       ['a', 'x'],
     ]);

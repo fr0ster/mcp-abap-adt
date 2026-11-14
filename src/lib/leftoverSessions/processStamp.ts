@@ -13,7 +13,7 @@
  */
 
 import * as fs from 'node:fs';
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 
 /** A process, as a runtime file names it. */
 export interface ProcessStamp {

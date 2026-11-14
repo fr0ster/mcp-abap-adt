@@ -21,7 +21,7 @@ import type {
   ILogonTarget,
   IRequestTarget,
 } from '@mcp-abap-adt/interfaces-auth';
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 
 export class CurrentCredential extends AuthProviderBase {
   #current: IAuthProvider;

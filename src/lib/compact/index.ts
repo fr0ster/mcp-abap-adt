@@ -26,6 +26,7 @@ export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
 export { jsonOf } from '../jsonText.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
+export { child, type Element, isElement, isList } from '../outsideValue.js';
 export { spentBy } from '../sessionLoss.js';
 export {
   LOCK_NOT_HELD_HERE_WORDS,
@@ -36,7 +37,6 @@ export {
 export { DETAIL_SHAPE } from '../strategies/detail.js';
 export { LOCK_WENT_WITH_SESSION_WORDS } from '../strategies/withLock.js';
 export { byVariant } from '../variantDefinition.js';
-export { child, type Element, isElement, isList } from '../xml/tree.js';
 export { handlerBatchDefinition } from './batch/handleHandlerBatch.js';
 export * from './compactDescriptions.js';
 export {

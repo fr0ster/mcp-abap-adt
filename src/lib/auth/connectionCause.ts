@@ -10,7 +10,7 @@
  * host.
  */
 import { TLS_FAILURE_CODES } from '@mcp-abap-adt/interfaces-auth';
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 
 /** Node's network codes a connection may fail with. */
 const NETWORK_CODES = [

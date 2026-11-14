@@ -14,7 +14,7 @@
  */
 
 import * as z from 'zod';
-import { child } from './xml/tree';
+import { child } from './outsideValue';
 
 /**
  * The approved list, by tool name: the same names as

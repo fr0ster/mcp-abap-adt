@@ -44,6 +44,7 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroup',
@@ -84,14 +85,14 @@ export async function handleUpdateFunctionGroup(
 
   return answer(
     { tool: 'UpdateFunctionGroup', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
       return withLock(
         () => obj.lock({ functionGroupName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> =>
           sequence(
             atStep('read metadata', () =>
               obj.readMetadata(

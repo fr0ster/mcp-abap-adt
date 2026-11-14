@@ -25,10 +25,10 @@ import {
 } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
+import { child } from '../../outsideValue';
 import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
-import { child } from '../../xml/tree';
 import type {
   HandlerEntry,
   IHandlerGroup,

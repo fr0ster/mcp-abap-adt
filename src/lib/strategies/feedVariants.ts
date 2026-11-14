@@ -1,4 +1,11 @@
-import { child, localName, text } from '../xml/tree';
+import {
+  child,
+  localName,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import {
   attributeOf,
   membersNamed,
@@ -28,7 +35,7 @@ export interface FeedVariants {
 }
 
 /** A feed's own text member (`atom:id`, `atom:title`): text, CDATA included, `''` when none. */
-function textOf(entry: unknown, name: string): string {
+function textOf(entry: XmlRead, name: string): string {
   return text(child(entry, name)) ?? '';
 }
 

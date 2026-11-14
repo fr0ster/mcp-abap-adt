@@ -38,6 +38,7 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdatePackage',
@@ -81,7 +82,7 @@ export async function handleUpdatePackage(
         connection,
         logger,
         'UpdatePackage',
-        (own): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        (own): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
           const pkg = createAdtClient(own, logger).getPackage(
             resultsFor(packageDocuments),
           );
@@ -89,7 +90,7 @@ export async function handleUpdatePackage(
             () => pkg.lock({ packageName }, { analyse: analyseLock }),
             (
               lockHandle,
-            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+            ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> =>
               sequence(
                 atStep('read metadata', () =>
                   pkg.readMetadata(

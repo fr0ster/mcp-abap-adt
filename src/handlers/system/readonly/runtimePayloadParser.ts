@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
-import { type JsonValue, jsonOf } from '../../../lib/json';
+import { type JsonValue, jsonOfNode } from '../../../lib/json';
+import { parseXml, type XmlNode } from '../../../lib/xml/node';
 
 const runtimeXmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -8,7 +9,7 @@ const runtimeXmlParser = new XMLParser({
 
 /**
  * Convert ADT XML payload to JSON object when payload is XML text, its
- * parse checked once ({@link jsonOf}). If payload is not XML text, or its
+ * parse typed at the parse ({@link parseXml}). If payload is not XML text, or its
  * parse is not JSON, returns it as-is.
  */
 export function parseRuntimePayloadToJson(payload: string): JsonValue {
@@ -17,12 +18,11 @@ export function parseRuntimePayloadToJson(payload: string): JsonValue {
     return payload;
   }
 
-  let parsed: unknown;
+  let parsed: XmlNode | undefined;
   try {
-    parsed = runtimeXmlParser.parse(trimmed);
+    parsed = parseXml(runtimeXmlParser, trimmed);
   } catch {
     return payload;
   }
-  const json = jsonOf(parsed);
-  return json === undefined ? payload : json;
+  return parsed === undefined ? payload : jsonOfNode(parsed);
 }

@@ -1,7 +1,7 @@
 // Refused (search): the old `absentPerCheck` — a regular expression over a
 // deletion message's text, read out of the parsed check document.
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, listOf } from '../../../../../../lib/xml/tree';
+import { child, childAt, listOf } from '../../../../../../lib/outsideValue';
 
 const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true });
 

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+
 /**
  * GetTypeInfo: every DDIC kind a type name is (#321).
  *
@@ -37,7 +38,15 @@ import {
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
-import { child, childAt, listOf } from '../../../lib/xml/tree';
+import { parseXml } from '../../../lib/xml/node';
+import {
+  child,
+  childAt,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
@@ -71,14 +80,14 @@ const parser = new XMLParser({
 });
 
 /** A DDIC number as it is written (`000003`), as a number; absent stays absent. */
-function numberOf(value: unknown): number | undefined {
+function numberOf(value: XmlRead): number | undefined {
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 /** A text element's value, trimmed; an empty element (`<x/>`) is absent. */
-function textOf(value: unknown): string | undefined {
+function textOf(value: XmlRead): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed === '' ? undefined : trimmed;
@@ -88,12 +97,12 @@ function textOf(value: unknown): string | undefined {
  * A fixed value's bound as written: an empty element is the blank value
  * (`''`), spaces are kept; only an element that is not there is absent.
  */
-function boundOf(value: unknown): string | undefined {
+function boundOf(value: XmlRead): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
 /** The attributes every ADT object document carries. */
-function objectFacts(root: unknown) {
+function objectFacts(root: XmlRead) {
   return {
     name: textOf(child(root, 'adtcore:name')),
     description: textOf(child(root, 'adtcore:description')),
@@ -102,8 +111,8 @@ function objectFacts(root: unknown) {
 }
 
 /** The document `xml` parses to, read from outside the type system. */
-function documentOf(xml: string): unknown {
-  return parser.parse(xml);
+function documentOf(xml: string): XmlRead {
+  return parseXml(parser, xml);
 }
 
 function parseDataElement(xml: string) {
@@ -198,7 +207,7 @@ type Lookup = {
   step: string;
   /** The root element of the kind's document, named in a refusal to read one. */
   document: string;
-  read: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  read: () => Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   parse: (xml: string) => JsonValue | undefined;
 };
 

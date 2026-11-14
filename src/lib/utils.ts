@@ -33,19 +33,19 @@ import {
   hasT100Key,
   NAME_TAKEN_KEYS,
 } from './messageKeys';
+import { child, childAt, listOf } from './outsideValue';
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
-import { child, childAt, listOf } from './xml/tree';
 
-/** The readers of a value from outside the type system (`xml/tree`), for the packages. */
+/** The readers of a value from outside the type system (`outsideValue`), for the packages. */
 export {
   child,
   childAt,
   type Element,
   isElement,
   isList,
-} from './xml/tree';
+} from './outsideValue';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues

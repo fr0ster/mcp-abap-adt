@@ -134,6 +134,7 @@ import {
   readLongBackground,
   statesBackground,
 } from '../lib/longTools.js';
+import { child, isElement } from '../lib/outsideValue.js';
 import {
   closeOwnedConnections,
   endConnection,
@@ -189,7 +190,6 @@ import {
 } from '../lib/toolResult.js';
 import { readOnlyToolNames } from '../lib/toolSet.js';
 import { return_error } from '../lib/utils.js';
-import { child, isElement } from '../lib/xml/tree.js';
 import type {
   ConnectionContext,
   ResolvedConnection,

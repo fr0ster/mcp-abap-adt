@@ -17,7 +17,14 @@ import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { attr, child, isList } from '../../../lib/xml/tree';
+import {
+  attr,
+  child,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
@@ -60,7 +67,7 @@ export interface SearchHit {
  * `structured` parse (`resultSets.ts`'s `READING_BY_SLOT`), so this walks that
  * tree directly rather than re-running a parser of its own.
  */
-export function parseSearchHits(value: unknown): SearchHit[] {
+export function parseSearchHits(value: XmlRead): SearchHit[] {
   const root =
     child(value, 'adtcore:objectReferences') ??
     child(value, 'objectReferences');
@@ -88,7 +95,7 @@ export function parseSearchHits(value: unknown): SearchHit[] {
 }
 
 /** The same tab-separated shape this tool answered before the migration. */
-function objectReferenceLines(value: unknown): string {
+function objectReferenceLines(value: XmlRead): string {
   const hits = parseSearchHits(value);
   if (hits.length === 0) return '';
   const lines = ['name\ttype\tdescription\tpackage'];

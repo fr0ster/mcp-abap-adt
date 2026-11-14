@@ -1,4 +1,4 @@
-import { type JsonValue, jsonOf } from '../json';
+import { type JsonValue, jsonOfNode } from '../json';
 import { terseWrite } from './projections';
 import type { AdtReading } from './reading';
 import {
@@ -11,10 +11,11 @@ import {
 
 /**
  * The structured reading of a tool that promised JSON: the document's parse,
- * checked once ({@link jsonOf}); `null` for one that does not parse.
+ * typed at the parse and written as JSON ({@link jsonOfNode}); `null` for one
+ * that does not parse.
  */
 const jsonReading = reading(
-  (answer): JsonValue => jsonOf(parseStructure(rawOf(answer))) ?? null,
+  (answer): JsonValue => jsonOfNode(parseStructure(rawOf(answer))),
 );
 
 /**

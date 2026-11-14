@@ -57,7 +57,13 @@ import {
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
-import { child, entries, isList, text } from '../../../lib/xml/tree';
+import {
+  child,
+  entries,
+  isList,
+  text,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 /**
  * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
@@ -182,7 +188,7 @@ export interface EnhancementResponse {
 }
 
 /** The first attribute of `node` whose name ends in `suffix` (`name` takes `enh:full_name` too). */
-function endingIn(node: unknown, suffix: string): string | undefined {
+function endingIn(node: XmlRead, suffix: string): string | undefined {
   const found = entries(child(node, '@')).find(([key]) => key.endsWith(suffix));
   return found ? attributeOf(node, found[0]) : undefined;
 }

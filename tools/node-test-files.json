@@ -132,5 +132,6 @@
   "src/__tests__/unit/sources/unknownSources.test.ts",
   "src/__tests__/unit/testConfigSchema.test.ts",
   "src/__tests__/unit/toolSet/dataTools.test.ts",
-  "src/__tests__/unit/toolSet/fixtureBytes.test.ts"
+  "src/__tests__/unit/toolSet/fixtureBytes.test.ts",
+  "src/__tests__/unit/xml/node.test.ts"
 ]

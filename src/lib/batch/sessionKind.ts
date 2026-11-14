@@ -17,7 +17,7 @@
  */
 
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 
 export type SessionKind = 'lock' | 'unlock' | 'stateless' | 'stateful';
 

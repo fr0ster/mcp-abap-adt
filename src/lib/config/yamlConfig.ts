@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
-import { childAt, isElement } from '../xml/tree';
+import { childAt, isElement } from '../outsideValue';
 import {
   CONF_ROW,
   ParameterRefusal,

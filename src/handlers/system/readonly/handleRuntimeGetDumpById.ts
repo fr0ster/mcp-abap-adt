@@ -5,9 +5,9 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { JsonValue } from '../../../lib/json';
+import { attr, child, childAt, isList } from '../../../lib/outsideValue';
 import { afterLast, digitsAfter } from '../../../lib/plainText';
 import { return_error } from '../../../lib/utils';
-import { attr, child, childAt, isList } from '../../../lib/xml/tree';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {

@@ -34,7 +34,7 @@ import { corpusBody } from '../helpers/adtCorpus';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /** A run document kept as text: the reading a set that keeps it answers. */
-function kept(raw: string): AdtReading<unknown> {
+function kept(raw: string): AdtReading<string> {
   return { value: raw, raw, status: 200 };
 }
 

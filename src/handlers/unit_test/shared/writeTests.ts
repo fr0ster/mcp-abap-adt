@@ -52,8 +52,9 @@ import {
 } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
+import type { XmlRead } from '../../../lib/xml/tree';
 
-type Answer = IAdtResponse<AdtReading<unknown>, IAdtError>;
+type Answer = IAdtResponse<AdtReading<XmlRead>, IAdtError>;
 
 export function programTestInclude(programName: string): string {
   return `${programName.toUpperCase()}_T99`;

@@ -32,6 +32,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import type { XmlRead } from '../../../lib/xml/tree';
 import { type RunOutcome, readRunOnce, unfinishedRun } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
@@ -62,11 +63,11 @@ export interface IUnitTestRunInformation {
     runId: string,
     withLongPolling: boolean | undefined,
     options: IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   getResult(
     runId: string,
     options: IUnitTestResultOptions & IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 }
 
 export function testRunner(
@@ -92,7 +93,7 @@ export function testRunner(
  */
 export interface StartedRun {
   readonly runId: string;
-  readonly waited?: RunOutcome<AdtReading<unknown>>;
+  readonly waited?: RunOutcome<AdtReading<XmlRead>>;
 }
 
 /**

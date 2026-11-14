@@ -5,7 +5,7 @@
  * (`LeftoverSessions`); a context without it answers "not available here".
  */
 
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 import type { LeftoverListing } from './LeftoverSessions';
 
 /** The status of SAP's answer to a request, as SAP gave it. */

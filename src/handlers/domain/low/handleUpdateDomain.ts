@@ -37,6 +37,7 @@ import {
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { child } from '../../../lib/outsideValue';
 import {
   clearableText,
   givenCount,
@@ -52,7 +53,6 @@ import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
-import { child } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDomainLow',

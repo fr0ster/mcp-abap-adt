@@ -23,7 +23,7 @@ import {
   runnerWaitOf,
   type WaitArgs,
 } from '../../handlers/unit_test/shared/runner';
-import { child } from '../../lib/xml/tree';
+import { child } from '../../lib/outsideValue';
 
 /** The runner and the wait a handler received, read as the SDK handed them. */
 function runArgs(given: unknown): RunnerArgs & WaitArgs {

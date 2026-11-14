@@ -49,7 +49,14 @@ import type { AdtCodes } from '../adtProjections';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import type { ReadVersion } from '../handlers/readVersion';
-import { attr, child, childAt } from '../xml/tree';
+import {
+  attr,
+  child,
+  childAt,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { readFunctionModuleMetadata } from './metadataReads';
 import { type AdtReading, parseStructure } from './reading';
 import { withStep } from './step';

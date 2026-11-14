@@ -52,6 +52,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
 
 export const TOOL_DEFINITION = {
@@ -154,7 +155,7 @@ export async function handleCreateServiceBinding(
 
   return answer(
     { tool: 'CreateServiceBinding', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getServiceBinding(
         resultsFor(serviceDocuments),
       );

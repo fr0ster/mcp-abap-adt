@@ -1,7 +1,8 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { withoutNamePrefix } from '../plainText';
-import { attr, child, type Visit, walk } from '../xml/tree';
+import { parseXml, type XmlNode } from '../xml/node';
+import { attr, child, type Visit, walk, type XmlRead } from '../xml/tree';
 
 /**
  * What a result strategy of ours answers.
@@ -97,20 +98,20 @@ const parser = new XMLParser({
 
 /**
  * Parse a document into named structure with verbatim attributes; `null` for
- * a blank document or one that does not parse. The parse comes from outside
- * the type system.
+ * a blank document or one that does not parse. The parse is typed at the
+ * parse (`xml/node`).
  */
-export function parseStructure(document: string): unknown {
+export function parseStructure(document: string): XmlNode | null {
   if (document.trim() === '') return null;
   try {
-    return parser.parse(document);
+    return parseXml(parser, document) ?? null;
   } catch {
     return null;
   }
 }
 
 /** The attribute `name` of an element {@link parseStructure} answered (its attributes sit under `@`). */
-export function attributeOf(node: unknown, name: string): string | undefined {
+export function attributeOf(node: XmlRead, name: string): string | undefined {
   return attr(child(node, '@'), name);
 }
 
@@ -124,7 +125,7 @@ export function attributeOf(node: unknown, name: string): string | undefined {
  * first appears: in `<r><x/><p/><x/></r>` both `x` come before `p`. Where
  * document order matters, read the ordered form (`xml/ordered`).
  */
-export function walkStructure(document: unknown): Visit[] {
+export function walkStructure(document: XmlRead): Visit[] {
   return walk(document, ATTRIBUTES).filter(
     (visit) => !ATTRIBUTES.has(visit.name),
   );
@@ -133,7 +134,7 @@ export function walkStructure(document: unknown): Visit[] {
 const ATTRIBUTES: ReadonlySet<string> = new Set(['@']);
 
 /** The members named `name` (as the document spells it), at any depth, in {@link walkStructure}'s order. */
-export function membersNamed(document: unknown, name: string): Visit[] {
+export function membersNamed(document: XmlRead, name: string): Visit[] {
   return walkStructure(document).filter((visit) => visit.name === name);
 }
 
@@ -142,7 +143,7 @@ export function membersNamed(document: unknown, name: string): Visit[] {
  * {@link walkStructure}'s order — an element before the ones it holds.
  */
 export function firstAttribute(
-  document: unknown,
+  document: XmlRead,
   name: string,
 ): string | undefined {
   for (const visit of walkStructure(document)) {
@@ -157,7 +158,7 @@ export function firstAttribute(
  * document spells it) that carries it, in {@link walkStructure}'s order.
  */
 export function firstAttributeOn(
-  document: unknown,
+  document: XmlRead,
   element: string,
   name: string,
 ): string | undefined {

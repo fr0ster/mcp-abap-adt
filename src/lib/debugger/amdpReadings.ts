@@ -6,6 +6,7 @@
 
 import { XMLParser } from 'fast-xml-parser';
 import { digitsAfter } from '../plainText';
+import { parseXml, type XmlNode } from '../xml/node';
 import { buildOrdered, ORDERED_ATTRIBUTES, parseOrdered } from '../xml/ordered';
 import {
   attr,
@@ -16,6 +17,7 @@ import {
   listOf,
   localName,
   walk,
+  type XmlRead,
 } from '../xml/tree';
 import { addressOf, type ObjectAddress } from './objectUri';
 import { terseFrames } from './readings';
@@ -40,14 +42,14 @@ const parser = new XMLParser({
     ].includes(n),
 });
 /** A document parsed with this module's parser, or nothing for a body that is not XML. */
-function parseOrEmpty(xml: string): unknown {
+function parseOrEmpty(xml: string): XmlNode | undefined {
   try {
-    return parser.parse(xml);
+    return parseXml(parser, xml);
   } catch {
     return undefined;
   }
 }
-const text = (v: unknown): string =>
+const text = (v: XmlRead): string =>
   v === undefined || v === null
     ? ''
     : typeof v === 'object'
@@ -94,12 +96,12 @@ export interface AmdpEvent {
   body: string;
 }
 
-const lineOf = (uri: unknown): number | undefined => {
+const lineOf = (uri: XmlRead): number | undefined => {
   const start = digitsAfter(text(uri), '#start=');
   return start ? Number(start) : undefined;
 };
 
-function breakpointState(b: unknown): AmdpBreakpointState {
+function breakpointState(b: XmlNode): AmdpBreakpointState {
   const name = text(child(b, 'name'));
   const line = lineOf(child(b, 'uri'));
   const errorMessage = text(child(b, 'errorMessage')).trim();
@@ -111,7 +113,7 @@ function breakpointState(b: unknown): AmdpBreakpointState {
   };
 }
 
-function frameOf(f: unknown): AmdpFrame {
+function frameOf(f: XmlNode): AmdpFrame {
   const abap = child(f, 'abapPosition');
   const native = child(f, 'nativePosition');
   const line = lineOf(child(abap, 'uri'));
@@ -140,7 +142,7 @@ function frameOf(f: unknown): AmdpFrame {
  */
 function mainResponseBodies(xml: string): string[] {
   const bodies: string[] = [];
-  const visit = (members: unknown): void => {
+  const visit = (members: XmlRead): void => {
     for (const member of listOf(members)) {
       for (const [name, content] of entries(member)) {
         if (name === ORDERED_ATTRIBUTES) continue;
@@ -161,10 +163,10 @@ function mainResponseBodies(xml: string): string[] {
  * depths by kind (a sync's breakpoints under value/syncBreakpoints/breakpoints,
  * measured on premise 2026-10-11), and the reading must not depend on that.
  */
-function deep(node: unknown, key: string): unknown[] {
+function deep(node: XmlRead, key: string): XmlNode[] {
   if (!node || typeof node !== 'object') return [];
   if (isList(node)) return node.flatMap((n) => deep(n, key));
-  const found: unknown[] = [];
+  const found: XmlNode[] = [];
   for (const [k, v] of entries(node)) {
     if (k === key) found.push(...(isList(v) ? v : [v]));
     else found.push(...deep(v, key));
@@ -174,7 +176,7 @@ function deep(node: unknown, key: string): unknown[] {
 
 export function readAmdpEvents(xml: string): AmdpEvent[] {
   if (!xml?.trim()) return [];
-  const doc: unknown = parser.parse(xml);
+  const doc = parseXml(parser, xml);
   // The system answers a mainResponseList (measured on premise, 2026-10-11).
   const list = child(doc, 'mainResponseList');
   const root = list && typeof list === 'object' ? list : doc;
@@ -257,7 +259,7 @@ export function readAmdpPreview(xml: string): {
   rows: Array<Record<string, string>>;
   columns: string[];
 } {
-  const table = child(parser.parse(xml ?? ''), 'tableData');
+  const table = child(parseXml(parser, xml ?? ''), 'tableData');
   const columns = listOf(child(table, 'columns'));
   const names = columns.map((c) => text(childAt(c, 'metadata', 'name')));
   const values: string[][] = columns.map((c) =>

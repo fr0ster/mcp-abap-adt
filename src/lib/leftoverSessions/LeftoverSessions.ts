@@ -62,8 +62,8 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { hasMethod } from '../capability';
 import { resolveSystemKind } from '../connectionFactory';
+import { child } from '../outsideValue';
 import { isEnded, whenLogoffCompleted } from '../ownedConnections';
-import { child } from '../xml/tree';
 import {
   nodeProcessProbe,
   type ProcessProbe,

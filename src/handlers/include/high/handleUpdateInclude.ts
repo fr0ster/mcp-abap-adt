@@ -22,10 +22,13 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import type { StepResponse } from '../../../lib/strategies/stepResponse';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateInclude',
@@ -75,7 +78,7 @@ export async function handleUpdateInclude(
 
   return answer(
     { tool: 'UpdateInclude', detail },
-    async () => {
+    async (): Promise<StepResponse<AdtReading<XmlRead>>> => {
       const obj = createOnPremAdtClient(connection, logger).getInclude(
         resultsFor(includeDocuments),
       );

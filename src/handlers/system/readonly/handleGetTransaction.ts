@@ -7,7 +7,14 @@ import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { child, entries, isList } from '../../../lib/xml/tree';
+import {
+  child,
+  entries,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
@@ -25,15 +32,15 @@ export function transactionUri(name: string): string {
   return `/sap/bc/adt/vit/wb/object_type/trant/object_name/${encodeURIComponent(name)}`;
 }
 
-const asArray = (value: unknown): readonly unknown[] =>
+const asArray = (value: XmlNode | undefined): XmlList =>
   isList(value) ? value : value === undefined ? [] : [value];
 
 /** The child whose local name (the part after any prefix) is `name`. */
-const byLocalName = (node: unknown, name: string): unknown =>
+const byLocalName = (node: XmlRead, name: string): XmlNode | undefined =>
   entries(node).find(([k]) => k.slice(k.indexOf(':') + 1) === name)?.[1];
 
 /** An element's attributes as SAP sent them, values as text. */
-const attributesOf = (element: unknown): Record<string, string> =>
+const attributesOf = (element: XmlRead): Record<string, string> =>
   Object.fromEntries(
     entries(child(element, '@')).map(([k, v]) => [k, String(v)]),
   );
@@ -47,7 +54,7 @@ const attributesOf = (element: unknown): Record<string, string> =>
  * type, owner, language, creation and the rest. Every attribute is answered
  * as SAP sent it.
  */
-export function transactionPropertiesOf(value: unknown): {
+export function transactionPropertiesOf(value: XmlRead): {
   object: Record<string, string> | undefined;
   properties: Record<string, string>[];
 } {

@@ -7,7 +7,17 @@
 import { readExceptionSubType } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, isElement, isList, listOf } from '../xml/tree';
+import { parseXml } from '../xml/node';
+import {
+  child,
+  childAt,
+  isElement,
+  isList,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { addressOf, type ObjectAddress } from './objectUri';
 
 const parser = new XMLParser({
@@ -28,11 +38,11 @@ const parser = new XMLParser({
 });
 
 /** A document's parse, from outside the type system; a blank one parses to `{}`. */
-const parse = (xml: string): unknown => parser.parse(xml);
-const text = (v: unknown): string =>
+const parse = (xml: string): XmlRead => parseXml(parser, xml);
+const text = (v: XmlRead): string =>
   v === undefined || v === null || typeof v === 'object' ? '' : String(v);
-const num = (v: unknown): number => Number(text(v).trim() || 0);
-const bool = (v: unknown): boolean => text(v) === 'true';
+const num = (v: XmlRead): number => Number(text(v).trim() || 0);
+const bool = (v: XmlRead): boolean => text(v) === 'true';
 
 export interface DebuggeeReading {
   debuggeeId: string;
@@ -449,9 +459,9 @@ export function failureText(error: {
 }): string {
   const data = error.response?.data;
   if (typeof data !== 'string') return error.message;
-  let doc: unknown;
+  let doc: XmlRead;
   try {
-    doc = child(exceptionParser.parse(data), 'exception');
+    doc = child(parseXml(exceptionParser, data), 'exception');
   } catch {
     return error.message;
   }

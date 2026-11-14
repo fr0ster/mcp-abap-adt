@@ -28,6 +28,7 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import { child } from '../../../lib/outsideValue';
 import {
   afterBlanksAt,
   asciiLower,
@@ -48,7 +49,6 @@ import {
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
 import { return_error, return_response } from '../../../lib/utils';
-import { child } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetStructuresList',

@@ -20,10 +20,10 @@ import { answerCaught, answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type AnswerObject, type JsonValue, jsonOf } from '../../../lib/json';
+import { child, isList } from '../../../lib/outsideValue';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
-import { child, isList } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',

@@ -69,6 +69,7 @@ import {
 } from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
@@ -316,9 +317,9 @@ function refusesCredential(
 async function whereUsedFromAnswers(
   context: HandlerContext,
   given: WhereUsedArgs,
-  scope: PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>> | undefined,
+  scope: PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>> | undefined,
   references:
-    | PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>
+    | PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>
     | undefined,
 ) {
   const { connection, logger } = context;
@@ -398,7 +399,7 @@ async function whereUsedFromAnswers(
  */
 function unsearchable(
   typedArgs: WhereUsedArgs,
-  scopeResponse: IAdtResponse<AdtReading<unknown>, IAdtError> & { ok: true },
+  scopeResponse: IAdtResponse<AdtReading<XmlRead>, IAdtError> & { ok: true },
 ): string | undefined {
   const scopeXml = scopeResponse.getResult().value?.raw ?? '';
   const available = new Set<string>(whereUsedScopeTypesOf(scopeXml));
@@ -450,7 +451,7 @@ async function whereUsedInEnvelopes(
     object_name: entry.name,
     object_type: entry.code,
   });
-  type Answered = PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  type Answered = PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   const scopes = new Map<number, Answered>();
   const references = new Map<number, Answered>();
   const ended = (

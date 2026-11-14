@@ -12,6 +12,7 @@ import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import type { XmlList, XmlNode, XmlRead } from '../../../lib/xml/tree';
 
 /**
  * The answer's shape, shared with `GetTableContents`, which reads the same
@@ -34,7 +35,7 @@ export interface SqlQueryResponse {
    * `detail: 'full'` only — the whole document, parsed generically, so
    * nothing the rows do not need is dropped on the way.
    */
-  document?: unknown | undefined;
+  document?: XmlRead | undefined;
 }
 
 export const TOOL_DEFINITION = {

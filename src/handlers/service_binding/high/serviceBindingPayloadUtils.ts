@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
-import { type JsonValue, jsonOf, parseJson } from '../../../lib/json';
+import { type JsonValue, jsonOfNode, parseJson } from '../../../lib/json';
+import { parseXml, type XmlNode } from '../../../lib/xml/node';
 
 export type ServiceBindingResponseFormat = 'xml' | 'json' | 'plain';
 
@@ -17,8 +18,8 @@ export function resolveServiceBindingAcceptHeader(
 
 /**
  * A service binding's answer in the format asked for: the text as it came
- * (`plain`, or a document that does not parse), else its parse, checked once
- * ({@link jsonOf}).
+ * (`plain`, or a document that does not parse), else its parse, typed at the parse
+ * ({@link parseXml}).
  */
 export function parseServiceBindingPayload(
   payload: string,
@@ -38,16 +39,15 @@ export function parseServiceBindingPayload(
     return payload;
   }
 
-  let parsed: unknown;
+  let parsed: XmlNode | undefined;
   try {
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
     });
-    parsed = parser.parse(trimmed);
+    parsed = parseXml(parser, trimmed);
   } catch {
     return payload;
   }
-  const json = jsonOf(parsed);
-  return json === undefined ? payload : json;
+  return parsed === undefined ? payload : jsonOfNode(parsed);
 }

@@ -49,7 +49,13 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
-import { child, childAt } from '../../../lib/xml/tree';
+import {
+  child,
+  childAt,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 const TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -89,7 +95,7 @@ type CreateTransportTaskArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * request's does — on the root rather than on a `tm:request` child, which is
  * the shape `parseCreatedTransport` learned in adt-clients 20.0.0.
  */
-const taskNumberOf = (value: unknown): string => {
+const taskNumberOf = (value: XmlRead): string => {
   const root = child(value, 'tm:root') ?? value;
   return String(childAt(root, '@', 'tm:number') ?? '');
 };
@@ -124,7 +130,7 @@ export async function handleCreateTransportTask(
   // not fail the creation — it is said in the answer instead.
   let typed: { type: TaskType; error?: FailureEntry } = { type: 'X' };
 
-  const terseTask = (value: unknown) => {
+  const terseTask = (value: XmlRead) => {
     const number = taskNumberOf(value);
     return {
       success: true,
@@ -162,7 +168,7 @@ export async function handleCreateTransportTask(
       )();
       // A reading, as `project` receives it: the parsed document is its value.
       const number = created.ok
-        ? taskNumberOf(child(created.getResult().value, 'value'))
+        ? taskNumberOf(created.getResult().value.value)
         : '';
       if (number && taskType !== 'X') {
         const changed = await withAdtHeaders(

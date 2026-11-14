@@ -10,6 +10,8 @@
  * `aggregates` read zero while it holds findings, so its counts are the
  * findings' (`readAtcObjects`), the same as `GetATCFindings` answers.
  */
+import type { XmlList, XmlNode, XmlRead } from '../xml/tree';
+
 import {
   type AtcFindingFull,
   atcElements,

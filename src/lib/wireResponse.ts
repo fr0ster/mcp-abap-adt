@@ -8,7 +8,7 @@
  * none.
  */
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { entries, isElement, isList } from './xml/tree';
+import { entries, isElement, isList } from './outsideValue';
 
 /** A header's value as the wire answer types it. */
 type IAdtHeaderValue = IAdtWireResponse['headers'][string];

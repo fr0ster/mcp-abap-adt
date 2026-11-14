@@ -3,7 +3,7 @@
  * changes, the model's own object, from outside the type system — member by
  * member, as the patch it feeds writes each one.
  */
-import { child, type Element, isElement, isList } from './xml/tree';
+import { child, type Element, isElement, isList } from './outsideValue';
 
 /** The first of `names` the bag carries (neither `undefined` nor `null`), as given. */
 export function given(bag: unknown, ...names: string[]): unknown {

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { child, entries, isElement } from '../../lib/xml/tree';
+import { child, entries, isElement } from '../../lib/outsideValue';
 import { repositoryRoot } from './repoRoot';
 
 /**

@@ -1,4 +1,4 @@
-import { isElement, isList } from './xml/tree';
+import { isElement, isList } from './outsideValue';
 
 type McpResponse = {
   isError: boolean;

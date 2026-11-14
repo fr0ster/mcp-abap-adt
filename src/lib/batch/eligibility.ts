@@ -17,7 +17,7 @@
  */
 
 import * as path from 'node:path';
-import { child, isList } from '../xml/tree';
+import { child, isList } from '../outsideValue';
 
 /**
  * One condition on a named argument; an entry's `when` holds when all of them

@@ -30,8 +30,20 @@
  * and it is what the ATC parse inside adt-clients uses, and what
  * `reading.ts` and `packageWalk.ts` here use.
  */
+
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, type Element, isElement, isList } from '../xml/tree';
+import { parseXml } from '../xml/node';
+
+import {
+  child,
+  childAt,
+  type Element,
+  isElement,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 
 export interface AtcFinding {
   /** `adtcore:name` of the enclosing object element. */
@@ -132,7 +144,7 @@ export type { Element };
  * of a list that is not an element (an empty `<object/>` parses to `''`) is
  * an element with nothing in it.
  */
-function asList(value: unknown): Element[] {
+function asList(value: XmlRead): Element[] {
   if (isList(value)) return value.map((m) => (isElement(m) ? m : {}));
   if (isElement(value)) return [value];
   return [];
@@ -203,13 +215,13 @@ function quickfixes(finding: Element): AtcQuickfixFlags | undefined {
 }
 
 export function parseAtcWorklist(document: string): AtcWorklistReading {
-  const parsed: unknown = parser.parse(document);
+  const parsed: XmlRead = parseXml(parser, document);
   return readAtcObjects(childAt(parsed, 'worklist', 'objects'));
 }
 
 /** The XML parser every ATC document here is read with: SAP's document, unread. */
-export function parseAtcDocument(document: string): unknown {
-  return parser.parse(document);
+export function parseAtcDocument(document: string): XmlRead {
+  return parseXml(parser, document);
 }
 
 /** One element, several, or none, as a list: for the readers of other ATC documents. */
@@ -220,7 +232,7 @@ export const atcElements = asList;
  * both carry `atcobject:object` elements with `atcobject:findings` of
  * `atcfinding:finding`.
  */
-export function readAtcObjects(objectsElement: unknown): AtcWorklistReading {
+export function readAtcObjects(objectsElement: XmlRead): AtcWorklistReading {
   const findings: AtcFindingFull[] = [];
   const by_priority: Record<string, number> = {};
   let objects_checked = 0;

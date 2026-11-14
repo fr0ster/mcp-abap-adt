@@ -5,6 +5,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
@@ -50,7 +51,7 @@ export async function handleGetUnitTestStatus(
   // by enumerating every `answer()` call's own projection rather than only
   // calls to the shared `project()` helper, which this handler's own
   // hand-written, `AdtReading`-typed projection does not use.
-  const terseRunStatus = (value: unknown) => ({
+  const terseRunStatus = (value: XmlRead) => ({
     run_id,
     finished: runIsFinished(value),
     run_status: runProgressStatus(value),

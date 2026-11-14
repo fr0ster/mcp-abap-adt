@@ -13,7 +13,7 @@ import {
   answerValueOf,
   isAnswerList,
 } from '../json';
-import { child, isElement, isList } from '../xml/tree';
+import { child, isElement, isList } from '../outsideValue';
 import type { LeftBehind } from './step';
 
 /**

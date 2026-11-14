@@ -29,6 +29,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
+import { child, isElement } from '../outsideValue';
 import { currentRequestSignal } from '../requestSignal';
 import { spentBy } from '../sessionLoss';
 import {
@@ -36,7 +37,6 @@ import {
   carryingPayload,
   noteLeftBehind,
 } from '../strategies/step';
-import { child, isElement } from '../xml/tree';
 import {
   type AmdpBreakpointState,
   type AmdpEvent,

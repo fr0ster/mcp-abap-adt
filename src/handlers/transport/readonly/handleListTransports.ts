@@ -40,6 +40,9 @@ import {
   elements,
   entries,
   isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
 } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
@@ -90,16 +93,27 @@ const STATUS_BY_CONTAINER: Record<string, string> = {
 const MODIFIABLE_STATUSES = new Set(['D', 'L']);
 
 /** The attribute `name` of `node` (the reading groups them under `@`), `''` when absent. */
-function attrOf(node: unknown, name: string): string {
+function attrOf(node: XmlRead, name: string): string {
   return attr(child(node, '@'), name) ?? '';
 }
 
+/**
+ * What a listing's reading holds: one search's parse, or each search's parse
+ * in their order when several were read.
+ */
+type ListedValue = XmlRead | readonly XmlRead[];
+
+/** Whether a listing's value holds several parses (or is a list itself). */
+function isSeveral(value: ListedValue): value is readonly XmlRead[] {
+  return Array.isArray(value);
+}
+
 function collectRequestNodes(
-  node: unknown,
+  node: ListedValue,
   containerStatus: string,
   found: { req: Element; containerStatus: string }[],
 ): void {
-  if (isList(node)) {
+  if (isSeveral(node)) {
     for (const item of node) {
       collectRequestNodes(item, containerStatus, found);
     }
@@ -138,7 +152,7 @@ function collectRequestNodes(
  * the tree, and duplicates (same request number reached through more than one
  * branch) are collapsed, first occurrence winning.
  */
-export function parseTransportListValue(value: unknown): TransportEntry[] {
+export function parseTransportListValue(value: ListedValue): TransportEntry[] {
   const found: { req: Element; containerStatus: string }[] = [];
   collectRequestNodes(value, '', found);
 
@@ -286,7 +300,7 @@ async function listTransportsOneByOne(
       const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
       searched = running.map((configuration) => configuration.uri);
 
-      const readings: AdtReading<unknown>[] = [];
+      const readings: AdtReading<XmlRead>[] = [];
       for (const configuration of running) {
         const listed = await atStep('list', () =>
           request.list({
@@ -308,7 +322,7 @@ async function listTransportsOneByOne(
       // documents joined for `detail: 'raw'` — there is no single document to
       // answer when several were read, and dropping all but one would be a
       // quieter lie than joining them.
-      const merged: AdtReading<unknown> =
+      const merged: AdtReading<ListedValue> =
         readings.length === 1
           ? readings[0]
           : {
@@ -392,7 +406,7 @@ async function listTransportsInEnvelopes(
     )(),
   );
   const configured = first;
-  let lists: PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>[] = [];
+  let lists: PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>[] = [];
   if (configured.ok && configured.value.ok) {
     const running = configured.value
       .getResult()
@@ -432,7 +446,7 @@ async function listTransportsInEnvelopes(
       const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
       searched = running.map((configuration) => configuration.uri);
 
-      const readings: AdtReading<unknown>[] = [];
+      const readings: AdtReading<XmlRead>[] = [];
       for (const result of lists) {
         if (!result.ok) throw result.error;
         const listed = result.value;
@@ -442,7 +456,7 @@ async function listTransportsInEnvelopes(
         readings.push(listed.getResult().value);
       }
 
-      const merged: AdtReading<unknown> =
+      const merged: AdtReading<ListedValue> =
         readings.length === 1
           ? readings[0]
           : {

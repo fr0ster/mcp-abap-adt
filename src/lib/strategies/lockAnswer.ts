@@ -25,7 +25,17 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { attr, child, childAt, isList, text } from '../xml/tree';
+import { attr as wireAttr, child as wireChild } from '../outsideValue';
+import {
+  attr,
+  child,
+  childAt,
+  isList,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { parseStructure } from './reading';
 
 /** A header's value as text: a string, or a list's first string; else empty. */
@@ -59,14 +69,14 @@ export const analyseLock: IAnalyse<IAdtError> = (verdict, answer) => {
   if (judged !== ADT_NO_FAILURE) return judged;
   if (carriesLockHandle(answer)) return ADT_NO_FAILURE;
   // The wire answer's `request` is the transport's, typed `unknown`: read.
-  const request = child(answer, 'request');
-  const url = attr(request, 'url');
+  const request = wireChild(answer, 'request');
+  const url = wireAttr(request, 'url');
   return {
     origin: 'refusal',
     message:
       'SAP answered the lock request without a lock handle; the object is not locked',
     response: answer,
-    ...(url ? { request: { method: attr(request, 'method'), url } } : {}),
+    ...(url ? { request: { method: wireAttr(request, 'method'), url } } : {}),
   };
 };
 

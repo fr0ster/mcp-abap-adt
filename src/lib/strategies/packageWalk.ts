@@ -31,7 +31,7 @@ import {
   isElement,
   isList,
   listOf,
-} from '../xml/tree';
+} from '../outsideValue';
 import {
   type MetadataRead,
   type MetadataTarget,

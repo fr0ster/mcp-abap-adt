@@ -1,4 +1,5 @@
-import { isElement } from './xml/tree';
+import { isElement } from './outsideValue';
+import type { XmlNode } from './xml/node';
 
 /**
  * A JSON value: what `JSON.parse` and the XML-to-object parsers answer, once
@@ -36,7 +37,7 @@ export function jsonOf(value: unknown): JsonValue | undefined {
     }
     return items;
   }
-  if (!isElement(value)) return undefined;
+  if (typeof value !== 'object' || value === null) return undefined;
   // Built by `Object.fromEntries`, which defines each member as its own: a
   // member named `__proto__` stays a member, never the copy's prototype.
   const members: [string, JsonValue][] = [];
@@ -46,6 +47,19 @@ export function jsonOf(value: unknown): JsonValue | undefined {
     members.push([key, json]);
   }
   return Object.fromEntries(members);
+}
+
+/**
+ * A parsed document's node as a JSON value, built afresh: a text value as it
+ * is, a list and an element member by member; no document (`null`) is
+ * `null`. Typed both sides, so nothing is checked.
+ */
+export function jsonOfNode(node: XmlNode | null): JsonValue {
+  if (node === null || typeof node !== 'object') return node;
+  if (Array.isArray(node)) return node.map(jsonOfNode);
+  return Object.fromEntries(
+    Object.entries(node).map(([name, member]) => [name, jsonOfNode(member)]),
+  );
 }
 
 /** `text` read as JSON and checked ({@link jsonOf}); `undefined` when it is not JSON. */

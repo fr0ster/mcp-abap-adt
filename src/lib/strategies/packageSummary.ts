@@ -11,7 +11,16 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { attr, child, childAt, isList } from '../xml/tree';
+import { parseXml } from '../xml/node';
+import {
+  attr,
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -23,10 +32,10 @@ const parser = new XMLParser({
 });
 
 /** The attribute `name` of `element`'s attribute group (`@`). */
-const at = (element: unknown, name: string): string | undefined =>
+const at = (element: XmlRead, name: string): string | undefined =>
   attr(child(element, '@'), name);
 
-const count = (value: unknown): number =>
+const count = (value: XmlRead): number =>
   value === undefined || value === '' ? 0 : isList(value) ? value.length : 1;
 
 export interface PackageSummary {
@@ -46,7 +55,7 @@ const orUndefined = (value: string | undefined) =>
   value === undefined || value === '' ? undefined : value;
 
 export function packageSummary(xml: string): PackageSummary {
-  const root = child(parser.parse(xml), 'package');
+  const root = child(parseXml(parser, xml), 'package');
   const transport = child(root, 'transport');
   return {
     name: orUndefined(at(root, 'name')),
@@ -81,7 +90,7 @@ export interface PackageDetails extends PackageSummary {
 
 /** The summary and, for `detail: full`, every sub-package by name and description. */
 export function packageDetails(xml: string): PackageDetails {
-  const root = child(parser.parse(xml), 'package');
+  const root = child(parseXml(parser, xml), 'package');
   const refs = childAt(root, 'subPackages', 'packageRef');
   const list = refs === undefined ? [] : isList(refs) ? refs : [refs];
   return {

@@ -63,6 +63,7 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorImplementation',
@@ -127,7 +128,7 @@ export async function handleUpdateBehaviorImplementation(
 
   return answer(
     { tool: 'UpdateBehaviorImplementation', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getBehaviorImplementation(
         resultsFor(classDocuments),
       );

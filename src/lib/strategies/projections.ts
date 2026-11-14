@@ -1,5 +1,14 @@
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
-import { attr, child, childAt, listOf, text } from '../xml/tree';
+import {
+  attr,
+  child,
+  childAt,
+  listOf,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import type { AdtReading } from './reading';
 
 /**
@@ -50,17 +59,17 @@ export function project<T, R>(
 // ---------------------------------------------------------------------------
 
 /** The attribute `name` of `node` (the reading parser groups them under `@`). */
-function attrOf(node: unknown, name: string): string | undefined {
+function attrOf(node: XmlRead, name: string): string | undefined {
   return attr(child(node, '@'), name);
 }
 
 /** A repeatable level's first member, or the level itself when it is one. */
-function first(node: unknown): unknown {
+function first(node: XmlRead): XmlRead {
   return listOf(node)[0];
 }
 
 /** `node`'s text, `''` when it has none. */
-function textOf(node: unknown): string {
+function textOf(node: XmlRead): string {
   return text(node) ?? '';
 }
 
@@ -68,7 +77,7 @@ function textOf(node: unknown): string {
  * A write with nothing to report. A class create answers 200 with zero bytes
  * and a successful source write answers the same, so the status is the verdict.
  */
-export const terseWrite = (_value: unknown, status: number) =>
+export const terseWrite = <T>(_value: T, status: number) =>
   status >= 200 && status < 300 ? 'SUCCESS' : undefined;
 
 /**
@@ -100,12 +109,12 @@ export const terseWrite = (_value: unknown, status: number) =>
  * fails the type check.
  */
 export type ActivationAnswer =
-  | { readonly form: 'checklist'; readonly checklist: unknown }
+  | { readonly form: 'checklist'; readonly checklist: XmlRead }
   | { readonly form: 'empty' };
 
 /** The activation's answer form, read from the reading: the body is text from outside, read here. */
 export function activationAnswerOf(
-  reading: AdtReading<unknown>,
+  reading: AdtReading<XmlRead>,
 ): ActivationAnswer | undefined {
   if (reading.raw.trim() === '') return { form: 'empty' };
   const checklist = child(reading.value, 'chkl:messages');
@@ -154,7 +163,7 @@ export function terseActivationAnswer(
  * activated before any projection runs). An activation's answer is projected
  * by {@link projectActivation}, which reads the empty `200` too.
  */
-export const terseActivation = (value: unknown, _status?: number) => {
+export const terseActivation = (value: XmlRead, _status?: number) => {
   const checklist = child(value, 'chkl:messages');
   return checklist
     ? terseActivationAnswer({ form: 'checklist', checklist })
@@ -166,9 +175,11 @@ export const terseActivation = (value: unknown, _status?: number) => {
  * for an empty `200`), `full` the parse (for an empty `200`, which has none,
  * its terse answer), `terse` {@link terseActivationAnswer} of its form.
  */
-export function projectActivation<T>(
+export function projectActivation(
   detail: AnswerDetail,
-): (reading: AdtReading<T>) => T | string | TerseActivationAnswer | undefined {
+): (
+  reading: AdtReading<XmlRead>,
+) => XmlRead | TerseActivationAnswer | undefined {
   return (reading) => {
     if (detail === 'raw') return reading.raw;
     const answer = activationAnswerOf(reading);
@@ -182,7 +193,7 @@ export function projectActivation<T>(
 }
 
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */
-export const terseCheck = (value: unknown, _status?: number) => {
+export const terseCheck = (value: XmlRead, _status?: number) => {
   const report = first(
     childAt(value, 'chkrun:checkRunReports', 'chkrun:checkReport'),
   );
@@ -209,7 +220,7 @@ export const terseCheck = (value: unknown, _status?: number) => {
  * the delete's own document: a check that permits the delete is followed by
  * it (`deleteIfDeletable`), and a refused check is a failure, answered as one.
  */
-export const terseDeletion = (value: unknown, _status?: number) => {
+export const terseDeletion = (value: XmlRead, _status?: number) => {
   const object = first(childAt(value, 'del:deletionResult', 'del:object'));
   if (!object) return undefined;
   return {
@@ -220,7 +231,7 @@ export const terseDeletion = (value: unknown, _status?: number) => {
 };
 
 /** SAP's message on a deletion's object, when it carries text. */
-function deletionMessage(object: unknown) {
+function deletionMessage(object: XmlRead) {
   const message = first(child(object, 'del:message'));
   const said = textOf(child(message, 'del:text'));
   return said
@@ -233,7 +244,7 @@ function deletionMessage(object: unknown) {
  * object, and SAP's message when it carries text (a permitted check may say
  * the object does not exist; that is SAP's answer, as it came).
  */
-export const terseDeletionCheck = (value: unknown, _status?: number) => {
+export const terseDeletionCheck = (value: XmlRead, _status?: number) => {
   const object = first(childAt(value, 'del:checkResponse', 'del:object'));
   if (!object) return undefined;
   return {
@@ -254,7 +265,7 @@ export const terseDeletionCheck = (value: unknown, _status?: number) => {
  * behind it, so it is answered as `result`, exactly as sent (an absent or
  * empty one as `''`), with SAP's messages and no `admissible` of ours.
  */
-export const terseTransportCheck = (value: unknown, _status?: number) => {
+export const terseTransportCheck = (value: XmlRead, _status?: number) => {
   const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
   const result = textOf(child(data, 'RESULT'));
@@ -271,7 +282,7 @@ export const terseTransportCheck = (value: unknown, _status?: number) => {
 };
 
 /** Validation: `CHECK_RESULT` means admissible, `SEVERITY` carries a verdict. */
-export const terseValidation = (value: unknown, _status?: number) => {
+export const terseValidation = (value: XmlRead, _status?: number) => {
   const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
   const checkResult = child(data, 'CHECK_RESULT');

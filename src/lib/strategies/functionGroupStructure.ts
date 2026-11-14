@@ -1,6 +1,14 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, listOf } from '../xml/tree';
+import { parseXml } from '../xml/node';
+import {
+  child,
+  childAt,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 
 /** One node of a function group's object structure. */
 export interface FugrChild {
@@ -25,7 +33,7 @@ export const functionGroupStructure: IResultStrategy<FugrChild[]> = (
   answer,
 ) => {
   const xml = String(answer.data ?? '');
-  const parsed: unknown = parser.parse(xml);
+  const parsed: XmlRead = parseXml(parser, xml);
   const found = childAt(
     parsed,
     'projectexplorer:objectstructure',

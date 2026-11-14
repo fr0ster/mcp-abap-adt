@@ -5,7 +5,7 @@
  */
 
 import * as z from 'zod';
-import { child } from '../../../lib/xml/tree';
+import { child } from '../../../lib/outsideValue';
 import { fieldOf } from './runTarget';
 
 export const UNIT_TEST_RUNNERS = ['async', 'sync'] as const;

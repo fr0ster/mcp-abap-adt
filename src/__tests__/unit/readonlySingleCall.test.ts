@@ -71,13 +71,13 @@ import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGet
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
+import { child, listOf } from '../../lib/outsideValue';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
 import {
   parseStructure,
   structured,
   verbatim,
 } from '../../lib/strategies/reading';
-import { child, listOf } from '../../lib/xml/tree';
 import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,

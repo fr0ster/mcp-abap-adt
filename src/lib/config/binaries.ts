@@ -10,7 +10,7 @@
  * Plain code over the words, no regular expression.
  */
 
-import { isList } from '../xml/tree';
+import { isList } from '../outsideValue';
 import type { RemovedParameter } from './authParameters.js';
 
 /** The transport a binary serves: one binary per transport and tool set. */

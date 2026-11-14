@@ -38,7 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { asciiLower, asciiUpper } from '../plainText';
-import { child, entries, listOf, text } from '../xml/tree';
+import { child, entries, listOf, text, type XmlRead } from '../xml/tree';
 import {
   type AdtReading,
   attributeOf,
@@ -98,11 +98,11 @@ export interface ActivationRunSource {
       withLongPolling?: boolean | undefined;
       analyse?: RunAnalyse | undefined;
     },
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   getActivationResults(
     runId: string,
     options: { analyse?: RunAnalyse | undefined },
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   /** Read with `wireItself` in the `inactive` slot: the list as it came. */
   getInactiveObjects(options: {
     analyse?: RunAnalyse | undefined;
@@ -149,8 +149,8 @@ export class UnreadableRunStatus extends Error {
 }
 
 /** A reading's parse and its document as it came. */
-export function readingOf(value: AdtReading<unknown>): {
-  parsed: unknown;
+export function readingOf(value: AdtReading<XmlRead>): {
+  parsed: XmlRead;
   raw: string;
 } {
   return { parsed: value.value, raw: value.raw };
@@ -161,13 +161,13 @@ export function readingOf(value: AdtReading<unknown>): {
  * its document kept as text, parsed (`parseStructure`) — a caller may hand a
  * set that keeps only the document.
  */
-function documentsOf(value: AdtReading<unknown>): unknown[] {
+function documentsOf(value: AdtReading<XmlRead>): XmlRead[] {
   const { parsed, raw } = readingOf(value);
   return [parsed, parseStructure(raw)];
 }
 
 /** A document's root element: its first member that is not the declaration. */
-function rootOf(document: unknown): unknown {
+function rootOf(document: XmlRead): XmlRead {
   return entries(document).find(([name]) => !name.startsWith('?'))?.[1];
 }
 
@@ -178,7 +178,7 @@ function rootOf(document: unknown): unknown {
  * otherwise, because `run`'s reading is `structured` in `READING_BY_SLOT` but a
  * caller may hand this a set that keeps the document.
  */
-export function runStatusOf(value: AdtReading<unknown>): string {
+export function runStatusOf(value: AdtReading<XmlRead>): string {
   for (const document of documentsOf(value)) {
     const root = rootOf(document);
     const stated =
@@ -191,7 +191,7 @@ export function runStatusOf(value: AdtReading<unknown>): string {
 }
 
 /** A message's words: its `shortText`, or the `txt` in it, else its `text` attribute. */
-function wordsOf(msg: unknown): string {
+function wordsOf(msg: XmlRead): string {
   const shortText = child(msg, 'shortText');
   const own = text(shortText);
   if (own !== undefined) return own;
@@ -214,7 +214,7 @@ function wordsOf(msg: unknown): string {
  * what `E` means.
  */
 export function activationMessagesOf(
-  value: AdtReading<unknown>,
+  value: AdtReading<XmlRead>,
 ): ActivationMessage[] {
   for (const document of documentsOf(value)) {
     const messages = membersNamed(document, 'msg').map(({ node: msg }) => {
@@ -239,7 +239,7 @@ export function activationMessagesOf(
  * document kept as text, parsed — never from a message's words.
  */
 export function activationExecutedOf(
-  value: AdtReading<unknown>,
+  value: AdtReading<XmlRead>,
 ): boolean | undefined {
   for (const document of documentsOf(value)) {
     for (const { node } of membersNamed(document, 'chkl:properties')) {

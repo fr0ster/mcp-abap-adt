@@ -21,12 +21,12 @@
  */
 
 import { type JsonValue, jsonValueOf } from '../json';
+import { entries, isElement, isList } from '../outsideValue';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
-import { entries, isElement, isList } from '../xml/tree';
 import type { TlsConfig } from './IServerConfig.js';
 
 /** A start the parameters refuse, in words that name parameters only. */

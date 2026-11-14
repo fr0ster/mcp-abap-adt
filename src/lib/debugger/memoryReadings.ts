@@ -1,7 +1,17 @@
 /** Memory snapshot documents, and any document without a reading of its own. */
 
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, type Element, isElement, listOf } from '../xml/tree';
+import { parseXml } from '../xml/node';
+import {
+  child,
+  childAt,
+  type Element,
+  isElement,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -16,8 +26,8 @@ const parser = new XMLParser({
  * Any document, its namespaces dropped — `full` for an answer without a
  * reading of its own. A blank document parses to `{}`.
  */
-export function readXmlDocument(xml: string): unknown {
-  return parser.parse(xml);
+export function readXmlDocument(xml: string): XmlRead {
+  return parseXml(parser, xml);
 }
 
 export interface SnapshotReading {
@@ -29,7 +39,7 @@ export interface SnapshotReading {
   fileName: string;
 }
 
-const field = (v: unknown): string =>
+const field = (v: XmlRead): string =>
   v === undefined || v === null || typeof v === 'object' ? '' : String(v);
 
 export function readSnapshotList(xml: string): SnapshotReading[] {
@@ -62,8 +72,8 @@ export interface MemorySizesReading {
   };
 }
 
-const count = (v: unknown): number => Number(field(v).trim() || 0);
-const group = (node: unknown): Element => (isElement(node) ? node : {});
+const count = (v: XmlRead): number => Number(field(v).trim() || 0);
+const group = (node: XmlRead): Element => (isElement(node) ? node : {});
 
 export function readMemorySizes(xml: string): MemorySizesReading {
   const doc = group(child(readXmlDocument(xml), 'memorySizes'));

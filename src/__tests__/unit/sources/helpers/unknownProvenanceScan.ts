@@ -150,8 +150,8 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/strategies/step.ts#stepOf(value)',
   'src/lib/utils.ts#httpFailureOf(error)',
   'src/lib/utils.ts#return_error(error)',
-  'src/lib/xml/tree.ts#child(value)',
-  'src/lib/xml/tree.ts#isElement(value)',
+  'src/lib/outsideValue.ts#child(value)',
+  'src/lib/outsideValue.ts#isElement(value)',
 ]);
 
 export type SiteKind = 'parameter' | 'variable' | 'return' | 'property';

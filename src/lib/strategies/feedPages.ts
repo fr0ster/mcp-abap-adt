@@ -21,7 +21,12 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { isAsciiDigit } from '../plainText';
-import { localName } from '../xml/tree';
+import {
+  localName,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { attributeOf, parseStructure, walkStructure } from './reading';
 import { succeededWith } from './sequence';
 

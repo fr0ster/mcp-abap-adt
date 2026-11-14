@@ -3,7 +3,12 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { failedWith } from '../../../lib/strategies/sequence';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { succeeded } from '../../../lib/strategies/stepResponse';
-import { childAt } from '../../../lib/xml/tree';
+import {
+  childAt,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 /**
  * Reconstructing what the v18 convenience read did.
@@ -43,7 +48,7 @@ const FINISHED = 'FINISHED';
 const NOT_STARTED = 'NOT_STARTED';
 
 /** The run's own verdict on itself, read off `<aunit:progress status="..."/>`. */
-export function runProgressStatus(statusValue: unknown): string | undefined {
+export function runProgressStatus(statusValue: XmlRead): string | undefined {
   const status = childAt(
     statusValue,
     'aunit:run',
@@ -55,7 +60,7 @@ export function runProgressStatus(statusValue: unknown): string | undefined {
 }
 
 /** `true` only once ADT itself says the run is `FINISHED` — never guessed. */
-export function runIsFinished(statusValue: unknown): boolean {
+export function runIsFinished(statusValue: XmlRead): boolean {
   return runProgressStatus(statusValue) === FINISHED;
 }
 
@@ -67,12 +72,12 @@ export function runIsFinished(statusValue: unknown): boolean {
 export type RunOutcome<TResult> =
   | {
       readonly finished: true;
-      readonly status: AdtReading<unknown>;
+      readonly status: AdtReading<XmlRead>;
       readonly result: TResult;
     }
   | {
       readonly finished: false;
-      readonly status: AdtReading<unknown>;
+      readonly status: AdtReading<XmlRead>;
       readonly runStatus: string;
     };
 
@@ -109,7 +114,7 @@ export async function readRunOnce<TResult>(
   getStatus: (
     runId: string,
     withLongPolling: boolean,
-  ) => Promise<IAdtResponse<AdtReading<unknown>>>,
+  ) => Promise<IAdtResponse<AdtReading<XmlRead>>>,
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {

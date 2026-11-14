@@ -1,46 +1,49 @@
 /**
- * Reading parsed documents: what fast-xml-parser or `JSON.parse` answered,
- * which comes from outside the type system and is `unknown` here.
- *
- * Each predicate checks what it claims, and every reader of such a value goes
- * through this module (spec §4): `Array.isArray` and `Object.entries` are read
- * here, never on `unknown` elsewhere.
+ * Reading parsed documents: the typed nodes `xml/node` checked at the parse.
+ * A reader takes a node, or none ({@link XmlRead}): a member that is absent
+ * (`undefined`), a document that did not parse (`null`). Narrowing is by the
+ * union's form, statically: a text value by `typeof`, a list by
+ * {@link isList}, an element by {@link isElement}.
  */
+import type { XmlElement, XmlList, XmlNode } from './node';
 
-/** An element of a parsed document: an object (never an array), keyed by name. */
-export interface Element {
-  readonly [name: string]: unknown;
+export type { XmlElement, XmlList, XmlNode, XmlText } from './node';
+
+/** A node read from a document, or none: absent (`undefined`), or no document (`null`). */
+export type XmlRead = XmlNode | null | undefined;
+
+/** An element of a parsed document ({@link XmlElement}). */
+export type Element = XmlElement;
+
+/** Whether `value` is an element: a node that is neither a text value nor a list. */
+export function isElement(value: XmlRead): value is XmlElement {
+  return typeof value === 'object' && value !== null && !isList(value);
 }
 
-/** Whether `value` is an element: a non-null object that is not an array. */
-export function isElement(value: unknown): value is Element {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Whether `value` is an array. */
-export function isList(value: unknown): value is readonly unknown[] {
+/** Whether `value` is a list. */
+export function isList(value: XmlRead): value is XmlList {
   return Array.isArray(value);
 }
 
-/** `value` as a list: an array as it is, `undefined` and `null` as none, anything else alone. */
-export function listOf(value: unknown): readonly unknown[] {
-  if (Array.isArray(value)) return value;
+/** `value` as a list: a list as it is, none as none, any other node alone. */
+export function listOf(value: XmlRead): XmlList {
   if (value === undefined || value === null) return [];
+  if (isList(value)) return value;
   return [value];
 }
 
 /** The elements of `value` read as a list ({@link listOf}); members that are not elements are left out. */
-export function elements(value: unknown): Element[] {
+export function elements(value: XmlRead): XmlElement[] {
   return listOf(value).filter(isElement);
 }
 
 /** The member `name` of `value` when it is an element, else `undefined`. */
-export function child(value: unknown, name: string): unknown {
+export function child(value: XmlRead, name: string): XmlNode | undefined {
   return isElement(value) ? value[name] : undefined;
 }
 
 /** The member at `path` under `value`: each step a {@link child}. */
-export function childAt(value: unknown, ...path: string[]): unknown {
+export function childAt(value: XmlRead, ...path: string[]): XmlRead {
   let node = value;
   for (const name of path) node = child(node, name);
   return node;
@@ -51,7 +54,7 @@ export function childAt(value: unknown, ...path: string[]): unknown {
  * element's text node (`textNode`, `#text` by default) read so; else
  * `undefined`.
  */
-export function text(value: unknown, textNode = '#text'): string | undefined {
+export function text(value: XmlRead, textNode = '#text'): string | undefined {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
@@ -68,7 +71,7 @@ export function text(value: unknown, textNode = '#text'): string | undefined {
  * decides its prefix) when it is a string, a number or a boolean, written
  * out; else `undefined`.
  */
-export function attr(value: unknown, name: string): string | undefined {
+export function attr(value: XmlRead, name: string): string | undefined {
   const member = child(value, name);
   if (typeof member === 'string') return member;
   if (typeof member === 'number' || typeof member === 'boolean') {
@@ -78,7 +81,7 @@ export function attr(value: unknown, name: string): string | undefined {
 }
 
 /** The members of `value` when it is an element, in their order; else none. */
-export function entries(value: unknown): Array<[string, unknown]> {
+export function entries(value: XmlRead): Array<[string, XmlNode]> {
   return isElement(value) ? Object.entries(value) : [];
 }
 
@@ -90,7 +93,7 @@ export function localName(qualified: string): string {
 /** A member met by {@link walk}: its name, its value, and the members it sits in, outermost first. */
 export interface Visit {
   readonly name: string;
-  readonly node: unknown;
+  readonly node: XmlNode;
   readonly path: readonly Visit[];
 }
 
@@ -102,11 +105,11 @@ export interface Visit {
  * (an attribute group, say) are met but not entered.
  */
 export function walk(
-  value: unknown,
-  leaves: ReadonlySet<string> = new Set(),
+  value: XmlRead,
+  leaves: ReadonlySet<string> = new Set<string>(),
 ): Visit[] {
   const met: Visit[] = [];
-  const enter = (node: unknown, path: readonly Visit[]): void => {
+  const enter = (node: XmlRead, path: readonly Visit[]): void => {
     for (const [name, member] of entries(node)) {
       for (const item of listOf(member)) {
         const visit: Visit = { name, node: item, path };

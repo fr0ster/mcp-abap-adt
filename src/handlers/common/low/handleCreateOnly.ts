@@ -77,6 +77,7 @@ import { atStep } from '../../../lib/strategies/step';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import {
   TOOL_DEFINITION as CreateClass_Tool,
   handleCreateClass,
@@ -251,7 +252,7 @@ function chainRefusal(objectType: string, fullTool: string) {
 function createAlone(
   args: Args,
   tool: string,
-  create: () => Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>,
+  create: () => Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>,
 ): Promise<ToolResultLike> {
   const detail = detailOf(args);
   return answer(

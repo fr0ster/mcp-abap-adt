@@ -61,6 +61,7 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree.js';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -184,14 +185,14 @@ export async function handleUpdateDataElement(
 
   return answer(
     { tool: 'UpdateDataElement', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getDataElement(
         resultsFor(dataElementDocuments),
       );
 
       const written = await withLock(
         () => obj.lock({ dataElementName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> =>
           sequence(
             atStep('read metadata', () =>
               obj.readMetadata(

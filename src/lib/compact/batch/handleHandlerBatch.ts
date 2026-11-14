@@ -15,7 +15,7 @@ import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
 import type { HandlerContext } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
-import { child } from '../../xml/tree';
+import { child } from '../../outsideValue';
 import { textsOf } from '../memberTexts';
 
 /** `HandlerBatch`'s actions. */

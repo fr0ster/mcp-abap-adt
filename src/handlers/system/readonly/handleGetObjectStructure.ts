@@ -13,7 +13,15 @@ import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { attr, child, childAt, isList } from '../../../lib/xml/tree';
+import {
+  attr,
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
@@ -53,7 +61,7 @@ interface ObjectStructureTreeNode {
  * shipped `rawDocument` default). `node`'s local name is one of `structured`'s
  * forced-array elements, so this holds for a single node too.
  */
-function flatNodesOf(value: unknown): FlatObjectStructureNode[] {
+function flatNodesOf(value: XmlRead): FlatObjectStructureNode[] {
   const nodesRaw = childAt(
     value,
     'projectexplorer:objectstructure',
@@ -164,7 +172,7 @@ function serializeTree(
  * a second line of defence for any caller that reaches it without going
  * through `call()` first — cheap, since the check is synchronous and idempotent.
  */
-export function assertObjectStructurePresent(value: unknown): void {
+export function assertObjectStructurePresent(value: XmlRead): void {
   const root = child(value, 'projectexplorer:objectstructure');
   if (root === undefined || root === null) {
     throw new Error(
@@ -180,7 +188,7 @@ export function assertObjectStructurePresent(value: unknown): void {
  * document through the same `ourUtils.objectStructure` (`structured`) reading.
  */
 export function treeText(
-  value: unknown,
+  value: XmlRead,
   root?: { objecttype: string; objectname: string },
 ): string {
   assertObjectStructurePresent(value);

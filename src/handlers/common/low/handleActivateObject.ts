@@ -133,6 +133,7 @@ import { withStep } from '../../../lib/strategies/step';
 import type { StepError } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 /**
  * The APIs whose own `activate()` this dispatcher reaches directly: those of
@@ -414,7 +415,7 @@ function activateSynchronously(
 /** What a group activation answered: a run, or the synchronous document. */
 type GroupAnswer =
   | { readonly runs: ActivationRunOutcome }
-  | { readonly synchronous: AdtReading<unknown> };
+  | { readonly synchronous: AdtReading<XmlRead> };
 
 type ActivateObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 

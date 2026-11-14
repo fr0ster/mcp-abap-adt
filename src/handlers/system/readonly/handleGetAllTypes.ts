@@ -11,7 +11,15 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { child, childAt, isList, text } from '../../../lib/xml/tree';
+import {
+  child,
+  childAt,
+  isList,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
@@ -42,7 +50,7 @@ interface NamedItem {
  * with exactly one type would hand back a bare object; normalised here the
  * same way the pre-migration handler already did.
  */
-function extractNamedItems(value: unknown): NamedItem[] {
+function extractNamedItems(value: XmlRead): NamedItem[] {
   const raw = childAt(value, 'nameditem:namedItemList', 'nameditem:namedItem');
   const items = raw ? (isList(raw) ? raw : [raw]) : [];
   return items.flatMap((item) => {

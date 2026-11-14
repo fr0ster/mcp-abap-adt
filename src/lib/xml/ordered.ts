@@ -14,19 +14,20 @@
  * builds back to its own bytes but for those apostrophes
  * (`src/__tests__/unit/xml/ordered.test.ts`).
  *
- * A node here is what the parser answered — outside the type system — and is
+ * A node here is what the parser answered, typed at the parse (`node`), and is
  * read with the `tree` helpers: a list of members, each an element whose one
  * name other than {@link ORDERED_ATTRIBUTES} holds its own list.
  */
 import { XMLBuilder, XMLParser, XMLValidator } from 'fast-xml-parser';
+import { parseXml, type XmlElement, type XmlList, type XmlNode } from './node';
 import {
   child,
-  type Element,
   entries,
   isElement,
   isList,
   listOf,
   text,
+  type XmlRead,
 } from './tree';
 
 /** The member of an ordered element that holds its attributes. */
@@ -58,17 +59,17 @@ export function isWellFormed(document: string): boolean {
 }
 
 /** The document in its order, or `null` for a body that is empty or not XML. */
-export function parseOrdered(document: string): unknown {
+export function parseOrdered(document: string): XmlNode | null {
   if (document.trim() === '') return null;
   try {
-    return parser.parse(document);
+    return parseXml(parser, document) ?? null;
   } catch {
     return null;
   }
 }
 
 /** Members of the ordered form, written back as text. */
-export function buildOrdered(members: readonly unknown[]): string {
+export function buildOrdered(members: XmlList): string {
   return builder.build(members);
 }
 
@@ -80,14 +81,14 @@ export const ORDERED_CDATA = '#cdata';
 /** An element of the ordered form: its name, the member it is, and its content. */
 export interface OrderedElement {
   readonly name: string;
-  readonly member: unknown;
-  readonly content: readonly unknown[];
+  readonly member: XmlNode;
+  readonly content: XmlList;
 }
 
 /** Every element of the ordered form at any depth, in document order: an element before what it holds. */
-export function orderedElements(members: unknown): OrderedElement[] {
+export function orderedElements(members: XmlRead): OrderedElement[] {
   const found: OrderedElement[] = [];
-  const visit = (list: unknown): void => {
+  const visit = (list: XmlRead): void => {
     for (const member of listOf(list)) {
       for (const [name, content] of entries(member)) {
         if (
@@ -109,21 +110,21 @@ export function orderedElements(members: unknown): OrderedElement[] {
 }
 
 /** The text an element's content holds directly, as it came (entities kept). */
-export function orderedText(content: readonly unknown[]): string {
+export function orderedText(content: XmlList): string {
   return content
     .map((member) => text(child(member, ORDERED_TEXT)) ?? '')
     .join('');
 }
 
 /** The CDATA an element's content holds directly, its sections joined. */
-export function orderedCdata(content: readonly unknown[]): string {
+export function orderedCdata(content: XmlList): string {
   return content
     .map((member) => orderedText(listOf(child(member, ORDERED_CDATA))))
     .join('');
 }
 
 /** Whether an element's content holds anything but text: an element, CDATA, a comment. */
-export function orderedHoldsMarkup(content: readonly unknown[]): boolean {
+export function orderedHoldsMarkup(content: XmlList): boolean {
   return content.some((member) =>
     entries(member).some(([name]) => name !== ORDERED_TEXT),
   );
@@ -134,11 +135,11 @@ export function orderedHoldsMarkup(content: readonly unknown[]): boolean {
  * replaced by `replacement`; every other member as it was.
  */
 export function replaceOrderedMember(
-  members: readonly unknown[],
-  target: unknown,
-  replacement: readonly unknown[],
-): unknown[] {
-  return members.flatMap((member): unknown[] => {
+  members: XmlList,
+  target: XmlNode,
+  replacement: XmlList,
+): XmlNode[] {
+  return members.flatMap((member): XmlNode[] => {
     if (member === target) return [...replacement];
     if (!isElement(member)) return [member];
     return [
@@ -180,9 +181,9 @@ export function orderedTextMember(value: string): {
 /** An element of the ordered form, named `name`, holding `content`, with `attributes` when it has any. */
 export function orderedElement(
   name: string,
-  content: readonly unknown[],
-  attributes?: Element,
-): Element {
+  content: XmlList,
+  attributes?: XmlElement,
+): XmlElement {
   return attributes === undefined || entries(attributes).length === 0
     ? { [name]: content }
     : { [name]: content, [ORDERED_ATTRIBUTES]: attributes };

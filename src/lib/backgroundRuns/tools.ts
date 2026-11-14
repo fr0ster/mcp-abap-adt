@@ -15,7 +15,7 @@
 import * as z from 'zod';
 import type { ToolDefinition } from '../handlers/interfaces.js';
 import { LONG_TOOL_ADVICE, LONG_TOOL_IN_CALL_ADVICE } from '../longTools';
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 
 /** The tools that take `background`, with the names of the tools that read and discard their runs. */
 export const BACKGROUND_TOOLS: Readonly<

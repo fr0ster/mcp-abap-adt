@@ -41,6 +41,7 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionModule',
@@ -108,7 +109,7 @@ export async function handleUpdateFunctionModule(
 
   return answer(
     { tool: 'UpdateFunctionModule', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getFunctionModule(
         resultsFor(functionModuleDocuments),
       );
@@ -128,7 +129,7 @@ export async function handleUpdateFunctionModule(
             { functionModuleName, functionGroupName },
             { analyse: analyseLock },
           ),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> =>
           sequence(
             atStep('update', () =>
               withAdtHeaders(context, 'functionModule.update', (headers) =>

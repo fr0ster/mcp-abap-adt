@@ -26,6 +26,7 @@
  */
 
 import { afterBlanksAt, isBlank, isWordCharacter, wordAt } from '../plainText';
+import type { XmlRead } from '../xml/tree';
 import {
   attributeOf,
   firstAttribute,
@@ -58,7 +59,7 @@ export interface ServiceBindingFacts {
  * the grouped parse's order (`walkStructure`); `undefined` when that element does not carry it.
  */
 const attribute = (
-  document: unknown,
+  document: XmlRead,
   element: string,
   name: string,
 ): string | undefined =>

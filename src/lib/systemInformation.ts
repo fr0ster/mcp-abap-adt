@@ -25,7 +25,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { childAt, isElement } from './xml/tree';
+import { childAt, isElement } from './outsideValue';
 
 const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
 const SYSTEM_INFORMATION_ACCEPT =

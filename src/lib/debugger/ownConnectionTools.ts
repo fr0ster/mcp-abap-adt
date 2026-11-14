@@ -15,7 +15,7 @@
  * `…Delta`) read the instance's connection and stay in the flow.
  */
 
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 export const DEBUGGER_OWN_CONNECTION_TOOLS: readonly string[] = [
   'AmdpDebugCancel',
   'AmdpDebugGetTable',

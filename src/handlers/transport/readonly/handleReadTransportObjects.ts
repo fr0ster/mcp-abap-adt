@@ -42,6 +42,9 @@ import {
   entries,
   isElement,
   isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
 } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
@@ -85,7 +88,7 @@ interface Entry {
  * objects are its tasks' entries, each once, each with its task number.
  */
 function collect(
-  node: unknown,
+  node: XmlRead,
   found: { attributes: Element; task?: string | undefined }[],
   task?: string | undefined,
   inRequest = false,
@@ -118,7 +121,7 @@ function collect(
 const text = (value: string | undefined): string | undefined =>
   value === undefined || value === '' ? undefined : value;
 
-function entriesOf(value: unknown): Entry[] {
+function entriesOf(value: XmlRead): Entry[] {
   const found: { attributes: Element; task?: string | undefined }[] = [];
   collect(value, found);
   const read: Entry[] = [];
@@ -153,7 +156,7 @@ export async function handleReadTransportObjects(
 
   const detail = detailOf(args);
 
-  const terseObjects = (value: unknown) => {
+  const terseObjects = (value: XmlRead) => {
     const entries = entriesOf(value);
     return {
       success: true,

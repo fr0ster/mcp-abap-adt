@@ -1,4 +1,4 @@
-import { child } from '../xml/tree';
+import { child } from '../outsideValue';
 import type { BatchKind } from './InstanceBatch';
 
 /**

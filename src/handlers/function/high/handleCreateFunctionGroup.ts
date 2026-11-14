@@ -44,6 +44,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroup',
@@ -102,12 +103,12 @@ export async function handleCreateFunctionGroup(
 
   return answer(
     { tool: 'CreateFunctionGroup', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
-      let created: IAdtResponse<AdtReading<unknown>, IAdtError> = await atStep(
+      let created: IAdtResponse<AdtReading<XmlRead>, IAdtError> = await atStep(
         'create',
         () =>
           withAdtHeaders(context, 'functionGroup.create', (headers) =>

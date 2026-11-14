@@ -38,8 +38,8 @@
 
 import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
+import { child } from './outsideValue';
 import { forceClose, logoffsAnswered } from './ownedConnections';
-import { child } from './xml/tree';
 
 /**
  * **The logoffs at once** (the process's end — stdio's client close, a

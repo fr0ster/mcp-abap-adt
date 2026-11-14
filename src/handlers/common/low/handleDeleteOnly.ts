@@ -45,6 +45,7 @@ import {
 import { atStep } from '../../../lib/strategies/step';
 import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import { DELETION_TARGETS } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
 
@@ -161,7 +162,7 @@ export async function handleDeleteOnly(
       )(),
     // The metadata extension's DELETE answers an empty 2xx; every other
     // deletion a `del:deletionResult`.
-    project('terse', (value: unknown, status: number) =>
+    project('terse', (value: XmlRead, status: number) =>
       objectType === 'METADATA_EXTENSION'
         ? terseWrite(value, status)
         : terseDeletion(value),

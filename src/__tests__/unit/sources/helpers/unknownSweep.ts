@@ -282,6 +282,9 @@ export const PARSE_SITES: ReadonlySet<string> = new Set<string>([
   // contract change of its own, after 24.0.0 (the owner, 2026-11-14).
   'src/lib/batch/sessionKind.ts#paramAction(params)',
   'src/lib/config/yamlConfig.ts#loadYamlConfig(parsed)',
+  // A registry entry, handed by the language's `every` over a list read off
+  // the global: checked here.
+  'src/lib/instance.ts#isEntry(entry)',
   'src/lib/instance.ts#isRegistry(value)',
   'src/lib/instance.ts#registry(found)',
   'src/lib/json.ts#jsonOf(value)',

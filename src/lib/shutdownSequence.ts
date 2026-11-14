@@ -36,6 +36,7 @@
  * Nothing is written to stdout, and no line carries an error's message.
  */
 
+import type { EventEmitter } from 'node:events';
 import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
 import { child } from './outsideValue';
@@ -61,9 +62,12 @@ export async function logOffAtOnce(): Promise<void> {
   await logoffsAnswered();
 }
 
+/** A listener as Node's own contract takes one (`EventEmitter.on`). */
+type NodeListener = Parameters<EventEmitter['on']>[1];
+
 /** A stream the shutdown watches: it only registers listeners on it. */
 export interface ShutdownStream {
-  on(event: string, listener: (...args: unknown[]) => void): void;
+  on(event: string, listener: NodeListener): void;
 }
 
 /**
@@ -73,7 +77,7 @@ export interface ShutdownStream {
  * itself, an `EventEmitter` — fits.
  */
 export interface ShutdownProcess {
-  on(event: string, listener: (...args: unknown[]) => void): void;
+  on(event: string, listener: NodeListener): void;
   stdin?: ShutdownStream | undefined;
   stdout?: ShutdownStream | undefined;
 }

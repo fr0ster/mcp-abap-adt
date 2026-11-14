@@ -535,3 +535,31 @@ describe('the forms round 8 found the flow scan missing are refused', () => {
     );
   });
 });
+
+describe('tool-argument input until it is checked (the owner rule)', () => {
+  it('a value read out of the arguments, a list of them, a nested object and a function handing them on pass', () => {
+    const sites = sitesOf('toolArgValue');
+    assert.deepEqual(judged(sites, 'value', 'parameter'), [
+      ['tool-args', false, []],
+      [undefined, true, []],
+    ]);
+    assert.deepEqual(judged(sites, 'listed', 'parameter'), [
+      ['tool-args', false, []],
+    ]);
+    assert.deepEqual(judged(sites, 'member', 'return'), [
+      ['tool-args', false, []],
+    ]);
+    assert.deepEqual(judged(sites, 'withoutRoute', 'return'), [
+      ['tool-args', false, []],
+    ]);
+  });
+
+  it('a value of no tool-argument type is refused', () => {
+    assert.deepEqual(
+      sitesOf('toolArgValue')
+        .filter((site) => site.refused)
+        .map((site) => site.key),
+      [key('toolArgValue', 'plain', 'value')],
+    );
+  });
+});

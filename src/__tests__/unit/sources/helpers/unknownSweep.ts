@@ -51,8 +51,10 @@ import { REPO, rel } from './failureScan';
  * - `thrown`: a reader of thrown values or a failure slot (`THROWN_READERS`);
  * - `parse`: a parse result up to the function that checks it, listed;
  * - `program-input`: a value of `process.argv` / `process.env`, listed;
- * - `tool-args`: a tool's arguments before their schema, `ToolArgs` and
- *   `X & ToolArgs` with a typed `X`;
+ * - `tool-args`: tool-argument input until it is checked — a declaration
+ *   written `ToolArgs` or `X & ToolArgs` with a typed `X`, a value read out
+ *   of them (`ToolArgValue`: a member, a nested object's, a list's element),
+ *   and a function returning them;
  * - `sink-contract`: a member of a contract of `SINK_CONTRACTS`, a function
  *   implementing one, or a listed sink site;
  * - `sink-slot`: a slot of `SINK_SLOTS`;
@@ -204,8 +206,8 @@ const NO_LISTS: ListedSites = {
   sink: new Set(),
 };
 
-/** The type names of a tool's arguments before their schema. */
-const INPUT_TYPES = new Set(['ToolArgs']);
+/** The type names of a tool's arguments, and of a value read out of them, before they are checked. */
+const INPUT_TYPES = new Set(['ToolArgs', 'ToolArgValue']);
 
 /** The type names of the program's own inputs. */
 const PROGRAM_TYPES = new Set(['ProcessEnv', 'ProgramArguments']);
@@ -1086,36 +1088,60 @@ export class UnknownSweep {
     return this.callback(place.fn, place.at, held);
   }
 
-  /** A declaration written `ToolArgs`, or `X & ToolArgs` with a typed `X`. */
+  /**
+   * Tool-argument input until it is checked (the owner's decision): a
+   * declaration written `ToolArgs` — a call's arguments, a nested object read
+   * out of them — or `ToolArgValue`, a value read out of them and not yet
+   * checked, a list's element included; a function that returns them, which
+   * passes the same input on. The written type may combine them with typed
+   * members (`X & ToolArgs`, `readonly ToolArgValue[]`, `ToolArgValue |
+   * undefined`): every `unknown` it holds is reached through one of them.
+   */
   private toolArgs(node: ts.Node): boolean {
     if (ts.isTypeAliasDeclaration(node)) return INPUT_TYPES.has(node.name.text);
     const written =
       ts.isParameter(node) ||
       ts.isVariableDeclaration(node) ||
       ts.isPropertySignature(node) ||
-      ts.isPropertyDeclaration(node)
+      ts.isPropertyDeclaration(node) ||
+      ts.isFunctionLike(node)
         ? node.type
         : undefined;
     if (written === undefined) return false;
-    const input = (member: ts.TypeNode): boolean => {
-      if (!ts.isTypeReferenceNode(member)) return false;
-      const name = ts.isIdentifier(member.typeName)
-        ? member.typeName.text
-        : member.typeName.right.text;
-      return INPUT_TYPES.has(name);
-    };
-    if (input(written)) return true;
-    return (
-      ts.isIntersectionTypeNode(written) &&
-      written.types.some(input) &&
-      written.types.every(
-        (member) =>
-          input(member) ||
-          this.held(this.checker.getTypeFromTypeNode(member)).every(
-            (each) => each.owner !== undefined,
-          ),
-      )
-    );
+    return this.inputOnly(written) === 'input';
+  }
+
+  /**
+   * Whether a written type holds `unknown` only through the tool-argument
+   * types: `input` when it names one, `typed` when it holds no `unknown`,
+   * `other` when it holds one of its own.
+   */
+  private inputOnly(written: ts.TypeNode): 'input' | 'typed' | 'other' {
+    if (ts.isTypeReferenceNode(written)) {
+      const name = ts.isIdentifier(written.typeName)
+        ? written.typeName.text
+        : written.typeName.right.text;
+      if (INPUT_TYPES.has(name)) return 'input';
+    }
+    const parts: readonly ts.TypeNode[] | undefined =
+      ts.isUnionTypeNode(written) || ts.isIntersectionTypeNode(written)
+        ? written.types
+        : ts.isArrayTypeNode(written)
+          ? [written.elementType]
+          : ts.isTypeOperatorNode(written) ||
+              ts.isParenthesizedTypeNode(written)
+            ? [written.type]
+            : undefined;
+    if (parts !== undefined) {
+      const each = parts.map((part) => this.inputOnly(part));
+      if (each.includes('other')) return 'other';
+      return each.includes('input') ? 'input' : 'typed';
+    }
+    return this.held(this.checker.getTypeFromTypeNode(written)).every(
+      (each) => each.owner !== undefined,
+    )
+      ? 'typed'
+      : 'other';
   }
 
   /** A declaration inside a contract named in `SINK_CONTRACTS`. */

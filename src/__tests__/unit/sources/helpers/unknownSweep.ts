@@ -2498,7 +2498,8 @@ export class UnknownSweep {
       ]);
       return;
     }
-    if (ts.isExpression(node)) {
+    // Inspected on its way out, it is read there, wherever it lands.
+    if (ts.isExpression(node) && !this.testedOnTheWay(node)) {
       const outer = this.awaitedOut(node);
       if (this.keysOnly(outer)) return;
       const lands = this.passesOn(outer);
@@ -2518,6 +2519,36 @@ export class UnknownSweep {
     this.report(node, 'third-party', position, undefined, true, 'third-party', [
       read,
     ]);
+  }
+
+  /**
+   * Whether a value is inspected on its way out: the left operand of `||`,
+   * `&&` or `??` is tested (truthy, nullish) before either operand is handed
+   * on, so it is read there; the right operand, a conditional's branches and
+   * an `await` hand it on whole. A conditional's condition and `!` are no
+   * carriers, so they end the way and are judged where they stand.
+   */
+  private testedOnTheWay(node: ts.Expression): boolean {
+    let current: ts.Expression = node;
+    for (;;) {
+      const parent = current.parent;
+      if (
+        ts.isBinaryExpression(parent) &&
+        parent.left === current &&
+        (parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+          parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+          parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
+      ) {
+        return true;
+      }
+      if (
+        !(carrierParent(current) || ts.isAwaitExpression(parent)) ||
+        !ts.isExpression(parent)
+      ) {
+        return false;
+      }
+      current = parent;
+    }
   }
 
   /**
@@ -2574,7 +2605,10 @@ export class UnknownSweep {
       symbol === undefined ? [] : (this.references.get(symbol) ?? []);
     return uses.every((use) => {
       const outer = this.awaitedOut(use);
-      return this.keysOnly(outer) || this.passesOn(outer) !== undefined;
+      return (
+        !this.testedOnTheWay(use) &&
+        (this.keysOnly(outer) || this.passesOn(outer) !== undefined)
+      );
     });
   }
 

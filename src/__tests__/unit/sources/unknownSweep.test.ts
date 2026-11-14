@@ -847,6 +847,27 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     ]);
   });
 
+  it('the left operand of ||, && and ??, a condition and ! inspect what they test and are refused; a right operand or a branch handed on whole passes', () => {
+    // The parse the reviver is handed to passes whole into a sink; a branch
+    // of each kind passes on its own.
+    assert.deepEqual(thirdPartyReads('inspectingOperators'), [
+      [10, 'refused'],
+      [11, 'refused'],
+      [12, 'refused'],
+      [13, 'refused'],
+      [14, 'refused'],
+      [15, 'refused'],
+      [21, 'refused'],
+      [27, 'refused'],
+      [27, 'sink-contract'],
+      [38, 'sink-contract'],
+      [39, 'sink-contract'],
+      [40, 'sink-contract'],
+      [41, 'sink-contract'],
+      [41, 'sink-contract'],
+    ]);
+  });
+
   it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
     assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
     assert.deepEqual(

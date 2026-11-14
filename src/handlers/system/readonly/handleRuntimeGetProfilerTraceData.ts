@@ -1,5 +1,10 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IAbapTraceDbAccesses,
+  type IAbapTraceHitList,
+  type IAbapTraceStatements,
+} from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -76,13 +81,13 @@ export async function handleRuntimeGetProfilerTraceData(
   // same on both sides.
   //
   // Three separate `answer()` calls, not one `call()` with a branch per
-  // view: `read<K>`'s three instantiations (`IAbapTraceHitList` /
-  // `IAbapTraceStatements` / `IAbapTraceDbAccesses`) are not exported by
-  // name from `@mcp-abap-adt/adt-clients`, so there is no union type to
-  // write down for a single `answer<T>` — and the projection below never
-  // reads a field of `payload`, so there is nothing lost by keeping each
-  // view's own type all the way to `answer()` instead.
-  const project = (payload: unknown) => ({
+  // view: each keeps `read<K>`'s own instantiation (`IAbapTraceHitList` /
+  // `IAbapTraceStatements` / `IAbapTraceDbAccesses`, adt-strategies' readings
+  // of the three views) all the way to `answer()`; the projection takes any
+  // of the three and reads no field of it.
+  const project = (
+    payload: IAbapTraceHitList | IAbapTraceStatements | IAbapTraceDbAccesses,
+  ) => ({
     success: true,
     view,
     trace_id_or_uri: traceIdOrUri,

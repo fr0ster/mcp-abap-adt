@@ -1,5 +1,16 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IAbapTraceAccessTime,
+  type IAbapTraceDbAccess,
+  type IAbapTraceDbAccesses,
+  type IAbapTraceHitList,
+  type IAbapTraceHitListEntry,
+  type IAbapTraceStatement,
+  type IAbapTraceStatements,
+  type ITraceProgramRef,
+  type ITraceTiming,
+} from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -7,7 +18,6 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { child, entries, isElement, isList } from '../../../lib/outsideValue';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -41,9 +51,35 @@ type RuntimeAnalyzeProfilerTraceArgs = z.output<
   typeof TOOL_DEFINITION.inputSchema
 >;
 
+/** A row of one of the three views, as adt-strategies reads it. */
+type TraceRow =
+  | IAbapTraceHitListEntry
+  | IAbapTraceStatement
+  | IAbapTraceDbAccess;
+
+/** A scalar a row's compact projection keeps. */
+type TraceScalar = string | number | boolean;
+
+/** A member of a row: a scalar, or one of the objects a row nests. */
+type TraceMember =
+  | TraceScalar
+  | ITraceProgramRef
+  | ITraceTiming
+  | IAbapTraceAccessTime
+  | undefined;
+
 interface RankedSummary {
   total_records: number;
-  top_records: Array<Record<string, unknown>>;
+  top_records: Array<Record<string, TraceScalar>>;
+}
+
+/** Whether a member is a scalar the projection keeps. */
+function isScalar(value: TraceMember): value is TraceScalar {
+  return (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  );
 }
 
 /**
@@ -55,24 +91,20 @@ interface RankedSummary {
  * turned every ranked row into `{}` before this fix (see `summarizeView`'s
  * own doc).
  */
-function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(row)) {
-    if (
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean'
-    ) {
+function flattenRow(row: TraceRow): Record<string, TraceScalar> {
+  const out: Record<string, TraceScalar> = {};
+  const members: Readonly<Record<string, TraceMember>> = { ...row };
+  for (const [key, value] of Object.entries(members)) {
+    if (isScalar(value)) {
       out[key] = value;
       continue;
     }
-    if (isElement(value)) {
-      for (const [nestedKey, nestedValue] of entries(value)) {
-        if (
-          typeof nestedValue === 'string' ||
-          typeof nestedValue === 'number' ||
-          typeof nestedValue === 'boolean'
-        ) {
+    if (value !== undefined) {
+      const nested: Readonly<Record<string, TraceScalar | undefined>> = {
+        ...value,
+      };
+      for (const [nestedKey, nestedValue] of Object.entries(nested)) {
+        if (isScalar(nestedValue)) {
           out[`${key}_${nestedKey}`] = nestedValue;
         }
       }
@@ -81,10 +113,8 @@ function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function rankBy(row: Record<string, unknown>, path: [string, string]): number {
-  const outer = row[path[0]];
-  if (!outer || typeof outer !== 'object') return 0;
-  const value = child(outer, path[1]);
+/** A row's rank: its value when it is a finite number, else `0`. */
+function rankOf(value: number | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
@@ -111,30 +141,13 @@ function rankBy(row: Record<string, unknown>, path: [string, string]): number {
  * every view here shares, so one real field beats guessing which of two is
  * "the" one to prefer.
  */
-function summarizeView(
-  view: 'hitlist' | 'statements' | 'db_accesses',
-  payload: unknown,
+function summarizeView<R extends TraceRow>(
+  rows: readonly R[],
+  rank: (row: R) => number | undefined,
   top: number,
 ): RankedSummary {
-  const collectionKey =
-    view === 'hitlist'
-      ? 'entries'
-      : view === 'statements'
-        ? 'statements'
-        : 'accesses';
-  const rankPath: [string, string] =
-    view === 'db_accesses' ? ['accessTime', 'total'] : ['grossTime', 'time'];
-
-  const collection = child(payload, collectionKey);
-  const rows: Record<string, unknown>[] = isList(collection)
-    ? collection.filter(
-        (row): row is Record<string, unknown> =>
-          !!row && typeof row === 'object',
-      )
-    : [];
-
   const topRecords = [...rows]
-    .sort((a, b) => rankBy(b, rankPath) - rankBy(a, rankPath))
+    .sort((a, b) => rankOf(rank(b)) - rankOf(rank(a)))
     .slice(0, Math.max(1, top))
     .map(flattenRow);
 
@@ -170,13 +183,16 @@ export async function handleRuntimeAnalyzeProfilerTrace(
   // narrows by `view`, not by `payload`'s static type), so nothing is lost
   // keeping each view's own type to the point `answer()` erases it into the
   // response.
-  const project = (payload: unknown) => ({
-    success: true,
-    trace_id_or_uri: traceIdOrUri,
-    view,
-    summary: summarizeView(view, payload, top),
-    payload,
-  });
+  // Each view ranks its own collection on its own numeric field.
+  const project =
+    <P>(summaryOf: (payload: P) => RankedSummary) =>
+    (payload: P) => ({
+      success: true,
+      trace_id_or_uri: traceIdOrUri,
+      view,
+      summary: summaryOf(payload),
+      payload,
+    });
   const ctx = { tool: 'RuntimeAnalyzeProfilerTrace', detail: 'terse' as const };
 
   if (view === 'hitlist') {
@@ -187,7 +203,9 @@ export async function handleRuntimeAnalyzeProfilerTrace(
           analyse: analyseException,
           withSystemEvents: args.with_system_events,
         }),
-      project,
+      project((payload: IAbapTraceHitList) =>
+        summarizeView(payload.entries, (row) => row.grossTime?.time, top),
+      ),
     );
   }
   if (view === 'statements') {
@@ -198,7 +216,9 @@ export async function handleRuntimeAnalyzeProfilerTrace(
           analyse: analyseException,
           withSystemEvents: args.with_system_events,
         }),
-      project,
+      project((payload: IAbapTraceStatements) =>
+        summarizeView(payload.statements, (row) => row.grossTime?.time, top),
+      ),
     );
   }
   return answer(
@@ -208,6 +228,8 @@ export async function handleRuntimeAnalyzeProfilerTrace(
         analyse: analyseException,
         withSystemEvents: args.with_system_events,
       }),
-    project,
+    project((payload: IAbapTraceDbAccesses) =>
+      summarizeView(payload.accesses, (row) => row.accessTime?.total, top),
+    ),
   );
 }

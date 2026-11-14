@@ -45,7 +45,6 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { child } from '../../../lib/outsideValue';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
 import {
@@ -212,7 +211,10 @@ type NodeAnswer = IAdtResponse<NodeLevel, IAdtError>;
 function textOf(response: IAdtSuccess<unknown>): string {
   const v = response.getResult().value;
   if (typeof v === 'string') return v;
-  return String(child(v, 'value') ?? child(v, 'raw') ?? '');
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return '';
+  const value = 'value' in v ? v.value : undefined;
+  const raw = 'raw' in v ? v.raw : undefined;
+  return String(value ?? raw ?? '');
 }
 
 /**

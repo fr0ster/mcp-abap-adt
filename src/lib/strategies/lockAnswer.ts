@@ -25,7 +25,6 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { attr as wireAttr, child as wireChild } from '../outsideValue';
 import {
   attr,
   child,
@@ -69,14 +68,34 @@ export const analyseLock: IAnalyse<IAdtError> = (verdict, answer) => {
   if (judged !== ADT_NO_FAILURE) return judged;
   if (carriesLockHandle(answer)) return ADT_NO_FAILURE;
   // The wire answer's `request` is the transport's, typed `unknown`: read.
-  const request = wireChild(answer, 'request');
-  const url = wireAttr(request, 'url');
+  const request = answer?.request;
+  const fields =
+    typeof request === 'object' && request !== null && !Array.isArray(request)
+      ? request
+      : undefined;
+  // Each member written out when it is a string, a number or a boolean.
+  const urlMember =
+    fields !== undefined && 'url' in fields ? fields.url : undefined;
+  const methodMember =
+    fields !== undefined && 'method' in fields ? fields.method : undefined;
+  const url =
+    typeof urlMember === 'string' ||
+    typeof urlMember === 'number' ||
+    typeof urlMember === 'boolean'
+      ? String(urlMember)
+      : undefined;
+  const method =
+    typeof methodMember === 'string' ||
+    typeof methodMember === 'number' ||
+    typeof methodMember === 'boolean'
+      ? String(methodMember)
+      : undefined;
   return {
     origin: 'refusal',
     message:
       'SAP answered the lock request without a lock handle; the object is not locked',
     response: answer,
-    ...(url ? { request: { method: wireAttr(request, 'method'), url } } : {}),
+    ...(url ? { request: { method, url } } : {}),
   };
 };
 

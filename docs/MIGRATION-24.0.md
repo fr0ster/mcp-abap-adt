@@ -323,6 +323,22 @@ a refused connection, a timeout and a DNS failure from such an `Error` by its `c
   `use` has another signature implements the two forms.
 - The logger adapters take `unknown` beside the message, as `ILogger` does.
 
+## Embedders: values the unknown audit found typed are typed
+
+- `ConnectionContext.metadata` (`@mcp-abap-adt/lib`, `/embeddable`) is `Record<string, string>`.
+  **What you do:** pass the metadata as strings (`String(value)` for a number or a flag).
+- `Parameter.parse` (`/config`) and `parseStateIdleMinutes` (`/state`) take the configured value
+  as `JsonValue`, checked once where the YAML was read. **What you do:** a parameter of your own
+  reads a `JsonValue`; a value YAML parses to something that is no JSON value (a timestamp's
+  `Date`) reaches it as `{}`.
+- `failurePayload` (`/auth`) answers a JSON object (`AnswerObject`), not `Record<string, unknown>`.
+  **What you do:** read its members as JSON values.
+- `/debugger`: `heldStateHandle` and `startedExtra` answer `DebugExtra` (string members);
+  `debugAnswer` is `debugAnswer<T, P, F = T>(args, work, terse, full?, extraOf?,
+  failureExtraOf?)`, `P` the terse answer's type and `F` the full one's, and `debugStateAnswer`
+  takes its extras as `() => DebugExtra`. **What you do:** a call that named `debugAnswer<T>`
+  names its terse type too (`debugAnswer<T, P>`), or lets both be inferred.
+
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 
 **Removed: `isCloudConnection`.** It reported an on-premise system with JWT authentication as

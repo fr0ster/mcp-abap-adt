@@ -716,6 +716,13 @@ below is what it carries besides.
 - **The program's arguments (the owner's decision, spec §4).** The scan reads `process.argv`
   as a boundary, through typed values and the input types; fixture `programInput.ts`, two cases,
   each with its break.
+- **The scope widened to containers (the owner's decision, spec §4 "Scope").** The scan reads
+  `unknown` inside arrays, tuples, `Record` and index signatures, `Map` / `Set` / `Promise`,
+  function types' returns and aliases, and an unannotated function-expression parameter its
+  function type writes `unknown`; `ToolArgs` sites are input. Fixtures `containers.ts`,
+  `containerBoundary.ts`, `toolInput.ts`, `literalSink.ts`, each refused by its break (no
+  container positions; no alias resolution; no `ToolArgs` input; no contextual function type).
+  The refused sites are then classified and fixed as in S3b.
 - **S3a's source test is added last in S3,** once nothing is refused. Its deliberate break (the
   laundered fixture) is checked then, and again with one site of S3b reverted in the real
   code.

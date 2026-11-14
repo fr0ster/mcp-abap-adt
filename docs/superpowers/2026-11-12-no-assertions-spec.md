@@ -247,6 +247,20 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
     `catch` binding; `JSON.parse`; the XML parser; `process.env`; a file read; a network
     answer's `data`; a tool argument before its schema; a value a third-party contract types
     `unknown`. A boundary value narrowed in plain code stays boundary data.
+- **Scope: every `unknown` a declaration writes, inside a type too (the owner's decision).** A
+  site is a parameter, variable, return or property whose written type is `unknown` or holds it:
+  an element of an array or a tuple, a value of a `Record` or an index signature, a type
+  argument of `Map`, `Set` or `Promise` (and their read-only kinds), a function type's return,
+  a member of an object type (its own property site), and an alias of `unknown`
+  (`type V = unknown`, or an alias of one of these containers). A function expression written
+  without a parameter type, whose function type in the repository writes that parameter
+  `unknown`, is a site too, fed by that function type's calls. Each position is read as a plain
+  `unknown` is: by the values that reach it, the source's type projected to the position (an
+  array literal's elements, an object literal's members, a function expression's returns
+  followed one by one). A site declared with `ToolArgs` (a tool's arguments before their schema,
+  what an entry's `call` parses) is input, like `process.argv`. Measured before the fix: 250
+  container sites in production and 94 sites refused in all (typed and mixed, among them plain
+  ones the contextual reading revealed), none an alias; after it, none.
 - **Classes and what each becomes:**
 
   | Class | Origin of every source | Becomes |

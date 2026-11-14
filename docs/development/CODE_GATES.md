@@ -38,7 +38,12 @@ against a `?: T`.
   code, once, at the boundary where it enters; it is typed after. A value that has a contract type
   is typed by that contract (the interface's declared type, the handler's argument type,
   `ReturnType<…>`), never held as `unknown` and narrowed by hand. The unknown audit follows each
-  `unknown` back to where its value comes from and refuses one whose origin is typed.
+  `unknown` back to where its value comes from and refuses one whose origin is typed. An
+  `unknown` inside a written type is read the same way: an array's or a tuple's element, a
+  `Record`'s or an index signature's value, a `Map`, `Set` or `Promise` argument, a function
+  type's return, an alias of `unknown`, and the parameter of a function expression whose
+  function type writes it `unknown`. A site declared `ToolArgs` (a tool's arguments before their
+  schema) is input, as `process.argv` and `process.env` are.
 - **Text is read with plain string code** (`src/lib/plainText.ts`), never a regex.
 - **Biome** (`biome.json`) turns the three rules on as errors for production, with no override.
   `lint:check`, `lint` and the build's check name the same directories, which

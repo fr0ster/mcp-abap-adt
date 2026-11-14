@@ -82,7 +82,6 @@ import {
   withBatchSentence,
 } from '../lib/batch/sentence.js';
 import { runWithCallTransport } from '../lib/callTransport.js';
-import { hasMethod } from '../lib/capability.js';
 import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
@@ -2955,9 +2954,7 @@ function callHandler(
 function isSpent(connection: IAbapConnection): boolean {
   if (isEnded(connection)) return true;
   try {
-    return hasMethod(connection, 'isConnected')
-      ? connection.isConnected() === false
-      : false;
+    return connection.isConnected?.() === false;
   } catch {
     return false;
   }
@@ -3099,10 +3096,18 @@ function registrationOf(
 function withSearchMeta(name: unknown, registered: unknown): unknown {
   if (typeof name !== 'string') return registered;
   const search = searchMeta(name)._meta;
-  if (search === undefined || registered === null) return registered;
-  if (!hasMethod(registered, 'update')) return registered;
+  if (
+    search === undefined ||
+    typeof registered !== 'object' ||
+    registered === null ||
+    !('update' in registered)
+  ) {
+    return registered;
+  }
+  const update = registered.update;
+  if (typeof update !== 'function') return registered;
   const meta = '_meta' in registered ? registered._meta : undefined;
-  registered.update({
+  update.call(registered, {
     _meta: {
       ...(typeof meta === 'object' && meta !== null && !Array.isArray(meta)
         ? meta

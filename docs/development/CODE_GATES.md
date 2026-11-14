@@ -58,38 +58,68 @@ against a `?: T`.
   - **Bound by the caller:** a type parameter's constraint and default are not sites; each
     instantiation is judged where it is written, a default that falls back to `unknown`
     included.
+  - **The closed rule: a third party's `unknown` is read only at a boundary** (the owner's
+    decision). A value whose type holds `unknown` or `any` that a declaration outside the
+    repository brings in — our other packages (`interfaces-*`, `adt-clients`,
+    `adt-strategies`, `connection`), zod, the MCP SDK, the TypeScript API, Node and the
+    language (`JSON.parse`, `Object.entries`, `Reflect.get`, `PromiseRejectedResult.reason`,
+    …) — is refused (`third-party`) wherever production reads it:
+    - a member read, by name or by a key (an index signature's included);
+    - a call, a `new` or a tagged template whose signature answers it, or whose instantiation
+      holds one no argument or receiver of ours brought in (`Reflect.get(box, 'data')`);
+    - a destructuring — of a variable, a parameter, an assignment or a `for … of` head;
+      nested, renamed, with a default, by a rest;
+    - a callback's parameter to which a contract hands its own `unknown` (a `JSON.parse`
+      reviver's value, a predicate over a list the language types `any[]`): it passes as a
+      `callback` only when every use of it passes on (below).
+
+    It passes only inside a listed function (`PARSE_SITES`, `THROWN_READERS`, `SINK_SITES`,
+    matched by `file#function(`, closures inside it included); landing whole where `unknown`
+    or `any` is declared — a parameter, a member or a return written so (a sink:
+    `JSON.stringify`, `String`, a logger's meta, a listed site) — or in a slot written
+    `ToolArgs` (input until checked), an `await` handing on what it settles with; discarded
+    (a statement of its own, `void`); or read for its keys alone — `Object.keys`,
+    `Reflect.ownKeys` (the language's) and `for … in`, the closed list `KEYS_ONLY` (an `any`
+    so read is no `any` landing either). A type parameter instantiated to `unknown` —
+    `consume(box.data)` with `consume<T>(value: T)` — is no sink: the function uses the value.
+    **Inspecting it is reading it:** `typeof x.data === 'string'`, `x.data === undefined`,
+    `x.data instanceof T`, a truthiness test are refused outside a boundary; the check moves
+    into the parse function (`wireValueOf`, `src/lib/wireValue.ts`, tells a wire value apart
+    once). A settled promise's `reason` is a caught value: handed whole to a reader of thrown
+    values it passes as `caught`.
+
+    Nothing is read by holding a whole third-party value as such (`r: IAdtWireResponse`) or
+    reading its typed members, and an `unknown` we supplied is ours, charged where written
+    (bound by the caller): a type argument of a language generic (`new Map<string,
+    unknown>()`), a name whose written type holds it (`answer: IAdtWireResponse<unknown>`), a
+    slot type the instantiation builds (`thrown: Set<unknown> = new Set()`), a type of ours a
+    callback's contract was instantiated with (`Reading<unknown>`). A member read sees every
+    declaration the member has: a typed member of ours beside a third party's `unknown` one
+    (an intersection, `Object.assign(typed, theirs)`, a spread copy) still reads theirs,
+    though the checker reduces `string & unknown` to `string`. No write is tracked: what was
+    put into a third party's member does not matter, its read is the site.
   - Three checks run beside it: an expression of type `any` (a library's answer) lands only
-    where `unknown` or `any` is expected, is discarded or only inspected; a typed value put
-    where `unknown` is expected — a container literal landing there whole included — is charged
-    to that slot, refused in a parse site and in a third party's member read back by the
-    repository (by name, by a key, by any destructuring; a read whose value only passes on,
-    where `unknown` or `any` is expected, or is only inspected, reads nothing back); a sink slot
-    is read only by its one reader.
-  - **Where a value passes on** is decided by the declaration it lands in, before any
-    instantiation: a parameter, a member or a return written `unknown` or `any` (a third
-    party's sink such as `JSON.stringify`, a listed site). A type parameter instantiated to
-    `unknown` — inferred or written, `consume(box.data)` with `consume<T>(value: T)` — is no
-    sink: the function it belongs to uses the value, so the read is a read-back.
-  - **A write by a computed key** (`box[key] = value`) lands in each member the key's literal
-    type names, a union of literals naming each.
-  - **A whole-object read** is a read of every member of the value it is given, a closed list
-    of the language's reflective reads (`REFLECTIVE_READS`): `Object.entries`,
-    `Object.values`, `Object.getOwnPropertyDescriptors`, `Object.getOwnPropertyDescriptor`,
-    `Object.assign` (its sources), `Reflect.get`, `Reflect.getOwnPropertyDescriptor`,
-    `structuredClone` — each resolved outside the repository. `Object.keys`, `Reflect.ownKeys`
-    and `for … in` read keys alone (a value read by such a key does not compile without an
-    assertion); a spread copy keeps its members' declarations, so a read of the copy's member
-    is the read-back.
+    where `unknown` or `any` is expected, is discarded, only inspected or read for its keys
+    alone; a typed value put where `unknown` is expected — a container literal landing there
+    whole included — is charged to that slot and refused in a parse site (a write by a
+    computed key, `box[key] = value`, lands in each member the key's literal type names, a
+    union of literals naming each); a sink slot is read only by its one reader (by name, by a
+    key, by any destructuring, or by one of the language's reflective reads,
+    `REFLECTIVE_READS`: `Object.entries`, `Object.values`,
+    `Object.getOwnPropertyDescriptors`, `Object.getOwnPropertyDescriptor`, `Object.assign`'s
+    sources, `Reflect.get`, `Reflect.getOwnPropertyDescriptor`, `structuredClone`).
 - **The boundaries** (`BoundaryKind`), the one list a site may pass under:
   - **caught** — a `catch` binding, a promise's rejection handler's parameter;
   - **thrown** — a reader of thrown values or a failure slot (`THROWN_READERS`, by exact site
     `file#owner(name)`): a caught value reaches it untyped;
   - **parse** — **typed at the parse** (the owner's rule): `unknown` lives only inside a parse
     function, up to the code that checks it (`PARSE_SITES`); JSON is `JsonValue` / `JsonObject`
-    (`src/lib/json.ts`), XML is `XmlNode` (`src/lib/xml/node.ts`) from there on. One site
-    reads a contract's own `unknown`: a request's `params` (`IAbapRequestOptions.params`, the
-    caller's), read for `_action` by `sessionKind.ts#paramAction` — typing it is a change of
-    the connection contract, after 24.0.0;
+    (`src/lib/json.ts`), XML is `XmlNode` (`src/lib/xml/node.ts`) from there on, a wire value
+    is `WireValue` (`src/lib/wireValue.ts#wireValueOf`: an answer's `data`, a request's
+    `params` and `data`, the transport's `request`). One site reads a contract's own
+    `unknown` itself: a request's `params` (`IAbapRequestOptions.params`, the caller's), read
+    for `_action` by `sessionKind.ts#paramAction` — typing it is a change of the connection
+    contract, after 24.0.0;
   - **program-input** — a value of `process.argv` / `process.env` (`PROGRAM_INPUT_SITES`);
   - **tool-args** — **input until checked** (the owner's rule): a declaration written
     `ToolArgs` or `X & ToolArgs` with a typed `X`, a value read out of them (`ToolArgValue`: a
@@ -103,7 +133,9 @@ against a `?: T`.
     slot by any other function reads a typed value back and is refused — a slot of our own
     contract whose content is read back is typed;
   - **callback** — a parameter or a return a contract outside the repository (or a boundary of
-    the repository's) types `unknown` at every place the function is handed to it.
+    the repository's) types `unknown` at every place the function is handed to it; a parameter
+    holding the contract's own `unknown` only when every use of it passes on (the closed
+    rule).
 - **The lists name exact sites and stay short:** an entry no site has is stale and refused. A
   finding is fixed in the code — typed by its contract, its wire or parse answer, or made
   generic — never by widening a list.
@@ -145,6 +177,8 @@ deliberately wrong value to prove a check at a boundary, or prove a refusal of t
 - `noRegexOverInput.test.ts` lists each site as `file:line` and its first line.
 - `unknownSweep.test.ts` "refuses no site" lists each refused site as `file:line kind
   file#owner(name) at '<position>' <reason>: <typed values put there>`; the position is the path
-  inside the site's type (`IAdtResponse<0>`, `[]`, `.member`, `()`).
+  inside the site's type (`IAdtResponse<0>`, `[]`, `.member`, `()`). A read the closed rule
+  refuses is `third-party`, followed by the declaration it reads (`IHttpWireResponse.data`,
+  `JSON.parse`), or `callback` for a callback's parameter.
 - A fixture per refusal lives under `src/__tests__/unit/sources/__fixtures__/`; a new rule comes
   with a fixture its scan refuses and a clean one it accepts.

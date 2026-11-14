@@ -27,7 +27,6 @@ import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
-import { child } from '../thrownValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
   childAt as nodeAt,
@@ -42,6 +41,7 @@ import {
   metadataKeyOf,
   metadataReadOf,
 } from './metadataReads';
+import type { AdtReading } from './reading';
 import { atStep, carryingFailure } from './step';
 
 /**
@@ -881,10 +881,8 @@ export function metadataDescriptionOf(xml: string): string | undefined {
  * The document a metadata reading answered: `AdtReading.raw`, or the
  * document itself where the type's read answers it whole.
  */
-function rawOf(value: unknown): string {
-  if (typeof value === 'string') return value;
-  const raw = child(value, 'raw');
-  return typeof raw === 'string' ? raw : '';
+function rawOf(value: AdtReading<string> | string): string {
+  return typeof value === 'string' ? value : value.raw;
 }
 
 /** The descriptions a metadata phase read, and the refusal that ended it. */

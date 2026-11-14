@@ -17,6 +17,7 @@
  */
 
 import * as path from 'node:path';
+import type { ToolArgs } from '../handlers/interfaces.js';
 import { type JsonValue, jsonAt, jsonOf } from '../json';
 import { child, isList } from '../outsideValue';
 
@@ -201,8 +202,8 @@ function compared(value: unknown): string | undefined {
  * list only when it holds an entry (`HandlerActivate`'s `objects: []` is its
  * single form).
  */
-function statedArgument(args: unknown, name: string): unknown {
-  const given = child(args, name);
+function statedArgument(args: ToolArgs, name: string): unknown {
+  const given = args[name];
   return isList(given) && given.length === 0 ? undefined : given;
 }
 
@@ -227,7 +228,7 @@ function valueHolds(
 export function whenHolds(
   tool: string,
   when: WhenRule | undefined,
-  args: unknown,
+  args: ToolArgs,
 ): boolean {
   for (const rule of when ?? []) {
     const given = statedArgument(args, rule.argument);
@@ -262,7 +263,7 @@ export function whenHolds(
  */
 export function eligible(
   tool: string,
-  args: unknown,
+  args: ToolArgs,
   connection: 'http' | 'rfc',
 ): Eligibility {
   const entries = entriesByTool().get(tool);

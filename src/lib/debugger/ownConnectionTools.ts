@@ -15,7 +15,7 @@
  * `…Delta`) read the instance's connection and stay in the flow.
  */
 
-import { child } from '../outsideValue';
+import type { ToolArgs } from '../handlers/interfaces.js';
 export const DEBUGGER_OWN_CONNECTION_TOOLS: readonly string[] = [
   'AmdpDebugCancel',
   'AmdpDebugGetTable',
@@ -78,11 +78,6 @@ const COMPACT_READS = new Set([
   'setVariableValue',
 ]);
 
-/** `args[name]`, when `args` is an object. */
-function argument(args: unknown, name: string): unknown {
-  return child(args, name);
-}
-
 /**
  * Whether a call of `tool` with `args` is recorded in the debugger batch
  * opened at `debuggee` (spec §7's table). At the ABAP stop: step, step to
@@ -99,13 +94,13 @@ function argument(args: unknown, name: string): unknown {
  */
 export function recordableInDebugBatch(
   tool: string,
-  args: unknown,
+  args: ToolArgs,
   debuggee: 'abap' | 'amdp',
 ): boolean {
   if (debuggee === 'amdp') return recordableAtAmdpBreak(tool, args);
   switch (tool) {
     case 'DebugStep':
-      return FULL_STEPS.has(String(argument(args, 'action')));
+      return FULL_STEPS.has(String(args.action));
     case 'DebugStepToLine':
     case 'DebugGetStack':
     case 'DebugGetVariables':
@@ -113,15 +108,9 @@ export function recordableInDebugBatch(
     case 'DebugSetVariable':
       return true;
     case 'HandlerDebugStep':
-      return (
-        argument(args, 'kind') === 'abap' &&
-        COMPACT_STEPS.has(String(argument(args, 'operation')))
-      );
+      return args.kind === 'abap' && COMPACT_STEPS.has(String(args.operation));
     case 'HandlerDebugMaintain':
-      return (
-        argument(args, 'kind') === 'abap' &&
-        COMPACT_READS.has(String(argument(args, 'operation')))
-      );
+      return args.kind === 'abap' && COMPACT_READS.has(String(args.operation));
     default:
       return false;
   }
@@ -130,21 +119,15 @@ export function recordableInDebugBatch(
 const AMDP_STEPS = new Set(['stepOver', 'stepContinue']);
 
 /** The AMDP half of `recordableInDebugBatch`. */
-function recordableAtAmdpBreak(tool: string, args: unknown): boolean {
+function recordableAtAmdpBreak(tool: string, args: ToolArgs): boolean {
   switch (tool) {
     case 'AmdpDebugStep':
     case 'AmdpDebugGetTable':
       return true;
     case 'HandlerDebugStep':
-      return (
-        argument(args, 'kind') === 'amdp' &&
-        AMDP_STEPS.has(String(argument(args, 'operation')))
-      );
+      return args.kind === 'amdp' && AMDP_STEPS.has(String(args.operation));
     case 'HandlerDebugMaintain':
-      return (
-        argument(args, 'kind') === 'amdp' &&
-        argument(args, 'operation') === 'getDataPreview'
-      );
+      return args.kind === 'amdp' && args.operation === 'getDataPreview';
     default:
       return false;
   }

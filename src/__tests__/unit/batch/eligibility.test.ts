@@ -471,12 +471,4 @@ describe('eligible', () => {
       ),
     }).toEqual({ single: no, code: no, class: { ok: true } });
   });
-
-  it('reads arguments that are not an object as absent', () => {
-    expect(eligible('HandlerGet', undefined, 'http')).toEqual({
-      ok: false,
-      reason: 'arguments',
-    });
-    expect(eligible('SearchObject', null, 'http')).toEqual({ ok: true });
-  });
 });

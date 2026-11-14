@@ -1,4 +1,4 @@
-import { child } from '../outsideValue';
+import type { ToolArgs } from '../handlers/interfaces.js';
 import type { BatchKind } from './InstanceBatch';
 
 /**
@@ -60,11 +60,11 @@ export function asksNumbers(args: NumberArgs): boolean {
  * Whether a call's arguments, as the SDK hands them before the tool's
  * schema, name `action: 'end'` and ask for no numbers.
  */
-function endAction(args: unknown): boolean {
+function endAction(args: ToolArgs): boolean {
   return (
-    child(args, 'action') === 'end' &&
-    child(args, 'number') === undefined &&
-    child(args, 'numbers') === undefined
+    args.action === 'end' &&
+    args.number === undefined &&
+    args.numbers === undefined
   );
 }
 
@@ -74,7 +74,7 @@ function endAction(args: unknown): boolean {
  * (`DebugBatchEnd`, `HandlerDebugBatch` with `action: 'end'`), or none. Its
  * failure before `execute()` ends that batch (`endBeforeExecute`).
  */
-export function endsBatch(tool: string, args: unknown): BatchKind | undefined {
+export function endsBatch(tool: string, args: ToolArgs): BatchKind | undefined {
   if (tool === 'BatchEnd') return 'communication';
   if (tool === 'DebugBatchEnd') return 'debugger';
   if (tool === 'HandlerBatch' && endAction(args)) return 'communication';
@@ -83,6 +83,6 @@ export function endsBatch(tool: string, args: unknown): BatchKind | undefined {
 }
 
 /** Whether a call of `tool` with `args` ends the communication batch. */
-export function endsCommunicationBatch(tool: string, args: unknown): boolean {
+export function endsCommunicationBatch(tool: string, args: ToolArgs): boolean {
   return endsBatch(tool, args) === 'communication';
 }

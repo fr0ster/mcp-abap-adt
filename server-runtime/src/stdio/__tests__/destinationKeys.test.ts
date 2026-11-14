@@ -11,7 +11,7 @@
  * destination's `.env` reaches `process.env`.
  */
 
-import type { DestinationKey } from '@mcp-abap-adt/lib/config';
+import type { DestinationKey, YamlConfig } from '@mcp-abap-adt/lib/config';
 import { withDestinationSystemContext } from '../../../../src/lib/requestSystemResolution';
 import { getStatedSystemContext } from '../../../../src/lib/systemContext';
 import { AuthBrokerFactory } from '../auth/brokerFactory';
@@ -65,7 +65,7 @@ function destinationLines(extra: string[]): string[] {
 function factoryOf(
   argv: string[],
   env: NodeJS.ProcessEnv = {},
-  yaml: Record<string, unknown> | null = null,
+  yaml: YamlConfig | null = null,
 ): AuthBrokerFactory {
   const config = readCoreConfig(
     [`--auth-broker-path=${base.root}`, ...argv],

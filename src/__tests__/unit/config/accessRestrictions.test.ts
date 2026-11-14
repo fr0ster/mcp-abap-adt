@@ -5,6 +5,7 @@
  * a non-string YAML item and every malformed entry stop the start, named in
  * the form given; denied and allowed tables together stop it too.
  */
+
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
@@ -16,6 +17,7 @@ import {
 import { parseDeniedEntry } from '../../../lib/access/deniedActions';
 import { readAccessRestrictions } from '../../../lib/config/accessRestrictions';
 import { ParameterRefusal } from '../../../lib/config/authParameters';
+import type { JsonValue } from '../../../lib/json';
 
 interface Row {
   readonly cli: string;
@@ -96,7 +98,7 @@ function nameOf(row: Row, form: Form): string {
 }
 
 /** Reads `value` given in `form` for `row`. */
-function readIn(row: Row, form: Form, value: unknown): AccessRestrictions {
+function readIn(row: Row, form: Form, value: JsonValue): AccessRestrictions {
   if (form === 'cli') {
     return readAccessRestrictions([`${row.cli}=${String(value)}`], {}, null);
   }

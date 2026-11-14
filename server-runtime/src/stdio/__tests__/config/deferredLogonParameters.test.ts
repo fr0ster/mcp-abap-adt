@@ -6,11 +6,13 @@
  * not a source. The restore flag stated without the deferred logon stops the
  * start.
  */
+
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
   ParameterRefusal,
@@ -36,7 +38,7 @@ function refusalOf(read: () => unknown): string | undefined {
 const deferred = (
   argv: string[],
   env: NodeJS.ProcessEnv = {},
-  yaml: Record<string, unknown> | null = null,
+  yaml: YamlConfig | null = null,
 ) => readCoreConfig(argv, env, yaml).deferredLogon;
 
 describe('--deferred-logon: its forms and their precedence', () => {
@@ -125,7 +127,7 @@ describe('--deferred-logon: its forms and their precedence', () => {
 const restore = (
   argv: string[],
   env: NodeJS.ProcessEnv = {},
-  yaml: Record<string, unknown> | null = null,
+  yaml: YamlConfig | null = null,
 ) => {
   const config = readCoreConfig(argv, env, yaml);
   return { value: config.restoreSession, source: config.restoreSessionSource };

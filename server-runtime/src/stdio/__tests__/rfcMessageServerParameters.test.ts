@@ -8,6 +8,7 @@
  * their CLI or YAML form stops the start like every other destination option.
  */
 
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   DESTINATION_OPTIONS_REMOVED,
   DESTINATIONS_ELSEWHERE,
@@ -34,7 +35,7 @@ const FORMS = [
 const read = (
   argv: readonly string[],
   env: NodeJS.ProcessEnv = {},
-  yaml: Record<string, unknown> | null = null,
+  yaml: YamlConfig | null = null,
 ) => readCoreConfig(argv, env, yaml) as unknown as Record<string, unknown>;
 
 describe('the CLI and YAML forms reach the same fields', () => {

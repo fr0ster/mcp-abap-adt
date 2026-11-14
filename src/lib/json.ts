@@ -14,6 +14,14 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+/** A JSON object: a JSON value that is neither a list nor a scalar. */
+export type JsonObject = { [key: string]: JsonValue };
+
+/** Whether a JSON value is an object ({@link JsonObject}). */
+export function isJsonObject(value: JsonValue): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * `value` as a JSON value, built afresh from what it holds, or `undefined`
  * when it, or anything it holds, is not one: plain code over a parser's

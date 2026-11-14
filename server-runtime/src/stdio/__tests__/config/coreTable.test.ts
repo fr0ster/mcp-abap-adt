@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
   type ParameterTable,
@@ -26,14 +27,14 @@ const ROWS_ONLY: ParameterTable = {
 const readAuthParameters = (
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ) => readParameters(ROWS_ONLY, argv, env, yaml) as Record<string, unknown>;
 const generateHelp = () => coreHelp();
 const template = () => generateYamlConfigTemplate(CORE_PARAMETERS);
-const validateYamlConfig = (config: Record<string, unknown>) =>
+const validateYamlConfig = (config: YamlConfig) =>
   validateTable(CORE_PARAMETERS, config);
 /** The program's reading of `process.argv` and `process.env`. */
-const parse = (yaml?: Record<string, unknown>) =>
+const parse = (yaml?: YamlConfig) =>
   readCoreConfig(process.argv.slice(2), process.env, yaml ?? null);
 
 const sample = (p: (typeof AUTH_PARAMETERS)[number]): string => {

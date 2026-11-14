@@ -10,7 +10,7 @@
  * Plain code over the words, no regular expression.
  */
 
-import { isList } from '../outsideValue';
+import type { JsonValue } from '../json';
 import type { RemovedParameter } from './authParameters.js';
 
 /** The transport a binary serves: one binary per transport and tool set. */
@@ -89,8 +89,10 @@ const DECIDING_ORDER = [
 type DecidingWord = (typeof DECIDING_ORDER)[number];
 
 /** `a,b` / `['a','b']` → lower-cased trimmed words. Plain code. */
-function wordsOf(value: unknown): string[] {
-  const items = isList(value) ? value.map(String) : [String(value ?? '')];
+function wordsOf(value: JsonValue | undefined): string[] {
+  const items = Array.isArray(value)
+    ? value.map(String)
+    : [String(value ?? '')];
   return items.flatMap((item) =>
     item
       .toLowerCase()
@@ -101,7 +103,9 @@ function wordsOf(value: unknown): string[] {
 }
 
 /** The deciding word of `value`, or undefined when it holds none of them. */
-export function decidingWord(value: unknown): DecidingWord | undefined {
+export function decidingWord(
+  value: JsonValue | undefined,
+): DecidingWord | undefined {
   const words = wordsOf(value);
   return DECIDING_ORDER.find((word) => words.includes(word));
 }
@@ -117,7 +121,7 @@ export function expositionGoneWords(
   family: 'core' | 'compact',
   transport: ServedTransport,
   form: string,
-  value: unknown,
+  value: JsonValue | undefined,
 ): string {
   const binaries = BINARIES[transport];
   const gone = `${form} is gone (19.0.0): the binary fixes its tool set, so remove it`;

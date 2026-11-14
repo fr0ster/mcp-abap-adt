@@ -18,6 +18,7 @@ import {
   STATE_IDLE_ROW,
   STATE_IDLE_YAML,
 } from './authParameters.js';
+import type { YamlConfig } from './yamlConfig.js';
 
 export { STATE_IDLE_CLI, STATE_IDLE_ENV, STATE_IDLE_YAML };
 
@@ -31,7 +32,7 @@ const STATE_IDLE_ONLY: ParameterTable = {
 export function readStateIdleMinutes(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): number {
   const minutes = readParameters(
     STATE_IDLE_ONLY,

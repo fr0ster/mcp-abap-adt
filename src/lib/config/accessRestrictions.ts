@@ -10,6 +10,7 @@
  * nothing at all (`MCP_DENY_ACTIONS=`, a YAML `[]`) is absent. Plain code,
  * no regular expression.
  */
+
 import {
   type AccessLists,
   type AccessRestrictions,
@@ -29,6 +30,7 @@ import {
   parameterSource,
   readParameters,
 } from './authParameters.js';
+import type { YamlConfig } from './yamlConfig.js';
 
 const SECTION = 'ACCESS RESTRICTIONS';
 
@@ -187,7 +189,7 @@ function parsed<E>(
 export function readAccessRestrictions(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): AccessRestrictions {
   const values = readParameters(RESTRICTIONS_ONLY, argv, env, yaml);
   const formOf = (key: string): string =>

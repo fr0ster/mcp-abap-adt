@@ -20,14 +20,14 @@
  * Plain code over the arguments, no regular expression.
  */
 
-import { type JsonValue, jsonValueOf } from '../json';
-import { entries, isElement, isList } from '../outsideValue';
+import { isJsonObject, type JsonValue } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
 import type { TlsConfig } from './IServerConfig.js';
+import type { YamlConfig } from './yamlConfig.js';
 
 /** A start the parameters refuse, in words that name parameters only. */
 export class ParameterRefusal extends Error {
@@ -126,7 +126,7 @@ export interface RemovedParameter {
    * the form alone; a removed `--exposition` names the binary its words ask
    * for.
    */
-  readonly words: (form: string, value?: unknown) => string;
+  readonly words: (form: string, value?: JsonValue) => string;
 }
 
 export interface ParameterTable {
@@ -150,18 +150,16 @@ function argName(arg: string): string {
 
 /** The value at a dotted YAML path, or undefined. Plain code. */
 function yamlAt(
-  yaml: Record<string, unknown> | null | undefined,
+  yaml: YamlConfig | null | undefined,
   dotted: string | undefined,
 ): JsonValue | undefined {
   if (!yaml || dotted === undefined) return undefined;
-  let node: unknown = yaml;
+  let node: JsonValue | undefined = yaml;
   for (const segment of dotted.split('.')) {
-    if (!isElement(node)) return undefined;
+    if (node === undefined || !isJsonObject(node)) return undefined;
     node = node[segment];
   }
-  // The parsed document's value, checked once as JSON writes it (a YAML
-  // timestamp's `Date` its ISO text): JSON from here on.
-  return jsonValueOf(node);
+  return node;
 }
 
 /**
@@ -174,15 +172,15 @@ interface ProgramArguments extends ReadonlyArray<string> {}
 interface RemovedHit {
   readonly form: string;
   /** The value given: the program's input (CLI, environment, YAML). */
-  readonly value: unknown;
+  readonly value: JsonValue | undefined;
   readonly removed: RemovedParameter;
 }
 
 function removedYamlHits(
   table: ParameterTable,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): RemovedHit[] {
-  if (!yaml || typeof yaml !== 'object') return [];
+  if (!yaml) return [];
   const found: RemovedHit[] = [];
   for (const removed of table.removed) {
     for (const key of removed.yaml ?? []) {
@@ -203,7 +201,7 @@ function removedHit(
   table: ParameterTable,
   argv: ProgramArguments,
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): RemovedHit | undefined {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -241,7 +239,7 @@ export function refuseRemovedParameters(
   table: ParameterTable,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): void {
   const hit = removedHit(table, argv, env, yaml);
   if (hit) throw new ParameterRefusal(hit.removed.words(hit.form, hit.value));
@@ -381,7 +379,7 @@ function readRow(
   p: Parameter,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): { value: ParameterValue; source: string } | undefined {
   const cli = readCli(p, argv);
   const cliName = nameIn(p, 'cli', cli?.name);
@@ -409,7 +407,7 @@ export function readParameters(
   table: ParameterTable,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): Record<string, ParameterValue> {
   refuseRemovedParameters(table, argv, env, yaml);
   const out: Record<string, ParameterValue> = {};
@@ -431,7 +429,7 @@ export function parameterSource(
   key: string,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): string | undefined {
   const p = table.rows.find((row) => row.key === key);
   if (!p) return undefined;
@@ -453,12 +451,12 @@ const SECRET_KEY_FRAGMENTS = [
 ] as const;
 
 /** Every secret- or session-looking key at any depth, by its dotted path. Never a value. */
-export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
+export function findSecretYamlKeys(value: JsonValue, prefix = ''): string[] {
   if (value === null || typeof value !== 'object') return [];
   const found: string[] = [];
-  const members: [string, unknown][] = isList(value)
+  const members: [string, JsonValue][] = Array.isArray(value)
     ? value.map((v, i) => [String(i), v])
-    : entries(value);
+    : Object.entries(value);
   for (const [key, inner] of members) {
     const path = prefix ? `${prefix}.${key}` : key;
     const lower = key.toLowerCase();
@@ -476,7 +474,7 @@ export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
 /** Every refusal of a YAML file against the table: removed keys, secrets, values. */
 export function validateYamlParameters(
   table: ParameterTable,
-  yaml: Record<string, unknown>,
+  yaml: YamlConfig,
 ): string[] {
   const errors: string[] = removedYamlHits(table, yaml).map(
     ({ form, value, removed }) => removed.words(form, value),

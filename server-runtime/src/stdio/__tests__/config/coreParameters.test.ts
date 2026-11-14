@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
   ParameterRefusal,
@@ -379,7 +380,7 @@ describe('every removed parameter stops core with its words', () => {
 
 describe('the YAML template and validation come from the table', () => {
   const template = generateYamlConfigTemplate(CORE_PARAMETERS);
-  const parsed = load(template) as Record<string, unknown>;
+  const parsed = load(template) as YamlConfig;
 
   it('the template is valid and sets only defaults', () => {
     expect(validateYamlConfig(CORE_PARAMETERS, parsed).errors).toEqual([]);

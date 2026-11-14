@@ -5,6 +5,7 @@
  * three readers — stdio's, Streamable HTTP's and SSE's — so a table that
  * lacks the row, or reads it otherwise, fails on its own.
  */
+
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -40,6 +41,7 @@ import {
   BINARIES as BINARY_NAMES,
   type ToolSetKind,
 } from '../../../lib/config/binaries';
+import type { YamlConfig } from '../../../lib/config/yamlConfig';
 import { generateYamlConfigTemplate } from '../../../lib/config/yamlConfig';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
 
@@ -50,7 +52,7 @@ const YAML = 'enable-data-tools';
 type Reader = (
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml: Record<string, unknown> | null,
+  yaml: YamlConfig | null,
 ) => boolean | undefined;
 
 interface Binary {

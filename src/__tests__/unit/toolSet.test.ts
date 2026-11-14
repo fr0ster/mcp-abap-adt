@@ -39,6 +39,7 @@ import {
   ParameterRefusal,
   refuseRemovedParameters,
 } from '../../lib/config/index';
+import type { YamlConfig } from '../../lib/config/yamlConfig';
 import {
   BackgroundRunHandlersGroup,
   BatchHandlersGroup,
@@ -694,10 +695,7 @@ describe('--exposition is gone: each word stops the start with its sentence', ()
           rows: [],
           removed: [set.expositionRemoved(transport)],
         };
-        const refusal = (
-          argv: string[],
-          yaml: Record<string, unknown> | null = null,
-        ) => {
+        const refusal = (argv: string[], yaml: YamlConfig | null = null) => {
           try {
             refuseRemovedParameters(table, argv, {}, yaml);
           } catch (error) {

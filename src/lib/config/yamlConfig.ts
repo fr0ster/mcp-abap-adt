@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
-import { childAt, isElement } from '../outsideValue';
+import { isJsonObject, type JsonObject, jsonValueOf } from '../json';
+import { childAt } from '../outsideValue';
 import {
   CONF_ROW,
   ParameterRefusal,
@@ -17,8 +18,11 @@ import {
   validateYamlParameters,
 } from './authParameters.js';
 
-/** A loaded config file: its top-level mapping. */
-export type YamlConfig = Record<string, unknown>;
+/**
+ * A loaded config file: its top-level mapping, typed at the parse as JSON
+ * ({@link jsonValueOf}: a YAML timestamp is its ISO text).
+ */
+export type YamlConfig = JsonObject;
 
 /**
  * `--conf` / `--config` as given on the command line, or undefined. Plain
@@ -96,12 +100,13 @@ export function loadYamlConfig(
     );
   }
   if (parsed === undefined || parsed === null) return {};
-  if (!isElement(parsed)) {
+  // The parsed document, checked once as JSON writes it: typed from here on.
+  const config = jsonValueOf(parsed);
+  if (config === undefined || !isJsonObject(config)) {
     throw new ParameterRefusal(
       `The config file ${configPath} must be a mapping of parameter keys`,
     );
   }
-  const config: YamlConfig = parsed;
   const { errors } = validateYamlConfig(table, config);
   if (errors.length > 0) {
     throw new ParameterRefusal(

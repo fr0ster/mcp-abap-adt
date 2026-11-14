@@ -48,9 +48,9 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isLatched } from './activeTools';
 import { ClosedInstanceRefusal } from './auth/failures';
-import { hasMethod } from './capability';
 
 /** What an owned connection is to its instance. */
 export type ConnectionRole =
@@ -72,8 +72,11 @@ export type ConnectionRole =
    */
   | 'background';
 
-/** A connection, as the registry keeps it: any object with an optional `disconnect()`. */
-type OwnedConnection = object;
+/**
+ * A connection, as the registry keeps it: the two members of
+ * `IAbapConnection` it calls, each optional there.
+ */
+type OwnedConnection = Pick<IAbapConnection, 'disconnect' | 'flushGoodbye'>;
 
 interface Owned {
   owner: object | undefined;
@@ -153,7 +156,7 @@ export function currentOwner(): object | undefined {
  * connection is not recorded again.
  */
 export function own(
-  connection: object,
+  connection: OwnedConnection,
   options: { role: ConnectionRole; owner?: object | undefined },
 ): void {
   if (ending.has(connection)) return;
@@ -184,7 +187,7 @@ export function refuseIfClosed(
  * latched closed meanwhile, the connection is ended (joined, if the terminal
  * close already asked for its logoff) and `ClosedInstanceRefusal` thrown.
  */
-export function refuseWhenClosed(connection: object): void {
+export function refuseWhenClosed(connection: OwnedConnection): void {
   if (!owners.has(connection)) return;
   if (!isLatched(owners.get(connection))) return;
   void endConnection(connection);
@@ -192,12 +195,15 @@ export function refuseWhenClosed(connection: object): void {
 }
 
 /** Whether `connection` was ended here (its `disconnect()` was asked for). */
-export function isEnded(connection: object): boolean {
+export function isEnded(connection: OwnedConnection): boolean {
   return ending.has(connection);
 }
 
 /** Calls `listener` once `connection` ends (now, if it already has). */
-export function whenEnded(connection: object, listener: () => void): void {
+export function whenEnded(
+  connection: OwnedConnection,
+  listener: () => void,
+): void {
   if (ending.has(connection)) {
     listener();
     return;
@@ -219,7 +225,7 @@ export function whenEnded(connection: object, listener: () => void): void {
  * began is not followed: its listener never runs.
  */
 export function whenLogoffCompleted(
-  connection: object,
+  connection: OwnedConnection,
   listener: () => void,
 ): void {
   if (ending.has(connection)) return;
@@ -234,7 +240,7 @@ export function whenLogoffCompleted(
  * words), never thrown. Resolves when the logoff is written (connection 16).
  */
 export function endConnection(
-  connection: object,
+  connection: OwnedConnection,
   onFailure: () => void = () => {
     process.stderr.write(`${CLOSE_FAILED_WORDS}\n`);
   },
@@ -251,9 +257,7 @@ export function endConnection(
   );
   const closing = (async () => {
     try {
-      if (hasMethod(connection, 'disconnect')) {
-        await connection.disconnect();
-      }
+      await connection.disconnect?.();
     } catch {
       logoffListeners.delete(connection);
       complete(false);
@@ -297,10 +301,10 @@ export function endConnection(
  * the completion listeners run, before the follow-up settles.
  */
 function followAnswer(
-  connection: object,
+  connection: OwnedConnection,
   complete: (completed: boolean) => void,
 ): void {
-  if (!hasMethod(connection, 'flushGoodbye')) {
+  if (connection.flushGoodbye === undefined) {
     // Nothing to wait for the answer with: the logoff never completes here.
     logoffListeners.delete(connection);
     complete(false);
@@ -309,7 +313,7 @@ function followAnswer(
   const answered = (async () => {
     let completed = false;
     try {
-      await connection.flushGoodbye();
+      await connection.flushGoodbye?.();
       completed = true;
     } catch {
       // The library's flush never rejects; a stand-in that does ends the
@@ -358,7 +362,7 @@ export async function logoffsAnswered(owner?: object): Promise<void> {
  * not written or its flush did not complete. A connection whose end was
  * never asked for answers `false`.
  */
-export function logoffCompleted(connection: object): Promise<boolean> {
+export function logoffCompleted(connection: OwnedConnection): Promise<boolean> {
   return completions.get(connection) ?? Promise.resolve(false);
 }
 

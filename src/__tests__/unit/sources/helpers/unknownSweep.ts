@@ -1991,13 +1991,68 @@ export class UnknownSweep {
     landing: () => ts.Node | undefined,
     reached: readonly ts.Type[],
   ): void {
-    const slot = each.owner ?? landing();
     const types = reached.map((t) => this.typeText(t));
     const where = pathText(each.path) || "''";
-    if (slot === undefined) {
-      this.report(node, 'widening', where, undefined, true, 'widening', types);
-      return;
+    const slots =
+      each.owner === undefined
+        ? (this.keyedSlots(outermost(node)) ?? [landing()])
+        : [each.owner];
+    for (const slot of slots) {
+      if (slot === undefined) {
+        this.report(
+          node,
+          'widening',
+          where,
+          undefined,
+          true,
+          'widening',
+          types,
+        );
+        continue;
+      }
+      this.chargeSlot(node, slot, where, types);
     }
+  }
+
+  /**
+   * The members a write by a computed key lands in (`box[key] = value`):
+   * each member the key's literal type names, a union of literals naming
+   * each; `undefined` for any other write.
+   */
+  private keyedSlots(node: ts.Expression): ts.Node[] | undefined {
+    const parent = node.parent;
+    if (
+      !ts.isBinaryExpression(parent) ||
+      parent.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+      parent.right !== node ||
+      !ts.isElementAccessExpression(parent.left)
+    ) {
+      return undefined;
+    }
+    const key = this.checker.getTypeAtLocation(parent.left.argumentExpression);
+    const keys = key.isUnion() ? key.types : [key];
+    if (
+      !keys.every((each) => each.isStringLiteral() || each.isNumberLiteral())
+    ) {
+      return undefined;
+    }
+    return keyedMembers(
+      this.checker,
+      this.checker.getTypeAtLocation(parent.left.expression),
+      key,
+    ).flatMap((member) => {
+      const declaration = member?.valueDeclaration ?? member?.declarations?.[0];
+      return declaration === undefined ? [] : [declaration];
+    });
+  }
+
+  /** A typed value charged to `slot`. */
+  private chargeSlot(
+    node: ts.Expression,
+    slot: ts.Node,
+    where: string,
+    types: readonly string[],
+  ): void {
     if (!ownNode(slot)) {
       if (
         thirdParty(slot) &&

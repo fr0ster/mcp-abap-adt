@@ -599,6 +599,17 @@ describe('the forms round 9 found the every-node sweep missing are refused', () 
   });
 });
 
+describe('the forms round 10 found the every-node sweep missing are refused', () => {
+  const readBacks = (fixture: string): number[] =>
+    sitesOf(fixture)
+      .filter((site) => site.kind === 'read-back')
+      .map((site) => Number(site.where.split(':').pop()));
+
+  it('a write by a computed key is charged to the member its literal type names', () => {
+    assert.deepEqual(readBacks('computedKeyWrite'), [10, 19]);
+  });
+});
+
 describe('tool-argument input until it is checked (the owner rule)', () => {
   it('a value read out of the arguments, a list of them, a nested object and a function handing them on pass', () => {
     const sites = sitesOf('toolArgValue');

@@ -14,6 +14,7 @@
  * one bounded wait is a sync's confirmation, inside its own call, at
  * WAIT_MAX_SECONDS.
  */
+
 import { randomUUID } from 'node:crypto';
 import {
   AdtBatchConnection,
@@ -22,10 +23,17 @@ import {
   type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { adtHeadersOf, withAdtHeaders } from '../adtHeaders/withAdtHeaders';
+import {
+  type AdtHeadersContext,
+  withAdtHeaders,
+} from '../adtHeaders/withAdtHeaders';
 import { currentRequestSignal } from '../requestSignal';
+import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
   carryingPayload,
@@ -76,8 +84,18 @@ export interface AmdpSessionPorts<O = unknown> {
     session?: 'stateful' | 'stateless',
   ): Promise<IAbapConnection>;
   closeConnection(c: IAbapConnection): Promise<void>;
+  /**
+   * Takes out a connection whose SAP session is gone: nothing more is sent
+   * on it, not even a logoff of the session that ended.
+   */
+  dropConnection(c: IAbapConnection): void;
   amdpDebugger(c: IAbapConnection): AmdpDebuggerT;
   requestUser(origin: O): Promise<string>;
+  /**
+   * The header port of the origin's system (`withAdtHeaders`): the pair each
+   * header-taking call is sent with. Absent, the default pairs.
+   */
+  headersOf?(origin: O): AdtHeadersContext;
   run(c: IAbapConnection, target: RunTarget): Promise<RunOutcome>;
 }
 export interface AmdpBreakpoint {
@@ -132,30 +150,37 @@ interface OnceAmdp {
   stopped: boolean;
 }
 
-const bodyOf = (a: IAdtResponse<unknown>): string =>
+const bodyOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
-const messageOf = (a: IAdtResponse<unknown>): string =>
+const messageOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** A debug error that carries the method's error as it is, with its step. */
 const failedAt = <E extends Error>(
   error: E,
-  a: IAdtResponse<unknown>,
+  a: IAdtResponse<string | void>,
   step: string,
 ): E =>
   a.ok || isFromThrow(a.getError())
     ? error
     : carryingFailure(error, a.getError(), step);
-type Wire = { headers?: Record<string, unknown>; data?: unknown };
-const wireOf = (a: IAdtResponse<unknown>): Wire =>
-  (a.ok ? (a.getResult().value ?? {}) : {}) as Wire;
+/** The frame a start or a command answers, as the library's reading keeps it. */
+type Wire = Partial<Pick<IAdtWireResponse, 'headers' | 'data'>>;
+const wireOf = (a: IAdtResponse<IAdtWireResponse>): Wire => {
+  const value = a.ok ? a.getResult().value : undefined;
+  if (value === undefined) return {};
+  return {
+    headers: value.headers,
+    ...(value.data !== undefined ? { data: value.data } : {}),
+  };
+};
 
 export class AmdpSession<O = unknown> {
   private readonly serial = new Serial();
   private origin?: O;
-  private open?: Open;
-  private closing?: Open; // retired, its cleanup not finished
-  private debuggeeId?: string;
+  private open?: Open | undefined;
+  private closing?: Open | undefined; // retired, its cleanup not finished
+  private debuggeeId?: string | undefined;
   private breaks = 0; // counts ON_BREAK, to tell a break that came during a step
   private ends = 0;
   /** The session's end began (`endWaits`): no stop waits for a debuggee any more. */
@@ -164,13 +189,15 @@ export class AmdpSession<O = unknown> {
   private readonly syncs = new Map<string, AmdpEvent>(); // SYNC_BREAKPOINTS by request id, apart from the queue
   private readonly abandoned = new Set<string>(); // syncs no call waits for any more
   private notices: AmdpState[] = [];
-  private failure?: string;
+  private failure?: string | undefined;
   /** The failed event read behind `failure`: the method's error, and what was not undone. */
-  private failedRead?: {
-    error?: IAdtError;
-    thrown?: DebugFailure;
-    failures: DebugFailure[];
-  };
+  private failedRead?:
+    | {
+        error?: IAdtError;
+        thrown?: DebugFailure;
+        failures: DebugFailure[];
+      }
+    | undefined;
   private cleanupFailures: DebugFailure[] = [];
   /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
   private readonly runs = new Set<{ connection?: IAbapConnection }>();
@@ -194,6 +221,14 @@ export class AmdpSession<O = unknown> {
     if (this.origin === undefined)
       throw new DebugStateError('the debugger has no connection yet');
     return this.origin;
+  }
+
+  /** The header port of the bound origin's system, as the ports name it. */
+  private headersContext(): AdtHeadersContext {
+    if (this.origin === undefined || this.ports.headersOf === undefined) {
+      return {};
+    }
+    return this.ports.headersOf(this.origin);
   }
   private requireOpen(): Open {
     if (!this.open)
@@ -255,7 +290,7 @@ export class AmdpSession<O = unknown> {
   start(options: {
     stopExisting: boolean;
     breakpoints: AmdpBreakpoint[];
-    run?: RunTarget;
+    run?: RunTarget | undefined;
   }): Promise<{ mainId: string; breakpoints: AmdpBreakpointState[] }> {
     return this.mutate(async () => {
       if (this.open || this.closing)
@@ -537,6 +572,7 @@ export class AmdpSession<O = unknown> {
         .syncBreakpoints(open.mainId, [])
         .catch(asFailure);
       if (cleared.ok) open.cleared = true;
+      else if (spentBy(cleared.getError())) return this.dropSpent(open);
       else failures.push(failedEntry(cleared, 'clear breakpoints'));
     }
     for (const id of [...open.unreleased]) {
@@ -547,11 +583,13 @@ export class AmdpSession<O = unknown> {
       if (released.ok) {
         open.unreleased.delete(id);
         open.released.add(id);
-      } else failures.push(failedEntry(released, `release debuggee ${id}`));
+      } else if (spentBy(released.getError())) return this.dropSpent(open);
+      else failures.push(failedEntry(released, `release debuggee ${id}`));
     }
     if (!open.stopped && !skipped('stop')) {
       const stopped = await open.onCommands.stop(open.mainId).catch(asFailure);
       if (stopped.ok) open.stopped = true;
+      else if (spentBy(stopped.getError())) return this.dropSpent(open);
       else failures.push(failedEntry(stopped, 'stop'));
     }
     // A stopped session owes no breakpoint clear: SAP removes a breakpoint
@@ -658,7 +696,7 @@ export class AmdpSession<O = unknown> {
     return this.mutate(async () => {
       const open = this.requireOpen();
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'amdpDebugger.getDataPreview',
         (headers) =>
           open.onCommands.getDataPreview({
@@ -789,7 +827,7 @@ export class AmdpSession<O = unknown> {
   > {
     const { open, debuggee, dbg } = this.batchSession(recorder);
     const answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'amdpDebugger.getDataPreview',
       (headers) =>
         dbg.getDataPreview({
@@ -838,7 +876,7 @@ export class AmdpSession<O = unknown> {
   > {
     const { once, dbg } = this.batchOnce(recorder);
     const answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'amdpDebugger.getDataPreview',
       (headers) =>
         dbg.getDataPreview({
@@ -870,7 +908,7 @@ export class AmdpSession<O = unknown> {
    * waits for its confirmation event. The two connections are opened by
    * `startOnce` (an open sends nothing) and closed by the cleanup.
    */
-  private once?: OnceAmdp;
+  private once?: OnceAmdp | undefined;
   /** Connections of an earlier one-request session: the cleanup closes them. */
   private readonly retiredOnce = new Set<IAbapConnection>();
 
@@ -1007,6 +1045,14 @@ export class AmdpSession<O = unknown> {
     return this.mutate(async () => {
       const once = this.requireOnce();
       const answer = await once.onCommands.stop(once.mainId);
+      // The commands connection spent: the AMDP debug session went with its
+      // SAP session. The answer stays as it came; the session goes with it,
+      // both connections dropped without a request, so nothing more is sent.
+      if (!answer.ok && spentBy(answer.getError())) {
+        this.once = undefined;
+        this.ports.dropConnection(once.commands);
+        this.ports.dropConnection(once.events);
+      }
       if (!answer.ok)
         throw failedAt(
           new DebugRequestError(messageOf(answer)),
@@ -1031,7 +1077,7 @@ export class AmdpSession<O = unknown> {
     return this.mutate(async () => {
       const once = this.requireOnce();
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'amdpDebugger.getDataPreview',
         (headers) =>
           once.onCommands.getDataPreview({
@@ -1059,7 +1105,7 @@ export class AmdpSession<O = unknown> {
 
   private command(
     step: string,
-    send: (once: OnceAmdp) => Promise<IAdtResponse<unknown>>,
+    send: (once: OnceAmdp) => Promise<IAdtResponse<IAdtWireResponse>>,
   ): Promise<DebugView<{ requestId: string }>> {
     return this.mutate(async () => {
       const answer = await send(this.requireOnce());
@@ -1079,12 +1125,24 @@ export class AmdpSession<O = unknown> {
           .stop(once.mainId)
           .catch(asFailure);
         if (stopped.ok) once.stopped = true;
-        else failures.push(failedEntry(stopped, 'stop'));
+        else if (spentBy(stopped.getError())) {
+          // The commands connection spent: the AMDP debug session went with
+          // its SAP session. Both connections are dropped without a request.
+          this.once = undefined;
+          this.ports.dropConnection(once.commands);
+          this.ports.dropConnection(once.events);
+          return this.closeRetiredOnce(failures);
+        } else failures.push(failedEntry(stopped, 'stop'));
       }
       this.once = undefined;
       this.retiredOnce.add(once.events);
       this.retiredOnce.add(once.commands);
     }
+    await this.closeRetiredOnce(failures);
+  }
+
+  /** The one-request sessions' retired connections, each closed; a close that throws is kept. */
+  private async closeRetiredOnce(failures: DebugFailure[]): Promise<void> {
     for (const c of [...this.retiredOnce]) {
       const before = failures.length;
       await this.closeOrKeep(c, 'a connection', failures);
@@ -1235,6 +1293,23 @@ export class AmdpSession<O = unknown> {
   }
 
   /**
+   * A closing session whose commands connection is spent (the owner's
+   * decision): the AMDP debug session went with its SAP session, and SAP's
+   * logoff freed what it held. Nothing more is sent on it; both connections
+   * are dropped without a request, and nothing is owed.
+   */
+  private dropSpent(open: Open): DebugFailure[] {
+    if (this.closing === open) this.closing = undefined;
+    open.stopped = true;
+    open.cleared = true;
+    open.unreleased.clear();
+    open.readDone = true;
+    this.ports.dropConnection(open.commands);
+    this.ports.dropConnection(open.events);
+    return [];
+  }
+
+  /**
    * Inside stop, before the session is retired: a debuggee standing at a
    * break is cancelled, and the stop waits until it has ended — the event
    * read reports `ON_WARNING`, `ON_EXECUTION_END` or `STOP`, and every run
@@ -1268,6 +1343,16 @@ export class AmdpSession<O = unknown> {
       .deleteDebuggee(open.mainId, debuggee)
       .catch(asFailure);
     if (!cancelled.ok) {
+      // The commands connection spent: the AMDP debug session went with its
+      // SAP session, so there is nothing to cancel or wait for. The session
+      // is retired and dropped here, so nothing more is sent on it; the stop
+      // goes on with what else it holds — whether the session is ending or
+      // not.
+      if (spentBy(cancelled.getError())) {
+        this.retire(open);
+        this.dropSpent(open);
+        return undefined;
+      }
       if (this.sessionEnding) return undefined;
       failures.push(failedEntry(cancelled, `release debuggee ${debuggee}`));
       return 'refused';
@@ -1372,7 +1457,7 @@ export class AmdpSession<O = unknown> {
       }
       try {
         await this.close(connection);
-        this.unclosed.delete(connection as IAbapConnection);
+        if (connection) this.unclosed.delete(connection);
       } catch {
         if (connection) this.unclosed.add(connection); // the next stop closes it
       }

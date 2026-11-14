@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
   ParameterRefusal,
@@ -281,7 +282,7 @@ describe('the Streamable HTTP rows', () => {
 
   it('a port out of range is refused, naming the form', () => {
     expect(() => readHttpConfig(['--port=70000'], {})).toThrow(
-      'Invalid --port: "70000". Must be a port between 1 and 65535',
+      'Invalid --port: "70000". Must be a port between 0 and 65535 (0: one the system chooses)',
     );
   });
 });
@@ -347,11 +348,15 @@ describe('every removed parameter stops http with its words', () => {
     ],
     ['--unsafe', '--unsafe', DESTINATION_WORDS],
     ['--connection-type=rfc', '--connection-type', DESTINATION_WORDS],
+    ['--ashost=value-one', '--ashost', DESTINATION_WORDS],
+    ['--sysnr=00', '--sysnr', DESTINATION_WORDS],
     ['--mshost=value-one', '--mshost', DESTINATION_WORDS],
     ['--msserv=value-one', '--msserv', DESTINATION_WORDS],
     ['--sysid=value-one', '--sysid', DESTINATION_WORDS],
     ['--group=value-one', '--group', DESTINATION_WORDS],
     ['--saprouter=value-one', '--saprouter', DESTINATION_WORDS],
+    ['--client=100', '--client', DESTINATION_WORDS],
+    ['--language=EN', '--language', DESTINATION_WORDS],
     ['--browser=none', '--browser', DESTINATION_WORDS],
     ['--browser-program=/x', '--browser-program', DESTINATION_WORDS],
     ['--browser-auth-port=61001', '--browser-auth-port', DESTINATION_WORDS],
@@ -431,7 +436,7 @@ describe('every removed parameter stops http with its words', () => {
 
 describe('the YAML template and validation come from the table', () => {
   const template = generateYamlConfigTemplate(HTTP_PARAMETERS);
-  const parsed = load(template) as Record<string, unknown>;
+  const parsed = load(template) as YamlConfig;
 
   it('the template is valid and sets only defaults', () => {
     expect(validateYamlConfig(HTTP_PARAMETERS, parsed).errors).toEqual([]);
@@ -446,7 +451,9 @@ describe('the YAML template and validation come from the table', () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
         'batch',
+        'enable-data-tools',
         'http',
+        'restrictions',
         'shutdown-timeout',
         'state-idle-minutes',
         'system-type',

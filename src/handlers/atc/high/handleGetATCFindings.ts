@@ -1,13 +1,17 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import {
   parseAtcWorklist,
   terseFinding,
 } from '../../../lib/strategies/atcFindings';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -27,24 +31,16 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     "[read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes).",
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      worklist_id: {
-        type: 'string',
-        description: 'Worklist identifier an ATC run answered.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['worklist_id'],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    worklist_id: z
+      .string()
+      .describe('Worklist identifier an ATC run answered.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface GetATCFindingsArgs {
-  worklist_id?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetATCFindingsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetATCFindings(
   context: HandlerContext,

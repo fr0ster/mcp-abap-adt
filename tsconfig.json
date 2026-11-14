@@ -8,6 +8,7 @@
     "moduleResolution": "node16",
     "isolatedModules": true,
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -22,8 +23,7 @@
       "node"
     ],
     "rootDir": "./src",
-    "outDir": "./dist",
-    "noImplicitAny": false
+    "outDir": "./dist"
   },
   "include": [
     "src/**/*"
@@ -31,6 +31,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "src/__tests__"
+    "src/__tests__",
+    "src/__typechecks__"
   ]
 }

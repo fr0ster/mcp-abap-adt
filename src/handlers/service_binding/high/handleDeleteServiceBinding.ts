@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteServiceBinding Handler - Delete ABAP service binding via ADT
  * deletion API
@@ -23,7 +25,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -34,36 +36,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name to delete.',
-      },
-      transport_request: {
-        type: 'string',
-        description: 'Optional transport request for deletion transport flow.',
-      },
-      response_format: {
-        type: 'string',
-        enum: ['xml', 'json', 'plain'],
-        default: 'xml',
-        description:
-          'Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['service_binding_name'],
-  },
+  inputSchema: z.object({
+    service_binding_name: z
+      .string()
+      .describe('Service binding name to delete.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe('Optional transport request for deletion transport flow.'),
+    response_format: z
+      .enum(['xml', 'json', 'plain'])
+      .default('xml')
+      .optional()
+      .describe(
+        'Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface DeleteServiceBindingArgs {
-  service_binding_name: string;
-  transport_request?: string;
-  response_format?: ServiceBindingResponseFormat;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteServiceBinding(
   context: HandlerContext,

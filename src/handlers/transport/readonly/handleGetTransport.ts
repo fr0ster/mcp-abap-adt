@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * GetTransport Handler - Retrieve ABAP transport request information via ADT API
  *
@@ -18,43 +20,49 @@ import { XMLParser } from 'fast-xml-parser';
 import { answerCaught, answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
+import {
+  type AnswerObject,
+  type JsonValue,
+  jsonOfNode,
+} from '../../../lib/json';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
+import { parseXml } from '../../../lib/xml/node';
+import {
+  child,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description: 'Transport request number, not a task',
-      },
-      include_objects: {
-        type: 'boolean',
-        description: 'Include list of objects in transport (default: true)',
-        default: true,
-      },
-      include_tasks: {
-        type: 'boolean',
-        description: 'Include list of tasks in transport (default: true)',
-        default: true,
-      },
-    },
-    required: ['transport_number'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe('Transport request number, not a task'),
+    include_objects: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Include list of objects in transport (default: true)'),
+    include_tasks: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Include list of tasks in transport (default: true)'),
+  }),
 } as const;
 
-interface GetTransportArgs {
-  transport_number: string;
-  include_objects?: boolean;
-  include_tasks?: boolean;
-}
+type GetTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** An object or a task of the request: its members as parsed, by name. */
+type TransportRow = AnswerObject;
 
 /**
  * Parse transport request XML response
@@ -63,7 +71,7 @@ function parseTransportXml(
   xmlData: string,
   includeObjects: boolean = true,
   includeTasks: boolean = true,
-): any {
+) {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
@@ -75,8 +83,8 @@ function parseTransportXml(
     },
   });
 
-  const result = parser.parse(xmlData);
-  const root = result['tm:root'] || result.root;
+  const result: XmlRead = parseXml(parser, xmlData);
+  const root = child(result, 'tm:root') || child(result, 'root');
 
   if (!root) {
     // A helper must not return a tool result: its value is spread into a
@@ -86,81 +94,102 @@ function parseTransportXml(
   }
 
   // Get detailed transport info from tm:request inside tm:root
-  const request = root['tm:request'] || {};
+  const request = child(root, 'tm:request') || {};
+  /** The attribute `name` of the request, else of the root, as parsed. */
+  const ofRequest = (name: string) => child(request, name);
+  const ofRoot = (name: string) => child(root, name);
 
   // Extract basic transport information from both root attributes and request details
   const transportInfo = {
-    number: root['adtcore:name'] || request['tm:number'] || root.name,
+    number: ofRoot('adtcore:name') || ofRequest('tm:number') || ofRoot('name'),
     description:
-      request['tm:desc'] || request.description || root['tm:description'],
-    type: request['tm:type'] || root['tm:object_type'] || root.type,
-    status: request['tm:status'] || root['tm:status'],
-    status_text: request['tm:status_text'],
-    owner: request['tm:owner'] || root['tm:owner'],
-    target_system: request['tm:target'] || root['tm:target'],
-    target_desc: request['tm:target_desc'],
+      ofRequest('tm:desc') ||
+      ofRequest('description') ||
+      ofRoot('tm:description'),
+    type: ofRequest('tm:type') || ofRoot('tm:object_type') || ofRoot('type'),
+    status: ofRequest('tm:status') || ofRoot('tm:status'),
+    status_text: ofRequest('tm:status_text'),
+    owner: ofRequest('tm:owner') || ofRoot('tm:owner'),
+    target_system: ofRequest('tm:target') || ofRoot('tm:target'),
+    target_desc: ofRequest('tm:target_desc'),
     created_at:
-      root['adtcore:createdAt'] || request['tm:createdAt'] || root.createdAt,
+      ofRoot('adtcore:createdAt') ||
+      ofRequest('tm:createdAt') ||
+      ofRoot('createdAt'),
     created_by:
-      root['adtcore:createdBy'] || request['tm:createdBy'] || root.createdBy,
+      ofRoot('adtcore:createdBy') ||
+      ofRequest('tm:createdBy') ||
+      ofRoot('createdBy'),
     changed_at:
-      root['adtcore:changedAt'] || request['tm:changedAt'] || root.changedAt,
+      ofRoot('adtcore:changedAt') ||
+      ofRequest('tm:changedAt') ||
+      ofRoot('changedAt'),
     changed_by:
-      root['adtcore:changedBy'] || request['tm:changedBy'] || root.changedBy,
-    release_date: request['tm:releaseDate'] || root.releaseDate,
-    client: request['tm:source_client'] || root['tm:client'],
-    cts_project: request['tm:cts_project'],
-    cts_project_desc: request['tm:cts_project_desc'],
+      ofRoot('adtcore:changedBy') ||
+      ofRequest('tm:changedBy') ||
+      ofRoot('changedBy'),
+    release_date: ofRequest('tm:releaseDate') || ofRoot('releaseDate'),
+    client: ofRequest('tm:source_client') || ofRoot('tm:client'),
+    cts_project: ofRequest('tm:cts_project'),
+    cts_project_desc: ofRequest('tm:cts_project_desc'),
+  };
+
+  /** A member that may repeat, as a list: a list as it is, one member alone. */
+  const repeated = (value: XmlNode): XmlList =>
+    isList(value) ? value : [value];
+
+  /** A member of a parsed row, checked once: JSON, or absent. */
+  const field = (node: XmlRead, name: string): JsonValue | undefined => {
+    const member = child(node, name);
+    return member === undefined ? undefined : jsonOfNode(member);
   };
 
   // Extract objects if requested
-  let objects: any[] = [];
-  if (includeObjects && request['tm:all_objects']) {
-    const objectList = request['tm:all_objects']['tm:abap_object'] || [];
-    objects = Array.isArray(objectList) ? objectList : [objectList];
-    objects = objects.map((obj) => ({
-      name: obj['tm:name'],
-      type: obj['tm:type'],
-      wbtype: obj['tm:wbtype'],
-      pgmid: obj['tm:pgmid'],
-      description: obj['tm:obj_desc'],
-      position: obj['tm:position'],
-      lock_status: obj['tm:lock_status'],
-      info: obj['tm:obj_info'],
+  let objects: TransportRow[] = [];
+  const allObjects = ofRequest('tm:all_objects');
+  if (includeObjects && allObjects) {
+    const objectList = child(allObjects, 'tm:abap_object');
+    objects = (objectList ? repeated(objectList) : []).map((obj) => ({
+      name: field(obj, 'tm:name'),
+      type: field(obj, 'tm:type'),
+      wbtype: field(obj, 'tm:wbtype'),
+      pgmid: field(obj, 'tm:pgmid'),
+      description: field(obj, 'tm:obj_desc'),
+      position: field(obj, 'tm:position'),
+      lock_status: field(obj, 'tm:lock_status'),
+      info: field(obj, 'tm:obj_info'),
     }));
   }
 
   // Extract tasks if requested
-  let tasks: any[] = [];
-  if (includeTasks && request['tm:task']) {
-    const taskList = Array.isArray(request['tm:task'])
-      ? request['tm:task']
-      : [request['tm:task']];
-    tasks = taskList.map((task) => ({
-      number: task['tm:number'],
-      parent: task['tm:parent'],
-      description: task['tm:desc'],
-      type: task['tm:type'],
-      status: task['tm:status'],
-      status_text: task['tm:status_text'],
-      owner: task['tm:owner'],
-      target: task['tm:target'],
-      target_desc: task['tm:target_desc'],
-      client: task['tm:source_client'],
-      created_at: task['tm:lastchanged_timestamp'],
-      objects: task['tm:abap_object']
-        ? (Array.isArray(task['tm:abap_object'])
-            ? task['tm:abap_object']
-            : [task['tm:abap_object']]
-          ).map((obj) => ({
-            name: obj['tm:name'],
-            type: obj['tm:type'],
-            wbtype: obj['tm:wbtype'],
-            description: obj['tm:obj_desc'],
-            position: obj['tm:position'],
-          }))
-        : [],
-    }));
+  let tasks: TransportRow[] = [];
+  const taskMember = ofRequest('tm:task');
+  if (includeTasks && taskMember) {
+    tasks = repeated(taskMember).map((task) => {
+      const taskObjects = child(task, 'tm:abap_object');
+      return {
+        number: field(task, 'tm:number'),
+        parent: field(task, 'tm:parent'),
+        description: field(task, 'tm:desc'),
+        type: field(task, 'tm:type'),
+        status: field(task, 'tm:status'),
+        status_text: field(task, 'tm:status_text'),
+        owner: field(task, 'tm:owner'),
+        target: field(task, 'tm:target'),
+        target_desc: field(task, 'tm:target_desc'),
+        client: field(task, 'tm:source_client'),
+        created_at: field(task, 'tm:lastchanged_timestamp'),
+        objects: taskObjects
+          ? repeated(taskObjects).map((obj) => ({
+              name: field(obj, 'tm:name'),
+              type: field(obj, 'tm:type'),
+              wbtype: field(obj, 'tm:wbtype'),
+              description: field(obj, 'tm:obj_desc'),
+              position: field(obj, 'tm:position'),
+            }))
+          : [],
+      };
+    });
   }
 
   return {
@@ -186,7 +215,7 @@ export async function handleGetTransport(
       return return_error('Transport number is required');
     }
 
-    const typedArgs = args as GetTransportArgs;
+    const typedArgs = args;
     const includeObjects = typedArgs.include_objects !== false;
     const includeTasks = typedArgs.include_tasks !== false;
 
@@ -201,7 +230,7 @@ export async function handleGetTransport(
       .getRequest(resultsFor(transportDocuments))
       .readObjects(typedArgs.transport_number, { analyse: analyseException });
     if (!read.ok) return answerFailure(withStep(read.getError(), step));
-    const response = read.getResult().value as AdtReading<unknown>;
+    const response = read.getResult().value;
 
     logger?.debug(`GetTransport response status: ${response.status}`);
 
@@ -223,7 +252,7 @@ export async function handleGetTransport(
         null,
         2,
       ),
-    } as Parameters<typeof return_response>[0]);
+    });
   } catch (error) {
     // Not the request's failure (answered above): a credential refusal as the
     // chain made it, or ours, such as a document we could not read.

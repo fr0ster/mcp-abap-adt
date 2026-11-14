@@ -1,10 +1,15 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAdtSuccess,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   failureEntry,
   isCredentialFailure,
   isCredentialPayload,
   thrownEntry,
 } from '../answer';
+import { spentBy } from '../sessionLoss';
 import {
   type Cleanup,
   type LeftLocked,
@@ -12,22 +17,16 @@ import {
   safeRequest,
 } from './safeFields';
 import { atStep, stepOf, withStep } from './step';
+import {
+  cleanupOf,
+  failed,
+  type StepError,
+  type StepResponse,
+  type StepSuccess,
+  succeeded,
+} from './stepResponse';
 
-export interface CleanupCarrier {
-  cleanup?: Cleanup;
-  operation?: 'succeeded';
-}
-
-const failure = <T>(
-  error: IAdtError & CleanupCarrier,
-): IAdtResponse<T, IAdtError> =>
-  ({
-    ok: false,
-    getResult: () => {
-      throw new Error('withLock: asked for the result of a failure');
-    },
-    getError: () => error,
-  }) as unknown as IAdtResponse<T, IAdtError>;
+const failure = (error: StepError) => failed(error, 'withLock');
 
 /** The release, in its three states. Refused and threw are not the same event. */
 type Released =
@@ -43,6 +42,13 @@ type Released =
 export function leftLockedWarning(reason: string): string {
   return `the object may be left locked: the unlock failed (${reason}); it is released when the SAP session ends (logoff) or by its owner`;
 }
+
+/**
+ * The fixed words of a release on a spent connection: the unlock found the
+ * SAP session ended, and SAP's logoff of it released the lock.
+ */
+export const LOCK_WENT_WITH_SESSION_WORDS =
+  "the lock went with its SAP session: the unlock found that session ended, and SAP's logoff of it released the lock";
 
 /** What every failed release adds: the lock may be held, its handle, its object. */
 function leftLocked<H>(
@@ -60,12 +66,12 @@ function leftLocked<H>(
   };
 }
 
-async function runRelease<H>(
-  release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+async function runRelease<H, U>(
+  release: (handle: H) => Promise<IAdtResponse<U, IAdtError>>,
   handle: H,
   object: LockedObject,
 ): Promise<Released> {
-  let answered: IAdtResponse<unknown, IAdtError>;
+  let answered: IAdtResponse<U, IAdtError>;
   try {
     answered = await release(handle);
   } catch (error) {
@@ -100,7 +106,15 @@ async function runRelease<H>(
       // The method's error as it is — status, code, adt_type, T100 messages,
       // raw body — with the step it arose at; a credential failure as it came.
       failures: [failureEntry(error, 'unlock')],
-      ...leftLocked(handle, object, error.message),
+      // A spent connection (the owner's decision): the lock went with its
+      // SAP session, so the carrier names the object and says so — no
+      // `left_locked`, no handle.
+      ...(spentBy(error)
+        ? {
+            object: { type: object.type, name: object.name },
+            warning: LOCK_WENT_WITH_SESSION_WORDS,
+          }
+        : leftLocked(handle, object, error.message)),
     },
   };
 }
@@ -120,41 +134,40 @@ async function runRelease<H>(
  * `object` names what `acquire` locks. A release that fails says the object
  * may be left locked, with its handle and this identity (`left_locked`).
  */
-export async function withLock<H, T>(
+export async function withLock<H, T, U>(
   acquire: () => Promise<IAdtResponse<H, IAdtError>>,
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
-  release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+  release: (handle: H) => Promise<IAdtResponse<U, IAdtError>>,
   object: LockedObject,
-): Promise<IAdtResponse<T, IAdtError>> {
+): Promise<StepResponse<T>> {
   // The lock is a step of its own: a refused or thrown lock says so.
   const acquired = await atStep('lock', acquire)();
-  if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
+  if (!acquired.ok) return acquired;
   const handle = acquired.getResult().value;
   // A backstop. Every lock here is given `analyseLock`, which refuses a 2xx
   // naming no handle with SAP's answer beside it (adt-clients 23 answers `''`
   // there and leaves the verdict to the caller, MIGRATION-23 §5). A lock
   // called without it would still stop here rather than write under an empty
   // handle. There is no handle to release.
-  if ((handle as unknown) === '') {
-    return failure<T>({
+  if (handle === '') {
+    return failure({
       message: 'SAP answered the lock request without a lock handle',
       origin: 'refusal',
       step: 'lock',
-    } as IAdtError);
+    });
   }
 
   // Deliberately a catch rather than a `finally`. A `finally` lets the original
   // exception out as soon as the block ends, so a release that ALSO failed has
   // nowhere to go: the caller would hear about a parser defect and never about
   // the lock still held.
-  let answered: IAdtResponse<T, IAdtError> | undefined;
-  let thrown: unknown;
-  let threw = false;
+  let outcome:
+    | { threw: false; answered: IAdtResponse<T, IAdtError> }
+    | { threw: true; thrown: unknown };
   try {
-    answered = await body(handle);
+    outcome = { threw: false, answered: await body(handle) };
   } catch (error) {
-    thrown = error;
-    threw = true;
+    outcome = { threw: true, thrown: error };
   }
 
   const released = await runRelease(release, handle, object);
@@ -162,7 +175,8 @@ export async function withLock<H, T>(
   // A credential failure ends the call as it came, once the release was
   // tried: the body's, else the release's — adt-clients rejects with it, and
   // every further request (an activation, say) would only be refused again.
-  if (threw && isCredentialFailure(thrown)) throw thrown;
+  if (outcome.threw && isCredentialFailure(outcome.thrown))
+    throw outcome.thrown;
   if (released.kind === 'threw' && isCredentialFailure(released.thrown))
     throw released.thrown;
   // A `401` SAP answered to the unlock is the same: the call's failure, the
@@ -171,17 +185,17 @@ export async function withLock<H, T>(
     released.kind === 'refused' &&
     isCredentialPayload(failureEntry(released.error, 'unlock'))
   )
-    return failure<T>(withStep(released.error, 'unlock'));
+    return failure(withStep(released.error, 'unlock'));
 
-  if (threw) {
-    if (released.kind === 'ok') throw thrown;
-    throw new LockNotReleased(thrown, { cleanup: released.carrier });
+  if (outcome.threw) {
+    if (released.kind === 'ok') throw outcome.thrown;
+    throw new LockNotReleased(outcome.thrown, { cleanup: released.carrier });
   }
 
-  const value = answered as IAdtResponse<T, IAdtError>;
+  const value = outcome.answered;
   if (!value.ok) {
     if (released.kind === 'ok') return value;
-    return failure<T>({ ...value.getError(), cleanup: released.carrier });
+    return failure({ ...value.getError(), cleanup: released.carrier });
   }
 
   // **The body succeeded, so the call succeeded.** A release that failed
@@ -201,10 +215,7 @@ export async function withLock<H, T>(
   // answer as `cleanup`, the same shape `answer()` already renders on the
   // failure path, rather than being dropped.
   if (released.kind === 'ok') return value;
-  if (released.kind === 'refused') {
-    return succeededWithCleanup(value, { cleanup: released.carrier });
-  }
-  return succeededWithCleanup(value, { cleanup: released.carrier });
+  return succeededWithCleanup(value, released.carrier);
 }
 
 /**
@@ -215,19 +226,10 @@ export async function withLock<H, T>(
  * cleanup note is added, on a property `answer()` knows how to render.
  */
 function succeededWithCleanup<T>(
-  value: IAdtResponse<T, IAdtError>,
-  carrier: CleanupCarrier,
-): IAdtResponse<T, IAdtError> {
-  if (!value.ok) return value;
-  const result = value.getResult();
-  return {
-    ok: true,
-    getResult: () => result,
-    getError: () => {
-      throw new Error('withLock: asked for the error of a success');
-    },
-    cleanup: carrier.cleanup,
-  } as unknown as IAdtResponse<T, IAdtError>;
+  value: IAdtSuccess<T>,
+  cleanup: Cleanup,
+): StepSuccess<T> {
+  return succeeded(value.getResult().value, 'withLock', cleanup);
 }
 
 /**
@@ -240,13 +242,16 @@ function succeededWithCleanup<T>(
  * be extensible.
  */
 export class LockNotReleased extends Error {
-  readonly cleanup?: Cleanup;
-  readonly operation?: 'succeeded';
+  readonly cleanup?: Cleanup | undefined;
+  readonly operation?: 'succeeded' | undefined;
   /** The step the cause arose at (`atStep`), kept as it was. */
   readonly step?: string;
   constructor(
     cause: unknown,
-    extra: { cleanup?: Cleanup; operation?: 'succeeded' },
+    extra: {
+      cleanup?: Cleanup | undefined;
+      operation?: 'succeeded' | undefined;
+    },
   ) {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
     this.name = 'LockNotReleased';
@@ -283,11 +288,11 @@ export class LockNotReleased extends Error {
  * that already carries a cleanup of its own keeps it — this only fills a gap.
  */
 export async function carryCleanup<T, U>(
-  from: IAdtResponse<T, IAdtError>,
-  next: () => Promise<IAdtResponse<U, IAdtError>>,
-): Promise<IAdtResponse<U, IAdtError>> {
-  const cleanup = (from as unknown as CleanupCarrier).cleanup;
-  let answered: IAdtResponse<U, IAdtError>;
+  from: StepResponse<T>,
+  next: () => Promise<StepResponse<U>>,
+): Promise<StepResponse<U>> {
+  const cleanup = cleanupOf(from);
+  let answered: StepResponse<U>;
   try {
     answered = await next();
   } catch (error) {
@@ -303,12 +308,12 @@ export async function carryCleanup<T, U>(
  * that have no call left to make — `pair`, building its tuple from scratch.
  */
 export function attachCleanup<T, U>(
-  from: IAdtResponse<T, IAdtError>,
-  onto: IAdtResponse<U, IAdtError>,
-): IAdtResponse<U, IAdtError> {
-  const cleanup = (from as unknown as CleanupCarrier).cleanup;
+  from: StepResponse<T>,
+  onto: StepResponse<U>,
+): StepResponse<U> {
+  const cleanup = cleanupOf(from);
   if (cleanup === undefined) return onto;
-  if ((onto as unknown as CleanupCarrier).cleanup !== undefined) return onto;
-  if (!onto.ok) return failure<U>({ ...onto.getError(), cleanup });
-  return succeededWithCleanup(onto, { cleanup });
+  if (cleanupOf(onto) !== undefined) return onto;
+  if (!onto.ok) return failure({ ...onto.getError(), cleanup });
+  return succeededWithCleanup(onto, cleanup);
 }

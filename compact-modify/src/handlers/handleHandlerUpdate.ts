@@ -8,6 +8,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 import { routeCompactWrite } from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {
@@ -20,7 +21,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerUpdateArgs = { object_type: string } & Record<string, unknown>;
+type HandlerUpdateArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** One request: the type's write under `lock_handle` (`handleUpdateUnderLock`, spec §4.6). */
 export async function handleHandlerUpdate(

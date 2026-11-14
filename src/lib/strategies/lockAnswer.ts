@@ -25,37 +25,78 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  attr,
+  child,
+  childAt,
+  isList,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
+import { parseStructure } from './reading';
 
-function headerValue(value: unknown): string {
-  if (Array.isArray(value)) return String(value[0] ?? '').trim();
-  return typeof value === 'string' ? value.trim() : '';
+/** A header's value as text: a string, or a list's first string; else empty. */
+function headerValue(value: IAdtWireResponse['headers'][string]): string {
+  if (typeof value === 'string') return value.trim();
+  if (!Array.isArray(value)) return '';
+  const [first] = value;
+  return typeof first === 'string' ? first.trim() : '';
 }
 
 /** Whether the answer names a lock handle, where adt-clients looks for one. */
 export function carriesLockHandle(
   answer: IAdtWireResponse | undefined,
 ): boolean {
-  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
-  if (headerValue(headers['sap-adt-lm-handle'])) return true;
-  const body = typeof answer?.data === 'string' ? answer.data : '';
-  return /<LOCK_HANDLE>\s*[^<\s][^<]*<\/LOCK_HANDLE>/.test(body);
+  // The answer is optional (`IAnalyse`); a wire answer's `headers` are not.
+  if (headerValue(answer?.headers['sap-adt-lm-handle'])) return true;
+  // The wire's body is a boundary: anything but text names no handle.
+  const body = answer?.data;
+  const handle = childAt(
+    typeof body === 'string' ? parseStructure(body) : null,
+    'asx:abap',
+    'asx:values',
+    'DATA',
+    'LOCK_HANDLE',
+  );
+  return (text(handle) ?? '').trim() !== '';
 }
 
 export const analyseLock: IAnalyse<IAdtError> = (verdict, answer) => {
   const judged = analyseException(verdict, answer);
   if (judged !== ADT_NO_FAILURE) return judged;
   if (carriesLockHandle(answer)) return ADT_NO_FAILURE;
-  const request = (answer as { request?: { method?: string; url?: string } })
-    ?.request;
+  // The wire answer's `request` is the transport's, typed `unknown`: read.
+  const request = answer?.request;
+  const fields =
+    typeof request === 'object' && request !== null && !Array.isArray(request)
+      ? request
+      : undefined;
+  // Each member written out when it is a string, a number or a boolean.
+  const urlMember =
+    fields !== undefined && 'url' in fields ? fields.url : undefined;
+  const methodMember =
+    fields !== undefined && 'method' in fields ? fields.method : undefined;
+  const url =
+    typeof urlMember === 'string' ||
+    typeof urlMember === 'number' ||
+    typeof urlMember === 'boolean'
+      ? String(urlMember)
+      : undefined;
+  const method =
+    typeof methodMember === 'string' ||
+    typeof methodMember === 'number' ||
+    typeof methodMember === 'boolean'
+      ? String(methodMember)
+      : undefined;
   return {
     origin: 'refusal',
     message:
       'SAP answered the lock request without a lock handle; the object is not locked',
     response: answer,
-    ...(request?.url
-      ? { request: { method: request.method, url: request.url } }
-      : {}),
-  } as unknown as IAdtError;
+    ...(url ? { request: { method, url } } : {}),
+  };
 };
 
 /**
@@ -88,8 +129,6 @@ export const analysePublicationLockAnswer: IAnalyse<IAdtError> = (
   // the answer because a `403` arrives thrown: adt-clients hands the analyse a
   // verdict whose `response` carries it, and `answer.status` can be undefined —
   // which is why `analysePublicationLock` reads it in that order too.
-  const status =
-    (judged as { response?: { status?: number } }).response?.status ??
-    answer?.status;
+  const status = judged.response?.status ?? answer?.status;
   return status === 403 ? ADT_NO_FAILURE : judged;
 };

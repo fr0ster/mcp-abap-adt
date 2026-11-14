@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The root and child view entities a RAP suite owns.
  *
@@ -46,6 +47,7 @@ import {
   delay,
   extractErrorMessage,
   extractLockHandle,
+  handlerAnswer,
   parseHandlerResponse,
 } from './testHelpers';
 
@@ -113,7 +115,7 @@ async function writeViewSource(
   if (locked.isError) {
     throw new Error(`lock ${view.name}: ${extractErrorMessage(locked)}`);
   }
-  const lockData = parseHandlerResponse(locked);
+  const lockData = handlerAnswer(locked, z.looseObject({}));
   const lockHandle = extractLockHandle(lockData);
 
   const failures: string[] = [];
@@ -315,7 +317,6 @@ export async function activateAndConfirm(
   }
   const verdict = parseHandlerResponse(activation) as {
     activated?: boolean;
-    activation_not_stated?: boolean;
     messages?: { type?: string; text?: string }[];
   };
   const refusals = (verdict?.messages ?? []).filter((m) =>

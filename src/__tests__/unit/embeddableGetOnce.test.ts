@@ -33,7 +33,7 @@ describe('EmbeddableMcpServer serves Get<Type> once, and no Read<Type>', () => {
       connection: {} as never,
       exposition: [...exposition],
       systemType: 'onprem',
-      readOnlyDedupStrategy: strategy,
+      ...(strategy !== undefined && { readOnlyDedupStrategy: strategy }),
     });
     const names = registeredToolNames(server);
     for (const tool of READS) {

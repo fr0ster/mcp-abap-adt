@@ -1,5 +1,13 @@
-import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import { parseXml } from './xml/node';
+import {
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from './xml/tree';
 
 export interface ParsedCheckRunResult {
   success: boolean;
@@ -8,46 +16,43 @@ export interface ParsedCheckRunResult {
   errors: Array<{
     type: string;
     text: string;
-    line?: string | number;
-    href?: string;
+    line?: string | number | undefined;
+    href?: string | undefined;
   }>;
   warnings: Array<{
     type: string;
     text: string;
-    line?: string | number;
-    href?: string;
+    line?: string | number | undefined;
+    href?: string | undefined;
   }>;
   info: Array<{
     type: string;
     text: string;
-    line?: string | number;
-    href?: string;
+    line?: string | number | undefined;
+    href?: string | undefined;
   }>;
   total_messages: number;
   has_errors: boolean;
   has_warnings: boolean;
 }
 
-export function parseCheckRunResponse(
-  response: AxiosResponse,
-): ParsedCheckRunResult {
+/** A check run's document parsed: `response.data`, the document's text. */
+export function parseCheckRunResponse(response: {
+  data: string;
+}): ParsedCheckRunResult {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
   });
 
   try {
-    const data =
-      typeof response.data === 'string'
-        ? response.data
-        : response.data?.toString?.() || '';
-    const result = parser.parse(data);
+    const result: XmlRead = parseXml(parser, response.data);
 
     const checkReport =
-      result['chkrun:checkRunReports']?.['chkrun:checkReport'] ??
-      result.checkRunReports?.checkReport ??
-      result['chkrun:checkReport'] ??
-      result.checkReport;
+      childAt(result, 'chkrun:checkRunReports', 'chkrun:checkReport') ??
+      childAt(result, 'checkRunReports', 'checkReport') ??
+      child(result, 'chkrun:checkReport') ??
+      child(result, 'checkReport');
 
     if (!checkReport) {
       return {
@@ -63,30 +68,31 @@ export function parseCheckRunResponse(
       };
     }
 
-    const status =
-      checkReport['@_chkrun:status'] ||
-      checkReport['chkrun:status'] ||
-      checkReport['@_status'] ||
-      checkReport.status ||
-      'unknown';
+    const status = String(
+      child(checkReport, '@_chkrun:status') ||
+        child(checkReport, 'chkrun:status') ||
+        child(checkReport, '@_status') ||
+        child(checkReport, 'status') ||
+        'unknown',
+    );
 
-    const statusText =
-      checkReport['chkrun:statusText'] ||
-      checkReport['@_chkrun:statusText'] ||
-      checkReport.statusText ||
-      checkReport['@_statusText'] ||
-      '';
+    const statusText = String(
+      child(checkReport, 'chkrun:statusText') ||
+        child(checkReport, '@_chkrun:statusText') ||
+        child(checkReport, 'statusText') ||
+        child(checkReport, '@_statusText') ||
+        '',
+    );
 
     const messages =
-      checkReport['chkrun:checkMessageList']?.['chkrun:checkMessage'] ??
-      checkReport.checkMessageList?.checkMessage ??
-      checkReport['chkrun:messages']?.msg ??
-      checkReport.messages?.msg ??
-      checkReport['chkrun:messages'] ??
-      checkReport.messages ??
-      [];
+      childAt(checkReport, 'chkrun:checkMessageList', 'chkrun:checkMessage') ??
+      childAt(checkReport, 'checkMessageList', 'checkMessage') ??
+      childAt(checkReport, 'chkrun:messages', 'msg') ??
+      childAt(checkReport, 'messages', 'msg') ??
+      child(checkReport, 'chkrun:messages') ??
+      child(checkReport, 'messages');
 
-    const messageArray = Array.isArray(messages)
+    const messageArray = isList(messages)
       ? messages
       : messages
         ? [messages]
@@ -101,23 +107,36 @@ export function parseCheckRunResponse(
         return;
       }
 
-      const msgType = msg['@_chkrun:type'] || msg['@_type'] || msg.type || 'I';
-      const shortText =
-        msg['@_chkrun:shortText'] ||
-        msg.shortText?.['#text'] ||
-        msg.shortText?.txt ||
-        msg.shortText ||
-        '';
-      const line = msg['@_line'] || msg.line;
-      const href = msg['@_chkrun:uri'] || msg['@_href'] || msg.href;
+      const msgType = String(
+        child(msg, '@_chkrun:type') ||
+          child(msg, '@_type') ||
+          child(msg, 'type') ||
+          'I',
+      );
+      const shortText = child(msg, 'shortText');
+      const text = String(
+        child(msg, '@_chkrun:shortText') ||
+          child(shortText, '#text') ||
+          child(shortText, 'txt') ||
+          shortText ||
+          '',
+      );
+      const line = child(msg, '@_line') || child(msg, 'line');
+      const href =
+        child(msg, '@_chkrun:uri') ||
+        child(msg, '@_href') ||
+        child(msg, 'href');
 
       const bucket =
         msgType === 'E' ? errors : msgType === 'W' ? warnings : info;
       bucket.push({
         type: msgType,
-        text: shortText,
-        line,
-        href,
+        text,
+        line:
+          typeof line === 'string' || typeof line === 'number'
+            ? line
+            : undefined,
+        href: typeof href === 'string' ? href : undefined,
       });
     });
 

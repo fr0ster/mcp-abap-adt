@@ -5,6 +5,7 @@
  * (`LeftoverSessions`); a context without it answers "not available here".
  */
 
+import { child } from '../thrownValue';
 import type { LeftoverListing } from './LeftoverSessions';
 
 /** The status of SAP's answer to a request, as SAP gave it. */
@@ -29,10 +30,9 @@ export interface LeftoverSessionTools {
  */
 export function sapAnswerOf(thrown: unknown): SapAnswer | undefined {
   try {
-    const response = (thrown as { response?: unknown } | null | undefined)
-      ?.response as { status?: unknown } | undefined;
+    const response = child(thrown, 'response');
     if (response === undefined || response === null) return undefined;
-    const status = response.status;
+    const status = child(response, 'status');
     if (typeof status !== 'number' || !Number.isInteger(status)) {
       return undefined;
     }

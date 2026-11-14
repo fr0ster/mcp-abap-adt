@@ -9,7 +9,6 @@ This directory contains test scripts for the MCP ABAP ADT server functionality.
 Including:
 - [Testing Guide](../docs/development/tests/TESTING_GUIDE.md) - Complete instructions
 - [Test Infrastructure](../docs/development/tests/TEST_INFRASTRUCTURE.md) - Technical overview
-- [CreateDomain Tool](../docs/development/tests/CREATE_DOMAIN_TOOL.md) - Handler documentation
 - [Config Template](../docs/development/tests/test-config.yaml.template) - YAML template
 
 ## 🎯 YAML-Based Testing (Recommended)
@@ -243,10 +242,15 @@ Then set `environment.env: "your-system.env"` in `tests/test-config.yaml`.
    - Verify SAP system accessibility
    - Confirm credentials are correct
 
-2. **Timeout Errors**
-   - Increase timeout values in test parameters
+2. **A test that does not end**
+   - A live test has no bound, no delay and no poll limit: each step goes on
+     the answer of the one before it, and `test-config.yaml` carries no time
+     key (`test_settings.timeout`, `timeouts`, `operation_delays`, the ATC
+     `poll_interval_ms` / `poll_timeout_ms` are gone).
+   - A step that waits for ever is ended by the person running the suite:
+     Ctrl-C once lets the running case and its cleanup finish, twice stops the
+     run (`src/__tests__/integration/README.md`, "Interrupting a run").
    - Check network connectivity
-   - Consider using non-nested mode for faster results
 
 3. **Authentication Errors**
    - Verify username/password in `.env`
@@ -265,6 +269,5 @@ DEBUG=1 node tests/test-name.js
 When adding new tests:
 1. Follow naming convention: `test-feature-name.js`
 2. Include comprehensive error handling
-3. Add timeout controls for long-running operations
-4. Document expected results and performance benchmarks
-5. Update this README with test description
+3. Document expected results and performance benchmarks
+4. Update this README with test description

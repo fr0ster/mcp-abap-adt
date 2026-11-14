@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -10,21 +11,12 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP message class (MSAG/T100) named by message_class_name in one request, at its active version: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Message class name.',
-      },
-    },
-    required: ['message_class_name'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Message class name.'),
+  }),
 } as const;
 
-interface GetMessageClassArgs {
-  message_class_name: string;
-}
+type GetMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetMessageClass(
   context: HandlerContext,

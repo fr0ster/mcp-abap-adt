@@ -96,9 +96,10 @@ bind-mount source is created by Docker as `root`, and the `node` user cannot wri
 
 A destination `.env` works as on a host: mount it and name it, e.g.
 `-v ./trial.env:/app/trial.env:ro … mcp-abap-adt-core --env-path=/app/trial.env`; the server copies
-only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`, `SAP_LANGUAGE` and the RFC message
-server's `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and `SAP_SAPROUTER` from it into the
-process. Without `--mcp` or `--env-path` the server starts in tool-inspection-only mode, which needs the
+only `SAP_CONNECTION_TYPE` and `SAP_SYSTEM_TYPE` from it into the process. The client, the language
+and the RFC address (`SAP_CLIENT`, `SAP_LANGUAGE`, `SAP_ASHOST`, `SAP_SYSNR`, the message-server
+keys) are read from the file as the destination's own, below the CLI and the container's
+environment. Without `--mcp` or `--env-path` the server starts in tool-inspection-only mode, which needs the
 system type too (`--system-type` or `SAP_SYSTEM_TYPE`) and lists that system type's tools.
 
 ### With compose
@@ -154,6 +155,7 @@ The process environment of the container is the server's process environment; se
 | `SAP_SYSTEM_TYPE` | all | `onprem`, `cloud` or `legacy`. Required; no image sets it. |
 | `MCP_HTTP_HOST`, `MCP_HTTP_PORT` | Streamable HTTP | Listen address and port. The images set `0.0.0.0` and `3000`; the binary's own default host, `127.0.0.1`, is unreachable from outside a container. |
 | `MCP_SSE_HOST`, `MCP_SSE_PORT` | SSE | The same for SSE: `0.0.0.0` and `3001`. |
+| `MCP_ENABLE_DATA_TOOLS` | all | `true` serves the data tools (`GetSqlQuery`, `GetTableContents`, compact `HandlerGetData`); no image sets it, so they are off. Whether to turn it on is the customer's decision (SAP API Policy FAQ v1.3, Q33: see the [README](../../README.md#the-data-tools-off-unless-enabled)). |
 | `AUTH_BROKER_PATH` | stdio | Base directory of `service-keys/` and `sessions/` (one directory). The images set `/app`. |
 | `NODE_EXTRA_CA_CERTS`, `TLS_REJECT_UNAUTHORIZED` | all | See [TLS](#tls). |
 | `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` | writing variants | Responsible person and master system of created objects, when no header (HTTP, SSE) or destination states them. |

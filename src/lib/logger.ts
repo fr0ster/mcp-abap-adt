@@ -6,12 +6,25 @@
  * interfere with MCP's JSON-RPC communication.
  */
 
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+
+/** The header names whose values a log line never carries, lower case. */
+const REDACTED_HEADERS: ReadonlySet<string> = new Set([
+  'authorization',
+  'cookie',
+  'x-csrf-token',
+]);
+
 /**
- * Safely stringifies an object, handling circular references
+ * A log line's fields as JSON: circular and transport objects named, and the
+ * credentials a header may hold (`Authorization`, `Cookie`, `X-CSRF-Token`,
+ * in any case and at any depth — a request's or an error's `config` headers
+ * among them) replaced.
  */
-function safeStringify(obj: any): string {
+function safeStringify(obj: object): string {
   const seen = new WeakSet();
-  return JSON.stringify(obj, (key, value) => {
+  return JSON.stringify(obj, (key: string, value: unknown) => {
+    if (REDACTED_HEADERS.has(key.toLowerCase())) return '[REDACTED]';
     if (typeof value === 'object' && value !== null) {
       if (seen.has(value)) {
         return '[Circular]';
@@ -27,63 +40,13 @@ function safeStringify(obj: any): string {
     ) {
       return '[HTTP Object]';
     }
-    // Remove sensitive headers (Authorization, Cookie, etc.)
-    if (key === 'Authorization' || key === 'authorization') {
-      return '[REDACTED]';
-    }
-    // Remove sensitive data from config.headers
-    if (key === 'headers' && value && typeof value === 'object') {
-      const sanitizedHeaders: any = {};
-      for (const [headerKey, headerValue] of Object.entries(value)) {
-        if (
-          headerKey.toLowerCase() === 'authorization' ||
-          headerKey.toLowerCase() === 'cookie' ||
-          headerKey.toLowerCase() === 'x-csrf-token'
-        ) {
-          sanitizedHeaders[headerKey] = '[REDACTED]';
-        } else {
-          sanitizedHeaders[headerKey] = headerValue;
-        }
-      }
-      return sanitizedHeaders;
-    }
-    // Remove sensitive data from config object (AxiosError.config)
-    if (key === 'config' && value && typeof value === 'object') {
-      const sanitizedConfig: any = {};
-      for (const [configKey, configValue] of Object.entries(value)) {
-        if (
-          configKey === 'headers' &&
-          configValue &&
-          typeof configValue === 'object'
-        ) {
-          const sanitizedHeaders: any = {};
-          for (const [headerKey, headerValue] of Object.entries(
-            configValue as any,
-          )) {
-            if (
-              headerKey.toLowerCase() === 'authorization' ||
-              headerKey.toLowerCase() === 'cookie' ||
-              headerKey.toLowerCase() === 'x-csrf-token'
-            ) {
-              sanitizedHeaders[headerKey] = '[REDACTED]';
-            } else {
-              sanitizedHeaders[headerKey] = headerValue;
-            }
-          }
-          sanitizedConfig[configKey] = sanitizedHeaders;
-        } else {
-          sanitizedConfig[configKey] = configValue;
-        }
-      }
-      return sanitizedConfig;
-    }
     return value;
   });
 }
 
 // Logger functions for different log levels
-function createLogFn(level: string) {
-  return (message: string, data?: any) => {
+function createLogFn(level: string): ILogger['info'] {
+  return (message, data) => {
     // Never log in stdio mode (MCP protocol requires clean JSON only)
     // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
@@ -91,74 +54,8 @@ function createLogFn(level: string) {
       return; // Suppress all logging in stdio mode
     }
 
-    // Check if this is an expected validation/creation error (should be suppressed)
-    if (level === 'ERROR' && data?.status === 400) {
-      // Check if it's an expected error type (validation or resource already exists)
-      const url = data?.url || '';
-      const dataStr =
-        typeof data?.data === 'string'
-          ? data?.data
-          : data?.data
-            ? safeStringify(data.data)
-            : '';
-      const responseData = data?.response?.data || '';
-      const allData = dataStr + responseData;
-
-      // Check if it's a validation endpoint OR an expected error type
-      const isValidationEndpoint =
-        url.includes('/validation/objectname') || url.includes('/validation/');
-      const isExpectedError =
-        allData.includes('InvalidClifName') ||
-        allData.includes('ExceptionResourceAlreadyExists') ||
-        allData.includes('ResourceAlreadyExists') ||
-        allData.includes('InvalidObjName') ||
-        allData.includes('does already exist');
-
-      if (isValidationEndpoint || isExpectedError) {
-        // Suppress expected errors - only log if debug is enabled
-        const debugEnabled =
-          process.env.DEBUG_CONNECTORS === 'true' ||
-          process.env.DEBUG_TESTS === 'true' ||
-          process.env.DEBUG_ADT_TESTS === 'true';
-        if (!debugEnabled) {
-          return; // Suppress expected errors
-        }
-      }
-    }
-
-    // Also check AxiosError format (second ERROR log format)
-    if (
-      level === 'ERROR' &&
-      data?.name === 'AxiosError' &&
-      data?.status === 400
-    ) {
-      const responseData = data?.response?.data || '';
-      const _configUrl = data?.config?.url || '';
-      const allData =
-        typeof responseData === 'string'
-          ? responseData
-          : safeStringify(responseData);
-
-      // Check if it's an expected error type
-      const isExpectedError =
-        allData.includes('InvalidClifName') ||
-        allData.includes('ExceptionResourceAlreadyExists') ||
-        allData.includes('ResourceAlreadyExists') ||
-        allData.includes('InvalidObjName') ||
-        allData.includes('does already exist');
-
-      if (isExpectedError) {
-        // Suppress expected errors - only log if debug is enabled
-        const debugEnabled =
-          process.env.DEBUG_CONNECTORS === 'true' ||
-          process.env.DEBUG_TESTS === 'true' ||
-          process.env.DEBUG_ADT_TESTS === 'true';
-        if (!debugEnabled) {
-          return; // Suppress expected errors
-        }
-      }
-    }
-
+    // No line is judged by what SAP said in it: every level, ERROR
+    // included, is written only in debug mode, and every line then.
     // All log levels (including ERROR) require DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS to be enabled
     // This prevents verbose error logs from appearing in test output when debug is not enabled
     const debugEnabled =
@@ -174,7 +71,8 @@ function createLogFn(level: string) {
         level,
         timestamp: new Date().toISOString(),
         message,
-        ...data,
+        // An object's own members; a value that is not an object adds none.
+        ...(typeof data === 'object' && data !== null ? data : {}),
       };
 
       // Output to stderr which won't interfere with MCP communication
@@ -227,96 +125,14 @@ export const logger = {
       );
     }
   },
-
-  // Special handler for CSRF token
-  csrfToken: (
-    type: 'fetch' | 'success' | 'error' | 'retry',
-    message: string,
-    data?: any,
-  ) => {
-    // Never log in stdio mode
-    // `--transport` is gone: only the explicit `--stdio` mark is left.
-    const isStdio = process.argv.includes('--stdio');
-    if (isStdio) {
-      return; // Suppress all logging in stdio mode
-    }
-    const debugEnabled = process.env.DEBUG_CONNECTORS === 'true';
-    if (debugEnabled) {
-      process.stderr.write(
-        `${JSON.stringify({
-          level: type === 'error' ? 'ERROR' : 'INFO',
-          timestamp: new Date().toISOString(),
-          type: `CSRF_${type.toUpperCase()}`,
-          message,
-          ...data,
-        })}\n`,
-      );
-    }
-  },
-};
-
-/**
- * Handler-specific logger for detailed debugging
- * Enabled via DEBUG_HANDLERS=true environment variable
- */
-function createHandlerLogFn(level: string) {
-  return (handlerName: string, step: string, message: string, data?: any) => {
-    // Never log in stdio mode
-    // `--transport` is gone: only the explicit `--stdio` mark is left.
-    const isStdio = process.argv.includes('--stdio');
-    if (isStdio) {
-      return; // Suppress all logging in stdio mode
-    }
-    const debugEnabled = process.env.DEBUG_HANDLERS === 'true';
-    if (debugEnabled) {
-      const logObject = {
-        level,
-        timestamp: new Date().toISOString(),
-        handler: handlerName,
-        step,
-        message,
-        ...data,
-      };
-
-      try {
-        process.stderr.write(`${safeStringify(logObject)}\n`);
-      } catch (_e) {
-        process.stderr.write(
-          `${JSON.stringify({
-            level,
-            timestamp: new Date().toISOString(),
-            handler: handlerName,
-            step,
-            message,
-            error: 'Failed to serialize log data',
-          })}\n`,
-        );
-      }
-    }
-  };
-}
-
-export const handlerLogger = {
-  info: (handlerName: string, step: string, message: string, data?: any) => {
-    createHandlerLogFn('INFO')(handlerName, step, message, data);
-  },
-  warn: (handlerName: string, step: string, message: string, data?: any) => {
-    createHandlerLogFn('WARN')(handlerName, step, message, data);
-  },
-  error: (handlerName: string, step: string, message: string, data?: any) => {
-    createHandlerLogFn('ERROR')(handlerName, step, message, data);
-  },
-  debug: (handlerName: string, step: string, message: string, data?: any) => {
-    createHandlerLogFn('DEBUG')(handlerName, step, message, data);
-  },
 };
 
 /**
  * Connection manager logger - for getManagedConnection debug logs
  * Enabled via DEBUG_CONNECTION_MANAGER=true environment variable
  */
-function createConnectionManagerLogFn(level: string) {
-  return (message: string, data?: any) => {
+function createConnectionManagerLogFn(level: string): ILogger['debug'] {
+  return (message, data) => {
     // Never log in stdio mode
     // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
@@ -329,7 +145,8 @@ function createConnectionManagerLogFn(level: string) {
         level,
         timestamp: new Date().toISOString(),
         message,
-        ...data,
+        // An object's own members; a value that is not an object adds none.
+        ...(typeof data === 'object' && data !== null ? data : {}),
       };
 
       try {
@@ -348,17 +165,17 @@ function createConnectionManagerLogFn(level: string) {
   };
 }
 
-export const connectionManagerLogger = {
-  debug: (message: string, data?: any) => {
+export const connectionManagerLogger: ILogger = {
+  debug(message: string, data?: unknown) {
     createConnectionManagerLogFn('DEBUG')(message, data);
   },
-  info: (message: string, data?: any) => {
+  info(message: string, data?: unknown) {
     createConnectionManagerLogFn('INFO')(message, data);
   },
-  warn: (message: string, data?: any) => {
+  warn(message: string, data?: unknown) {
     createConnectionManagerLogFn('WARN')(message, data);
   },
-  error: (message: string, data?: any) => {
+  error(message: string, data?: unknown) {
     createConnectionManagerLogFn('ERROR')(message, data);
   },
 };

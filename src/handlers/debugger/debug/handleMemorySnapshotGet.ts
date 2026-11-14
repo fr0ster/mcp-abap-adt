@@ -1,62 +1,64 @@
 import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
 
 export const SNAPSHOT_VIEW_PROPERTIES = {
-  view: {
-    type: 'string',
-    enum: ['header', 'overview', 'ranking', 'children', 'references'],
-    default: 'overview',
-    description:
+  view: z
+    .enum(['header', 'overview', 'ranking', 'children', 'references'])
+    .default('overview')
+    .optional()
+    .describe(
       'header: the snapshot; overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.',
-  },
-  key: {
-    type: 'string',
-    description: 'Object key, for children and references.',
-  },
-  max_objects: {
-    type: 'integer',
-    minimum: 1,
-    default: 50,
-    description: 'Objects in a ranking, children or references answer.',
-  },
-} as const;
+    ),
+  key: z
+    .string()
+    .optional()
+    .describe('Object key, for children and references.'),
+  max_objects: z
+    .number()
+    .int()
+    .min(1)
+    .default(50)
+    .optional()
+    .describe('Objects in a ranking, children or references answer.'),
+};
 
 export const TOOL_DEFINITION = {
   name: 'MemorySnapshotGet',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      snapshot_id: { type: 'string', description: 'Snapshot id.' },
-      ...SNAPSHOT_VIEW_PROPERTIES,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['snapshot_id'],
-  },
+  inputSchema: z.object({
+    snapshot_id: z.string().describe('Snapshot id.'),
+    ...SNAPSHOT_VIEW_PROPERTIES,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** The key the children and references views need; the schema cannot tie it to the view. */
-export function requireKey(args: { key?: string; view?: string }): string {
+export function requireKey(args: {
+  key?: string | undefined;
+  view?: string | undefined;
+}): string {
   if (!args.key) throw new Error(`view ${args.view}: give key`);
   return args.key;
 }
 
 /** The limit of a view, or the default the schema states; its minimum is the schema's. */
-export function maxObjectsOf(args: { max_objects?: number }): number {
+export function maxObjectsOf(args: {
+  max_objects?: number | undefined;
+}): number {
   return args.max_objects ?? 50;
 }
 
 export async function handleMemorySnapshotGet(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const snapshots = MemorySnapshots.create(context.connection, {
     logger: context.logger,

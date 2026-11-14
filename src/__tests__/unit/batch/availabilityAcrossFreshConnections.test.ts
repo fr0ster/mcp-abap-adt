@@ -16,6 +16,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
 import type {
@@ -44,7 +45,7 @@ const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 const get = async (item: string, connection: IAbapConnection) =>
   (
-    await connection.makeAdtRequest<string>({
+    await connection.makeAdtRequest({
       url: `/sap/bc/adt/probe/${item.toLowerCase()}`,
       method: 'GET',
       timeout: 0,
@@ -56,9 +57,9 @@ const longRead: HandlerEntry = {
   toolDefinition: {
     name: TOOL,
     description: 'reads two items',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: z.object({}),
   } as never,
-  handler: (async (context: HandlerContext, _args: unknown) => {
+  call: (async (context: HandlerContext, _args: unknown) => {
     const ran = await withSequentialFallback(
       context,
       async () => {

@@ -1,12 +1,12 @@
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
-import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import { runWithRequestSignal } from '../../../lib/requestSignal';
 import { payloadCarriedBy } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   AMDP_BREAK_LINE,
@@ -25,6 +25,7 @@ function world() {
   const reads: Array<ReturnType<typeof deferred<any>>> = [];
   const calls: string[] = [];
   const closed: unknown[] = [];
+  const dropped: unknown[] = [];
   const run = deferred<any>();
   let syncN = 0;
   /** The system's answer to an accepted stop: the open event read ends with STOP. Off, a test answers it. */
@@ -69,6 +70,9 @@ function world() {
     closeConnection: async (c) => {
       closed.push(c);
     },
+    dropConnection: (c) => {
+      dropped.push(c);
+    },
     amdpDebugger: () => dbg as any,
     requestUser: async () => 'SAPUSER01',
     run: async () => {
@@ -78,7 +82,7 @@ function world() {
   }).bind('origin');
   /** The request id the next sync will be answered with. */
   const nextSync = () => `Q${syncN + 1}`;
-  return { session, reads, calls, closed, dbg, run, nextSync, sim };
+  return { session, reads, calls, closed, dropped, dbg, run, nextSync, sim };
 }
 
 /** An ABAP side that holds nothing, for a DebuggerInstance around the AMDP session. */
@@ -375,6 +379,94 @@ describe('AmdpSession', () => {
     await w.session.stop();
     expect(w.closed).toHaveLength(2);
     expect(w.session.holdsState()).toBe(false);
+  });
+
+  // The commands connection spent (the owner's decision), read from the typed
+  // verdict alone: the AMDP debug session is gone with its SAP session, and
+  // SAP's logoff freed it. Nothing more is sent on it; both connections are
+  // dropped without a request, and the stop completes.
+  it.each([
+    ['sessionError ADT_NOT_CONNECTED', { sessionError: 'ADT_NOT_CONNECTED' }],
+    ['sessionLost', { sessionLost: 'ADT_SESSION_REPLACED' }],
+  ] as const)(
+    'a stop answered %s: the session is dropped, nothing more is sent, the stop completes',
+    async (_name, extra) => {
+      const w = await started();
+      w.dbg.stop = async () => {
+        w.calls.push('stop');
+        return refusedResponse('words that are never read', {
+          origin: 'connection',
+          ...extra,
+        });
+      };
+      await expect(w.session.stop()).resolves.toBeUndefined();
+      expect(w.dropped).toHaveLength(2);
+      expect(w.closed).toHaveLength(0);
+      expect(w.session.holdsState()).toBe(false);
+    },
+  );
+
+  it('a cancel answered with a spent connection: no wait, nothing more is sent, the session is dropped', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    w.dbg.deleteDebuggee = async (_m: string, d: string) => {
+      w.calls.push(`spent-delete:${d}`);
+      return refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionError: 'ADT_SESSION_REPLACED',
+      });
+    };
+    const before = w.calls.length;
+    const stopped = w.session.stop();
+    w.run.resolve({ ok: false, message: 'ended with its session' });
+    await expect(stopped).resolves.toBeUndefined();
+    // The spent cancel is the last call on the commands connection: no
+    // breakpoint clear, no second cancel, no stop.
+    const after = w.calls.slice(before);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatch(/^spent-delete:/);
+    expect(w.dropped).toHaveLength(2);
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a cancel answered with a spent connection while the session is ending: nothing more is sent', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    w.dbg.deleteDebuggee = async (_m: string, d: string) => {
+      w.calls.push(`spent-delete:${d}`);
+      return refusedResponse('words that are never read', {
+        origin: 'connection',
+        sessionError: 'ADT_SESSION_REPLACED',
+      });
+    };
+    w.session.endWaits(); // a dispose, the instance's close
+    const before = w.calls.length;
+    const stopped = w.session.stop();
+    w.run.resolve({ ok: false, message: 'ended with its session' });
+    await expect(stopped).resolves.toBeUndefined();
+    const after = w.calls.slice(before);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatch(/^spent-delete:/);
+    expect(w.dropped).toHaveLength(2);
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a stop refused with ADT_RELEASE_PENDING is no spent connection: it fails and is kept', async () => {
+    const w = await started();
+    w.dbg.stop = async () => {
+      w.calls.push('stop');
+      return refusedResponse('pending', {
+        origin: 'connection',
+        sessionError: 'ADT_RELEASE_PENDING',
+      });
+    };
+    await expect(w.session.stop()).rejects.toThrow(/stop: .*pending/);
+    expect(w.dropped).toHaveLength(0);
+    expect(w.session.holdsState()).toBe(true);
   });
 
   it('a read the system never answers holds the stopping call only: a second stop, a dispose and a wait go on', async () => {

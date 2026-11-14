@@ -1,5 +1,14 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { parseXml } from '../xml/node';
+import {
+  child,
+  childAt,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 
 /** One node of a function group's object structure. */
 export interface FugrChild {
@@ -7,12 +16,6 @@ export interface FugrChild {
   objectname: string;
   /** The node's `objecturi`: where its source is, or a SAP GUI address. */
   objecturi?: string;
-}
-
-interface StructureNode {
-  objecttype?: unknown;
-  objectname?: unknown;
-  objecturi?: unknown;
 }
 
 const parser = new XMLParser({
@@ -29,26 +32,28 @@ const parser = new XMLParser({
 export const functionGroupStructure: IResultStrategy<FugrChild[]> = (
   answer,
 ) => {
-  const xml = String((answer as { data?: unknown })?.data ?? '');
-  const parsed = parser.parse(xml);
-  const found = parsed?.['projectexplorer:objectstructure']?.[
-    'projectexplorer:node'
-  ] as StructureNode | StructureNode[] | undefined;
+  const xml = String(answer.data ?? '');
+  const parsed: XmlRead = parseXml(parser, xml);
+  const found = childAt(
+    parsed,
+    'projectexplorer:objectstructure',
+    'projectexplorer:node',
+  );
   if (!found) return [];
-  const nodes = Array.isArray(found) ? found : [found];
   const out: FugrChild[] = [];
-  for (const node of nodes) {
-    const type = node.objecttype;
-    const name = node.objectname;
+  for (const node of listOf(found)) {
+    const type = child(node, 'objecttype');
+    const name = child(node, 'objectname');
+    const uri = child(node, 'objecturi');
     if (typeof type !== 'string' || typeof name !== 'string') continue;
     if (type === '' || name === '' || !type.startsWith('FUGR/')) continue;
     out.push(
-      node.objecturi === undefined
+      uri === undefined
         ? { objecttype: type, objectname: name }
         : {
             objecttype: type,
             objectname: name,
-            objecturi: String(node.objecturi),
+            objecturi: String(uri),
           },
     );
   }

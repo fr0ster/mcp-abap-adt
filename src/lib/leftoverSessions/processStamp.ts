@@ -13,6 +13,7 @@
  */
 
 import * as fs from 'node:fs';
+import { child } from '../thrownValue';
 
 /** A process, as a runtime file names it. */
 export interface ProcessStamp {
@@ -56,7 +57,7 @@ function exists(pid: number): boolean {
     return true;
   } catch (error) {
     // Another user's process answers EPERM: it exists.
-    return (error as { code?: unknown }).code === 'EPERM';
+    return child(error, 'code') === 'EPERM';
   }
 }
 

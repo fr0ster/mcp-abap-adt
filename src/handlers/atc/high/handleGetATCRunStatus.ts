@@ -1,5 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
@@ -29,22 +30,14 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] Answers whether the ATC run named by run_id has ended (a run started with wait=false answers its run_id). Answers the status the server reports and whether it is finished — finished means ended, whatever the checks found. The run's findings are read by its worklist_id.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      run_id: {
-        type: 'string',
-        description:
-          'Run identifier an ATC run started with wait=false answered.',
-      },
-    },
-    required: ['run_id'],
-  },
+  inputSchema: z.object({
+    run_id: z
+      .string()
+      .describe('Run identifier an ATC run started with wait=false answered.'),
+  }),
 } as const;
 
-interface GetATCRunStatusArgs {
-  run_id?: string;
-}
+type GetATCRunStatusArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetATCRunStatus(
   context: HandlerContext,

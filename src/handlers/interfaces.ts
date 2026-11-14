@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { IAccessChecks } from '../lib/access/accessChecks';
 import type { AdtHeaderPort } from '../lib/adtHeaders/AdtHeaderPairs';
 import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
 import type { BatchAvailability } from '../lib/batch/availability';
@@ -11,6 +12,8 @@ import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution';
+import type { LineMatchStrategy } from '../lib/search-source/lineMatch';
+import type { SapAnswerStrategy } from '../lib/search-source/readFailure';
 import type { HeldLockPort } from '../lib/state/heldLocks';
 import type { InstanceState } from '../lib/state/InstanceState';
 import type { LongSessionPort } from '../lib/state/longSession';
@@ -21,7 +24,7 @@ import type { LongSessionPort } from '../lib/state/longSession';
  */
 export interface HandlerContext {
   connection: IAbapConnection;
-  logger?: ILogger;
+  logger?: ILogger | undefined;
   /** What the server instance holds between tool calls, and its handle; absent where no instance state is served. */
   state?: InstanceState;
   /** The instance's debugger, created on first use and attached to `state`. */
@@ -59,6 +62,20 @@ export interface HandlerContext {
    */
   batchAvailability?: BatchAvailability;
   /**
+   * @internal Set by the server from its options; not part of the context a
+   * consumer builds. `SearchSource`'s SAP-answer strategy (DO22): what a SAP
+   * answer to a failed read leads to. Absent, the handler takes the shipped
+   * one (`skipSapAnswers`). Kept in every context derived from this one.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * @internal Set by the server from its options; not part of the context a
+   * consumer builds. `SearchSource`'s line-match strategy (DO24): which lines
+   * of a source are hits. Absent, the handler takes the shipped one
+   * (`substringLineMatch`). Kept in every context derived from this one.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
+  /**
    * The request header pairs of the call's system (`AdtHeaderPairs`): the
    * pair a header-taking member is called with (`withAdtHeaders`), and
    * where a corrected one is kept. Kept in every context derived from this
@@ -66,11 +83,21 @@ export interface HandlerContext {
    */
   adtHeaders?: AdtHeaderPort;
   /**
-   * The locks this instance holds between requests (`HeldLocks`), given by a
-   * host whose instances last one request each (Streamable HTTP); absent on
-   * stdio and SSE, whose instance keeps its session between calls.
+   * The locks this instance holds between requests (`HeldLocks`): every
+   * server instance's own. Absent (a group registered on a plain McpServer):
+   * no lock is taken, and nothing is sent under a `lock_handle`.
    */
   heldLocks?: HeldLockPort;
+  /**
+   * The access checks a plain registration of this group applies to every
+   * call (spec §3.2, path 2), with the tools the `-ro` twins serve
+   * (`readOnlyToolNames()`): set on the context a group is built with
+   * (`HandlerExporter`'s `accessChecks`, an embedder's own). Absent: none.
+   */
+  accessChecks?: {
+    readonly checks: IAccessChecks;
+    readonly readOnly: ReadonlySet<string>;
+  };
   /**
    * The instance's long session (`LongSession`), given by a host whose
    * instances last one request each (Streamable HTTP); absent on stdio and

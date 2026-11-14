@@ -38,6 +38,7 @@ export {
   handleGetActivationResults,
   handleGetActivationStatus,
 } from '../../handlers/common/readonly/handleGetActivationRun.js';
+export { handleGetObjectDraft } from '../../handlers/common/readonly/handleGetObjectDraft.js';
 export { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement.js';
 export { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl.js';
 export { handleGetDomain } from '../../handlers/domain/high/handleGetDomain.js';
@@ -53,7 +54,12 @@ export { handleGetProgram } from '../../handlers/program/high/handleGetProgram.j
 export { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject.js';
 export { handleGetServiceBinding } from '../../handlers/service_binding/high/handleGetServiceBinding.js';
 export { handleListServiceBindingTypes } from '../../handlers/service_binding/high/handleListServiceBindingTypes.js';
-export { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding.js';
+export {
+  handleValidateServiceBinding,
+  PACKAGE_NAME_REQUIRED,
+  SERVICE_BINDING_NAME_REQUIRED,
+  SERVICE_DEFINITION_NAME_REQUIRED,
+} from '../../handlers/service_binding/high/handleValidateServiceBinding.js';
 export { handleGetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition.js';
 export { handleGetStructure } from '../../handlers/structure/high/handleGetStructure.js';
 // The metadata readers and the preview-URL tool: `part` on the compact read
@@ -92,3 +98,5 @@ export {
   handleGetUnitTestResultOnce,
 } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
 export { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';
+// The read tools' definitions, for the compact routes' entries.
+export { READ_DEFINITIONS } from './readDefinitions.js';

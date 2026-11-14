@@ -44,7 +44,7 @@ export class AdtHeaderPairs {
   forSystem(system: string): AdtHeaderPort {
     let pairs = this.bySystem.get(system);
     if (pairs === undefined) {
-      pairs = new Map();
+      pairs = new Map<AdtOperation, IAdtHeaders>();
       this.bySystem.set(system, pairs);
     }
     return portOver(pairs);
@@ -57,7 +57,7 @@ export class AdtHeaderPairs {
   forConnection(connection: object): AdtHeaderPort {
     let pairs = this.byConnection.get(connection);
     if (pairs === undefined) {
-      pairs = new Map();
+      pairs = new Map<AdtOperation, IAdtHeaders>();
       this.byConnection.set(connection, pairs);
     }
     return portOver(pairs);

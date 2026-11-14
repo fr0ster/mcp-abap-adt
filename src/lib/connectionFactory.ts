@@ -11,19 +11,27 @@
  */
 
 import {
+  type CreatedConnection,
   createConnection,
   type ILogger,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
-
+import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
   declaredSystemKindOf,
+  declareSystemKind,
   statedSystemKind,
+  stateSystemKind,
 } from './systemKind';
+import { child, childAt, entries } from './thrownValue';
 
 export type { AbapSystemKind } from './systemKind';
 export { statedSystemKind } from './systemKind';
@@ -100,8 +108,8 @@ function wireLogger(logger: ILogger | null | undefined): ILogger | undefined {
   if (!rfcWireOptions().logWire) return undefined;
 
   const write =
-    (level: string) =>
-    (message: string, meta?: unknown): void => {
+    (level: string): ILogger['debug'] =>
+    (message, meta) => {
       process.stderr.write(`[${level}] ${message}\n`);
       if (meta !== undefined) process.stderr.write(`${JSON.stringify(meta)}\n`);
     };
@@ -157,8 +165,31 @@ function rfcWireOptions(): { logWire: boolean; maxLoggedBodyChars?: number } {
  * stderr, for the reason `wireLogger` gives above: in stdio transport stdout
  * carries JSON-RPC and nothing else.
  */
-const REDACTED =
-  /^(authorization|cookie|set-cookie)$|token|secret|password|credential|apikey|api-key/i;
+/** Header names redacted as a whole, lower-cased. */
+const REDACTED_NAMES: ReadonlySet<string> = new Set([
+  'authorization',
+  'cookie',
+  'set-cookie',
+]);
+
+/** Words that redact any header name holding them, lower-cased. */
+const REDACTED_WORDS: readonly string[] = [
+  'token',
+  'secret',
+  'password',
+  'credential',
+  'apikey',
+  'api-key',
+];
+
+/** Whether a header's value is redacted in the wire log, by its name in any case (ASCII). */
+export function isRedactedHeader(name: string): boolean {
+  const lower = asciiLower(name);
+  return (
+    REDACTED_NAMES.has(lower) ||
+    REDACTED_WORDS.some((word) => lower.includes(word))
+  );
+}
 
 function httpWireOptions(): { logWire: boolean; bodyChars: number } {
   const asked =
@@ -180,7 +211,12 @@ function httpWireOptions(): { logWire: boolean; bodyChars: number } {
   };
 }
 
-function clip(value: unknown, ceiling: number): string {
+/** A body as a log line shows it: text as it is, anything else as JSON, clipped at `ceiling`. */
+function clip(
+  body: Partial<Pick<IAdtWireResponse, 'data'>>,
+  ceiling: number,
+): string {
+  const value = body.data;
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   if (text === undefined || text === null) return '';
   if (ceiling === 0) return `(${text.length} chars, not logged)`;
@@ -189,13 +225,10 @@ function clip(value: unknown, ceiling: number): string {
     : text;
 }
 
-function safeHeaders(headers: unknown): string {
-  if (headers === null || typeof headers !== 'object') return '';
-  const out: Record<string, unknown> = {};
-  for (const [name, value] of Object.entries(
-    headers as Record<string, unknown>,
-  )) {
-    out[name] = REDACTED.test(name) ? '[redacted]' : value;
+function safeHeaders(headers: Readonly<Record<string, string>>): string {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    out[name] = isRedactedHeader(name) ? '[redacted]' : value;
   }
   return JSON.stringify(out);
 }
@@ -205,15 +238,14 @@ function safeHeaders(headers: unknown): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
-function withHttpWireLog<T>(connection: T): T {
+function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
-  const target = connection as unknown as {
-    makeAdtRequest: (options: Record<string, unknown>) => Promise<unknown>;
-  };
-  const original = target.makeAdtRequest.bind(target);
+  const original = connection.makeAdtRequest.bind(connection);
   let n = 0;
-  target.makeAdtRequest = async (options) => {
+  connection.makeAdtRequest = async (
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse> => {
     n += 1;
     const id = n;
     process.stderr.write(
@@ -230,36 +262,28 @@ function withHttpWireLog<T>(connection: T): T {
       );
     }
     if (options.data !== undefined) {
-      process.stderr.write(
-        `[WIRE ${id}] body ${clip(options.data, bodyChars)}\n`,
-      );
+      process.stderr.write(`[WIRE ${id}] body ${clip(options, bodyChars)}\n`);
     }
     try {
-      const answer = (await original(options)) as {
-        status?: number;
-        statusText?: string;
-        data?: unknown;
-      };
+      const answer = await original(options);
       process.stderr.write(
-        `[WIRE ${id}] → ${String(answer?.status ?? '?')} ${String(answer?.statusText ?? '')}\n`,
+        `[WIRE ${id}] → ${String(answer.status ?? '?')} ${String(answer.statusText ?? '')}\n`,
       );
-      if (answer?.data !== undefined) {
+      if (answer.data !== undefined) {
         process.stderr.write(
-          `[WIRE ${id}] → body ${clip(answer.data, bodyChars)}\n`,
+          `[WIRE ${id}] → body ${clip(answer, bodyChars)}\n`,
         );
       }
       return answer;
     } catch (error: unknown) {
-      const e = error as {
-        message?: string;
-        response?: { status?: number; data?: unknown };
-      };
+      const status = childAt(error, 'response', 'status');
+      const body = childAt(error, 'response', 'data');
       process.stderr.write(
-        `[WIRE ${id}] → threw ${String(e?.response?.status ?? '')} ${String(e?.message ?? error)}\n`,
+        `[WIRE ${id}] → threw ${String(status ?? '')} ${String(child(error, 'message') ?? error)}\n`,
       );
-      if (e?.response?.data !== undefined) {
+      if (body !== undefined) {
         process.stderr.write(
-          `[WIRE ${id}] → body ${clip(e.response.data, bodyChars)}\n`,
+          `[WIRE ${id}] → body ${clip({ data: body }, bodyChars)}\n`,
         );
       }
       throw error;
@@ -277,7 +301,7 @@ export interface ConnectionRecord {
    */
   kind: AbapSystemKind;
   credential: IAuthProvider;
-  logger?: ILogger | null;
+  logger?: ILogger | null | undefined;
 }
 
 const records = new WeakMap<object, ConnectionRecord>();
@@ -310,6 +334,19 @@ export function systemKindOf(
 }
 
 /**
+ * Gives `view` — a connection built over `outer` (a batch connection, a
+ * forwarding or recording view) — the system kind `outer` has
+ * (`systemKindOf`). An `outer` with no kind gives the view none, and nothing
+ * (`SAP_SYSTEM_TYPE` above all) is read for the view later. Answers `view`.
+ */
+export function withSystemKindOf<V extends object>(view: V, outer: object): V {
+  const kind = systemKindOf(outer);
+  if (kind !== undefined) declareSystemKind(view, kind);
+  else stateSystemKind(view, undefined);
+  return view;
+}
+
+/**
  * The record of a connection this factory built — its settings, credential
  * and the kind it was built for, so a sibling is built exactly like it
  * (`createAbapConnection(…, record.kind)`); undefined for any other.
@@ -320,10 +357,14 @@ export function siblingRecordOf(
   return records.get(connection);
 }
 
+/** An RFC config handed to the factory for ABAP Cloud, which has only HTTP. */
+export const CLOUD_OVER_RFC_WORDS =
+  'ABAP Cloud is served over HTTP: an RFC config (connectionType rfc) is not built for it — SAP_SYSTEM_TYPE, SAP_CONNECTION_TYPE';
+
 export function createAbapConnection(
   settings: SapConfig,
   credential: IAuthProvider,
-  logger?: ILogger | null,
+  logger?: ILogger | null | undefined,
   sessionId?: string,
   /**
    * An existing SAP session to build the instance on (connection 17): the
@@ -339,31 +380,19 @@ export function createAbapConnection(
    * kind is what `SAP_SYSTEM_TYPE` states now (`resolveSystemKind`).
    */
   kind: AbapSystemKind = resolveSystemKind(settings),
-): IAbapConnection {
+): CreatedConnection {
   // connection's `createConnection` with the system and the wire stated: the
   // choice is this server's, made from the settings as before; the connector
-  // and its transport are connection's (connection 16).
-  const common = {
-    config: settings,
-    credential,
-    logger,
-    ...(sessionId !== undefined ? { sessionId } : {}),
-  };
+  // and its transport are connection's (connection 16). Each spec's `config`
+  // is built inside the branch that narrowed the settings' wire.
+  const sessionPart = sessionId !== undefined ? { sessionId } : {};
   const resumed = session !== undefined ? { session } : {};
-  const built = ((): IAbapConnection => {
-    if (kind === 'cloud') {
-      return withHttpWireLog(
-        createConnection({
-          ...common,
-          ...resumed,
-          system: 'cloud',
-          transport: 'http',
-          wireLogger: logger,
-        }),
-      );
-    }
-
+  const built = ((): CreatedConnection => {
     if (settings.connectionType === 'rfc') {
+      // ABAP Cloud has one wire, HTTP: an RFC config is not built for it.
+      if (kind === 'cloud') {
+        throw new Error(CLOUD_OVER_RFC_WORDS);
+      }
       // No `session` over RFC: its session is a conversation, which cannot
       // be taken over (no runtime file is kept of one).
       if (session !== undefined) {
@@ -372,7 +401,10 @@ export function createAbapConnection(
         );
       }
       return createConnection({
-        ...common,
+        config: settings,
+        credential,
+        logger,
+        ...sessionPart,
         system: 'onprem',
         transport: 'rfc',
         wireLogger: wireLogger(logger),
@@ -380,11 +412,29 @@ export function createAbapConnection(
       });
     }
 
+    if (kind === 'cloud') {
+      return withHttpWireLog(
+        createConnection({
+          config: settings,
+          credential,
+          logger,
+          ...sessionPart,
+          ...resumed,
+          system: 'cloud',
+          transport: 'http',
+          wireLogger: logger,
+        }),
+      );
+    }
+
     // TLS material reaches the wire through the logon, not through the
     // transport's options.
     return withHttpWireLog(
       createConnection({
-        ...common,
+        config: settings,
+        credential,
+        logger,
+        ...sessionPart,
         ...resumed,
         system: 'onprem',
         transport: 'http',
@@ -393,7 +443,7 @@ export function createAbapConnection(
     );
   })();
 
-  records.set(built as unknown as object, {
+  records.set(built, {
     settings,
     credential,
     logger,

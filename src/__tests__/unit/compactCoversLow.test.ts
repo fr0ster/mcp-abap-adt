@@ -14,20 +14,21 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { holdingLockOf } from '../helpers/heldLocks';
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
+import { toolAnswer } from '../helpers/toolAnswer';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
-function tools(connection: unknown): Map<string, HandlerEntry> {
-  const context = { connection, logger: silentLogger } as HandlerContext;
+function tools(): Map<string, HandlerEntry> {
   return new Map(
-    [
-      ...compactModifyEntries(() => context),
-      ...compactReadOnlyEntries(() => context),
-    ].map((e) => [e.toolDefinition.name, e]),
+    [...compactModifyEntries(), ...compactReadOnlyEntries()].map((e) => [
+      e.toolDefinition.name,
+      e,
+    ]),
   );
 }
 
@@ -35,18 +36,21 @@ async function call(
   tool: string,
   args: Record<string, unknown>,
   connection = recordingConnection(),
-): Promise<{ isError?: boolean; text: string; sent: number }> {
-  const entry = tools(connection).get(tool);
+): Promise<{ isError?: boolean | undefined; text: string; sent: number }> {
+  const entry = tools().get(tool);
   if (!entry) throw new Error(tool);
-  const answered = (await (
-    entry.handler as unknown as (a: unknown) => Promise<unknown>
-  )(args)) as {
-    isError?: boolean;
-    content?: Array<{ text?: string }>;
-  };
+  const context = { connection, logger: silentLogger } as HandlerContext;
+  // Arguments the tool's schema refuses never reach its handler: the
+  // refusal is the call's answer.
+  const answered = await entry
+    .call({ ...context, heldLocks: holdingLockOf(args) }, args)
+    .then(toolAnswer, (error) => ({
+      isError: true,
+      content: [{ text: String(error) }],
+    }));
   return {
-    isError: answered?.isError,
-    text: answered?.content?.[0]?.text ?? '',
+    isError: answered.isError,
+    text: answered.content[0]?.text ?? '',
     sent: connection.requests.length,
   };
 }
@@ -67,7 +71,9 @@ describe('compact covers what the low set did', () => {
       source_code: 'source text',
     });
     expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('lock_handle is required');
+    expect(answered.text).toContain(
+      'Invalid arguments for tool HandlerUpdate: Invalid input: expected string, received undefined at lock_handle',
+    );
     expect(answered.sent).toBe(0);
   });
 
@@ -128,6 +134,9 @@ describe('compact covers what the low set did', () => {
       const answered = await call(tool, {
         object_type: 'FUNCTION_MODULE',
         object_name: 'FM_A',
+        // A validation states a description (SAP answers 400 without one):
+        // given, so the name's form is what is refused.
+        ...(tool === 'HandlerValidate' ? { description: 'Text' } : {}),
       });
       expect(answered.isError).toBe(true);
       expect(answered.text).toContain('GROUP|FM_NAME');

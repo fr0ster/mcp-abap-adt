@@ -1,5 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
@@ -9,36 +10,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      user: {
-        type: 'string',
-        description: 'Filter by author username.',
-      },
-      max_results: {
-        type: 'number',
-        description: 'Maximum number of messages to return.',
-      },
-      from: {
-        type: 'string',
-        description: 'Start of time range in YYYYMMDDHHMMSS format.',
-      },
-      to: {
-        type: 'string',
-        description: 'End of time range in YYYYMMDDHHMMSS format.',
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    user: z.string().optional().describe('Filter by author username.'),
+    max_results: z
+      .number()
+      .optional()
+      .describe('Maximum number of messages to return.'),
+    from: z
+      .string()
+      .optional()
+      .describe('Start of time range in YYYYMMDDHHMMSS format.'),
+    to: z
+      .string()
+      .optional()
+      .describe('End of time range in YYYYMMDDHHMMSS format.'),
+  }),
 } as const;
 
-interface RuntimeListSystemMessagesArgs {
-  user?: string;
-  max_results?: number;
-  from?: string;
-  to?: string;
-}
+type RuntimeListSystemMessagesArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeListSystemMessages(
   context: HandlerContext,

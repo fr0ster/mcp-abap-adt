@@ -4,8 +4,12 @@ import type {
   IAdtError,
   IAdtFailure,
   IAdtHeaders,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
 import {
@@ -19,15 +23,25 @@ import {
   isCredentialFailure,
   isCredentialPayload,
 } from '../answer';
+import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
+import { parseXml, type XmlNode } from '../xml/node';
+import {
+  childAt as nodeAt,
+  child as nodeChild,
+  entries as nodeEntries,
+  listOf as nodeList,
+  type XmlRead,
+} from '../xml/tree';
 import {
   type MetadataRead,
   type MetadataTarget,
   metadataKeyOf,
   metadataReadOf,
 } from './metadataReads';
+import type { AdtReading } from './reading';
 import { atStep, carryingFailure } from './step';
 
 /**
@@ -38,7 +52,7 @@ import { atStep, carryingFailure } from './step';
  * than on the whole utility says which side of that line this file is on, and
  * keeps it testable without a client.
  */
-export interface NodeStructureSource {
+export interface NodeStructureSourceOf<R> {
   fetchNodeStructure(
     parentType: AdtTypeCode,
     parentName: string,
@@ -47,8 +61,14 @@ export interface NodeStructureSource {
       withShortDescriptions?: boolean;
       analyse?: typeof analyseException;
     },
-  ): Promise<unknown>;
+  ): Promise<R>;
 }
+
+/** A source of node structure reads, each answer read as a `NodeAnswer`. */
+export type NodeStructureSource = NodeStructureSourceOf<NodeAnswer>;
+
+/** What one node structure read answers: the level, as our `node` reading (`nodeLevel`) read it. */
+export type NodeAnswer = IAdtResponse<NodeLevel, IAdtError>;
 
 /** The options a node structure read takes, beside its header pair. */
 type NodeStructureOptions = {
@@ -137,7 +157,7 @@ export function concurrentReader<I, R>(
   stopsAt?: (value: R) => boolean,
 ): LevelReader<I, R> {
   const reader = async (items: readonly I[]): Promise<PhaseResult<R>[]> => {
-    const out: PhaseResult<R>[] = new Array(items.length);
+    const out = new Array<PhaseResult<R>>(items.length);
     let next = 0;
     let ended: { error: unknown } | undefined;
     let stopped = false;
@@ -145,7 +165,7 @@ export function concurrentReader<I, R>(
       while (ended === undefined && !stopped && next < items.length) {
         const at = next++;
         try {
-          const value = await read(items[at] as I, context.connection);
+          const value = await read(items[at], context.connection);
           out[at] = { ok: true, value };
           if (stopsAt?.(value)) stopped = true;
         } catch (error) {
@@ -205,10 +225,10 @@ export interface NodeRequest {
 }
 
 /** `request` read on `utils`: one `fetchNodeStructure`. */
-export function readNode(
-  utils: NodeStructureSource,
+export function readNode<R>(
+  utils: NodeStructureSourceOf<R>,
   request: NodeRequest,
-): Promise<unknown> {
+): Promise<R> {
   return utils.fetchNodeStructure(request.parentType, request.parentName, {
     ...(request.analysed ? { analyse: analyseException } : {}),
     ...(request.nodeId !== undefined ? { nodeId: request.nodeId } : {}),
@@ -237,115 +257,74 @@ export interface NodeLevel {
   objects: Array<{
     name: string;
     type: string;
-    description?: string;
-    techName?: string;
-    uri?: string;
+    description?: string | undefined;
+    techName?: string | undefined;
+    uri?: string | undefined;
   }>;
   childNodes: Array<{ type: string; nodeId: string }>;
 }
 
 /** Our `node` strategy: one answer in, one level out, descriptions kept. */
-export function nodeLevel(answer: unknown): NodeLevel {
-  const xml = String((answer as { data?: unknown })?.data ?? '');
-  const data = (parser.parse(xml) as any)?.['asx:abap']?.['asx:values']?.DATA;
+export function nodeLevel(
+  answer: Partial<Pick<IAdtWireResponse, 'data'>>,
+): NodeLevel {
+  // The wire's body, from outside the type system, as text.
+  return nodeLevelOf(String(answer.data ?? ''));
+}
+
+/** One level of a node-structure document's text, descriptions kept. */
+export function nodeLevelOf(xml: string): NodeLevel {
+  const data = nodeAt(parseXml(parser, xml), 'asx:abap', 'asx:values', 'DATA');
   return {
-    objects: asArray(data?.TREE_CONTENT?.SEU_ADT_REPOSITORY_OBJ_NODE)
-      .map((n: any) => ({
-        name: textOf(n?.OBJECT_NAME),
-        type: textOf(n?.OBJECT_TYPE),
-        description: textOf(n?.DESCRIPTION) || undefined,
-        techName: textOf(n?.TECH_NAME) || undefined,
-        uri: textOf(n?.OBJECT_URI) || undefined,
+    objects: nodeList(
+      nodeAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
+    )
+      .map((n) => ({
+        name: textOf(nodeChild(n, 'OBJECT_NAME')),
+        type: textOf(nodeChild(n, 'OBJECT_TYPE')),
+        description: textOf(nodeChild(n, 'DESCRIPTION')) || undefined,
+        techName: textOf(nodeChild(n, 'TECH_NAME')) || undefined,
+        uri: textOf(nodeChild(n, 'OBJECT_URI')) || undefined,
       }))
       // Every object has a type. An entry without one is SAP's message for
       // a node it could not load ("Error loading node:", on premise 2026-09-25),
       // not an object.
       .filter((o) => o.name && o.type),
-    childNodes: asArray(data?.OBJECT_TYPES?.SEU_ADT_OBJECT_TYPE_INFO)
-      .map((t: any) => ({
-        type: textOf(t?.OBJECT_TYPE),
+    childNodes: nodeList(
+      nodeAt(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
+    )
+      .map((t) => ({
+        type: textOf(nodeChild(t, 'OBJECT_TYPE')),
         // The document writes the id padded — `000031` — and the request the
         // corpus recorded sends `31`. The system accepts both, verified
         // live, but sending what ADT itself sends keeps the wire comparable
         // with the fixtures and with a trace.
-        nodeId: String(Number(textOf(t?.NODE_ID))),
-      }))
-      .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
-  };
-}
-
-/** Ours: objects carry `name`, child nodes carry `type`. */
-function isOurLevel(value: object): value is NodeLevel {
-  const v = value as { objects?: unknown[]; childNodes?: unknown[] };
-  const first = (v.objects ?? [])[0] ?? (v.childNodes ?? [])[0];
-  return (
-    first === undefined ||
-    (typeof first === 'object' &&
-      first !== null &&
-      ('name' in first || 'type' in first))
-  );
-}
-
-/**
- * The library's own `nodeContents` reading, in our shape. It carries no
- * description — a caller wanting one passes `ourUtils` — but names, types,
- * tech names and URIs are all there.
- */
-function fromLibraryLevel(value: object): NodeLevel {
-  const v = value as {
-    objects?: Array<Record<string, unknown>>;
-    childNodes?: Array<Record<string, unknown>>;
-  };
-  return {
-    objects: (v.objects ?? [])
-      .map((o) => ({
-        name: String(o.objectName ?? ''),
-        type: String(o.objectType ?? ''),
-        techName: o.techName ? String(o.techName) : undefined,
-        uri: o.objectUri ? String(o.objectUri) : undefined,
-      }))
-      .filter((o) => o.name && o.type),
-    childNodes: (v.childNodes ?? [])
-      .map((c) => ({
-        type: String(c.objectType ?? ''),
-        nodeId: String(Number(c.nodeId)),
+        nodeId: String(Number(textOf(nodeChild(t, 'NODE_ID')))),
       }))
       .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
   };
 }
 
 /** `fetchNodeStructure` answers an IAdtResponse; this is the level inside it. */
-function levelOf(answer: unknown): NodeLevel {
-  const a = answer as {
-    ok?: boolean;
-    getResult?: () => { value: unknown };
-    data?: unknown;
-  };
-  if (a?.ok === false) {
-    const error = (answer as { getError: () => IAdtError }).getError();
-    // A level that is not there stays what it was: empty. Any other refusal
-    // is the method's error as it is, with the step — not an empty level that
-    // reads as "nothing here".
-    if (error?.response?.status === 404) return { objects: [], childNodes: [] };
+function levelOf(
+  answer: NodeAnswer,
+  missingLevel: MissingLevel = 'empty',
+): NodeLevel {
+  if (!answer.ok) {
+    const error = answer.getError();
+    // A level that is not there stays what it was: empty, unless the caller
+    // asked for it as a refusal. Any other refusal is the method's error as
+    // it is, with the step — not an empty level that reads as "nothing here".
+    if (error.response?.status === 404 && missingLevel === 'empty') {
+      return { objects: [], childNodes: [] };
+    }
     throw carryingFailure(
       new Error(error.message),
       error,
       'read package node structure',
     );
   }
-  if (typeof a?.getResult === 'function') {
-    const value = a.getResult().value;
-    // The injected reading may be ours, the library's own, or the raw wire;
-    // each is recognised by what it carries, never assumed. Having
-    // `childNodes` is NOT enough to be ours: the library's reading has them
-    // too, keyed `objectType`/`objectName`, and passing it through as ours
-    // answered nameless, typeless rows (on premise, 2026-09-25).
-    if (value && typeof value === 'object' && 'childNodes' in value) {
-      return isOurLevel(value) ? value : fromLibraryLevel(value);
-    }
-    return nodeLevel({ data: value });
-  }
-  return nodeLevel(answer);
+  return answer.getResult().value;
 }
 
 /**
@@ -404,7 +383,7 @@ export interface PackageItem {
   name: string;
   type: string;
   kind?: PackageItemKind;
-  description?: string;
+  description?: string | undefined;
   packageName: string;
   isPackage: boolean;
 }
@@ -417,7 +396,7 @@ export interface PackageNode {
   name: string;
   type: string;
   kind?: PackageItemKind;
-  description?: string;
+  description?: string | undefined;
   isPackage: boolean;
   codeFormat?: CodeFormat;
   restoreStatus?: 'ok' | 'not-implemented';
@@ -514,28 +493,61 @@ const RESTORABLE = new Set<string>([
   'behaviorImplementation',
 ]);
 
-function asArray<T>(value: T | T[] | undefined): T[] {
-  if (value === undefined || value === null) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-function textOf(value: unknown): string {
+function textOf(value: XmlRead): string {
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
   if (value && typeof value === 'object') {
-    const t = (value as Record<string, unknown>)['#text'];
+    const t = nodeChild(value, '#text');
     if (typeof t === 'string' || typeof t === 'number') return String(t).trim();
   }
   return '';
 }
 
 export interface WalkOptions {
-  includeSubpackages?: boolean;
-  maxDepth?: number;
-  includeDescriptions?: boolean;
+  includeSubpackages?: boolean | undefined;
+  maxDepth?: number | undefined;
+  includeDescriptions?: boolean | undefined;
+  /**
+   * What a `404` on a level answers: `'empty'` (the default) reads the level
+   * as empty; `'refused'` makes it the walk's failure, SAP's answer with its
+   * step — for a caller that must name every scope it did not read.
+   */
+  missingLevel?: MissingLevel | undefined;
+  /** A refused level below the root excludes only its branch (`BranchRule`); absent, it ends the package's walk. */
+  branchRule?: BranchRule | undefined;
 }
+
+/** What a `404` on a level of a walk answers. */
+export type MissingLevel = 'empty' | 'refused';
+
+/**
+ * The branch rule of a walk that reads what it can (`SearchSource`, DO19): a
+ * refused level below the asked package's root — a type node, or a
+ * subpackage's root, its `404` included under `missingLevel: 'refused'` —
+ * excludes only that branch, and the walk goes on with the next node or
+ * subpackage; a refused root of the asked package still settles the package
+ * as refused; a credential failure still ends the walk.
+ */
+export interface BranchRule {
+  /**
+   * A refused read of the walk, at its place: returns when what the place
+   * names is skipped (the package, or the branch below it); throws to end
+   * the walk. Every failed level, the root's included, is handed here.
+   */
+  onFailure(failure: unknown, place: WalkFailurePlace): void;
+}
+
+/** Where a walk's read failed: the asked package's root, or a level below it. */
+export type WalkFailurePlace =
+  | { kind: 'package'; package: string }
+  | {
+      kind: 'level';
+      package: string;
+      /** The refused subpackage, or the refused type node. */
+      level: { subpackage: string } | { node: { id: string; type: string } };
+    };
 
 /** A package of a walk: what was found in it, and the subpackages walked from it. */
 interface PackageWalk {
@@ -585,10 +597,10 @@ function flatten(walk: PackageWalk): WalkedItem[] {
  * the caller read them already in a phase of its own.
  */
 export async function walkPackages(
-  read: LevelReader<NodeRequest, unknown>,
+  read: LevelReader<NodeRequest, NodeAnswer>,
   packageNames: readonly string[],
   options: WalkOptions = {},
-  roots?: readonly PhaseResult<unknown>[],
+  roots?: readonly PhaseResult<NodeAnswer>[],
 ): Promise<PhaseResult<WalkedItem[]>[]> {
   // An envelope part's description can be another part's: asked for only
   // where each answer is its request's own.
@@ -597,7 +609,7 @@ export async function walkPackages(
   const objectOf = (o: NodeLevel['objects'][number], packageName: string) =>
     withShortDescriptions ? { ...o, packageName } : undescribed(o, packageName);
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
-  const failures = new Map<number, unknown>();
+  const failures: Map<number, unknown> = new Map<number, unknown>();
   const seen = packageNames.map((name) => new Set([name.toUpperCase()]));
   const walks: PackageWalk[] = packageNames.map((name, root) => ({
     root,
@@ -607,23 +619,48 @@ export async function walkPackages(
     subs: [],
   }));
 
+  // The branches the branch rule excluded: a subpackage whose root was refused.
+  const excluded = new Set<PackageWalk>();
   /** The level an answer carries, or undefined once its package failed. */
   const settle = (
     walk: PackageWalk,
-    result: PhaseResult<unknown>,
+    result: PhaseResult<NodeAnswer>,
+    node?: { id: string; type: string },
   ): NodeLevel | undefined => {
     if (failures.has(walk.root)) return undefined;
     try {
       if (!result.ok) throw result.error;
-      return levelOf(result.value);
+      const level = levelOf(result.value, options.missingLevel);
+      return level;
     } catch (error) {
-      // A credential failure is every root's: it ends the walk as it came.
-      if (endsTheCall(error)) throw error;
-      failures.set(walk.root, error);
+      const rule = options.branchRule;
+      if (rule === undefined) {
+        // A credential failure is every root's: it ends the walk as it came.
+        if (endsTheCall(error)) throw error;
+        failures.set(walk.root, error);
+        return undefined;
+      }
+      // Under the branch rule the caller decides; a return skips what the
+      // place names: the node, the subpackage's branch, the asked package.
+      const asked = walks[walk.root]?.name ?? walk.name;
+      rule.onFailure(
+        error,
+        node !== undefined
+          ? { kind: 'level', package: walk.name, level: { node } }
+          : walk.depth > 1
+            ? {
+                kind: 'level',
+                package: asked,
+                level: { subpackage: walk.name },
+              }
+            : { kind: 'package', package: walk.name },
+      );
+      if (node === undefined) excluded.add(walk);
       return undefined;
     }
   };
-  const alive = (walk: PackageWalk) => !failures.has(walk.root);
+  const alive = (walk: PackageWalk) =>
+    !failures.has(walk.root) && !excluded.has(walk);
 
   let level = walks;
   let first = roots;
@@ -638,13 +675,20 @@ export async function walkPackages(
         })),
       ));
     first = undefined;
-    const typeNodes: Array<{ walk: PackageWalk; nodeId: string }> = [];
+    const typeNodes: Array<{
+      walk: PackageWalk;
+      nodeId: string;
+      type: string;
+    }> = [];
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      walk.found.push(...root.objects.map((o) => objectOf(o, walk.name)));
+      appendAll(
+        walk.found,
+        root.objects.map((o) => objectOf(o, walk.name)),
+      );
       for (const child of root.childNodes) {
-        typeNodes.push({ walk, nodeId: child.nodeId });
+        typeNodes.push({ walk, nodeId: child.nodeId, type: child.type });
       }
     });
 
@@ -657,10 +701,13 @@ export async function walkPackages(
           withShortDescriptions,
         })),
       );
-      typeNodes.forEach(({ walk }, i) => {
-        const typed = settle(walk, typeAnswers[i]);
+      typeNodes.forEach(({ walk, nodeId, type }, i) => {
+        const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
-        walk.found.push(...typed.objects.map((o) => objectOf(o, walk.name)));
+        appendAll(
+          walk.found,
+          typed.objects.map((o) => objectOf(o, walk.name)),
+        );
       });
     }
 
@@ -671,7 +718,7 @@ export async function walkPackages(
       for (const item of walk.found) {
         if (kindOf(item.type) !== 'package') continue;
         const name = item.name.toUpperCase();
-        const own = seen[walk.root] as Set<string>;
+        const own = seen[walk.root];
         if (own.has(name)) continue;
         own.add(name);
         const sub: PackageWalk = {
@@ -708,15 +755,27 @@ export async function walkPackage(
   options: WalkOptions = {},
   depth = 1,
   seen: Set<string> = new Set(),
+  asked: string = packageName.toUpperCase(),
 ): Promise<WalkedItem[]> {
   const pkg = packageName.toUpperCase();
   if (seen.has(pkg)) return [];
   seen.add(pkg);
 
   const withShortDescriptions = options.includeDescriptions === true;
-  const root = levelOf(
-    await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
+  const root = await underBranchRule(
+    options,
+    depth > 1
+      ? { kind: 'level', package: asked, level: { subpackage: pkg } }
+      : { kind: 'package', package: pkg },
+    async () =>
+      levelOf(
+        await utils.fetchNodeStructure('DEVC/K', pkg, {
+          withShortDescriptions,
+        }),
+        options.missingLevel,
+      ),
   );
+  if (root === undefined) return [];
 
   // A description only when asked for: SAP sends some without it.
   const owned = (o: WalkedItem): WalkedItem => {
@@ -727,13 +786,23 @@ export async function walkPackage(
   };
   const found: WalkedItem[] = root.objects.map(owned);
   for (const child of root.childNodes) {
-    const level = levelOf(
-      await utils.fetchNodeStructure('DEVC/K', pkg, {
-        nodeId: child.nodeId,
-        withShortDescriptions,
-      }),
+    const level = await underBranchRule(
+      options,
+      {
+        kind: 'level',
+        package: pkg,
+        level: { node: { id: child.nodeId, type: child.type } },
+      },
+      async () =>
+        levelOf(
+          await utils.fetchNodeStructure('DEVC/K', pkg, {
+            nodeId: child.nodeId,
+            withShortDescriptions,
+          }),
+          options.missingLevel,
+        ),
     );
-    found.push(...level.objects.map(owned));
+    if (level !== undefined) appendAll(found, level.objects.map(owned));
   }
 
   if (!options.includeSubpackages) return found;
@@ -743,11 +812,32 @@ export async function walkPackage(
   for (const item of found) {
     if (kindOf(item.type) !== 'package') continue;
     if (depth >= limit) continue;
-    out.push(
-      ...(await walkPackage(utils, item.name, options, depth + 1, seen)),
+    appendAll(
+      out,
+      await walkPackage(utils, item.name, options, depth + 1, seen, asked),
     );
   }
   return out;
+}
+
+/**
+ * A level of the walk: its answer, or — under the branch rule, when the
+ * caller's `onFailure` returns — `undefined`, which skips what `place`
+ * names. Without the rule the failure is thrown as it came.
+ */
+async function underBranchRule<T>(
+  options: WalkOptions,
+  place: WalkFailurePlace,
+  read: () => Promise<T>,
+): Promise<T | undefined> {
+  try {
+    return await read();
+  } catch (error) {
+    const rule = options.branchRule;
+    if (rule === undefined) throw error;
+    rule.onFailure(error, place);
+    return undefined;
+  }
 }
 
 /**
@@ -758,10 +848,10 @@ export async function walkPackage(
 export type WalkedItem = {
   name: string;
   type: string;
-  description?: string;
+  description?: string | undefined;
   packageName?: string;
-  techName?: string;
-  uri?: string;
+  techName?: string | undefined;
+  uri?: string | undefined;
 };
 
 /** The step of a failed object metadata read. */
@@ -769,20 +859,17 @@ export const METADATA_STEP = 'read object metadata';
 
 /** The `adtcore:description` of a metadata document's root element. */
 export function metadataDescriptionOf(xml: string): string | undefined {
-  let doc: unknown;
+  let doc: XmlNode | undefined;
   try {
-    doc = parser.parse(xml);
+    doc = parseXml(parser, xml);
   } catch {
     return undefined;
   }
-  if (doc === null || typeof doc !== 'object') return undefined;
-  for (const [name, root] of Object.entries(doc as Record<string, unknown>)) {
-    if (name.startsWith('?') || root === null || typeof root !== 'object') {
+  for (const [name, root] of nodeEntries(doc)) {
+    if (name.startsWith('?') || typeof root !== 'object') {
       continue;
     }
-    const description = (root as Record<string, unknown>)[
-      'adtcore:description'
-    ];
+    const description = nodeChild(root, 'adtcore:description');
     return typeof description === 'string'
       ? description.trim() || undefined
       : undefined;
@@ -794,10 +881,8 @@ export function metadataDescriptionOf(xml: string): string | undefined {
  * The document a metadata reading answered: `AdtReading.raw`, or the
  * document itself where the type's read answers it whole.
  */
-function rawOf(value: unknown): string {
-  if (typeof value === 'string') return value;
-  const raw = (value as { raw?: unknown } | undefined)?.raw;
-  return typeof raw === 'string' ? raw : '';
+function rawOf(value: AdtReading<string> | string): string {
+  return typeof value === 'string' ? value : value.raw;
 }
 
 /** The descriptions a metadata phase read, and the refusal that ended it. */
@@ -829,14 +914,12 @@ export async function metadataDescriptions(
       reads.set(key, read);
     }
   }
-  const keys = [...reads.keys()];
+  const keyed = [...reads];
+  const keys = keyed.map(([key]) => key);
   const descriptions = new Map<string, string | undefined>();
   if (keys.length === 0) return { descriptions };
-  const results = await runPhase(context, keys, (key, connection) =>
-    atStep(
-      METADATA_STEP,
-      reads.get(key) as MetadataRead,
-    )(createAdtClient(connection, context.logger)),
+  const results = await runPhase(context, keyed, ([, read], connection) =>
+    atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
   );
   let refused: IAdtFailure | undefined;
   results.forEach((result, i) => {
@@ -847,7 +930,7 @@ export async function metadataDescriptions(
     const response = result.value;
     if (response.ok) {
       descriptions.set(
-        keys[i] as string,
+        keys[i],
         metadataDescriptionOf(rawOf(response.getResult().value)),
       );
       return;

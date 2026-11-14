@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateBehaviorImplementation Handler - Create ABAP Behavior Implementation Class
  *
@@ -25,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
@@ -37,46 +40,31 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the RAP behavior implementation class named by class_name for the behavior definition named by behavior_definition, in initial state: the FOR BEHAVIOR OF main source and the implementations include are written afterwards, the main source as a class source and the implementations include under the class lock.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Behavior Implementation class name.',
-      },
-      behavior_definition: {
-        type: 'string',
-        description:
-          'Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Class description. If not provided, class_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'behavior_definition', 'package_name'],
-  },
+  inputSchema: createArguments('CreateBehaviorImplementation', {
+    class_name: z.string().describe('Behavior Implementation class name.'),
+    behavior_definition: z
+      .string()
+      .describe(
+        'Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.',
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe('Class description. If not provided, class_name will be used.'),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CreateBehaviorImplementationArgs {
-  class_name: string;
-  behavior_definition: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateBehaviorImplementationArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleCreateBehaviorImplementation(
   context: HandlerContext,

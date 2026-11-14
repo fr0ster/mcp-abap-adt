@@ -1,4 +1,5 @@
 import { messageDocuments } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdateMessageClassMessage Handler - Update (upsert) a single message in a
  * Message Class (MSAG)
@@ -43,48 +44,34 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Change the text / flags of an existing message in an ABAP message class (T100). Creates the message when the class lacks it (upsert).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Parent message class name.',
-      },
-      msgno: {
-        type: 'string',
-        description: 'Message number (e.g., "001").',
-      },
-      msgtext: {
-        type: 'string',
-        description:
-          'New message text. May contain placeholders &1 &2 &3 &4 (or &).',
-      },
-      self_explanatory: {
-        type: 'boolean',
-        description: '(optional) Mark the message as self-explanatory.',
-      },
-      description: {
-        type: 'string',
-        description: '(optional) Long description for the message.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          '(optional) Transport request number, not a task. Required for transportable objects.',
-      },
-    },
-    required: ['message_class_name', 'msgno', 'msgtext'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Parent message class name.'),
+    msgno: z.string().describe('Message number (e.g., "001").'),
+    msgtext: z
+      .string()
+      .describe(
+        'New message text. May contain placeholders &1 &2 &3 &4 (or &).',
+      ),
+    self_explanatory: z
+      .boolean()
+      .optional()
+      .describe('(optional) Mark the message as self-explanatory.'),
+    description: z
+      .string()
+      .optional()
+      .describe('(optional) Long description for the message.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Transport request number, not a task. Required for transportable objects.',
+      ),
+  }),
 } as const;
 
-interface UpdateMessageClassMessageArgs {
-  message_class_name: string;
-  msgno: string;
-  msgtext: string;
-  self_explanatory?: boolean;
-  description?: string;
-  transport_request?: string;
-}
+type UpdateMessageClassMessageArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleUpdateMessageClassMessage(
   context: HandlerContext,

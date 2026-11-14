@@ -9,19 +9,20 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
 ## The tools
 
 - the **17 compact tools that change nothing**, one per operation with the object in
-  `object_type`: `HandlerGet`, `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`,
+  `object_type`: `HandlerGet`, `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData` (a data
+  tool: served only with `--enable-data-tools`, off by default),
   `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
+- the **background-run tools** (`HandlerBackgroundRunGet`, `HandlerBackgroundRunList`, `HandlerBackgroundRunDiscard`): a long read runs in the background by default and is read, listed and cancelled by them;
 - **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode;
 - **`HandlerSession`** (`action: 'open' | 'close'`): the long session — an instance and its SAP
   connection kept for every call carrying the `state_handle` open answers, until close or the idle
   bound ([compact-http](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)). Every tool
   declares the optional `state_handle` argument.
 
-19 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
-is in the tool list at all, so a client cannot call one; nor the four debugger tools or the
-background-run tools — those are `mcp-abap-adt-compact-http`'s ([`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)).
+21 tools in all (one more, `HandlerGetData`, with `--enable-data-tools`) (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+is in the tool list at all, so a client cannot call one; nor the four debugger tools — those are `mcp-abap-adt-compact-http`'s ([`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)).
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many
 users, so it writes no runtime session file and serves no leftover-session tool; those are the

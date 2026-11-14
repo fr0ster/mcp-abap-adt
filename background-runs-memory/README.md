@@ -19,12 +19,13 @@ const backgroundRuns = new InMemoryBackgroundRuns({ prefix: 'replica-1.' }); // 
 const server = new EmbeddableMcpServer({ connection, freshConnection, backgroundRuns });
 ```
 
-- **Whose run:** each run is its caller's — the URL, the client and the backend user. Another
+- **Whose run:** each run is its caller's — the system, the client and the backend user. Another
   caller's handle reads exactly as an unknown one.
 - **16 runs per caller** (`BACKGROUND_RUNS_PER_CALLER`), running and kept together; the start of
   a 17th is refused. No process-wide limit.
-- **No timeouts:** a finished run's answer stays until its caller discards it; every answer ends
-  with the process.
+- **No timeouts:** a finished run's answer stays until it is taken; every answer ends with the
+  process. A long read's answer is taken by the one read that answers it (the server discards it
+  then); a run of code stays until its caller discards it.
 - **Handles:** 128 random bits as hex, after the optional `prefix` (an instance id, when the host
   routes handles between instances — the routing is the host's).
 

@@ -17,9 +17,9 @@ Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`
 | Package | What it is | Command |
 |---|---|---|
 | [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …): the `readonly`, `high` and `debug` sets, the leftover sessions (stdio only) and background runs. The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
-| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) | **The read-only full server**: the `readonly` tools (with system and search), the leftover-session list and logoff — no high, debugger, background-run or resume tool. Configuration is the full server's. | `mcp-abap-adt-ro` |
+| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) | **The read-only full server**: the `readonly` tools (with system and search), the background runs of the long reads, the leftover-session list — no high, debugger, run or resume tool. Configuration is the full server's. | `mcp-abap-adt-ro` |
 | [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request — with the four debugger tools. Configuration is the full server's. | `mcp-abap-adt-compact` |
-| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) | **The read-only compact server**: the 17 compact tools that change nothing, the leftover-session list and logoff. | `mcp-abap-adt-compact-ro` |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) | **The read-only compact server**: the 17 compact tools that change nothing (`HandlerGetData` only with `--enable-data-tools`), the leftover-session list (stdio). | `mcp-abap-adt-compact-ro` |
 | [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify), [`background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory), [`responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Libraries, not servers: the tool handlers, an embeddable server for your own application, the in-memory store of background runs, and the rules that name a call's responsible, user and system. | — |
 
 ### How it connects
@@ -71,7 +71,8 @@ npm ls -g @mcp-abap-adt/sap-rfc-lite
 **`(empty)` means the server was installed without RFC** (`--no-optional` / `--omit=optional`): run
 the install again without that option. On a platform with no prebuilt binding (another platform or
 architecture, Linux with musl), the module is installed but has no binding until you build one, and the
-server refuses the first RFC call with `@mcp-abap-adt/sap-rfc-lite is not available`. The runtime
+RFC logon is refused with `@mcp-abap-adt/sap-rfc-lite is not available` (at the start, or with
+`--deferred-logon` at the first tool call that needs the connection). The runtime
 settings per platform, building a binding and the SNC prerequisites: [RFC Setup](RFC_SETUP.md).
 
 ### Portable build (personal)
@@ -130,6 +131,7 @@ For basic authentication:
 cd ~/my-project
 cat > .env << EOF
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -149,22 +151,34 @@ npm install -g @mcp-abap-adt/auth-broker-cli
 mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap   # `mcp-auth --help` lists the rest
 ```
 
-For RFC with basic authentication, add `SAP_CONNECTION_TYPE=rfc` to the basic `.env` above.
+For RFC with basic authentication, the `.env` states its address, its client and its logon language, and no `SAP_URL`:
+```bash
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=<user>
+SAP_PASSWORD=<password>
+SAP_CONNECTION_TYPE=rfc
+```
 
 For SNC (passwordless logon over RFC; no user, no password):
 ```bash
-SAP_URL=http://your-sap-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 # Creates need a responsible person: no login is known over SNC
 SAP_RESPONSIBLE=<your ABAP user>
 ```
-Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`). For a URL
-whose port follows no such rule (an `https` port such as `44300`), set `SAP_SYSNR` in the process
-environment. See [RFC Setup](RFC_SETUP.md).
-Through a message server and a logon group instead, add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one is required), and optionally `SAP_GROUP` (default `PUBLIC`, connection's) and `SAP_SAPROUTER`; then no host and no system number come from `SAP_URL` and `SAP_SYSNR` is not read. See [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group).
+Over RFC the address is stated: `SAP_ASHOST` and `SAP_SYSNR` (an application server), both read
+from the `.env`; `SAP_CLIENT` and `SAP_LANGUAGE` are required, and an RFC destination states no
+`SAP_URL`. Nothing is derived from a URL and nothing has a default. See [RFC Setup](RFC_SETUP.md).
+Through a message server and a logon group instead, state `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (or both) and `SAP_GROUP` (required); `SAP_SAPROUTER` goes with either address. See [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 **Run the server:**
 ```bash
@@ -279,6 +293,7 @@ After installation, create a `.env` file with your SAP connection details:
 # of mcp-abap-adt-http / mcp-abap-adt-sse, never in a stdio .env)
 cat > .env << 'EOF'
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=<your ABAP user>
@@ -337,7 +352,9 @@ naming the binary that serves the tools it asked for.
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
 - `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
 - `--connection-type=http|rfc` - SAP connection type, required for a destination (here, `SAP_CONNECTION_TYPE` in its `.env`, or `connection-type` in YAML)
+- `--ashost`, `--sysnr` - RFC to an application server (`SAP_ASHOST`, `SAP_SYSNR` in the `.env`)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … in the `.env`); see [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group)
+- `--client`, `--language` - The client and the logon language (`SAP_CLIENT`, `SAP_LANGUAGE`), both required over RFC; precedence for all of these: the CLI, the process environment, the destination's `.env`, YAML
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.
 
@@ -393,15 +410,16 @@ You can also configure the server using environment variables.
 - `HANDLER_LOG_SILENT` - Disable all handler logs (true|false)
 
 *SAP Connection (in .env file):*
-- `SAP_URL` - SAP system URL (required)
-- `SAP_CLIENT` - SAP client number (required)
+- `SAP_URL` - SAP system URL (required over HTTP; an RFC destination states none)
+- `SAP_ASHOST`, `SAP_SYSNR` - RFC: the application server's host and system number; or `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` and `SAP_GROUP` (a message server); `SAP_SAPROUTER` with either
+- `SAP_CLIENT` - SAP client number (required over RFC)
 - `SAP_AUTH_TYPE` - Authentication type: basic|snc|jwt (required)
 - `SAP_GRANT_TYPE` - `authorization_code`; required with jwt
 - `SAP_SNC_PARTNERNAME`, `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` - SNC (RFC only; no user, no password)
 - `SAP_SYSTEM_TYPE` - System type, required (or `--system-type`; no default): `cloud`, `onprem`, or `legacy`. Decides the tools, their enums and the object types each argument accepts (the system type's ADT type table; e.g. a program's writes require `onprem`), the connector, and how the system's answers are read; inspection (no destination) needs it too
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
-- `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
+- `SAP_LANGUAGE` - Logon language (required over RFC) and master language of created objects (e.g., EN, DE)
 - `SAP_JWT_TOKEN` - The session's token, written by `mcp-auth` or the server (a token you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`)
 - `SAP_REFRESH_TOKEN` - Refresh token for token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2

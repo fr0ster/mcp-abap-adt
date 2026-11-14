@@ -1,3 +1,6 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateFunctionInclude Handler - ABAP Function Group Include Creation via ADT API
  *
@@ -18,7 +21,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -28,39 +31,24 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP include within an existing function group. Creates the include in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Parent function group name',
-      },
-      include_name: {
-        type: 'string',
-        description: 'Include name.',
-      },
-      description: {
-        type: 'string',
-        description: 'Optional description for the include',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'include_name'],
-  },
+  inputSchema: createArguments('CreateFunctionInclude', {
+    function_group_name: z.string().describe('Parent function group name'),
+    include_name: z.string().describe('Include name.'),
+    description: z
+      .string()
+      .optional()
+      .describe('Optional description for the include'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CreateFunctionIncludeArgs {
-  function_group_name: string;
-  include_name: string;
-  description?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateFunctionIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateFunctionInclude(
   context: HandlerContext,

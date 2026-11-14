@@ -5,24 +5,27 @@ import {
   COMPACT_MAIN_PROGRAMS,
   COMPACT_READ,
   compactGetDescription,
-  compactGetSchemaFor,
+  compactGetSchemaWithNamesFor,
+  HANDLER_GET_DRAFT_TYPES,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
-import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
+import {
+  defineTool,
+  type HandlerContext,
+  variantOf,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetActivationResults,
   handleGetActivationStatus,
   handleGetNodeStructureOnce,
   handleGetObjectStructure,
   handleGetVirtualFolders,
+  READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import {
-  type CompactReadPart,
-  hasSourcePart,
-  partsFor,
-  routeCompactPart,
-} from './compactPartRoutes';
+import type * as z from 'zod';
+import { hasSourcePart, partsFor, routeCompactPart } from './compactPartRoutes';
 import { routeCompactRead } from './compactReadRoutes';
 
 export const TOOL_DEFINITION = {
@@ -30,38 +33,52 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: compactGetDescription(variant),
-    inputSchema: compactGetSchemaFor(
+    inputSchema: compactGetSchemaWithNamesFor(
       COMPACT_READ[variant],
       COMPACT_MAIN_PROGRAMS[variant],
+      undefined,
+      COMPACT_READ[variant],
+      HANDLER_GET_DRAFT_TYPES[variant],
     ),
     members: COMPACT_READ[variant],
   })),
 } as const;
 
-type HandlerGetArgs = { object_type?: CompactObjectType } & Record<
-  string,
-  unknown
->;
+/** The call's arguments, as HandlerGet's schema parses them. */
+type HandlerGetGiven = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** The parts that read the repository by ADT address rather than by object_type. */
-const ADDRESS_PARTS = ['object_structure', 'node_structure', 'virtual_folders'];
+/** The arguments past the boundary of object_type: the member it names. */
+type HandlerGetArgs = Omit<HandlerGetGiven, 'object_type'> & {
+  object_type?: CompactObjectType | undefined;
+};
 
-/** The parts that read an activation run by its run_id. */
-const RUN_PARTS = ['activation_status', 'activation_results'];
+/** The address parts' targets: each tool's entry, so its schema parses the call. */
+const virtualFolders = defineTool(
+  READ_DEFINITIONS.GetVirtualFoldersLow,
+  handleGetVirtualFolders,
+).call;
+const nodeStructure = defineTool(
+  READ_DEFINITIONS.GetNodeStructureLow,
+  handleGetNodeStructureOnce,
+).call;
+const objectStructure = defineTool(
+  READ_DEFINITIONS.GetObjectStructure,
+  handleGetObjectStructure,
+).call;
 
 function routeAddressPart(
   context: HandlerContext,
   part: string,
-  args: Record<string, unknown>,
-): Promise<unknown> | unknown {
+  args: ToolArgs,
+): Promise<ToolResultLike> | ToolResultLike {
   if (part === 'virtual_folders') {
-    return handleGetVirtualFolders(context, {
+    return virtualFolders(context, {
       object_search_pattern: args.object_search_pattern,
       preselection: args.preselection,
       facet_order: args.facet_order,
       with_versions: args.with_versions,
       ignore_short_descriptions: args.ignore_short_descriptions,
-    } as never);
+    });
   }
   if (!args.object_adt_type || !args.object_name) {
     return return_error(
@@ -69,17 +86,18 @@ function routeAddressPart(
     );
   }
   if (part === 'node_structure') {
-    return handleGetNodeStructureOnce(context, {
+    return nodeStructure(context, {
       parent_type: args.object_adt_type,
       parent_name: args.object_name,
       node_id: args.node_id,
       with_short_descriptions: args.with_short_descriptions,
-    } as never);
+    });
   }
-  return handleGetObjectStructure(context, {
-    object_type: args.object_adt_type,
-    object_name: args.object_name,
-  } as never);
+  // GetObjectStructure's own arguments: `objecttype`, `objectname`.
+  return objectStructure(context, {
+    objecttype: args.object_adt_type,
+    objectname: args.object_name,
+  });
 }
 
 /**
@@ -139,7 +157,7 @@ function functionModuleArgs<A extends HandlerGetArgs>(
 
 export async function handleHandlerGet(
   context: HandlerContext,
-  given: Omit<HandlerGetArgs, 'object_type'> & { object_type?: string },
+  given: HandlerGetGiven,
 ) {
   // The boundary of object_type: one of the declared variant's members
   // (`COMPACT_READ`); past it, the type is typed by it.
@@ -158,18 +176,20 @@ export async function handleHandlerGet(
   } else {
     args = { ...given, object_type: undefined };
   }
-  const requested = (args.part as string | undefined) ?? 'source';
-  if (ADDRESS_PARTS.includes(requested)) {
-    return routeAddressPart(context, requested, args);
+  const part = args.part ?? 'source';
+  switch (part) {
+    case 'object_structure':
+    case 'node_structure':
+    case 'virtual_folders':
+      return routeAddressPart(context, part, args);
+    case 'activation_status':
+      return handleGetActivationStatus(context, {
+        run_id: args.run_id,
+        with_long_polling: args.with_long_polling,
+      });
+    case 'activation_results':
+      return handleGetActivationResults(context, { run_id: args.run_id });
   }
-  if (RUN_PARTS.includes(requested)) {
-    const read =
-      requested === 'activation_status'
-        ? handleGetActivationStatus
-        : handleGetActivationResults;
-    return read(context, { run_id: args.run_id });
-  }
-  const part = requested as CompactReadPart;
   // Every other part reads an object: without object_type the router
   // refuses it, in its own words and through its log, whatever the part.
   if (!args.object_type) {
@@ -180,7 +200,7 @@ export async function handleHandlerGet(
   let read = { ...args, object_type: args.object_type };
   if (
     args.object_type === 'FUNCTION_MODULE' &&
-    (part === 'source' || part === 'metadata')
+    (part === 'source' || part === 'metadata' || part === 'draft')
   ) {
     const named = functionModuleArgs(read);
     if (!named.ok) return named.refusal;

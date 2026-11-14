@@ -7,9 +7,13 @@
  * Type-checked by `npm run test:check`.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import type { HandlerContext } from '../src/handlers/interfaces.js';
 import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
+import * as z from 'zod';
+import {
+  DataHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -17,6 +21,7 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../src/lib/handlers/groups/index.js';
+import { noConnectionContext } from '../src/lib/handlers/index.js';
 import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,
@@ -25,11 +30,9 @@ import {
   type ToolSet,
 } from '../src/lib/toolSet.js';
 
-// Groups only read `connection` when a handler runs; listing never runs one.
-const ctx = {
-  connection: null,
-  logger: undefined,
-} as unknown as HandlerContext;
+// Groups only read `connection` when a handler runs; listing never runs one,
+// and a context built for registration refuses any use of its connection.
+const ctx = noConnectionContext();
 
 const groups = {
   // Default arguments on purpose: an empty overriding set and NoDedupStrategy,
@@ -37,76 +40,31 @@ const groups = {
   readonly: new ReadOnlyHandlersGroup(ctx),
   high: new HighLevelHandlersGroup(ctx),
   system: new SystemHandlersGroup(ctx),
+  // The data tools, opt-in: listed here, served only when asked for.
+  data: new DataHandlersGroup(ctx),
   runtime: new RuntimeRunHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
   debug: new DebugHandlersGroup(ctx),
 };
 
-// Two input-schema shapes exist among the 362 tools (a codebase finding, not a script
-// bug — see the document): most `inputSchema`s are plain JSON Schema
-// (`{ type: 'object', properties: {...}, required: [...] }`), but four handlers
-// (CreatePackage, GetPackageContents, GetTableContents, SearchSource) declare
-// a bare zod raw shape instead — a plain object whose values are zod schema instances,
-// with no `type`/`properties`/`required` wrapper at all. Reading `.properties`/`.required`
-// on that shape silently returns `undefined`, which previously rendered as "(none)" — the
-// exact "empty cell reads as checked" failure the brief warns about, one level below the
-// column. Detect the shape instead of hardcoding the four names, so a fifth handler
-// written in either style lands correctly with no script edit.
-type ParamInfo = { name: string; required: 'yes' | 'no' | 'unknown' };
+type ParamInfo = { name: string; required: 'yes' | 'no' };
 
-const isJsonSchemaObject = (
-  v: unknown,
-): v is {
-  type: 'object';
-  properties: Record<string, unknown>;
-  required?: string[];
-} =>
-  !!v &&
-  typeof v === 'object' &&
-  (v as { type?: unknown }).type === 'object' &&
-  typeof (v as { properties?: unknown }).properties === 'object' &&
-  (v as { properties?: unknown }).properties !== null;
-
-const hasIsOptional = (v: unknown): v is { isOptional: () => boolean } =>
-  !!v &&
-  typeof v === 'object' &&
-  typeof (v as { isOptional?: unknown }).isOptional === 'function';
-
-const describeInputs = (schema: unknown): ParamInfo[] => {
-  if (isJsonSchemaObject(schema)) {
-    const required = new Set(schema.required ?? []);
-    return Object.keys(schema.properties).map((name) => ({
-      name,
-      required: required.has(name) ? 'yes' : 'no',
-    }));
-  }
-  if (schema && typeof schema === 'object') {
-    // Not JSON Schema: a bare zod raw shape. Its own keys are the parameter names;
-    // whether each is required is read from the zod type itself via `isOptional()`
-    // rather than guessed. If a value doesn't expose that (not a zod type at all),
-    // the row says so explicitly instead of defaulting to yes or no.
-    return Object.entries(schema as Record<string, unknown>).map(
-      ([name, value]) => ({
-        name,
-        required: hasIsOptional(value)
-          ? value.isOptional()
-            ? 'no'
-            : 'yes'
-          : 'unknown',
-      }),
-    );
-  }
-  return [];
-};
+// Required as each schema states it: a field neither optional nor a default
+// over an optional field (a default over a required one stays required).
+const describeInputs = (schema: z.ZodObject<z.ZodRawShape>): ParamInfo[] =>
+  Object.entries(schema.shape).map(([name, value]) => ({
+    name,
+    required:
+      value instanceof z.ZodOptional ||
+      (value instanceof z.ZodDefault && value.unwrap() instanceof z.ZodOptional)
+        ? 'no'
+        : 'yes',
+  }));
 
 const formatInputs = (params: ParamInfo[]): string => {
   if (params.length === 0) return '(none)';
   return params
-    .map((p) => {
-      if (p.required === 'yes') return `${p.name}*`;
-      if (p.required === 'unknown') return `${p.name} (required: unknown)`;
-      return p.name;
-    })
+    .map((p) => (p.required === 'yes' ? `${p.name}*` : p.name))
     .join(', ');
 };
 
@@ -145,22 +103,32 @@ const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
     'compact',
     compactToolSetOf({
       readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
       modify: compactModifyEntries,
     }),
   ],
-  ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
+  [
+    'compact-ro',
+    compactReadOnlyToolSetOf({
+      readOnly: compactReadOnlyEntries,
+      data: compactDataEntries,
+    }),
+  ],
 ];
 
 const visibilityBySet: Record<string, { group: string; name: string }[]> = {};
 // Per transport: the leftover-session tools are stdio's only.
 for (const transport of ['stdio', 'http', 'sse'] as const) {
   for (const [kind, set] of SETS) {
-    const visible = set.groups(ctx, transport).flatMap((group) =>
-      group.getHandlers().map((entry) => ({
-        group: group.getName(),
-        name: entry.toolDefinition.name,
-      })),
-    );
+    // With the data tools served: what a binary lists with --enable-data-tools.
+    const visible = set
+      .groups(ctx, transport, { dataTools: true })
+      .flatMap((group) =>
+        group.getHandlers().map((entry) => ({
+          group: group.getName(),
+          name: entry.toolDefinition.name,
+        })),
+      );
     const key = transport === 'stdio' ? kind : `${kind} (${transport})`;
     console.error(key, visible.length);
     visibilityBySet[key] = visible;

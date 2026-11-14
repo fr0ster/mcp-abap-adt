@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "test:integration": "jest --testPathPatterns=integration --runInBand --forceExit",
+    "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests --forceExit"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "test:a": "node tools/run-tests.mjs --concurrency 1 --test-timeout=60000 src/a.test.ts",
+    "test:b": "node tools/run-tests.mjs --concurrency 1 --test-timeout 60000 src/b.test.ts",
+    "test:c": "node tools/run-tests.mjs --concurrency 1 '--test-timeout=60000' src/c.test.ts",
+    "test:d": "npm run build&&node --test --test-timeout=1 src/d.test.js"
+  }
+}

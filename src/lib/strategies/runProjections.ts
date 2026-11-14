@@ -10,22 +10,22 @@ export interface RuntimeRunValue {
   readonly className: string;
   readonly output?: string;
   readonly profilerId?: string;
-  readonly traceId?: string;
+  readonly traceId?: string | undefined;
 }
 
 /**
- * **Not `Terse`.** `Terse<T>` (`projections.ts`) is `(value, status) =>
- * unknown` and `answer()` takes `(value) => unknown`: TypeScript lets a
- * function drop a parameter, not gain a required one, so a `Terse` cannot be
- * passed where `answer()` wants a projection — it would compile in this file
- * and fail TS2345 at the call.
- *
- * There is no status to take here anyway, which is the same reason `project()`
- * is not used on this path: these two handlers pass the projection itself to
- * `answer()`, with `detail: 'terse'` fixed in the context rather than read
- * from a `detail` argument these tools do not declare.
+ * What `terseClassRun` answers. **Not a `Terse`:** a `Terse<T>`
+ * (`projections.ts`) takes `(value, status)`, and there is no status here —
+ * these handlers pass the projection itself to `answer()`, with
+ * `detail: 'terse'` fixed in the context rather than read from a `detail`
+ * argument these tools do not declare.
  */
-type RuntimeProjection = (value: RuntimeRunValue) => unknown;
+export type TerseClassRun = {
+  success: true;
+  class_name: string;
+  output: string;
+  profile?: { profiler_id: string | undefined; trace_id: string | undefined };
+};
 
 /**
  * `RuntimeRunClass`: profiler fields nested under `profile`, and `output` at
@@ -36,7 +36,7 @@ type RuntimeProjection = (value: RuntimeRunValue) => unknown;
  * `undefined`; that is how a tool ends up answering `"run_status": null`
  * forever.
  */
-export const terseClassRun: RuntimeProjection = (value) => ({
+export const terseClassRun = (value: RuntimeRunValue): TerseClassRun => ({
   success: true,
   class_name: value.className,
   output: value.output ?? '',

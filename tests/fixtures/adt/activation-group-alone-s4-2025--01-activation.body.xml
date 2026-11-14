@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">
+  <ioc:entry>
+    <ioc:object/>
+    <ioc:transport ioc:user="SAPUSER01" ioc:linked="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/cts/transportrequests/SYSK9R0001" adtcore:type="/RQ" adtcore:name="SYSK9R0001" adtcore:description="adt-clients integration tests" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:transport>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="SAPUSER01" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/functions/groups/zact751p9325" adtcore:type="FUGR/F" adtcore:name="ZACT751P9325" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/functions/groups/zact751p9325/source/main" adtcore:type="FUGR/F" adtcore:name="ZACT751P9325" adtcore:parentUri="/sap/bc/adt/functions/groups/zact751p9325" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+</ioc:inactiveObjects>

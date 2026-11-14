@@ -1,3 +1,4 @@
+import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugStep.ts
 import {
   debugBatchRecorder,
@@ -9,8 +10,7 @@ import {
   terseOnceStep,
 } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -18,27 +18,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      action: {
-        type: 'string',
-        enum: [
-          'into',
-          'over',
-          'return',
-          'continue',
-          'detach',
-          'release_debugger',
-        ],
-        description:
-          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'action'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    action: z
+      .enum([
+        'into',
+        'over',
+        'return',
+        'continue',
+        'detach',
+        'release_debugger',
+      ])
+      .describe(
+        'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 const STEPS = {
@@ -50,7 +45,7 @@ const STEPS = {
 
 export async function handleDebugStep(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const recorder = debugBatchRecorder(context);
   if (

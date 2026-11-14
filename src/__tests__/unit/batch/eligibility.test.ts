@@ -141,19 +141,25 @@ describe('eligible', () => {
           'http',
         ),
       ).toEqual({ ok: true });
-      expect(
-        eligible(
-          'HandlerGet',
-          {
-            object_type: 'FUNCTION_MODULE',
-            part,
-            function_module_name: 'FM_A',
-            function_group_name: 'FUGR_A',
-          },
-          'http',
-        ),
-      ).toEqual({ ok: true });
     }
+    // A function module's source is read after its metadata names the group
+    // given (#2): two requests, the second after the first answer. Its
+    // metadata is the one request, checked locally.
+    const module = (part: string) =>
+      eligible(
+        'HandlerGet',
+        {
+          object_type: 'FUNCTION_MODULE',
+          part,
+          function_module_name: 'FM_A',
+          function_group_name: 'FUGR_A',
+        },
+        'http',
+      );
+    expect([module('source'), module('metadata')]).toEqual([
+      { ok: false, reason: 'arguments' },
+      { ok: true },
+    ]);
     // A package node is one request too: its blank body is answered as it is.
     expect(
       eligible(
@@ -237,10 +243,16 @@ describe('eligible', () => {
    * run — a function module's under its group, named GROUP|MODULE. Each is
    * listed, so a member the activate routes gain cannot be left out.
    */
-  it('every member HandlerActivate activates is eligible, on each variant', () => {
+  it('every member HandlerActivate activates is eligible but a function module, on each variant', () => {
     for (const variant of PROJECTION_VARIANTS) {
       for (const member of COMPACT_ACTIVATE[variant]) {
         const object_name = member === 'FUNCTION_MODULE' ? 'G|M' : 'O';
+        // A function module's group is checked before the run (#2): its
+        // metadata read is answered before the activation is sent.
+        const recorded =
+          member === 'FUNCTION_MODULE'
+            ? { ok: false, reason: 'arguments' }
+            : { ok: true };
         expect({
           variant,
           member,
@@ -249,7 +261,7 @@ describe('eligible', () => {
             { object_type: member, object_name },
             'http',
           ),
-        }).toEqual({ variant, member, eligible: { ok: true } });
+        }).toEqual({ variant, member, eligible: recorded });
       }
     }
   });
@@ -364,11 +376,99 @@ describe('eligible', () => {
     ).toEqual(no);
   });
 
-  it('reads arguments that are not an object as absent', () => {
-    expect(eligible('HandlerGet', undefined, 'http')).toEqual({
-      ok: false,
-      reason: 'arguments',
+  it('a function module addressed through its group is not recorded: its metadata is read first (#2)', () => {
+    const no = { ok: false, reason: 'arguments' };
+    const listed = (type: string) =>
+      eligible(
+        'HandlerActivate',
+        {
+          objects: [
+            { name: 'DDL_A', type: 'DDLS/DF' },
+            { name: 'FM_A', type, parentName: 'FUGR_A' },
+          ],
+        },
+        'http',
+      );
+    expect({
+      'objects FUGR/FF': listed('FUGR/FF'),
+      'objects fugr/ff': listed('fugr/ff'),
+      'objects function_module': listed('function_module'),
+      'objects without a module': listed('BDEF/BDO'),
+      'object_adt_type FUGR/FF': eligible(
+        'HandlerActivate',
+        { object_name: 'FM_A', object_adt_type: 'FUGR/FF', parentName: 'G' },
+        'http',
+      ),
+      'GetWhereUsed FUGR/FF': eligible(
+        'GetWhereUsed',
+        { object_name: 'G|M', object_type: 'FUGR/FF' },
+        'http',
+      ),
+      'GetWhereUsed function': eligible(
+        'GetWhereUsed',
+        { object_name: 'G|M', object_type: 'function' },
+        'http',
+      ),
+      'GetObjectVersions function_module': eligible(
+        'GetObjectVersions',
+        {
+          object_type: 'function_module',
+          object_name: 'M',
+          function_group_name: 'G',
+        },
+        'http',
+      ),
+      'GetFunctionModule source': eligible(
+        'GetFunctionModule',
+        { function_module_name: 'M', function_group_name: 'G' },
+        'http',
+      ),
+      'GetFunctionModule metadata': eligible(
+        'GetFunctionModule',
+        {
+          function_module_name: 'M',
+          function_group_name: 'G',
+          part: 'metadata',
+        },
+        'http',
+      ),
+    }).toEqual({
+      'objects FUGR/FF': no,
+      'objects fugr/ff': no,
+      'objects function_module': no,
+      'objects without a module': { ok: true },
+      'object_adt_type FUGR/FF': no,
+      'GetWhereUsed FUGR/FF': no,
+      'GetWhereUsed function': no,
+      'GetObjectVersions function_module': no,
+      'GetFunctionModule source': no,
+      'GetFunctionModule metadata': { ok: true },
     });
-    expect(eligible('SearchObject', null, 'http')).toEqual({ ok: true });
+  });
+
+  it('an empty objects list is the single form, as HandlerActivate dispatches it: a function module there is not recorded (#2)', () => {
+    const no = { ok: false, reason: 'arguments' };
+    expect({
+      single: eligible(
+        'HandlerActivate',
+        { objects: [], object_type: 'FUNCTION_MODULE', object_name: 'G|M' },
+        'http',
+      ),
+      code: eligible(
+        'HandlerActivate',
+        {
+          objects: [],
+          object_name: 'M',
+          object_adt_type: 'FUGR/FF',
+          parentName: 'G',
+        },
+        'http',
+      ),
+      class: eligible(
+        'HandlerActivate',
+        { objects: [], object_type: 'CLASS', object_name: 'ZCL_A' },
+        'http',
+      ),
+    }).toEqual({ single: no, code: no, class: { ok: true } });
   });
 });

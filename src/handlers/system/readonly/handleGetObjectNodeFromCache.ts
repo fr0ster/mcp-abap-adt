@@ -1,23 +1,23 @@
+import * as z from 'zod';
 export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present, reading the active version of the object it names.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_type: { type: 'string', description: '[read-only] Object type' },
-      object_name: { type: 'string', description: '[read-only] Object name' },
-      tech_name: { type: 'string', description: '[read-only] Technical name' },
-    },
-    required: ['object_type', 'object_name', 'tech_name'],
-  },
+  inputSchema: z.object({
+    object_type: z.string().describe('[read-only] Object type'),
+    object_name: z.string().describe('[read-only] Object name'),
+    tech_name: z.string().describe('[read-only] Technical name'),
+  }),
 } as const;
 
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
 import { answerRequestThrown } from '../../../lib/answer';
-import { objectsListCache } from '../../../lib/getObjectsListCache';
+import {
+  type CachedObject,
+  objectsListCache,
+} from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { makeAdtRequest } from '../../../lib/utils';
 
@@ -40,7 +40,7 @@ function atActiveVersion(endpoint: string): string {
  */
 export async function handleGetObjectNodeFromCache(
   context: HandlerContext,
-  args: any,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const { object_type, object_name, tech_name } = args;
@@ -53,17 +53,13 @@ export async function handleGetObjectNodeFromCache(
     };
   }
   const cache = objectsListCache.getCache();
-  let node: any = null;
-  if (cache && Array.isArray(cache.objects)) {
-    node =
-      (cache.objects as any[]).find(
-        (obj: any) =>
-          obj.OBJECT_TYPE === object_type &&
-          obj.OBJECT_NAME === object_name &&
-          obj.TECH_NAME === tech_name,
-      ) || null;
-  }
-  if (!node) {
+  const objects = cache !== null && 'objects' in cache ? cache.objects : [];
+  const matches = (obj: CachedObject) =>
+    obj.OBJECT_TYPE === object_type &&
+    obj.OBJECT_NAME === object_name &&
+    obj.TECH_NAME === tech_name;
+  const found = objects.find(matches);
+  if (found === undefined) {
     logger?.debug(
       `Node ${object_type}/${object_name}/${tech_name} not found in cache`,
     );
@@ -72,7 +68,9 @@ export async function handleGetObjectNodeFromCache(
       content: [{ type: 'text', text: 'Node not found in cache' }],
     };
   }
-  if (node.OBJECT_URI && !node.object_uri_response) {
+  let node: CachedObject = found;
+  const objectUri = node.OBJECT_URI;
+  if (objectUri && !node.object_uri_response) {
     const buildEndpoint = (uri: string) => {
       if (uri.startsWith('http')) {
         try {
@@ -85,13 +83,13 @@ export async function handleGetObjectNodeFromCache(
       }
       return uri;
     };
-    const endpoint = atActiveVersion(buildEndpoint(node.OBJECT_URI));
+    const endpoint = atActiveVersion(buildEndpoint(objectUri));
     let resp: Awaited<ReturnType<typeof makeAdtRequest>>;
     try {
       // No deadline of the server's: the request waits for SAP's answer.
       resp = await makeAdtRequest(connection, endpoint, 'GET', 0);
     } catch (e) {
-      logger?.error('Failed to expand OBJECT_URI from cache', e as any);
+      logger?.error('Failed to expand OBJECT_URI from cache', e);
       // The read's error as SAP answered it, with its step — the call's
       // failure, not content inside a success; a credential failure as the
       // chain made it.
@@ -101,22 +99,19 @@ export async function handleGetObjectNodeFromCache(
         'read OBJECT_URI',
       );
     }
-    node.object_uri_response =
+    const objectUriResponse =
       typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+    node = { ...node, object_uri_response: objectUriResponse };
 
     // Persist the fetched OBJECT_URI payload back into the cache entry
-    const idx = cache.objects.findIndex(
-      (obj: any) =>
-        obj.OBJECT_TYPE === object_type &&
-        obj.OBJECT_NAME === object_name &&
-        obj.TECH_NAME === tech_name,
-    );
-    if (idx >= 0) {
-      cache.objects[idx] = {
-        ...cache.objects[idx],
-        object_uri_response: node.object_uri_response,
-      };
-      objectsListCache.setCache(cache);
+    const idx = objects.findIndex(matches);
+    if (idx >= 0 && cache !== null && 'objects' in cache) {
+      objectsListCache.setCache({
+        ...cache,
+        objects: objects.map((obj, at) =>
+          at === idx ? { ...obj, object_uri_response: objectUriResponse } : obj,
+        ),
+      });
     }
   }
   logger?.info(

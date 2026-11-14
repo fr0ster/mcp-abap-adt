@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateMessageClass Handler - Write a Message Class's own metadata
  *
@@ -21,23 +23,28 @@
  * the document in `options.source` (MIGRATION-23 §7). In 22 it read the
  * class itself and patched `config.description` into it; passed that way now,
  * the description is dropped and the PUT carries no document. So this handler
- * reads the class, sets the first `adtcore:description` — the class's own;
- * every message carries one too — and writes the whole document back.
+ * reads the class, has adt-clients' `patchMessageClassDocument` set the
+ * class's own `adtcore:description` (on `mc:messageClass`; every message
+ * carries one too, and none is touched), and writes the whole document back.
+ * A refused patch is the answer, before any lock is taken.
  */
 
-import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  messageClassDocuments,
+  patchMessageClassDocument,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
-import { patchXmlAttribute } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -45,34 +52,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Updates the header of the ABAP message class named by message_class_name: its description.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Message class name.',
-      },
-      description: {
-        type: 'string',
-        description: 'New short description for the message class.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          '(optional) Transport request number, not a task. Required for transportable objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['message_class_name', 'description'],
-  },
+  inputSchema: z.object({
+    message_class_name: z.string().describe('Message class name.'),
+    description: z
+      .string()
+      .describe('New short description for the message class.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Transport request number, not a task. Required for transportable objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateMessageClassArgs {
-  message_class_name: string;
-  description: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateMessageClass(
   context: HandlerContext,
@@ -103,12 +98,15 @@ export async function handleUpdateMessageClass(
           { version: 'workingArea', analyse: analyseException },
         ),
       )();
-      if (!current.ok) return current as never;
-      const edited = patchXmlAttribute(
-        String(current.getResult().value.raw),
-        'adtcore:description',
-        args.description,
+      if (!current.ok) return current;
+      const edited = patchedDocument(
+        patchMessageClassDocument(current.getResult().value.raw, {
+          description: args.description,
+        }),
+        `message class ${name}`,
       );
+      if (!edited.ok) return edited;
+      const document = edited.getResult().value;
 
       return withLock(
         () => obj.lock({ name }, { analyse: analyseLock }),
@@ -118,7 +116,7 @@ export async function handleUpdateMessageClass(
               { name, transportRequest: args.transport_request },
               {
                 headers,
-                source: edited,
+                source: document,
                 lockHandle,
                 analyse: analyseException,
               },

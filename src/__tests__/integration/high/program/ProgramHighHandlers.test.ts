@@ -14,30 +14,41 @@
  * Run: npm test -- --testPathPattern=integration/program
  */
 
-import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
-import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
-import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
-import { getTimeout } from '../../helpers/configHelpers';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import {
+  TOOL_DEFINITION as CreateProgramTool,
+  handleCreateProgram,
+} from '../../../../handlers/program/high/handleCreateProgram';
+import {
+  TOOL_DEFINITION as DeleteProgramTool,
+  handleDeleteProgram,
+} from '../../../../handlers/program/high/handleDeleteProgram';
+import {
+  handleUpdateProgram,
+  TOOL_DEFINITION as UpdateProgramTool,
+} from '../../../../handlers/program/high/handleUpdateProgram';
+
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Program High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_program',
       'builder_program',
       'program-high',
       {
-        create: handleCreateProgram,
-        update: handleUpdateProgram,
-        delete: handleDeleteProgram,
+        create: defineTool(CreateProgramTool, handleCreateProgram),
+        update: defineTool(UpdateProgramTool, handleUpdateProgram),
+        delete: defineTool(DeleteProgramTool, handleDeleteProgram),
       },
     );
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +60,7 @@ describe('Program High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Program high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Program high-level handlers', async () => {
+    await tester.run();
+  });
 });

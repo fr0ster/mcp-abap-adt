@@ -2,6 +2,11 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const {
+  asNameCharacters,
+  collapseBlanks,
+  replacedEverywhere,
+} = require('./readings.js');
 const yaml = require('js-yaml');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const {
@@ -135,10 +140,6 @@ function resolvePackageName(params, config) {
   return String(def).trim();
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function replaceProgramNameInSource(sourceCode, oldName, newName) {
   if (!sourceCode || oldName === newName) return sourceCode;
   let updated = String(sourceCode);
@@ -148,7 +149,7 @@ function replaceProgramNameInSource(sourceCode, oldName, newName) {
     [oldName.toLowerCase(), newName.toLowerCase()],
   ];
   for (const [from, to] of variants) {
-    updated = updated.replace(new RegExp(escapeRegExp(from), 'g'), to);
+    updated = replacedEverywhere(updated, from, to);
   }
   return updated;
 }
@@ -156,7 +157,7 @@ function replaceProgramNameInSource(sourceCode, oldName, newName) {
 function withSuffix(name, suffix, maxLen = 30) {
   if (!suffix) return name.toUpperCase();
   const base = name.toUpperCase();
-  const normalizedSuffix = suffix.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+  const normalizedSuffix = asNameCharacters(suffix.toUpperCase());
   let result = `${base}_${normalizedSuffix}`;
   if (result.length <= maxLen) return result;
   const prefixMax = maxLen - normalizedSuffix.length - 1;
@@ -375,7 +376,7 @@ async function main() {
       try {
         const result = await callTool(client, step.name, step.args);
         const text = extractText(result);
-        console.log(`  ✓ ${step.name}${text ? ` -> ${text.slice(0, 120).replace(/\s+/g, ' ')}` : ''}`);
+        console.log(`  ✓ ${step.name}${text ? ` -> ${collapseBlanks(text.slice(0, 120))}` : ''}`);
       } catch (error) {
         caseFailed = true;
         const message = error instanceof Error ? error.message : String(error);

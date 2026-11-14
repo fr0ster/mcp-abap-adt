@@ -1,4 +1,10 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  failed,
+  type StepError,
+  type StepResponse,
+  succeeded,
+} from './stepResponse';
 import { attachCleanup, carryCleanup } from './withLock';
 
 /**
@@ -32,7 +38,7 @@ import { attachCleanup, carryCleanup } from './withLock';
  *
  * This example used to pass `writeProjection` (from `promised.ts`) straight
  * to `answer()` in place of the last line above. That does not compile:
- * `writeProjection` is `Terse<unknown>` — `(value, status)`, same as
+ * `writeProjection` is `(value, status)`, same as
  * `terseWrite` — and `answer()`'s `project` takes one argument. A function
  * that requires a second, required parameter is not assignable where the
  * caller supplies only the first — TS2345, "Target signature provides too
@@ -81,28 +87,46 @@ export async function sequence<A, B, C, D, E>(
   fourth: Step<C, D>,
   fifth: Step<D, E>,
 ): Promise<IAdtResponse<E, IAdtError>>;
-export async function sequence(
-  first: () => Promise<IAdtResponse<unknown, IAdtError>>,
-  ...rest: Array<Step<unknown, unknown>>
-): Promise<IAdtResponse<unknown, IAdtError>> {
-  let answer = await first();
-  for (const step of rest) {
-    // The failing step's answer is the answer. Not re-wrapped, not summarised:
-    // the strategy that judged it already said everything there is to say.
-    if (!answer.ok) return answer;
-    // **A step's answer replaces the one before it; a held lock does not.**
-    // A `withLock` step inside a lifecycle create answers the write with the
-    // unreleased lock hung on it as `cleanup`, and the check that follows
-    // then answered in its place — so the lock vanished one step before
-    // anyone could carry it to the caller. Only that note travels; the answer
-    // is still wholly the latest step's.
-    //
-    // The step is handed over rather than awaited here, so a step that throws
-    // carries the note out on the exception instead of unwinding past it.
-    const previous = answer.getResult().value;
-    answer = await carryCleanup(answer, () => step(previous));
-  }
-  return answer;
+export async function sequence<A, B, C, D, E>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: Step<A, B>,
+  third?: Step<B, C>,
+  fourth?: Step<C, D>,
+  fifth?: Step<D, E>,
+): Promise<
+  | IAdtResponse<B, IAdtError>
+  | IAdtResponse<C, IAdtError>
+  | IAdtResponse<D, IAdtError>
+  | IAdtResponse<E, IAdtError>
+> {
+  const b = await following(await first(), second);
+  if (third === undefined) return b;
+  const c = await following(b, third);
+  if (fourth === undefined) return c;
+  const d = await following(c, fourth);
+  if (fifth === undefined) return d;
+  return following(d, fifth);
+}
+
+/** One step of {@link sequence}: `step` on `answer`'s value, or `answer` itself when it failed. */
+async function following<T, U>(
+  answer: IAdtResponse<T, IAdtError>,
+  step: Step<T, U>,
+): Promise<IAdtResponse<U, IAdtError>> {
+  // The failing step's answer is the answer. Not re-wrapped, not summarised:
+  // the strategy that judged it already said everything there is to say.
+  if (!answer.ok) return answer;
+  // **A step's answer replaces the one before it; a held lock does not.**
+  // A `withLock` step inside a lifecycle create answers the write with the
+  // unreleased lock hung on it as `cleanup`, and the check that follows
+  // then answered in its place — so the lock vanished one step before
+  // anyone could carry it to the caller. Only that note travels; the answer
+  // is still wholly the latest step's.
+  //
+  // The step is handed over rather than awaited here, so a step that throws
+  // carries the note out on the exception instead of unwinding past it.
+  const previous = answer.getResult().value;
+  return await carryCleanup(answer, () => step(previous));
 }
 
 /**
@@ -112,25 +136,13 @@ export async function sequence(
  * here rather than writing a third copy: the failing `getError` sentinel is
  * the one thing worth keeping identical across every caller.
  */
-export function succeededWith<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('succeededWith: asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+export function succeededWith<T>(value: T): StepResponse<T> {
+  return succeeded(value, 'succeededWith');
 }
 
 /** `succeededWith`'s twin, for a composite that reads a refusal out of a later request. */
-export function failedWith<T>(error: IAdtError): IAdtResponse<T, IAdtError> {
-  return {
-    ok: false,
-    getResult: () => {
-      throw new Error('failedWith: asked for the result of a failure');
-    },
-    getError: () => error,
-  } as unknown as IAdtResponse<T, IAdtError>;
+export function failedWith<T>(error: StepError): StepResponse<T> {
+  return failed(error, 'failedWith');
 }
 
 /**
@@ -147,13 +159,13 @@ export function failedWith<T>(error: IAdtError): IAdtResponse<T, IAdtError> {
 export async function pair<A, B>(
   first: () => Promise<IAdtResponse<A, IAdtError>>,
   second: (a: A) => Promise<IAdtResponse<B, IAdtError>>,
-): Promise<IAdtResponse<[A, B], IAdtError>> {
+): Promise<StepResponse<[A, B]>> {
   const a = await first();
-  if (!a.ok) return a as unknown as IAdtResponse<[A, B], IAdtError>;
+  if (!a.ok) return a;
 
   const valueA = a.getResult().value;
   const b = await second(valueA);
-  if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
+  if (!b.ok) return b;
 
   const both: [A, B] = [valueA, b.getResult().value];
   // Built fresh, so anything hanging off either answer would be dropped here
@@ -181,7 +193,7 @@ export async function pair<A, B>(
 export async function both<A, B>(
   first: () => Promise<IAdtResponse<A, IAdtError>>,
   second: () => Promise<IAdtResponse<B, IAdtError>>,
-): Promise<IAdtResponse<[A, B], IAdtError>> {
+): Promise<StepResponse<[A, B]>> {
   const answeringA = first();
   const answeringB = second();
   // Settled, whatever it answers: `both` never ends while its second request
@@ -200,10 +212,10 @@ export async function both<A, B>(
   }
   if (!a.ok) {
     await settledB;
-    return a as unknown as IAdtResponse<[A, B], IAdtError>;
+    return a;
   }
   const b = await answeringB;
-  if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
+  if (!b.ok) return b;
   const both: [A, B] = [a.getResult().value, b.getResult().value];
   return attachCleanup(a, attachCleanup(b, succeededWith(both)));
 }

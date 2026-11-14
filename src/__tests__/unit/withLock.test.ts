@@ -2,6 +2,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   attachCleanup,
   carryCleanup,
+  LOCK_WENT_WITH_SESSION_WORDS,
   LockNotReleased,
   withLock,
 } from '../../lib/strategies/withLock';
@@ -291,6 +292,60 @@ describe('withLock', () => {
  * activation's answer, not the write's, and for a while the note stopped at
  * the write.
  */
+// A release on a spent connection (the owner's decision), read from the typed
+// verdict alone: the lock went with its SAP session, so the carrier says so
+// instead of `left_locked` and the handle.
+describe('withLock, a release on a spent connection', () => {
+  const spentRelease = (extra: Partial<IAdtError>) => async () =>
+    ({
+      ok: false,
+      getResult: () => {
+        throw new Error('not a success');
+      },
+      getError: () => ({
+        origin: 'connection',
+        message: 'words that are never read',
+        ...extra,
+      }),
+    }) as unknown as IAdtResponse<never, IAdtError>;
+
+  it.each([
+    ['sessionError ADT_NOT_CONNECTED', { sessionError: 'ADT_NOT_CONNECTED' }],
+    [
+      'sessionError ADT_SESSION_REPLACED',
+      { sessionError: 'ADT_SESSION_REPLACED' },
+    ],
+    ['sessionLost', { sessionLost: 'ADT_SESSION_REPLACED' }],
+  ] as const)(
+    '%s: the lock went with the session — no left_locked, no handle',
+    async (_name, extra) => {
+      const result = await withLock(
+        async () => ok('handle-1'),
+        async () => ok('written'),
+        spentRelease(extra),
+        OBJECT,
+      );
+      expect(result.ok).toBe(true);
+      const cleanup = (result as { cleanup?: Record<string, unknown> }).cleanup;
+      expect(cleanup?.left_locked).toBeUndefined();
+      expect(cleanup?.lock_handle).toBeUndefined();
+      expect(cleanup?.object).toEqual({ type: 'CLASS', name: 'OBJ' });
+      expect(cleanup?.warning).toBe(LOCK_WENT_WITH_SESSION_WORDS);
+    },
+  );
+
+  it('ADT_RELEASE_PENDING is no spent connection: the lock may be left locked', async () => {
+    const result = await withLock(
+      async () => ok('handle-1'),
+      async () => ok('written'),
+      spentRelease({ sessionError: 'ADT_RELEASE_PENDING' }),
+      OBJECT,
+    );
+    const cleanup = (result as { cleanup?: Record<string, unknown> }).cleanup;
+    expect(cleanup).toMatchObject(leftLockedBy('words that are never read'));
+  });
+});
+
 describe('carryCleanup', () => {
   const held = { message: 'Unlock refused', origin: 'refusal' as const };
 

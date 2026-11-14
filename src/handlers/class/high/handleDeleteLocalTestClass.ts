@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteLocalTestClass Handler - Empty a class's testclasses include
  *
@@ -20,7 +22,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -28,42 +30,33 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Clears the local test classes include of the ABAP class named by class_name. The include is cleared under the class lock; with activate_on_delete the class is activated.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Parent class name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable objects), not a task.',
-      },
-      activate_on_delete: {
-        type: 'boolean',
-        description:
-          'Activate parent class after deleting test class. Default: false',
-        default: false,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Parent class name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable objects), not a task.',
+      ),
+    activate_on_delete: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Activate parent class after deleting test class. Default: false',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface DeleteLocalTestClassArgs {
-  class_name: string;
-  transport_request?: string;
-  activate_on_delete?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteLocalTestClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteLocalTestClass(
   context: HandlerContext,
@@ -81,7 +74,7 @@ export async function handleDeleteLocalTestClass(
 
   return answer(
     { tool: 'DeleteLocalTestClass', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getLocalTestClass(
         resultsFor(classDocuments),
       );
@@ -102,7 +95,7 @@ export async function handleDeleteLocalTestClass(
       );
 
       if (!deleted.ok || !shouldActivate) {
-        return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return deleted;
       }
 
       return carryCleanup(

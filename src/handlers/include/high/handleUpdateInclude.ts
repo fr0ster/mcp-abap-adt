@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateInclude Handler - Write the Source of an Existing ABAP Include
  *
@@ -17,54 +19,44 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import type { StepResponse } from '../../../lib/strategies/stepResponse';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateInclude',
   available_in: ['onprem'] as const,
   description:
     "Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      include_name: {
-        type: 'string',
-        description: 'Include name. The include must already exist.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP source of the include.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate the include after the write. Default: false.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['include_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    include_name: z
+      .string()
+      .describe('Include name. The include must already exist.'),
+    source_code: z.string().describe('Complete ABAP source of the include.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate the include after the write. Default: false.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface UpdateIncludeArgs {
-  include_name?: string;
-  source_code?: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateIncludeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateInclude(
   context: HandlerContext,
@@ -86,7 +78,7 @@ export async function handleUpdateInclude(
 
   return answer(
     { tool: 'UpdateInclude', detail },
-    async () => {
+    async (): Promise<StepResponse<AdtReading<XmlRead>>> => {
       const obj = createOnPremAdtClient(connection, logger).getInclude(
         resultsFor(includeDocuments),
       );

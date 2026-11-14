@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
  * WhereUsed handler using AdtClient utilities
  * Endpoint: /sap/bc/adt/repository/informationsystem/usageReferences
@@ -51,18 +53,23 @@ import {
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { type JsonValue, jsonFields, jsonOrText } from '../../../lib/json';
+import { withLongToolAdvice } from '../../../lib/longTools';
+import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
+import { whereUsedScopeTypesOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
+  presentScopeOptions,
   type WhereUsedListResult,
   type WhereUsedSource,
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
@@ -85,70 +92,58 @@ function whereUsedTypeDescription(variant: ProjectionVariant): string {
 
 /** GetWhereUsed's input on `variant`. */
 function whereUsedSchema(variant: ProjectionVariant) {
-  return {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      object_name: {
-        type: 'string',
-        description:
-          "Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).",
-      },
-      object_type: {
-        type: 'string',
-        description: whereUsedTypeDescription(variant),
-      },
-      objects: {
-        type: 'array',
-        description:
-          'Several objects, read together (give this or object_name and object_type). The type filters apply to every object.',
-        items: {
-          type: 'object',
-          properties: {
-            object_name: {
-              type: 'string',
-              description:
-                "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
-            },
-            object_type: {
-              type: 'string',
-              description: 'Type of the ABAP object, as object_type takes it',
-            },
-          },
-          required: ['object_name', 'object_type'],
-        },
-      },
-      enable_all_types: {
-        type: 'boolean',
-        description:
-          "If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.",
-        default: false,
-      },
-      enable_only_types: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.",
-      },
-      disable_types: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
-      },
-    },
-    required: [],
-  } as const;
+  return z.object({
+    background: LONG_BACKGROUND_FIELD,
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        "Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).",
+      ),
+    object_type: z
+      .string()
+      .optional()
+      .describe(whereUsedTypeDescription(variant)),
+    objects: z
+      .array(
+        z.object({
+          object_name: z
+            .string()
+            .describe(
+              "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
+            ),
+          object_type: z
+            .string()
+            .describe('Type of the ABAP object, as object_type takes it'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Several objects, read together (give this or object_name and object_type). The type filters apply to every object.',
+      ),
+    enable_all_types: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        "If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.",
+      ),
+    enable_only_types: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.",
+      ),
+    disable_types: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
+      ),
+  });
 }
 
-interface WhereUsedArgs {
-  object_name: string;
-  object_type: string;
-  objects?: Array<{ object_name: string; object_type: string }>;
-  enable_all_types?: boolean;
-  enable_only_types?: string[];
-  disable_types?: string[];
-}
+type WhereUsedArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The boundary of `object_type` on the variant declared for `connection`: a
@@ -180,7 +175,10 @@ function notWhereUsed(connection: object, text: string): string {
 /**
  * Returns where-used references for ABAP objects using AdtClient utilities.
  */
-async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
+async function whereUsedOf(
+  context: HandlerContext,
+  args: WhereUsedArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args?.object_name) {
@@ -194,7 +192,11 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
     return return_error(notWhereUsed(connection, args.object_type));
   }
 
-  const typedArgs = args as WhereUsedArgs;
+  const typedArgs = {
+    ...args,
+    object_name: args.object_name,
+    object_type: args.object_type,
+  };
   logger?.info(
     `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
   );
@@ -228,11 +230,7 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
       );
     }
     const scopeXml = scopeResponse.getResult().value?.raw ?? '';
-    const available = new Set<string>(
-      [
-        ...scopeXml.matchAll(/<usagereferences:type\b[^>]*\bname="([^"]+)"/g),
-      ].map((m) => m[1]),
-    );
+    const available = new Set<string>(whereUsedScopeTypesOf(scopeXml));
     const unknown = typedArgs.enable_only_types.filter(
       (t) => !available.has(t),
     );
@@ -255,7 +253,7 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
         disableTypes: typedArgs.disable_types,
       }),
     (result: WhereUsedListResult) => {
-      const formattedResponse = {
+      const formattedResponse = jsonFields({
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
         enable_all_types: typedArgs.enable_all_types || false,
@@ -263,8 +261,8 @@ async function whereUsedOf(context: HandlerContext, args: WhereUsedArgs) {
         disable_types: typedArgs.disable_types,
         total_references: result.totalReferences,
         result_description: result.resultDescription,
-        references: result.references,
-      };
+        references: result.references.map(jsonFields),
+      });
       objectsListCache.setCache({
         isError: false,
         content: [{ type: 'json', json: formattedResponse }],
@@ -298,8 +296,8 @@ async function answered<T>(result: PhaseResult<T> | undefined): Promise<T> {
 }
 
 /** Whether a phase's answer is SAP's refusal of the credential: it ends the call. */
-function refusesCredential(
-  result: PhaseResult<IAdtResponse<unknown, IAdtError>> | undefined,
+function refusesCredential<T>(
+  result: PhaseResult<IAdtResponse<T, IAdtError>> | undefined,
   step: string,
 ): boolean {
   return (
@@ -318,19 +316,24 @@ function refusesCredential(
  */
 async function whereUsedFromAnswers(
   context: HandlerContext,
-  typedArgs: WhereUsedArgs,
-  scope: PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>> | undefined,
+  given: WhereUsedArgs,
+  scope: PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>> | undefined,
   references:
-    | PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>
+    | PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>
     | undefined,
 ) {
   const { connection, logger } = context;
-  if (!typedArgs?.object_name) {
+  if (!given?.object_name) {
     return return_error('Object name is required');
   }
-  if (!typedArgs?.object_type) {
+  if (!given?.object_type) {
     return return_error('Object type is required');
   }
+  const typedArgs = {
+    ...given,
+    object_name: given.object_name,
+    object_type: given.object_type,
+  };
   const objectType = whereUsedCodeOf(connection, typedArgs.object_type);
   if (objectType === undefined) {
     return return_error(notWhereUsed(connection, typedArgs.object_type));
@@ -358,7 +361,7 @@ async function whereUsedFromAnswers(
         {
           getWhereUsedScope: () => answered(scope),
           modifyWhereUsedScope: (scopeXml, options) =>
-            utils.modifyWhereUsedScope(scopeXml, options),
+            utils.modifyWhereUsedScope(scopeXml, presentScopeOptions(options)),
           getWhereUsed: () => answered(references),
         },
         {
@@ -370,7 +373,7 @@ async function whereUsedFromAnswers(
         },
       ),
     (result: WhereUsedListResult) => {
-      const formattedResponse = {
+      const formattedResponse = jsonFields({
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
         enable_all_types: typedArgs.enable_all_types || false,
@@ -378,8 +381,8 @@ async function whereUsedFromAnswers(
         disable_types: typedArgs.disable_types,
         total_references: result.totalReferences,
         result_description: result.resultDescription,
-        references: result.references,
-      };
+        references: result.references.map(jsonFields),
+      });
       objectsListCache.setCache({
         isError: false,
         content: [{ type: 'json', json: formattedResponse }],
@@ -396,14 +399,10 @@ async function whereUsedFromAnswers(
  */
 function unsearchable(
   typedArgs: WhereUsedArgs,
-  scopeResponse: IAdtResponse<AdtReading<unknown>, IAdtError> & { ok: true },
+  scopeResponse: IAdtResponse<AdtReading<XmlRead>, IAdtError> & { ok: true },
 ): string | undefined {
   const scopeXml = scopeResponse.getResult().value?.raw ?? '';
-  const available = new Set<string>(
-    [...scopeXml.matchAll(/<usagereferences:type\b[^>]*\bname="([^"]+)"/g)].map(
-      (m) => m[1],
-    ),
-  );
+  const available = new Set<string>(whereUsedScopeTypesOf(scopeXml));
   const unknown = (typedArgs.enable_only_types ?? []).filter(
     (t) => !available.has(t),
   );
@@ -442,19 +441,17 @@ async function whereUsedInEnvelopes(
   // A target without a name, or whose type is no code of the tables, is
   // sent nothing; `whereUsedFromAnswers` answers it with its refusal.
   const readable = targets.flatMap((target, i) => {
-    const code = target.object_name
+    const name = target.object_name;
+    const code = name
       ? whereUsedCodeOf(context.connection, target.object_type ?? '')
       : undefined;
-    return code === undefined ? [] : [{ target, i, code }];
+    return !name || code === undefined ? [] : [{ target, i, code, name }];
   });
-  const params = (entry: {
-    target: WhereUsedArgs;
-    code: AdtWhereUsedCode;
-  }) => ({
-    object_name: entry.target.object_name,
+  const params = (entry: { name: string; code: AdtWhereUsedCode }) => ({
+    object_name: entry.name,
     object_type: entry.code,
   });
-  type Answered = PhaseResult<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  type Answered = PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   const scopes = new Map<number, Answered>();
   const references = new Map<number, Answered>();
   const ended = (
@@ -479,12 +476,12 @@ async function whereUsedInEnvelopes(
       );
     }
     return {
-      ended: (await whereUsedFromAnswers(
+      ended: await whereUsedFromAnswers(
         context,
-        targets[i] as WhereUsedArgs,
+        targets[i],
         scopes.get(i),
         references.get(i),
-      )) as McpResult,
+      ),
     };
   };
 
@@ -492,7 +489,7 @@ async function whereUsedInEnvelopes(
   if (readsScope(filter)) {
     let read: Answered[];
     try {
-      read = (await runPhase(context, readable, (entry, batch) => {
+      read = await runPhase(context, readable, (entry, batch) => {
         if (validatesScope(filter)) {
           return withAdtHeaders(context, 'utils.getWhereUsedScope', (headers) =>
             utilsOn(batch).getWhereUsedScope(params(entry), {
@@ -505,7 +502,7 @@ async function whereUsedInEnvelopes(
         // it names (`WhereUsedSource`).
         const source: WhereUsedSource = whereUsedOn(context, utilsOn(batch));
         return source.getWhereUsedScope(params(entry));
-      })) as Answered[];
+      });
     } catch (error) {
       // The sequential version throws a refusal of the validating read and
       // answers one of the scope read `fetchWhereUsedReferences` makes.
@@ -530,7 +527,7 @@ async function whereUsedInEnvelopes(
   if (searched.length > 0) {
     let read: Answered[];
     try {
-      read = (await runPhase(context, searched, (entry, batch) => {
+      read = await runPhase(context, searched, (entry, batch) => {
         const { i } = entry;
         // Sent as `fetchWhereUsedReferences` sends it, through the members
         // it names (`WhereUsedSource`).
@@ -551,7 +548,7 @@ async function whereUsedInEnvelopes(
             },
           ),
         });
-      })) as Answered[];
+      });
     } catch (error) {
       if (failureOf(error) === undefined) throw error;
       return { ended: answerThrown(error, WHERE_USED_CONTEXT) };
@@ -567,12 +564,12 @@ async function whereUsedInEnvelopes(
   const answers: McpResult[] = [];
   for (const [i, target] of targets.entries()) {
     answers.push(
-      (await whereUsedFromAnswers(
+      await whereUsedFromAnswers(
         context,
         target,
         scopes.get(i),
         references.get(i),
-      )) as McpResult,
+      ),
     );
   }
   return { answers };
@@ -581,13 +578,8 @@ async function whereUsedInEnvelopes(
 const WHERE_USED_CONTEXT = { tool: 'GetWhereUsed', detail: 'terse' } as const;
 
 /** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): unknown {
-  const text = result.content[0]?.text ?? '';
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+function payloadOfAnswer(result: McpResult): JsonValue {
+  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
@@ -598,11 +590,14 @@ function endsList(result: McpResult): boolean {
 
 /** A list call's answer: one entry per object, in the order asked. */
 function listAnswer(
-  objects: ReadonlyArray<{ object_name: unknown; object_type: unknown }>,
+  objects: ReadonlyArray<{
+    readonly object_name: string;
+    readonly object_type: string;
+  }>,
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) => {
-    const asked = objects[i] as (typeof objects)[number];
+    const asked = objects[i];
     return result.isError
       ? {
           object_name: asked.object_name,
@@ -617,9 +612,35 @@ function listAnswer(
   };
 }
 
+/**
+ * SAP ignores the group of a function module's address (#2): every
+ * `GROUP|FM_NAME` target's group is checked against the module's metadata,
+ * one read each, before any scope, reference or batch request. The first
+ * refusal is the call's answer; `undefined` when every group holds its
+ * module (or no target names a module).
+ */
+async function refusedModule(
+  context: HandlerContext,
+  targets: readonly WhereUsedArgs[],
+): Promise<McpResult | undefined> {
+  const references = targets.flatMap((target) => {
+    const name = target?.object_name;
+    const type = target?.object_type;
+    if (!name || !type) return [];
+    const code = whereUsedCodeOf(context.connection, type);
+    const [group, module, ...more] = name.split('|');
+    if (code === undefined || more.length > 0 || !group || !module) return [];
+    return [{ type: code, name: module, parentName: group }];
+  });
+  const refused = await checkModuleReferences(context, references);
+  return refused === undefined
+    ? undefined
+    : answerFailure(refused.getError(), WHERE_USED_CONTEXT);
+}
+
 /** One answer of the batched version: an object's, or the one that ended the call. */
 const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
-  'ended' in outcome ? outcome.ended : (outcome.answers[0] as McpResult);
+  'ended' in outcome ? outcome.ended : outcome.answers[0];
 
 /**
  * Where-used lists of one object or several, read in ADT batch envelopes
@@ -629,22 +650,19 @@ const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
  */
 export async function handleGetWhereUsed(
   context: HandlerContext,
-  given: Omit<WhereUsedArgs, 'object_name' | 'object_type'> & {
-    object_name?: string;
-    object_type?: string;
-  },
+  args: WhereUsedArgs,
 ) {
-  // The single object's arguments as the sequential version reads them.
-  const args = given as WhereUsedArgs;
   const listed = args?.objects;
   if (listed === undefined) {
+    const refused = await refusedModule(context, [args]);
+    if (refused !== undefined) return refused;
     if (!args?.object_name || !args?.object_type || !readsScope(args)) {
       return whereUsedOf(context, args);
     }
     return withSequentialFallback<McpResult>(
       context,
       async () => onlyAnswer(await whereUsedInEnvelopes(context, [args], args)),
-      () => whereUsedOf(context, args) as Promise<McpResult>,
+      () => whereUsedOf(context, args),
     );
   }
   if (
@@ -663,6 +681,8 @@ export async function handleGetWhereUsed(
   }));
   const { objects: _list, ...rest } = args;
   const targets: WhereUsedArgs[] = objects.map((o) => ({ ...rest, ...o }));
+  const refused = await refusedModule(context, targets);
+  if (refused !== undefined) return refused;
   return withSequentialFallback<McpResult>(
     context,
     async () => {
@@ -676,7 +696,7 @@ export async function handleGetWhereUsed(
       // credential failure ends the call, and nothing after it is read.
       const results: McpResult[] = [];
       for (const target of targets) {
-        const result = (await whereUsedOf(context, target)) as McpResult;
+        const result = await whereUsedOf(context, target);
         if (endsList(result)) return result;
         results.push(result);
       }

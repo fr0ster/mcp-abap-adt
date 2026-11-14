@@ -245,8 +245,6 @@ runtime_readonly_handlers:
         trace_id_or_uri: ""
         trace_feed_retries: 6
         trace_feed_retry_delay_ms: 1000
-        trace_read_retries: 6
-        trace_read_retry_delay_ms: 1500
         # Optional user filter for dumps; empty = all users
         dumps_user: ""
         dumps_read_limit: 5
@@ -301,7 +299,4 @@ environment:
 test_settings:
   fail_fast: false
   verbose: true
-  timeout: 30000
-  retry_on_failure: false
-  max_retries: 1
   cleanup_after_test: false

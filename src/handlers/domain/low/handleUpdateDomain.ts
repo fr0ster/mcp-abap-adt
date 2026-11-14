@@ -1,4 +1,8 @@
-import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  domainDocuments,
+  patchDomainDocument,
+} from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
  *
@@ -26,50 +30,76 @@ import { domainDocuments } from '@mcp-abap-adt/adt-clients';
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answerFailure, answerThrown } from '../../../lib/answer';
+import {
+  answerFailure,
+  answerThrown,
+  messageCarriedBy,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import type {
+  HandlerContext,
+  ToolArgValue,
+} from '../../../lib/handlers/interfaces';
+import {
+  clearableText,
+  givenCount,
+  givenElements,
+  givenFlag,
+  givenText,
+} from '../../../lib/propertyBag';
+import {
+  type DomainChanges,
+  domainChanges,
+} from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDomainLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      domain_name: {
-        type: 'string',
-        description: 'Domain name. Domain must already exist.',
-      },
-      properties: {
-        type: 'object',
-        description:
-          'Domain properties object. Can include: description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, etc.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-    },
-    required: ['domain_name', 'properties', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    domain_name: z.string().describe('Domain name. Domain must already exist.'),
+    properties: z
+      .unknown()
+      .describe(
+        'Domain properties object. Can include: description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, etc.',
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+  }),
 } as const;
 
-interface UpdateDomainArgs {
-  domain_name: string;
-  properties: Record<string, any>;
-  lock_handle: string;
+/** The tool's arguments, as its schema parses them. */
+type UpdateDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/**
+ * The changes `properties` names, each as the patch writes it: text, a
+ * length or a count a number (or its digits), a flag a boolean (or `true` /
+ * `false`), `null`
+ * clearing the conversion exit and the value table, the fixed values a list
+ * (each `low` and `text` written out); a value of no such kind is left out.
+ */
+function domainChangesOf(properties: ToolArgValue): DomainChanges {
+  const fixedValues = givenElements(properties, 'fixed_values');
+  return {
+    description: givenText(properties, 'description'),
+    datatype: givenText(properties, 'datatype'),
+    length: givenCount(properties, 'length'),
+    decimals: givenCount(properties, 'decimals'),
+    conversion_exit: clearableText(properties, 'conversion_exit'),
+    sign_exists: givenFlag(properties, 'sign_exists'),
+    lowercase: givenFlag(properties, 'lowercase'),
+    value_table: clearableText(properties, 'value_table'),
+    fixed_values: fixedValues?.map((fixed) => ({
+      low: String(fixed.low),
+      text: String(fixed.text),
+    })),
+  };
 }
 
 /**
@@ -83,7 +113,7 @@ export async function handleUpdateDomain(
 ) {
   const { connection, logger } = context;
   try {
-    const { domain_name, properties, lock_handle } = args as UpdateDomainArgs;
+    const { domain_name, properties, lock_handle } = args;
 
     // Validation
     if (!domain_name || !properties || !lock_handle) {
@@ -102,7 +132,8 @@ export async function handleUpdateDomain(
     // `UpdateDataElementLow`'s own `transportRequest` reads out of its
     // `properties` bag.
     const transportRequest =
-      properties.transport_request || properties.transportRequest;
+      givenText(properties, 'transport_request') ||
+      givenText(properties, 'transportRequest');
 
     try {
       // The three steps, in the handler because 19 put them there. `analyse` on
@@ -118,7 +149,15 @@ export async function handleUpdateDomain(
               { version: 'workingArea', analyse: analyseException },
             ),
         ),
-        atStep('update metadata', (current) =>
+        async (current) =>
+          patchedDocument(
+            patchDomainDocument(
+              current,
+              domainChanges(domainChangesOf(properties)),
+            ),
+            `domain ${domainName}`,
+          ),
+        atStep('update metadata', (document) =>
           withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
             client.getDomain(domainDocuments).updateMetadata(
               {
@@ -127,10 +166,7 @@ export async function handleUpdateDomain(
               },
               {
                 headers,
-                source: patchDomainXml(
-                  extractXmlString(current, `domain ${domainName}`),
-                  properties,
-                ),
+                source: document,
                 lockHandle: lock_handle,
                 analyse: analyseException,
               },
@@ -161,8 +197,8 @@ export async function handleUpdateDomain(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is
       // where that verdict is read. This catch is left for a genuine bug in
@@ -171,11 +207,11 @@ export async function handleUpdateDomain(
       // can still produce — that read belongs to `analyseException`, not a
       // second opinion here (found while writing the handler invariant that
       // checks for exactly this).
-      const message = error?.message ?? String(error);
+      const message = messageCarriedBy(error);
       logger?.error(`Error updating domain ${domainName}: ${message}`);
       return answerThrown(error, { tool: 'UpdateDomainLow', detail: 'terse' });
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

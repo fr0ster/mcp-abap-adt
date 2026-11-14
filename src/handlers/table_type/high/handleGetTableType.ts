@@ -1,8 +1,9 @@
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readTableTypeMetadata } from '../../../lib/strategies/metadataReads';
@@ -14,23 +15,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP table type named by table_type_name in one request: its ADT metadata document (row type, access, key, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name.',
-      },
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['table_type_name'],
-  },
+  inputSchema: z.object({
+    table_type_name: z.string().describe('Table type name.'),
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
-interface GetTableTypeArgs {
-  table_type_name?: string;
-  version?: ReadVersion;
-}
+type GetTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetTableType(
   context: HandlerContext,

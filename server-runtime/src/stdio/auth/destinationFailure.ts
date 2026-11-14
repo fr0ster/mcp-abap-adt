@@ -22,6 +22,13 @@ import {
   readOwn,
   ServerRefusal,
 } from '@mcp-abap-adt/lib/auth';
+import {
+  type DestinationAddressCase,
+  type DestinationAddressFault,
+  destinationAddressHint,
+  destinationAddressWords,
+} from '@mcp-abap-adt/lib/config';
+import { isList } from '@mcp-abap-adt/lib/utils';
 import type { AuthType } from './vocabulary';
 
 /**
@@ -84,6 +91,32 @@ export class UnsupportedAuthenticationError extends ServerRefusal {
   }
 }
 
+/**
+ * A destination whose address or logon is refused (24.0.0, the nine cases):
+ * the destination, the case and the keys it names — never a value. Answered
+ * `destination_refused` in the case's words, at the start and at a tool
+ * call alike.
+ */
+export class DestinationAddressRefusal extends DestinationRefusal {
+  readonly destination: string;
+  readonly case: DestinationAddressCase;
+  readonly keys: readonly string[];
+
+  constructor(destination: string, fault: DestinationAddressFault) {
+    super(destinationAddressWords(destination, fault));
+    this.name = 'DestinationAddressRefusal';
+    this.destination = destination;
+    this.case = fault.case;
+    this.keys = [...fault.keys];
+    const hint =
+      destinationAddressHint(fault) ??
+      fault.keys
+        .map((key) => (Object.hasOwn(HINTS, key) ? HINTS[key] : undefined))
+        .find((each) => each !== undefined);
+    if (hint !== undefined) UNSUPPORTED_HINTS.set(this, hint);
+  }
+}
+
 /** One fixed remedy per field the server knows how to fix. */
 export const HINTS: Readonly<Record<string, string>> = {
   grantType:
@@ -98,11 +131,13 @@ export const HINTS: Readonly<Record<string, string>> = {
 
 export interface DestinationFailureOptions {
   /** The destination the server serves: named by a refusal whose error does not carry it. */
-  readonly destination?: string;
+  readonly destination?: string | undefined;
   /** The platform a browser login found no browser on (default `process.platform`). */
-  readonly platform?: string;
+  readonly platform?: string | undefined;
   /** The server's own sentence beside a chain failure. */
-  readonly sentenceFor?: (error: IAuthProviderError) => string | undefined;
+  readonly sentenceFor?:
+    | ((error: IAuthProviderError) => string | undefined)
+    | undefined;
 }
 
 /** The headline of a destination refused for `fields`. */
@@ -127,12 +162,12 @@ function destinationConfigFailure(
   // answers differently on a second read cannot change what was checked.
   const destination = readOwn(thrown, 'destination');
   const listed = readOwn(thrown, 'missingFields');
-  if (typeof destination !== 'string' || !Array.isArray(listed)) {
+  if (typeof destination !== 'string' || !isList(listed)) {
     return undefined;
   }
-  const copied: unknown[] = Array.from(listed as unknown[]);
-  if (!copied.every((field) => typeof field === 'string')) return undefined;
-  const fields = copied as string[];
+  const copied = Array.from(listed);
+  const fields = copied.filter((field) => typeof field === 'string');
+  if (fields.length !== copied.length) return undefined;
   const carried = readOwn(thrown, 'error');
   const cause =
     carried === undefined ? undefined : classify(carried, 'unfamiliar-error');

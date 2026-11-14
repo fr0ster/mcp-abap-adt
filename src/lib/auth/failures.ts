@@ -21,7 +21,11 @@ import type {
   AuthProviderErrorKind,
   IAuthProviderError,
 } from '@mcp-abap-adt/interfaces-auth';
-import { INSTANCE_CLOSED_WORDS, serverRefusalOf } from './serverRefusal';
+import {
+  type AccessRefusalCode,
+  INSTANCE_CLOSED_WORDS,
+  serverRefusalOf,
+} from './serverRefusal';
 
 export { INSTANCE_CLOSED_WORDS };
 
@@ -50,12 +54,14 @@ export type FailureCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout'
+  | 'batch_no_background'
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
   | 'long_session_unavailable'
-  | 'connection_provider_failed';
+  | 'connection_provider_failed'
+  | 'no_connection'
+  | AccessRefusalCode;
 
 /**
  * A failure as it was read: the fields of the failure answer, and the chain's
@@ -182,7 +188,7 @@ export class ClosedInstanceRefusal extends Error {
 }
 
 /** Whether `value` is a `ClosedInstanceRefusal` the server built. Total. */
-export function isClosedInstanceRefusal(value: unknown): boolean {
+export function isClosedInstanceRefusal(value: unknown): value is object {
   return (
     value !== null &&
     (typeof value === 'object' || typeof value === 'function') &&
@@ -203,7 +209,7 @@ function closedAnswer(value: object): ReadFailure {
  */
 export function failureOf(thrown: unknown): ReadFailure | undefined {
   try {
-    if (isClosedInstanceRefusal(thrown)) return closedAnswer(thrown as object);
+    if (isClosedInstanceRefusal(thrown)) return closedAnswer(thrown);
     const chain = chainErrorOf(thrown);
     if (chain !== undefined) return authenticationFailed(chain);
     const own = serverRefusalOf(thrown);

@@ -29,15 +29,15 @@
  * (`shared_dependencies`, those served on the system): GetIncludesList (two
  * function groups), GetStructuresList (two structures), GetEnhancements (two
  * classes), ListTransports (modifiable), DescribeByList (a class, a table and
- * a structure), GetAbapSystemSymbols (a source naming a shared class and
- * interface), GetWhereUsed (two
- * tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
+ * a structure), GetWhereUsed (two tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
  *
  * Run (HTTP): npm test -- --testPathPatterns='batchedReadsTiming' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
  *             the RFC SDK's libraries on LD_LIBRARY_PATH.
  */
 
+import assert from 'node:assert/strict';
+import { before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
@@ -48,7 +48,6 @@ import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGe
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapSystemSymbols } from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeListFeeds } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
@@ -60,15 +59,18 @@ import {
 } from '../../../lib/batch/availability';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import {
+  configuredSystemKind,
   getSharedDependenciesConfig,
-  getSystemType,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestConfig,
   resolvePackageName,
 } from '../helpers/configHelpers';
+import { NO_KIND_STATED } from '../helpers/configuredSystemKind';
+import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
+import { transportSearchMissing } from '../helpers/transportSearch';
 
 const testLogger = createTestLogger('batched-reads-timing');
 
@@ -164,6 +166,14 @@ const median = (values: number[]): number => {
 const isError = (answer: unknown): boolean =>
   (answer as { isError?: boolean } | null)?.isError === true;
 
+/** An answer's first text, for the log of a failing case: SAP's answer as the tool answered it. */
+const answerText = (answer: unknown): string => {
+  const content = (answer as { content?: unknown } | null)?.content;
+  const first: unknown = Array.isArray(content) ? content[0] : undefined;
+  const text = (first as { text?: unknown } | undefined)?.text;
+  return typeof text === 'string' ? text : JSON.stringify(answer);
+};
+
 type Case = {
   tool: string;
   read: (name: string) => (context: HandlerContext) => Promise<unknown>;
@@ -255,7 +265,12 @@ function sharedNames(kind: string): string[] {
 type Read = (context: HandlerContext) => Promise<unknown>;
 
 /** A tool of Tasks 25–27 on the shared objects: its read, or why there is none here. */
-type SharedCase = { tool: string; prepare: () => Read | string };
+type SharedCase = {
+  tool: string;
+  prepare: (
+    connection: IAbapConnection,
+  ) => Promise<Read | string> | Read | string;
+};
 
 /** Two names of `kind`, or why there are not two. */
 function two(kind: string): string[] | string {
@@ -305,8 +320,9 @@ const SHARED_CASES: SharedCase[] = [
   },
   {
     tool: 'ListTransports',
-    prepare: () => (context) =>
-      handleListTransports(context, { modifiable_only: true }),
+    prepare: async (connection) =>
+      (await transportSearchMissing(connection)) ??
+      ((context) => handleListTransports(context, { modifiable_only: true })),
   },
   {
     tool: 'DescribeByList',
@@ -324,23 +340,6 @@ const SHARED_CASES: SharedCase[] = [
             { name: table, type: 'TABL/DT' },
             { name: structure },
           ],
-        });
-    },
-  },
-  {
-    tool: 'GetAbapSystemSymbols',
-    prepare: () => {
-      // A class and an interface: the symbols the tool reads one request each.
-      const [cls] = sharedNames('classes');
-      const [intf] = sharedNames('interfaces');
-      if (!cls || !intf) {
-        return 'the config names no shared class or interface served here';
-      }
-      return (context) =>
-        handleGetAbapSystemSymbols(context, {
-          // The handler reads a class or an interface it finds defined in the
-          // source: one definition of each, named after the shared objects.
-          code: `CLASS ${cls.toLowerCase()} DEFINITION.\nENDCLASS.\nINTERFACE ${intf.toLowerCase()}.\nENDINTERFACE.`,
         });
     },
   },
@@ -428,9 +427,13 @@ async function timeBothPaths(
   read: (context: HandlerContext) => Promise<unknown>,
 ): Promise<void> {
   const reference = await measured(connection, 'sequential', read);
-  expect(isError(reference.answer)).toBe(false);
-  expect(itemErrors(reference.answer)).toEqual([]);
-  expect(reference.measure.envelopes).toBe(0);
+  assert.equal(
+    isError(reference.answer),
+    false,
+    `${tool} answered an error: ${answerText(reference.answer)}`,
+  );
+  assertEquals(itemErrors(reference.answer), []);
+  assert.equal(reference.measure.envelopes, 0);
 
   const runs: Record<Path, Measure[]> = { sequential: [], batched: [] };
   // Compared once every repetition is timed, so a differing answer
@@ -442,8 +445,8 @@ async function timeBothPaths(
     for (const path of order) {
       const { answer, measure } = await measured(connection, path, read);
       answers.push({ path, answer });
-      if (path === 'sequential') expect(measure.envelopes).toBe(0);
-      else expect(measure.envelopes).toBeGreaterThan(0);
+      if (path === 'sequential') assert.equal(measure.envelopes, 0);
+      else assert.ok(measure.envelopes > 0);
       runs[path].push(measure);
     }
   }
@@ -466,17 +469,19 @@ async function timeBothPaths(
   }
 
   for (const { answer } of answers) {
-    expect(answer).toEqual(reference.answer);
+    assertEquals(answer, reference.answer);
   }
 }
 
 describe('batched reads timed against the sequential path on the system the test config names', () => {
   let connection: IAbapConnection | null = null;
   let packages: Array<{ label: string; name: string }> = [];
-  // Legacy support is parked: a legacy config skips before any logon.
-  const served = getSystemType() !== 'legacy';
+  // Legacy support is parked: a legacy config skips before any logon, and
+  // so does a run whose kind nothing states (never on-premise by default).
+  const stated = configuredSystemKind();
+  const served = stated !== undefined && stated !== 'legacy';
 
-  beforeAll(async () => {
+  before(async () => {
     if (!served) return;
     try {
       connection = (await createTestConnectionAndSession()).connection;
@@ -484,70 +489,59 @@ describe('batched reads timed against the sequential path on the system the test
     } catch (_error) {
       connection = null;
     }
-  }, getTimeout('long'));
+  });
 
   for (const tool of CASES) {
     for (const scope of ['the package', 'a larger package']) {
-      it(
-        `${tool.tool} on ${scope}: the same answer, timed on both paths`,
-        async () => {
-          if (!served) {
-            testLogger?.info(
-              '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
-            );
-            return;
-          }
-          if (connection === null) {
-            testLogger?.info(
-              '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
-            );
-            return;
-          }
-          const target = packages.find((p) => p.label === scope);
-          if (target === undefined) {
-            testLogger?.info(
-              `⏭️  Skipping ${tool.tool} on ${scope}: the config names no shared_dependencies.super_package`,
-            );
-            return;
-          }
-          const read = tool.read(target.name);
-
-          await timeBothPaths(connection, tool.tool, scope, read);
-        },
-        getTimeout('long'),
-      );
-    }
-  }
-
-  for (const shared of SHARED_CASES) {
-    it(
-      `${shared.tool} on the shared objects: the same answer, timed on both paths`,
-      async () => {
+      it(`${tool.tool} on ${scope}: the same answer, timed on both paths`, async () => {
         if (!served) {
-          testLogger?.info(
-            '⏭️  Skipping: the test config names a legacy system, which the server does not serve',
+          skipRunningTest(
+            stated === undefined
+              ? NO_KIND_STATED
+              : 'the test config names a legacy system, which the server does not serve',
           );
           return;
         }
         if (connection === null) {
-          testLogger?.info(
-            '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
+          skipRunningTest(
+            'runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
           );
           return;
         }
-        const read = shared.prepare();
-        if (typeof read === 'string') {
-          testLogger?.info(`⏭️  Skipping ${shared.tool}: ${read}`);
+        const target = packages.find((p) => p.label === scope);
+        if (target === undefined) {
+          skipRunningTest(
+            `${tool.tool} on ${scope}: the config names no shared_dependencies.super_package`,
+          );
           return;
         }
-        await timeBothPaths(
-          connection,
-          shared.tool,
-          'the shared objects',
-          read,
+        const read = tool.read(target.name);
+
+        await timeBothPaths(connection, tool.tool, scope, read);
+      });
+    }
+  }
+
+  for (const shared of SHARED_CASES) {
+    it(`${shared.tool} on the shared objects: the same answer, timed on both paths`, async () => {
+      if (!served) {
+        skipRunningTest(
+          'the test config names a legacy system, which the server does not serve',
         );
-      },
-      getTimeout('long'),
-    );
+        return;
+      }
+      if (connection === null) {
+        skipRunningTest(
+          'runs only on the system the test config names (tests/test-config.yaml or MCP_TEST_CONFIG); no configuration, connection or session here',
+        );
+        return;
+      }
+      const read = await shared.prepare(connection);
+      if (typeof read === 'string') {
+        skipRunningTest(`${shared.tool}: ${read}`);
+        return;
+      }
+      await timeBothPaths(connection, shared.tool, 'the shared objects', read);
+    });
   }
 });

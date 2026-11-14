@@ -11,15 +11,30 @@
  * UNLOCK; the instance's logoff (its end, the idle bound's terminal close)
  * ends it in SAP. No clock of its own.
  *
- * Given only by a host whose instances last one request each (the
- * Streamable HTTP server); stdio and SSE keep their instance's session
- * between calls and give none.
+ * Every transport gives each instance its own (#4): the Streamable HTTP
+ * server each pooled instance, the SSE server each connection's instance,
+ * the stdio server its one instance. SAP releases a session's lock on an
+ * UNLOCK whatever handle it names, so only the handles kept here tell a
+ * lock this instance took from one it did not.
  */
 import type { StatePart } from './InstanceState';
 
-/** The words of a write or an unlock under a lock this instance does not hold. */
+/**
+ * The words of a write or an unlock under a lock this instance does not
+ * hold, where the host routes a call to its instance by the `state_handle`
+ * (Streamable HTTP). An unknown handle and another instance's get these
+ * same words.
+ */
 export const LOCK_NOT_HELD_WORDS =
   'lock_handle is not held by this instance: send the state_handle HandlerLock answered as the state_handle argument (or in the x-mcp-state-handle header)';
+
+/**
+ * The same refusal where the host routes nothing by a `state_handle` (stdio,
+ * SSE, an embedder's instance): a lock handle works only in the instance
+ * that issued it.
+ */
+export const LOCK_NOT_HELD_HERE_WORDS =
+  'lock_handle is not held by this instance: a lock handle works only in the server instance whose HandlerLock issued it';
 
 /**
  * Where a lock lives: the instance's own SAP session (`main`), or a session
@@ -35,13 +50,30 @@ export interface HeldLockPort {
   release(handle: string): void;
   /** The instance's live SAP session, as a token that changes when it ends. */
   session(): number;
+  /** Whether the host routes a call to this instance by its `state_handle`. */
+  readonly routedByStateHandle: boolean;
+}
+
+export interface HeldLocksOptions {
+  /**
+   * The host routes a call to its instance by the `state_handle` (Streamable
+   * HTTP's pool): the refusal tells the caller to send it. Default `false`.
+   */
+  routedByStateHandle?: boolean;
 }
 
 export class HeldLocks implements StatePart, HeldLockPort {
+  readonly routedByStateHandle: boolean;
   private readonly handles = new Map<string, LockSession>();
+  /** The sessions whose locks the last disposal let go of. */
+  private dropped = new Set<LockSession>();
   private readonly listeners: Array<() => void> = [];
   /** Which SAP session of the instance is live: one more at every end of one. */
   private generation = 0;
+
+  constructor(options: HeldLocksOptions = {}) {
+    this.routedByStateHandle = options.routedByStateHandle === true;
+  }
 
   /** Keeps `handle` as held by this instance, in `session`. */
   hold(handle: string, session: LockSession = 'main'): void {
@@ -90,6 +122,7 @@ export class HeldLocks implements StatePart, HeldLockPort {
       holds: (handle) => this.holds(handle),
       release: (handle) => this.release(handle),
       session: () => this.session(),
+      routedByStateHandle: this.routedByStateHandle,
     };
   }
 
@@ -126,9 +159,21 @@ export class HeldLocks implements StatePart, HeldLockPort {
    * disposal of a pooled instance.
    */
   async dispose(): Promise<void> {
+    this.dropped = new Set(this.handles.values());
     if (this.handles.size === 0) return;
     this.handles.clear();
     this.notify();
+  }
+
+  /**
+   * The sessions whose locks the last disposal let go of, once: the idle
+   * bound's stop reads it to end those sessions, so no lock outlives its
+   * handle in SAP.
+   */
+  takeDropped(): ReadonlySet<LockSession> {
+    const dropped = this.dropped;
+    this.dropped = new Set();
+    return dropped;
   }
 
   observe(onChange: () => void): void {
@@ -141,13 +186,26 @@ export class HeldLocks implements StatePart, HeldLockPort {
 }
 
 /**
- * Whether a write or an unlock under `lockHandle` may be sent on this
- * instance: always where the host keeps no locks; else only under a handle
- * this instance holds.
+ * Whether a write, a delete or an unlock under `lockHandle` may be sent on
+ * this instance: only under a handle this instance holds. An instance whose
+ * host gave it no held locks holds none. SAP releases a session's lock on an
+ * UNLOCK whatever handle it names (measured on premise), so the check is the
+ * server's.
  */
 export function lockHeldHere(
   heldLocks: HeldLockPort | undefined,
   lockHandle: string,
 ): boolean {
-  return heldLocks === undefined || heldLocks.holds(lockHandle);
+  return heldLocks !== undefined && heldLocks.holds(lockHandle);
+}
+
+/**
+ * The refusal of a handle `heldLocks` does not hold: one answer for an
+ * unknown handle and another instance's; the `state_handle` advice only
+ * where the host routes by it.
+ */
+export function lockNotHeldWords(heldLocks: HeldLockPort | undefined): string {
+  return heldLocks?.routedByStateHandle === true
+    ? LOCK_NOT_HELD_WORDS
+    : LOCK_NOT_HELD_HERE_WORDS;
 }

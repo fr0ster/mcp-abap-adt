@@ -117,7 +117,7 @@ describe('cloud', () => {
       getHandlers: (): HandlerEntry[] => [
         {
           toolDefinition: CreateMessageClassTool as never,
-          handler: handleCreateMessageClass as never,
+          call: handleCreateMessageClass as never,
         },
       ],
     },
@@ -338,7 +338,7 @@ describe('on-premise, through the server', () => {
       getHandlers: (): HandlerEntry[] => [
         {
           toolDefinition: CreateMessageClassTool as never,
-          handler: handleCreateMessageClass as never,
+          call: handleCreateMessageClass as never,
         },
       ],
     },

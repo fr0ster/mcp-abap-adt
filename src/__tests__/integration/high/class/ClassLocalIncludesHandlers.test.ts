@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Integration tests for Class Local Includes High-Level Handlers
  *
@@ -16,6 +17,8 @@
  * Run: npm test -- --testPathPattern=integration/class/local
  */
 
+import assert from 'node:assert/strict';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleDeleteLocalDefinitions } from '../../../../handlers/class/high/handleDeleteLocalDefinitions';
@@ -32,9 +35,8 @@ import { handleUpdateLocalTestClass } from '../../../../handlers/class/high/hand
 import { handleUpdateLocalTypes } from '../../../../handlers/class/high/handleUpdateLocalTypes';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
 import {
-  getSystemType,
-  getTimeout,
   isTestAvailableForSystem,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -42,6 +44,7 @@ import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
+  handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -49,7 +52,7 @@ describe('Class Local Includes High-Level Handlers Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('class-local-includes');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'create_class',
       'builder_class',
@@ -100,9 +103,9 @@ describe('Class Local Includes High-Level Handlers Integration', () => {
         }
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async () => {});
   });
 
@@ -114,68 +117,57 @@ describe('Class Local Includes High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Class local includes high-level handlers',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const {
-          connection,
-          objectName,
-          params,
-          packageName,
-          transportRequest,
-        } = context;
+  it('should test all Class local includes high-level handlers', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, objectName, params, packageName, transportRequest } =
+        context;
 
-        expect(objectName).toBeDefined();
-        expect(objectName).not.toBe('');
-        if (!objectName) {
-          fail('objectName is required');
-        }
-        const className = objectName;
-        const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
-          directCall: () => Promise<any>,
-        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+      assert.ok(objectName !== undefined);
+      assert.notEqual(objectName, '');
+      if (!objectName) {
+        assert.fail('objectName is required');
+      }
+      const className = objectName;
+      const invoke = async (
+        toolName: string,
+        args: Record<string, unknown>,
+        directCall: () => Promise<any>,
+      ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
-        // Step 1: Create empty parent class (no source code — initial state)
-        logger?.info(`   • create empty parent class: ${objectName}`);
-        const createLogger = createTestLogger('class-local-includes-create');
-        const createResponse = await invoke(
-          'CreateClass',
-          {
+      // Step 1: Create empty parent class (no source code — initial state)
+      logger?.info(`   • create empty parent class: ${objectName}`);
+      const createLogger = createTestLogger('class-local-includes-create');
+      const createResponse = await invoke(
+        'CreateClass',
+        {
+          class_name: className,
+          package_name: packageName,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const createCtx = createHandlerContext({
+            connection,
+            logger: createLogger,
+          });
+          return handleCreateClass(createCtx, {
             class_name: className,
             package_name: packageName,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const createCtx = createHandlerContext({
-              connection,
-              logger: createLogger,
-            });
-            return handleCreateClass(createCtx, {
-              class_name: className,
-              package_name: packageName,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
+          });
+        },
+      );
 
-        expect(createResponse.isError).toBe(false);
-        if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          fail(`Create parent class failed: ${errorMsg}`);
-        }
+      assert.equal(createResponse.isError, false);
+      if (createResponse.isError) {
+        const errorMsg = extractErrorMessage(createResponse);
+        assert.fail(`Create parent class failed: ${errorMsg}`);
+      }
 
-        logger?.success(`✅ create parent class: ${objectName} completed`);
+      logger?.success(`✅ create parent class: ${objectName} completed`);
 
-        // Wait a bit after creation
-        const delay = context.getOperationDelay('create');
-        await new Promise((resolve) => setTimeout(resolve, delay));
-
-        // Step 2: Test LocalTestClass handlers
-        logger?.info(`   • testing LocalTestClass handlers`);
-        const testClassCode = `CLASS lcl_test DEFINITION FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+      // Step 2: Test LocalTestClass handlers
+      logger?.info(`   • testing LocalTestClass handlers`);
+      const testClassCode = `CLASS lcl_test DEFINITION FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
   PRIVATE SECTION.
     METHODS test_method FOR TESTING.
 ENDCLASS.
@@ -186,40 +178,36 @@ CLASS lcl_test IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-        // Update LocalTestClass (local includes exist after class creation — use Update to set content)
-        const setTestClassLogger = createTestLogger('local-test-class-set');
-        const setTestClassResponse = await invoke(
-          'UpdateLocalTestClass',
-          {
+      // Update LocalTestClass (local includes exist after class creation — use Update to set content)
+      const setTestClassLogger = createTestLogger('local-test-class-set');
+      const setTestClassResponse = await invoke(
+        'UpdateLocalTestClass',
+        {
+          class_name: className,
+          test_class_code: testClassCode,
+          activate_on_update: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const setTestClassCtx = createHandlerContext({
+            connection,
+            logger: setTestClassLogger,
+          });
+          return handleUpdateLocalTestClass(setTestClassCtx, {
             class_name: className,
             test_class_code: testClassCode,
             activate_on_update: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const setTestClassCtx = createHandlerContext({
-              connection,
-              logger: setTestClassLogger,
-            });
-            return handleUpdateLocalTestClass(setTestClassCtx, {
-              class_name: className,
-              test_class_code: testClassCode,
-              activate_on_update: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
-        expect(setTestClassResponse.isError).toBe(false);
+          });
+        },
+      );
+      assert.equal(setTestClassResponse.isError, false);
 
-        // Wait after update
-        const createDelay = context.getOperationDelay('create');
-        await new Promise((resolve) => setTimeout(resolve, createDelay));
+      logger?.success(`✅ LocalTestClass set completed`);
 
-        logger?.success(`✅ LocalTestClass set completed`);
-
-        // Step 3: Test LocalTypes handlers
-        logger?.info(`   • testing LocalTypes handlers`);
-        const localTypesCode = `CLASS lcl_helper DEFINITION.
+      // Step 3: Test LocalTypes handlers
+      logger?.info(`   • testing LocalTypes handlers`);
+      const localTypesCode = `CLASS lcl_helper DEFINITION.
   PUBLIC SECTION.
     METHODS helper_method.
 ENDCLASS.
@@ -230,405 +218,394 @@ CLASS lcl_helper IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-        // Update LocalTypes (set content via Update)
-        const setLocalTypesLogger = createTestLogger('local-types-set');
-        const setLocalTypesResponse = await invoke(
-          'UpdateLocalTypes',
-          {
+      // Update LocalTypes (set content via Update)
+      const setLocalTypesLogger = createTestLogger('local-types-set');
+      const setLocalTypesResponse = await invoke(
+        'UpdateLocalTypes',
+        {
+          class_name: className,
+          local_types_code: localTypesCode,
+          activate_on_update: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const setLocalTypesCtx = createHandlerContext({
+            connection,
+            logger: setLocalTypesLogger,
+          });
+          return handleUpdateLocalTypes(setLocalTypesCtx, {
             class_name: className,
             local_types_code: localTypesCode,
             activate_on_update: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const setLocalTypesCtx = createHandlerContext({
-              connection,
-              logger: setLocalTypesLogger,
-            });
-            return handleUpdateLocalTypes(setLocalTypesCtx, {
-              class_name: className,
-              local_types_code: localTypesCode,
-              activate_on_update: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
-        expect(setLocalTypesResponse.isError).toBe(false);
+          });
+        },
+      );
+      assert.equal(setLocalTypesResponse.isError, false);
 
-        // Wait after update
-        await new Promise((resolve) => setTimeout(resolve, createDelay));
+      logger?.success(`✅ LocalTypes set completed`);
 
-        logger?.success(`✅ LocalTypes set completed`);
-
-        // Step 4: Test LocalDefinitions handlers
-        logger?.info(`   • testing LocalDefinitions handlers`);
-        const localDefinitionsCode = `TYPES: BEGIN OF ty_test,
+      // Step 4: Test LocalDefinitions handlers
+      logger?.info(`   • testing LocalDefinitions handlers`);
+      const localDefinitionsCode = `TYPES: BEGIN OF ty_test,
            field1 TYPE string,
            field2 TYPE i,
          END OF ty_test.`;
 
-        // Update LocalDefinitions (set content via Update)
-        const setLocalDefsLogger = createTestLogger('local-defs-set');
-        const setLocalDefsResponse = await invoke(
-          'UpdateLocalDefinitions',
-          {
+      // Update LocalDefinitions (set content via Update)
+      const setLocalDefsLogger = createTestLogger('local-defs-set');
+      const setLocalDefsResponse = await invoke(
+        'UpdateLocalDefinitions',
+        {
+          class_name: className,
+          definitions_code: localDefinitionsCode,
+          activate_on_update: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const setLocalDefsCtx = createHandlerContext({
+            connection,
+            logger: setLocalDefsLogger,
+          });
+          return handleUpdateLocalDefinitions(setLocalDefsCtx, {
             class_name: className,
             definitions_code: localDefinitionsCode,
             activate_on_update: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const setLocalDefsCtx = createHandlerContext({
-              connection,
-              logger: setLocalDefsLogger,
-            });
-            return handleUpdateLocalDefinitions(setLocalDefsCtx, {
-              class_name: className,
-              definitions_code: localDefinitionsCode,
-              activate_on_update: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
+          });
+        },
+      );
+      assert.equal(setLocalDefsResponse.isError, false);
+
+      logger?.success(`✅ LocalDefinitions set completed`);
+
+      // Step 5: Test LocalMacros handlers.
+      //
+      // Macros are classic ABAP. On a cloud system `DEFINE` and
+      // `END-OF-DEFINITION` are not part of the language version at all,
+      // and the refusal does not arrive at the write: the macros include
+      // is written happily, and activation then refuses the whole class —
+      // `"DEFINE" is not allowed in the current ABAP language version.`
+      // So tolerating a failed write, which the code below already does,
+      // cannot cover this case. On such a system the write must not
+      // happen at all.
+      if (!isTestAvailableForSystem(['onprem', 'legacy'])) {
+        logger?.info(
+          `   • skipping LocalMacros handlers: macros are not part of the ${statedKindWords()} ABAP language version`,
         );
-        expect(setLocalDefsResponse.isError).toBe(false);
-
-        // Wait after update
-        await new Promise((resolve) => setTimeout(resolve, createDelay));
-
-        logger?.success(`✅ LocalDefinitions set completed`);
-
-        // Step 5: Test LocalMacros handlers.
-        //
-        // Macros are classic ABAP. On a cloud system `DEFINE` and
-        // `END-OF-DEFINITION` are not part of the language version at all,
-        // and the refusal does not arrive at the write: the macros include
-        // is written happily, and activation then refuses the whole class —
-        // `"DEFINE" is not allowed in the current ABAP language version.`
-        // So tolerating a failed write, which the code below already does,
-        // cannot cover this case. On such a system the write must not
-        // happen at all.
-        if (!isTestAvailableForSystem(['onprem', 'legacy'])) {
-          logger?.info(
-            `   • skipping LocalMacros handlers: macros are not part of the ${getSystemType()} ABAP language version`,
-          );
-        } else {
-          logger?.info(`   • testing LocalMacros handlers`);
-          const localMacrosCode = `DEFINE test_macro.
+      } else {
+        logger?.info(`   • testing LocalMacros handlers`);
+        const localMacrosCode = `DEFINE test_macro.
   " Test macro
 END-OF-DEFINITION.`;
 
-          try {
-            // Update LocalMacros (set content via Update)
-            const setLocalMacrosLogger = createTestLogger('local-macros-set');
-            const setLocalMacrosResponse = await invoke(
-              'UpdateLocalMacros',
-              {
+        try {
+          // Update LocalMacros (set content via Update)
+          const setLocalMacrosLogger = createTestLogger('local-macros-set');
+          const setLocalMacrosResponse = await invoke(
+            'UpdateLocalMacros',
+            {
+              class_name: className,
+              macros_code: localMacrosCode,
+              activate_on_update: false,
+            },
+            async () => {
+              const setLocalMacrosCtx = createHandlerContext({
+                connection,
+                logger: setLocalMacrosLogger,
+              });
+              return handleUpdateLocalMacros(setLocalMacrosCtx, {
                 class_name: className,
                 macros_code: localMacrosCode,
                 activate_on_update: false,
-              },
-              async () => {
-                const setLocalMacrosCtx = createHandlerContext({
-                  connection,
-                  logger: setLocalMacrosLogger,
-                });
-                return handleUpdateLocalMacros(setLocalMacrosCtx, {
-                  class_name: className,
-                  macros_code: localMacrosCode,
-                  activate_on_update: false,
-                });
-              },
-            );
+              });
+            },
+          );
 
-            if (!setLocalMacrosResponse.isError) {
-              // Wait after update
-              await new Promise((resolve) => setTimeout(resolve, createDelay));
-              logger?.success(`✅ LocalMacros set completed`);
-            } else {
-              logger?.warn(
-                `⚠️ LocalMacros not supported on this system (expected for newer ABAP versions)`,
-              );
-            }
-          } catch (error: any) {
+          if (!setLocalMacrosResponse.isError) {
+            logger?.success(`✅ LocalMacros set completed`);
+          } else {
             logger?.warn(
-              `⚠️ LocalMacros test skipped: ${error.message || String(error)}`,
+              `⚠️ LocalMacros not supported on this system (expected for newer ABAP versions)`,
             );
           }
+        } catch (error: any) {
+          logger?.warn(
+            `⚠️ LocalMacros test skipped: ${error.message || String(error)}`,
+          );
         }
+      }
 
-        // Step 6: Test Update operations
-        logger?.info(`   • testing Update operations`);
+      // Step 6: Test Update operations
+      logger?.info(`   • testing Update operations`);
 
-        // Update LocalTestClass
-        const updatedTestClassCode = `${testClassCode}\n    " Updated`;
-        const updateTestClassLogger = createTestLogger(
-          'local-test-class-update',
-        );
-        const updateTestClassResponse = await invoke(
-          'UpdateLocalTestClass',
-          {
+      // Update LocalTestClass
+      const updatedTestClassCode = `${testClassCode}\n    " Updated`;
+      const updateTestClassLogger = createTestLogger('local-test-class-update');
+      const updateTestClassResponse = await invoke(
+        'UpdateLocalTestClass',
+        {
+          class_name: className,
+          test_class_code: updatedTestClassCode,
+          activate_on_update: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const updateTestClassCtx = createHandlerContext({
+            connection,
+            logger: updateTestClassLogger,
+          });
+          return handleUpdateLocalTestClass(updateTestClassCtx, {
             class_name: className,
             test_class_code: updatedTestClassCode,
             activate_on_update: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const updateTestClassCtx = createHandlerContext({
-              connection,
-              logger: updateTestClassLogger,
-            });
-            return handleUpdateLocalTestClass(updateTestClassCtx, {
-              class_name: className,
-              test_class_code: updatedTestClassCode,
-              activate_on_update: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
-        expect(updateTestClassResponse.isError).toBe(false);
+          });
+        },
+      );
+      assert.equal(updateTestClassResponse.isError, false);
 
-        // Update LocalTypes
-        const updatedLocalTypesCode = `${localTypesCode}\n    " Updated`;
-        const updateLocalTypesLogger = createTestLogger('local-types-update');
-        const updateLocalTypesResponse = await invoke(
-          'UpdateLocalTypes',
-          {
+      // Update LocalTypes
+      const updatedLocalTypesCode = `${localTypesCode}\n    " Updated`;
+      const updateLocalTypesLogger = createTestLogger('local-types-update');
+      const updateLocalTypesResponse = await invoke(
+        'UpdateLocalTypes',
+        {
+          class_name: className,
+          local_types_code: updatedLocalTypesCode,
+          activate_on_update: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const updateLocalTypesCtx = createHandlerContext({
+            connection,
+            logger: updateLocalTypesLogger,
+          });
+          return handleUpdateLocalTypes(updateLocalTypesCtx, {
             class_name: className,
             local_types_code: updatedLocalTypesCode,
             activate_on_update: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const updateLocalTypesCtx = createHandlerContext({
-              connection,
-              logger: updateLocalTypesLogger,
-            });
-            return handleUpdateLocalTypes(updateLocalTypesCtx, {
-              class_name: className,
-              local_types_code: updatedLocalTypesCode,
-              activate_on_update: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
-        );
-        expect(updateLocalTypesResponse.isError).toBe(false);
+          });
+        },
+      );
+      assert.equal(updateLocalTypesResponse.isError, false);
 
-        // Wait after update before reading (like in ClassHighHandlers.test.ts)
-        await new Promise((resolve) => setTimeout(resolve, createDelay));
+      // Activate class after updates to match adt-clients flow
+      const activateResponse = await invoke(
+        'ActivateClass',
+        { class_name: className },
+        async () =>
+          handleActivateClass(
+            { connection, logger },
+            { class_name: className },
+          ),
+      );
+      if (activateResponse.isError) {
+        const errorMsg = extractErrorMessage(activateResponse);
+        throw new Error(`ActivateClass failed: ${errorMsg}`);
+      }
 
-        // Activate class after updates to match adt-clients flow
-        const activateResponse = await invoke(
-          'ActivateClass',
-          { class_name: className },
-          async () =>
-            handleActivateClass(
-              { connection, logger },
-              { class_name: className },
-            ),
-        );
-        if (activateResponse.isError) {
-          const errorMsg = extractErrorMessage(activateResponse);
-          throw new Error(`ActivateClass failed: ${errorMsg}`);
-        }
-        await new Promise((resolve) =>
-          setTimeout(resolve, context.getOperationDelay('activate')),
-        );
+      // Step 7: Test Get (read) operations - after Update
+      logger?.info(`   • testing Get (read) operations`);
 
-        // Step 7: Test Get (read) operations - after Update
-        logger?.info(`   • testing Get (read) operations`);
-
-        // Get LocalTestClass - read after update
-        // Since update was done with activate_on_update: false, read inactive version
-        const getTestClassLogger = createTestLogger('local-test-class-get');
-        const getTestClassResponse = await invoke(
-          'GetLocalTestClass',
-          {
+      // Get LocalTestClass - read after update
+      // Since update was done with activate_on_update: false, read inactive version
+      const getTestClassLogger = createTestLogger('local-test-class-get');
+      const getTestClassResponse = await invoke(
+        'GetLocalTestClass',
+        {
+          class_name: className,
+          version: 'inactive', // Read inactive version since update wasn't activated
+        },
+        async () => {
+          const getTestClassCtx = createHandlerContext({
+            connection,
+            logger: getTestClassLogger,
+          });
+          return handleGetLocalTestClass(getTestClassCtx, {
             class_name: className,
             version: 'inactive', // Read inactive version since update wasn't activated
-          },
-          async () => {
-            const getTestClassCtx = createHandlerContext({
-              connection,
-              logger: getTestClassLogger,
-            });
-            return handleGetLocalTestClass(getTestClassCtx, {
-              class_name: className,
-              version: 'inactive', // Read inactive version since update wasn't activated
-            });
-          },
+          });
+        },
+      );
+      if (getTestClassResponse.isError) {
+        const errorMsg = extractErrorMessage(getTestClassResponse);
+        const rawError = getTestClassResponse.content[0]?.text || '';
+        const errorLower = `${errorMsg} ${rawError}`.toLowerCase();
+        if (
+          errorLower.includes('406') ||
+          errorLower.includes('not acceptable') ||
+          errorLower.includes('unsupported')
+        ) {
+          logger?.warn(
+            `GetLocalTestClass not supported on this system (406): ${errorMsg}`,
+          );
+        } else {
+          logger?.error(`GetLocalTestClass failed: ${errorMsg}`);
+          throw new Error(`GetLocalTestClass failed: ${errorMsg}`);
+        }
+      }
+      if (!getTestClassResponse.isError) {
+        assert.equal(getTestClassResponse.isError, false);
+        const getTestClassData = handlerAnswer(
+          getTestClassResponse,
+          z.looseObject({ source: z.unknown() }),
         );
-        if (getTestClassResponse.isError) {
-          const errorMsg = extractErrorMessage(getTestClassResponse);
-          const rawError = getTestClassResponse.content[0]?.text || '';
-          const errorLower = `${errorMsg} ${rawError}`.toLowerCase();
-          if (
-            errorLower.includes('406') ||
-            errorLower.includes('not acceptable') ||
-            errorLower.includes('unsupported')
-          ) {
-            logger?.warn(
-              `GetLocalTestClass not supported on this system (406): ${errorMsg}`,
-            );
-          } else {
-            logger?.error(`GetLocalTestClass failed: ${errorMsg}`);
-            throw new Error(`GetLocalTestClass failed: ${errorMsg}`);
-          }
-        }
-        if (!getTestClassResponse.isError) {
-          expect(getTestClassResponse.isError).toBe(false);
-          const getTestClassData = parseHandlerResponse(getTestClassResponse);
-          expect(getTestClassData.source).toBeDefined();
-        }
+        assert.ok(getTestClassData.source !== undefined);
+      }
 
-        // Get LocalTypes - read after update
-        const getLocalTypesLogger = createTestLogger('local-types-get');
-        logger?.info(`   • GetLocalTypes (version: active)`);
-        const getLocalTypesResponse = await invoke(
-          'GetLocalTypes',
-          {
+      // Get LocalTypes - read after update
+      const getLocalTypesLogger = createTestLogger('local-types-get');
+      logger?.info(`   • GetLocalTypes (version: active)`);
+      const getLocalTypesResponse = await invoke(
+        'GetLocalTypes',
+        {
+          class_name: className,
+          version: 'active',
+        },
+        async () => {
+          const getLocalTypesCtx = createHandlerContext({
+            connection,
+            logger: getLocalTypesLogger,
+          });
+          return handleGetLocalTypes(getLocalTypesCtx, {
             class_name: className,
             version: 'active',
-          },
-          async () => {
-            const getLocalTypesCtx = createHandlerContext({
-              connection,
-              logger: getLocalTypesLogger,
-            });
-            return handleGetLocalTypes(getLocalTypesCtx, {
-              class_name: className,
-              version: 'active',
-            });
-          },
-        );
-        if (getLocalTypesResponse.isError) {
-          const errorMsg = extractErrorMessage(getLocalTypesResponse);
-          logger?.error(`GetLocalTypes failed: ${errorMsg}`);
-        }
-        expect(getLocalTypesResponse.isError).toBe(false);
-        const getLocalTypesData = parseHandlerResponse(getLocalTypesResponse);
-        expect(getLocalTypesData.source).toBeDefined();
+          });
+        },
+      );
+      if (getLocalTypesResponse.isError) {
+        const errorMsg = extractErrorMessage(getLocalTypesResponse);
+        logger?.error(`GetLocalTypes failed: ${errorMsg}`);
+      }
+      assert.equal(getLocalTypesResponse.isError, false);
+      const getLocalTypesData = handlerAnswer(
+        getLocalTypesResponse,
+        z.looseObject({ source: z.unknown() }),
+      );
+      assert.ok(getLocalTypesData.source !== undefined);
 
-        // Get LocalDefinitions - read after update
-        const getLocalDefsLogger = createTestLogger('local-defs-get');
-        logger?.info(`   • GetLocalDefinitions (version: active)`);
-        const getLocalDefsResponse = await invoke(
-          'GetLocalDefinitions',
-          {
+      // Get LocalDefinitions - read after update
+      const getLocalDefsLogger = createTestLogger('local-defs-get');
+      logger?.info(`   • GetLocalDefinitions (version: active)`);
+      const getLocalDefsResponse = await invoke(
+        'GetLocalDefinitions',
+        {
+          class_name: className,
+          version: 'active',
+        },
+        async () => {
+          const getLocalDefsCtx = createHandlerContext({
+            connection,
+            logger: getLocalDefsLogger,
+          });
+          return handleGetLocalDefinitions(getLocalDefsCtx, {
             class_name: className,
             version: 'active',
-          },
-          async () => {
-            const getLocalDefsCtx = createHandlerContext({
-              connection,
-              logger: getLocalDefsLogger,
-            });
-            return handleGetLocalDefinitions(getLocalDefsCtx, {
-              class_name: className,
-              version: 'active',
-            });
-          },
-        );
-        if (getLocalDefsResponse.isError) {
-          const errorMsg = extractErrorMessage(getLocalDefsResponse);
-          logger?.error(`GetLocalDefinitions failed: ${errorMsg}`);
-        }
-        expect(getLocalDefsResponse.isError).toBe(false);
-        const getLocalDefsData = parseHandlerResponse(getLocalDefsResponse);
-        expect(getLocalDefsData.source).toBeDefined();
+          });
+        },
+      );
+      if (getLocalDefsResponse.isError) {
+        const errorMsg = extractErrorMessage(getLocalDefsResponse);
+        logger?.error(`GetLocalDefinitions failed: ${errorMsg}`);
+      }
+      assert.equal(getLocalDefsResponse.isError, false);
+      const getLocalDefsData = handlerAnswer(
+        getLocalDefsResponse,
+        z.looseObject({ source: z.unknown() }),
+      );
+      assert.ok(getLocalDefsData.source !== undefined);
 
-        logger?.success(`✅ Get (read) operations completed`);
+      logger?.success(`✅ Get (read) operations completed`);
 
-        logger?.success(`✅ Update operations completed`);
+      logger?.success(`✅ Update operations completed`);
 
-        // Step 8: Test Delete operations
-        logger?.info(`   • testing Delete operations`);
+      // Step 8: Test Delete operations
+      logger?.info(`   • testing Delete operations`);
 
-        // Delete LocalTestClass
-        const deleteTestClassLogger = createTestLogger(
-          'local-test-class-delete',
-        );
-        const deleteTestClassResponse = await invoke(
-          'DeleteLocalTestClass',
-          {
+      // Delete LocalTestClass
+      const deleteTestClassLogger = createTestLogger('local-test-class-delete');
+      const deleteTestClassResponse = await invoke(
+        'DeleteLocalTestClass',
+        {
+          class_name: className,
+          activate_on_delete: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const deleteTestClassCtx = createHandlerContext({
+            connection,
+            logger: deleteTestClassLogger,
+          });
+          return handleDeleteLocalTestClass(deleteTestClassCtx, {
             class_name: className,
             activate_on_delete: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const deleteTestClassCtx = createHandlerContext({
-              connection,
-              logger: deleteTestClassLogger,
-            });
-            return handleDeleteLocalTestClass(deleteTestClassCtx, {
-              class_name: className,
-              activate_on_delete: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
+          });
+        },
+      );
+      if (deleteTestClassResponse.isError) {
+        logger?.warn(
+          `Delete LocalTestClass failed: ${extractErrorMessage(deleteTestClassResponse)}`,
         );
-        if (deleteTestClassResponse.isError) {
-          logger?.warn(
-            `Delete LocalTestClass failed: ${extractErrorMessage(deleteTestClassResponse)}`,
-          );
-        }
+      }
 
-        // Delete LocalTypes
-        const deleteLocalTypesLogger = createTestLogger('local-types-delete');
-        const deleteLocalTypesResponse = await invoke(
-          'DeleteLocalTypes',
-          {
+      // Delete LocalTypes
+      const deleteLocalTypesLogger = createTestLogger('local-types-delete');
+      const deleteLocalTypesResponse = await invoke(
+        'DeleteLocalTypes',
+        {
+          class_name: className,
+          activate_on_delete: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const deleteLocalTypesCtx = createHandlerContext({
+            connection,
+            logger: deleteLocalTypesLogger,
+          });
+          return handleDeleteLocalTypes(deleteLocalTypesCtx, {
             class_name: className,
             activate_on_delete: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const deleteLocalTypesCtx = createHandlerContext({
-              connection,
-              logger: deleteLocalTypesLogger,
-            });
-            return handleDeleteLocalTypes(deleteLocalTypesCtx, {
-              class_name: className,
-              activate_on_delete: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
+          });
+        },
+      );
+      if (deleteLocalTypesResponse.isError) {
+        logger?.warn(
+          `Delete LocalTypes failed: ${extractErrorMessage(deleteLocalTypesResponse)}`,
         );
-        if (deleteLocalTypesResponse.isError) {
-          logger?.warn(
-            `Delete LocalTypes failed: ${extractErrorMessage(deleteLocalTypesResponse)}`,
-          );
-        }
+      }
 
-        // Delete LocalDefinitions
-        const deleteLocalDefsLogger = createTestLogger('local-defs-delete');
-        const deleteLocalDefsResponse = await invoke(
-          'DeleteLocalDefinitions',
-          {
+      // Delete LocalDefinitions
+      const deleteLocalDefsLogger = createTestLogger('local-defs-delete');
+      const deleteLocalDefsResponse = await invoke(
+        'DeleteLocalDefinitions',
+        {
+          class_name: className,
+          activate_on_delete: false,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+        async () => {
+          const deleteLocalDefsCtx = createHandlerContext({
+            connection,
+            logger: deleteLocalDefsLogger,
+          });
+          return handleDeleteLocalDefinitions(deleteLocalDefsCtx, {
             class_name: className,
             activate_on_delete: false,
             ...(transportRequest && { transport_request: transportRequest }),
-          },
-          async () => {
-            const deleteLocalDefsCtx = createHandlerContext({
-              connection,
-              logger: deleteLocalDefsLogger,
-            });
-            return handleDeleteLocalDefinitions(deleteLocalDefsCtx, {
-              class_name: className,
-              activate_on_delete: false,
-              ...(transportRequest && { transport_request: transportRequest }),
-            });
-          },
+          });
+        },
+      );
+      if (deleteLocalDefsResponse.isError) {
+        logger?.warn(
+          `Delete LocalDefinitions failed: ${extractErrorMessage(deleteLocalDefsResponse)}`,
         );
-        if (deleteLocalDefsResponse.isError) {
-          logger?.warn(
-            `Delete LocalDefinitions failed: ${extractErrorMessage(deleteLocalDefsResponse)}`,
-          );
-        }
+      }
 
-        logger?.success(`✅ Delete operations completed`);
-      });
-    },
-    getTimeout('long'),
-  );
+      logger?.success(`✅ Delete operations completed`);
+    });
+  });
 });

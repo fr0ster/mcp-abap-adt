@@ -18,15 +18,15 @@ Each `object_type` enum, and each tool's description, is the declared system typ
 members are those the system type's ADT type table serves (22.0.0) — on cloud the writes offer
 no `PROGRAM` and no `INCLUDE` — and a member outside them is refused naming the list, before
 anything is sent. On cloud a write handler's schema offers only the properties its cloud members
-take (23.0.0): `HandlerCreate` has no `program_name`, `program_type`, `application` or
-`include_name` there, for example.
+take (23.0.0): `HandlerCreate` has no `program_name`, `application` or `include_name` there,
+for example.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP
 through MCP reliably. A consumer that does select per request (cloud-llm-hub, for
 one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 
-**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerCreate` (the create request alone — no validation, lock, write, check or activation; the object is created inactive with what the create carries; its schema lists only what the create sends; `UNIT_TEST` and `CDS_UNIT_TEST`, whose create is a chain, are refused — the full set serves `CreateUnitTest` and `CreateCdsUnitTest`), `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (one request: the write alone, under your lock; `lock_handle` is required; for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`, `source_code` is the whole metadata document, sent as given — read it with `HandlerGet` part `metadata`, change it, pass all of it back; `part` is taken by INCLUDE alone, `source` when absent; for SERVICE_BINDING the write is its publication request), `HandlerUnlock`, `HandlerDeletionCheck` (the one deletion check, SAP's verdict as it came), `HandlerDelete` (one request: the deletion request alone, with no lock held on the object; a class include and `UNIT_TEST` are written empty by one `PUT` under your class lock's `lock_handle`), `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate` (one request: one object of a type the per-object activation maps answers its verdict; every other call starts an activation run and answers `{ run_id }`), and `HandlerGet` — one request per part: `source` the source alone, `metadata` the metadata document alone (PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE have only `metadata`; a function module is named `GROUP|MODULE` or with `function_group_name`), and `object_structure` / `node_structure` / `virtual_folders` (a package's blank node structure is the empty listing with `blank`: an empty package, or no package of that name), and `activation_status` / `activation_results` (an activation run by its `run_id`: its status, then its messages — asking again until the status settles is yours), and `object_type` `UNIT_TEST` / `CDS_UNIT_TEST` (a unit-test run's result by its `run_id`, one request, as `HandlerUnitTestResult` / `HandlerCdsUnitTestResult` read it; the status is `HandlerUnitTestStatus` / `HandlerCdsUnitTestStatus`, asked until it says `FINISHED`). `HandlerDumpList` reads one page per call (`top` 1 to 100, `to`): its `next_to` is the `to` of SAP's next link, and following it is yours; that page starts at the boundary second, inclusive, so match entries by `dump_id`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerCreate` (the create request alone — no validation, lock, write, check or activation; the object is created inactive with what the create carries; its schema lists only what the create sends; `UNIT_TEST` and `CDS_UNIT_TEST`, whose create is a chain, are refused — the full set serves `CreateUnitTest` and `CreateCdsUnitTest`), `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (one request: the write alone, under your lock; `lock_handle` is required; for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`, `source_code` is the whole metadata document, sent as given — read it with `HandlerGet` part `metadata`, change it, pass all of it back; `part` is taken by INCLUDE alone, `source` when absent; for SERVICE_BINDING the write is its publication request), `HandlerUnlock`, `HandlerDeletionCheck` (the one deletion check, SAP's verdict as it came), `HandlerDelete` (one request: the deletion request alone, with no lock held on the object; a class include and `UNIT_TEST` are written empty by one `PUT` under your class lock's `lock_handle`), `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate` (one request: one object of a type the per-object activation maps answers its verdict; every other call starts an activation run and answers `{ run_id }`; on a system whose discovery offers no activation runs (SAP_BASIS 751, 7.40) that call answers SAP's refusal, and a group activation there is `ActivateObjects` of the full set or `ActivateObjectLow` of the low handlers group), and `HandlerGet` — one request per part: `source` the source alone, `metadata` the metadata document alone (PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE have only `metadata`; a function module is named `GROUP|MODULE` or with `function_group_name`), and `object_structure` / `node_structure` / `virtual_folders` (a package's blank node structure is the empty listing with `blank`: an empty package, or no package of that name), and `activation_status` / `activation_results` (an activation run by its `run_id`: its status, then its messages — asking again until the status settles is yours), and `object_type` `UNIT_TEST` / `CDS_UNIT_TEST` (a unit-test run's result by its `run_id`, one request, as `HandlerUnitTestResult` / `HandlerCdsUnitTestResult` read it; the status is `HandlerUnitTestStatus` / `HandlerCdsUnitTestStatus`, asked until it says `FINISHED`). `HandlerDumpList` reads one page per call (`top` 1 to 100, `to`): its `next_to` is the `to` of SAP's next link, and following it is yours; that page starts at the boundary second, inclusive, so match entries by `dump_id`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 
 **Batch mode: `HandlerBatch`.** Every compact binary, `-ro` ones included, on every transport,
 serves batch mode as one tool: `action: 'begin'` switches the server into batch mode, every call
@@ -77,25 +77,24 @@ mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 29, the debugger 
 mcp-abap-adt-compact --version
 
 npm install -g @mcp-abap-adt/compact-ro
-mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothing, the leftover-session list and logoff
+mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothing, the leftover-session list
 ```
 
 **The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 29 tools (every access, which
 is what a local server gives), the four debugger tools, the debugger batch (`HandlerDebugBatch`),
-the leftover-session list and logoff, the background-run tools and `HandlerBatch` — 40. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
+the leftover-session list and logoff, the background-run tools and `HandlerBatch` — 39; `HandlerGetData`, one of the 29, only with `--enable-data-tools` (40). `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
 where-used, checks and validations, the unit-test status and result reads, the profiler list and
-view, the dump list and view, the service-binding type list — with `HandlerBatch` and the
-leftover-session list and logoff — 20; its tool list is exactly these, so a client calls only them. `--exposition`
+view, the dump list and view, the service-binding type list — with the background-run tools, `HandlerBatch` and the
+leftover-session list — 21, `HandlerGetData` (one of the 17) only with `--enable-data-tools` (22); its tool list is exactly these, so a client calls only them. `--exposition`
 (`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence
 naming the binary to install instead, e.g. *--exposition is gone (19.0.0): the binary fixes its tool
 set, so remove it; the compact tools that change nothing are served by `mcp-abap-adt-compact-ro`
 (`@mcp-abap-adt/compact-ro`)*.
 
-**Leftover sessions, in both.** `HandlerLeftoverSessionList` and
-`HandlerLeftoverSessionLogoff` are served by `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro`
-alike (a logoff is a system action, not a data change) — the SAP sessions a killed
-server process left open (and the locks in them), listed or logged off by the user, only
-the caller's own; no tool resumes one: a stdio server takes up the one leftover session of its
+**Leftover sessions.** `HandlerLeftoverSessionList` is served by `mcp-abap-adt-compact` and
+`mcp-abap-adt-compact-ro`; `HandlerLeftoverSessionLogoff` by `mcp-abap-adt-compact` alone (a logoff
+releases every lock a session holds) — the SAP sessions a killed server process left open (and
+the locks in them), listed or logged off by the user, only the caller's own; no tool resumes one: a stdio server takes up the one leftover session of its
 destination at its start:
 [Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). They are stdio's: `-compact-http` and `-compact-sse`
 (and their `-ro`) serve none and write no session file, since one such server holds the sessions of

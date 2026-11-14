@@ -1,4 +1,17 @@
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { withoutNamePrefix } from '../plainText';
+import { parseXml } from '../xml/node';
+import {
+  attr,
+  child,
+  childAt,
+  isElement,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { type AdtReading, parseStructure, reading } from './reading';
 
 /**
@@ -49,9 +62,9 @@ export interface SqlPreview {
   /** One object per row, keyed by column name. A blank cell is `null`. */
   rows: Array<Record<string, string | null>>;
   /** `dataPreview:totalRows` — how many the query has, not how many came. */
-  total_rows?: number;
+  total_rows?: number | undefined;
   /** `dataPreview:queryExecutionTime`, in seconds as the server reports it. */
-  execution_time?: number;
+  execution_time?: number | undefined;
   /**
    * The whole document, parsed generically — what `detail: 'full'` answers.
    *
@@ -69,7 +82,7 @@ export interface SqlPreview {
    * answers exactly what it answered then, and the rows are correct beside
    * it.
    */
-  document: unknown;
+  document: XmlRead;
 }
 
 const parser = new XMLParser({
@@ -80,18 +93,17 @@ const parser = new XMLParser({
   parseTagValue: false,
   // The column and its cells repeat; a document with one of either would
   // otherwise arrive as an object and be read as no columns at all.
-  isArray: (name) => ['columns', 'data'].includes(name.replace(/^\w+:/, '')),
+  isArray: (name) => ['columns', 'data'].includes(withoutNamePrefix(name)),
   removeNSPrefix: true,
 });
 
-type Element = Record<string, unknown> & { '@'?: Record<string, string> };
+/** One element or several, as a list; a single value that is not an element is none. */
+const asList = (value: XmlRead): XmlList =>
+  isList(value) ? value : isElement(value) ? [value] : [];
 
-const asList = (value: unknown): Element[] =>
-  Array.isArray(value)
-    ? (value as Element[])
-    : value && typeof value === 'object'
-      ? [value as Element]
-      : [];
+/** The attribute `name` of `element`'s attribute group (`@`). */
+const at = (element: XmlRead, name: string): string | undefined =>
+  attr(child(element, '@'), name);
 
 /**
  * A cell's text.
@@ -102,43 +114,40 @@ const asList = (value: unknown): Element[] =>
  * caller can tell "SAP sent nothing" from "SAP sent a blank string", which is
  * what the pre-migration answer did too.
  */
-const cell = (value: unknown): string | null => {
+const cell = (value: XmlRead): string | null => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'object') {
-    const text = (value as { '#text'?: unknown })['#text'];
+    const text = child(value, '#text');
     return text === undefined || text === '' ? null : String(text);
   }
   const text = String(value);
   return text === '' ? null : text;
 };
 
-const numberOf = (value: unknown): number | undefined => {
+const numberOf = (value: XmlRead): number | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 export function parseSqlPreview(document: string): SqlPreview {
-  const table = (parser.parse(document) as Element)?.tableData as
-    | Element
-    | undefined;
+  const table = child(parseXml(parser, document), 'tableData');
   if (!table)
     return { columns: [], rows: [], document: parseStructure(document) };
 
   const columns: SqlColumn[] = [];
   const byColumn: Array<Array<string | null>> = [];
 
-  for (const column of asList(table.columns)) {
-    const metadata = (column.metadata ?? {}) as Element;
+  for (const column of asList(child(table, 'columns'))) {
+    const metadata = child(column, 'metadata');
     columns.push({
-      name: metadata['@']?.name ?? '',
-      type: metadata['@']?.type ?? '',
-      description: metadata['@']?.description ?? '',
+      name: at(metadata, 'name') ?? '',
+      type: at(metadata, 'type') ?? '',
+      description: at(metadata, 'description') ?? '',
     });
     // Each column carries its own `dataSet`, and the cells inside it are the
     // column's values in row order.
-    const dataSet = (column.dataSet ?? {}) as Element;
-    byColumn.push(asList(dataSet.data).map(cell));
+    byColumn.push(asList(childAt(column, 'dataSet', 'data')).map(cell));
   }
 
   // The longest column decides the row count: a column that came back short
@@ -159,14 +168,13 @@ export function parseSqlPreview(document: string): SqlPreview {
   return {
     columns,
     rows,
-    total_rows: numberOf(table.totalRows),
-    execution_time: numberOf(table.queryExecutionTime),
+    total_rows: numberOf(child(table, 'totalRows')),
+    execution_time: numberOf(child(table, 'queryExecutionTime')),
     document: parseStructure(document),
   };
 }
 
 /** The reading itself, for the `query` slot. */
-export const sqlPreview: (answer: unknown) => AdtReading<SqlPreview> = reading(
-  (answer) =>
-    parseSqlPreview(String((answer as { data?: unknown })?.data ?? '')),
-) as (answer: unknown) => AdtReading<SqlPreview>;
+export const sqlPreview: IResultStrategy<AdtReading<SqlPreview>> = reading(
+  (answer) => parseSqlPreview(String(answer.data ?? '')),
+);

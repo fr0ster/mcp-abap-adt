@@ -3,14 +3,14 @@
  * Provides utilities for parsing responses, managing sessions, etc.
  */
 
+import assert from 'node:assert/strict';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError } from 'axios';
+import type * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  isAlreadyCheckedError,
-  isAlreadyExistsError,
-} from '../../../lib/utils';
+import { type JsonValue, parseJson } from '../../../lib/json';
+import { HeldLocks } from '../../../lib/state/heldLocks';
 import type { LoggerWithExtras } from './loggerHelpers';
 import { createTestLogger } from './loggerHelpers';
 
@@ -20,7 +20,7 @@ import { createTestLogger } from './loggerHelpers';
 export function parseHandlerResponse(response: {
   isError: boolean;
   content: Array<{ type: string; text: string }>;
-}): any {
+}): JsonValue {
   if (response.isError) {
     throw new Error(
       `Handler returned error: ${response.content[0]?.text || 'Unknown error'}`,
@@ -32,11 +32,32 @@ export function parseHandlerResponse(response: {
     throw new Error('Handler response has no content');
   }
 
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`Failed to parse handler response: ${e}`);
+  const parsed = parseJson(text);
+  if (parsed === undefined) {
+    throw new Error(`Failed to parse handler response: ${text.slice(0, 200)}`);
   }
+  return parsed;
+}
+
+/**
+ * A handler's answer as `schema` reads it: the JSON it answered, checked
+ * once against what the test reads of it.
+ */
+export function handlerAnswer<S extends z.ZodType>(
+  response: {
+    isError: boolean;
+    content: Array<{ type: string; text: string }>;
+  },
+  schema: S,
+): z.output<S> {
+  return schema.parse(parseHandlerResponse(response));
+}
+
+/** `value`'s own `key`, when `value` is an object; parsed JSON is read by shape. */
+function fieldOf(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null && key in value
+    ? Reflect.get(value, key)
+    : undefined;
 }
 
 /**
@@ -64,30 +85,34 @@ export function expectWriteAccepted(response: {
       `Handler returned error: ${response.content[0]?.text || 'Unknown error'}`,
     );
   }
-  expect(response.content[0]?.text).toBe('SUCCESS');
+  assert.equal(response.content[0]?.text, 'SUCCESS');
 }
 
 /**
  * Extract session state from handler response
  */
-export function extractSessionState(response: any): {
+export function extractSessionState(response: unknown): {
   session_id: string | null;
-  session_state: any;
+  session_state: { cookies: string } | null;
 } {
+  const sessionId = fieldOf(response, 'session_id');
+  const state = fieldOf(response, 'session_state');
+  const cookies = fieldOf(state, 'cookies');
   return {
-    session_id: response.session_id || null,
-    session_state: response.session_state || null,
+    session_id: typeof sessionId === 'string' && sessionId ? sessionId : null,
+    session_state: typeof cookies === 'string' ? { cookies } : null,
   };
 }
 
 /**
  * Extract lock handle from Lock handler response
  */
-export function extractLockHandle(response: any): string {
-  if (!response.lock_handle) {
+export function extractLockHandle(response: unknown): string {
+  const lockHandle = fieldOf(response, 'lock_handle');
+  if (typeof lockHandle !== 'string' || !lockHandle) {
     throw new Error('Lock response does not contain lock_handle');
   }
-  return response.lock_handle;
+  return lockHandle;
 }
 
 /**
@@ -109,8 +134,8 @@ export function extractErrorMessage(response: {
 /**
  * Check if handler response indicates success
  */
-export function isSuccessResponse(response: any): boolean {
-  return response.success === true && !response.isError;
+export function isSuccessResponse(response: unknown): boolean {
+  return fieldOf(response, 'success') === true && !fieldOf(response, 'isError');
 }
 
 /**
@@ -123,7 +148,7 @@ export function delay(ms: number): Promise<void> {
 /**
  * Safely stringify an object, handling circular references
  */
-export function safeStringify(obj: any): string {
+export function safeStringify(obj: unknown): string {
   const seen = new WeakSet();
   return JSON.stringify(obj, (key, value) => {
     if (typeof value === 'object' && value !== null) {
@@ -157,7 +182,7 @@ export const DEBUG_TESTS =
   process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true';
 const testLogger = createTestLogger('test');
 
-export function debugLog(step: string, message: string, data?: any): void {
+export function debugLog(step: string, message: string, data?: unknown): void {
   if (!DEBUG_TESTS) return;
 
   testLogger?.debug(`${step}: ${message}`);
@@ -187,78 +212,6 @@ export function logTestStep(step: string): void {
 }
 
 /**
- * Check if error message indicates object was already checked
- * Re-exports from lib/utils for use in tests
- */
-/**
- * Check if error message indicates object already exists
- * Re-exports from lib/utils for use in tests
- */
-export { isAlreadyCheckedError, isAlreadyExistsError };
-
-/**
- * Safely handle check operation response - ignores "already checked" errors
- * @param checkResponse - Handler response from check operation
- * @param objectName - Name of object being checked (for error messages)
- * @throws Error if check failed with a real error (not "already checked")
- */
-export function handleCheckResponse(
-  checkResponse: {
-    isError: boolean;
-    content: Array<{ type: string; text: string }>;
-  },
-  objectName: string,
-): void {
-  if (!checkResponse.isError) {
-    return; // Success
-  }
-
-  const errorMsg = extractErrorMessage(checkResponse);
-
-  // "Already checked" is not an error - it's OK, just return
-  if (isAlreadyCheckedError(errorMsg)) {
-    return; // Already checked is OK
-  }
-
-  // Real error - throw
-  throw new Error(`Check failed for ${objectName}: ${errorMsg}`);
-}
-
-/**
- * Safely handle validation response - checks if object already exists
- * @param validateResponse - Handler response from validation
- * @param validateData - Parsed validation data (can be null if validation failed)
- * @param objectName - Name of object being validated
- * @returns true if object exists (should skip test), false if should continue
- */
-export function shouldSkipDueToExistingObject(
-  validateResponse: {
-    isError: boolean;
-    content: Array<{ type: string; text: string }>;
-  },
-  validateData: any | null,
-  _objectName: string,
-): boolean {
-  // Check error message first
-  if (validateResponse.isError) {
-    const errorMsg = extractErrorMessage(validateResponse);
-    if (isAlreadyExistsError(errorMsg)) {
-      return true;
-    }
-  }
-
-  // Check validation result if data is available
-  if (validateData && !validateData.validation_result?.valid) {
-    const message = validateData.validation_result?.message || '';
-    const indicatesExists =
-      validateData.validation_result?.exists || isAlreadyExistsError(message);
-    return indicatesExists;
-  }
-
-  return false;
-}
-
-/**
  * Create HandlerContext from TesterContext
  * Logger is included only if DEBUG_HANDLERS=true
  *
@@ -269,8 +222,12 @@ export function createHandlerContext(context: {
   connection: IAbapConnection;
   logger: LoggerWithExtras;
 }): HandlerContext {
+  // The context stands for a server instance: its own `HandlerLock` keeps
+  // the handles it took, and a write, a delete or an unlock is sent only
+  // under one of them (#4) — without an owner every compact lock is refused.
   const handlerContext: HandlerContext = {
     connection: context.connection,
+    heldLocks: new HeldLocks(),
   };
 
   // Include logger only if DEBUG_HANDLERS is enabled

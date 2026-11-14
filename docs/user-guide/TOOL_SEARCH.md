@@ -145,8 +145,10 @@ The tests:
   for five embedding models of a local Ollama (`http://127.0.0.1:11434`:
   nomic-embed-text, bge-m3, mxbai-embed-large, bge-large,
   snowflake-arctic-embed:335m); it runs where that Ollama answers with the
-  model and is skipped elsewhere, its name saying why. Its requests carry no
-  timeout of their own; a hung Ollama is bounded by Jest's test timeout.
+  model and is skipped elsewhere, with the reason. It is a run of its own,
+  `npm run test:retrieval` — not in `npm test`, not in CI. Its requests carry
+  no timeout of their own, and the run sets none: a hung Ollama is ended with
+  Ctrl-C (the runner's interrupt).
 
 `descriptionsFunctional.test.ts` holds every `description` to its rules:
 no negation, no other tool of its set named, `[read-only]` on every tool that

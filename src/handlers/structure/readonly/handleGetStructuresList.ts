@@ -1,7 +1,8 @@
 import { structureDocuments, tableDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import type { AdtCodes } from '../../../lib/adtProjections';
 import {
   type FailureEntry,
@@ -19,23 +20,35 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { type JsonValue, jsonOrText } from '../../../lib/json';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import {
+  afterBlanksAt,
+  asciiLower,
+  asciiUpper,
+  holdsPhrase,
+  isAsciiLetter,
+  isWordCharacter,
+  linesOf,
+  wordAt,
+} from '../../../lib/plainText';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
+  presentScopeOptions,
   type WhereUsedSource,
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { child } from '../../../lib/thrownValue';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetStructuresList',
@@ -46,30 +59,27 @@ export const TOOL_DEFINITION = {
       'Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; ' +
       'legacy systems (BASIS < 7.50) refuse it (issue #207).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      structure_name: {
-        type: 'string',
-        description: 'Structure name (or give structure_names).',
-      },
-      structure_names: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Several structure names, read together (give this or structure_name).',
-      },
-      version: READ_VERSION_PROPERTY,
-      include_extensions: {
-        type: 'boolean',
-        description:
-          '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
-        default: true,
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    structure_name: z
+      .string()
+      .optional()
+      .describe('Structure name (or give structure_names).'),
+    structure_names: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Several structure names, read together (give this or structure_name).',
+      ),
+    version: READ_VERSION_FIELD,
+    include_extensions: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
+      ),
+  }),
 } as const;
 
 interface StructureNode {
@@ -114,11 +124,10 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
   const refs: EmbeddedRef[] = [];
   if (!source) return refs;
 
-  const lines = source.split(/\r?\n/);
-  for (const rawLine of lines) {
+  for (const rawLine of linesOf(source)) {
     // Strip line comments (both classic '* ' and DDL '//').
-    let line = rawLine.replace(/\/\/.*$/, '');
-    line = line.trim();
+    const comment = rawLine.indexOf('//');
+    const line = (comment === -1 ? rawLine : rawLine.slice(0, comment)).trim();
     if (!line || line.startsWith('@') || line.startsWith('*')) continue;
 
     // Classic field-list include: .INCLUDE <name>
@@ -126,41 +135,63 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
     // line in a structure's source. An append is a separate object that
     // `extend type <this> with …`; those are resolved via where-used in
     // findExtensions(), not here.
-    const classicInclude = line.match(/^\.include\s+([a-z0-9_/]+)/i);
-    if (classicInclude) {
-      refs.push({
-        name: classicInclude[1].toUpperCase(),
-        attribute: null,
-        kind: 'include',
-      });
+    const classicInclude = includedName(line, '.INCLUDE');
+    if (classicInclude !== undefined) {
+      refs.push({ name: classicInclude, attribute: null, kind: 'include' });
       continue;
     }
 
     // Modern DDL named include: `<attr> : include <name>;`
-    const namedInclude = line.match(
-      /^([a-z][a-z0-9_]*)\s*:\s*include\s+([a-z0-9_/]+)\s*;?/i,
-    );
-    if (namedInclude) {
-      refs.push({
-        name: namedInclude[2].toUpperCase(),
-        attribute: namedInclude[1].toLowerCase(),
-        kind: 'include',
-      });
+    const named = namedInclude(line);
+    if (named !== undefined) {
+      refs.push({ ...named, kind: 'include' });
       continue;
     }
 
     // Modern DDL anonymous include: `include <name>;`
-    const ddlInclude = line.match(/^include\s+([a-z0-9_/]+)\s*;?/i);
-    if (ddlInclude) {
-      refs.push({
-        name: ddlInclude[1].toUpperCase(),
-        attribute: null,
-        kind: 'include',
-      });
+    const ddlInclude = includedName(line, 'INCLUDE');
+    if (ddlInclude !== undefined) {
+      refs.push({ name: ddlInclude, attribute: null, kind: 'include' });
     }
   }
 
   return refs;
+}
+
+/** A structure name's characters: letters, digits, `_` and `/` (a namespace). */
+const isStructureNameCharacter = (character: string | undefined): boolean =>
+  isWordCharacter(character) || character === '/';
+
+/**
+ * The name after `keyword` (any case) at the start of `line`, the keyword
+ * and the name one or more blanks apart, in upper case; what follows the
+ * name is not read. `undefined` when the line does not start so.
+ */
+function includedName(line: string, keyword: string): string | undefined {
+  if (!wordAt(line, 0, keyword)) return undefined;
+  const at = afterBlanksAt(line, keyword.length);
+  if (at === keyword.length) return undefined;
+  let end = at;
+  while (end < line.length && isStructureNameCharacter(line[end])) end++;
+  return end > at ? asciiUpper(line.slice(at, end)) : undefined;
+}
+
+/** `<attr> : include <name>` at the start of `line`: the attribute in lower case, the name in upper. */
+function namedInclude(
+  line: string,
+): { name: string; attribute: string } | undefined {
+  if (!isAsciiLetter(line[0])) return undefined;
+  let end = 1;
+  while (end < line.length && isWordCharacter(line[end])) end++;
+  const colon = afterBlanksAt(line, end);
+  if (line[colon] !== ':') return undefined;
+  const name = includedName(
+    line.slice(afterBlanksAt(line, colon + 1)),
+    'INCLUDE',
+  );
+  return name === undefined
+    ? undefined
+    : { name, attribute: asciiLower(line.slice(0, end)) };
 }
 
 /**
@@ -176,35 +207,18 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
  * rather than relying on a caught exception for the ordinary "not this
  * endpoint, try the other one" case.
  */
-function extractSource(result: unknown): string | null {
-  if (
-    result !== null &&
-    typeof result === 'object' &&
-    'ok' in result &&
-    (result as { ok: unknown }).ok === true &&
-    'getResult' in result
-  ) {
-    const value = (result as { getResult(): { value: unknown } }).getResult()
-      .value;
-    if (value == null) return null;
-    if (typeof value === 'string') return value;
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-  return null;
+function extractSource(result: IAdtResponse<string, IAdtError>): string | null {
+  return result.ok ? result.getResult().value : null;
 }
 
 async function structuresListOf(
   context: HandlerContext,
   args: {
-    structure_name: string;
-    version?: ReadVersion;
-    include_extensions?: boolean;
+    structure_name?: string | undefined;
+    version?: ReadVersion | undefined;
+    include_extensions?: boolean | undefined;
   },
-) {
+): Promise<McpResult> {
   const { connection, logger } = context;
   try {
     const { structure_name, version = 'active' } = args;
@@ -242,18 +256,14 @@ async function structuresListOf(
       let answered = 0; // endpoints that answered 404 (or nothing to read)
       const attempt = async (
         step: 'read structure' | 'read table',
-        read: () => Promise<unknown>,
+        read: () => Promise<IAdtResponse<string, IAdtError>>,
       ): Promise<string | null> => {
         try {
           const answer = await read();
           const source = extractSource(answer);
           if (source != null) return source;
-          const failed = answer as {
-            ok?: unknown;
-            getError?: () => IAdtError;
-          };
-          if (failed?.ok === false && typeof failed.getError === 'function') {
-            const error = failed.getError();
+          if (!answer.ok) {
+            const error = answer.getError();
             // The credentials are the same for every node: the whole call
             // ends, as it came.
             if (isCredentialPayload(failureEntry(error, step)))
@@ -343,9 +353,7 @@ async function structuresListOf(
         // from "no appends".
         appendsUnavailable = true;
         logger?.warn(
-          `where-used failed for ${baseName}: ${
-            (lastErr as any)?.message ?? String(lastErr)
-          }`,
+          `where-used failed for ${baseName}: ${messageOf(lastErr)}`,
         );
         return [];
       }
@@ -355,13 +363,9 @@ async function structuresListOf(
       for (const ref of references) {
         const name = (ref.name ?? '').trim().toUpperCase();
         if (!name || name === baseName) continue;
-        if (!/^TABL\//i.test(ref.type ?? '')) continue;
+        if (!isTablType(ref.type)) continue;
         candidates.add(name);
       }
-      const extendRe = new RegExp(
-        `extend\\s+type\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+with`,
-        'i',
-      );
       const refs: EmbeddedRef[] = [];
       for (const cand of candidates) {
         const read = await readDdl(cand);
@@ -373,7 +377,7 @@ async function structuresListOf(
           });
         }
         const csrc = 'source' in read ? read.source : null;
-        if (csrc && extendRe.test(csrc)) {
+        if (csrc && extendsBase(csrc, baseName)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
         }
       }
@@ -464,10 +468,18 @@ async function structuresListOf(
         null,
         2,
       ),
-    } as AxiosResponse);
-  } catch (error: any) {
+    });
+  } catch (error) {
     return return_error(error);
   }
+}
+
+/** A thrown value's `message`, else the value written out. */
+function messageOf(thrown: unknown): string {
+  const message = child(thrown, 'message');
+  return message === undefined || message === null
+    ? String(thrown)
+    : String(message);
 }
 
 type DdlStep = 'read structure' | 'read table';
@@ -489,20 +501,16 @@ const STRUCTURES_ONLY: AdtCodes<'TABL/DS'> = 'TABL/DS';
  */
 function attemptOf(
   step: DdlStep,
-  result: PhaseResult<unknown>,
-  state: { failures: FailureEntry[]; answered: number },
+  result: PhaseResult<DdlAnswer>,
+  state: AttemptState,
 ): string | null {
   try {
     if (!result.ok) throw result.error;
     const answer = result.value;
     const source = extractSource(answer);
     if (source != null) return source;
-    const failed = answer as {
-      ok?: unknown;
-      getError?: () => IAdtError;
-    };
-    if (failed?.ok === false && typeof failed.getError === 'function') {
-      const error = failed.getError();
+    if (!answer.ok) {
+      const error = answer.getError();
       if (isCredentialPayload(failureEntry(error, step)))
         throw carryingFailure(new Error(error.message), error, step);
       state.failures.push(failureEntry(error, step));
@@ -516,6 +524,21 @@ function attemptOf(
   return null;
 }
 
+/** What a DDL read answered. */
+type DdlAnswer = IAdtResponse<string, IAdtError>;
+
+/** One name's DDL attempts so far: the failures recorded, the `404`s counted. */
+interface AttemptState {
+  failures: FailureEntry[];
+  answered: number;
+}
+
+/** What a where-used request answered. */
+type WhereUsedAnswer = Awaited<ReturnType<WhereUsedSource['getWhereUsed']>>;
+
+/** What a where-used scope request answered. */
+type ScopeAnswer = Awaited<ReturnType<WhereUsedSource['getWhereUsedScope']>>;
+
 /** What a where-used lookup of a base came to: its references, or its last error. */
 type WhereUsedOutcome =
   | { resolved: true; references: Array<{ name?: string; type?: string }> }
@@ -526,21 +549,42 @@ const WHERE_USED_SCOPE = { enableOnlyTypes: [STRUCTURES_ONLY] };
 /** A `WhereUsedSource` whose two requests answer `scope` and `whereUsed`. */
 function answeredWhereUsed(
   modify: WhereUsedSource['modifyWhereUsedScope'],
-  scope: PhaseResult<unknown>,
-  whereUsed: (
-    params: Parameters<WhereUsedSource['getWhereUsed']>[0],
-  ) => unknown,
+  scope: () => Promise<ScopeAnswer>,
+  whereUsed: WhereUsedSource['getWhereUsed'],
 ): WhereUsedSource {
   return {
-    getWhereUsedScope: () => settledAs(scope) as never,
+    getWhereUsedScope: scope,
     modifyWhereUsedScope: modify,
-    getWhereUsed: (params) => whereUsed(params) as never,
+    getWhereUsed: whereUsed,
   };
 }
 
-/** An answer as the request's promise gave it: its value, or its rejection. */
-const settledAs = (result: PhaseResult<unknown>): Promise<unknown> =>
-  result.ok ? Promise.resolve(result.value) : Promise.reject(result.error);
+/**
+ * An answer as the request's promise gave it: its value, or its rejection;
+ * a request no phase sent (`what` names it) rejects in words.
+ */
+function settledAs<R>(
+  result: PhaseResult<R | undefined> | undefined,
+  what: string,
+): Promise<R> {
+  if (result === undefined) {
+    return Promise.reject(new Error(`${what} was not sent`));
+  }
+  if (!result.ok) return Promise.reject(result.error);
+  const { value } = result;
+  return value === undefined
+    ? Promise.reject(new Error(`${what} was not sent`))
+    : Promise.resolve(value);
+}
+
+/** The entry of `map` for `name`, which an earlier phase set; else a throw in words. */
+function readEarlier<V>(map: ReadonlyMap<string, V>, name: string): V {
+  const value = map.get(name);
+  if (value === undefined) {
+    throw new Error(`${name} was not read in an earlier phase`);
+  }
+  return value;
+}
 
 /**
  * The reads of the batched version, by name, and their phases (spec §11):
@@ -552,17 +596,17 @@ const settledAs = (result: PhaseResult<unknown>): Promise<unknown> =>
  */
 function structureReads(context: HandlerContext, version: ReadVersion) {
   const { logger } = context;
-  const structures = new Map<string, PhaseResult<unknown>>();
-  const tables = new Map<string, PhaseResult<unknown>>();
+  const structures = new Map<string, PhaseResult<DdlAnswer>>();
+  const tables = new Map<string, PhaseResult<DdlAnswer>>();
   const ddl = new Map<string, DdlRead>();
-  const scopes = new Map<string, PhaseResult<unknown>>();
-  const whereUsed = new Map<string, PhaseResult<unknown>>();
+  const scopes = new Map<string, PhaseResult<ScopeAnswer>>();
+  const whereUsed = new Map<string, PhaseResult<WhereUsedAnswer | undefined>>();
   const outcomes = new Map<string, WhereUsedOutcome>();
   const pairKey = (name: string, type: WhereUsedType) => `${type}:${name}`;
   // Local: builds the scope document, sends nothing.
   const local = createAdtClient(context.connection, logger).getUtils(ourUtils);
   const modify: WhereUsedSource['modifyWhereUsedScope'] = (xml, options) =>
-    local.modifyWhereUsedScope(xml, options);
+    local.modifyWhereUsedScope(xml, presentScopeOptions(options));
   const utilsOn = (connection: IAbapConnection) =>
     createAdtClient(connection, logger).getUtils(ourUtils);
 
@@ -579,8 +623,8 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
         const wu = await fetchWhereUsedReferences(
           answeredWhereUsed(
             modify,
-            scopes.get(key) as PhaseResult<unknown>,
-            () => settledAs(whereUsed.get(key) as PhaseResult<unknown>),
+            () => settledAs(scopes.get(key), `where-used scope of ${key}`),
+            () => settledAs(whereUsed.get(key), `where-used of ${key}`),
           ),
           {
             object_name: baseName,
@@ -616,7 +660,7 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
   return {
     /** The DDL of `name`, read in an earlier phase. */
     ddlOf(name: string): DdlRead {
-      return ddl.get(name) as DdlRead;
+      return readEarlier(ddl, name);
     },
     outcomeOf,
     /** (a), (b): the DDL of every name not read yet. */
@@ -632,10 +676,10 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
       );
       const second: string[] = [];
       fresh.forEach((name, i) => {
-        const result = read[i] as PhaseResult<unknown>;
+        const result = read[i];
         if (!result.ok && endsTheCall(result.error)) throw result.error;
         structures.set(name, result);
-        const state = { failures: [] as FailureEntry[], answered: 0 };
+        const state: AttemptState = { failures: [], answered: 0 };
         if (attemptOf('read structure', result, state) == null)
           second.push(name);
       });
@@ -650,26 +694,22 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
             )
           : [];
       second.forEach((name, i) => {
-        const result = tableRead[i] as PhaseResult<unknown>;
+        const result = tableRead[i];
         if (!result.ok && endsTheCall(result.error)) throw result.error;
         tables.set(name, result);
       });
       for (const name of fresh) {
-        const state = { failures: [] as FailureEntry[], answered: 0 };
+        const state: AttemptState = { failures: [], answered: 0 };
         const structure = attemptOf(
           'read structure',
-          structures.get(name) as PhaseResult<unknown>,
+          readEarlier(structures, name),
           state,
         );
         if (structure != null) {
           ddl.set(name, { source: structure });
           continue;
         }
-        const table = attemptOf(
-          'read table',
-          tables.get(name) as PhaseResult<unknown>,
-          state,
-        );
+        const table = attemptOf('read table', readEarlier(tables, name), state);
         ddl.set(
           name,
           table != null
@@ -706,15 +746,13 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
         });
       });
       pairs.forEach((pair, i) => {
-        const result = scoped[i] as PhaseResult<unknown>;
+        const result = scoped[i];
         if (!result.ok && endsTheCall(result.error)) throw result.error;
         scopes.set(pair.key, result);
       });
       const answered = pairs.filter((pair) => {
-        const scope = scopes.get(pair.key) as PhaseResult<unknown>;
-        return (
-          scope.ok && (scope.value as { ok?: unknown } | undefined)?.ok === true
-        );
+        const scope = scopes.get(pair.key);
+        return scope?.ok === true && scope.value.ok;
       });
       const found =
         answered.length > 0
@@ -723,12 +761,16 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
                 context,
                 utilsOn(connection),
               );
-              let sent: Promise<unknown> | undefined;
+              let sent: Promise<WhereUsedAnswer> | undefined;
               try {
                 await fetchWhereUsedReferences(
                   answeredWhereUsed(
                     modify,
-                    scopes.get(pair.key) as PhaseResult<unknown>,
+                    () =>
+                      settledAs(
+                        scopes.get(pair.key),
+                        `where-used scope of ${pair.key}`,
+                      ),
                     (params) => {
                       sent = source.getWhereUsed(params);
                       return sent;
@@ -743,11 +785,11 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
               } catch {
                 // The request's own answer is kept below, as it came.
               }
-              return sent as Promise<unknown>;
+              return sent;
             })
           : [];
       answered.forEach((pair, i) => {
-        const result = found[i] as PhaseResult<unknown>;
+        const result = found[i];
         if (!result.ok && endsTheCall(result.error)) throw result.error;
         whereUsed.set(pair.key, result);
       });
@@ -761,12 +803,18 @@ function structureReads(context: HandlerContext, version: ReadVersion) {
 
 type StructureReads = ReturnType<typeof structureReads>;
 
-/** The `extend type <base> with` test an append candidate's source passes. */
-const extendsBase = (baseName: string) =>
-  new RegExp(
-    `extend\\s+type\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+with`,
-    'i',
-  );
+/**
+ * Whether an append candidate's source states `extend type <base> with`:
+ * the words in any case, one or more white-space characters apart.
+ */
+export function extendsBase(source: string, baseName: string): boolean {
+  return holdsPhrase(source, ['extend', 'type', baseName, 'with']);
+}
+
+/** Whether a where-used reference's type is a `TABL` one, in any case. */
+function isTablType(type: string | undefined): boolean {
+  return wordAt(type ?? '', 0, 'TABL/');
+}
 
 /** The append candidates a where-used outcome names: referencing TABL objects, not the base. */
 function candidatesOf(baseName: string, outcome: WhereUsedOutcome): string[] {
@@ -775,7 +823,7 @@ function candidatesOf(baseName: string, outcome: WhereUsedOutcome): string[] {
   for (const ref of outcome.references) {
     const name = (ref.name ?? '').trim().toUpperCase();
     if (!name || name === baseName) continue;
-    if (!/^TABL\//i.test(ref.type ?? '')) continue;
+    if (!isTablType(ref.type)) continue;
     candidates.add(name);
   }
   return [...candidates];
@@ -792,7 +840,7 @@ async function structureTreeFromAnswers(
   rootName: string,
   includeExtensions: boolean,
   reads: StructureReads,
-) {
+): Promise<McpResult> {
   const { logger } = context;
   try {
     let appendsUnavailable = false;
@@ -807,13 +855,10 @@ async function structureTreeFromAnswers(
       if (!outcome.resolved) {
         appendsUnavailable = true;
         logger?.warn(
-          `where-used failed for ${baseName}: ${
-            (outcome.lastErr as any)?.message ?? String(outcome.lastErr)
-          }`,
+          `where-used failed for ${baseName}: ${messageOf(outcome.lastErr)}`,
         );
         return [];
       }
-      const extendRe = extendsBase(baseName);
       const refs: EmbeddedRef[] = [];
       for (const cand of candidatesOf(baseName, outcome)) {
         const read = reads.ddlOf(cand);
@@ -825,7 +870,7 @@ async function structureTreeFromAnswers(
           });
         }
         const csrc = 'source' in read ? read.source : null;
-        if (csrc && extendRe.test(csrc)) {
+        if (csrc && extendsBase(csrc, baseName)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
         }
       }
@@ -905,8 +950,8 @@ async function structureTreeFromAnswers(
         null,
         2,
       ),
-    } as AxiosResponse);
-  } catch (error: any) {
+    });
+  } catch (error) {
     return return_error(error);
   }
 }
@@ -953,7 +998,6 @@ async function structureTrees(
       }
       await reads.readDdl([...candidates.values()].flat());
       for (const [base, names] of candidates) {
-        const extendRe = extendsBase(base);
         appends.set(
           base,
           names.filter((name) => {
@@ -961,7 +1005,7 @@ async function structureTrees(
             return (
               'source' in read &&
               read.source !== '' &&
-              extendRe.test(read.source)
+              extendsBase(read.source, base)
             );
           }),
         );
@@ -986,25 +1030,20 @@ async function structureTrees(
   const trees: McpResult[] = [];
   for (const rootName of rootNames) {
     trees.push(
-      (await structureTreeFromAnswers(
+      await structureTreeFromAnswers(
         context,
         rootName,
         includeExtensions,
         reads,
-      )) as McpResult,
+      ),
     );
   }
   return trees;
 }
 
 /** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): unknown {
-  const text = result.content[0]?.text ?? '';
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+function payloadOfAnswer(result: McpResult): JsonValue {
+  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several structures. */
@@ -1031,28 +1070,20 @@ function listAnswer(
 
 export async function handleGetStructuresList(
   context: HandlerContext,
-  args: {
-    structure_name?: string;
-    structure_names?: string[];
-    version?: ReadVersion;
-    include_extensions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const listed = args?.structure_names;
   const version = args?.version ?? 'active';
   const includeExtensions = args?.include_extensions !== false;
-  const sequential = (structure_name: string) => {
+  const sequential = (structure_name: string | undefined) => {
     const { structure_names: _list, ...rest } = args;
-    return structuresListOf(context, {
-      ...rest,
-      structure_name,
-    }) as Promise<McpResult>;
+    return structuresListOf(context, { ...rest, structure_name });
   };
   try {
     if (listed === undefined) {
       const structure_name = args?.structure_name;
       if (!structure_name) {
-        return await sequential(structure_name as string);
+        return await sequential(structure_name);
       }
       return await withSequentialFallback<McpResult>(
         context,
@@ -1064,7 +1095,7 @@ export async function handleGetStructuresList(
               version,
               includeExtensions,
             )
-          )[0] as McpResult,
+          )[0],
         () => sequential(structure_name),
       );
     }
@@ -1098,7 +1129,7 @@ export async function handleGetStructuresList(
         return listAnswer(names, results);
       },
     );
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

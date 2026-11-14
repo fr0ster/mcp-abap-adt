@@ -2,7 +2,7 @@ import {
   isModifiableStatus,
   parseTransportListXml,
 } from '../../handlers/transport/readonly/handleListTransports';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * Guard for #168: `ListTransports` reported `count: 0` on a system where the

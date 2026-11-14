@@ -30,6 +30,7 @@ import {
 } from '@mcp-abap-adt/compact-modify';
 import {
   CompactReadOnlyHandlersGroup,
+  compactDataEntries,
   compactReadOnlyEntries,
 } from '@mcp-abap-adt/compact-readonly-entries';
 import { compactBackgroundRunEntries } from '../../lib/compact/backgroundRuns/group';
@@ -38,6 +39,7 @@ import {
   ParameterRefusal,
   refuseRemovedParameters,
 } from '../../lib/config/index';
+import type { YamlConfig } from '../../lib/config/yamlConfig';
 import {
   BackgroundRunHandlersGroup,
   BatchHandlersGroup,
@@ -67,6 +69,7 @@ import {
   type ServedTransport,
   type ToolSet,
 } from '../../lib/toolSet';
+import { listedJson } from '../helpers/listedJson';
 
 const context = {
   connection: undefined as never,
@@ -85,13 +88,17 @@ const namesOf = (groups: readonly IHandlerGroup[]) =>
   groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
 const toolsOf = (set: ToolSet, transport: ServedTransport = 'stdio') =>
-  namesOf(set.groups(context, transport));
+  namesOf(set.groups(context, transport, { dataTools: false }));
 
 const compact = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
   modify: compactModifyEntries,
 });
-const compactRo = compactReadOnlyToolSetOf(compactReadOnlyEntries);
+const compactRo = compactReadOnlyToolSetOf({
+  readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
+});
 
 /** The four sets, by the kind of binary that serves them. */
 const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
@@ -107,7 +114,9 @@ describe('the four tool sets', () => {
       new HighLevelHandlersGroup(context),
       new DebugHandlersGroup(context),
     ];
-    expect(shape(fullToolSet.groups(context, 'stdio'))).toEqual(
+    expect(
+      shape(fullToolSet.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual(
       shape([
         new ReadOnlyHandlersGroup(context, new Set(namesOf(overriding))),
         new SystemHandlersGroup(context),
@@ -122,12 +131,15 @@ describe('the four tool sets', () => {
     );
   });
 
-  it('core-ro: readonly (with system), search, the leftover-session list, batch mode', () => {
-    expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
+  it('core-ro: readonly (with system), search, background runs, the leftover-session list, batch mode', () => {
+    expect(
+      shape(fullReadOnlyToolSet.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual(
       shape([
         new ReadOnlyHandlersGroup(context),
         new SystemHandlersGroup(context),
         new SearchHandlersGroup(context),
+        new BackgroundRunHandlersGroup(context),
         new LeftoverSessionListHandlersGroup(context),
         new BatchHandlersGroup(context),
       ]),
@@ -139,8 +151,11 @@ describe('the four tool sets', () => {
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
     ]);
-    expect(both).toHaveLength(29);
-    expect(shape(compact.groups(context, 'stdio'))).toEqual([
+    // The 29 compact tools but the data tool (HandlerGetData, opt-in).
+    expect(both).toHaveLength(28);
+    expect(
+      shape(compact.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual([
       { group: 'CompactHandlers', tools: both },
       {
         group: 'CompactDebugHandlers',
@@ -168,11 +183,22 @@ describe('the four tool sets', () => {
     ]);
   });
 
-  it('compact-ro: the 17 that change nothing, the leftover-session list, HandlerBatch', () => {
+  it('compact-ro: the 17 that change nothing, background runs, the leftover-session list, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
-    expect(half).toHaveLength(17);
-    expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
+    // The 17 that change nothing but the data tool (HandlerGetData, opt-in).
+    expect(half).toHaveLength(16);
+    expect(
+      shape(compactRo.groups(context, 'stdio', { dataTools: false })),
+    ).toEqual([
       { group: 'CompactReadOnlyHandlers', tools: half },
+      {
+        group: 'CompactBackgroundRunHandlers',
+        tools: [
+          'HandlerBackgroundRunGet',
+          'HandlerBackgroundRunList',
+          'HandlerBackgroundRunDiscard',
+        ],
+      },
       {
         group: 'CompactLeftoverSessionListHandlers',
         tools: ['HandlerLeftoverSessionList'],
@@ -184,21 +210,23 @@ describe('the four tool sets', () => {
   it('a registry of a set lists the same tools', () => {
     for (const [, set] of SETS) {
       for (const transport of ['stdio', 'http', 'sse'] as const) {
-        expect(namesOf(registryOf(set, transport).getHandlerGroups())).toEqual(
-          toolsOf(set, transport),
-        );
+        expect(
+          namesOf(
+            registryOf(set, transport, { dataTools: false }).getHandlerGroups(),
+          ),
+        ).toEqual(toolsOf(set, transport));
       }
     }
   });
 
-  it('only a write set serves background runs, so only its launcher creates a store', () => {
+  it('every set serves background runs (a -ro set those of its long reads), so every launcher creates a store', () => {
     expect(
       SETS.map(([kind, set]) => [kind, set.kind, set.backgroundRuns]),
     ).toEqual([
       ['core', 'core', true],
-      ['core-ro', 'core-ro', false],
+      ['core-ro', 'core-ro', true],
       ['compact', 'compact', true],
-      ['compact-ro', 'compact-ro', false],
+      ['compact-ro', 'compact-ro', true],
     ]);
   });
 
@@ -301,10 +329,11 @@ describe('the leftover-session tools are served on stdio only', () => {
 
 /**
  * What a `-ro` set must not hold: every tool that writes (the high group,
- * the compact modify half), debugs (the debugger groups) or runs in the
- * background (the background-run tools).
+ * the compact modify half) or debugs (the debugger groups). Since 24.0.0
+ * (D24, the owner) it serves the background-run tools: its long reads run
+ * in the background, and only reads run there.
  */
-describe('a -ro set holds no write, debugger or background-run tool; a write set holds its -ro set', () => {
+describe('a -ro set holds no write or debugger tool, and the background-run tools; a write set holds its -ro set', () => {
   // A high tool the readonly group also defines reads (GetUnitTestResult,
   // the Get<Type> object reads): the high group's copy replaces it in core,
   // and it is no write.
@@ -314,7 +343,7 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
       ...namesOf([new HighLevelHandlersGroup(context)]).filter(
         (n) => !readonlyNames.includes(n),
       ),
-      ...compactModifyEntries(() => context).map((e) => e.toolDefinition.name),
+      ...compactModifyEntries().map((e) => e.toolDefinition.name),
     ],
     debug: [
       ...namesOf([new DebugHandlersGroup(context)]),
@@ -341,9 +370,27 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
       kind,
       write: names.filter((n) => FORBIDDEN.write.includes(n)),
       debug: names.filter((n) => FORBIDDEN.debug.includes(n)),
-      background: names.filter((n) => FORBIDDEN.background.includes(n)),
-    }).toEqual({ kind, write: [], debug: [], background: [] });
+    }).toEqual({ kind, write: [], debug: [] });
   });
+
+  it.each([
+    ['core-ro', fullReadOnlyToolSet, 'GetBackgroundRun'],
+    ['compact-ro', compactRo, 'HandlerBackgroundRunGet'],
+  ] as const)(
+    '%s serves the background-run tools of its long reads',
+    (kind, set, get) => {
+      const names = toolsOf(set);
+      const own = FORBIDDEN.background.filter((n) =>
+        get === 'GetBackgroundRun'
+          ? !n.startsWith('Handler')
+          : n.startsWith('Handler'),
+      );
+      expect({ kind, missing: own.filter((n) => !names.includes(n)) }).toEqual({
+        kind,
+        missing: [],
+      });
+    },
+  );
 
   it.each([
     ['core', fullToolSet],
@@ -428,13 +475,13 @@ describe('the run tools are the full set’s alone', () => {
   ];
   const runTools = (set: ToolSet) =>
     set
-      .groups(context, 'stdio')
+      .groups(context, 'stdio', { dataTools: false })
       .flatMap((g) => g.getHandlers())
       .filter((e) => RUN_TOOLS.includes(e.toolDefinition.name))
       .map((e) => ({
         name: e.toolDefinition.name,
         background: Object.hasOwn(
-          (e.toolDefinition.inputSchema as { properties: object }).properties,
+          listedJson(e.toolDefinition.inputSchema).properties ?? {},
           'background',
         ),
       }));
@@ -648,10 +695,7 @@ describe('--exposition is gone: each word stops the start with its sentence', ()
           rows: [],
           removed: [set.expositionRemoved(transport)],
         };
-        const refusal = (
-          argv: string[],
-          yaml: Record<string, unknown> | null = null,
-        ) => {
+        const refusal = (argv: string[], yaml: YamlConfig | null = null) => {
           try {
             refuseRemovedParameters(table, argv, {}, yaml);
           } catch (error) {

@@ -44,7 +44,7 @@ class BoundaryServer extends BaseMcpServer {
       SnapshotGet,
       VirtualFolders,
       CompactSession,
-    ].map((toolDefinition) => ({ toolDefinition, handler: this.handler }));
+    ].map((toolDefinition) => ({ toolDefinition, call: this.handler }));
     this.registerHandlers(
       new CompositeHandlersRegistry([
         {

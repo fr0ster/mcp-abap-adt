@@ -5,20 +5,55 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { ISapConfigBase } from '@mcp-abap-adt/interfaces-auth-sap';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { resolveEnvFilePath } from '../../../../server-runtime/src/stdio/config/envResolver';
+import type { IServerAdtClient } from '../../../lib/adtClientContract';
+import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders';
+import { withoutTrailingSlashes } from '../../../lib/adtHeaders/systemKey';
+import {
+  DESTINATION_KEY_ENV,
+  DESTINATION_KEYS,
+  type DestinationKeyValues,
+} from '../../../lib/config/messageServer';
+import {
+  checkDestinationStatement,
+  destinationAddressWords,
+  rfcConfigOf,
+} from '../../../lib/config/rfcDestination';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { invalidateConnectionCache } from '../../../lib/utils';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { setupAuthBrokerForTests } from './authHelpers';
+import {
+  type ConfiguredSystemKind,
+  configuredSystemKindOf,
+  NO_KIND_STATED,
+  testDestinationName,
+} from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
 import { testConfigPathFromEnv } from './testConfigPath';
+import {
+  type CaseParams,
+  handlerTestCases,
+  parseTestConfig,
+  type SharedDependencies,
+  type SharedDependency,
+  sharedDependenciesOf,
+  type TestCase,
+  type TestConfig,
+} from './testConfigSchema';
+import { thrownStatus, thrownWords } from './thrownValue';
 
+export type { ConfiguredSystemKind };
 export { testConfigPathFromEnv };
 
 const configLogger = createTestLogger('config');
 
-let cachedConfig: any = null;
+let cachedConfig: TestConfig | null = null;
 let envLoaded = false;
 let envLoadError: Error | null = null;
 let brokerAttempted = false;
@@ -27,13 +62,8 @@ let brokerSucceeded = false;
 function resolveUseAuthBrokerFlag(): boolean {
   try {
     const cfg = loadTestConfig();
-    // If destination is specified, always use auth-broker (ignore .env)
-    const hasDestination =
-      !!cfg?.auth_broker?.abap?.destination ||
-      !!cfg?.abap?.destination ||
-      !!cfg?.environment?.destination ||
-      !!cfg?.abap?.service_keys?.destination ||
-      !!cfg?.abap?.sessions?.destination;
+    // A destination (the session environment.env names) uses auth-broker.
+    const hasDestination = testDestinationName(cfg) !== undefined;
 
     // test-config.yaml alone decides. MCP_USE_AUTH_BROKER is not read: the
     // server refuses it since 16.0.0, so the harness neither reads nor sets it.
@@ -53,7 +83,7 @@ function resolveUseAuthBrokerFlag(): boolean {
  * `auth_broker.paths.service_keys_dir` (as the test auth-broker reads it),
  * else undefined — the platform directory.
  */
-export function testAuthBrokerPath(cfg: any): string | undefined {
+export function testAuthBrokerPath(cfg: TestConfig): string | undefined {
   const dir = cfg?.auth_broker?.paths?.service_keys_dir;
   return dir
     ? path.resolve(String(dir).replace(/^~/, require('node:os').homedir()))
@@ -79,7 +109,8 @@ function resolveUnsafeFlag(): boolean {
  *    `<name>.env`, exactly as `--env=<name>` (under
  *    `auth_broker.paths.service_keys_dir` when set, else the platform
  *    directory); a path is that file;
- * 2. the auth-broker destination (`auth_broker.abap.destination`);
+ * 2. the auth-broker destination — the session `environment.env` names
+ *    (`testDestinationName`) — when that file is not there yet;
  * 3. `MCP_ENV_PATH`, a file named explicitly.
  *
  * Nothing is looked up in the working directory or the repository root: the
@@ -133,16 +164,16 @@ export async function loadTestEnv(): Promise<void> {
     if (useAuthBroker) {
       try {
         brokerAttempted = true;
-        await setupAuthBrokerForTests({ force: true });
-        brokerOk = !!process.env.SAP_URL;
+        // Over RFC the destination has no URL: its set-up answers itself.
+        brokerOk = await setupAuthBrokerForTests({ force: true });
         brokerSucceeded = brokerOk;
-      } catch (error: any) {
+      } catch (error) {
         configLogger?.warn(
-          `[loadTestEnv] Auth-broker failed: ${error?.message || String(error)}`,
+          `[loadTestEnv] Auth-broker failed: ${thrownWords(error)}`,
         );
       }
 
-      if (brokerOk && process.env.SAP_URL) {
+      if (brokerOk) {
         envLoaded = true;
         return;
       }
@@ -184,7 +215,7 @@ export async function loadTestEnv(): Promise<void> {
     }
   } else {
     configLogger?.warn(
-      '⚠️ No destination: set environment.env (a sessions-store name) or auth_broker.abap.destination in test-config.yaml.',
+      '⚠️ No destination: set environment.env (a sessions-store name, or a path) in test-config.yaml.',
     );
   }
 
@@ -197,8 +228,12 @@ export async function loadTestEnv(): Promise<void> {
     if (cfg?.environment?.system_type) {
       process.env.SAP_SYSTEM_TYPE = cfg.environment.system_type;
     }
-    // RFC through a message server and a logon group, as configured.
+    // An RFC destination's address, client and language, as configured.
     for (const [key, name] of [
+      ['ashost', 'SAP_ASHOST'],
+      ['sysnr', 'SAP_SYSNR'],
+      ['client', 'SAP_CLIENT'],
+      ['language', 'SAP_LANGUAGE'],
       ['mshost', 'SAP_MSHOST'],
       ['msserv', 'SAP_MSSERV'],
       ['sysid', 'SAP_SYSID'],
@@ -212,10 +247,12 @@ export async function loadTestEnv(): Promise<void> {
     // ignore
   }
 
-  // Final guard: require SAP_URL
-  if (!process.env.SAP_URL) {
+  // Final guard: an HTTP destination requires SAP_URL; an RFC one states
+  // its address instead, checked by getSapConfigFromEnv.
+  const wire = process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
+  if (wire !== 'rfc' && !process.env.SAP_URL) {
     envLoadError = new Error(
-      'SAP_URL is not set. Set environment.env (a sessions-store name, or a path) or auth_broker.abap.destination in test-config.yaml.',
+      'SAP_URL is not set. Set environment.env (a sessions-store name, or a path) in test-config.yaml.',
     );
     throw envLoadError;
   }
@@ -249,7 +286,7 @@ function logEnvLoaded(envPath: string): void {
  * Load test configuration from YAML
  * Uses test-config.yaml from mcp-abap-adt/tests, or the file MCP_TEST_CONFIG names
  */
-export function loadTestConfig(): any {
+export function loadTestConfig(): TestConfig {
   if (cachedConfig) {
     return cachedConfig;
   }
@@ -260,25 +297,28 @@ export function loadTestConfig(): any {
   // template and quietly disabling every test.
   const chosen = testConfigPathFromEnv();
   if (chosen) {
-    cachedConfig =
-      (yaml.load(fs.readFileSync(chosen, 'utf8')) as Record<string, unknown>) ||
-      {};
+    cachedConfig = parseTestConfig(
+      yaml.load(fs.readFileSync(chosen, 'utf8')),
+      chosen,
+    );
     return cachedConfig;
   }
 
   // Load from mcp-abap-adt/tests/test-config.yaml
-  const configPath = path.resolve(
-    __dirname,
-    '../../../../tests/test-config.yaml',
+  const configPath = path.join(
+    repositoryRoot(__dirname),
+    'tests',
+    'test-config.yaml',
   );
-  const templatePath = path.resolve(
-    __dirname,
-    '../../../../tests/test-config.yaml.template',
+  const templatePath = path.join(
+    repositoryRoot(__dirname),
+    'tests',
+    'test-config.yaml.template',
   );
 
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, 'utf8');
-    cachedConfig = (yaml.load(configContent) as Record<string, unknown>) || {};
+    cachedConfig = parseTestConfig(yaml.load(configContent), configPath);
     return cachedConfig;
   }
 
@@ -287,8 +327,7 @@ export function loadTestConfig(): any {
       '⚠️ tests/test-config.yaml not found. Using template (all integration tests will be disabled).',
     );
     const templateContent = fs.readFileSync(templatePath, 'utf8');
-    cachedConfig =
-      (yaml.load(templateContent) as Record<string, unknown>) || {};
+    cachedConfig = parseTestConfig(yaml.load(templateContent), templatePath);
     return cachedConfig;
   }
 
@@ -296,7 +335,7 @@ export function loadTestConfig(): any {
   configLogger?.error(
     'Please create tests/test-config.yaml with test parameters.',
   );
-  return {};
+  return parseTestConfig({}, 'no test config');
 }
 
 /**
@@ -307,9 +346,9 @@ export function loadTestConfig(): any {
 export function getEnabledTestCase(
   handlerName: string,
   testCaseName?: string,
-): any {
+): TestCase | null {
   const config = loadTestConfig();
-  const handlerTests = config[handlerName]?.test_cases || [];
+  const handlerTests = handlerTestCases(config, handlerName);
 
   if (handlerTests.length === 0) {
     configLogger?.debug(
@@ -318,9 +357,9 @@ export function getEnabledTestCase(
     return null;
   }
 
-  let enabledTest;
+  let enabledTest: TestCase | undefined;
   if (testCaseName) {
-    const testCase = handlerTests.find((tc: any) => tc.name === testCaseName);
+    const testCase = handlerTests.find((tc) => tc.name === testCaseName);
     if (!testCase) {
       configLogger?.debug(
         `[DEBUG] Test case "${testCaseName}" not found for handler: ${handlerName}`,
@@ -329,20 +368,18 @@ export function getEnabledTestCase(
     }
     if (testCase.enabled !== true) {
       configLogger?.info(
-        `⏭️  Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`,
+        `Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`,
       );
       return null;
     }
     enabledTest = testCase;
   } else {
-    enabledTest = handlerTests.find((tc: any) => tc.enabled === true);
+    enabledTest = handlerTests.find((tc) => tc.enabled === true);
     if (!enabledTest) {
-      const disabledTests = handlerTests.filter(
-        (tc: any) => tc.enabled === false,
-      );
+      const disabledTests = handlerTests.filter((tc) => tc.enabled === false);
       if (disabledTests.length > 0) {
         configLogger?.info(
-          `⏭️  All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`,
+          `All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`,
         );
       } else {
         configLogger?.debug(
@@ -360,7 +397,7 @@ export function getEnabledTestCase(
  * Get shared object configuration from shared_objects section.
  * Shared objects are prerequisites used by multiple tests (e.g., BDEF for BehaviorImplementation).
  */
-export function getSharedObject(key: string): any {
+export function getSharedObject(key: string): CaseParams | null {
   const config = loadTestConfig();
   return config?.shared_objects?.[key] ?? null;
 }
@@ -370,7 +407,7 @@ export function getSharedObject(key: string): any {
  * Shared dependencies are persistent prerequisite objects (tables, views, BDEFs)
  * created once and reused across all tests.
  */
-export function getSharedDependenciesConfig(): any {
+export function getSharedDependenciesConfig(): SharedDependencies | null {
   const config = loadTestConfig();
   return config?.shared_dependencies ?? null;
 }
@@ -385,11 +422,10 @@ export function sharedDependencyKind(name: string): string | undefined {
   if (!shared || !name) return undefined;
   const wanted = String(name).toUpperCase();
   if (String(shared.package ?? '').toUpperCase() === wanted) return 'package';
-  for (const [kind, list] of Object.entries(shared)) {
-    if (!Array.isArray(list)) continue;
+  for (const kind of Object.keys(shared)) {
     if (
-      list.some(
-        (item: any) => String(item?.name ?? '').toUpperCase() === wanted,
+      sharedDependenciesOf(shared, kind).some(
+        (item) => item.name.toUpperCase() === wanted,
       )
     ) {
       return kind;
@@ -420,15 +456,12 @@ export function assertNotSharedDependency(what: string, name: string): void {
 export function resolveSharedDependency(
   type: string,
   name: string,
-): any | null {
+): SharedDependency | null {
   const sharedConfig = getSharedDependenciesConfig();
   if (!sharedConfig) return null;
-  const collection = sharedConfig[type];
-  if (!Array.isArray(collection)) return null;
   return (
-    collection.find(
-      (item: any) =>
-        String(item.name).toUpperCase() === String(name).toUpperCase(),
+    sharedDependenciesOf(sharedConfig, type).find(
+      (item) => item.name.toUpperCase() === name.toUpperCase(),
     ) ?? null
   );
 }
@@ -439,118 +472,125 @@ export function resolveSharedDependency(
 export function getTestCaseDefinition(
   handlerName: string,
   testCaseName: string,
-): any {
-  const config = loadTestConfig();
-  const handlerTests = config[handlerName]?.test_cases || [];
-  return handlerTests.find((tc: any) => tc.name === testCaseName) || null;
-}
-
-/**
- * Get timeout for operation type
- */
-export function getTimeout(operationType: string = 'default'): number {
-  const config = loadTestConfig();
-  const timeouts = config.test_settings?.timeouts || {};
-  return timeouts[operationType] || timeouts.default || 60000;
+): TestCase | null {
+  const handlerTests = handlerTestCases(loadTestConfig(), handlerName);
+  return handlerTests.find((tc) => tc.name === testCaseName) || null;
 }
 
 /** The authentications this helper builds a config for. */
 const TEST_AUTH_TYPES = ['basic', 'jwt'] as const;
+
+/** `name` in the environment, trimmed; a blank one is absent. */
+function envValue(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
 
 /**
  * Build SAP config for tests from environment variables (auth-broker or .env).
  *
  * Nothing is guessed (#320): `SAP_AUTH_TYPE` must be stated and be one this
  * helper builds (`basic`, `jwt`); `basic` needs `SAP_USERNAME` and
- * `SAP_PASSWORD`, `jwt` needs `SAP_JWT_TOKEN`. Anything else is refused,
- * naming what is wrong.
+ * `SAP_PASSWORD`, `jwt` needs `SAP_JWT_TOKEN`. The wire is read first
+ * (`SAP_CONNECTION_TYPE`, `http` or `rfc`), then per wire: HTTP requires
+ * `SAP_URL`; RFC states its address (`SAP_ASHOST` + `SAP_SYSNR`, or
+ * `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` and `SAP_GROUP`), its
+ * `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL` — each refusal of the
+ * server's (`checkDestinationStatement`) in its words, keys only. Anything
+ * else is refused, naming what is wrong.
  */
 export function getSapConfigFromEnv(): SapConfig {
-  const urlRaw = process.env.SAP_URL?.trim();
-  if (!urlRaw) {
-    throw new Error(
-      'SAP_URL is not set. Ensure auth-broker or .env provided credentials.',
-    );
-  }
-
-  let url: string;
-  try {
-    const normalized = new URL(urlRaw);
-    url = normalized.href.replace(/\/$/, '');
-  } catch (err) {
-    throw new Error(`Invalid SAP_URL: ${urlRaw}`);
-  }
-
-  const stated = process.env.SAP_AUTH_TYPE?.trim();
+  const stated = envValue('SAP_AUTH_TYPE');
   if (!stated) {
     throw new Error(
       `SAP_AUTH_TYPE is not set. State one of: ${TEST_AUTH_TYPES.join(', ')}.`,
     );
   }
-  if (!(TEST_AUTH_TYPES as readonly string[]).includes(stated)) {
+  const authType = TEST_AUTH_TYPES.find((type) => type === stated);
+  if (authType === undefined) {
     throw new Error(
       `SAP_AUTH_TYPE "${stated}" is not one this test helper builds: ${TEST_AUTH_TYPES.join(', ')}.`,
     );
   }
-  const authType = stated as (typeof TEST_AUTH_TYPES)[number];
 
   // Stated, and one of the two, in any case as the launcher reads an enum: an
   // absent value or a typo is refused rather than run over HTTP.
-  const statedWire = process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
+  const statedWire = envValue('SAP_CONNECTION_TYPE')?.toLowerCase();
   if (!statedWire) {
     throw new Error('SAP_CONNECTION_TYPE is not set. State one of: http, rfc.');
   }
   if (statedWire !== 'http' && statedWire !== 'rfc') {
     throw new Error(
-      `SAP_CONNECTION_TYPE "${process.env.SAP_CONNECTION_TYPE?.trim()}" is not one of: http, rfc.`,
+      `SAP_CONNECTION_TYPE "${envValue('SAP_CONNECTION_TYPE')}" is not one of: http, rfc.`,
     );
   }
-  const connectionType: SapConfig['connectionType'] = statedWire;
 
-  const config: SapConfig = {
-    url,
-    authType,
-    connectionType,
-  };
-
+  const base: ISapConfigBase = { authType };
   if (authType === 'jwt') {
-    const token = process.env.SAP_JWT_TOKEN?.trim();
+    const token = envValue('SAP_JWT_TOKEN');
     if (!token) {
       throw new Error('SAP_AUTH_TYPE is jwt, but SAP_JWT_TOKEN is not set.');
     }
-    config.jwtToken = token;
+    base.jwtToken = token;
     if (process.env.SAP_REFRESH_TOKEN) {
-      config.refreshToken = process.env.SAP_REFRESH_TOKEN;
+      base.refreshToken = process.env.SAP_REFRESH_TOKEN;
     }
-    if (process.env.SAP_UAA_URL) {
-      config.uaaUrl = process.env.SAP_UAA_URL;
-    }
+    if (process.env.SAP_UAA_URL) base.uaaUrl = process.env.SAP_UAA_URL;
     if (process.env.SAP_UAA_CLIENT_ID) {
-      config.uaaClientId = process.env.SAP_UAA_CLIENT_ID;
+      base.uaaClientId = process.env.SAP_UAA_CLIENT_ID;
     }
     if (process.env.SAP_UAA_CLIENT_SECRET) {
-      config.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
+      base.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
     }
   } else {
-    const username = process.env.SAP_USERNAME?.trim();
+    const username = envValue('SAP_USERNAME');
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
       throw new Error(
         'SAP_AUTH_TYPE is basic, but SAP_USERNAME or SAP_PASSWORD is not set.',
       );
     }
-    config.username = username;
-    config.password = password;
+    base.username = username;
+    base.password = password;
   }
 
-  if (process.env.SAP_CLIENT) {
-    config.client = process.env.SAP_CLIENT.trim();
+  const keys: DestinationKeyValues = {};
+  for (const key of DESTINATION_KEYS) {
+    const value = envValue(DESTINATION_KEY_ENV[key]);
+    if (value !== undefined) keys[key] = value;
   }
-  if (process.env.SAP_LANGUAGE) {
-    (config as any).language = process.env.SAP_LANGUAGE.trim();
+  const systemType = envValue('SAP_SYSTEM_TYPE');
+  const checked = checkDestinationStatement({
+    connectionType: statedWire,
+    systemType:
+      systemType === 'onprem' ||
+      systemType === 'cloud' ||
+      systemType === 'legacy'
+        ? systemType
+        : undefined,
+    authType,
+    urlKey: 'SAP_URL',
+    url: envValue('SAP_URL'),
+    keys,
+  });
+  if ('fault' in checked) {
+    throw new Error(destinationAddressWords('test', checked.fault));
   }
+  if ('rfc' in checked) return rfcConfigOf(base, checked.rfc);
 
-  return config;
+  let url: string;
+  try {
+    const normalized = new URL(checked.http.url);
+    url = withoutTrailingSlashes(normalized.href);
+  } catch {
+    throw new Error('SAP_URL is not a URL.');
+  }
+  return {
+    ...base,
+    url,
+    connectionType: 'http',
+    ...(keys.client !== undefined && { client: keys.client }),
+  };
 }
 
 /**
@@ -558,8 +598,8 @@ export function getSapConfigFromEnv(): SapConfig {
  * Used by test infrastructure to populate system context before creating AdtClient.
  */
 export function resolveTestSystemContext(): {
-  masterSystem?: string;
-  responsible?: string;
+  masterSystem?: string | undefined;
+  responsible?: string | undefined;
 } {
   const config = loadTestConfig();
   return {
@@ -574,24 +614,9 @@ export function resolveTestSystemContext(): {
 }
 
 /**
- * Get operation delay
- */
-export function getOperationDelay(operation: string, testCase?: any): number {
-  // Check test case specific delay first
-  if (testCase?.params?.operation_delays?.[operation]) {
-    return testCase.params.operation_delays[operation];
-  }
-
-  // Check global config
-  const config = loadTestConfig();
-  const delays = config.test_settings?.operation_delays || {};
-  return delays[operation] || delays.default || 3000;
-}
-
-/**
  * Resolve package name (from test case or default)
  */
-export function resolvePackageName(testCase?: any): string {
+export function resolvePackageName(testCase?: TestCase | null): string {
   let packageName: string;
 
   if (testCase?.params?.package_name) {
@@ -616,18 +641,17 @@ export function resolvePackageName(testCase?: any): string {
 /**
  * Resolve transport request (from test case or default)
  */
-export function resolveTransportRequest(testCase?: any): string | undefined {
+export function resolveTransportRequest(
+  testCase?: TestCase | null,
+): string | undefined {
   let transportRequest: string | undefined;
 
   // Check if transport_request key explicitly exists in test case params
   // This allows overriding to "no transport" by setting transport_request: "" or null in YAML
   // (e.g., for $TMP package which does not require a transport request)
-  const hasExplicitTransport =
-    testCase?.params != null &&
-    'transport_request' in (testCase.params as Record<string, unknown>);
-
-  if (hasExplicitTransport) {
-    const raw = testCase.params.transport_request;
+  const params = testCase?.params;
+  if (params != null && 'transport_request' in params) {
+    const raw = params.transport_request;
     transportRequest = raw ? String(raw).trim() : undefined;
   } else {
     const config = loadTestConfig();
@@ -663,7 +687,7 @@ export function resolveTransportRequest(testCase?: any): string | undefined {
  * @param testCase - Optional test case object (may have params.cleanup_after or params.skip_cleanup)
  * @returns true if cleanup should be performed, false otherwise
  */
-export function getCleanupAfter(testCase?: any): boolean {
+export function getCleanupAfter(testCase?: TestCase | null): boolean {
   const config = loadTestConfig();
 
   // Global skip flag has highest priority
@@ -703,72 +727,16 @@ export function getCleanupAfter(testCase?: any): boolean {
  * @param testCase - Test case object, as for {@link getCleanupAfter}
  * @param failed - Whether the test that just ran failed
  */
-export function getCleanupAfterRun(testCase: any, failed: boolean): boolean {
+export function getCleanupAfterRun(
+  testCase: TestCase | null | undefined,
+  failed: boolean,
+): boolean {
   if (failed && loadTestConfig().test_settings?.cleanup_on_failure !== true) {
     return false;
   }
   return getCleanupAfter(testCase);
 }
 
-/**
- * Check if current connection is cloud (JWT auth) or on-premise (basic auth).
- * Programs/FunctionGroups are not available on cloud, so tests should be skipped.
- *
- * Detection order:
- * 1. lib/utils sessionContext (when MCP server is running in-process)
- * 2. process.env.SAP_JWT_TOKEN (set by test globalSetup from auth broker)
- * 3. test-config.yaml auth_type field
- */
-export function isCloudConnection(): boolean {
-  try {
-    const { isCloudConnection: utilsIsCloud } = require('../../../lib/utils');
-    if (utilsIsCloud()) return true;
-  } catch {
-    // lib/utils not available or sessionContext not set
-  }
-
-  // Fallback: check env vars set by loadTestEnv / auth broker
-  if (process.env.SAP_JWT_TOKEN) {
-    return true;
-  }
-
-  // Fallback: check session file for hard mode destination (JWT = cloud)
-  try {
-    const config = loadTestConfig();
-    const destination =
-      config?.hard_mode?.mcp_destination ||
-      config?.auth_broker?.abap?.destination ||
-      config?.environment?.destination;
-    if (destination) {
-      const os = require('node:os');
-      const fs = require('node:fs');
-      const path = require('node:path');
-      const sessionFile = path.join(
-        os.homedir(),
-        '.config',
-        'mcp-abap-adt',
-        'sessions',
-        `${destination}.env`,
-      );
-      if (fs.existsSync(sessionFile)) {
-        const content = fs.readFileSync(sessionFile, 'utf8');
-        if (content.includes('SAP_JWT_TOKEN=')) return true;
-      }
-    }
-  } catch {
-    // no config or session file
-  }
-
-  return false;
-}
-
-/**
- * Get current system type based on connection detection.
- *
- * Returns 'cloud', 'onprem', or 'legacy'.
- * Detection: JWT auth → cloud, otherwise onprem.
- * Legacy can be set via test-config.yaml `environment.system_type: legacy`.
- */
 /**
  * The database system the test config states for its system
  * (`environment.database_system`, e.g. "HDB"), upper case, or undefined when
@@ -785,23 +753,24 @@ export function getStatedDatabaseSystem(): string | undefined {
   }
 }
 
-export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
-  // Check explicit override in test config
-  try {
-    const config = loadTestConfig();
-    const explicitType = config?.environment?.system_type;
-    if (
-      explicitType === 'cloud' ||
-      explicitType === 'onprem' ||
-      explicitType === 'legacy'
-    ) {
-      return explicitType;
-    }
-  } catch {
-    // no config
-  }
+/**
+ * The system kind this run is configured for (`configuredSystemKindOf` over
+ * the test config): stated only — `environment.system_type`, then
+ * `SAP_SYSTEM_TYPE` in the environment or the session file — `undefined`
+ * when nothing states one. A credential type is not a statement of the kind.
+ */
+export function configuredSystemKind(): ConfiguredSystemKind | undefined {
+  return configuredSystemKindOf(loadTestConfig());
+}
 
-  return isCloudConnection() ? 'cloud' : 'onprem';
+/**
+ * The configured system kind, or a refusal naming what to set — never a
+ * default: a run whose kind nothing states does not run as on-premise.
+ */
+export function getSystemType(): ConfiguredSystemKind {
+  const kind = configuredSystemKind();
+  if (kind === undefined) throw new Error(NO_KIND_STATED);
+  return kind;
 }
 
 /**
@@ -812,7 +781,15 @@ export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
  */
 export function isTestAvailableForSystem(availableIn?: string[]): boolean {
   if (!availableIn || availableIn.length === 0) return true;
-  return availableIn.includes(getSystemType());
+  // No stated kind: the case skips (its caller names the reason), never
+  // runs as on-premise by default.
+  const kind = configuredSystemKind();
+  return kind !== undefined && availableIn.includes(kind);
+}
+
+/** A skip message's words for the configured kind: it, or that none is stated. */
+export function statedKindWords(): string {
+  return configuredSystemKind() ?? `no stated system kind (${NO_KIND_STATED})`;
 }
 
 /**
@@ -826,14 +803,22 @@ export function isTestAvailableForSystem(availableIn?: string[]): boolean {
  * @returns Object with success flag and optional reason for skipping
  */
 export async function preCheckTestParameters(
-  client: any,
+  client: IServerAdtClient | null,
   packageName?: string,
   transportRequest?: string,
   superPackage?: string,
   testLabel: string = 'test',
 ): Promise<{ success: boolean; reason?: string }> {
-  const extractStatus = (checkState: any): number | undefined => {
-    return checkState?.checkResult?.status ?? checkState?.status;
+  // The check as the server sends it (CheckPackageLow): its status and its
+  // headers. 200 when it passed, else the HTTP status SAP answered, if any.
+  const checkStatus = async (name: string): Promise<number | undefined> => {
+    if (!client) return undefined;
+    const checked = await client
+      .getPackage(resultsFor(packageDocuments))
+      .check({ packageName: name }, 'active', {
+        headers: DEFAULT_ADT_HEADERS['package.check'],
+      });
+    return checked.ok ? 200 : checked.getError().response?.status;
   };
 
   // Pre-check: Verify super package exists (if specified - for package tests)
@@ -842,11 +827,7 @@ export async function preCheckTestParameters(
       configLogger?.debug(
         `[PRE_CHECK] Checking super package (parent) existence: ${superPackage}`,
       );
-      const superPackageCheck = await client.getPackage().check({
-        packageName: superPackage,
-        superPackage: undefined,
-      });
-      const superPackageStatus = extractStatus(superPackageCheck);
+      const superPackageStatus = await checkStatus(superPackage);
       if (
         superPackageStatus !== undefined &&
         superPackageStatus !== null &&
@@ -860,14 +841,14 @@ export async function preCheckTestParameters(
           `[PRE_CHECK] ✓ Super package (parent) ${superPackage} exists and is accessible`,
         );
       }
-    } catch (superPackageError: any) {
-      const status = superPackageError.response?.status;
+    } catch (superPackageError) {
+      const status = thrownStatus(superPackageError);
       if (status === 404) {
         const reason = `Super package (parent) ${superPackage} does not exist! Please create it before running the ${testLabel}.`;
         configLogger?.error(`❌ ${reason}`);
         return { success: false, reason };
       } else {
-        const reason = `Cannot verify super package (parent) ${superPackage} (HTTP ${status}): ${superPackageError.message}`;
+        const reason = `Cannot verify super package (parent) ${superPackage} (HTTP ${status}): ${thrownWords(superPackageError)}`;
         configLogger?.warn(`⚠️  ${reason}`);
         configLogger?.warn(
           `⚠️  Continuing ${testLabel}, but it may fail if parent package is not accessible.`,
@@ -886,11 +867,7 @@ export async function preCheckTestParameters(
       configLogger?.debug(
         `[PRE_CHECK] Checking package existence: ${packageName}`,
       );
-      const packageCheck = await client.getPackage().check({
-        packageName,
-        superPackage: undefined,
-      });
-      const packageStatus = extractStatus(packageCheck);
+      const packageStatus = await checkStatus(packageName);
       if (
         packageStatus !== undefined &&
         packageStatus !== null &&
@@ -904,15 +881,15 @@ export async function preCheckTestParameters(
           `[PRE_CHECK] ✓ Package ${packageName} exists and is accessible`,
         );
       }
-    } catch (packageError: any) {
-      const status = packageError.response?.status;
+    } catch (packageError) {
+      const status = thrownStatus(packageError);
       if (status === 404) {
         // For package creation tests, 404 is expected (package doesn't exist yet)
         configLogger?.debug(
           `[PRE_CHECK] ✓ Package ${packageName} does not exist (expected for creation test)`,
         );
       } else {
-        const reason = `Cannot verify package ${packageName} (HTTP ${status}): ${packageError.message}`;
+        const reason = `Cannot verify package ${packageName} (HTTP ${status}): ${thrownWords(packageError)}`;
         configLogger?.warn(`⚠️  ${reason}`);
         configLogger?.warn(
           `⚠️  Continuing ${testLabel}, but it may fail if package is not accessible.`,
@@ -923,7 +900,7 @@ export async function preCheckTestParameters(
   } else if (packageName && superPackage) {
     // For package creation tests with superPackage, we skip checking packageName
     configLogger?.debug(
-      `[PRE_CHECK] Skipping package ${packageName} check (will be created as child of ${superPackage})`,
+      `[PRE_CHECK] Not checking package ${packageName} (will be created as child of ${superPackage})`,
     );
   }
 

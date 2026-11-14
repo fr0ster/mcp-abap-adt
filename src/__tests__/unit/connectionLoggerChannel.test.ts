@@ -25,7 +25,10 @@ describe('adding a channel to a logger keeps the logger', () => {
       string,
       unknown
     >;
-    const spread = { ...logger, csrfToken: logger.debug };
+    const spread: Record<string, unknown> = {
+      ...logger,
+      csrfToken: logger.debug,
+    };
 
     expect(
       channels.filter((name) => typeof spread[name] === 'function'),

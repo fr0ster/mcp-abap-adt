@@ -7,26 +7,33 @@
  */
 
 import {
+  ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
+  ENABLE_DATA_TOOLS_ROW,
+  flagValue,
   type IServerConfig,
+  listValue,
+  numberValue,
   type Parameter,
   type ParameterTable,
-  type ParameterValue,
   parameterSource,
+  readAccessRestrictions,
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_ROW,
   type TlsConfig,
+  textValue,
   tlsConfigOf,
   tlsRows,
   transportRemoved,
+  wordValue,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
+import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 
 const HTTP = 'STREAMABLE HTTP';
 
@@ -51,9 +58,10 @@ export const HTTP_ROWS: readonly Parameter[] = [
     env: 'MCP_HTTP_PORT',
     yaml: 'http.port',
     kind: 'port',
+    ephemeral: true,
     default: 3000,
     section: HTTP,
-    help: 'Port to listen on, 1-65535 (default 3000)',
+    help: 'Port to listen on, 1-65535, or 0 for a free one the system chooses, announced on the listening line (default 3000)',
   },
   {
     key: 'httpPath',
@@ -122,7 +130,9 @@ export function httpParameters(
       ...tlsRows('http'),
       STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
       toolSet.expositionRemoved('http'),
@@ -138,24 +148,21 @@ export const HTTP_PARAMETERS: ParameterTable = httpParameters(fullToolSet);
 
 /** What `mcp-abap-adt-http` reads. */
 export interface HttpConfig extends IServerConfig {
-  host?: string;
-  port?: number;
+  host?: string | undefined;
+  port?: number | undefined;
   /** The MCP endpoint path */
-  httpPath?: string;
+  httpPath?: string | undefined;
   /** JSON responses rather than SSE streams */
-  httpJsonResponse?: boolean;
+  httpJsonResponse?: boolean | undefined;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | undefined;
   /** Enable DNS-rebinding protection */
-  enableDnsRebindingProtection?: boolean;
+  enableDnsRebindingProtection?: boolean | undefined;
   /** TLS: cert and key start HTTPS */
-  tls?: TlsConfig;
+  tls?: TlsConfig | undefined;
 }
-
-const list = (v: ParameterValue | undefined): string[] | undefined =>
-  Array.isArray(v) ? [...v] : undefined;
 
 /**
  * `mcp-abap-adt-http`'s configuration from the arguments, the environment
@@ -171,20 +178,22 @@ export function readHttpConfig(
   const table = httpParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    configFile: values.configFile as string | undefined,
-    systemType: values.systemType as HttpConfig['systemType'],
+    configFile: textValue(values.configFile),
+    systemType: wordValue(values.systemType, SYSTEM_TYPES),
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
-    stateIdleMinutes: values.stateIdleMinutes as number,
+    stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
-    shutdownTimeout: values.shutdownTimeout as number | undefined,
-    host: values.host as string,
-    port: values.port as number,
-    httpPath: values.httpPath as string | undefined,
-    httpJsonResponse: values.httpJsonResponse as boolean | undefined,
-    allowedHosts: list(values.allowedHosts),
-    allowedOrigins: list(values.allowedOrigins),
+    enableDataTools: values.enableDataTools === true,
+    accessRestrictions: readAccessRestrictions(argv, env, yaml),
+    shutdownTimeout: numberValue(values.shutdownTimeout),
+    host: textValue(values.host),
+    port: numberValue(values.port),
+    httpPath: textValue(values.httpPath),
+    httpJsonResponse: flagValue(values.httpJsonResponse),
+    allowedHosts: listValue(values.allowedHosts),
+    allowedOrigins: listValue(values.allowedOrigins),
     enableDnsRebindingProtection:
-      (values.enableDnsRebindingProtection as boolean | undefined) ?? false,
+      flagValue(values.enableDnsRebindingProtection) ?? false,
     tls: tlsConfigOf(values),
   };
 }

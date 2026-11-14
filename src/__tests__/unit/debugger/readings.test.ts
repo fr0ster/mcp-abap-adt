@@ -1,4 +1,3 @@
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   breakpointKey,
   failureText,
@@ -14,7 +13,20 @@ import {
   terseStop,
   terseVariables,
 } from '../../../lib/debugger/readings';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { settingsXml } from './fakes';
+
+describe('a blank document reads as an empty one', () => {
+  it.each(['', ' \n\t '])(
+    '%j: no debuggee, no frames, no breakpoints',
+    (xml) => {
+      expect(readDebuggee(xml)).toBeUndefined();
+      expect(readStack(xml)).toEqual({ cursor: 0, frames: [] });
+      expect(readBreakpoints(xml)).toEqual([]);
+      expect(readVariables(xml)).toEqual({ variables: [], children: [] });
+    },
+  );
+});
 
 describe('readings of the debugger documents (recorded answers)', () => {
   it('the listener catch names the debuggee and its server', () => {

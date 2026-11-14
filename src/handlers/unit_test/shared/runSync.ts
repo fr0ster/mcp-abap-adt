@@ -33,6 +33,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 /** What a synchronous run is given, per object type. */
 export type SyncRunTarget =
@@ -45,7 +46,7 @@ export type SyncRunTarget =
       functionModuleName: string;
     };
 
-type SyncAnswer = Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+type SyncAnswer = Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 
 /** One request: the run, answered with its finished result. */
 export function runTestsSync(
@@ -60,14 +61,11 @@ export function runTestsSync(
       case 'program':
         return executor
           .getProgramTestRunner(ourUnitTest)
-          .runSync(run.programName.toUpperCase(), withAnalyse) as SyncAnswer;
+          .runSync(run.programName.toUpperCase(), withAnalyse);
       case 'functionGroup':
         return executor
           .getFunctionGroupTestRunner(ourUnitTest)
-          .runSync(
-            run.functionGroupName.toUpperCase(),
-            withAnalyse,
-          ) as SyncAnswer;
+          .runSync(run.functionGroupName.toUpperCase(), withAnalyse);
       case 'functionModule':
         return executor.getFunctionModuleTestRunner(ourUnitTest).runSync(
           {
@@ -75,19 +73,19 @@ export function runTestsSync(
             functionModuleName: run.functionModuleName.toUpperCase(),
           },
           withAnalyse,
-        ) as SyncAnswer;
+        );
       default:
         return executor
           .getClassTestRunner(ourUnitTest)
-          .runSync(run.target, withAnalyse) as SyncAnswer;
+          .runSync(run.target, withAnalyse);
     }
   };
-  return atStep('run', send)() as SyncAnswer;
+  return atStep('run', send)();
 }
 
 /** What a synchronous run tool answers: the finished result. */
 export function projectSync(detail: 'terse' | 'full' | 'raw') {
-  return (result: AdtReading<unknown>) => ({
+  return (result: AdtReading<XmlRead>) => ({
     success: true,
     runner: 'sync',
     finished: true,

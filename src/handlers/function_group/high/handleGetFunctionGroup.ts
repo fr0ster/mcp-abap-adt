@@ -1,8 +1,9 @@
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readFunctionGroupMetadata } from '../../../lib/strategies/metadataReads';
@@ -14,23 +15,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'FunctionGroup name.',
-      },
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['function_group_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z.string().describe('FunctionGroup name.'),
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
-interface GetFunctionGroupArgs {
-  function_group_name: string;
-  version?: ReadVersion;
-}
+type GetFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetFunctionGroup(
   context: HandlerContext,

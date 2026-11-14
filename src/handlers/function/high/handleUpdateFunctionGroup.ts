@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateFunctionGroup Handler - Update Existing ABAP Function Group Metadata
  *
@@ -15,20 +17,25 @@
  * `interfaces-adt@9` merged the channels — and does that request itself now.
  * Verified against `AdtFunctionGroup.ts` in adt-clients 22.
  *
- * The patch itself is `patchFunctionGroupXml` (`functionGroupPatch.ts`),
- * ported field-for-field from `v18.0.2`'s own patcher — description only, a
- * function group being a container with nothing else `update` ever touched.
+ * The patch itself is adt-clients' `patchFunctionGroupDocument` — the
+ * description only, on `group:abapFunctionGroup`, passed as given: SAP holds
+ * 40 characters and answers a longer one `400` `FUNC_ADT/103`, which reaches
+ * the model as it is. A refused patch is the failure of the step `patch`
+ * (`documentPatch.ts`); nothing is written.
  */
 
-import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  functionGroupDocuments,
+  patchFunctionGroupDocument,
+} from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { patchFunctionGroupXml } from '../../../lib/strategies/functionGroupPatch';
+import { detailOf } from '../../../lib/strategies/detail';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -36,42 +43,30 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules, which carry the source; this updates the group's metadata alone. Locks the group, writes, and unlocks it.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name. Must exist in the system.',
-      },
-      description: {
-        type: 'string',
-        description: 'New description for the function group.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'description'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group name. Must exist in the system.'),
+    description: z.string().describe('New description for the function group.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateFunctionGroupArgs {
-  function_group_name: string;
-  description: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateFunctionGroup(
   context: HandlerContext,
@@ -90,14 +85,14 @@ export async function handleUpdateFunctionGroup(
 
   return answer(
     { tool: 'UpdateFunctionGroup', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
       return withLock(
         () => obj.lock({ functionGroupName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> =>
           sequence(
             atStep('read metadata', () =>
               obj.readMetadata(
@@ -105,7 +100,14 @@ export async function handleUpdateFunctionGroup(
                 { version: 'workingArea', analyse: analyseException },
               ),
             ),
-            atStep('update metadata', (current) =>
+            async (current) =>
+              patchedDocument(
+                patchFunctionGroupDocument(current.raw, {
+                  description: args.description || undefined,
+                }),
+                `function group ${functionGroupName}`,
+              ),
+            atStep('update metadata', (document) =>
               withAdtHeaders(
                 context,
                 'functionGroup.updateMetadata',
@@ -117,13 +119,7 @@ export async function handleUpdateFunctionGroup(
                     },
                     {
                       headers,
-                      source: patchFunctionGroupXml(
-                        extractXmlString(
-                          current.raw,
-                          `function group ${functionGroupName}`,
-                        ),
-                        { description: args.description },
-                      ),
+                      source: document,
                       lockHandle,
                       analyse: analyseException,
                     },

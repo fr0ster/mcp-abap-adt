@@ -18,27 +18,25 @@ import {
   type CompactHandler,
   type CompactObjectType,
   dispatchCompact,
+  HANDLER_GET_DRAFT_TYPES,
+  isArgList,
+  isJsonObject,
+  type JsonValue,
+  jsonAt,
+  jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
-import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
+import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
-  handleGetBehaviorDefinition,
-  handleGetBehaviorImplementation,
-  handleGetClass,
-  handleGetDataElement,
-  handleGetDdl,
-  handleGetDomain,
-  handleGetFunctionGroup,
-  handleGetFunctionModule,
-  handleGetInterface,
-  handleGetMetadataExtension,
-  handleGetPackage,
+  defineTool,
+  type HandlerContext,
+  type ToolArgs,
+  variantOf,
+} from '@mcp-abap-adt/lib/handlers';
+import {
+  handleGetObjectDraft,
   handleGetPackageContents,
-  handleGetProgram,
-  handleGetServiceBinding,
   handleGetServiceBindingPreviewUrl,
-  handleGetServiceDefinition,
-  handleGetStructure,
-  handleGetTable,
+  READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import {
@@ -46,66 +44,61 @@ import {
   readIncludePart,
   readMainPrograms,
   readTableType,
+  compactSourceRoutes as route,
 } from './compactReadRoutes';
 
 /**
- * `part: 'metadata'` — the ADT metadata document, for the types that have one:
- * the type's `Get<Type>`, which reads it in one request (`part: 'metadata'`
- * for a type with a source; a metadata-only type's read is that document).
+ * The metadata routes: the same target entries as the source reads, each
+ * given `part` metadata by the read (`handleHandlerGet` passes it on).
  */
 export const compactMetadataRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  PACKAGE: handleGetPackage as unknown as CompactHandler,
-  DOMAIN: handleGetDomain as unknown as CompactHandler,
-  DATA_ELEMENT: handleGetDataElement as unknown as CompactHandler,
-  TABLE: handleGetTable as unknown as CompactHandler,
-  STRUCTURE: handleGetStructure as unknown as CompactHandler,
+  PACKAGE: route.PACKAGE,
+  DOMAIN: route.DOMAIN,
+  DATA_ELEMENT: route.DATA_ELEMENT,
+  TABLE: route.TABLE,
+  STRUCTURE: route.STRUCTURE,
   TABLE_TYPE: readTableType,
-  DDL: handleGetDdl as unknown as CompactHandler,
-  SERVICE_DEFINITION: handleGetServiceDefinition as unknown as CompactHandler,
-  SERVICE_BINDING: handleGetServiceBinding as unknown as CompactHandler,
-  CLASS: handleGetClass as unknown as CompactHandler,
-  PROGRAM: handleGetProgram as unknown as CompactHandler,
+  DDL: route.DDL,
+  SERVICE_DEFINITION: route.SERVICE_DEFINITION,
+  SERVICE_BINDING: route.SERVICE_BINDING,
+  CLASS: route.CLASS,
+  PROGRAM: route.PROGRAM,
   INCLUDE: readIncludePart('metadata'),
-  INTERFACE: handleGetInterface as unknown as CompactHandler,
-  FUNCTION_GROUP: handleGetFunctionGroup as unknown as CompactHandler,
-  FUNCTION_MODULE: handleGetFunctionModule as unknown as CompactHandler,
-  BEHAVIOR_DEFINITION: handleGetBehaviorDefinition as unknown as CompactHandler,
-  BEHAVIOR_IMPLEMENTATION:
-    handleGetBehaviorImplementation as unknown as CompactHandler,
-  METADATA_EXTENSION: handleGetMetadataExtension as unknown as CompactHandler,
+  INTERFACE: route.INTERFACE,
+  FUNCTION_GROUP: route.FUNCTION_GROUP,
+  FUNCTION_MODULE: route.FUNCTION_MODULE,
+  BEHAVIOR_DEFINITION: route.BEHAVIOR_DEFINITION,
+  BEHAVIOR_IMPLEMENTATION: route.BEHAVIOR_IMPLEMENTATION,
+  METADATA_EXTENSION: route.METADATA_EXTENSION,
 };
 
-/**
- * `part: 'urls'` — the service URL, its `$metadata` and the browser preview.
- *
- * One entry, and that is the honest size of it: a preview URL is a thing a service
- * binding has and other repository objects do not.
- */
 export const compactUrlRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  SERVICE_BINDING:
-    handleGetServiceBindingPreviewUrl as unknown as CompactHandler,
+  SERVICE_BINDING: defineTool(
+    READ_DEFINITIONS.GetServiceBindingPreviewUrl,
+    handleGetServiceBindingPreviewUrl,
+  ).call,
 };
 
-/**
- * `part: 'contents'` — the objects a package contains, as a flat list. A package
- * has no source, and its metadata carries its sub-packages, not its members.
- */
+/** GetPackageContents' entry: the contents part reads through it. */
+const packageContents = defineTool(
+  READ_DEFINITIONS.GetPackageContents,
+  handleGetPackageContents,
+).call;
+
 export const compactContentsRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  PACKAGE: packageContentsLines as unknown as CompactHandler,
+  PACKAGE: packageContentsLines,
 };
 
-type ContentsAnswer = {
-  isError?: boolean;
-  content?: Array<{ type?: string; text?: string }>;
-};
-
-type ContentsItem = { name?: string; type?: string; description?: string };
+/** A member's field as its listing line shows it: `''` when absent. */
+function fieldOf(item: JsonValue, name: string): string {
+  return String(jsonAt(item, name) ?? '');
+}
 
 /**
  * A package's members, one per line: name, type, description — the shape a
@@ -114,11 +107,11 @@ type ContentsItem = { name?: string; type?: string; description?: string };
  * for a package with a few hundred members that is tens of kilobytes
  * carrying three facts per object.
  */
-function contentsLines(items: ContentsItem[], max: number): string {
+function contentsLines(items: readonly JsonValue[], max: number): string {
   const lines = ['name\ttype\tdescription'];
   for (const item of items.slice(0, max)) {
     lines.push(
-      `${item.name ?? ''}\t${item.type ?? ''}\t${item.description ?? ''}`,
+      `${fieldOf(item, 'name')}\t${fieldOf(item, 'type')}\t${fieldOf(item, 'description')}`,
     );
   }
   if (items.length > max) {
@@ -134,50 +127,38 @@ function contentsLines(items: ContentsItem[], max: number): string {
  */
 async function packageContentsLines(
   context: HandlerContext,
-  args: Record<string, unknown>,
-): Promise<unknown> {
-  const answered = (await handleGetPackageContents(
-    context,
-    args as never,
-  )) as ContentsAnswer;
-  const text = answered?.content?.[0]?.text;
-  if (answered?.isError || typeof text !== 'string') return answered;
+  args: ToolArgs,
+): Promise<ToolResultLike> {
+  const answered = await packageContents(context, args);
+  const text = answered.content[0]?.text;
+  if (answered.isError || typeof text !== 'string') return answered;
   // Capped like a where-used list: a structure package's members are its
   // sub-packages, and on the cloud trial one had 5,813 of them.
   const max =
     typeof args.max_results === 'number' && args.max_results > 0
       ? args.max_results
       : 100;
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    if (!Array.isArray(parsed)) return answered;
-    const listed = Array.isArray(args.package_names)
-      ? JSON.stringify(
-          (
-            parsed as Array<{
-              package_name?: string;
-              objects?: ContentsItem[];
-              error?: unknown;
-            }>
-          ).map((entry) =>
-            Array.isArray(entry.objects)
-              ? {
-                  package_name: entry.package_name,
-                  contents: contentsLines(entry.objects, max),
-                }
-              : entry,
-          ),
-          null,
-          2,
-        )
-      : contentsLines(parsed as ContentsItem[], max);
-    return {
-      ...answered,
-      content: [{ type: 'text', text: listed }],
-    };
-  } catch {
-    return answered;
-  }
+  const parsed = jsonOf(text);
+  if (!Array.isArray(parsed)) return answered;
+  const listed = isArgList(args.package_names)
+    ? JSON.stringify(
+        parsed.map((entry) => {
+          const objects = jsonAt(entry, 'objects');
+          return isJsonObject(entry) && Array.isArray(objects)
+            ? {
+                package_name: entry.package_name,
+                contents: contentsLines(objects, max),
+              }
+            : entry;
+        }),
+        null,
+        2,
+      )
+    : contentsLines(parsed, max);
+  return {
+    ...answered,
+    content: [{ type: 'text', text: listed }],
+  };
 }
 
 /** A system type of `COMPACT_MAIN_PROGRAMS`. */
@@ -198,24 +179,78 @@ export function compactMainProgramsRoutes(
   return routes;
 }
 
+/** The argument that names the object, per type the draft part reads. */
+const DRAFT_NAME_ARGUMENT: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    PROGRAM: 'program_name',
+    INCLUDE: 'include_name',
+    INTERFACE: 'interface_name',
+    CLASS: 'class_name',
+    BEHAVIOR_IMPLEMENTATION: 'behavior_implementation_name',
+    FUNCTION_MODULE: 'function_module_name',
+    FUNCTION_GROUP: 'function_group_name',
+    DDL: 'ddl_name',
+    BEHAVIOR_DEFINITION: 'behavior_definition_name',
+    METADATA_EXTENSION: 'metadata_extension_name',
+    SERVICE_DEFINITION: 'service_definition_name',
+    TABLE: 'table_name',
+    STRUCTURE: 'structure_name',
+    DOMAIN: 'domain_name',
+    DATA_ELEMENT: 'data_element_name',
+    TABLE_TYPE: 'table_type_name',
+  } satisfies Partial<Record<CompactObjectType, string>>),
+);
+
+const objectDraft = defineTool(
+  READ_DEFINITIONS.GetObjectDraft,
+  handleGetObjectDraft,
+).call;
+
+/** `part: 'draft'`: the object's draft, read as the full set's draft tool reads it. */
+const readDraft: CompactHandler = (context, args) => {
+  const type = args.object_type;
+  const argument =
+    typeof type === 'string' ? DRAFT_NAME_ARGUMENT.get(type) : undefined;
+  const name = argument === undefined ? undefined : args[argument];
+  return objectDraft(context, {
+    object_type: type,
+    object_name: name,
+    ...(type === 'FUNCTION_MODULE'
+      ? { function_group_name: args.function_group_name }
+      : {}),
+  });
+};
+
+/** `part: 'draft'`, on the members the draft part reads on `variant`. */
+export function compactDraftRoutes(
+  variant: MainProgramsVariant,
+): Partial<Record<CompactObjectType, CompactHandler>> {
+  const routes: Partial<Record<CompactObjectType, CompactHandler>> = {};
+  for (const member of HANDLER_GET_DRAFT_TYPES[variant]) {
+    routes[member] = readDraft;
+  }
+  return routes;
+}
+
 export type CompactReadPart =
   | 'source'
   | 'metadata'
   | 'urls'
   | 'contents'
-  | 'main_programs';
+  | 'main_programs'
+  | 'draft';
 
 /**
  * The types with a metadata document and no source: their `Get<Type>` reads
  * that document, so `part: 'source'` has nothing to answer.
  */
-const SOURCELESS: ReadonlySet<CompactObjectType> = new Set([
+const SOURCELESS: ReadonlySet<CompactObjectType> = new Set<CompactObjectType>([
   'PACKAGE',
   'DOMAIN',
   'DATA_ELEMENT',
   'FUNCTION_GROUP',
   'TABLE_TYPE',
-] as CompactObjectType[]);
+]);
 
 /** Whether `part: 'source'` reads something for this type. */
 export function hasSourcePart(objectType: CompactObjectType): boolean {
@@ -239,6 +274,7 @@ export function partsFor(
   if (compactMainProgramsRoutes(variant)[objectType]) {
     parts.push('main_programs');
   }
+  if (compactDraftRoutes(variant)[objectType]) parts.push('draft');
   return parts;
 }
 
@@ -246,9 +282,9 @@ export function partsFor(
 export async function routeCompactPart(
   context: HandlerContext,
   part: Exclude<CompactReadPart, 'source'>,
-  args: { object_type: CompactObjectType } & Record<string, unknown>,
+  args: { readonly object_type: CompactObjectType } & ToolArgs,
   hasSource: boolean,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const variant = variantOf(context.connection);
   const routes =
     part === 'metadata'
@@ -257,8 +293,11 @@ export async function routeCompactPart(
         ? compactContentsRoutes
         : part === 'main_programs'
           ? compactMainProgramsRoutes(variant)
-          : compactUrlRoutes;
-  if (routes[args.object_type] === undefined) {
+          : part === 'draft'
+            ? compactDraftRoutes(variant)
+            : compactUrlRoutes;
+  const routed = routes[args.object_type];
+  if (routed === undefined) {
     // Answered as a refusal rather than thrown, the way the router answers an
     // unsupported operation: both paths through this surface should have the same
     // shape, and a caller reads the message either way.
@@ -270,8 +309,10 @@ export async function routeCompactPart(
       ),
     );
   }
-  const map = {
-    [args.object_type]: { get: routes[args.object_type] },
-  } as never;
-  return dispatchCompact(context, map, 'get', args);
+  return dispatchCompact(
+    context,
+    { [args.object_type]: { get: routed } },
+    'get',
+    args,
+  );
 }

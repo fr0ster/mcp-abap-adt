@@ -21,8 +21,21 @@
  * published, which is also when the preview can work at all.
  */
 
+import {
+  isAsciiDigit,
+  isAsciiLetter,
+  withoutTrailing,
+  wordAt,
+} from '../plainText';
+
 /** Characters that may stand for themselves in a URL path segment. */
-const URL_SAFE = /[A-Za-z0-9_.~-]/;
+function isUrlSafe(character: string): boolean {
+  return (
+    isAsciiLetter(character) ||
+    isAsciiDigit(character) ||
+    '_.~-'.includes(character)
+  );
+}
 
 /**
  * Shift by 20 and percent-encode, exactly as ADT does.
@@ -38,7 +51,7 @@ export function encodeFeapSegment(descriptor: string): string {
     const code = character.charCodeAt(0) + 0x14;
     if (code < 0x7f) {
       const shifted = String.fromCharCode(code);
-      encoded += URL_SAFE.test(shifted)
+      encoded += isUrlSafe(shifted)
         ? shifted
         : `%${code.toString(16).toUpperCase().padStart(2, '0')}`;
       continue;
@@ -184,18 +197,40 @@ export function annotationServiceOf(service: string): string {
  * unchanged.
  */
 export function browserHostOf(baseUrl: string): string {
-  return baseUrl.replace(
-    /^(https?:\/\/[^./]+)\.abap\.(?=[^./]+\.hana\.ondemand\.com)/i,
-    '$1.abap-web.',
-  );
+  const scheme = wordAt(baseUrl, 0, 'https://')
+    ? 'https://'.length
+    : wordAt(baseUrl, 0, 'http://')
+      ? 'http://'.length
+      : undefined;
+  if (scheme === undefined) return baseUrl;
+  const tenantEnd = labelEnd(baseUrl, scheme);
+  if (tenantEnd === scheme || !wordAt(baseUrl, tenantEnd, '.abap.')) {
+    return baseUrl;
+  }
+  const regionAt = tenantEnd + '.abap.'.length;
+  const regionEnd = labelEnd(baseUrl, regionAt);
+  if (
+    regionEnd === regionAt ||
+    !wordAt(baseUrl, regionEnd, '.hana.ondemand.com')
+  ) {
+    return baseUrl;
+  }
+  return `${baseUrl.slice(0, tenantEnd)}.abap-web.${baseUrl.slice(regionAt)}`;
+}
+
+/** The end of the host label at `at`: the first `.` or `/` after it, or the end. */
+function labelEnd(url: string, at: number): number {
+  let end = at;
+  while (end < url.length && url[end] !== '.' && url[end] !== '/') end++;
+  return end;
 }
 
 export function feapPreviewUrl(input: {
   baseUrl: string;
   protocol: 'odatav2' | 'odatav4';
   descriptor: FeapDescriptor | FeapV4Descriptor;
-  client?: string;
-  language?: string;
+  client?: string | undefined;
+  language?: string | undefined;
 }): string {
   const descriptor = input.descriptor;
   const segment = encodeFeapSegment(
@@ -208,6 +243,6 @@ export function feapPreviewUrl(input: {
     `sap-ui-language=${input.language ?? 'EN'}`,
     ...(input.client ? [`sap-client=${input.client}`] : []),
   ].join('&');
-  const base = browserHostOf(input.baseUrl.replace(/\/+$/, ''));
+  const base = browserHostOf(withoutTrailing(input.baseUrl, '/'));
   return `${base}/sap/bc/adt/businessservices/${input.protocol}/feap/${segment}/flp.html?${query}`;
 }

@@ -1,8 +1,17 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IAbapTraceDbAccesses,
+  type IAbapTraceHitList,
+  type IAbapTraceStatements,
+} from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -12,48 +21,36 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      trace_id_or_uri: {
-        type: 'string',
-        description: 'Profiler trace ID or full ADT trace URI.',
-      },
-      view: {
-        type: 'string',
-        enum: ['hitlist', 'statements', 'db_accesses'],
-        description: 'Trace view to retrieve.',
-      },
-      with_system_events: {
-        type: 'boolean',
-        description: 'Include system events.',
-      },
-      id: {
-        type: 'number',
-        description: 'Statement node ID (for statements view).',
-      },
-      with_details: {
-        type: 'boolean',
-        description: 'Include statement details (for statements view).',
-      },
-      auto_drill_down_threshold: {
-        type: 'number',
-        description: 'Auto drill-down threshold (for statements view).',
-      },
-    },
-    required: ['trace_id_or_uri', 'view'],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    trace_id_or_uri: z
+      .string()
+      .describe('Profiler trace ID or full ADT trace URI.'),
+    view: z
+      .enum(['hitlist', 'statements', 'db_accesses'])
+      .describe('Trace view to retrieve.'),
+    with_system_events: z
+      .boolean()
+      .optional()
+      .describe('Include system events.'),
+    id: z
+      .number()
+      .optional()
+      .describe('Statement node ID (for statements view).'),
+    with_details: z
+      .boolean()
+      .optional()
+      .describe('Include statement details (for statements view).'),
+    auto_drill_down_threshold: z
+      .number()
+      .optional()
+      .describe('Auto drill-down threshold (for statements view).'),
+  }),
 } as const;
 
-interface RuntimeGetProfilerTraceDataArgs {
-  trace_id_or_uri: string;
-  view: 'hitlist' | 'statements' | 'db_accesses';
-  with_system_events?: boolean;
-  id?: number;
-  with_details?: boolean;
-  auto_drill_down_threshold?: number;
-}
+type RuntimeGetProfilerTraceDataArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeGetProfilerTraceData(
   context: HandlerContext,
@@ -84,13 +81,13 @@ export async function handleRuntimeGetProfilerTraceData(
   // same on both sides.
   //
   // Three separate `answer()` calls, not one `call()` with a branch per
-  // view: `read<K>`'s three instantiations (`IAbapTraceHitList` /
-  // `IAbapTraceStatements` / `IAbapTraceDbAccesses`) are not exported by
-  // name from `@mcp-abap-adt/adt-clients`, so there is no union type to
-  // write down for a single `answer<T>` — and the projection below never
-  // reads a field of `payload`, so there is nothing lost by keeping each
-  // view's own type all the way to `answer()` instead.
-  const project = (payload: unknown) => ({
+  // view: each keeps `read<K>`'s own instantiation (`IAbapTraceHitList` /
+  // `IAbapTraceStatements` / `IAbapTraceDbAccesses`, adt-strategies' readings
+  // of the three views) all the way to `answer()`; the projection takes any
+  // of the three and reads no field of it.
+  const project = (
+    payload: IAbapTraceHitList | IAbapTraceStatements | IAbapTraceDbAccesses,
+  ) => ({
     success: true,
     view,
     trace_id_or_uri: traceIdOrUri,

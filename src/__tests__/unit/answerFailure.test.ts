@@ -1,6 +1,6 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { corpusBody } from '../../lib/adtCorpus';
 import { answer, return_answer } from '../../lib/answer';
+import { corpusBody } from '../helpers/adtCorpus';
 
 function failure(
   error: Partial<IAdtError> & { messages?: unknown },
@@ -85,6 +85,28 @@ describe('return_answer — failure', () => {
     });
     expect(result.content[0].text).not.toContain('Bearer');
     expect(result.content[0].text).not.toContain('SAP_SESSIONID');
+  });
+
+  it('names no lock handle: the url of a write under a lock goes without it', () => {
+    const handle = 'A1B2C3D4E5F60718293A4B5C6D7E8F90LOCK';
+    const result = return_answer(
+      failure({
+        message: 'Request failed with status code 400',
+        origin: 'connection',
+        request: {
+          method: 'PUT',
+          url: `/sap/bc/adt/ddic/domains/zd?lockHandle=${handle}&corrNr=SYSK900001`,
+        },
+      }),
+      project,
+      { tool: 'UpdateDomain', detail: 'full' },
+    );
+
+    expect(result.content[0].text).not.toContain(handle);
+    expect(JSON.parse(result.content[0].text).request).toEqual({
+      method: 'PUT',
+      url: '/sap/bc/adt/ddic/domains/zd?corrNr=SYSK900001',
+    });
   });
 
   it('omits request entirely when it carries neither method nor url', () => {

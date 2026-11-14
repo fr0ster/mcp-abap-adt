@@ -1,0 +1,200 @@
+{
+  "HandlerBatch": {
+    "description": "[read-only] action 'begin': Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header). action 'end': Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it. action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.",
+    "inputSchema.action.description": "begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).",
+    "inputSchema.action.enum": [
+      "begin",
+      "end",
+      "answers"
+    ],
+    "inputSchema.number.description": "answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.",
+    "inputSchema.numbers.description": "answers only: several batch numbers to read, answered in the order given; give this or number, not both."
+  },
+  "HandlerDebugBatch": {
+    "description": "action 'begin': Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header). action 'end': Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it. action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.",
+    "inputSchema.action.description": "begin starts the debugger batch on the stopped ABAP debuggee or at the AMDP break; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.",
+    "inputSchema.action.enum": [
+      "begin",
+      "end",
+      "answers"
+    ],
+    "inputSchema.number.description": "answers: one batch number to read, at least 1.",
+    "inputSchema.numbers.description": "answers: several batch numbers to read, each at least 1, answered in the order given."
+  },
+  "HandlerSession": {
+    "description": "[read-only] action 'open': Opens a long session on this server: the server instance and its SAP connection are kept for every call that carries the session's state_handle, until the session is closed or the server's idle bound passes between two calls. Answers the state_handle: send it as the state_handle argument of every call of the session (or in the x-mcp-state-handle header). Called with the state_handle of an instance that already holds state, or of an open session, answers that same state_handle and keeps what the instance holds. In batch mode it runs at once and the batch stays open. action 'close': Closes the long session the state_handle names: once this answer is written the server instance is closed — every SAP session it holds is logged off, which releases the locks taken in it; an open batch and its recorded calls are dropped unsent — and the state_handle ends: a later call carrying it gets the unavailable-state answer. Answers that the session is closed and what it held: its locks, a batch, a debug session. Called with an unknown state_handle, or on a new instance, it gets the unavailable-state answer. In batch mode it runs at once and drops the batch.",
+    "inputSchema.action.description": "open: open a long session and answer its state_handle. close: close the long session the state_handle names.",
+    "inputSchema.action.enum": [
+      "open",
+      "close"
+    ]
+  },
+  "HandlerDebugSession": {
+    "description": "Debugger listener and session. Each operation up to end sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on the attaching session, which the first attach opens and every later attach, step and reading uses; detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end); setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until stopListener removes them; the debug state and its handle end with it, and a new debug state of either kind and any identity opens after it. The answer carries state_handle while the debug state holds something, and for abap the identity in force.",
+    "inputSchema.state_handle.description": "The handle of this server's debug state. abap checkListener, listen, stopListener and attach, and amdp start, open the debug state when it is omitted and answer its handle; every other operation takes it.",
+    "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
+    "inputSchema.operation.description": "The one request: abap checkListener, listen, stopListener, attach, detachDebugger, terminateDebuggee, terminateDebugger or setDebuggerSettings; amdp start, getEvents, stop or deleteDebuggee. end, for either kind, logs off the debug state.",
+    "inputSchema.operation.enum": [
+      "checkListener",
+      "listen",
+      "stopListener",
+      "attach",
+      "detachDebugger",
+      "terminateDebuggee",
+      "terminateDebugger",
+      "setDebuggerSettings",
+      "start",
+      "getEvents",
+      "stop",
+      "deleteDebuggee",
+      "end"
+    ],
+    "inputSchema.hold_seconds.description": "abap listen: how long SAP holds the listen, in seconds; SAP answers at a catch or when the hold ends.",
+    "inputSchema.take_over.description": "abap listen: true displaces another debugger listening for the same user; false, or omitted, answers its 409. amdp start: true ends an AMDP session of this user left behind.",
+    "inputSchema.debuggee_id.description": "abap attach: the debuggee_id listen answered. amdp deleteDebuggee: the debuggee id of a break event.",
+    "inputSchema.server.description": "abap attach: the debuggee's application server, as listen answered it.",
+    "inputSchema.settings.description": "abap setDebuggerSettings: the settings sent; a field left out keeps its value.",
+    "inputSchema.settings.system_debugging.description": "Steps into system programs and stops at breakpoints there.",
+    "inputSchema.settings.update_debugging.description": "Debugs update tasks.",
+    "inputSchema.settings.create_exception_object.description": "Creates the exception object even where a CATCH does not ask for it.",
+    "inputSchema.settings.background_rfc.description": "Debugs background RFC calls.",
+    "inputSchema.settings.shared_object_debugging.description": "Debugs shared objects.",
+    "inputSchema.request_user.description": "abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.",
+    "inputSchema.debugging_mode.description": "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
+    "inputSchema.debugging_mode.enum": [
+      "user",
+      "terminal"
+    ],
+    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.enum": [
+      "terse",
+      "full",
+      "raw"
+    ]
+  },
+  "HandlerDebugStep": {
+    "description": "Moves the stopped debuggee: each call sends one SAP request, the operation's. kind abap, on the attached debuggee: stepInto, stepOver, stepReturn and stepContinue step from where it stands; stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack. setStackPosition makes frame position the one variables are read in. kind amdp: stepOver and stepContinue move debuggee_id and answer the request id; the next stop arrives as a break event.",
+    "inputSchema.state_handle.description": "Opaque handle identifying the server-held state this operation works on.",
+    "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
+    "inputSchema.operation.description": "The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.",
+    "inputSchema.operation.enum": [
+      "stepInto",
+      "stepOver",
+      "stepReturn",
+      "stepContinue",
+      "stepRunToLine",
+      "stepJumpToLine",
+      "setStackPosition"
+    ],
+    "inputSchema.object_type.description": "For a line: CLAS, PROG, INCL or FUNC.",
+    "inputSchema.object_name.description": "For a line: the object holding it.",
+    "inputSchema.line.description": "For a line: the line in the object source.",
+    "inputSchema.include.description": "For a class: definitions, implementations, macros or testclasses; the main source when omitted.",
+    "inputSchema.parent_name.description": "For a function module: its function group.",
+    "inputSchema.position.description": "abap setStackPosition: the frame's position in the stack.",
+    "inputSchema.debuggee_id.description": "amdp: the debuggee id of the break event.",
+    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.enum": [
+      "terse",
+      "full",
+      "raw"
+    ]
+  },
+  "HandlerDebugBreakpoints": {
+    "description": "Debugger breakpoints and watchpoints: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: setBreakpoints sets the breakpoint set of this debugging identity to breakpoints and answers each row SAP placed or refused; syncBreakpoints rewrites the full set (sync_scope full) or the part of the objects in sync_objects (sync_scope partial); deleteBreakpoint deletes breakpoint_id; createWatchpoint, listWatchpoints and deleteWatchpoint work on the attached debuggee. In user mode the breakpoints catch every request of the request user; the set is one per SAP user and request user, shared by every IDE of that user, and each change rewrites it as a whole. kind amdp: syncBreakpoints rewrites the breakpoints of the running AMDP session and answers the request id; SAP confirms them in a SYNC_BREAKPOINTS event. The answer carries state_handle, and for abap the identity in force.",
+    "inputSchema.state_handle.description": "The handle of this server's debug state. abap setBreakpoints and syncBreakpoints open the debug state when it is omitted and answer its handle; every other operation takes it.",
+    "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
+    "inputSchema.operation.description": "The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.",
+    "inputSchema.operation.enum": [
+      "setBreakpoints",
+      "syncBreakpoints",
+      "deleteBreakpoint",
+      "createWatchpoint",
+      "listWatchpoints",
+      "deleteWatchpoint"
+    ],
+    "inputSchema.breakpoints.description": "setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.",
+    "inputSchema.breakpoints[].object_type.description": "For a line: CLAS, PROG, INCL or FUNC.",
+    "inputSchema.breakpoints[].object_name.description": "For a line: the object holding it.",
+    "inputSchema.breakpoints[].line.description": "For a line: the line in the object source.",
+    "inputSchema.breakpoints[].include.description": "For a class: definitions, implementations, macros or testclasses; the main source when omitted.",
+    "inputSchema.breakpoints[].parent_name.description": "For a function module: its function group.",
+    "inputSchema.breakpoints[].exception_class.description": "Stops where an exception of this class is raised.",
+    "inputSchema.breakpoints[].statement.description": "Stops at every ABAP statement of this keyword.",
+    "inputSchema.breakpoints[].message.description": "Stops where this message is sent: message class, number, type.",
+    "inputSchema.breakpoints[].condition.description": "A line breakpoint only: stops only when this ABAP condition holds.",
+    "inputSchema.sync_scope.description": "abap syncBreakpoints: full replaces every breakpoint of the set; partial replaces those of the objects in sync_objects and takes line breakpoints.",
+    "inputSchema.sync_scope.enum": [
+      "full",
+      "partial"
+    ],
+    "inputSchema.sync_objects.description": "abap syncBreakpoints with sync_scope partial: the ADT URIs of the objects whose breakpoints are replaced.",
+    "inputSchema.breakpoint_id.description": "abap deleteBreakpoint: the id SAP gave the breakpoint.",
+    "inputSchema.variable_name.description": "abap createWatchpoint: the variable watched.",
+    "inputSchema.condition.description": "abap createWatchpoint: the ABAP condition the watchpoint stops on.",
+    "inputSchema.watchpoint_id.description": "abap deleteWatchpoint: the id SAP gave the watchpoint.",
+    "inputSchema.request_user.description": "abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.",
+    "inputSchema.debugging_mode.description": "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
+    "inputSchema.debugging_mode.enum": [
+      "user",
+      "terminal"
+    ],
+    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.enum": [
+      "terse",
+      "full",
+      "raw"
+    ]
+  },
+  "HandlerDebugMaintain": {
+    "description": "Reads and changes the stopped debuggee: each call sends one SAP request, chosen by operation. kind abap, on the attached debuggee: getStack answers the frames, each with its program, include, line and ADT address, the stopped position on top; getVariables answers the variables in names (a path reads a component or a table row); getChildVariables answers the members of the ids in parents, the scopes (@ROOT) when parents is omitted; getMemorySizes answers the memory sizes; createMemorySnapshot creates a memory snapshot; setVariableValue sets variable_name to value and answers the variable. kind amdp: getDataPreview answers the rows of the table variable variable_name of debuggee_id.",
+    "inputSchema.state_handle.description": "Opaque handle identifying the server-held state this operation works on.",
+    "inputSchema.kind.description": "abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.",
+    "inputSchema.kind.enum": [
+      "abap",
+      "amdp"
+    ],
+    "inputSchema.operation.description": "What the call does: abap getStack (the stack), getVariables (variables by name), getChildVariables (child variables), getMemorySizes (memory sizes), createMemorySnapshot (a snapshot) or setVariableValue (set a value); amdp getDataPreview (the data preview of a table variable).",
+    "inputSchema.operation.enum": [
+      "getStack",
+      "getVariables",
+      "getChildVariables",
+      "getMemorySizes",
+      "createMemorySnapshot",
+      "setVariableValue",
+      "getDataPreview"
+    ],
+    "inputSchema.names.description": "abap getVariables: the variables read.",
+    "inputSchema.parents.description": "abap getChildVariables: the ids whose members are read; @ROOT, the scopes, when omitted.",
+    "inputSchema.variable_name.description": "abap setVariableValue: the variable set. amdp getDataPreview: the table variable read.",
+    "inputSchema.value.description": "abap setVariableValue: the new value.",
+    "inputSchema.debuggee_id.description": "amdp getDataPreview: the debuggee id of the break event.",
+    "inputSchema.query.description": "amdp getDataPreview: a SELECT over the table variable; every column when omitted.",
+    "inputSchema.row_number.description": "amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.",
+    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.enum": [
+      "terse",
+      "full",
+      "raw"
+    ]
+  },
+  "HandlerGetData": {
+    "description": "[read-only] Reads the rows of the table or CDS view named by object_name, or the rows sql_query selects: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.",
+    "inputSchema.background.description": "Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.",
+    "inputSchema.object_name.description": "Table or CDS view whose rows are read, all columns. Used when sql_query is absent.",
+    "inputSchema.sql_query.description": "ABAP SQL SELECT naming the columns, conditions and order to read.",
+    "inputSchema.max_rows.description": "Maximum number of rows returned."
+  }
+}

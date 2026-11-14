@@ -33,11 +33,7 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 const conn = {} as IAbapConnection;
 
-type Options =
-  | { responsible?: string; masterSystem?: string; masterLanguage?: string }
-  | undefined;
-
-function lastOptions(): Options {
+function lastOptions(): ConstructorParameters<typeof AdtClientOnPrem>[2] {
   const calls = jest.mocked(AdtClientOnPrem).mock.calls;
   return calls.at(-1)?.[2];
 }

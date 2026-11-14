@@ -23,14 +23,14 @@
   {
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.entries",
-    "site": "WeakMap<AbapConnection, BuiltConnection>",
+    "site": "WeakMap<IAbapConnection, BuiltConnection>",
     "end": "none needed: keyed weakly; the entry it names counts the calls handed its connection, and a replaced entry ends its connection when the count reaches zero",
     "why": "a call releases the connection it was handed (connectionReleased); the use is counted in getConnection before any await, so a replacement never ends a connection under a call that received it"
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.systemContexts",
-    "site": "WeakMap<AbapConnection, DestinationSystemContext | undefined>",
+    "site": "WeakMap<IAbapConnection, DestinationSystemContext | undefined>",
     "end": "none needed: keyed weakly, holds no connection",
     "why": "what each built connection's source stated; the connection itself ends through the instance's terminal close"
   },

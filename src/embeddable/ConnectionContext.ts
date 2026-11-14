@@ -1,4 +1,5 @@
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 
@@ -42,7 +43,15 @@ export interface ConnectionSource {
  */
 export type Source =
   | { kind: 'built'; source: ConnectionSource }
-  | { kind: 'injected'; connection: AbapConnection };
+  | {
+      kind: 'injected';
+      connection: IAbapConnection;
+      /**
+       * The system the host states for a connection that answers no URL
+       * (`EmbeddableMcpServerOptions.system`): the background-run identity.
+       */
+      system?: string;
+    };
 
 /**
  * Connection context for an MCP server instance: its source, and what
@@ -60,5 +69,5 @@ export type ConnectionContext = Source & {
    */
   destination?: string;
   /** Optional metadata for additional context information. */
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, string>;
 };

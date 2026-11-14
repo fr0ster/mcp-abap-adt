@@ -194,13 +194,21 @@ const abapKey = {
 const writeKey = (name: string, body: unknown) =>
   fs.writeFileSync(path.join(keysDir, `${name}.json`), JSON.stringify(body));
 const basicLines = (password = PASSWORD, wire: string | null = 'http') => [
-  `SAP_URL=${SYSTEM_URL}`,
+  // An RFC destination states its address and language, and no URL.
+  ...(wire === 'rfc'
+    ? ['SAP_ASHOST=system.example.test', 'SAP_SYSNR=00', 'SAP_LANGUAGE=EN']
+    : [`SAP_URL=${SYSTEM_URL}`]),
   'SAP_CLIENT=100',
   'SAP_AUTH_TYPE=basic',
   // A destination states its wire (#320); `null` leaves it out.
   ...(wire === null ? [] : [`SAP_CONNECTION_TYPE=${wire}`]),
   'SAP_USERNAME=placeholder-user',
   `SAP_PASSWORD=${password}`,
+];
+/** A file stating rfc beside an HTTP destination's URL: usable only once HTTP wins. */
+const rfcStatedBesideUrl = () => [
+  ...basicLines(PASSWORD, null),
+  'SAP_CONNECTION_TYPE=rfc',
 ];
 const writeSession = (name: string, lines: string[]) =>
   fs.writeFileSync(
@@ -364,6 +372,8 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
         [
           '--mcp=dest',
           `--auth-broker-path=${root}`,
+          // A key states no wire: the start states it (decided first).
+          '--connection-type=http',
           `--browser=${browser}`,
           `--browser-auth-port=${port}`,
         ],
@@ -518,6 +528,7 @@ describe('a destination that cannot be served stops the start', () => {
     const { stderr, exits } = await run([
       '--mcp=dest',
       `--auth-broker-path=${root}`,
+      '--connection-type=http',
     ]);
     expect(exits).toEqual([1]);
     const said = stderr.join('\n');
@@ -533,7 +544,10 @@ describe('a destination that cannot be served stops the start', () => {
 
   it('an --env-path file that does not exist: the parameter and the path', async () => {
     const missing = path.join(root, 'nope.env');
-    const { stderr, exits } = await run([`--env-path=${missing}`]);
+    const { stderr, exits } = await run([
+      `--env-path=${missing}`,
+      '--connection-type=http',
+    ]);
     expect(exits).toEqual([1]);
     expect(stderr).toEqual([
       `[MCP] --env-path: the file does not exist: ${missing}`,
@@ -698,7 +712,10 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
 
   it('snc + rfc in the file: not refused, rfc', async () => {
     const file = envFile([
-      `SAP_URL=${SYSTEM_URL}`,
+      'SAP_ASHOST=system.example.test',
+      'SAP_SYSNR=00',
+      'SAP_CLIENT=100',
+      'SAP_LANGUAGE=EN',
       'SAP_AUTH_TYPE=snc',
       'SAP_SNC_PARTNERNAME=p:placeholder',
       'SAP_CONNECTION_TYPE=rfc',
@@ -709,7 +726,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('--connection-type=http beats the file', async () => {
-    const file = envFile(basicLines(PASSWORD, 'rfc'));
+    const file = envFile(rfcStatedBesideUrl());
     const settings = await settingsOf([
       `--env-path=${file}`,
       '--connection-type=http',
@@ -729,7 +746,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('the process environment beats the file', async () => {
-    const file = envFile(basicLines(PASSWORD, 'rfc'));
+    const file = envFile(rfcStatedBesideUrl());
     process.env.SAP_CONNECTION_TYPE = 'http';
     const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('http');

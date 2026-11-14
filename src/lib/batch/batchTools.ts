@@ -1,3 +1,4 @@
+import type { ToolArgs } from '../handlers/interfaces.js';
 import type { BatchKind } from './InstanceBatch';
 
 /**
@@ -44,20 +45,26 @@ export function runsBesideBatch(tool: string): boolean {
   return LISTED.has(tool) || SESSION_LISTED.has(tool);
 }
 
-/** Whether `args` ask for numbers: `number` or `numbers` given. */
-export function asksNumbers(args: unknown): boolean {
-  if (args === null || typeof args !== 'object') return false;
-  const given = args as { number?: unknown; numbers?: unknown };
-  return given.number !== undefined || given.numbers !== undefined;
+/** What a batch tool's parsed arguments say of the numbers asked. */
+export interface NumberArgs {
+  readonly number?: number | undefined;
+  readonly numbers?: readonly number[] | undefined;
 }
 
-/** Whether `args` name `action: 'end'` and ask for no numbers. */
-function endAction(args: unknown): boolean {
+/** Whether `args` ask for numbers: `number` or `numbers` given. */
+export function asksNumbers(args: NumberArgs): boolean {
+  return args.number !== undefined || args.numbers !== undefined;
+}
+
+/**
+ * Whether a call's arguments, as the SDK hands them before the tool's
+ * schema, name `action: 'end'` and ask for no numbers.
+ */
+function endAction(args: ToolArgs): boolean {
   return (
-    args !== null &&
-    typeof args === 'object' &&
-    (args as { action?: unknown }).action === 'end' &&
-    !asksNumbers(args)
+    args.action === 'end' &&
+    args.number === undefined &&
+    args.numbers === undefined
   );
 }
 
@@ -67,7 +74,7 @@ function endAction(args: unknown): boolean {
  * (`DebugBatchEnd`, `HandlerDebugBatch` with `action: 'end'`), or none. Its
  * failure before `execute()` ends that batch (`endBeforeExecute`).
  */
-export function endsBatch(tool: string, args: unknown): BatchKind | undefined {
+export function endsBatch(tool: string, args: ToolArgs): BatchKind | undefined {
   if (tool === 'BatchEnd') return 'communication';
   if (tool === 'DebugBatchEnd') return 'debugger';
   if (tool === 'HandlerBatch' && endAction(args)) return 'communication';
@@ -76,6 +83,6 @@ export function endsBatch(tool: string, args: unknown): BatchKind | undefined {
 }
 
 /** Whether a call of `tool` with `args` ends the communication batch. */
-export function endsCommunicationBatch(tool: string, args: unknown): boolean {
+export function endsCommunicationBatch(tool: string, args: ToolArgs): boolean {
   return endsBatch(tool, args) === 'communication';
 }

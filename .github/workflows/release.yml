@@ -111,8 +111,17 @@ jobs:
       - name: Type-check tests
         run: npm run test:check
 
+      # The runner has no default concurrency: 2, as ci.yml's ubuntu-latest
+      # cells (D27, measured 2026-11-08; docs/development/tests/TESTING_GUIDE.md,
+      # "Concurrency is a setting"); after the script's own value, the last
+      # one wins.
       - name: Run tests
-        run: npm test
+        run: npm test -- --concurrency 2
+
+      # The suites that pack and install the release (`npm run test:install`:
+      # installMatrix, binSmoke) are a run of their own (D27, step 15).
+      - name: Run install tests
+        run: npm run test:install
         env:
           # The install matrix (installMatrix.test.ts: ~100 s and ~20 npm
           # installs on Linux) runs on one cell only, Node 22 (this job is

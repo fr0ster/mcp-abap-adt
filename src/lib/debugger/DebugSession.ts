@@ -10,6 +10,7 @@
  * timer of ours. Every change goes through one Serial; the long poll runs
  * outside it and its answer is dropped when the generation moved on.
  */
+
 import {
   type AbapDebugger,
   AdtBatchConnection,
@@ -38,15 +39,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type AdtHeadersContext,
-  adtHeadersOf,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
 import {
-  type FailureEntry,
   isCredentialFailure,
   isCredentialPayload,
   unlessCredentialFailure,
 } from '../answer';
+import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
   carryingPayload,
@@ -130,6 +130,11 @@ export interface DebugSessionPorts<O = unknown> {
   ): Debugger;
   requestUser(origin: O): Promise<string>;
   /**
+   * The header port of the origin's system (`withAdtHeaders`): the pair each
+   * header-taking call is sent with. Absent, the default pairs.
+   */
+  headersOf?(origin: O): AdtHeadersContext;
+  /**
    * `debuggee` makes the run carry those ids, so a terminal-mode listener under
    * them catches it; without it only a user-mode listener does.
    */
@@ -144,11 +149,11 @@ export interface StopView {
   attach: AttachReading;
   stack: StackReading;
   /** Reading the stack failed: the method's error as it is, with its step; the stop stands. */
-  stackError?: DebugFailure;
+  stackError?: DebugFailure | undefined;
   /** The settings in force after this attach applied the preferences. */
-  settings?: SettingsReading;
+  settings?: SettingsReading | undefined;
   /** Why applying them failed — the method's error as it is, with its step; the stop stands. */
-  settingsError?: DebugFailure;
+  settingsError?: DebugFailure | undefined;
   raw: { debuggee: string; attach: string; stack: string };
 }
 export type EndReason =
@@ -164,7 +169,7 @@ export type DebugState =
   | {
       state: 'ended';
       reason: EndReason;
-      run?: RunOutcome;
+      run?: RunOutcome | undefined;
       message?: string;
       /** A refused attach: the method's error as it is, with its step. */
       failure?: DebugFailure;
@@ -189,7 +194,7 @@ export type DebugSettings = Omit<IDebuggerSettings, 'showDataAging'>;
 export interface DebugStartOptions {
   /** At least one: a start with an empty list is refused before the wire. */
   breakpoints: IDebuggerBreakpoint[];
-  run?: RunTarget;
+  run?: RunTarget | undefined;
   /** User mode: whose requests are caught; the connected user when omitted. */
   requestUser?: string;
   /**
@@ -279,11 +284,24 @@ const settledPolls = new WeakSet<Promise<IAdtResponse<string>>>();
 export const DEBUGGEE_KEPT_WORDS =
   "not sent: the listener's stop failed and a breakpoint may still be set, where the debuggee would stop again. It stays held for the next stop.";
 
+/** The words a stop dropped with its spent connection is reported in. */
+export const STOP_DROPPED_WORDS =
+  "the debuggee's connection had lost its SAP session: the stop was dropped without a request, and SAP's logoff of that session freed what it held";
+
+/**
+ * A release's outcome: released; its connection spent (dropped without a
+ * request, the failed release a note); or failed, kept for the next stop.
+ */
+type ReleaseOutcome =
+  | { kind: 'released' }
+  | { kind: 'spent'; note?: DebugFailure }
+  | { kind: 'failed'; failure: DebugFailure };
+
 interface Listener {
   connection: IAbapConnection;
   debugger: Debugger;
   /** The last poll, until its answer was handled: a stop waits for it and handles a catch in it. */
-  open?: Promise<IAdtResponse<string>>;
+  open?: Promise<IAdtResponse<string>> | undefined;
 }
 interface Stop {
   connection: IAbapConnection;
@@ -305,9 +323,9 @@ interface OwedRelease {
   what: string;
 }
 
-const bodyOf = (a: IAdtResponse<unknown>): string =>
+const bodyOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
-const messageOf = (a: IAdtResponse<unknown>): string =>
+const messageOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /**
@@ -320,7 +338,7 @@ const listenerThrown = (e: unknown, step: string): DebugListenerError =>
 /** A debug error that carries the method's error as it is, with its step. */
 const failedAt = <E extends Error>(
   error: E,
-  a: IAdtResponse<unknown>,
+  a: IAdtResponse<string | void>,
   step: string,
 ): E =>
   a.ok || isFromThrow(a.getError())
@@ -356,9 +374,11 @@ export function refuseConditionOffLine(
   list: readonly IDebuggerBreakpoint[],
 ): void {
   list.forEach((b, i) => {
-    if (b.kind !== 'line' && (b as { condition?: string }).condition)
+    // The breakpoints come from the model's arguments: a condition is read.
+    const { kind, condition } = b;
+    if (kind !== 'line' && condition)
       throw new DebugRefusedError(
-        `breakpoints[${i}] (${b.kind}): a condition applies to a line breakpoint only`,
+        `breakpoints[${i}] (${kind}): a condition applies to a line breakpoint only`,
       );
   });
 }
@@ -376,7 +396,7 @@ export function refuseConditionOffLine(
  * a safety net a conforming server does not reach. Any other failure is not
  * read as this.
  */
-function refusesUser(answer: IAdtResponse<unknown>): boolean {
+function refusesUser(answer: IAdtResponse<string | void>): boolean {
   if (answer.ok) return false;
   const response = answer.getError().response;
   const subType = readExceptionSubType(response?.data);
@@ -403,7 +423,7 @@ function describePlaced(b: BreakpointReading): string {
  */
 function credentialEntryOf(error: unknown): DebugFailure | undefined {
   if (isCredentialFailure(error)) return thrownFailure(error, 'start');
-  const carried = payloadCarriedBy(error) as FailureEntry | undefined;
+  const carried = payloadCarriedBy(error);
   return carried !== undefined && isCredentialPayload(carried)
     ? carried
     : undefined;
@@ -411,7 +431,7 @@ function credentialEntryOf(error: unknown): DebugFailure | undefined {
 
 /** A failed listener answer: the holder named when it is the system's conflict. */
 function listenerError(
-  answer: IAdtResponse<unknown>,
+  answer: IAdtResponse<string | void>,
   step: string,
 ): DebugListenerError {
   if (!answer.ok && isFromThrow(answer.getError()))
@@ -463,7 +483,7 @@ function variablesView(
 
 /** A stack position answer: the position asked; its failure at `set stack position`. */
 function positionView(
-  answer: IAdtResponse<unknown>,
+  answer: IAdtResponse<string | void>,
   position: number,
 ): DebugView<{ position: number }> {
   if (!answer.ok)
@@ -504,7 +524,7 @@ export class DebugSession<O = unknown> {
   protected readonly serial = new Serial();
   protected origin?: O;
   protected mode: IDebuggerListenerConflict = 'refuse';
-  protected control?: Listener;
+  protected control?: Listener | undefined;
   protected readonly armed = new Map<string, BreakpointReading>();
   /** The breakpoint definitions as the callers gave them, deduplicated and tagged: what every change sends again. */
   protected requested: RequestedBreakpoint[] = [];
@@ -512,24 +532,36 @@ export class DebugSession<O = unknown> {
   protected readonly pairedWith = new Map<string, string>();
   /** The last tag handed out. Never reset — not by a stop, not by a new start — so a tag is never reused. */
   private tags = 0;
-  protected listener?: Listener;
-  protected current?: Stop;
-  protected failure?: string;
-  /** The failed listen behind `failure`, carrying the method's error. */
-  private failedListen?: DebugListenerError;
+  protected listener?: Listener | undefined;
+  protected current?: Stop | undefined;
+  private failureWords?: string | undefined;
+  /**
+   * The failed listen behind `failure`, carrying the method's error. Set
+   * right after `failure`, whose every write drops it: it is never one
+   * recorded for an earlier failure.
+   */
+  private failedListen?: DebugListenerError | undefined;
+  /** The failure the next report throws. */
+  protected get failure(): string | undefined {
+    return this.failureWords;
+  }
+  protected set failure(value: string | undefined) {
+    this.failureWords = value;
+    this.failedListen = undefined;
+  }
   protected generation = 0;
   protected readonly notices: DebugState[] = [];
   private readonly waiters = new Set<() => void>();
   private readonly closedConnections = new WeakSet<object>();
   protected readonly breakpointConflict: BreakpointConflict;
   /** The identity of this debug session: fixed by a start, kept until a cleanup succeeded completely. */
-  protected fixed?: IDebuggerIdentity;
+  protected fixed?: IDebuggerIdentity | undefined;
   /** True once something that changes the system was sent: the cleanup owes a stopListener. */
   protected changed = false;
   /** The settings the caller set; applied after each attach. */
   protected preferences: DebugSettings = {};
   /** The last answer of setDebuggerSettings. */
-  protected effective?: SettingsReading;
+  protected effective?: SettingsReading | undefined;
 
   constructor(
     protected readonly ports: DebugSessionPorts<O>,
@@ -549,6 +581,14 @@ export class DebugSession<O = unknown> {
     if (this.origin === undefined)
       throw new DebugStateError('the debugger has no connection yet');
     return this.origin;
+  }
+
+  /** The header port of the bound origin's system, as the ports name it. */
+  protected headersContext(): AdtHeadersContext {
+    if (this.origin === undefined || this.ports.headersOf === undefined) {
+      return {};
+    }
+    return this.ports.headersOf(this.origin);
   }
   /** The identity in force: undefined before a start and after a complete cleanup. */
   currentIdentity(): IDebuggerIdentity | undefined {
@@ -660,6 +700,10 @@ export class DebugSession<O = unknown> {
     this.closedConnections.add(connection);
   }
   protected async controlDebugger(): Promise<Debugger> {
+    return (await this.controlListener()).debugger;
+  }
+  /** The control connection and its debugger, opened at the first need. */
+  private async controlListener(): Promise<Listener> {
     if (!this.control) {
       const connection = await this.open();
       this.control = {
@@ -667,7 +711,7 @@ export class DebugSession<O = unknown> {
         debugger: this.ports.abapDebugger(connection, this.mode),
       };
     }
-    return this.control.debugger;
+    return this.control;
   }
   private observer?: () => void;
   observe(onChange: () => void): void {
@@ -725,7 +769,7 @@ export class DebugSession<O = unknown> {
     const changedBefore = this.changed;
     this.changed = true;
     const answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'debugger.setBreakpoints',
       (headers) => dbg.setBreakpoints(identity, sent.map(wireOf), { headers }),
     );
@@ -753,7 +797,7 @@ export class DebugSession<O = unknown> {
     const raw = bodyOf(answer);
     const pairing = pairRows(sent, earlier, readBreakpoints(raw));
     this.armed.clear();
-    for (const row of pairing.placed) this.armed.set(row.id!, row);
+    for (const row of pairing.placed) this.armed.set(row.id, row);
     this.requested = pairing.requested;
     this.pairedWith.clear();
     for (const [id, tag] of pairing.paired) this.pairedWith.set(id, tag);
@@ -1128,12 +1172,15 @@ export class DebugSession<O = unknown> {
       if (generation !== this.generation) {
         // Overtaken while attaching: released at once. A release that fails is recorded,
         // and the debuggee is kept with its connection for the next stop to release.
-        const notReleased = await this.release(dbg, 'the debuggee');
-        if (notReleased) {
-          this.cleanupFailures.push(notReleased);
+        // A connection found spent is dropped without a request: its SAP
+        // session is gone, and SAP's logoff freed the debuggee; nothing is owed.
+        const outcome = await this.release(dbg, 'the debuggee');
+        if (outcome.kind === 'failed') {
+          this.cleanupFailures.push(outcome.failure);
           this.owed.add({ connection, debugger: dbg, what: 'the debuggee' });
-        } else
-          await this.closeOrRecord(connection, "the debuggee's connection");
+        } else if (outcome.kind === 'spent')
+          this.ports.dropConnection(connection);
+        else await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
       }
       const stack = await dbg.getStack();
@@ -1178,14 +1225,32 @@ export class DebugSession<O = unknown> {
   }
 
   /** Lets an attached debuggee run on. Never throws: answers why it was not released. */
-  private async release(
-    dbg: Debugger,
-    what: string,
-  ): Promise<DebugFailure | undefined> {
+  private async release(dbg: Debugger, what: string): Promise<ReleaseOutcome> {
     const released = await dbg
       .step('stepContinue', { analyse: analyseDebuggeeEnd })
       .catch(asFailure);
-    return released.ok ? undefined : failedEntry(released, `release ${what}`);
+    if (released.ok)
+      return released.getResult().sessionLost === undefined
+        ? { kind: 'released' }
+        : { kind: 'spent' };
+    const entry = failedEntry(released, `release ${what}`);
+    // Its connection spent (the owner's decision): the SAP session is gone,
+    // and SAP's logoff of it freed what it held — reported, no debt.
+    return spentBy(released.getError())
+      ? {
+          kind: 'spent',
+          note: { ...entry, cleanup: { message: STOP_DROPPED_WORDS } },
+        }
+      : { kind: 'failed', failure: entry };
+  }
+
+  /** A spent release: its connection taken out without a request, its note kept. */
+  private dropSpent(
+    connection: IAbapConnection,
+    outcome: { kind: 'spent'; note?: DebugFailure },
+  ): void {
+    this.ports.dropConnection(connection);
+    if (outcome.note !== undefined) this.cleanupNotes.push(outcome.note);
   }
 
   /**
@@ -1215,10 +1280,14 @@ export class DebugSession<O = unknown> {
         .catch(asFailure);
       if (!attached.ok) failures.push(failedEntry(attached, `attach ${what}`));
       else {
-        const notReleased = await this.release(dbg, what);
-        if (notReleased) {
+        const outcome = await this.release(dbg, what);
+        if (outcome.kind === 'spent') {
+          this.dropSpent(connection, outcome);
+          return;
+        }
+        if (outcome.kind === 'failed') {
           // Kept with the session that attached it: the next stop retries the release there.
-          failures.push(notReleased);
+          failures.push(outcome.failure);
           this.owed.add({ connection, debugger: dbg, what });
           return;
         }
@@ -1270,9 +1339,7 @@ export class DebugSession<O = unknown> {
       this.failure = undefined;
       this.failedListen = undefined;
       this.observer?.(); // consuming it may leave nothing held
-      throw carried !== undefined && carried.message === message
-        ? carried
-        : new DebugListenerError(message);
+      throw carried ?? new DebugListenerError(message);
     }
     const notice = this.notices.shift();
     if (notice) {
@@ -1302,7 +1369,7 @@ export class DebugSession<O = unknown> {
 
   private async afterMove(
     stop: Stop,
-    answer: IAdtResponse<unknown>,
+    answer: IAdtResponse<string | void>,
     step: string,
   ): Promise<DebugState> {
     if (!answer.ok) {
@@ -1400,15 +1467,19 @@ export class DebugSession<O = unknown> {
   releaseDebugger(): Promise<DebugState> {
     return this.mutate(async () => {
       const stop = this.requireStop();
-      // terminateDebugger frees this ABAP session, and the system answers that with a
-      // plain ICF 500 (errata "The debugger freeing its session is answered as an ICF
-      // 500", measured on premise (2026-10-11), BASIS 816): analyseDebuggerFreed takes
-      // exactly that shape as no failure. An ADT document, an HTML 500 or a 400 stay
-      // failures, and the attachment is kept for DebugStop.
+      // terminateDebugger frees this ABAP session, and the system answers that in one
+      // of two shapes, each read as freed. Over HTTP a plain ICF 500 (errata "The
+      // debugger freeing its session is answered as an ICF 500", measured on premise
+      // (2026-10-11), BASIS 816): analyseDebuggerFreed takes exactly that shape as no
+      // failure. Over RFC the freed session closes the RFC conversation (measured on
+      // premise, 2026-11-12): the RFC SDK's RFC_CLOSED, read from the verdict's `rfc`
+      // field (adt-clients 45.3), never from its message. An ADT document, an HTML 500,
+      // a 400 or any other RFC failure stay failures, and the attachment is kept for
+      // DebugStop.
       const answer = await stop.debugger.terminateDebugger({
         analyse: analyseDebuggerFreed,
       });
-      if (!answer.ok) {
+      if (!answer.ok && answer.getError().rfc?.codeString !== 'RFC_CLOSED') {
         throw failedAt(
           new DebugRequestError(messageOf(answer)),
           answer,
@@ -1482,12 +1553,12 @@ export class DebugSession<O = unknown> {
   }
   getVariables(names: string[]) {
     return this.variables('read variables', (d) =>
-      readVariablesOf(adtHeadersOf(this.origin), d, names),
+      readVariablesOf(this.headersContext(), d, names),
     );
   }
   getChildVariables(parents: string[]) {
     return this.variables('read child variables', (d) =>
-      readChildVariablesOf(adtHeadersOf(this.origin), d, parents),
+      readChildVariablesOf(this.headersContext(), d, parents),
     );
   }
   setVariable(name: string, value: string) {
@@ -1572,7 +1643,7 @@ export class DebugSession<O = unknown> {
   ): Promise<DebugView<VariablesReading>> {
     const { debugger: dbg } = this.batchDebugger(recorder);
     return variablesView(
-      await readVariablesOf(adtHeadersOf(this.origin), dbg, names),
+      await readVariablesOf(this.headersContext(), dbg, names),
       'read variables',
     );
   }
@@ -1583,7 +1654,7 @@ export class DebugSession<O = unknown> {
   ): Promise<DebugView<VariablesReading>> {
     const { debugger: dbg } = this.batchDebugger(recorder);
     return variablesView(
-      await readChildVariablesOf(adtHeadersOf(this.origin), dbg, parents),
+      await readChildVariablesOf(this.headersContext(), dbg, parents),
       'read child variables',
     );
   }
@@ -1610,7 +1681,7 @@ export class DebugSession<O = unknown> {
 
   private document(
     step: string,
-    call: (d: Debugger) => Promise<IAdtResponse<unknown>>,
+    call: (d: Debugger) => Promise<IAdtResponse<string | void>>,
   ): Promise<DebugView<string>> {
     return this.mutate(async () => {
       const answer = await call(this.requireStop().debugger);
@@ -1650,12 +1721,16 @@ export class DebugSession<O = unknown> {
    * other call sends a logoff.
    */
   /** The listener connection of the one-request path, and its listen while one is open. */
-  private onceListener?: {
-    connection: IAbapConnection;
-    open?: Promise<IAdtResponse<string>>;
-  };
+  private onceListener?:
+    | {
+        connection: IAbapConnection;
+        open?: Promise<IAdtResponse<string>> | undefined;
+      }
+    | undefined;
   /** The attaching session of the one-request path, opened by its first attach: every attach goes on it. */
-  private onceAttaching?: { connection: IAbapConnection; debugger: Debugger };
+  private onceAttaching?:
+    | { connection: IAbapConnection; debugger: Debugger }
+    | undefined;
 
   /**
    * The identity in force, or one fixed now from the call's arguments. A call
@@ -1691,8 +1766,7 @@ export class DebugSession<O = unknown> {
 
   /** The control connection's debugger, under the conflict behaviour asked for. */
   private async onceControl(conflict: IDebuggerListenerConflict) {
-    await this.controlDebugger();
-    const control = this.control as Listener;
+    const control = await this.controlListener();
     return this.ports.abapDebugger(control.connection, conflict);
   }
 
@@ -1721,7 +1795,7 @@ export class DebugSession<O = unknown> {
       const dbg = await this.onceControl(this.mode);
       this.changed = true;
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.setBreakpoints',
         (headers) => dbg.setBreakpoints(identity, list, { headers }),
       );
@@ -1749,7 +1823,7 @@ export class DebugSession<O = unknown> {
       const dbg = await this.onceControl(this.mode);
       this.changed = true;
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.syncBreakpoints',
         (headers) => dbg.syncBreakpoints(identity, sync, { headers }),
       );
@@ -1924,7 +1998,7 @@ export class DebugSession<O = unknown> {
 
   private afterStepOnce(
     stop: Stop,
-    answer: IAdtResponse<unknown>,
+    answer: IAdtResponse<string | void>,
     step: string,
   ): DebugView<OnceStep> {
     if (!answer.ok)
@@ -2012,7 +2086,7 @@ export class DebugSession<O = unknown> {
     return this.mutate(async () => {
       const stop = this.requireStop();
       const answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.setDebuggerSettings',
         (headers) => stop.debugger.setDebuggerSettings(settings, { headers }),
       );
@@ -2073,7 +2147,9 @@ export class DebugSession<O = unknown> {
   }
 
   // --- lifecycle -------------------------------------------------------------
-  private run?: { generation: number; connection?: IAbapConnection };
+  private run?:
+    | { generation: number; connection?: IAbapConnection }
+    | undefined;
   private reconciled = false;
   private cleanupFailures: DebugFailure[] = [];
   /** What the current cleanup has to tell that is no debt: SAP's final refusal of the stopListener. */
@@ -2208,7 +2284,7 @@ export class DebugSession<O = unknown> {
   private async applySettings(stop: Stop): Promise<DebugView<SettingsReading>> {
     const first = !stop.settingsSent;
     let answer = await withAdtHeaders(
-      adtHeadersOf(this.origin),
+      this.headersContext(),
       'debugger.setDebuggerSettings',
       (headers) =>
         stop.debugger.setDebuggerSettings(this.preferences, { headers }),
@@ -2225,7 +2301,7 @@ export class DebugSession<O = unknown> {
     stop.settingsSent = true;
     if (first && this.preferences.systemDebugging === false) {
       answer = await withAdtHeaders(
-        adtHeadersOf(this.origin),
+        this.headersContext(),
         'debugger.setDebuggerSettings',
         (headers) =>
           stop.debugger.setDebuggerSettings(this.preferences, { headers }),
@@ -2384,9 +2460,14 @@ export class DebugSession<O = unknown> {
       for (const owed of owedBefore) {
         if (skipped(`release ${owed.what}`)) continue;
         if (keptHeld(`release ${owed.what}`)) continue;
-        const notReleased = await this.release(owed.debugger, owed.what);
-        if (notReleased) {
-          failures.push(notReleased); // kept: a later stop retries
+        const outcome = await this.release(owed.debugger, owed.what);
+        if (outcome.kind === 'failed') {
+          failures.push(outcome.failure); // kept: a later stop retries
+          continue;
+        }
+        if (outcome.kind === 'spent') {
+          this.owed.delete(owed);
+          this.dropSpent(owed.connection, outcome);
           continue;
         }
         // Released: only its connection may be left, and a retry must not release twice.
@@ -2416,10 +2497,8 @@ export class DebugSession<O = unknown> {
         !skipped('release the debuggee') &&
         !keptHeld('release the debuggee')
       ) {
-        const released = await stop.debugger
-          .step('stepContinue', { analyse: analyseDebuggeeEnd })
-          .catch(asFailure);
-        if (released.ok) {
+        const outcome = await this.release(stop.debugger, 'the debuggee');
+        if (outcome.kind === 'released') {
           // Released: only its connection may be left, and a retry must not release twice.
           this.current = undefined;
           await this.closeOrKeep(
@@ -2427,8 +2506,13 @@ export class DebugSession<O = unknown> {
             "the debuggee's connection",
             failures,
           );
+        } else if (outcome.kind === 'spent') {
+          // Its connection is spent: the stop is dropped without a request —
+          // no logoff on the spent connection.
+          this.current = undefined;
+          this.dropSpent(stop.connection, outcome);
         } else {
-          failures.push(failedEntry(released, 'release the debuggee')); // kept: a later stop retries
+          failures.push(outcome.failure); // kept: a later stop retries
         }
       }
       // The one-request path's listener: its open listen answers once the

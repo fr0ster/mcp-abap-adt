@@ -16,7 +16,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import {
-  BATCH_NO_TIMEOUT_WORDS,
+  BATCH_NO_BACKGROUND_WORDS,
   batchNotRecordableWords,
   batchNotServedWords,
 } from '../../../lib/auth/serverRefusal';
@@ -29,6 +29,7 @@ import {
 import { createRecorder, untilSent } from '../../../lib/batch/recorder';
 import { callTransportRequest } from '../../../lib/callTransport';
 import { createAdtClient } from '../../../lib/clients';
+import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import type {
@@ -38,6 +39,7 @@ import type {
   IHandlersRegistry,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import * as longCall from '../../../lib/longCall';
 import * as packageSessions from '../../../lib/packageSessions';
 import { currentRequestSignal } from '../../../lib/requestSignal';
@@ -71,15 +73,12 @@ type Handler = (context: HandlerContext, args: never) => Promise<unknown>;
 function tool(
   name: string,
   handler: Handler,
-  inputSchema: Record<string, unknown> = {
-    type: 'object',
-    properties: { name: { type: 'string' } },
-  },
+  inputSchema: z.ZodObject = z.object({ name: z.string().optional() }),
   extra: Partial<HandlerEntry> = {},
 ): HandlerEntry {
   return {
     toolDefinition: { name, description: name, inputSchema },
-    handler: handler as never,
+    call: handler as never,
     ...extra,
   } as HandlerEntry;
 }
@@ -327,14 +326,10 @@ describe('recording in batch mode', () => {
             received = args;
             return oneGet('/class')(context, args);
           },
-          {
-            type: 'object',
-            properties: {
-              class_name: { type: 'string' },
-              version: { type: 'string', default: 'active' },
-            },
-            required: ['class_name'],
-          },
+          z.object({
+            class_name: z.string(),
+            version: z.string().default('active').optional(),
+          }),
         ),
       ]),
     ]);
@@ -419,7 +414,10 @@ describe('recording in batch mode', () => {
       registerAllTools(server: McpServer) {
         server.registerTool(
           'OwnTool',
-          { description: 'own', inputSchema: { name: z.string().optional() } },
+          {
+            description: 'own',
+            inputSchema: z.object({ name: z.string().optional() }),
+          },
           own as never,
         );
       },
@@ -452,17 +450,24 @@ describe('recording in batch mode', () => {
     await s.close();
   });
 
-  it('timeout given in batch mode is refused batch_no_timeout before recording', async () => {
-    const s = await stand([shipped('SearchObject')]);
+  it('background: true given in batch mode is refused batch_no_background before recording', async () => {
+    // A server that lists `background`: a strategy and the tool reading its runs.
+    const s = await stand(
+      [
+        shipped('SearchObject'),
+        new BackgroundRunHandlersGroup(noConnectionContext()),
+      ],
+      { backgroundRuns: true },
+    );
     const refused = refusalOf(
       await s.call('SearchObject', {
         object_name: 'ZPLACEHOLDER*',
-        timeout: 30,
+        background: true,
       }),
     );
     expect(refused).toEqual({
-      error: 'batch_no_timeout',
-      message: BATCH_NO_TIMEOUT_WORDS,
+      error: 'batch_no_background',
+      message: BATCH_NO_BACKGROUND_WORDS,
     });
     expect(s.recorded).toEqual([]);
     expect(recordedCalls(s)).toEqual([]);
@@ -497,13 +502,10 @@ describe('recording in batch mode', () => {
             seen = callTransportRequest();
             return oneGet('/program')(context, args);
           },
-          {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              transport_request: { type: 'string' },
-            },
-          },
+          z.object({
+            name: z.string().optional(),
+            transport_request: z.string().optional(),
+          }),
         ),
       ]),
     ]);
@@ -560,13 +562,14 @@ describe('recording in batch mode', () => {
     const s = await stand(
       [
         groupOf([
-          tool('RuntimeRunClass', run as Handler, {
-            type: 'object',
-            properties: {
-              class_name: { type: 'string' },
-              background: { type: 'boolean' },
-            },
-          }),
+          tool(
+            'RuntimeRunClass',
+            run as Handler,
+            z.object({
+              class_name: z.string().optional(),
+              background: z.boolean().optional(),
+            }),
+          ),
         ]),
       ],
       { backgroundRuns: true },

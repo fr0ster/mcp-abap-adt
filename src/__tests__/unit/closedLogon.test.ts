@@ -6,7 +6,7 @@
  * error and never a connection whose session is gone. One logoff.
  */
 
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
@@ -57,11 +57,14 @@ import { closeInstance } from '../../lib/instanceClose';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 const SETTINGS: SapConfig = {
-  url: 'https://system.invalid',
   authType: 'basic',
   username: 'placeholder-user',
   password: 'placeholder-password',
   connectionType: 'rfc',
+  client: '100',
+  language: 'EN',
+  ashost: 'system.invalid',
+  sysnr: '00',
 };
 const ok = async () => ({ ok: true as const });
 const credential: IAuthProvider = {
@@ -81,7 +84,7 @@ class Server extends BaseMcpServer {
       source: { resolve: async () => ({ settings: SETTINGS, credential }) },
     });
   }
-  connection(): Promise<AbapConnection> {
+  connection(): Promise<IAbapConnection> {
     return this.getConnection(new AbortController().signal);
   }
 }

@@ -483,11 +483,13 @@ only:
   in a loop finished without stopping at that line's next pass; the system
   answered the detach as the run ended, before the listener polled again).
 - **`release_debugger`**: frees the debugger; the program runs on and returns its
-  output. The system answers this with a plain `500` that is the request having
-  worked (adt-clients' errata, "The debugger freeing its session is answered as an
-  ICF 500"); the server reads exactly that as no failure, and anything else — an
-  ADT document, an HTML page, a `400` — as a failure that keeps the stop for
-  `DebugStop`. The freed ABAP session takes no further request, so the server sends
+  output. Over HTTP the system answers this with a plain `500` that is the request
+  having worked (adt-clients' errata, "The debugger freeing its session is answered
+  as an ICF 500"); over RFC the freed session closes the RFC conversation, and the
+  RFC SDK reports `RFC_CLOSED` (measured on premise, 2026-11-12). The server reads
+  exactly those two as no failure — the RFC code from the error's fields, never its
+  message — and anything else — an ADT document, an HTML page, a `400`, any other
+  RFC error — as a failure that keeps the stop for `DebugStop`. The freed ABAP session takes no further request, so the server sends
   it none, not even a logoff.
 
 Both answer the listening state, or the run's end when the program finished before the answer (measured on premise (2026-10-12) for `release_debugger`). `DebugTerminate` ends the
@@ -573,7 +575,31 @@ ends by:
   (`release the debuggee`, `release <what>`) and the words "not sent: the listener's stop failed
   and a breakpoint may still be set, where the debuggee would stop again. It stays held for the
   next stop.", and the next stop releases it once the listener's stop or the deletes succeeded
-  (unit-tested, not measured: `DebugSessionCleanup.test.ts`). While a debuggee stays held — not
+  (unit-tested, not measured: `DebugSessionCleanup.test.ts`). A held debuggee whose connection is spent is
+  dropped instead. A connection is spent when the release's answer names the connection's own
+  session error (`sessionError` `ADT_NOT_CONNECTED` or `ADT_SESSION_REPLACED`), or is marked
+  `sessionLost`; this is read from those fields, never from the words.
+  - Its SAP session is gone, and SAP's logoff of it freed what it held. The stop takes the
+    connection out without a request (no logoff on it), as a freed debugger session is.
+  - A failed release is reported as a note in the shape of every other entry, its `cleanup`
+    saying the stop was dropped. It is no failure: the stop completes, and a new start is
+    accepted.
+  - The same rule holds for every release the debug session sends: a release an earlier stop
+    owed, a debuggee caught during the stop, and an attach overtaken by a newer listener
+    generation. Each is dropped and owed no more; inside a stop, a failed one is a note.
+  - **AMDP** works the same way. A cancel, a breakpoint clear, a release or the stop that finds
+    the commands connection spent means the AMDP debug session went with its SAP session.
+    Nothing more is sent, both connections are dropped without a request, and the stop
+    completes. The one-request path (the compact debugger) does the same when its stop finds
+    the commands connection spent; its `stop` operation answers that failure as it came, and the
+    session goes with both connections.
+  - Any other failure of the release, `ADT_RELEASE_PENDING` included, stays a failure kept for
+    the next stop.
+  - Unit-tested in `DebugSessionCleanup.test.ts`.
+  - Measured on premise over RFC (2026-11-12), with `RFC_CLOSED` sent down the release's
+    failure path by a local change, not committed. `DebugStop` answered `stopped`, with the
+    release's `ADT_NOT_CONNECTED` as a note; a new start answered `listening`, and its stop
+    succeeded. While a debuggee stays held — not
   released, or owed — the run's connection stays open with it: the run's request is the one held
   at the breakpoint, and its logoff would end that session. The stop that releases the debuggee
   closes the run's connection after the release; the instance's close and the process's shutdown
@@ -593,7 +619,8 @@ ends by:
   stop, whatever it is: measured on premise (2026-10-19, `refusalFollowUps.test.ts`), with
   the listener's poll held so that the second stop is sent and the password made wrong
   between the two, over HTTP with the session ended between them the second stop was
-  answered `400` (`ICMENOSESSION`) and over RFC it was answered `200`; each time the stop
+  answered `400` (`ICMENOSESSION`), which the connection reports as the session gone
+  (`ADT_SESSION_REPLACED`, measured again 2026-11-12), and over RFC it was answered `200`; each time the stop
   answered `stopped`, sent nothing more, asked nothing more of the credential and held
   nothing. A wrong password brings no credential refusal to the second stop on either
   transport — a live session's cookie, or the RFC conversation's one logon, authenticates

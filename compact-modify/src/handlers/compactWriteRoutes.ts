@@ -14,33 +14,65 @@ import type {
 import {
   type CompactHandler,
   type CompactRouterMap,
+  compactCreateSchema,
+  compactDeleteSchema,
+  compactUpdateSchema,
   dispatchCompact,
 } from '@mcp-abap-adt/lib/compact-shared';
+import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
+import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import {
   handleCreateOnly,
   handleDeleteOnly,
   handleUpdateUnderLock,
 } from '@mcp-abap-adt/lib/handlers/write';
 
+/*
+ * Each route parses its arguments with the compact schema it serves: a
+ * wrong-typed argument is refused with the schema's words, and a key the
+ * schema does not declare is dropped (spec §3).
+ */
+
 /**
  * The create of every type: its create request alone, one `POST`
  * (`handleCreateOnly`, spec §4.6) — UNIT_TEST and CDS_UNIT_TEST, whose create
  * is a chain, refused there before anything is sent.
  */
-const create = handleCreateOnly as unknown as CompactHandler;
+const create: CompactHandler = defineTool(
+  {
+    name: 'HandlerCreate',
+    description: 'The create request alone.',
+    inputSchema: compactCreateSchema,
+  },
+  handleCreateOnly,
+).call;
 
 /**
  * The update of every type: its one write under the caller's `lock_handle`
  * (`handleUpdateUnderLock`, spec §4.6).
  */
-const update = handleUpdateUnderLock as unknown as CompactHandler;
+const update: CompactHandler = defineTool(
+  {
+    name: 'HandlerUpdate',
+    description: "The one write under the caller's lock.",
+    inputSchema: compactUpdateSchema,
+  },
+  handleUpdateUnderLock,
+).call;
 
 /**
  * The delete of every type: one request (`handleDeleteOnly`, spec §4.6) — the
  * deletion request alone, or for a class include and the unit tests the
  * include written empty under the caller's `lock_handle`.
  */
-const remove = handleDeleteOnly as unknown as CompactHandler;
+const remove: CompactHandler = defineTool(
+  {
+    name: 'HandlerDelete',
+    description: 'The deletion request alone.',
+    inputSchema: compactDeleteSchema,
+  },
+  handleDeleteOnly,
+).call;
 
 export const compactWriteRouterMap: CompactRouterMap = {
   PACKAGE: {
@@ -171,7 +203,7 @@ export const compactWriteRouterMap: CompactRouterMap = {
 export async function routeCompactWrite(
   context: Parameters<typeof dispatchCompact>[0],
   operation: Exclude<CompactCrudOperation, 'get'>,
-  args: { object_type?: CompactObjectType } & Record<string, unknown>,
-): Promise<unknown> {
+  args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
+): Promise<ToolResultLike> {
   return dispatchCompact(context, compactWriteRouterMap, operation, args);
 }

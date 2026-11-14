@@ -74,7 +74,9 @@ function searchNamesOf<N extends string>(table: ListedSearchTypes<N>) {
 const SEARCH_NAMES = {
   onprem: searchNamesOf(ADT_SEARCH_TYPES_ONPREM),
   cloud: searchNamesOf(ADT_SEARCH_TYPES_CLOUD),
-} as const satisfies Readonly<Record<ProjectionVariant, unknown>>;
+} as const satisfies Readonly<
+  Record<ProjectionVariant, (upper: string) => string | undefined>
+>;
 
 /**
  * The search name of the variant's object types list `text` names,

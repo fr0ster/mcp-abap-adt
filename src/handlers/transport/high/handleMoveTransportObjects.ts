@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * MoveTransportObjects — the transport organizer's *Move Objects*: entries
  * from one task to another (adt-clients 30.0.0, `moveObjects`).
@@ -19,8 +21,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -29,59 +31,45 @@ import { return_error } from '../../../lib/utils';
  * from this file as text, and a nested `default` inside the `objects`
  * property would be reported as the default of `objects` itself.
  */
-const MOVED_ENTRY = {
-  type: 'object',
-  properties: {
-    object_name: {
-      type: 'string',
-      description: 'Object name.',
-    },
-    object_type: {
-      type: 'string',
-      description:
-        'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
-    },
-    position: {
-      type: 'string',
-      description:
-        "Position of the object's entry in the source task's object list.",
-    },
-    pgmid: {
-      type: 'string',
-      description: "Program id. Defaults to R3TR, a workbench object's.",
-      default: 'R3TR',
-    },
-  },
-  required: ['object_name', 'object_type', 'position'],
-} as const;
+const MOVED_ENTRY = z.object({
+  object_name: z.string().describe('Object name.'),
+  object_type: z
+    .string()
+    .describe(
+      'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
+    ),
+  position: z
+    .string()
+    .describe(
+      "Position of the object's entry in the source task's object list.",
+    ),
+  pgmid: z
+    .string()
+    .default('R3TR')
+    .optional()
+    .describe("Program id. Defaults to R3TR, a workbench object's."),
+});
 
 export const TOOL_DEFINITION = {
   name: 'MoveTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Moves the object entries named by objects from the transport task named by transport_number to the task named by target_number. Each entry is named by its position in the source task's object list.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description: 'Number of the transport task that holds the entries.',
-      },
-      target_number: {
-        type: 'string',
-        description: 'Number of the transport task the entries move to.',
-      },
-      objects: {
-        type: 'array',
-        minItems: 1,
-        description:
-          'The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.',
-        items: MOVED_ENTRY,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number', 'target_number', 'objects'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe('Number of the transport task that holds the entries.'),
+    target_number: z
+      .string()
+      .describe('Number of the transport task the entries move to.'),
+    objects: z
+      .array(MOVED_ENTRY)
+      .min(1)
+      .describe(
+        'The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface MoveTransportObjectEntry {
@@ -91,12 +79,7 @@ interface MoveTransportObjectEntry {
   pgmid?: string;
 }
 
-interface MoveTransportObjectsArgs {
-  transport_number: string;
-  target_number: string;
-  objects: MoveTransportObjectEntry[];
-  detail?: 'terse' | 'full' | 'raw';
-}
+type MoveTransportObjectsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 const ENTRY_FIELDS = ['object_name', 'object_type', 'position'] as const;
 
@@ -109,9 +92,7 @@ function missingArgument(args: MoveTransportObjectsArgs): string | undefined {
   if (args.objects.length === 0) return 'objects must hold at least one entry';
   for (const [index, entry] of args.objects.entries()) {
     for (const field of ENTRY_FIELDS) {
-      const value = (entry as Partial<MoveTransportObjectEntry> | undefined)?.[
-        field
-      ];
+      const value = entry?.[field];
       if (typeof value !== 'string' || value === '') {
         return `objects[${index}].${field} is required`;
       }
@@ -135,7 +116,7 @@ export async function handleMoveTransportObjects(
   // echoes what it was sent, so the answer says the document was understood,
   // not that any entry changed task. `accepted`, and the re-read of both tasks
   // that settles it.
-  const terseMove: Terse<unknown> = () => ({
+  const terseMove = () => ({
     accepted: true,
     transport_number: args.transport_number,
     target_number: args.target_number,

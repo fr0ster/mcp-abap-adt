@@ -1,10 +1,11 @@
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
@@ -22,31 +23,22 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name. Case-insensitive.',
-      },
-      part: READ_PART_PROPERTY,
-      response_format: {
-        type: 'string',
-        enum: ['xml', 'json', 'plain'],
-        description:
-          'Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.',
-        default: 'xml',
-      },
-    },
-    required: ['service_binding_name'],
-  },
+  inputSchema: z.object({
+    service_binding_name: z
+      .string()
+      .describe('Service binding name. Case-insensitive.'),
+    part: READ_PART_FIELD,
+    response_format: z
+      .enum(['xml', 'json', 'plain'])
+      .default('xml')
+      .optional()
+      .describe(
+        'Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.',
+      ),
+  }),
 } as const;
 
-interface GetServiceBindingArgs {
-  service_binding_name: string;
-  part?: ReadPart;
-  response_format?: ServiceBindingResponseFormat;
-}
+type GetServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetServiceBinding(
   context: HandlerContext,
@@ -57,7 +49,6 @@ export async function handleGetServiceBinding(
     return return_error(new Error('service_binding_name is required'));
   }
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
 
   // The config field is `bindingName`, not `serviceBindingName` — confirmed
   // against `IServiceBindingConfig`, and the pre-migration handler already

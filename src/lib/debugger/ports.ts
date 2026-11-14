@@ -49,10 +49,7 @@ async function openStateful(
     context.connection,
     context.logger,
   );
-  if (session === 'stateful')
-    (
-      connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
-    ).setSessionType?.('stateful');
+  if (session === 'stateful') connection.setSessionType('stateful');
   // Held state's own: closed at its stop, the idle bound's stop, the host's
   // stop and the instance's terminal close, whichever comes first.
   own(connection, { role: 'state' });
@@ -129,6 +126,7 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       AbapDebugger.create(c, { onConflict }),
     requestUser: async () => requestUserOf(),
+    headersOf: (origin) => origin,
     run,
   };
 }
@@ -137,8 +135,15 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
+    // Its SAP session is gone: it ends like every owned connection, with its
+    // one `disconnect()` (connection 16 sends no logoff for a session it no
+    // longer holds).
+    dropConnection: (connection) => {
+      void endConnection(connection);
+    },
     amdpDebugger: (c) => AmdpDebugger.create(c),
     requestUser: async () => requestUserOf(),
+    headersOf: (origin) => origin,
     run,
   };
 }

@@ -1,0 +1,6 @@
+{
+  "expect": "context-skip",
+  "files": {
+    "src/__tests__/unit/thing.test.ts": "unit.ts"
+  }
+}

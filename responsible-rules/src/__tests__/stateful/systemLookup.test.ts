@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The ABAP Cloud system-context lookup (`systeminformation`) is asked once
  * per connection, before the first tool on it runs, inside the main flow
@@ -153,9 +154,9 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
     toolDefinition: {
       name: 'DebugWait',
       description: 'DebugWait',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
-    handler: (async (_context: unknown, _args: unknown) => ({
+    call: (async (_context: unknown, _args: unknown) => ({
       content: [{ type: 'text', text: 'waited' }],
     })) as never,
   } as unknown as HandlerEntry;
@@ -276,13 +277,9 @@ describe('ABAP Cloud, the lookup refused', () => {
     toolDefinition: {
       name: 'TwoStep',
       description: 'TwoStep',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-      },
+      inputSchema: z.object({ id: z.string() }),
     },
-    handler: (async (
+    call: (async (
       context: {
         connection: { makeAdtRequest(o: object): Promise<unknown> };
       },
@@ -418,9 +415,9 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
     toolDefinition: {
       name: 'DebugWait',
       description: 'DebugWait',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
-    handler: (async (_context: unknown, _args: unknown) => {
+    call: (async (_context: unknown, _args: unknown) => {
       ran += 1;
       return { content: [{ type: 'text', text: 'waited' }] };
     }) as never,
@@ -463,9 +460,9 @@ it('a replacement after a lost session asks no lookup: the same credential on th
     toolDefinition: {
       name: 'LoseSession',
       description: 'LoseSession',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
-    handler: (async (
+    call: (async (
       context: { connection: Sender & { isConnected?: () => boolean } },
       _args: unknown,
     ) => {
@@ -482,9 +479,9 @@ it('a replacement after a lost session asks no lookup: the same credential on th
     toolDefinition: {
       name: 'Responsible',
       description: 'Responsible',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
-    handler: (async (context: { connection: Sender }, _args: unknown) => {
+    call: (async (context: { connection: Sender }, _args: unknown) => {
       const { responsible: user } = requireSystemContextForCreate();
       await context.connection.makeAdtRequest({
         url: `/sap/bc/adt/probe/after/${user}`,

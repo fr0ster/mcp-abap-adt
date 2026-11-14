@@ -79,13 +79,23 @@ async function filesAfterACall(
   });
   const server = new Server(
     owner,
-    {
-      url: 'http://placeholder.invalid',
-      client: '100',
-      authType: 'basic',
-      username: 'PLACEHOLDER_USER',
-      connectionType,
-    },
+    connectionType === 'rfc'
+      ? {
+          client: '100',
+          language: 'EN',
+          ashost: 'placeholder.invalid',
+          sysnr: '00',
+          authType: 'basic',
+          username: 'PLACEHOLDER_USER',
+          connectionType,
+        }
+      : {
+          url: 'http://placeholder.invalid',
+          client: '100',
+          authType: 'basic',
+          username: 'PLACEHOLDER_USER',
+          connectionType,
+        },
     destination ?? undefined,
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

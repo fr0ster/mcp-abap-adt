@@ -111,7 +111,15 @@
     "tool": "GetFunctionModule",
     "set": "full",
     "handler": "src/handlers/function_module/high/handleGetFunctionModule.ts#handleGetFunctionModule",
-    "sends": "one request at the group given: GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/fmodules/{name} (part metadata)"
+    "sends": "part metadata: one request at the group given, GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}, the group it states checked against the group given",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "metadata"
+        ]
+      }
+    ]
   },
   {
     "tool": "GetFunctionInclude",
@@ -177,7 +185,21 @@
     "tool": "GetObjectVersions",
     "set": "full",
     "handler": "src/handlers/common/readonly/handleGetObjectVersions.ts#handleGetObjectVersions",
-    "sends": "GET the versions feed of the object (…/versions)"
+    "sends": "GET the versions feed of the object (…/versions)",
+    "when": [
+      {
+        "argument": "object_type",
+        "notEquals": [
+          "function_module"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "GetObjectDraft",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectDraft.ts#handleGetObjectDraft",
+    "sends": "for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together"
   },
   {
     "tool": "GetObjectVersionSource",
@@ -202,12 +224,6 @@
     "set": "full",
     "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
     "sends": "GET /sap/bc/adt/oo/interfaces/{name}/source/main/versions"
-  },
-  {
-    "tool": "GetFunctionModuleVersions",
-    "set": "full",
-    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
-    "sends": "GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions"
   },
   {
     "tool": "GetTableVersions",
@@ -405,7 +421,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "one request: GET the type's source (as the full set's Get<Type>, part source); FUNCTION_MODULE at the group its arguments name",
+    "sends": "one request: GET the type's source (as the full set's Get<Type>, part source)",
     "when": [
       {
         "argument": "part",
@@ -430,7 +446,6 @@
           "PROGRAM",
           "INCLUDE",
           "INTERFACE",
-          "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION"
@@ -525,7 +540,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "GET /sap/bc/adt/activation/runs/{run_id}",
+    "sends": "GET /sap/bc/adt/activation/runs/{run_id}; with with_long_polling true, GET /sap/bc/adt/activation/runs/{run_id}?withLongPolling=true, which SAP holds until the run ends",
     "when": [
       {
         "argument": "part",
@@ -579,6 +594,20 @@
       {
         "argument": "run_id",
         "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "as the full set's draft read: for each part of the object, GET its source or metadata ?version=active, ?version=inactive and ?version=workingArea, all sent together",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "draft"
+        ]
       }
     ]
   },
@@ -719,7 +748,6 @@
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_GROUP",
-          "FUNCTION_MODULE",
           "TABLE",
           "STRUCTURE",
           "DDL",
@@ -764,7 +792,6 @@
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_GROUP",
-          "FUNCTION_MODULE",
           "TABLE",
           "STRUCTURE",
           "DDL",
@@ -826,7 +853,6 @@
           "CDS_UNIT_TEST",
           "PROGRAM",
           "INTERFACE",
-          "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
@@ -877,7 +903,6 @@
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_GROUP",
-          "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
@@ -970,12 +995,6 @@
     "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
   },
   {
-    "tool": "ActivateFunctionModule",
-    "set": "full",
-    "handler": "src/handlers/function/low/handleActivateFunctionModule.ts#handleActivateFunctionModule",
-    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object"
-  },
-  {
     "tool": "ActivateFunctionGroup",
     "set": "full",
     "handler": "src/handlers/function/low/handleActivateFunctionGroup.ts#handleActivateFunctionGroup",
@@ -1042,33 +1061,22 @@
     "tool": "HandlerActivate",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
-    "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the function module under its function group (object_name GROUP|MODULE, or with function_group_name), answering { run_id }",
-    "when": [
-      {
-        "argument": "objects",
-        "present": false
-      },
-      {
-        "argument": "object_adt_type",
-        "present": false
-      },
-      {
-        "argument": "object_type",
-        "equals": [
-          "FUNCTION_MODULE"
-        ]
-      }
-    ]
-  },
-  {
-    "tool": "HandlerActivate",
-    "set": "compact",
-    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
     "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate)",
     "when": [
       {
         "argument": "objects",
         "present": true
+      },
+      {
+        "argument": "objects",
+        "field": "type",
+        "notEquals": [
+          "FUGR/FF",
+          "function",
+          "functionmodule",
+          "function_module",
+          "func"
+        ]
       }
     ]
   },
@@ -1085,6 +1093,16 @@
       {
         "argument": "object_adt_type",
         "present": true
+      },
+      {
+        "argument": "object_adt_type",
+        "notEquals": [
+          "FUGR/FF",
+          "function",
+          "functionmodule",
+          "function_module",
+          "func"
+        ]
       }
     ]
   },
@@ -1136,12 +1154,6 @@
     "tool": "CheckFunctionGroup",
     "set": "full",
     "handler": "src/handlers/function/high/handleCheckFunctionGroup.ts#handleCheckFunctionGroup",
-    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
-  },
-  {
-    "tool": "CheckFunctionModule",
-    "set": "full",
-    "handler": "src/handlers/function/high/handleCheckFunctionModule.ts#handleCheckFunctionModule",
     "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object"
   },
   {
@@ -1202,13 +1214,29 @@
     "tool": "HandlerCheckRun",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerCheckRun.ts#handleHandlerCheckRun",
-    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package)"
+    "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package)",
+    "when": [
+      {
+        "argument": "object_type",
+        "notEquals": [
+          "FUNCTION_MODULE"
+        ]
+      }
+    ]
   },
   {
     "tool": "HandlerDeletionCheck",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts#handleHandlerDeletionCheck",
-    "sends": "POST /sap/bc/adt/deletion/check for the one object"
+    "sends": "POST /sap/bc/adt/deletion/check for the one object",
+    "when": [
+      {
+        "argument": "object_type",
+        "notEquals": [
+          "FUNCTION_MODULE"
+        ]
+      }
+    ]
   },
   {
     "tool": "HandlerValidate",
@@ -1472,24 +1500,6 @@
     ]
   },
   {
-    "tool": "RunFunctionModuleUnitTest",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts#handleRunFunctionModuleUnitTest",
-    "sends": "POST /sap/bc/adt/abapunit/testruns at the module under its function group: runs every test of the group and answers the finished result",
-    "when": [
-      {
-        "argument": "runner",
-        "equals": [
-          "sync"
-        ]
-      },
-      {
-        "argument": "function_group_name",
-        "present": true
-      }
-    ]
-  },
-  {
     "tool": "HandlerProfileSchedule",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerProfileSchedule.ts#handleHandlerProfileSchedule",
@@ -1571,6 +1581,16 @@
       {
         "argument": "objects",
         "present": false
+      },
+      {
+        "argument": "object_type",
+        "notEquals": [
+          "FUGR/FF",
+          "function",
+          "functionmodule",
+          "function_module",
+          "func"
+        ]
       }
     ]
   },
@@ -1578,7 +1598,15 @@
     "tool": "HandlerWhereUsed",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
-    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope"
+    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope",
+    "when": [
+      {
+        "argument": "object_type",
+        "notEquals": [
+          "FUNCTION_MODULE"
+        ]
+      }
+    ]
   },
   {
     "tool": "GetObjectVersionDiff",

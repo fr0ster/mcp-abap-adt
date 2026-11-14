@@ -10,11 +10,14 @@
  * an entry that matches no finding fails too, so the list cannot rot.
  */
 
+import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { productionFiles, typeCodeFindings } from './helpers/typeCodeScan';
 
-const ROOT = join(__dirname, '../../../..');
+const ROOT = repositoryRoot(__dirname);
 const TSCONFIG = join(ROOT, 'tsconfig.test.json');
 
 /** `src`, and the `src` of every package directory of the repository. */
@@ -50,14 +53,6 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     "The node type GetIncludesList's answer gives a class section (ADT's class include type), read from the class's metadata: no API of the library serves it, so no table holds it; it is the tree's label as answered before.",
   ],
   [
-    'src/lib/search-source/sourceReader.ts:VIEW',
-    "The first four letters of a function module's name (the `VIEW…` maintenance modules), compared with a name, not a type.",
-  ],
-  [
-    'src/handlers/system/readonly/handleGetAbapSystemSymbols.ts:FUNC',
-    "A function module in the symbols tool's own object-type answer (CLAS, INTF, FUNC or LOCAL): that tool's word for what a symbol resolved to, not an ADT type code.",
-  ],
-  [
     'src/handlers/data_element/high/handleCreateDataElement.ts:CHAR',
     'The ABAP data type a data element defaults to (the DDIC built-in type `CHAR`), not an object type; it is also the search name of characteristics (`CHAR/8B`), which this literal does not mean.',
   ],
@@ -87,19 +82,23 @@ describe('type codes in production source come from the tables', () => {
   );
 
   it('scans src and every package directory', () => {
-    expect(SOURCE_DIRS.length).toBeGreaterThan(10);
+    assert.ok(SOURCE_DIRS.length > 10, `${SOURCE_DIRS.length} directories`);
   });
 
   it('types every code literal and names only table codes in comments and strings', () => {
-    expect(
+    assert.deepEqual(
       findings
         .filter((finding) => !ALLOWED.has(finding.key))
         .map((finding) => finding.line),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('keeps no allow-list entry that matches no finding', () => {
     const keys = new Set(findings.map((finding) => finding.key));
-    expect([...ALLOWED.keys()].filter((key) => !keys.has(key))).toEqual([]);
+    assert.deepEqual(
+      [...ALLOWED.keys()].filter((key) => !keys.has(key)),
+      [],
+    );
   });
 });

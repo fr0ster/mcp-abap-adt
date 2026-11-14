@@ -13,9 +13,6 @@
 # │  4. environment.default_transport  — transport request or ""     │
 # │  5. shared_dependencies.package    — package for shared objects  │
 # │  6. shared_dependencies.software_component — "ZLOCAL"/"HOME"    │
-# │                                                                  │
-# │  OPTIONAL (cloud/BTP, JWT token refresh):                        │
-# │  7. auth_broker.abap.destination   — auth broker destination     │
 # └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
@@ -33,6 +30,10 @@
 # - Views: ZMCP_BLD_VIEW01, ZMCP_BLD_VIEW_H1, etc.
 # - Packages: ZMCP_BLD_PKG01, ZMCP_BLD_PKG02, etc.
 #
+# No time keys: a live test has no bound, delay or poll limit; each step goes
+# on the answer of the one before it. A step that waits for ever is ended with
+# Ctrl-C (src/__tests__/integration/README.md, "Interrupting a run").
+#
 # Test settings
 
 # ============================================================================
@@ -42,29 +43,10 @@
 test_settings:
   fail_fast: false
   verbose: true
-  timeout: 120000  # Global test timeout (120 seconds)
-  retry_on_failure: false
-  max_retries: 1
   cleanup_after_test: false
   # A failed test keeps the objects it created, so their state can say why it
   # failed; locks are released either way. true deletes them regardless.
   cleanup_on_failure: false
-  # Timeouts for different operations (in milliseconds)
-  timeouts:
-    default: 120000
-    long: 600000  # Long timeout for complex operations (group activation, shared setup, etc.)
-    create: 120000
-    test: 120000
-    delay: 3000  # Delay after delete/create operations
-  # Operation delays (milliseconds) - time to wait for SAP to commit operations
-  # These delays ensure SAP has time to persist state changes between operations
-  operation_delays:
-    lock: 3000      # Delay after lock operation (default: 3 seconds)
-    unlock: 3000    # Delay after unlock operation (default: 3 seconds)
-    update: 3000    # Delay after update operation (default: 3 seconds)
-    create: 3000    # Delay after create operation (default: 3 seconds)
-    cleanup: 3000   # Delay after pre-test cleanup (delete) before test starts
-    default: 3000   # Default delay for any operation (default: 3 seconds)
 
 # Session persistence configuration
 
@@ -90,23 +72,49 @@ lock_config:
 
 environment:
   # Connection: .env file from standard sessions folder (~/Documents/mcp-abap-adt/sessions/)
-  # Contains SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # HTTP: SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # RFC: no SAP_URL; SAP_ASHOST + SAP_SYSNR (or SAP_MSHOST with SAP_MSSERV or
+  # SAP_SYSID and SAP_GROUP), SAP_CLIENT, SAP_LANGUAGE, SAP_AUTH_TYPE, etc.
+  # The test destination is this file's name without ".env" (on premise and
+  # cloud alike): the auth broker reads sessions/<destination>.env (and, for
+  # a cloud destination, service-keys/<destination>.json) under
+  # auth_broker.paths.service_keys_dir. A path outside that sessions folder
+  # names no destination: the suites that need one are refused.
   env: ""                                    # ← CHANGE: session file name (e.g., "your-system.env", "another-system.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
+  # The realm check before any logon: an unauthenticated GET of the ADT
+  # discovery must answer 401. On premise its WWW-Authenticate realm must
+  # equal this value; empty refuses the run before anything logs on. On the
+  # cloud it is not read: the session's JWT must not have expired instead.
+  expected_realm: ""                         # ← CHANGE (on premise): the system's 401 realm
+  # RFC only (test-only, never part of the destination): an RFC destination
+  # states no URL, so the realm check runs against this HTTP URL of the
+  # system. Required when connection_type is "rfc"; not read over HTTP, which
+  # checks the session's SAP_URL.
+  realm_check_url: ""                        # ← CHANGE (RFC): the system's HTTP URL
   connection_type: "http"                    # "http" | "rfc"
-  # RFC through a message server and a logon group (optional; rfc only).
-  # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to
-  # dial the application server of SAP_URL. With mshost, msserv or sysid is required.
+  # RFC (rfc only): the destination states its address, client and language,
+  # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)
+  # over the .env's; leave "" to take the .env's. One address: ashost + sysnr
+  # (an application server), or mshost with msserv or sysid and group (a
+  # message server). Nothing is derived from a URL and nothing has a default.
+  ashost: ""                                 # application server host
+  sysnr: ""                                  # system number (two digits)
+  client: ""                                 # SAP client (required over RFC)
+  language: ""                               # logon language (required over RFC)
   mshost: ""                                 # message server host
   msserv: ""                                 # message server service (name or port)
   sysid: ""                                  # system id
-  group: ""                                  # logon group (connection default: PUBLIC)
-  saprouter: ""                              # SAProuter string
+  group: ""                                  # logon group (required with mshost)
+  saprouter: ""                              # SAProuter string, with either address
   # Test defaults
   # database_system: "HDB"                  # the system's database, stated (e.g. ABAP cloud,
                                              # whose system information names none); the AMDP
                                              # tests read SAP's DBSystem when omitted
+  # On ABAP Cloud this is the build package SearchSource's live known-hit case searches with its
+  # subpackages: shared_dependencies.package must be a descendant of it, or that case fails
+  # naming the prerequisite.
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   cleanup_after: true                        # Clean up objects after test
@@ -126,6 +134,9 @@ environment:
 # Manage with: npm run shared:setup / shared:teardown / shared:check
 
 shared_dependencies:
+  # On ABAP Cloud this package must be a descendant of environment.default_package (the build
+  # package): SearchSource's live known-hit case searches the build package's tree for it, and
+  # fails naming the prerequisite when it is not there.
   package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
   super_package: ""                          # super package (optional, leave "" if none)
   software_component: "ZLOCAL"               # ← CHANGE: "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
@@ -598,6 +609,20 @@ shared_dependencies:
             RETURN SELECT n, square FROM :lt_rows;
           ENDMETHOD.
         ENDCLASS.
+    # Locked and unlocked by the deferred-logon live suite's take-up case
+    # (MCP_LIVE_DEFERRED_LOCK_CLASS=ZMCP_SHR_LOCK_CLS,
+    # src/__tests__/integration/live/deferredLogon.test.ts); never changed,
+    # used by no other test.
+    - name: "ZMCP_SHR_LOCK_CLS"
+      description: "Shared class the deferred-logon take-up locks and unlocks"
+      available_in: ["onprem"]
+      source: |
+        CLASS zmcp_shr_lock_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+        ENDCLASS.
+
+        CLASS zmcp_shr_lock_cls IMPLEMENTATION.
+        ENDCLASS.
 
   function_groups:
     - name: "ZMCP_BLD_SHR_FGR"
@@ -741,13 +766,8 @@ auth_broker:
     #   - ~/.config/mcp-abap-adt/sessions/<destination>.env
     service_keys_dir: "~/.config/mcp-abap-adt"  # Base path for service keys and sessions
 
-  # ABAP destination configuration (for on-premise or cloud ABAP systems)
-  abap:
-    # ABAP destination name (used for service key file: <destination>.json and session file: <destination>.env)
-    # Example: "TRIAL" -> looks for TRIAL.json in service-keys directory and TRIAL.env in sessions directory
-    # This destination is used by refreshTokensForTests() to automatically refresh tokens before integration tests
-    # If not specified, token refresh will be skipped and tests will use tokens from .env file
-    destination: ""                    # Auth broker destination (cloud/BTP only, e.g. "TRIAL", "mcp")
+  # The destination is not stated here: it is environment.env's session file
+  # name without ".env" (see environment.env).
 
 # ============================================================================
 # OBJECT TESTS (High-Level, then Low-Level for each object)
@@ -1116,13 +1136,6 @@ create_class_low:
         description: "Class low-level handler test"
         # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        # Extra delays to give backend time to persist between steps (especially in async env)
-        operation_delays:
-          create: 5000
-          lock: 5000
-          update: 5000
-          unlock: 5000
-          default: 5000
         source_code: |
           CLASS ZMCP_BLD_CLS_L1 DEFINITION
             PUBLIC
@@ -1178,8 +1191,6 @@ create_data_element:
         medium_label: "Builder Data"
         long_label: "Builder Data Element"
         heading_label: "Builder Data Element"
-      operation_delays:
-        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
 
 # Create Interface
 
@@ -1203,10 +1214,6 @@ create_domain:
         decimals: 0
         lowercase: false
         sign_exists: false
-      operation_delays:
-        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
-        create: 5000
-        update: 3000
 
 # Create Data Element
 
@@ -1300,11 +1307,6 @@ create_interface:
             PUBLIC .
             METHODS: test_method.
           ENDINTERFACE.
-      operation_delays:
-        create: 5000  # Increased delay for interface creation
-        lock: 3000
-        update: 3000
-        unlock: 3000
 
 # Create Program
 
@@ -1356,12 +1358,6 @@ create_package:
         updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
         software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
-        operation_delays:
-          create: 5000
-          update: 3000
-          unlock: 5000
-          delete: 20000
-          delete_retry: 20000
 
 # Create Domain
 
@@ -1898,9 +1894,6 @@ runtime_readonly_handlers:
         # Increase for slow systems (e.g. SAP trial cloud) — default in client is 5×2000ms.
         profiled_run_max_trace_attempts: 15
         profiled_run_trace_retry_delay_ms: 2000
-        # Retries for reading profiler trace data (trace can appear with delay)
-        trace_read_retries: 6
-        trace_read_retry_delay_ms: 1500
         # Optional user filter for dumps list (empty = all users)
         dumps_user: ""
         # Number of dump IDs to read from feed
@@ -1959,6 +1952,32 @@ debugger_handlers:
         # with basic authentication; the connected user needs the debug authorization
         # on that user. Empty: the another-user case is skipped.
         second_user_env: ""
+
+# The draft tool (src/__tests__/integration/high/draft/ObjectDraft.test.ts):
+# GetObjectDraft and HandlerGet part draft on objects the run creates and
+# deletes ($TMP on premise; environment.default_package on the cloud).
+draft:
+  # On premise: a session .env name (in the standard sessions folder) of a
+  # second SAP user with basic authentication, who reads the writer's draft
+  # as another user's. Empty skips only the "other" cases, naming the reason.
+  # On the cloud: empty (the trial has one user).
+  second_user_env: ""
+
+# The access restrictions (src/__tests__/integration/high/access/AccessRestrictions.test.ts):
+# an in-process server started with allowed packages and requests.
+access:
+  # On premise: an open request of the configured user, which the allowed
+  # write records into. On the cloud: empty (the case skips: the probe package
+  # takes no request).
+  transport_request: ""
+  # The package the allowed creates go into: $TMP on premise, the probe
+  # package on the cloud.
+  package: ""
+  # A package above `package` in its tree, allowed as `<package_parent>/**`
+  # for the tree case. Empty: on premise the case creates a local package of
+  # its own under $TMP and allows `$TMP/**`; on the cloud it reads the
+  # package's own super package.
+  package_parent: ""
 
 # Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
 # the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
@@ -2121,8 +2140,6 @@ run_atc:
         # At least this many findings, so the per-finding checks run. What a
         # variant finds is the system's: set 0 where DEFAULT finds nothing.
         min_findings: 1
-        poll_interval_ms: 3000
-        poll_timeout_ms: 120000
 
 get_sql_query:
   test_cases:

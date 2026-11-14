@@ -22,6 +22,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
+import { longToolInTheCall } from '../../../src/lib/backgroundRuns/tools';
 import { createAdtClient } from '../../../src/lib/clients';
 import { createAbapConnection } from '../../../src/lib/connectionFactory';
 import type {
@@ -30,6 +31,7 @@ import type {
 } from '../../../src/lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../src/lib/handlers/registry/CompositeHandlersRegistry';
 import { logger } from '../../../src/lib/logger';
+import { isLongTool } from '../../../src/lib/longTools';
 import {
   defaultSystemContextResolver,
   runWithRequestContext,
@@ -41,6 +43,7 @@ import {
   setSystemContext,
 } from '../../../src/lib/systemContext';
 import { readSystemInformation } from '../../../src/lib/systemInformation';
+import type { ToolResultLike } from '../../../src/lib/toolResult';
 
 import {
   BaseHandlerGroup,
@@ -112,9 +115,7 @@ function foreignConn(url: string): IAbapConnection {
   return { getBaseUrl: async () => url } as unknown as IAbapConnection;
 }
 
-type Options =
-  | { responsible?: string; masterSystem?: string; masterLanguage?: string }
-  | undefined;
+type Options = ConstructorParameters<typeof AdtClientOnPrem>[2];
 
 /** The options of the last client built, of either variant. */
 function lastOptions(): Options {
@@ -805,6 +806,11 @@ describe('withResolvedSystemContext', () => {
   });
 });
 
+/** A handler's answer that reports what it saw beside its (empty) content. */
+function reported<F extends object>(facts: F): ToolResultLike & F {
+  return { content: [], ...facts };
+}
+
 /** A group whose handlers report the context they ran under. */
 function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
   context: HandlerContext;
@@ -813,20 +819,17 @@ function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
     context: { connection } as HandlerContext,
     getName: () => 'fake',
     registerHandlers: () => {},
-    // What the exporter reads an args-only handler's context by.
-    currentContext: () => group.context,
     getHandlers(): HandlerEntry[] {
       return [
         {
           toolDefinition: { name: 'WithContext', description: 'd' } as never,
-          handler: async (_context: HandlerContext, _args: unknown) => seen(),
+          call: async (_context: HandlerContext, _args: unknown) =>
+            reported(seen()),
         },
         {
           toolDefinition: { name: 'Closure', description: 'd' } as never,
-          handler: (async (_args: unknown) => ({
-            ...seen(),
-            connection: group.context.connection,
-          })) as never,
+          call: async (context: HandlerContext, _args: unknown) =>
+            reported({ ...seen(), connection: context.connection }),
         },
       ];
     },
@@ -846,40 +849,34 @@ function exporterWith(
 }
 
 describe('HandlerExporter.getHandlerEntries', () => {
-  it('keeps every handler arity the embedders branch on', () => {
+  it("hands out every entry with its group's definition, a listed long tool's without background", () => {
     const exporter = new HandlerExporter({ systemType: 'onprem' });
     const raw = (
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());
     const wrapped = exporter.getHandlerEntries();
-    expect(wrapped.map((e) => e.handler.length)).toEqual(
-      raw.map((e) => e.handler.length),
-    );
     expect(wrapped.map((e) => e.toolDefinition)).toEqual(
-      raw.map((e) => e.toolDefinition),
+      raw.map((e) =>
+        isLongTool(e.toolDefinition.name)
+          ? longToolInTheCall(e.toolDefinition)
+          : e.toolDefinition,
+      ),
     );
-    const arities = new Set(raw.map((e) => e.handler.length));
-    expect(arities.has(1)).toBe(true);
   });
 
-  it('a context+args handler runs with values filled from its connection', async () => {
+  it('a handler runs with values filled from its connection', async () => {
     const exporter = exporterWith([fakeGroup(null)]);
     const entry = exporter.getHandlerEntries()[0];
-    expect(entry.handler.length).toBe(2);
     await expect(
-      entry.handler({ connection: cloudConn() }, {}),
+      entry.call({ connection: cloudConn() }, {}),
     ).resolves.toMatchObject({ responsible: 'CB_USER', masterSystem: 'CLD' });
   });
 
-  it("an args-only handler resolves the group's swapped connection", async () => {
+  it("a handler reading its context's connection gets the call's", async () => {
     const group = fakeGroup(null);
     const entry = exporterWith([group]).getHandlerEntries()[1];
-    expect(entry.handler.length).toBe(1);
     const conn = cloudConn();
-    group.context = { connection: conn };
-    const result = await (entry.handler as unknown as (a: unknown) => unknown)(
-      {},
-    );
+    const result = await entry.call({ connection: conn }, {});
     expect(result).toMatchObject({
       responsible: 'CB_USER',
       masterSystem: 'CLD',
@@ -888,34 +885,26 @@ describe('HandlerExporter.getHandlerEntries', () => {
   });
 
   describe.each([
-    ['context+args', 0],
-    ['args-only', 1],
-  ])('a %s handler', (_arity, index) => {
+    ['WithContext', 0],
+    ['Closure', 1],
+  ])('the %s handler', (_name, index) => {
     /** Calls the entry on `connection` as an embedder does, recording whether it ran. */
     function callOn(connection: IAbapConnection) {
       const group = fakeGroup(connection);
       const ran = jest.fn();
       const original = group.getHandlers;
       group.getHandlers = () =>
-        original().map((e) => {
-          const handler = e.handler as (...a: unknown[]) => Promise<unknown>;
-          const counted =
-            handler.length >= 2
-              ? async (c: unknown, a: unknown) => {
-                  ran();
-                  return handler(c, a);
-                }
-              : async (a: unknown) => {
-                  ran();
-                  return handler(a);
-                };
-          return { ...e, handler: counted as never };
-        });
+        original().map(
+          (e): HandlerEntry => ({
+            ...e,
+            call: async (c, a) => {
+              ran();
+              return e.call(c, a);
+            },
+          }),
+        );
       const entry = exporterWith([group]).getHandlerEntries()[index];
-      const call = () =>
-        index === 0
-          ? entry.handler({ connection }, {})
-          : (entry.handler as unknown as (a: unknown) => Promise<unknown>)({});
+      const call = () => entry.call({ connection }, {});
       return { call, ran };
     }
 
@@ -1016,9 +1005,9 @@ describe('HandlerExporter.getHandlerEntries', () => {
     });
     const result = await exporter
       .getHandlerEntries()[0]
-      .handler({ connection: cloudConn() }, {});
+      .call({ connection: cloudConn() }, {});
     expect(lookup).not.toHaveBeenCalled();
-    expect(result.responsible).toBeUndefined();
+    expect(result).toMatchObject({ responsible: undefined });
   });
 });
 
@@ -1029,7 +1018,7 @@ class ReportingGroup extends BaseHandlerGroup {
     return [
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
-        handler: async () => {
+        call: async () => {
           this.observed = seen();
           return { content: [{ type: 'text', text: 'ok' }] };
         },
@@ -1077,31 +1066,20 @@ describe('BaseMcpServer.registerHandlers', () => {
     return {
       ...inner,
       getHandlers: () =>
-        inner.getHandlers().map((e) => ({
-          ...e,
-          handler: (e.handler.length >= 2
-            ? async (c: HandlerContext, a: unknown) => ({
-                content: [
-                  { type: 'text', text: JSON.stringify(await e.handler(c, a)) },
-                ],
-              })
-            : async (_a: unknown) => ({
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify(
-                      await (e.handler as unknown as (a: unknown) => unknown)(
-                        _a,
-                      ),
-                    ),
-                  },
-                ],
-              })) as never,
-        })),
+        inner.getHandlers().map(
+          (e): HandlerEntry => ({
+            ...e,
+            call: async (c, a) => ({
+              content: [
+                { type: 'text', text: JSON.stringify(await e.call(c, a)) },
+              ],
+            }),
+          }),
+        ),
     };
   }
 
-  it('fills values for both handler arities', async () => {
+  it('fills values for both handlers', async () => {
     const server = new EmbeddableMcpServer({
       connection: cloudConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),

@@ -1,0 +1,61 @@
+<abapsource:objectStructureElement xml:base="/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/objectstructure" adtcore:name="ZMCP_D1_9E25_CL" visibility="public" final="true" adtcore:type="CLAS/OC" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:atom="http://www.w3.org/2005/Atom">
+  <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=1,6;end=1,21"/>
+  <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="./source/main#start=24,6;end=24,21"/>
+  <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=1,0;end=22,8"/>
+  <atom:link rel="http://www.sap.com/adt/relations/source/implementationBlock" href="./source/main#start=24,0;end=37,8"/>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OR" adtcore:name="ZMCP_D1_9E25_IF">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=3,15;end=3,30"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="./source/main#start=34,9;end=34,28" type="CLAS/OM"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=3,4;end=3,30"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OT" adtcore:name="TY_ROW" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=4,20;end=4,26"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=4,4;end=7,24"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OA" adtcore:name="ATTR" level="instance" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=8,9;end=8,13"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=8,4;end=8,25"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OA" adtcore:name="COUNTER" level="static" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=9,15;end=9,22"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=9,4;end=9,29"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OA" constant="true" adtcore:name="C_MAX" level="static" readOnly="true" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=10,14;end=10,19"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=10,4;end=10,35"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OE" adtcore:name="DONE" level="instance" visibility="public" clif_name="ZMCP_D1_9E25_CL">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=11,11;end=11,15"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=11,4;end=11,45"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OM" adtcore:name="PUB" level="instance" clif_name="ZMCP_D1_9E25_CL" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=12,12;end=12,15" type="CLAS/OM"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="./source/main#start=25,9;end=25,12"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=12,4;end=16,32"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationBlock" href="./source/main#start=25,2;end=28,11"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OM" adtcore:name="PROT" level="instance" clif_name="ZMCP_D1_9E25_CL" visibility="protected">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=18,12;end=18,16" type="CLAS/OM"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="./source/main#start=29,9;end=29,13"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=18,4;end=18,16"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationBlock" href="./source/main#start=29,2;end=30,11"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OA" adtcore:name="PRIV_ATTR" level="instance" visibility="private">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=20,9;end=20,18"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=20,4;end=20,25"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OM" adtcore:name="PRIV" level="instance" clif_name="ZMCP_D1_9E25_CL" visibility="private">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=21,12;end=21,16" type="CLAS/OM"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="./source/main#start=31,9;end=31,13"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionBlock" href="./source/main#start=21,4;end=21,40"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationBlock" href="./source/main#start=31,2;end=33,11"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement clif_name="ZMCP_D1_9E25_CL" adtcore:type="CLAS/OM" adtcore:name="ZMCP_D1_9E25_IF~RUN" level="instance" visibility="public">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="./source/main#start=3,15;end=3,30" type="CLAS/OR"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="./source/main#start=34,9;end=34,28" type="CLAS/OM"/>
+    <atom:link rel="http://www.sap.com/adt/relations/source/implementationBlock" href="./source/main#start=34,2;end=36,11"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:type="CLAS/OCX" adtcore:name="ZMCP_D1_9E25_CL" isExternalRef="true" description="Text Elements">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/textelements/classes/zmcp_d1_9e25_cl"/>
+  </abapsource:objectStructureElement>
+</abapsource:objectStructureElement>

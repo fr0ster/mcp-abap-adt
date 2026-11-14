@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * RemoveTransportObject — detach one object's entry from a request or task.
  *
@@ -31,8 +33,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -41,46 +43,29 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description: 'Number of the transport task that holds the entry.',
-      },
-      object_name: {
-        type: 'string',
-        description: 'Object name.',
-      },
-      object_type: {
-        type: 'string',
-        description:
-          'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
-      },
-      position: {
-        type: 'string',
-        description:
-          "Position of the object's entry in the task's object list.",
-      },
-      pgmid: {
-        type: 'string',
-        description: "Program id. Defaults to R3TR, a workbench object's.",
-        default: 'R3TR',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number', 'object_name', 'object_type', 'position'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe('Number of the transport task that holds the entry.'),
+    object_name: z.string().describe('Object name.'),
+    object_type: z
+      .string()
+      .describe(
+        'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
+      ),
+    position: z
+      .string()
+      .describe("Position of the object's entry in the task's object list."),
+    pgmid: z
+      .string()
+      .default('R3TR')
+      .optional()
+      .describe("Program id. Defaults to R3TR, a workbench object's."),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface RemoveTransportObjectArgs {
-  transport_number: string;
-  object_name: string;
-  object_type: string;
-  position: string;
-  pgmid?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type RemoveTransportObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRemoveTransportObject(
   context: HandlerContext,
@@ -109,7 +94,7 @@ export async function handleRemoveTransportObject(
   // field would skip the re-read that is the only thing establishing the
   // outcome. The field a caller finds instead is `accepted`, and next to it
   // the reading that settles the question.
-  const terseRemoval: Terse<unknown> = () => ({
+  const terseRemoval = () => ({
     accepted: true,
     removed: 'unknown',
     transport_number: args.transport_number,

@@ -30,7 +30,20 @@
  * and it is what the ATC parse inside adt-clients uses, and what
  * `reading.ts` and `packageWalk.ts` here use.
  */
+
 import { XMLParser } from 'fast-xml-parser';
+import { parseXml } from '../xml/node';
+
+import {
+  child,
+  childAt,
+  type Element,
+  isElement,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 
 export interface AtcFinding {
   /** `adtcore:name` of the enclosing object element. */
@@ -38,26 +51,26 @@ export interface AtcFinding {
   /** `adtcore:type` — `CLAS`, `FUGR`, `TABL`… */
   object_type: string;
   /** From `location`'s `#start=LINE,COLUMN`, absent when it carries none. */
-  line?: number;
+  line?: number | undefined;
   /** The source the position is in, without the fragment. */
-  location?: string;
+  location?: string | undefined;
   /** 1, 2 or 3 as the document gives it. */
-  priority?: number;
+  priority?: number | undefined;
   /** `checkTitle` — what ran, in words. */
-  check?: string;
+  check?: string | undefined;
   /** `messageTitle` — what it found. */
-  message?: string;
+  message?: string | undefined;
 }
 
 /** The finding's `quickfixes` element, its flags as the document gives them. */
 export interface AtcQuickfixFlags {
-  manual?: boolean;
-  automatic?: boolean;
-  pseudo?: boolean;
+  manual?: boolean | undefined;
+  automatic?: boolean | undefined;
+  pseudo?: boolean | undefined;
   /** `aiBasedQF`. */
-  ai_based?: boolean;
+  ai_based?: boolean | undefined;
   /** `ai_enabled`. */
-  ai_enabled?: boolean;
+  ai_enabled?: boolean | undefined;
 }
 
 /**
@@ -66,24 +79,24 @@ export interface AtcQuickfixFlags {
  */
 export interface AtcFindingFull extends AtcFinding {
   /** From `location`'s `#start=LINE,COLUMN`, absent when it carries none. */
-  column?: number;
+  column?: number | undefined;
   /** `checkId`. */
-  check_id?: string;
+  check_id?: string | undefined;
   /** `checkClass` — the check's ABAP class. */
-  check_class?: string;
+  check_class?: string | undefined;
   /** `messageId`. */
-  message_id?: string;
+  message_id?: string | undefined;
   /**
    * The `href` of the finding's `atom:link` whose `rel` is ADT's
    * documentation relation (`/sap/bc/adt/documentation/atc/…`).
    */
-  documentation_uri?: string;
+  documentation_uri?: string | undefined;
   /** `exemptionApproval`, verbatim (`-` in every captured finding). */
-  exemption_approval?: string;
+  exemption_approval?: string | undefined;
   /** `exemptionKind`, verbatim; absent when empty. */
-  exemption_kind?: string;
+  exemption_kind?: string | undefined;
   /** Which kinds of quick fix the finding offers. */
-  quickfixes?: AtcQuickfixFlags;
+  quickfixes?: AtcQuickfixFlags | undefined;
 }
 
 /** The terse fields of a finding, in the order they were always answered. */
@@ -124,19 +137,21 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-export type Element = Record<string, unknown> & {
-  '@'?: Record<string, string>;
-};
+export type { Element };
 
-/** One element, several, or none — all three arrive here as a list. */
-function asList(value: unknown): Element[] {
-  if (Array.isArray(value)) return value as Element[];
-  if (value && typeof value === 'object') return [value as Element];
+/**
+ * One element, several, or none — all three arrive here as a list. A member
+ * of a list that is not an element (an empty `<object/>` parses to `''`) is
+ * an element with nothing in it.
+ */
+function asList(value: XmlRead): Element[] {
+  if (isList(value)) return value.map((m) => (isElement(m) ? m : {}));
+  if (isElement(value)) return [value];
   return [];
 }
 
 const attribute = (element: Element, name: string): string | undefined => {
-  const value = element['@']?.[name];
+  const value = child(element['@'], name);
   return typeof value === 'string' && value !== '' ? value : undefined;
 };
 
@@ -154,8 +169,8 @@ function digits(text: string | undefined): number | undefined {
  */
 function position(location: string | undefined): {
   location?: string;
-  line?: number;
-  column?: number;
+  line?: number | undefined;
+  column?: number | undefined;
 } {
   if (!location) return {};
   const hash = location.indexOf('#');
@@ -200,14 +215,13 @@ function quickfixes(finding: Element): AtcQuickfixFlags | undefined {
 }
 
 export function parseAtcWorklist(document: string): AtcWorklistReading {
-  const parsed = parser.parse(document) as Element;
-  const worklist = (parsed.worklist ?? {}) as Element;
-  return readAtcObjects(worklist.objects);
+  const parsed: XmlRead = parseXml(parser, document);
+  return readAtcObjects(childAt(parsed, 'worklist', 'objects'));
 }
 
 /** The XML parser every ATC document here is read with: SAP's document, unread. */
-export function parseAtcDocument(document: string): unknown {
-  return parser.parse(document);
+export function parseAtcDocument(document: string): XmlRead {
+  return parseXml(parser, document);
 }
 
 /** One element, several, or none, as a list: for the readers of other ATC documents. */
@@ -218,7 +232,7 @@ export const atcElements = asList;
  * both carry `atcobject:object` elements with `atcobject:findings` of
  * `atcfinding:finding`.
  */
-export function readAtcObjects(objectsElement: unknown): AtcWorklistReading {
+export function readAtcObjects(objectsElement: XmlRead): AtcWorklistReading {
   const findings: AtcFindingFull[] = [];
   const by_priority: Record<string, number> = {};
   let objects_checked = 0;

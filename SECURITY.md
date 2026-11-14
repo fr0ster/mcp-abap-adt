@@ -9,6 +9,16 @@ files, its environment or the traffic to it can do whatever those credentials
 allow. The server does not pretend otherwise and promises nothing that only
 the deployment can provide.
 
+## Access restrictions narrow; SAP's authorization decides
+
+The start-time access restrictions (denied actions, allowed packages and requests, denied or
+allowed tables; [Access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md)) are **formal**:
+they read a call's own arguments — the tool, its value, the package, request and table it
+names — and nothing else. They do not analyse code or document text: a class written to read
+what is denied, or to create objects elsewhere, passes them. SAP's authorization of the user
+the server logs on as remains the boundary; the restrictions narrow what the model is offered
+and asks for, never what that user may do.
+
 ## Who may call the server
 
 **The server does not authenticate its MCP clients.** It has no user list,

@@ -1,17 +1,26 @@
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_PART_PROPERTY,
+  READ_PART_FIELD,
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
+import {
+  answerSourceRead,
+  rangeFields,
+  SOURCE_RANGE_SHAPE,
+  SOURCE_RANGE_WORDS,
+  type SourceRangeArgs,
+  sourceRangeOf,
+} from '../../../lib/handlers/sourceRange';
 import { readProgramMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -20,27 +29,16 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetProgram',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP\'s standard programs.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name.',
-      },
-      part: READ_PART_PROPERTY,
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['program_name'],
-  },
+  description: `[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. ${SOURCE_RANGE_WORDS}`,
+  inputSchema: z.object({
+    program_name: z.string().describe('Program name.'),
+    part: READ_PART_FIELD,
+    version: READ_VERSION_FIELD,
+    ...SOURCE_RANGE_SHAPE,
+  }),
 } as const;
 
-interface GetProgramArgs {
-  program_name: string;
-  part?: ReadPart;
-  version?: ReadVersion;
-}
+type GetProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetProgram(
   context: HandlerContext,
@@ -50,7 +48,8 @@ export async function handleGetProgram(
   const { program_name, version = 'active' } = args;
   if (!program_name) return return_error(new Error('program_name is required'));
   const part = readPartOf(args.part);
-  if (part instanceof Error) return return_error(part);
+  const range = sourceRangeOf(args, part);
+  if (range instanceof Error) return return_error(range);
 
   const programName = program_name.toUpperCase();
   const client = createAdtClient(connection, logger);
@@ -69,15 +68,17 @@ export async function handleGetProgram(
       }),
     );
   }
-  return answer(
+  return answerSourceRead(
     { tool: 'GetProgram', detail: 'terse' },
+    range,
     () => obj.read({ programName }, version, { analyse: analyseException }),
-    (source: AdtReading<string>) => ({
+    (source, cut) => ({
       success: true,
       program_name: programName,
       version,
       part,
-      source: source.raw,
+      source,
+      ...rangeFields(cut),
     }),
   );
 }

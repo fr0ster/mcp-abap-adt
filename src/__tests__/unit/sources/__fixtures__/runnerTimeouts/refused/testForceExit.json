@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "test:a": "node tools/run-tests.mjs --concurrency 1 --test-force-exit src/a.test.ts",
+    "test:b": "node --test \"--test-force-exit\" src/b.test.js",
+    "test:c": "npm run build;node --test --test-force-exit=true src/c.test.js"
+  }
+}

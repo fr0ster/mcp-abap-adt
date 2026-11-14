@@ -3,9 +3,22 @@
  * the documents as they came; refining them is the server's (the layer
  * split). Every reading is checked against a recorded answer.
  */
+
 import { readExceptionSubType } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { parseXml } from '../xml/node';
+import {
+  child,
+  childAt,
+  isElement,
+  isList,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import { addressOf, type ObjectAddress } from './objectUri';
 
 const parser = new XMLParser({
@@ -25,12 +38,12 @@ const parser = new XMLParser({
     ].includes(name),
 });
 
-type Node = Record<string, any>;
-const parse = (xml: string): Node => (xml?.trim() ? parser.parse(xml) : {});
-const text = (v: unknown): string =>
+/** A document's parse, from outside the type system; a blank one parses to `{}`. */
+const parse = (xml: string): XmlRead => parseXml(parser, xml);
+const text = (v: XmlRead): string =>
   v === undefined || v === null || typeof v === 'object' ? '' : String(v);
-const num = (v: unknown): number => Number(text(v).trim() || 0);
-const bool = (v: unknown): boolean => text(v) === 'true';
+const num = (v: XmlRead): number => Number(text(v).trim() || 0);
+const bool = (v: XmlRead): boolean => text(v) === 'true';
 
 export interface DebuggeeReading {
   debuggeeId: string;
@@ -123,8 +136,15 @@ export interface BreakpointReading {
 export type DebuggeeEnd = 'debuggeeEnded' | 'terminateDebuggee';
 
 export function readDebuggee(xml: string): DebuggeeReading | undefined {
-  const row = parse(xml)?.abap?.values?.DATA?.STPDA_DEBUGGEE?.[0];
-  if (!row) return undefined;
+  const debuggees = childAt(
+    parse(xml),
+    'abap',
+    'values',
+    'DATA',
+    'STPDA_DEBUGGEE',
+  );
+  const row = isList(debuggees) ? debuggees[0] : undefined;
+  if (!isElement(row)) return undefined;
   const dumpId = text(row.DUMP_ID);
   const dumpUri = text(row.DUMP_URI);
   return {
@@ -160,20 +180,20 @@ export function readDebuggee(xml: string): DebuggeeReading | undefined {
 
 export function readAttach(xml: string): AttachReading {
   const doc = parse(xml);
-  const a = doc?.attach ?? doc?.step ?? {};
-  const reached: Node[] = a.reachedBreakpoints?.breakpoint ?? [];
+  const a = child(doc, 'attach') ?? child(doc, 'step');
+  const reached = listOf(childAt(a, 'reachedBreakpoints', 'breakpoint'));
   return {
-    debugSessionId: text(a.debugSessionId),
-    isSteppingPossible: bool(a.isSteppingPossible),
-    isTerminationPossible: bool(a.isTerminationPossible),
-    isPostMortem: bool(a.isPostMortem),
-    isNonExclusive: bool(a.isNonExclusive),
-    isDebuggeeChanged: bool(a.isDebuggeeChanged),
+    debugSessionId: text(child(a, 'debugSessionId')),
+    isSteppingPossible: bool(child(a, 'isSteppingPossible')),
+    isTerminationPossible: bool(child(a, 'isTerminationPossible')),
+    isPostMortem: bool(child(a, 'isPostMortem')),
+    isNonExclusive: bool(child(a, 'isNonExclusive')),
+    isDebuggeeChanged: bool(child(a, 'isDebuggeeChanged')),
     reachedBreakpoints: reached.map((b) => {
-      const condition = text(b.unresolvableCondition);
-      const offset = text(b.unresolvableConditionErrorOffset);
+      const condition = text(child(b, 'unresolvableCondition'));
+      const offset = text(child(b, 'unresolvableConditionErrorOffset'));
       return {
-        id: text(b.id),
+        id: text(child(b, 'id')),
         ...(condition ? { unresolvableCondition: condition } : {}),
         ...(offset ? { unresolvableConditionErrorOffset: offset } : {}),
       };
@@ -182,45 +202,49 @@ export function readAttach(xml: string): AttachReading {
 }
 
 export function readStack(xml: string): StackReading {
-  const s = parse(xml)?.stack ?? {};
-  const frames: FrameReading[] = (s.stackEntry ?? []).map((e: Node) => ({
-    position: num(e.stackPosition),
-    program: text(e.programName),
-    include: text(e.includeName),
-    line: num(e.line),
-    eventType: text(e.eventType),
-    event: text(e.eventName),
-    uri: text(e.uri),
-    systemProgram: bool(e.systemProgram),
+  const s = child(parse(xml), 'stack');
+  const frames: FrameReading[] = listOf(child(s, 'stackEntry')).map((e) => ({
+    position: num(child(e, 'stackPosition')),
+    program: text(child(e, 'programName')),
+    include: text(child(e, 'includeName')),
+    line: num(child(e, 'line')),
+    eventType: text(child(e, 'eventType')),
+    event: text(child(e, 'eventName')),
+    uri: text(child(e, 'uri')),
+    systemProgram: bool(child(e, 'systemProgram')),
   }));
-  return { cursor: num(s.debugCursorStackIndex), frames };
+  return { cursor: num(child(s, 'debugCursorStackIndex')), frames };
 }
 
 export function readVariables(xml: string): VariablesReading {
-  const data = parse(xml)?.abap?.values?.DATA ?? {};
-  const rows: Node[] =
-    data.VARIABLES?.STPDA_ADT_VARIABLE ?? data.STPDA_ADT_VARIABLE ?? [];
-  const links: Node[] = data.HIERARCHIES?.STPDA_ADT_VARIABLE_HIERARCHY ?? [];
+  const data = childAt(parse(xml), 'abap', 'values', 'DATA');
+  const rows = listOf(
+    childAt(data, 'VARIABLES', 'STPDA_ADT_VARIABLE') ??
+      child(data, 'STPDA_ADT_VARIABLE'),
+  );
+  const links = listOf(
+    childAt(data, 'HIERARCHIES', 'STPDA_ADT_VARIABLE_HIERARCHY'),
+  );
   return {
     variables: rows.map((r) => ({
-      id: text(r.ID),
-      name: text(r.NAME),
-      type: text(r.DECLARED_TYPE_NAME),
-      metaType: text(r.META_TYPE),
-      value: text(r.VALUE).trimEnd(),
-      tableLines: num(r.TABLE_LINES),
+      id: text(child(r, 'ID')),
+      name: text(child(r, 'NAME')),
+      type: text(child(r, 'DECLARED_TYPE_NAME')),
+      metaType: text(child(r, 'META_TYPE')),
+      value: text(child(r, 'VALUE')).trimEnd(),
+      tableLines: num(child(r, 'TABLE_LINES')),
     })),
     children: links.map((l) => ({
-      parent: text(l.PARENT_ID),
-      child: text(l.CHILD_ID),
-      label: text(l.CHILD_NAME),
+      parent: text(child(l, 'PARENT_ID')),
+      child: text(child(l, 'CHILD_ID')),
+      label: text(child(l, 'CHILD_NAME')),
     })),
   };
 }
 
 export function readBreakpoints(xml: string): BreakpointReading[] {
-  return (parse(xml)?.breakpoints?.breakpoint ?? []).map((b: Node) => {
-    const r: BreakpointReading = { kind: text(b.kind) };
+  return listOf(childAt(parse(xml), 'breakpoints', 'breakpoint')).map((b) => {
+    const r: BreakpointReading = { kind: text(child(b, 'kind')) };
     for (const k of [
       'id',
       'uri',
@@ -232,10 +256,10 @@ export function readBreakpoints(xml: string): BreakpointReading[] {
       'condition',
       'clientId',
     ] as const) {
-      const v = text(b[k]);
+      const v = text(child(b, k));
       if (v) r[k] = v;
     }
-    const error = text(b.errorMessage);
+    const error = text(child(b, 'errorMessage'));
     if (error) r.error = error;
     return r;
   });
@@ -245,29 +269,30 @@ export function readBreakpoints(xml: string): BreakpointReading[] {
 export function breakpointKey(
   b: BreakpointReading | IDebuggerBreakpoint,
 ): string {
-  const x = b as BreakpointReading;
-  switch (x.kind) {
+  switch (b.kind) {
     case 'line':
-      return `line|${x.uri ?? ''}`;
+      return `line|${b.uri ?? ''}`;
     case 'exception':
-      return `exception|${(x.exceptionClass ?? '').toUpperCase()}`;
+      return `exception|${(b.exceptionClass ?? '').toUpperCase()}`;
     case 'statement':
-      return `statement|${(x.statement ?? '').toUpperCase()}`;
+      return `statement|${(b.statement ?? '').toUpperCase()}`;
     case 'message':
-      return `message|${x.msgId}|${x.msgNo}|${x.msgTy}`.toUpperCase();
+      return `message|${b.msgId}|${b.msgNo}|${b.msgTy}`.toUpperCase();
     default:
-      return `${x.kind}|`;
+      return `${b.kind}|`;
   }
 }
 
-const ENDS = new Set<DebuggeeEnd>(['debuggeeEnded', 'terminateDebuggee']);
+function isDebuggeeEnd(value: string | undefined): value is DebuggeeEnd {
+  return value === 'debuggeeEnded' || value === 'terminateDebuggee';
+}
 export function readDebuggeeEnd(body: string): DebuggeeEnd | undefined {
   const sub = readExceptionSubType(body);
-  return sub && ENDS.has(sub as DebuggeeEnd) ? (sub as DebuggeeEnd) : undefined;
+  return isDebuggeeEnd(sub) ? sub : undefined;
 }
 
 export interface PlaceReading {
-  address?: ObjectAddress;
+  address?: ObjectAddress | undefined;
   unit: string;
   program: string;
   include: string;
@@ -302,10 +327,10 @@ const SETTINGS = [
 ] as const;
 
 export function readSettings(xml: string): SettingsReading {
-  const node: Node = parse(xml)?.settings ?? {};
+  const node = child(parse(xml), 'settings');
   const out: SettingsReading = {};
   for (const k of SETTINGS) {
-    const v = text(node[k]);
+    const v = text(child(node, k));
     if (v === 'true' || v === 'false') out[k] = v === 'true';
   }
   return out;
@@ -426,26 +451,42 @@ const exceptionParser = new XMLParser({
  * exception document says beyond it — the conflict text, the localized
  * message, the subtype and the T100 key. The transport's line alone ("status
  * code 409") does not tell a conflict from a take-over (measured on premise,
- * 2026-10-11: both are 409, told apart only by the document).
+ * 2026-10-11: both are 409, told apart only by the document). A body that is
+ * no exception document adds nothing; neither text is searched.
  */
 export function failureText(error: {
-  message: string;
-  response?: { data?: unknown };
+  readonly message: string;
+  readonly response?: Pick<IAdtWireResponse, 'data'> | undefined;
 }): string {
   const data = error.response?.data;
-  const xml = typeof data === 'string' ? data : '';
-  if (!xml.includes('exception')) return error.message;
-  let doc: Node;
+  return bodyFailureText(
+    error.message,
+    typeof data === 'string' ? data : undefined,
+  );
+}
+
+/** {@link failureText} of a failure's message and the body it came with. */
+export function bodyFailureText(
+  message: string,
+  body: string | undefined,
+): string {
+  if (body === undefined) return message;
+  let doc: XmlRead;
   try {
-    doc = exceptionParser.parse(xml)?.exception ?? {};
+    doc = child(parseXml(exceptionParser, body), 'exception');
   } catch {
-    return error.message;
+    return message;
   }
-  const entries: Node[] = doc.properties?.entry ?? [];
+  const properties = listOf(childAt(doc, 'properties', 'entry'));
   const entry = (key: string) =>
-    text(entries.find((e) => e.key === key)?.['#text']).trim();
+    text(
+      child(
+        properties.find((e) => child(e, 'key') === key),
+        '#text',
+      ),
+    ).trim();
   const localized = text(
-    doc.localizedMessage?.['#text'] ?? doc.localizedMessage,
+    childAt(doc, 'localizedMessage', '#text') ?? child(doc, 'localizedMessage'),
   ).trim();
   const said = entry('conflictText') || localized;
   const subType = entry('com.sap.adt.communicationFramework.subType');
@@ -454,7 +495,5 @@ export function failureText(error: {
     .join(' ');
   const tags = [subType, t100].filter(Boolean).join(', ');
   const told = [said, tags && `[${tags}]`].filter(Boolean).join(' ');
-  return told && !error.message.includes(told)
-    ? `${error.message}: ${told}`
-    : error.message;
+  return told ? `${message}: ${told}` : message;
 }

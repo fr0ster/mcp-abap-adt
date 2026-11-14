@@ -13,10 +13,14 @@
 import { type LogFields, logFields } from '@mcp-abap-adt/auth-errors';
 import type { ReadFailure } from './failures';
 
-export interface FailureAnswer {
+/**
+ * A failure's answer: `isError` always. A type, not an interface, so it is
+ * assignable where the SDK takes a result with an index signature.
+ */
+export type FailureAnswer = {
   isError: true;
   content: Array<{ type: 'text'; text: string }>;
-}
+};
 
 /** The failure payload, field by field. */
 export function failurePayload(read: ReadFailure): Record<string, string> {

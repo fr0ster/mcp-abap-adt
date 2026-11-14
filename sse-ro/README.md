@@ -9,15 +9,15 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
 ## The tools
 
 - the **readonly** tools — `Get*`, `List*`, `ReadTransport*`: the read operations of every object type, one `Get<Type>` per type (`part: source | metadata` where the type has a source), the same tools as `mcp-abap-adt`;
-- the **system** tools — where-used, type and object information, the ABAP AST and semantic
-  analysis, SQL queries, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
+- the **system** tools — where-used, type and object information, the object outline and
+  structure, dumps, profiler traces and their analysis, and the ABAP Test Cockpit
   (`RunATC`, `GetATCRunStatus`, `GetATCFindings`, and the stored results:
   `ListATCResults`, `GetATCResult`);
 - **search** (`SearchObject`);
+- the background-run tools of the long reads (`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`): a long read runs in the background by default and is read, listed and cancelled by them;
 - the **batch tools** (`BatchBegin`, `BatchEnd`, `BatchAnswers`): batch mode, the reads none of whose requests depends on another's answer recorded and sent together.
 
-70 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule, the debugger and
-background runs — those are
+73 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the class and program runs, the trace schedule and the debugger — those are
 `mcp-abap-adt-sse`'s ([`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)).
 
 **Nothing here changes the system.** No tool of this binary runs code or changes data: the class

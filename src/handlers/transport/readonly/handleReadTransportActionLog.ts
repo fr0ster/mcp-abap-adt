@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ReadTransportActionLog — what has happened to a transport request.
  *
@@ -14,34 +16,35 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import {
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportActionLog',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description:
-          'Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe(
+        'Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface ReadTransportActionLogArgs {
-  transport_number: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ReadTransportActionLogArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The text of one `log:entry`, as `structured` parses it.
@@ -54,23 +57,23 @@ interface ReadTransportActionLogArgs {
  * entries. The `log:text` spellings stay for the shape this was first
  * written against.
  */
-const textOf = (entry: any): string => {
-  const message = entry?.['log:message']?.['log:messageText'];
+const textOf = (entry: XmlRead): string => {
+  const message = childAt(entry, 'log:message', 'log:messageText');
   const text =
-    (typeof message === 'object' ? message?.['#text'] : message) ??
-    entry?.['@']?.['log:text'] ??
-    entry?.['log:text'] ??
+    (typeof message === 'object' ? child(message, '#text') : message) ??
+    childAt(entry, '@', 'log:text') ??
+    child(entry, 'log:text') ??
     '';
   return String(text);
 };
 
-const entriesOf = (value: unknown): { text: string }[] => {
-  const log = (value as Record<string, any>)?.['log:log'] ?? value;
-  const raw = (log as Record<string, any>)?.['log:entry'];
-  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+const entriesOf = (value: XmlRead): { text: string }[] => {
+  const log = child(value, 'log:log') ?? value;
+  const raw = child(log, 'log:entry');
+  const list = isList(raw) ? raw : raw ? [raw] : [];
   return list
-    .map((entry: any) => ({ text: textOf(entry) }))
-    .filter((entry: { text: string }) => entry.text !== '');
+    .map((entry) => ({ text: textOf(entry) }))
+    .filter((entry) => entry.text !== '');
 };
 
 export async function handleReadTransportActionLog(
@@ -85,7 +88,7 @@ export async function handleReadTransportActionLog(
 
   const detail = detailOf(args);
 
-  const terseLog: Terse<unknown> = (value) => {
+  const terseLog = (value: XmlRead) => {
     const entries = entriesOf(value);
     return {
       success: true,

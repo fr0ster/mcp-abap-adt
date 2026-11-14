@@ -20,12 +20,14 @@
  * Plain code over the arguments, no regular expression.
  */
 
+import { type JsonValue, jsonAt } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
 import type { TlsConfig } from './IServerConfig.js';
+import type { YamlConfig } from './yamlConfig.js';
 
 /** A start the parameters refuse, in words that name parameters only. */
 export class ParameterRefusal extends Error {
@@ -73,9 +75,22 @@ export interface Parameter {
   /** An enum's words. */
   readonly values?: readonly string[];
   /** A custom row's reader: the typed value, or a throw in its own words. */
-  readonly parse?: (raw: unknown, name: string) => ParameterValue;
+  readonly parse?: (raw: JsonValue, name: string) => ParameterValue;
   /** The value when no form gives one; also the template's value. */
   readonly default?: ParameterValue;
+  /**
+   * A flag the `--conf` template leaves unstated (an empty value) instead of
+   * writing `false`: one whose stated `false` is refused in some starts
+   * (`--restore-session` without `--deferred-logon`), so a template written
+   * and used as it is never states it.
+   */
+  readonly unstatedInTemplate?: true;
+  /**
+   * A `port` that may be 0: a listener's port, where 0 is a free port the
+   * system chooses (announced by the listener). Absent: 1-65535 only — a
+   * port someone else must know in advance, such as a login callback.
+   */
+  readonly ephemeral?: true;
   /** The value placeholder of the help (`=<minutes>`); default by kind. */
   readonly valueHint?: string;
   /** The help section the row is listed under. */
@@ -111,7 +126,7 @@ export interface RemovedParameter {
    * the form alone; a removed `--exposition` names the binary its words ask
    * for.
    */
-  readonly words: (form: string, value?: unknown) => string;
+  readonly words: (form: string, value?: JsonValue) => string;
 }
 
 export interface ParameterTable {
@@ -135,38 +150,39 @@ function argName(arg: string): string {
 
 /** The value at a dotted YAML path, or undefined. Plain code. */
 function yamlAt(
-  yaml: Record<string, unknown> | null | undefined,
+  yaml: YamlConfig | null | undefined,
   dotted: string | undefined,
-): unknown {
+): JsonValue | undefined {
   if (!yaml || dotted === undefined) return undefined;
-  let node: unknown = yaml;
-  for (const segment of dotted.split('.')) {
-    if (node === null || typeof node !== 'object' || Array.isArray(node)) {
-      return undefined;
-    }
-    node = (node as Record<string, unknown>)[segment];
-  }
-  return node;
+  return jsonAt(yaml, ...dotted.split('.'));
 }
+
+/**
+ * The program's arguments, by contract: what a reader of a removed
+ * parameter is handed (`process.argv.slice(2)`, by the embedder). A value
+ * read from it is the program's input, like one read from the environment.
+ */
+interface ProgramArguments extends ReadonlyArray<string> {}
 
 interface RemovedHit {
   readonly form: string;
-  readonly value: unknown;
+  /** The value given: the program's input (CLI, environment, YAML). */
+  readonly value: JsonValue | undefined;
   readonly removed: RemovedParameter;
 }
 
 function removedYamlHits(
   table: ParameterTable,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): RemovedHit[] {
-  if (!yaml || typeof yaml !== 'object') return [];
+  if (!yaml) return [];
   const found: RemovedHit[] = [];
   for (const removed of table.removed) {
     for (const key of removed.yaml ?? []) {
       if (key in yaml) {
         found.push({
           form: `${key} (config file)`,
-          value: (yaml as Record<string, unknown>)[key],
+          value: yaml[key],
           removed,
         });
       }
@@ -178,9 +194,9 @@ function removedYamlHits(
 /** The first form of a removed parameter, as the user used it: CLI, then env, then YAML. */
 function removedHit(
   table: ParameterTable,
-  argv: readonly string[],
+  argv: ProgramArguments,
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): RemovedHit | undefined {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -218,7 +234,7 @@ export function refuseRemovedParameters(
   table: ParameterTable,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): void {
   const hit = removedHit(table, argv, env, yaml);
   if (hit) throw new ParameterRefusal(hit.removed.words(hit.form, hit.value));
@@ -259,7 +275,7 @@ function splitList(text: string): string[] {
 function convert(
   p: Parameter,
   name: string,
-  raw: unknown,
+  raw: JsonValue | undefined,
 ): ParameterValue | undefined {
   if (raw === undefined || raw === null) return undefined;
 
@@ -303,9 +319,12 @@ function convert(
 
   if (p.kind === 'port') {
     const port = isDigits(text) ? Number.parseInt(text, 10) : Number.NaN;
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    const lowest = p.ephemeral === true ? 0 : 1;
+    if (!Number.isInteger(port) || port < lowest || port > 65535) {
       throw new ParameterRefusal(
-        `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,
+        p.ephemeral === true
+          ? `Invalid ${name}: "${text}". Must be a port between 0 and 65535 (0: one the system chooses)`
+          : `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,
       );
     }
     return port;
@@ -355,19 +374,22 @@ function readRow(
   p: Parameter,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): { value: ParameterValue; source: string } | undefined {
   const cli = readCli(p, argv);
-  const sources: [Source, unknown, string | undefined][] = [
-    ['cli', cli?.raw, cli?.name],
-    ['env', p.env === undefined ? undefined : env[p.env], undefined],
-    ['yaml', yamlAt(yaml, p.yaml), undefined],
-  ];
-  for (const [source, raw, cliName] of sources) {
-    const name = nameIn(p, source, cliName);
-    const value = convert(p, name, raw);
-    if (value !== undefined) return { value, source: name };
-  }
+  const cliName = nameIn(p, 'cli', cli?.name);
+  const fromCli = convert(p, cliName, cli?.raw);
+  if (fromCli !== undefined) return { value: fromCli, source: cliName };
+  const envName = nameIn(p, 'env');
+  const fromEnv = convert(
+    p,
+    envName,
+    p.env === undefined ? undefined : env[p.env],
+  );
+  if (fromEnv !== undefined) return { value: fromEnv, source: envName };
+  const yamlName = nameIn(p, 'yaml');
+  const fromYaml = convert(p, yamlName, yamlAt(yaml, p.yaml));
+  if (fromYaml !== undefined) return { value: fromYaml, source: yamlName };
   return undefined;
 }
 
@@ -380,7 +402,7 @@ export function readParameters(
   table: ParameterTable,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): Record<string, ParameterValue> {
   refuseRemovedParameters(table, argv, env, yaml);
   const out: Record<string, ParameterValue> = {};
@@ -402,7 +424,7 @@ export function parameterSource(
   key: string,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): string | undefined {
   const p = table.rows.find((row) => row.key === key);
   if (!p) return undefined;
@@ -424,13 +446,13 @@ const SECRET_KEY_FRAGMENTS = [
 ] as const;
 
 /** Every secret- or session-looking key at any depth, by its dotted path. Never a value. */
-export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
+export function findSecretYamlKeys(value: JsonValue, prefix = ''): string[] {
   if (value === null || typeof value !== 'object') return [];
   const found: string[] = [];
-  const entries: [string, unknown][] = Array.isArray(value)
+  const members: [string, JsonValue][] = Array.isArray(value)
     ? value.map((v, i) => [String(i), v])
-    : Object.entries(value as Record<string, unknown>);
-  for (const [key, inner] of entries) {
+    : Object.entries(value);
+  for (const [key, inner] of members) {
     const path = prefix ? `${prefix}.${key}` : key;
     const lower = key.toLowerCase();
     if (
@@ -447,7 +469,7 @@ export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
 /** Every refusal of a YAML file against the table: removed keys, secrets, values. */
 export function validateYamlParameters(
   table: ParameterTable,
-  yaml: Record<string, unknown>,
+  yaml: YamlConfig,
 ): string[] {
   const errors: string[] = removedYamlHits(table, yaml).map(
     ({ form, value, removed }) => removed.words(form, value),
@@ -574,7 +596,11 @@ interface TemplateNode {
 }
 
 function newNode(): TemplateNode {
-  return { leaves: new Map(), children: new Map(), order: [] };
+  return {
+    leaves: new Map<string, Parameter>(),
+    children: new Map<string, TemplateNode>(),
+    order: [],
+  };
 }
 
 function renderNode(node: TemplateNode, depth: number): string {
@@ -590,7 +616,7 @@ function renderNode(node: TemplateNode, depth: number): string {
     if (!p) continue;
     const values = p.values ? ` (${p.values.join(' | ')})` : '';
     const value =
-      p.kind === 'flag'
+      p.kind === 'flag' && p.unstatedInTemplate !== true
         ? templateValue(p.default ?? false)
         : templateValue(p.default);
     const forms = [p.cli, ...(p.cliAliases ?? []), ...(p.env ? [p.env] : [])];
@@ -703,6 +729,31 @@ export const BATCH_KEEP_RAW_PARTS_ROW: Parameter = {
   help: "Each answer of a batch (BatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
 };
 
+export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';
+export const ENABLE_DATA_TOOLS_ENV = 'MCP_ENABLE_DATA_TOOLS';
+export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';
+
+/**
+ * `--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / YAML `enable-data-tools`:
+ * whether the binary serves the tools that read business data —
+ * `GetSqlQuery` and `GetTableContents`, compact `HandlerGetData`. `true` or
+ * `false`, default `false`; an empty value or YAML null is not given (the
+ * next form decides, as for every row), and any other value is refused at
+ * startup. In every binary's table: on Streamable HTTP and SSE it is a start parameter of the
+ * server, never a request header. SAP API Policy FAQ v1.3 (June 2026), Q33,
+ * is the reason for the default; whether to turn it on is the customer's.
+ */
+export const ENABLE_DATA_TOOLS_ROW: Parameter = {
+  key: 'enableDataTools',
+  cli: ENABLE_DATA_TOOLS_CLI,
+  env: ENABLE_DATA_TOOLS_ENV,
+  yaml: ENABLE_DATA_TOOLS_YAML,
+  kind: 'flag',
+  default: false,
+  section: 'DATA TOOLS',
+  help: "Serves the tools that read business data: GetSqlQuery and GetTableContents (compact: HandlerGetData). true or false; off by default (an empty value counts as not given). SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems. Whether to turn this on is the customer's decision.",
+};
+
 /** The longest `--shutdown-timeout`: a day. */
 export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
 
@@ -710,7 +761,7 @@ export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
  * `--shutdown-timeout`'s value: a whole number of seconds from 1 to 86 400,
  * read by plain code — ASCII digits only, as a string or a YAML number.
  */
-export function parseShutdownTimeout(raw: unknown, name: string): number {
+export function parseShutdownTimeout(raw: JsonValue, name: string): number {
   const text = typeof raw === 'string' ? raw.trim() : String(raw);
   let digits = text.length > 0;
   for (let i = 0; i < text.length; i += 1) {
@@ -794,13 +845,18 @@ export function tlsRows(yamlPrefix: 'http' | 'sse'): readonly Parameter[] {
   ];
 }
 
+/** A text parameter's value; any other kind is none. */
+function textValue(value: ParameterValue | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
 /** The TLS configuration of the read values: cert and key together, or no TLS. */
 export function tlsConfigOf(
   values: Record<string, ParameterValue>,
 ): TlsConfig | undefined {
-  const cert = values.tlsCert as string | undefined;
-  const key = values.tlsKey as string | undefined;
-  const ca = values.tlsCa as string | undefined;
+  const cert = textValue(values.tlsCert);
+  const key = textValue(values.tlsKey);
+  const ca = textValue(values.tlsCa);
   if (cert === undefined && key === undefined && ca === undefined) {
     return undefined;
   }
@@ -886,11 +942,15 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     '--allow-destination-header',
     '--unsafe',
     '--connection-type',
+    '--ashost',
+    '--sysnr',
     '--mshost',
     '--msserv',
     '--sysid',
     '--group',
     '--saprouter',
+    '--client',
+    '--language',
     '--login-timeout',
     '--renewal',
     '--auth-debug',
@@ -904,11 +964,15 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     'allow-destination-header',
     'unsafe',
     'connection-type',
+    'ashost',
+    'sysnr',
     'mshost',
     'msserv',
     'sysid',
     'group',
     'saprouter',
+    'client',
+    'language',
     'browser',
     'browser-program',
     'browser-auth-port',

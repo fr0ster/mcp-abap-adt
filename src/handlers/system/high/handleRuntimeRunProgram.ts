@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 /**
  * RuntimeRunProgram Handler - Execute an ABAP program, optionally profiled
  *
@@ -29,10 +31,9 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { createOnPremExecutor } from '../../../lib/clients';
-import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
@@ -43,60 +44,36 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     '[runtime] Runs the ABAP program (report) named by program_name and returns its output. Set profile=true to also start a profiler trace; the trace is then found in the list of profiler trace files (program execution is fire-and-forget, so the traceId arrives later, through that list).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'ABAP program name to execute.',
-      },
-      background: BACKGROUND_PROPERTY,
-      profile: {
-        type: 'boolean',
-        description:
-          'When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Profiler trace description (only used when profile=true).',
-      },
-      all_procedural_units: { type: 'boolean' },
-      all_misc_abap_statements: { type: 'boolean' },
-      all_internal_table_events: { type: 'boolean' },
-      all_dynpro_events: { type: 'boolean' },
-      aggregate: { type: 'boolean' },
-      explicit_on_off: { type: 'boolean' },
-      with_rfc_tracing: { type: 'boolean' },
-      all_system_kernel_events: { type: 'boolean' },
-      sql_trace: { type: 'boolean' },
-      all_db_events: { type: 'boolean' },
-      max_size_for_trace_file: { type: 'number' },
-      amdp_trace: { type: 'boolean' },
-      max_time_for_tracing: { type: 'number' },
-    },
-    required: ['program_name'],
-  },
+  inputSchema: z.object({
+    program_name: z.string().describe('ABAP program name to execute.'),
+    background: BACKGROUND_FIELD,
+    profile: z
+      .boolean()
+      .optional()
+      .describe(
+        'When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.',
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe('Profiler trace description (only used when profile=true).'),
+    all_procedural_units: z.boolean().optional(),
+    all_misc_abap_statements: z.boolean().optional(),
+    all_internal_table_events: z.boolean().optional(),
+    all_dynpro_events: z.boolean().optional(),
+    aggregate: z.boolean().optional(),
+    explicit_on_off: z.boolean().optional(),
+    with_rfc_tracing: z.boolean().optional(),
+    all_system_kernel_events: z.boolean().optional(),
+    sql_trace: z.boolean().optional(),
+    all_db_events: z.boolean().optional(),
+    max_size_for_trace_file: z.number().optional(),
+    amdp_trace: z.boolean().optional(),
+    max_time_for_tracing: z.number().optional(),
+  }),
 } as const;
 
-interface RuntimeRunProgramArgs {
-  program_name: string;
-  profile?: boolean;
-  description?: string;
-  all_procedural_units?: boolean;
-  all_misc_abap_statements?: boolean;
-  all_internal_table_events?: boolean;
-  all_dynpro_events?: boolean;
-  aggregate?: boolean;
-  explicit_on_off?: boolean;
-  with_rfc_tracing?: boolean;
-  all_system_kernel_events?: boolean;
-  sql_trace?: boolean;
-  all_db_events?: boolean;
-  max_size_for_trace_file?: number;
-  amdp_trace?: boolean;
-  max_time_for_tracing?: number;
-}
+type RuntimeRunProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleRuntimeRunProgram(
   context: HandlerContext,
@@ -133,22 +110,7 @@ export async function handleRuntimeRunProgram(
         atStep('schedule trace', () =>
           withAdtHeaders(context, 'programExecutor.scheduleTrace', (headers) =>
             programExecutor.scheduleTrace({
-              ...definedOnly({
-                description: args.description,
-                allProceduralUnits: args.all_procedural_units,
-                allMiscAbapStatements: args.all_misc_abap_statements,
-                allInternalTableEvents: args.all_internal_table_events,
-                allDynproEvents: args.all_dynpro_events,
-                aggregate: args.aggregate,
-                explicitOnOff: args.explicit_on_off,
-                withRfcTracing: args.with_rfc_tracing,
-                allSystemKernelEvents: args.all_system_kernel_events,
-                sqlTrace: args.sql_trace,
-                allDbEvents: args.all_db_events,
-                maxSizeForTraceFile: args.max_size_for_trace_file,
-                amdpTrace: args.amdp_trace,
-                maxTimeForTracing: args.max_time_for_tracing,
-              }),
+              ...profilerTraceParameters(args),
               analyse: analyseException,
               headers,
             }),
@@ -184,7 +146,10 @@ export async function handleRuntimeRunProgram(
  */
 export async function handleRuntimeRunProgramUnderProfiler(
   context: HandlerContext,
-  args: { program_name?: string; profiler_id?: string },
+  args: {
+    program_name?: string | undefined;
+    profiler_id?: string | undefined;
+  },
   tool: string,
 ) {
   const { connection, logger } = context;

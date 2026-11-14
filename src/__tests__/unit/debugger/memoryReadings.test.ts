@@ -1,10 +1,10 @@
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   readMemorySizes,
   readSnapshotList,
   readXmlDocument,
   terseMemorySizes,
 } from '../../../lib/debugger/memoryReadings';
+import { corpusBody } from '../../helpers/adtCorpus';
 
 it('lists the recorded snapshots of a user; none for a user with none', () => {
   const list = readSnapshotList(
@@ -25,6 +25,14 @@ it('any document parses, its namespaces dropped', () => {
   expect(readXmlDocument('<a:x xmlns:a="u"><a:y>1</a:y></a:x>')).toEqual({
     x: { y: '1' },
   });
+});
+
+it('a blank document reads as an empty one, whitespace or none', () => {
+  // The parser answers `{}` for a blank document itself: nothing of ours is
+  // made in its place.
+  expect(readXmlDocument('')).toEqual({});
+  expect(readXmlDocument(' \n\t ')).toEqual({});
+  expect(readSnapshotList('')).toEqual([]);
 });
 
 it('the memory sizes and a created snapshot, as recorded, read as their documents', () => {

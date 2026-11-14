@@ -17,6 +17,7 @@
  * provider cache, the broker does.
  */
 
+import * as fs from 'node:fs';
 import {
   AuthBroker,
   type BrokerCallOptions,
@@ -24,13 +25,14 @@ import {
 } from '@mcp-abap-adt/auth-broker';
 import { classify } from '@mcp-abap-adt/auth-errors';
 import { refreshOnly, refreshThenLogin } from '@mcp-abap-adt/auth-providers';
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig, SapHttpConfig } from '@mcp-abap-adt/connection';
 import type {
   IAuthorizationStrategy,
   IAuthProvider,
   IAuthProviderError,
   IRenewalStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
+import type { IConnectionConfig } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
@@ -38,11 +40,17 @@ import {
   SettingsError,
 } from '@mcp-abap-adt/lib/auth';
 import {
-  MESSAGE_SERVER_FIELDS,
-  type MessageServerField,
+  checkDestinationStatement,
+  DESTINATION_KEYS,
+  type DestinationKey,
+  type DestinationKeyValues,
+  rfcConfigOf,
+  URL_KEYS,
 } from '@mcp-abap-adt/lib/config';
+import * as dotenv from 'dotenv';
 import { getPlatformPaths } from '../config/platformPaths';
 import { countedProvider, ProviderGate } from './countedProvider';
+import { DestinationAddressRefusal } from './destinationFailure';
 import {
   type DestinationMode,
   type DestinationStores,
@@ -55,7 +63,10 @@ import {
   handlerFor,
 } from './handlers';
 import type { IAuthBrokerFactory, SettleReport } from './IAuthBrokerFactory.js';
-import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
+import type {
+  IAuthBrokerFactoryConfig,
+  StartDestinationKeys,
+} from './IAuthBrokerFactoryConfig.js';
 import { brokerLogger, type LoginBound, loginBound } from './serverLogin';
 import {
   type RenewalMode,
@@ -67,11 +78,15 @@ import { type VettedAuthentication, vetMeans } from './vocabulary';
 /** The destination an `--env` file is served as. */
 const ENV_FILE_DESTINATION = 'default';
 
-interface Built {
+/** A destination's stores and its vetted authentication, read before any handler is chosen. */
+interface Stated {
+  stores: DestinationStores;
+  vetted: VettedAuthentication;
+}
+
+interface Built extends Stated {
   broker: AuthBroker;
   handler: AuthenticationHandler;
-  vetted: VettedAuthentication;
-  stores: DestinationStores;
 }
 
 /** An own data property of a foreign value, never a getter; `undefined` otherwise. */
@@ -114,6 +129,72 @@ const SILENT: ILogger = {
   debug: () => {},
 };
 
+/** The means field each destination key is read from. */
+const MEANS_FIELD = {
+  ashost: 'ashost',
+  sysnr: 'sysnr',
+  mshost: 'mshost',
+  msserv: 'msserv',
+  sysid: 'sysid',
+  group: 'group',
+  saprouter: 'saprouter',
+  client: 'sapClient',
+  language: 'language',
+} as const satisfies Record<DestinationKey, keyof IConnectionConfig>;
+
+/**
+ * `key` as the destination's own `.env` states it; absent when the file
+ * states none or cannot be read. Read only to refuse a URL over RFC.
+ */
+function ownFileValue(file: string, key: string): string | undefined {
+  try {
+    return dotenv.parse(fs.readFileSync(file, 'utf8'))[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** An HTTP destination's settings, as a literal of its shape. */
+function httpSettingsOf(
+  authType: SapHttpConfig['authType'],
+  url: string,
+  client: string | undefined,
+): SapHttpConfig {
+  return {
+    url,
+    ...(client !== undefined ? { client } : {}),
+    authType,
+    connectionType: 'http',
+  };
+}
+
+/** `value` trimmed; a blank one is unset. */
+function stated(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/**
+ * The destination keys in effect: for each, the start's CLI or process
+ * environment, then the destination's means (its `.env`, then a service
+ * key's fallback, as its store merged them), then YAML — trimmed, a blank
+ * value unset. A key stated nowhere has no key.
+ */
+export function effectiveDestinationKeys(
+  start: StartDestinationKeys | undefined,
+  means: IConnectionConfig | null | undefined,
+): DestinationKeyValues {
+  const out: DestinationKeyValues = {};
+  for (const key of DESTINATION_KEYS) {
+    const value =
+      stated(start?.overMeans[key]) ??
+      stated(means?.[MEANS_FIELD[key]]) ??
+      stated(start?.underMeans[key]);
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
 const RENEWALS: Readonly<Record<RenewalMode, () => IRenewalStrategy>> = {
   'refresh-then-login': refreshThenLogin,
   'refresh-only': refreshOnly,
@@ -132,6 +213,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private readonly bound: LoginBound | undefined;
   /** The build of each destination, set before its first await. */
   private readonly built = new Map<string, Promise<Built>>();
+  /** What each destination states, read once, set before its first await. */
+  private readonly stated = new Map<string, Promise<Stated>>();
   /** One counted wrapper per inner provider the brokers answered. */
   private readonly counted = new WeakMap<IAuthProvider, IAuthProvider>();
   /** Every login strategy composed, disposed at shutdown. */
@@ -217,39 +300,81 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return settings;
   }
 
-  /** The message-server fields the server was started with, each only when set. */
-  private messageServer(): Pick<SapConfig, MessageServerField> {
-    const out: Pick<SapConfig, MessageServerField> = {};
-    for (const field of MESSAGE_SERVER_FIELDS) {
-      const value = this.config[field];
-      if (value !== undefined) out[field] = value;
-    }
-    return out;
+  /** The destination keys in effect for `destination` (`effectiveDestinationKeys`). */
+  async destinationKeysFor(destination: string): Promise<DestinationKeyValues> {
+    // The means are read on every call, as the broker answers them: a fixed
+    // file answers the next read.
+    const { stores } = await this.statedOf(destination);
+    const means = await stores.serviceKeyStore.getConnectionConfig(destination);
+    return effectiveDestinationKeys(this.config.destinationKeys, means);
   }
 
+  /**
+   * The destination's settings, checked where they enter the type system
+   * (24.0.0): the connection type is stated (the launcher refuses its
+   * absence first); the URL is read as the wire takes it — over HTTP from the
+   * URL store, over RFC only to refuse one the destination's own file states,
+   * the store asked nothing; the address, the client and the language as in
+   * effect (`destinationKeysFor`). The nine refusals of
+   * `checkDestinationStatement` come before any connection opens, as a
+   * `DestinationAddressRefusal`; a complete destination is built per wire,
+   * as a literal of its shape.
+   */
   private async readSettings(destination: string): Promise<SapConfig> {
-    const { broker, handler, vetted, stores } = await this.buildOf(destination);
-    const means = await broker.getConnectionConfig(destination);
-    // An XSUAA destination's URL is XSUAA_MCP_URL alone, never the key's url.
-    const url = (await stores.urlStore.getConnectionConfig(destination))
-      ?.serviceUrl;
-    if (!url) {
+    const { connectionType } = this.config;
+    if (connectionType === undefined) {
       throw new DestinationConfigError(
         destination,
-        [stores.urlKey],
-        'the destination states no system URL',
+        ['SAP_CONNECTION_TYPE'],
+        'the destination states no connection type',
       );
     }
-    const settings: SapConfig = {
-      url,
-      ...(means?.sapClient ? { client: means.sapClient } : {}),
+    // What the destination states is checked before a handler is chosen:
+    // an address refusal answers even for an authentication not served.
+    const { vetted, stores } = await this.statedOf(destination);
+    const keys = await this.destinationKeysFor(destination);
+    const url =
+      connectionType === 'http'
+        ? // An XSUAA destination's URL is XSUAA_MCP_URL alone, never the key's url.
+          stated(
+            (await stores.urlStore.getConnectionConfig(destination))
+              ?.serviceUrl,
+          )
+        : undefined;
+    // Over RFC every URL key of the destination's own file refuses it, its
+    // URL key or not; the stores are asked nothing.
+    const statedUrlKeys =
+      connectionType === 'rfc'
+        ? URL_KEYS.filter(
+            (key) =>
+              stated(ownFileValue(stores.destinationFile, key)) !== undefined,
+          )
+        : [];
+    const checked = checkDestinationStatement({
+      connectionType,
+      systemType: this.config.systemType,
       authType: vetted.authType,
-      ...(this.config.connectionType
-        ? { connectionType: this.config.connectionType }
-        : {}),
-      // RFC through a message server: as configured, an absent field no key.
-      ...this.messageServer(),
-    };
+      urlKey: stores.urlKey,
+      url,
+      statedUrlKeys,
+      keys,
+    });
+    if ('fault' in checked) {
+      // HTTP without a URL: today's refusal, naming the URL key.
+      if (checked.fault.case === 'http-without-url') {
+        throw new DestinationConfigError(
+          destination,
+          [stores.urlKey],
+          'the destination states no system URL',
+        );
+      }
+      throw new DestinationAddressRefusal(destination, checked.fault);
+    }
+    const { handler } = await this.buildOf(destination);
+    const settings: SapConfig =
+      'rfc' in checked
+        ? rfcConfigOf({ authType: vetted.authType }, checked.rfc)
+        : httpSettingsOf(vetted.authType, checked.http.url, keys.client);
     try {
       handler.checkSettings?.(settings, this.context);
     } catch (error) {
@@ -267,16 +392,22 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
 
   /**
    * The responsible, the login and the master system the destination's own
-   * `.env` states, read once per process like its settings. The process environment is not
-   * read here: it is the server's fallback, after the destination.
+   * `.env` states, and the master language of its created objects — its
+   * `SAP_LANGUAGE` in effect (`effectiveDestinationKeys`) — read once per
+   * process like its settings. The process environment is read here only as
+   * the start parameters rank it.
    */
   systemContextFor(destination: string): Promise<DestinationSystemContext> {
     const cached = this.systemContexts.get(destination);
     if (cached) return cached;
-    const context = (async () =>
-      readDestinationSystemContext(
-        (await this.buildOf(destination)).stores.destinationFile,
-      ))();
+    const context = (async (): Promise<DestinationSystemContext> => {
+      const { stores } = await this.buildOf(destination);
+      const { language } = await this.destinationKeysFor(destination);
+      return {
+        ...readDestinationSystemContext(stores.destinationFile),
+        ...(language !== undefined ? { masterLanguage: language } : {}),
+      };
+    })();
     this.systemContexts.set(destination, context);
     context.catch(() => {
       if (this.systemContexts.get(destination) === context) {
@@ -371,17 +502,40 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return build;
   }
 
+  /** What a destination states, cached as a promise; a failed read is dropped. */
+  private statedOf(destination: string): Promise<Stated> {
+    try {
+      // Before any file is touched: the name is joined into keysDir/sessionsDir.
+      assertDestinationName(destination, 'destination');
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const cached = this.stated.get(destination);
+    if (cached) return cached;
+    const read = (async (): Promise<Stated> => {
+      const stores = storesFor(this.modeOf(destination), this.config.logger);
+      const means =
+        await stores.serviceKeyStore.getConnectionConfig(destination);
+      return { stores, vetted: vetMeans(destination, means) };
+    })();
+    this.stated.set(destination, read);
+    read.catch(() => {
+      if (this.stated.get(destination) === read) {
+        this.stated.delete(destination);
+      }
+    });
+    return read;
+  }
+
   private async build(destination: string): Promise<Built> {
     const mode = this.modeOf(destination);
-    const stores = storesFor(mode, this.config.logger);
+    const { stores, vetted } = await this.statedOf(destination);
     // The failed write under 'continue' reaches stderr whatever
     // DEBUG_AUTH_LOG says; the rest stays the gated diagnostics.
     const logger = brokerLogger(
       (line) => this.config.promptLogger.info(line),
       this.config.logger ?? SILENT,
     );
-    const means = await stores.serviceKeyStore.getConnectionConfig(destination);
-    const vetted = vetMeans(destination, means);
     const handler = handlerFor(destination, vetted);
     const renewal = RENEWALS[this.renewal];
     const broker = new AuthBroker(

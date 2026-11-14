@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateServiceDefinition Handler - Update Existing ABAP Service Definition Source
  *
@@ -26,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -35,45 +37,35 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_definition_name: {
-        type: 'string',
-        description: 'Service definition name. Must exist in the system.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete service definition source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate service definition after update. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['service_definition_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    service_definition_name: z
+      .string()
+      .describe('Service definition name. Must exist in the system.'),
+    source_code: z
+      .string()
+      .describe('Complete service definition source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate service definition after update. Default: true.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateServiceDefinitionArgs {
-  service_definition_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateServiceDefinitionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateServiceDefinition(
   context: HandlerContext,
@@ -93,14 +85,14 @@ export async function handleUpdateServiceDefinition(
 
   return answer(
     { tool: 'UpdateServiceDefinition', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getServiceDefinition(
         resultsFor(serviceDefinitionDocuments),
       );
 
       const written = await withLock(
         () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> =>
           sequence(
             atStep('update', () =>
               withAdtHeaders(context, 'serviceDefinition.update', (headers) =>
@@ -135,7 +127,7 @@ export async function handleUpdateServiceDefinition(
       );
 
       if (!written.ok) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.

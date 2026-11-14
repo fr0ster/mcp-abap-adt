@@ -1,10 +1,11 @@
 /**
  * Running ABAP Unit tests for a tool: start the run and, with `wait` (the
- * default), read its status once by long polling — SAP holds the read until
- * the run finished — and answer the result of a run SAP answered `FINISHED`,
- * or the run id and SAP's status for any other answer. With `wait: false` the
- * call answers the run id right after the start, and the run is read by its
- * id: a client with a request time limit shorter than the run would cut the
+ * default), read its status as `readRunOnce` does — at once, then by long
+ * polling (SAP holds each read until the run finished) while SAP answers it
+ * `RUNNING` — and answer the result of a run SAP answered `FINISHED`, or the
+ * run id and SAP's status for a run it answered `NOT_STARTED`. With
+ * `wait: false` the call answers the run id right after the start, and the
+ * run is read by its id: a client with a request time limit shorter than the run would cut the
  * waiting call and lose the id (measured with a 60 s client limit and a
  * 200 s run, 2026-10-31).
  *
@@ -23,6 +24,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAdtSuccess,
   IClassUnitTestRunOptions,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -30,6 +32,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import type { XmlRead } from '../../../lib/xml/tree';
 import { type RunOutcome, readRunOnce, unfinishedRun } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
@@ -48,7 +51,7 @@ export interface IUnitTestRunner extends IUnitTestRunInformation {
   run(
     objectName: string,
     options: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<unknown, IAdtError>>;
+  ): Promise<IAdtResponse<string, IAdtError>>;
 }
 
 /**
@@ -60,11 +63,11 @@ export interface IUnitTestRunInformation {
     runId: string,
     withLongPolling: boolean | undefined,
     options: IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   getResult(
     runId: string,
     options: IUnitTestResultOptions & IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 }
 
 export function testRunner(
@@ -85,17 +88,17 @@ export function testRunner(
 }
 
 /**
- * A started run: its id, and — when the call waited — what the long-polled
- * status read found.
+ * A started run: its id, and — when the call waited — what reading its
+ * status found.
  */
 export interface StartedRun {
   readonly runId: string;
-  readonly waited?: RunOutcome<AdtReading<unknown>>;
+  readonly waited?: RunOutcome<AdtReading<XmlRead>>;
 }
 
 /**
  * Start a run of every test the named object holds; with `wait`, read its
- * status once by long polling and fetch the result of a finished run.
+ * status as `readRunOnce` does and fetch the result of a finished run.
  */
 export async function runAndWait(
   context: HandlerContext,
@@ -116,19 +119,19 @@ export async function runAndWait(
 
 /**
  * Start a run with `start` — whose answer is the run's id — and, with `wait`,
- * read its status once with `runner` by long polling and fetch the result of
- * a finished run; without, answer the id alone.
+ * read its status with `runner` as `readRunOnce` does and fetch the result
+ * of a finished run; without, answer the id alone.
  */
 export async function waitForRun(
   runner: IUnitTestRunInformation,
   wait: boolean,
-  start: () => Promise<IAdtResponse<unknown, IAdtError>>,
+  start: () => Promise<IAdtResponse<string, IAdtError>>,
 ): Promise<IAdtResponse<StartedRun, IAdtError>> {
   const started = await atStep('run', start)();
   if (!started.ok) {
-    return started as unknown as IAdtResponse<StartedRun, IAdtError>;
+    return started;
   }
-  const runId = String(started.getResult().value);
+  const runId = started.getResult().value;
   const outcome = wait
     ? await readRunOnce(
         (id, withLongPolling) =>
@@ -138,25 +141,26 @@ export async function waitForRun(
       )
     : undefined;
   if (outcome !== undefined && !outcome.ok) {
-    return outcome as unknown as IAdtResponse<StartedRun, IAdtError>;
+    return outcome;
   }
   const value: StartedRun =
     outcome === undefined
       ? { runId }
       : { runId, waited: outcome.getResult().value };
   const answered = outcome ?? started;
-  return {
+  const success: IAdtSuccess<StartedRun> = {
     ...answered,
     getResult: () => ({ ...answered.getResult(), value }),
-  } as unknown as IAdtResponse<StartedRun, IAdtError>;
+  };
+  return success;
 }
 
 /**
  * What a run tool answers: the result of a run SAP answered `FINISHED`; the
- * run id and SAP's status for a run its long poll answered with another
- * status; the run id alone for a run it did not wait for. `raw` answers the
- * wire document, `terse` and `full` the parse — no fixture proves a further
- * reduction of a test-run result is safe.
+ * run id and SAP's status for a run SAP answered `NOT_STARTED`; the run id
+ * alone for a run it did not wait for. `raw` answers the wire document,
+ * `terse` and `full` the parse — no fixture proves a further reduction of a
+ * test-run result is safe.
  */
 export function projectRun(detail: 'terse' | 'full' | 'raw') {
   return (run: StartedRun) => {

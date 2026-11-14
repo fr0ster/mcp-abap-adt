@@ -1,13 +1,20 @@
 import type { McpResult } from '../answer';
-import { detailOf } from '../strategies/detail';
+import type { IAnswerSerializer } from '../answerSerializer';
+import { type DetailArgs, detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
-import type { DebugState, DebugView, OnceStep, StopView } from './DebugSession';
+import type { DebugExtra } from './access';
+import type { DebugState, DebugView, OnceStep } from './DebugSession';
 import { terseSettings, terseStop } from './readings';
 
-const asText = (value: unknown) => ({
-  type: 'text' as const,
-  text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
-});
+/** A debugger answer's text block: a string as it is, any other value as JSON. */
+const textBlocks: IAnswerSerializer<{ type: 'text'; text: string }> = {
+  json(value: unknown) {
+    return {
+      type: 'text',
+      text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+    };
+  },
+};
 
 /**
  * terse / full / raw of one reading. `extraOf` — the handle and the SAP ids a
@@ -16,13 +23,13 @@ const asText = (value: unknown) => ({
  * `failureExtraOf` joins an error answer as a block of its own: a start that
  * failed but left something held answers the handle that stops it.
  */
-export async function debugAnswer<T>(
-  args: unknown,
+export async function debugAnswer<T, P, F = T>(
+  args: DetailArgs,
   work: () => Promise<DebugView<T>>,
-  terse: (v: T) => unknown,
-  full: (v: T) => unknown = (v) => v,
-  extraOf: () => Record<string, unknown> = () => ({}),
-  failureExtraOf: () => Record<string, unknown> = () => ({}),
+  terse: (v: T) => P,
+  full?: (v: T) => F,
+  extraOf: () => DebugExtra = () => ({}),
+  failureExtraOf: () => DebugExtra = () => ({}),
 ): Promise<McpResult> {
   try {
     const view = await work();
@@ -32,21 +39,29 @@ export async function debugAnswer<T>(
     if (detail === 'raw') {
       return {
         isError: false,
-        content: [asText(view.raw), ...(hasExtra ? [asText(extra)] : [])],
+        content: [
+          textBlocks.json(view.raw),
+          ...(hasExtra ? [textBlocks.json(extra)] : []),
+        ],
       };
     }
-    const projected = detail === 'full' ? full(view.value) : terse(view.value);
+    const projected =
+      detail !== 'full'
+        ? terse(view.value)
+        : full === undefined
+          ? view.value
+          : full(view.value);
     const merged = !hasExtra
       ? projected
       : projected && typeof projected === 'object' && !Array.isArray(projected)
-        ? { ...(projected as Record<string, unknown>), ...extra }
+        ? { ...projected, ...extra }
         : { value: projected, ...extra };
-    return { isError: false, content: [asText(merged)] };
+    return { isError: false, content: [textBlocks.json(merged)] };
   } catch (error) {
-    const failed = return_error(error) as McpResult;
+    const failed = return_error(error);
     const extra = failureExtraOf();
     return Object.keys(extra).length > 0
-      ? { ...failed, content: [...failed.content, asText(extra)] }
+      ? { ...failed, content: [...failed.content, textBlocks.json(extra)] }
       : failed;
   }
 }
@@ -55,14 +70,12 @@ export async function debugAnswer<T>(
 export const terseOnceStep = (v: OnceStep) =>
   'ended' in v ? { state: 'ended', reason: v.ended } : v.step;
 
-type Stopped = Extract<DebugState, { state: 'stopped' }>;
-
 /** A debug state: under terse a stop is its place and the top frames; raw is SAP's documents of the stop. */
 export async function debugStateAnswer(
-  args: unknown,
+  args: DetailArgs,
   work: () => Promise<DebugState>,
-  extraOf: () => Record<string, unknown> = () => ({}),
-  failureExtraOf: () => Record<string, unknown> = () => ({}),
+  extraOf: () => DebugExtra = () => ({}),
+  failureExtraOf: () => DebugExtra = () => ({}),
 ): Promise<McpResult> {
   return debugAnswer(
     args,
@@ -81,10 +94,7 @@ export async function debugStateAnswer(
     (s) => {
       if (s.state !== 'stopped') return s;
       // Everything a start added beside the stop (breakpoints placed and refused, reconciliation) stays.
-      const { stop, ...rest } = s as Stopped & { stop: StopView } & Record<
-          string,
-          unknown
-        >;
+      const { stop, ...rest } = s;
       return {
         ...rest,
         ...terseStop(stop.debuggee, stop.stack, stop.attach),

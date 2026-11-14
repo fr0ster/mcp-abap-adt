@@ -97,6 +97,7 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+Coming from 23.x? See the [24.0 migration note](docs/MIGRATION-24.0.md) — an RFC destination states its address (`SAP_ASHOST` and `SAP_SYSNR`, or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`; over MCP two arguments become required (`CreateDomain`'s `package_name`, compact `HandlerCreate` `BEHAVIOR_IMPLEMENTATION`'s `behavior_definition`) and a few tools declare arguments their handlers already read; an embedder writes a tool's `inputSchema` in zod, builds an entry with `defineTool`, calls it as `entry.call(context, args)` and registers it with `registerTool(server, entry)`.
 Coming from 22.x? See the [23.0 migration note](docs/MIGRATION-23.0.md) — `CreateProgram` no longer offers `include` (create an include with `CreateInclude`); an embedder registering the `./handlers` groups on its own `McpServer` states `systemType` (`SAP_SYSTEM_TYPE` is not read there), and `HandlerExporter` serves no background run and no debugger.
 Coming from 21.x? See the [22.0 migration note](docs/MIGRATION-22.0.md) — the tools, their enums and the object types each argument accepts are the declared system type's (onprem or cloud), inspection needs `--system-type` too, `function` / `func` are the function module, main types stand for their one code, `RunATC` on cloud offers no program, and `ValidateServiceBinding` requires `package_name`.
 Coming from 19.x? See the [20.0 migration note](docs/MIGRATION-20.0.md) — RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, a prebuilt binding for Linux x64, Windows x64 and macOS ARM64 only; over Streamable HTTP `state_handle` is an argument of every tool, and a long session keeps one SAP session across calls.
@@ -124,8 +125,8 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/server-runtime`](https://www.npmjs.com/package/@mcp-abap-adt/server-runtime) | AGPL-3.0-only | The launch code of every server: the stdio, Streamable HTTP and SSE launchers and servers, and the destination layer. **No command of its own**: every server package depends on it, so it is installed with each server; you never install it yourself. |
 | [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. Every server package depends on it. |
 | [`@mcp-abap-adt/responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Apache-2.0 | The rules that name a call's responsible, user and system from `systeminformation` (`SystemContextRules` of the library), and the system type the binaries require. Every server package passes them; the library applies none, so an embedder opts in. |
-| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search), batch mode and, on stdio, the leftover-session list — nothing that changes the system: no high, run, trace-schedule, debugger, leftover-session logoff, background-run or resume tool. |
-| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 17 compact tools that change nothing, `HandlerBatch` and, on stdio, the leftover-session list. |
+| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search), the background runs of the long reads, batch mode and, on stdio, the leftover-session list — nothing that changes the system: no high, run, trace-schedule, debugger, leftover-session logoff or resume tool. |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 17 compact tools that change nothing, the background runs of the long reads, `HandlerBatch` and, on stdio, the leftover-session list. |
 | [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
 Eighteen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
@@ -141,7 +142,8 @@ package brings everything it runs on — `server-runtime`, `lib` and the rest �
 no other server package, so installing two servers, in one command or in two, is fine and
 neither needs the other. Since 19.2.0 a process that loads two copies of `@mcp-abap-adt/lib`
 anyway does not start: it prints `Two copies of @mcp-abap-adt/lib are loaded in this process
-(…): reinstall <package> (npm install -g <package>).` and exits `1` — see
+(<copy>, <copy>): reinstall <package> (npm install -g <package>).` — each copy by its version
+and label, an earlier one as `a copy before 24.0.0` — and exits `1` — see
 [One `lib` per server process](docs/architecture/README.md#one-lib-per-server-process-1920).
 
 ### 1. Standalone MCP Server (Default)
@@ -209,24 +211,26 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
 Key examples of high-value workflows and tools:
 
 - **Repository and impact analysis**: `GetWhereUsed`, `DescribeByList`, `GetObjectStructure`, `GetObjectInfo`, `SearchObject`, `GetPackageTree`, `GetPackageContents`
-- **Code and semantic introspection**: `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetIncludesList`
+- **Code structure, as SAP states it**: `GetObjectOutline` (an object's components with the source lines each occupies), the `Get<Type>` source reads with `start_line`/`end_line` for just those lines, `GetIncludesList`
 - **RAP development**: `CreateBehaviorDefinition`, `UpdateBehaviorDefinition`, `CreateBehaviorImplementation`, `UpdateBehaviorImplementation`, `CreateServiceDefinition`, `UpdateServiceDefinition`, `CreateMetadataExtension`, `UpdateMetadataExtension`
 - **CDS/View development**: `CreateView`, `UpdateView`, `GetView`, `DeleteView`
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
 - **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
-- **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status once by long polling and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and SAP's status for a run SAP answers with another status, read on by `run_id`; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
+- **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it only while SAP answers it running, and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` at once for a run SAP does not know; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
 
-### Long reads take a `timeout`
+### Long reads run in the background
 
-The long reads on an approved list (where-used and search, package walks, data preview, the
-dump feed, profiler traces, … — the list in
-[MIGRATION-19.0](docs/MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own))
-run on an ABAP session of their own and take an optional `timeout` in seconds, with no default.
-When it passes the read is cancelled — its session logged off — and nothing was changed. Set it
-below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a tool call
-cannot be cancelled** — a client's cancel aborts nothing, the call runs to its end. No other tool takes a `timeout`: a unit test, ATC, class or program run
-goes on to its end.
+The long reads on an approved list (where-used and search, `SearchSource`, package walks, data
+preview, the dump feed, profiler traces, … — `tools/long-handlers.json`) run on an ABAP session
+of their own. Since 24.0.0 a call **without** `background` answers a `run_handle` at once, and the
+result is read with `GetBackgroundRun` (compact `HandlerBackgroundRunGet`); `background: false`
+answers the result in the call. `DiscardBackgroundRun` (compact `HandlerBackgroundRunDiscard`) on a
+running read cancels it: its session is logged off, and nothing was changed. No tool takes a
+`timeout`: a read ends when SAP answers or when you cancel it. Once Get answers a finished or cancelled read, that read is gone: a Get response lost on the way cannot be recovered, `ListBackgroundRuns` no longer shows it, and the read must be started again. Every binary serves the background-run tools, the `-ro` ones included (their runs are reads
+alone). A server without background runs (an embedder without a store) lists a long tool without
+`background` and answers its read in the call.
+See [MIGRATION-24.0](docs/MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).
 
 ### Batch mode
 
@@ -244,7 +248,7 @@ create or update, a fallback after a `404`, a poll. Run such work as phases, eac
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
 the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
 the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`), unlock
-(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
+(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`; with `with_long_polling: true` the status read is one request SAP holds until the run ends, without it a read answered at once, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. Every tool's description ends with
@@ -267,7 +271,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 
 - **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains
 - **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
-- **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
+- **📦 Table Management**: `GetTable`, `CreateTable` - Create and retrieve ABAP database tables; `GetTableContents` (the data preview) is a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
 - **🧾 Table Type Management**: `GetTableType`, `CreateTableType`, `UpdateTableType`, `DeleteTableType`, `CheckTableType`, `ActivateTableType`, `GetTableTypeVersions` - Create, read, change, check, activate and delete ABAP table types (on premise and cloud); the create and the update take the definition (row type, access, key) and answer the definition SAP stored
 - **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
@@ -287,7 +291,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🔗 Long session over Streamable HTTP** (`mcp-abap-adt-http`, `-compact-http` and their `-ro`): every tool takes an optional `state_handle` argument that routes the call to the instance holding that state (a lock, a batch, a debug session); `SessionOpen` / `SessionClose` (compact: `HandlerSession`) keep one instance and its SAP session for a run of calls and log it off at the close, or at the idle bound. See [`@mcp-abap-adt/http`](http/README.md#held-state-and-the-long-session)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
-- **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
+- **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API; a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
 
@@ -318,6 +322,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-24.0.md](docs/MIGRATION-24.0.md)** - Static types: a tool's schema is zod, an entry carries its typed `call`, `registerTool` takes the entry, the args-only form and its helpers are gone, typed handler arguments; `CreateDomain` requires `package_name`, compact `HandlerCreate` `BEHAVIOR_IMPLEMENTATION` `behavior_definition`; the low-to-compact table as it stands
 - **[docs/MIGRATION-23.0.md](docs/MIGRATION-23.0.md)** - Includes are created by `CreateInclude`, not `CreateProgram`; the include and table-type tools; a plain `./handlers` registration lists and calls on its stated system type; `ToolHandler` is either call form; `HandlerExporter` without background runs and the debugger; compact cloud schemas; the search table's shape
 - **[docs/MIGRATION-22.0.md](docs/MIGRATION-22.0.md)** - The system type decides the tools and the object types each argument accepts (the ADT type tables of interfaces-adt 24, adt-clients 39); inspection needs the system type; friendly names and main types; the search filter's names; RunATC per system type; arguments now required
 - **[docs/MIGRATION-20.0.md](docs/MIGRATION-20.0.md)** - RFC on connection 19 and sap-rfc-lite 0.3.2: nothing compiled on install, prebuilt bindings for three platforms, the RFC library at run time, the portable build on 0.3 only; Streamable HTTP: held state by the `state_handle` argument, and the long session
@@ -423,37 +428,43 @@ A JWT you already hold is not served over stdio: send it in the `x-sap-jwt-token
 `mcp-abap-adt-http` or `mcp-abap-adt-sse` (`@mcp-abap-adt/http`, `@mcp-abap-adt/sse`), or create
 the session with `mcp-auth`.
 
-For RFC connection:
+For RFC connection — the destination states its address, its client and its logon language, and no `SAP_URL`:
 ```bash
-SAP_URL=http://your-onprem-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
 ```
 
-`SAP_CONNECTION_TYPE=rfc` in the destination's `.env` (the `--env` / `--env-path` file, or `<auth-broker-path>/sessions/<name>.env` for `--mcp=<name>`) selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`); a port that follows no such rule needs `SAP_SYSNR` in the process environment. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK, a C++ toolchain, `SAPNWRFC_HOME` before the install).
+`SAP_CONNECTION_TYPE=rfc` in the destination's `.env` (the `--env` / `--env-path` file, or `<auth-broker-path>/sessions/<name>.env` for `--mcp=<name>`) selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`; the connection type is decided before anything else of the destination is read. An RFC destination states exactly one address — an application server (`SAP_ASHOST` and `SAP_SYSNR`, its two-digit system number) or a message server (below) — and `SAP_CLIENT` and `SAP_LANGUAGE`. Nothing is derived from a URL and nothing has a default. Each key is also a CLI option and a YAML key of its name (`--ashost`, `--sysnr`, `--client`, `--language`, …, YAML `ashost`, …), read in one order: the CLI, then the process environment, then the destination's own `.env` (or a service key's fallback), then YAML. The destination's `.env` does not feed the process environment for them. A destination that states a URL over RFC, two addresses, none, an incomplete one, or no client or language is refused at startup, naming the keys. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (the SAP NW RFC library at run time).
 
-**Through a message server and a logon group** (load-balanced logon): add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one of the two is required; `SAP_MSHOST` with neither is refused by `@mcp-abap-adt/connection`, naming both), and optionally `SAP_GROUP` (the logon group; `PUBLIC` when absent — connection's default, not the server's) and `SAP_SAPROUTER` (works with either addressing). Each is also `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, or the YAML key of that name, with the same precedence as the connection type; in the `.env` they belong to the `--env` / `--env-path` file. With `SAP_MSHOST` the RFC wire takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read; `SAP_URL` is still the system's URL. The server passes the five fields as configured and adds nothing. Logon through a message server is implemented and unit-tested, but not yet measured on a live system (as of 2026-10-20): if the SDK refuses `SAP_MSSERV` without `SAP_SYSID`, add `SAP_SYSID`.
+**Through a message server and a logon group** (load-balanced logon): instead of `SAP_ASHOST` and `SAP_SYSNR`, state `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (or both) and `SAP_GROUP` (the logon group). `SAP_SAPROUTER` goes with either address. Each is also `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, or the YAML key of that name, in the order above. The server passes the fields as stated and adds nothing. Logon through a message server is implemented and unit-tested, but not yet measured on a live system (as of 2026-10-20): if the SDK refuses `SAP_MSSERV` without `SAP_SYSID`, add `SAP_SYSID`.
 
 ```bash
-SAP_URL=http://your-onprem-system.example:8000
+SAP_MSHOST=your-message-server.example
+SAP_SYSID=ABC
+SAP_GROUP=<logon group>
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
-SAP_MSHOST=your-message-server.example
-SAP_SYSID=ABC
-SAP_GROUP=PUBLIC
 # Optional: SAP_MSSERV=sapmsABC, SAP_SAPROUTER=/H/your-router.example/S/3299/H/
 ```
 
+An embedder of `@mcp-abap-adt/lib` that reads a configuration from outside the type system (an env file, the environment, YAML) validates it before it builds an `ISapConfig` — the union of `ISapHttpConfig` and `ISapRfcConfig`, narrowed on `connectionType`; a typed `SapConfig` it hands to the server is used as typed. Over RFC `getBaseUrl()` answers `undefined`: `GetServiceBindingPreviewUrl` answers paths, and an injected connection's background runs need `EmbeddableMcpServerOptions.system`.
+
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
-SAP_URL=http://your-onprem-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
@@ -493,10 +504,56 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` or `rfc`; required for a destination unless its `.env`, the environment or YAML states it (no default)
+- `--ashost`, `--sysnr` - RFC to an application server (`SAP_ASHOST`, `SAP_SYSNR` — see above)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … — see above)
+- `--client`, `--language` - The client and the logon language (`SAP_CLIENT`, `SAP_LANGUAGE`); both required over RFC
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
+
+#### Access restrictions
+
+Every binary takes optional start-time restrictions: `--deny-actions` (tools and values not
+registered), `--allowed-packages`, `--allowed-requests`, `--denied-tables` / `--allowed-tables`
+(each also an `MCP_*` variable and a `restrictions.*` key of the `--conf` file). None is set by
+default, and with none the server behaves as without them. They are formal checks of a call's
+arguments; SAP's authorization remains the boundary. The server names what it read in one start
+line (`[MCP] Access restrictions: …`). See
+[Access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md), which also describes
+`GetObjectDraft` (compact: `HandlerGet` `part: 'draft'`): whether an object holds an
+unactivated change, and whose.
+
+#### The data tools: off unless enabled
+
+`GetSqlQuery` (a freestyle ABAP SQL `SELECT`) and `GetTableContents` (the rows of a table or CDS
+view), and their compact form `HandlerGetData`, read business data through ADT's data preview.
+From 24.0.0 every binary — full, `-ro`, compact and compact `-ro`, over stdio, Streamable HTTP
+and SSE — leaves them out unless it is started with the flag, in any of its three forms (the CLI
+wins over the environment, which wins over the configuration file):
+
+- `--enable-data-tools` (or `--enable-data-tools=false`),
+- `MCP_ENABLE_DATA_TOOLS=true`,
+- `enable-data-tools: true` in the `--conf` YAML file.
+
+`false` in a higher form turns them off again. A value other than empty, null, `true` or `false`
+stops the start; an empty value or YAML null counts as not given, as for every parameter, and the
+next form decides.
+
+On Streamable HTTP and SSE it is a start parameter of the server; no request header turns it on.
+Without it the tools are not listed, and a call of one is answered that the tool is not found.
+An embedder states it too: `exposition: [..., 'data']` (`EmbeddableMcpServer`),
+`includeData: true` (`HandlerExporter`), or `DataHandlersGroup` / `CompactDataHandlersGroup`.
+
+The reason is SAP's API Policy FAQ, version 1.3 (June 2026), question 33, which SAP marks as
+informational and non-binding ([PDF](https://d.dam.sap.com/x/UL9AiqH/SAP_API_Policy_FAQ_v1.3_June.pdf)): "ADT APIs are not intended for programmatic reading of application tables or export of business data, SQL execution against SAP backend systems, business data integration or runtime orchestration, agentic AI workflows operating on business data, or substitution for business APIs."
+**Whether to enable the data tools is the customer's decision**; the server leaves them off
+until the customer makes it.
+
+Other tools can reach business data too and are served as before; reviewing them is a separate,
+later task: the debugger's variable reads and its AMDP table preview (`DebugGetVariables`,
+`AmdpDebugGetTable`, compact `HandlerDebugMaintain` `getVariables` / `getDataPreview`), memory
+snapshots, short dumps (`RuntimeGetDumpById`, `HandlerDumpView`), the gateway error log, profiler
+traces, and the runs of a class or a program (not in any `-ro` binary).
 
 **Examples:**
 ```bash
@@ -525,8 +582,13 @@ See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete
 
 ### Testing
 ```bash
-npm test
+npm test                  # the unit run: Jest, then node:test — no SAP system, no outside service
+npm run test:install      # packs and installs the release (the npm registry): the install suites
+npm run test:retrieval    # vector tool retrieval through a local Ollama
+npm run test:integration  # the live suites, against the system tests/test-config.yaml names
 ```
+
+How each run selects, skips and is interrupted: [the testing guide](docs/development/tests/TESTING_GUIDE.md) and [the integration tests' README](src/__tests__/integration/README.md).
 
 #### Test logging switches
 - `TEST_LOG_LEVEL=error|warn|info|debug` — controls test logger verbosity (DEBUG_TESTS/DEBUG_ADT_TESTS/DEBUG_CONNECTORS force `debug`).

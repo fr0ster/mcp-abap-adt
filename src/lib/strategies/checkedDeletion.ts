@@ -15,8 +15,12 @@
  * references" for a table still used by the shared CDS views; `analyseDeletion`
  * reads both as refusals.
  *
- * A check that permits the delete but says the object "does not exist" ends
- * it too, without an error: the answer is the check's, the delete is not sent.
+ * A check that permits the delete is followed by the delete, whatever its
+ * messages say: on premise (2026-11-04) the check answered `isDeletable="true"`
+ * with W "<name> does not exist" for an existing function module, function
+ * include, inactive service definition and inactive service binding, and the
+ * delete sent after it deleted each. The delete's own answer is relayed; a
+ * refusal there is named by its T100 key (`analyseDeletion`).
  *
  * `deleteAnalyse` is the delete's own reading: the deletion service answers a
  * `del:deletionResult` (`analyseDeletion`), while an object deleted by a
@@ -34,17 +38,18 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
-import { absentPerCheck, analyseDeletion } from './deletionRefusal';
+import { analyseDeletion } from './deletionRefusal';
 import { atStep } from './step';
+import type { StepResponse } from './stepResponse';
 
 export interface CheckedDeletable<C, V> {
   checkDeletion(
     config: C,
-    options: { headers: IAdtHeaders; analyse?: IAnalyse<any> },
-  ): Promise<IAdtResponse<unknown, IAdtError>>;
+    options: { headers: IAdtHeaders; analyse?: IAnalyse },
+  ): Promise<IAdtResponse<V, IAdtError>>;
   delete(
     config: C,
-    options: { headers: IAdtHeaders; analyse?: IAnalyse<any> },
+    options: { headers: IAdtHeaders; analyse?: IAnalyse },
   ): Promise<IAdtResponse<V, IAdtError>>;
 }
 
@@ -61,8 +66,8 @@ export async function deleteIfDeletable<C, V>(
   objectType: CheckedDeletableType,
   object: CheckedDeletable<C, V>,
   config: C,
-  deleteAnalyse: IAnalyse<any> = analyseDeletion,
-): Promise<IAdtResponse<V, IAdtError>> {
+  deleteAnalyse: IAnalyse = analyseDeletion,
+): Promise<StepResponse<V>> {
   const check = await atStep('delete check', () =>
     withAdtHeaders(
       context,
@@ -71,16 +76,7 @@ export async function deleteIfDeletable<C, V>(
         object.checkDeletion(config, { headers, analyse: analyseDeletion }),
     ),
   )();
-  if (!check.ok) return check as unknown as IAdtResponse<V, IAdtError>;
-  // Permitted, but not there: nothing to delete, so no delete is sent. The
-  // check's answer is the result — `terseDeletion` reads it as `deleted:
-  // false` with the warning. See `absentPerCheck`.
-  const reading = (
-    check.getResult() as { value?: { raw?: unknown } } | undefined
-  )?.value;
-  if (absentPerCheck(reading?.raw)) {
-    return check as unknown as IAdtResponse<V, IAdtError>;
-  }
+  if (!check.ok) return check;
   return atStep('delete', () =>
     withAdtHeaders(context, adtOperation(objectType, 'delete'), (headers) =>
       object.delete(config, { headers, analyse: deleteAnalyse }),

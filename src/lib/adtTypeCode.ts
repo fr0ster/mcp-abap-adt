@@ -108,8 +108,17 @@ export function parentedCodesOf<C extends AdtUtilityCode>(
  */
 export function activationParentDescription(
   variant: ProjectionVariant,
+  codes?: readonly string[],
 ): string {
-  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parentedCodesOf(ACTIVATION_CODES[variant]), ACTIVATION_NAMES[variant])}.`;
+  // Narrowed to `codes`, the code arguments take codes as written only: no
+  // name stands for one.
+  const parented =
+    codes === undefined
+      ? parentedCodesOf(ACTIVATION_CODES[variant])
+      : parentedCodesOf(ACTIVATION_CODES[variant]).filter((code) =>
+          codes.includes(code),
+        );
+  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parented, codes === undefined ? ACTIVATION_NAMES[variant] : [])}.`;
 }
 
 /** One object of a group request, as a tool's argument names it. */

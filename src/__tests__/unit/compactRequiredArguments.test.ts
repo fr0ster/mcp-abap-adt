@@ -25,12 +25,14 @@ import {
   TOOL_DEFINITION as ValidateServiceBinding,
 } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import type { ProjectionVariant } from '../../lib/adtProjections';
-import type { HandlerContext } from '../../lib/handlers/interfaces';
+import { defineTool, type HandlerContext } from '../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { holding } from '../helpers/heldLocks';
+import { listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 jest.setTimeout(60_000);
@@ -126,24 +128,17 @@ const NEEDS: readonly Need[] = [
   },
 ];
 
+/** Each tool's entry: the model's call, parsed with the tool's schema first. */
 const TOOLS = {
   HandlerLock: {
     definition: HandlerLock,
     send: (context: HandlerContext, args: Record<string, string>) =>
-      handleHandlerLock(context, {
-        object_type: '',
-        object_name: '',
-        ...args,
-      }),
+      defineTool(HandlerLock, handleHandlerLock).call(context, args),
   },
   HandlerValidate: {
     definition: HandlerValidate,
     send: (context: HandlerContext, args: Record<string, string>) =>
-      handleHandlerValidate(context, {
-        object_type: '',
-        object_name: '',
-        ...args,
-      }),
+      defineTool(HandlerValidate, handleHandlerValidate).call(context, args),
   },
 } as const;
 
@@ -162,7 +157,10 @@ async function call(
   const connection = recordingConnection();
   declareSystemKind(connection, variant);
   const answered = await TOOLS[need.tool]
-    .send({ connection }, { object_type: need.objectType, ...args })
+    .send(
+      { connection, heldLocks: holding() },
+      { object_type: need.objectType, ...args },
+    )
     .catch((thrown: unknown) => ({ thrown: String(thrown) }));
   return { requests: connection.requests.length, answered: textOf(answered) };
 }
@@ -294,12 +292,30 @@ describe('HandlerValidate and HandlerCheckRun take a table type', () => {
  */
 describe('ValidateServiceBinding requires package_name', () => {
   it('the schema requires it', () => {
-    expect(ValidateServiceBinding.inputSchema.required).toContain(
+    expect(listedJson(ValidateServiceBinding.inputSchema).required).toContain(
       'package_name',
     );
   });
 
-  it.each([{}, { package_name: '' }, { package_name: '  ' }])(
+  it('a call without it is refused at the schema, naming it, nothing sent', async () => {
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'onprem');
+    const refused = expect(
+      defineTool(ValidateServiceBinding, handleValidateServiceBinding).call(
+        { connection },
+        {
+          service_binding_name: 'ZSRVB_A',
+          service_definition_name: 'ZSRVD_A',
+        },
+      ),
+    ).rejects.toThrow(
+      'Invalid arguments for tool ValidateServiceBinding: Invalid input: expected string, received undefined at package_name',
+    );
+    await refused;
+    expect(connection.requests).toEqual([]);
+  });
+
+  it.each([{ package_name: '' }, { package_name: '  ' }])(
     'a call with %j is refused naming it, nothing sent',
     async (absent) => {
       const connection = recordingConnection();
@@ -330,5 +346,84 @@ describe('ValidateServiceBinding requires package_name', () => {
       },
     );
     expect(connection.requests.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * HandlerValidate's SERVICE_BINDING branch hands its arguments to
+ * ValidateServiceBinding's handler, which refuses a missing one in a fixed
+ * order: the binding's name, the service definition, the package. Through the
+ * tool's entry, as the model's call: each refusal names its argument, in that
+ * order, and nothing is sent.
+ */
+describe('HandlerValidate SERVICE_BINDING: the callee’s refusals, in its order', () => {
+  const cases: ReadonlyArray<
+    readonly [string, Readonly<Record<string, string>>, string]
+  > = [
+    [
+      'object_name empty',
+      { object_name: '' },
+      'service_binding_name is required',
+    ],
+    [
+      'object_name empty, the definition given',
+      { object_name: '', service_definition_name: 'ZSRVD_A' },
+      'service_binding_name is required',
+    ],
+    [
+      'service_definition_name absent',
+      { object_name: 'ZSRVB_A', package_name: 'ZPKG_A' },
+      'service_definition_name is required',
+    ],
+    [
+      'service_definition_name empty',
+      {
+        object_name: 'ZSRVB_A',
+        service_definition_name: '',
+        package_name: 'ZPKG_A',
+      },
+      'service_definition_name is required',
+    ],
+    [
+      'package_name absent',
+      { object_name: 'ZSRVB_A', service_definition_name: 'ZSRVD_A' },
+      'package_name is required',
+    ],
+    [
+      'package_name empty',
+      {
+        object_name: 'ZSRVB_A',
+        service_definition_name: 'ZSRVD_A',
+        package_name: '',
+      },
+      'package_name is required',
+    ],
+    [
+      'package_name blank',
+      {
+        object_name: 'ZSRVB_A',
+        service_definition_name: 'ZSRVD_A',
+        package_name: '  ',
+      },
+      'package_name is required',
+    ],
+    [
+      'the definition and the package both absent',
+      { object_name: 'ZSRVB_A' },
+      'service_definition_name is required',
+    ],
+  ];
+
+  it.each(cases)('%s: refused, nothing sent', async (_case, given, words) => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    const connection = recordingConnection();
+    declareSystemKind(connection, 'onprem');
+    const answered = await defineTool(
+      HandlerValidate,
+      handleHandlerValidate,
+    ).call({ connection }, { object_type: 'SERVICE_BINDING', ...given });
+    expect(textOf(answered)).toContain(words);
+    expect(textOf(answered)).toContain('"isError":true');
+    expect(connection.requests).toEqual([]);
   });
 });

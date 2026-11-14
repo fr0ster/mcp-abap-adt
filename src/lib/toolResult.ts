@@ -22,16 +22,20 @@ export interface ToolResultLike {
  * `text: ''` must normalize to an empty string, not to a stringified object.
  */
 export function normalizeToolContent(
-  result: unknown,
+  result: ToolResultLike,
 ): { type: 'text'; text: string }[] {
-  const items = (result as ToolResultLike | undefined)?.content || [];
-  return items.map((item) => {
-    if (item?.type === 'json' && item.json !== undefined) {
+  return (result.content ?? []).map((item) => {
+    if (item.type === 'json' && item.json !== undefined) {
       return { type: 'text' as const, text: JSON.stringify(item.json) };
     }
     return {
       type: 'text' as const,
-      text: item?.text !== undefined ? String(item.text) : String(item || ''),
+      text: item.text !== undefined ? String(item.text) : String(item || ''),
     };
   });
+}
+
+/** Whether a handler's answer says it failed: its `isError`. */
+export function isErrorResult(result: ToolResultLike): boolean {
+  return result.isError === true;
 }

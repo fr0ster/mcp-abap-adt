@@ -1,7 +1,6 @@
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { HandlerContext } from '../../handlers/interfaces';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   assembleList,
   assembleTree,
@@ -9,10 +8,14 @@ import {
   concurrentReader,
   kindOf,
   NODE_READ_CONCURRENCY,
+  type NodeLevel,
   type NodeStructureSource,
   nodeLevel,
+  nodeLevelOf,
   walkPackage,
 } from '../../lib/strategies/packageWalk';
+import { succeeded } from '../../lib/strategies/stepResponse';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * The walk, offline, over the levels the corpus recorded.
@@ -50,7 +53,8 @@ function replaying(): NodeStructureSource & { calls: number } {
       source.calls += 1;
       const nodeId = options?.nodeId;
       const data = nodeId ? (byNodeId.get(nodeId) ?? '') : root;
-      return { data };
+      // The document as our `node` reading answers it.
+      return succeeded(nodeLevelOf(data));
     },
   };
   return source;
@@ -153,50 +157,6 @@ describe('the node reading', () => {
 });
 
 /**
- * The library's own reading of a node structure, as `getUtils()` without
- * `ourUtils` answers it — measured on premise, 2026-09-25:
- * `{objects: [{objectType, objectName, techName, objectUri}],
- *   childNodes: [{objectType, nodeId: '000035'}]}`.
- *
- * `levelOf` used to pass anything with `childNodes` through as our
- * `NodeLevel`, so `name`/`type` came out undefined: GetPackageContents
- * answered rows of `{packageName, isPackage: false}` and GetPackageTree
- * nameless children, and `include_subpackages` never recursed.
- */
-describe("the library's own reading is mapped, never passed through as ours", () => {
-  const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
-
-  it('names the objects and types the child nodes', async () => {
-    const source: NodeStructureSource = {
-      async fetchNodeStructure(_t, _n, options) {
-        if (!options?.nodeId || options.nodeId === '000000') {
-          return ok({
-            objects: [],
-            childNodes: [{ objectType: 'TABL/DT', nodeId: '000035' }],
-          });
-        }
-        return ok({
-          objects: [
-            {
-              objectType: 'TABL/DT',
-              objectName: 'ZMCP_SHR_RTABL',
-              techName: 'ZMCP_SHR_RTABL',
-              objectUri: '/sap/bc/adt/ddic/tables/zmcp_shr_rtabl',
-            },
-          ],
-          childNodes: [],
-        });
-      },
-    };
-
-    const walked = await walkPackage(source, 'TEST_MCP_SHR_PKG', {});
-    const items = assembleList('TEST_MCP_SHR_PKG', walked);
-    expect(JSON.stringify(items)).toContain('ZMCP_SHR_RTABL');
-    expect(JSON.stringify(items)).toContain('TABL/DT');
-  });
-});
-
-/**
  * A subpackage's objects belong under the subpackage, not under the root.
  * `walkPackage` answered one flat list with no owner, so `assembleTree` hung
  * everything off the root and left every subpackage `children: []` (an on-premise system,
@@ -204,8 +164,8 @@ describe("the library's own reading is mapped, never passed through as ours", ()
  * subpackage's objects the ROOT as their `packageName`.
  */
 describe('subpackages keep their own objects', () => {
-  const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
-  const levels: Record<string, Record<string, unknown>> = {
+  const ok = (value: NodeLevel) => succeeded(value);
+  const levels: Record<string, NodeLevel> = {
     'P|root': {
       objects: [],
       childNodes: [

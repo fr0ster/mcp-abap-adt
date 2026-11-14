@@ -5,19 +5,25 @@
  */
 
 import type { HandlerContext } from '../../handlers/interfaces';
+import type { IAnswerSerializer } from '../answerSerializer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { BackgroundRunTools } from './port';
 import type { StartedBackgroundRun } from './run';
-import { BACKGROUND_TOOLS } from './tools';
+import { runToolsOf } from './tools';
 
 export interface BackgroundAnswer {
   isError?: true;
   content: Array<{ type: 'text'; text: string }>;
 }
 
-const json = (payload: unknown): BackgroundAnswer => ({
-  content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-});
+/** A value as a background-run answer's JSON text. */
+const answers: IAnswerSerializer<BackgroundAnswer> = {
+  json(payload: unknown): BackgroundAnswer {
+    return {
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    };
+  },
+};
 
 function portOf(context: HandlerContext): BackgroundRunTools {
   const port = context.backgroundRuns;
@@ -31,31 +37,32 @@ function portOf(context: HandlerContext): BackgroundRunTools {
 export function answerBackgroundStarted(
   started: StartedBackgroundRun,
 ): BackgroundAnswer {
-  const names = BACKGROUND_TOOLS[started.tool] ?? {
-    get: 'GetBackgroundRun',
-    discard: 'DiscardBackgroundRun',
-  };
-  return json({
+  const names = runToolsOf(started.tool);
+  return answers.json({
     run_handle: started.run_handle,
     state: 'running',
     tool: started.tool,
     object: started.object,
     started_at: started.started_at,
-    message: `Started in the background on an ABAP session of its own; it runs until SAP answers and cannot be stopped. Read its answer with ${names.get} (run_handle); it is kept until you remove it with ${names.discard}.`,
+    message:
+      started.kind === 'read'
+        ? `Started in the background on an ABAP session of its own; it runs until SAP answers. Read its answer with ${names.get} (run_handle): it is answered once, then removed. ${names.discard} cancels it while it runs.`
+        : `Started in the background on an ABAP session of its own; it runs until SAP answers and cannot be stopped. Read its answer with ${names.get} (run_handle); it is kept until you remove it with ${names.discard}.`,
   });
 }
 
 /**
- * A run as read: `running`, or `finished` — its header, then what the run
- * tool answered, as it answered it (`isError` included).
+ * A run as read: `running`, or `finished` / `cancelled` — its header, then
+ * its answer: what the run tool answered, as it answered it (`isError`
+ * included), or the cancel's fixed words.
  */
 export async function answerBackgroundGet(
   context: HandlerContext,
-  handle: unknown,
+  handle: string,
 ): Promise<BackgroundAnswer> {
   const record = await portOf(context).get(handle);
   if (record.state === 'running') {
-    return json({
+    return answers.json({
       run_handle: record.run_handle,
       state: 'running',
       tool: record.tool,
@@ -63,9 +70,9 @@ export async function answerBackgroundGet(
       started_at: record.started_at,
     });
   }
-  const header = json({
+  const header = answers.json({
     run_handle: record.run_handle,
-    state: 'finished',
+    state: record.state,
     tool: record.tool,
     object: record.object,
     started_at: record.started_at,
@@ -80,12 +87,12 @@ export async function answerBackgroundGet(
 export async function answerBackgroundList(
   context: HandlerContext,
 ): Promise<BackgroundAnswer> {
-  return json({ runs: await portOf(context).list() });
+  return answers.json({ runs: await portOf(context).list() });
 }
 
 export async function answerBackgroundDiscard(
   context: HandlerContext,
-  handle: unknown,
+  handle: string,
 ): Promise<BackgroundAnswer> {
-  return json(await portOf(context).discard(handle));
+  return answers.json(await portOf(context).discard(handle));
 }

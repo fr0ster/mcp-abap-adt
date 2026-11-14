@@ -19,38 +19,45 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type * as z from 'zod';
 import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { COMPACT_DELETE, supported } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import type { compactDeleteSchema } from '../../../lib/compact/compactSchemas';
 import {
   DELETION_CHECK_TYPES,
   DELETION_NAME_FIELDS,
   EMPTIED_INCLUDE_TYPES,
 } from '../../../lib/compact/compactSchemas';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  LOCK_NOT_HELD_WORDS,
-  lockHeldHere,
-} from '../../../lib/state/heldLocks';
+import type {
+  HandlerContext,
+  ToolArgs,
+} from '../../../lib/handlers/interfaces';
+import { lockHeldHere, lockNotHeldWords } from '../../../lib/state/heldLocks';
 import {
   project,
   terseDeletion,
   terseWrite,
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import { DELETION_TARGETS } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
 
-type Args = Record<string, unknown> & {
-  object_type?: string;
-  lock_handle?: string;
+/**
+ * HandlerDelete's arguments, as its schema parses them; `object_type` as any
+ * string, since the boundary below reads the value as given (`acceptedOf`).
+ */
+type Args = Omit<z.output<typeof compactDeleteSchema>, 'object_type'> & {
+  readonly object_type?: string;
 };
 
-const text = (value: unknown): string | undefined =>
+const text = (value: string | undefined): string | undefined =>
   typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 
 const ANSWER = { tool: 'HandlerDelete', detail: 'terse' } as const;
@@ -58,7 +65,7 @@ const ANSWER = { tool: 'HandlerDelete', detail: 'terse' } as const;
 export async function handleDeleteOnly(
   context: HandlerContext,
   args: Args,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const objectType = String(args.object_type ?? '');
   const { connection, logger } = context;
   const transportRequest = text(args.transport_request);
@@ -86,7 +93,7 @@ export async function handleDeleteOnly(
       );
     }
     if (!lockHeldHere(context.heldLocks, lockHandle)) {
-      return return_error(new Error(LOCK_NOT_HELD_WORDS));
+      return return_error(new Error(lockNotHeldWords(context.heldLocks)));
     }
     const className = text(args.class_name);
     if (className === undefined) {
@@ -96,27 +103,25 @@ export async function handleDeleteOnly(
     return answer(
       ANSWER,
       () =>
-        atStep(
-          'update',
-          () =>
-            withAdtHeaders(
-              context,
-              adtOperation(includeType, 'update'),
-              (headers) =>
-                include(createAdtClient(connection, logger)).update(
-                  {
-                    className: className.toUpperCase(),
-                    ...(transportRequest ? { transportRequest } : {}),
-                  },
-                  {
-                    headers,
-                    source: '',
-                    lockHandle,
-                    analyse: analyseException,
-                  },
-                ),
-            ) as Promise<never>,
-        )() as Promise<never>,
+        atStep('update', () =>
+          withAdtHeaders(
+            context,
+            adtOperation(includeType, 'update'),
+            (headers) =>
+              include(createAdtClient(connection, logger)).update(
+                {
+                  className: className.toUpperCase(),
+                  ...(transportRequest ? { transportRequest } : {}),
+                },
+                {
+                  headers,
+                  source: '',
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+          ),
+        )(),
       project('terse', terseWrite),
     );
   }
@@ -143,30 +148,24 @@ export async function handleDeleteOnly(
   return answer(
     ANSWER,
     () =>
-      atStep(
-        'delete',
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(target.objectType, 'delete'),
-            (headers) =>
-              target.deleted(connection, logger).delete(
-                target.config(
-                  {
-                    name: name.toUpperCase(),
-                    ...(group ? { group: group.toUpperCase() } : {}),
-                  },
-                  transportRequest,
-                ),
-                { headers, analyse: target.deleteAnalyse },
-              ),
-          ) as Promise<never>,
-      )() as Promise<never>,
+      atStep('delete', () =>
+        target.delete(
+          context,
+          connection,
+          logger,
+          {
+            name: name.toUpperCase(),
+            ...(group ? { group: group.toUpperCase() } : {}),
+          },
+          transportRequest,
+        ),
+      )(),
     // The metadata extension's DELETE answers an empty 2xx; every other
     // deletion a `del:deletionResult`.
-    project(
-      'terse',
-      objectType === 'METADATA_EXTENSION' ? terseWrite : terseDeletion,
+    project('terse', (value: XmlRead, status: number) =>
+      objectType === 'METADATA_EXTENSION'
+        ? terseWrite(value, status)
+        : terseDeletion(value),
     ),
   );
 }

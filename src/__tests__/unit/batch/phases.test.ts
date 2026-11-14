@@ -29,12 +29,12 @@ const ITEMS = ['ITEM_A', 'ITEM_B', 'ITEM_C'] as const;
 
 /** One GET per item, its answer's body the value. */
 const read = async (item: string, batch: IAbapConnection) => {
-  const response = await batch.makeAdtRequest<string>({
+  const response = await batch.makeAdtRequest({
     url: `/sap/bc/adt/probe/${item.toLowerCase()}`,
     method: 'GET',
     timeout: 0,
   });
-  return response.data;
+  return String(response.data);
 };
 
 const contextOn = (connection: unknown): HandlerContext =>
@@ -210,14 +210,16 @@ describe('runPhase', () => {
       const results = await withinTurns(
         runPhase(contextOn(fake.connection), ITEMS, async (item, batch) =>
           item === 'ITEM_C'
-            ? (
-                await batch.makeAdtRequest<string>({
-                  url: '/sap/bc/adt/probe/item_c?_action=LOCK',
-                  method: 'POST',
-                  timeout: 0,
-                  headers: { 'X-sap-adt-sessiontype': 'stateful' },
-                })
-              ).data
+            ? String(
+                (
+                  await batch.makeAdtRequest({
+                    url: '/sap/bc/adt/probe/item_c?_action=LOCK',
+                    method: 'POST',
+                    timeout: 0,
+                    headers: { 'X-sap-adt-sessiontype': 'stateful' },
+                  })
+                ).data,
+              )
             : read(item, batch),
         ),
       );

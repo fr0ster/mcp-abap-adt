@@ -1,6 +1,6 @@
 [
   {
-    "group": "readonly",
+    "group": "data",
     "name": "GetTableContents",
     "inputs": "table_name*, max_rows, detail",
     "available_in": "cloud, onprem"
@@ -80,6 +80,12 @@
   {
     "group": "readonly",
     "name": "GetObjectVersions",
+    "inputs": "object_type*, object_name*, function_group_name",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetObjectDraft",
     "inputs": "object_type*, object_name*, function_group_name",
     "available_in": "cloud, onprem"
   },
@@ -1416,7 +1422,7 @@
     "available_in": "onprem"
   },
   {
-    "group": "system",
+    "group": "data",
     "name": "GetSqlQuery",
     "inputs": "sql_query*, row_number, detail",
     "available_in": "cloud, onprem"
@@ -1435,24 +1441,6 @@
   },
   {
     "group": "system",
-    "name": "GetAbapAST",
-    "inputs": "code*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "system",
-    "name": "GetAbapSemanticAnalysis",
-    "inputs": "code*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "system",
-    "name": "GetAbapSystemSymbols",
-    "inputs": "code*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "system",
     "name": "GetInactiveObjects",
     "inputs": "detail",
     "available_in": "cloud, onprem"
@@ -1467,6 +1455,12 @@
     "group": "system",
     "name": "GetObjectStructure",
     "inputs": "objecttype*, objectname*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "system",
+    "name": "GetObjectOutline",
+    "inputs": "object_type*, object_name*, version, detail",
     "available_in": "cloud, onprem"
   },
   {

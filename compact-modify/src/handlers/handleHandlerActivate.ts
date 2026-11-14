@@ -5,7 +5,7 @@ import {
   COMPACT_ACTIVATE_ROUTES,
   type CompactObjectType,
   compactActivateDescription,
-  compactActivateSchemaFor,
+  compactActivateSchemaWithNamesFor,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -15,6 +15,7 @@ import {
   handleActivateObjectOnce,
 } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 /**
  * A function module is activated in a group activation addressed under its
@@ -49,25 +50,15 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: compactActivateDescription(variant),
-    inputSchema: compactActivateSchemaFor(COMPACT_ACTIVATE[variant], variant),
+    inputSchema: compactActivateSchemaWithNamesFor(
+      COMPACT_ACTIVATE[variant],
+      variant,
+    ),
     members: COMPACT_ACTIVATE[variant],
   })),
 } as const;
 
-type HandlerActivateArgs = {
-  object_type?: string;
-  object_name?: string;
-  object_adt_type?: string;
-  parentName?: string;
-  function_group_name?: string;
-  objects?: Array<{
-    name: string;
-    type: string;
-    parentName?: string;
-    uri?: string;
-  }>;
-  preaudit?: boolean;
-};
+type HandlerActivateArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerActivate(
   context: HandlerContext,

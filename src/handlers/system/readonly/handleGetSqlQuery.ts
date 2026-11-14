@@ -1,15 +1,18 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import type { SqlPreview } from '../../../lib/strategies/sqlPreview';
 import { return_error } from '../../../lib/utils';
+import type { XmlList, XmlNode, XmlRead } from '../../../lib/xml/tree';
 
 /**
  * The answer's shape, shared with `GetTableContents`, which reads the same
@@ -24,15 +27,15 @@ import { return_error } from '../../../lib/utils';
 export interface SqlQueryResponse {
   sql_query: string;
   row_number: number;
-  execution_time?: number;
-  total_rows?: number;
+  execution_time?: number | undefined;
+  total_rows?: number | undefined;
   columns: Array<{ name: string; type: string; description?: string }>;
   rows: Array<Record<string, string | null>>;
   /**
    * `detail: 'full'` only — the whole document, parsed generically, so
    * nothing the rows do not need is dropped on the way.
    */
-  document?: unknown;
+  document?: XmlRead | undefined;
 }
 
 export const TOOL_DEFINITION = {
@@ -41,28 +44,21 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      sql_query: {
-        type: 'string',
-        description: 'SQL query to execute',
-      },
-      row_number: {
-        type: 'number',
-        description: '[read-only] Maximum number of rows to return',
-        default: 100,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['sql_query'],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    sql_query: z.string().describe('SQL query to execute'),
+    row_number: z
+      .number()
+      .default(100)
+      .optional()
+      .describe('[read-only] Maximum number of rows to return'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleGetSqlQuery(
   context: HandlerContext,
-  args: { sql_query: string; row_number?: number; detail?: AnswerDetail },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   logger?.info('handleGetSqlQuery called');
@@ -90,7 +86,7 @@ export async function handleGetSqlQuery(
             { headers, analyse: analyseException },
           ),
       ),
-    (reading: AdtReading<SqlPreview>) => {
+    (reading) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;
       logger?.debug(

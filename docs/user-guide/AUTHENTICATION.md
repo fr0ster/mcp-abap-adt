@@ -38,7 +38,11 @@ Login Client). The `.env` carries no user and no password: the SAP system maps t
 SNC name to an ABAP user.
 
 ```bash
-SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=rfc
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 # Optional:
@@ -47,6 +51,8 @@ SAP_SNC_LIB=/path/to/the/snc/library
 SAP_SNC_MYNAME='p:CN=<client name>'
 ```
 
+An RFC destination states its address (here an application server; a message server is in
+[Client configuration](CLIENT_CONFIGURATION.md)), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 SNC needs RFC: `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env`, in the
 process environment, `--connection-type=rfc`, or YAML `connection-type: rfc` (precedence: CLI, environment
 including that `.env`, YAML).
@@ -384,9 +390,7 @@ it arose. A tool never rewrites it:
   and no `raw_body`.
 - **The method failed** — a throw in the client, a reading or the tool itself (a document it
   could not parse, a defect): `error: "client_threw"` and the thrown message, with no `origin`
-  — it is not presented as SAP's answer. The tools that only parse the source they are given
-  and send no request (`GetAbapAST` with `step: "parse"`, `GetAbapSemanticAnalysis` with
-  `step: "analyse"`) answer a throw of their parser this way.
+  — it is not presented as SAP's answer.
 - **A tool of several reads** names the read that was refused as its `step`: `GetTypeInfo`
   (`read data element`, `read domain`, `read structure`, `read table type`; a `404` there is the
   kind absent, not a refusal) and `GetTransport` (`read transport request`). Each read is a
@@ -420,6 +424,16 @@ it arose. A tool never rewrites it:
   ```
 
   The same fields ride on a write that landed. An unlock that answered adds none of them.
+  An unlock on a **spent connection** is different. The connection answered with its own
+  session error (`sessionError` `ADT_NOT_CONNECTED` or `ADT_SESSION_REPLACED`), or SAP's answer
+  is marked `sessionLost`; both are read from those fields, never from the words.
+  - The lock went with its SAP session, and SAP's logoff of that session released it.
+  - `cleanup` then names the `object` and its `warning` says so: "the lock went with its SAP
+    session: the unlock found that session ended, and SAP's logoff of it released the lock". It
+    carries no `left_locked` and no `lock_handle`.
+  - Compact `HandlerUnlock` answers the same case with `unlocked: false` and those words, and
+    the instance no longer holds the handle.
+  - Every other failed unlock stays as above.
 - **`hint` — the request SAP names.** A failure whose T100 messages hold `CTS_WBO_API` 019 (the
   object is already locked in a transport request) or 020 (a task was passed, and SAP names the
   request that holds the object) carries `hint: { transport_request, text }`: the request number
@@ -434,16 +448,17 @@ it arose. A tool never rewrites it:
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:
 
-- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`,
-  `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
-  its failure (`failures[]` with the object for `SearchSource`, `{ name, error }` for
-  `DescribeByList`, `error` on the symbol for `GetAbapSystemSymbols` — a throw while resolving
-  one included, as `client_threw` with its step —, `unreadable` beside the tree for
-  `GetIncludesList`) beside the other items' results, and the rest are read on — except a
-  credential failure (an authentication failure, a `401`): the credentials are the same for
-  every item, so it ends the whole call, as it came, and no further request is sent
-  (`DescribeByList` sends no second, untyped search after it; `GetObjectInfo` reads no tree
-  after its enrichment search was refused so);
+- a tool that reads a list of items — `DescribeByList`, `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
+  its failure (`{ name, error }` for `DescribeByList`, `unreadable` beside the tree for
+  `GetIncludesList`) beside the other items' results, and the rest are read on;
+  `SearchSource` skips what it cannot read — a source, an object, a refused mask search, a
+  package whose root is refused or missing, and below the root a refused type node or
+  subpackage with everything under it — with no entry, and reads the rest on (its `scanned`
+  counters count only what was read). Every one of them ends on a credential failure (an
+  authentication failure, a `401`): the credentials are the same for every item, so it ends
+  the whole call, as it came, and no further request is sent (`DescribeByList` sends no
+  second, untyped search after it; `GetObjectInfo` reads no tree after its enrichment search
+  was refused so);
 - a tool that tries two endpoints — `GetStructuresList` reads a name as a structure, then as a
   table — answers both failures in one array (`read structure`, `read table`) when neither
   has it; a `404` from both stays absence; an append candidate that where-used named and SAP

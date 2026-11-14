@@ -112,6 +112,15 @@ same way.
    responsible person and master system are resolved first: what the system names
    (`systeminformation`, on ABAP Cloud and on-premise), over anything configured; the destination's
    `.env` and the request's headers only where an on-premise system gives no information.
+   **The access checks.** With an `accessChecks` option (`IAccessChecks`), a call that names a
+   checked package, request or table is checked once, after the SDK's parse and before
+   `getConnection` — so a refused call takes no connection, sends nothing, starts no background
+   run and takes no batch number. A strategy that reads (the package tree) is handed a lazy
+   `IPackageReader` whose first read takes the call's connection and its turn in the main flow,
+   exactly as the wrapper would next; the call then goes on with what it took. A refusal is the
+   server's own (`package_not_allowed`, `package_tree_unreadable`, `request_not_allowed`,
+   `table_not_allowed`). Denied actions are not checked per call: `registryOf` /
+   `withoutDenied` leave them out at registration.
 4. **The answer.** A failure is read by `readFailure(thrown)`, which is lib's `failureOf`; core
    reads the destination layer's failures first. A failure it knows is answered as JSON `{ error,
    kind?, message, hint?, … }`: `authentication_failed`, `destination_refused`, or one of the
@@ -320,7 +329,7 @@ two explicit tools; with several the server picks none.
   to write it (`sessionOf` → `sessionIdentity(destination, settings, login)`).
 - **The tools** (`ListLeftoverSessions` / `LogoffLeftoverSession`; compact
   `HandlerLeftoverSession{List,Logoff}`) — in every stdio binary, none in an http or sse binary
-  (`ToolSet.groups(context, transport)`), and no resume tool anywhere — are
+  (`ToolSet.groups(context, transport, served)`), and no resume tool anywhere — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a list or a
   logoff must not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
   resolves the caller from the instance's source (`resolveCaller`) and destination
@@ -367,13 +376,27 @@ A run of ABAP code cannot be cut (a running request dies with its socket or its 
 the call answers at once with a handle and the run goes on (background-runs spec). Where runs and
 their answers are kept is the host's: a strategy.
 
+- **`SearchSource`'s strategies** (DO22, DO24): `sapAnswerStrategy` (what a SAP
+  answer to a failed read leads to; only SAP answers reach it — a credential
+  refusal ends the call, a failed envelope and anything else are thrown) and
+  `lineMatchStrategy` (which lines are hits), options of `EmbeddableMcpServer`
+  (and `StdioServer`, `StreamableHttpServer`, `SseServer`, whose launchers pass
+  the shipped `skipSapAnswers` and `substringLineMatch`), put by `BaseMcpServer`
+  into every context it builds and kept in every derived one (a long call's
+  own connection, a background run's). The context fields are internal;
+  absent, the handler's default is the shipped one. Contracts and shipped
+  strategies: `@mcp-abap-adt/lib/embeddable`.
 - **The contract** (`IBackgroundRuns`, `src/lib/backgroundRuns/contract.ts`, exported from
   `@mcp-abap-adt/lib/embeddable`): `start(caller, { tool, object, started_at })` → `{ handle }`
   (opaque, at least 128 random bits) or `{ refused: 'limit', limit }`; `finish(handle, answer,
   finishedAt)`, called once per started run by the library; `get(handle, caller)` → the run or
   `undefined`; `list(caller)` (no output); `discard(handle, caller)` → `'discarded'` | `'running'` |
-  `'not-available'`. The caller is `{ url, client, user }`; `get` and `discard` answer an unknown
-  handle and someone else's alike. Every method may answer a promise. The strategy decides only
+  `'not-available'`. The caller is `{ system, client, user }` (24.0.0; `url` is gone): `system` is
+  the system's key — a destination's system key (`adtSystemKey`: its wire and URL, or its RFC
+  address), an injected connection's `["http", <URL>, ""]` when `getBaseUrl()` answers a URL, else
+  the `system` its embedder states (`EmbeddableMcpServerOptions.system`); `get` and `discard`
+  answer an unknown handle and someone else's alike. Two systems with the same client and user
+  never share a run in one store. Every method may answer a promise. The strategy decides only
   where runs are kept and how a handle is found (an embedder: its store, its routing between
   replicas).
 - **lib ships no implementation.** An embedder implements `IBackgroundRuns`, or takes the
@@ -391,8 +414,12 @@ their answers are kept is the host's: a strategy.
   refused at once without a fresh connection to be had (`freshConnectionAvailable`; its fixed words);
   the caller resolved (`backgroundCaller`: the user its destination's parameters name — made with
   the connection, no lookup of its own —, else the stated responsible, else the login
-  — `SAP_USERNAME`, `x-sap-login`; an injected connection's URL from `getBaseUrl()`; none at all →
-  `system_user_unknown`);
+  — `SAP_USERNAME`, `x-sap-login`; none at all → `system_user_unknown`), and its system: a
+  destination's system key, an injected connection's URL from `getBaseUrl()`, or — when that
+  answers `undefined` (RFC) — `EmbeddableMcpServerOptions.system`; with neither, the run is
+  refused `background_runs_unavailable`, in fixed words naming `system`, before anything is kept.
+  The caller is computed from the injected connection before the run starts: a run on a fresh
+  connection keeps it, whatever the fresh connection answers;
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and
   re-owned by the **strategy** (role `background`), stateless; `strategy.start` (a limit refusal
@@ -494,10 +521,9 @@ await server.start(); // standalone, or registers its routes on `app` (registerR
   `idle()`. Each handle is unique among those the pool holds.
 - **The declared `state_handle`.** Each instance is built with `stateHandleArgument: true`: every
   tool's input schema gets an optional string `state_handle` (a tool declaring its own keeps it),
-  taken out of the arguments before a handler that did not declare it. **A tool registered with a
-  whole `z.object(...)` schema gets no declared `state_handle`** — the schema is registered as it
-  is, so a model cannot send the handle to it: register your tool with a JSON Schema
-  `inputSchema` or a raw zod shape.
+  taken out of the arguments before a handler that did not declare it. Every tool's `inputSchema`
+  is a `z.object(...)`, and the handle is added to it with `.extend`, so a tool of yours gets it
+  as the server's own do.
 - **The long session.** Each instance carries a `LongSession` state part; the tool sets of
   `@mcp-abap-adt/lib/tool-set` give the `http` transport `SessionOpen` / `SessionClose` (compact:
   `HandlerSession`; `streamableHttpSurface` lists what HTTP adds). Open holds the instance in the pool; once a close call's answer is
@@ -557,9 +583,17 @@ const server = new EmbeddableMcpServer({
   systemType: 'onprem',
   // Build a new connection with its own credential; it receives no signal.
   freshConnection: async () => buildMyConnection(),
+  // A connection that answers no URL (RFC: getBaseUrl() answers undefined)
+  // names its system here, for its background runs; one with a URL needs none.
+  system: 'my-rfc-system',
 });
 await server.connect(transport);
 ```
+
+`system` is read only when `getBaseUrl()` answers `undefined`. Without it such a connection's
+background runs are refused `background_runs_unavailable` ("… the connection the host gave answers
+no URL, and the host stated no `system` …"); give two systems two keys, since runs are kept per
+system, client and user.
 
 `EmbeddableMcpServer` uses the connection it is given exactly as it is. It does not build a
 credential, wrap the connection or call `connect()` on it, and every tool call works on it. A
@@ -631,20 +665,26 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
 
 - **Registry and groups.** `IHandlersRegistry` is the registry a server takes;
   `CompositeHandlersRegistry` is the one built from handler groups (`IHandlerGroup`:
-  `getName()`, `getHandlers()`, each a `TOOL_DEFINITION` with its handler). The groups are
+  `getName()`, `getHandlers()`, each entry `defineTool(TOOL_DEFINITION, handler)` — the
+  definition with its zod schema, and its `call(context, args)`). The groups are
   `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `SystemHandlersGroup`,
   `SearchHandlersGroup` and `DebugHandlersGroup` (`LowLevelHandlersGroup` is gone since 19.0.0).
 - **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`), fixed by the
-  binary (there is no `--exposition`): its groups, the TOOLS section of its help, its removed
+  binary (there is no `--exposition`) but for the data tools: its groups, the TOOLS section of its help, its removed
   `--exposition` and whether it serves background runs. `fullToolSet` covers readonly, high, debug,
   search, background runs and, on stdio, the leftover sessions; `fullReadOnlyToolSet` readonly,
-  search and, on stdio, the leftover-session list and logoff; `compactToolSetOf({ readOnly, modify })`
-  is the compact facade's, `compactReadOnlyToolSetOf(readOnly)` its read-only half's. The
-  transport is a set's one other dimension: `groups(context, transport)` builds the
-  leftover-session group for `'stdio'` only, and `registryOf(toolSet, transport)` builds the
-  registry.
+  search and, on stdio, the leftover-session list; `compactToolSetOf({ readOnly, data, modify })`
+  is the compact facade's, `compactReadOnlyToolSetOf({ readOnly, data })` its read-only half's. The
+  transport is a set's other dimension: `groups(context, transport, served)` builds the
+  leftover-session group for `'stdio'` only, and `registryOf(toolSet, transport, served)` builds the
+  registry. `served` (`ServedTools`, `{ dataTools }`, required) adds the data tools —
+  `DataHandlersGroup` (`GetSqlQuery`, `GetTableContents`), compact `compactDataEntries`
+  (`HandlerGetData`) — only when the binary was started with `--enable-data-tools`; off by default
+  (SAP API Policy FAQ v1.3, Q33; whether to enable them is the customer's decision).
 - **Embedders.** `EmbeddableMcpServer` builds its registry from `exposition` (`readonly`, `high`,
-  `compact`, `system`, `search`), or takes `handlersRegistry`.
+  `compact`, `system`, `search`, and `data` for the data tools, which no default names), or takes
+  `handlersRegistry`. `HandlerExporter` hands the data tools out only with `includeData: true`;
+  `CompactReadOnlyHandlersGroup` serves no `HandlerGetData`, `CompactDataHandlersGroup` does.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's
   system type: the `systemType` option, else `SAP_SYSTEM_TYPE` — not required by lib (an
   embedder or `HandlerExporter` constructs without one); the binaries require it

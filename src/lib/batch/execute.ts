@@ -31,7 +31,7 @@
 
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { answerFailure, type McpResult, requestFailureOf } from '../answer';
+import { answerFailure, type McpResult, requestErrorOf } from '../answer';
 import { answerRead } from '../auth/answerFailure';
 import { failureOf, readOwn } from '../auth/failures';
 import {
@@ -115,6 +115,14 @@ export function openCommunication(owner: InstanceBatch | undefined): OpenBatch {
   return openBatchOf(owner, 'communication');
 }
 
+/**
+ * `BatchEnd`'s failure: what `execute()` threw, or the server's own refusal
+ * of a batch that did not split. Whatever was thrown reaches it untyped.
+ */
+interface Rejection {
+  error: unknown;
+}
+
 /** Whether `part` is a part SAP answered: its inner response, 2xx or another status. */
 function cameBack(part: PartSettlement, envelopeError: unknown): boolean {
   if (part.state === 'resolved') return true;
@@ -138,8 +146,8 @@ function cameBack(part: PartSettlement, envelopeError: unknown): boolean {
  */
 function split(
   open: OpenBatch,
-  rejected: { error: unknown } | undefined,
-): { summary: BatchSummary } | { error: unknown } {
+  rejected: Rejection | undefined,
+): { summary: BatchSummary } | Rejection {
   const parts = open.recorded.flatMap((call) => call.parts());
   const sent = parts.length;
   const received = parts.filter((part) =>
@@ -189,7 +197,7 @@ function failureAnswer(error: unknown): McpResult {
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
   return answerFailure(
-    withStep(requestFailureOf(error, undefined) as IAdtError, EXECUTE_STEP),
+    withStep(requestErrorOf(error, undefined), EXECUTE_STEP),
   );
 }
 
@@ -217,7 +225,7 @@ export async function executeBatch(
   open: OpenBatch,
   connection?: IAbapConnection,
 ): Promise<McpResult> {
-  let rejected: { error: unknown } | undefined;
+  let rejected: Rejection | undefined;
   open.target?.point(connection);
   try {
     await open.connection.execute();

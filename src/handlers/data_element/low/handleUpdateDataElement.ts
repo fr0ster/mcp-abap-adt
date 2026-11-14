@@ -1,4 +1,8 @@
-import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  dataElementDocuments,
+  patchDataElementDocument,
+} from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 /**
  * UpdateDataElement Handler - Update ABAP Data Element Properties
  *
@@ -23,98 +27,123 @@ import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
  * 14) is the one this handler avoids by construction, and the contract now
  * refuses it outright.
  *
- * **No corpus fixture exists for `GET /sap/bc/adt/ddic/dataelements/{name}`**
- * (the read half of this sequence) — the corpus has a data element `create`
- * response (`create-dataelement--01-ddic-dataelements`) but never a
- * metadata read. The `dtel:`-tagged document `patchDataElementXml` patches
- * is ported field-for-field from `v18.0.2`'s own patcher (see
- * `dataElementPatch.ts`), and the tests exercising this sequence build a
- * hand-written document with those same tags rather than a captured one —
- * the same disclosure `CreateTransportLow` makes for its own missing
- * fixture, made here for the same reason.
+ * The document read is patched by adt-clients' `patchDataElementDocument`
+ * (`documentPatch.ts`); a refused patch is the failure of the step `patch`,
+ * and nothing is written.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answerFailure, answerThrown } from '../../../lib/answer';
+import {
+  answerFailure,
+  answerThrown,
+  messageCarriedBy,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type {
+  HandlerContext,
+  ToolArgValue,
+} from '../../../lib/handlers/interfaces';
+import { givenCount, givenText } from '../../../lib/propertyBag';
 import {
   type DataElementChanges,
-  patchDataElementXml,
-} from '../../../lib/strategies/dataElementPatch';
+  type DataElementTypeKind,
+  dataElementChanges,
+} from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDataElementLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      data_element_name: {
-        type: 'string',
-        description: 'Data element name. Data element must already exist.',
-      },
-      properties: {
-        type: 'object',
-        description:
-          'Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-    },
-    required: ['data_element_name', 'properties', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    data_element_name: z
+      .string()
+      .describe('Data element name. Data element must already exist.'),
+    properties: z
+      .unknown()
+      .describe(
+        'Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.',
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+  }),
 } as const;
 
-interface UpdateDataElementArgs {
-  data_element_name: string;
-  properties: Record<string, any>;
-  lock_handle: string;
+/** The tool's arguments, as its schema parses them. */
+type UpdateDataElementArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** The type kinds SAP knows for a data element. */
+const TYPE_KINDS: ReadonlyArray<DataElementTypeKind> = [
+  'domain',
+  'predefinedAbapType',
+  'refToPredefinedAbapType',
+  'refToDictionaryType',
+  'refToClifType',
+];
+
+/** `text` as a type kind SAP knows, or none. */
+function typeKindOf(text: string): DataElementTypeKind | undefined {
+  return TYPE_KINDS.find((kind) => kind === text);
 }
 
-/** `properties` always took both spellings; the patch function only knows snake_case. */
-function changesOf(properties: Record<string, any>): DataElementChanges {
+/**
+ * `properties` always took both spellings; the patch function only knows
+ * snake_case. Each member as the patch writes it: text, a length or a count
+ * a number (or its digits); a value of no such kind is left out. The type
+ * kind is read apart (`typeKindOf`): one SAP does not know is refused.
+ */
+function changesOf(
+  properties: ToolArgValue,
+  typeKind: DataElementTypeKind | undefined,
+): DataElementChanges {
   return {
-    description: properties.description,
-    type_kind: properties.type_kind ?? properties.typeKind,
-    type_name: properties.type_name ?? properties.typeName,
-    data_type: properties.data_type ?? properties.dataType,
-    length: properties.length,
-    decimals: properties.decimals,
-    short_label:
-      properties.field_label_short ??
-      properties.short_label ??
-      properties.shortLabel,
-    medium_label:
-      properties.field_label_medium ??
-      properties.medium_label ??
-      properties.mediumLabel,
-    long_label:
-      properties.field_label_long ??
-      properties.long_label ??
-      properties.longLabel,
-    heading_label:
-      properties.field_label_heading ??
-      properties.heading_label ??
-      properties.headingLabel,
-    search_help: properties.search_help ?? properties.searchHelp,
-    search_help_parameter:
-      properties.search_help_parameter ?? properties.searchHelpParameter,
-    set_get_parameter:
-      properties.set_get_parameter ?? properties.setGetParameter,
+    description: givenText(properties, 'description'),
+    type_kind: typeKind,
+    type_name: givenText(properties, 'type_name', 'typeName'),
+    data_type: givenText(properties, 'data_type', 'dataType'),
+    length: givenCount(properties, 'length'),
+    decimals: givenCount(properties, 'decimals'),
+    short_label: givenText(
+      properties,
+      'field_label_short',
+      'short_label',
+      'shortLabel',
+    ),
+    medium_label: givenText(
+      properties,
+      'field_label_medium',
+      'medium_label',
+      'mediumLabel',
+    ),
+    long_label: givenText(
+      properties,
+      'field_label_long',
+      'long_label',
+      'longLabel',
+    ),
+    heading_label: givenText(
+      properties,
+      'field_label_heading',
+      'heading_label',
+      'headingLabel',
+    ),
+    search_help: givenText(properties, 'search_help', 'searchHelp'),
+    search_help_parameter: givenText(
+      properties,
+      'search_help_parameter',
+      'searchHelpParameter',
+    ),
+    set_get_parameter: givenText(
+      properties,
+      'set_get_parameter',
+      'setGetParameter',
+    ),
   };
 }
 
@@ -124,8 +153,7 @@ export async function handleUpdateDataElement(
 ) {
   const { connection, logger } = context;
   try {
-    const { data_element_name, properties, lock_handle } =
-      args as UpdateDataElementArgs;
+    const { data_element_name, properties, lock_handle } = args;
 
     if (!data_element_name || !properties || !lock_handle) {
       return return_error(
@@ -142,8 +170,19 @@ export async function handleUpdateDataElement(
     logger?.info(`Starting data element update: ${dataElementName}`);
 
     const transportRequest =
-      properties.transport_request || properties.transportRequest;
-    const changes = changesOf(properties);
+      givenText(properties, 'transport_request') ||
+      givenText(properties, 'transportRequest');
+    const typeKindText = givenText(properties, 'type_kind', 'typeKind');
+    const typeKind =
+      typeKindText === undefined ? undefined : typeKindOf(typeKindText);
+    if (typeKindText !== undefined && typeKind === undefined) {
+      return return_error(
+        new Error(
+          `properties.type_kind must be one of ${TYPE_KINDS.join(', ')}; nothing was sent`,
+        ),
+      );
+    }
+    const changes = changesOf(properties, typeKind);
 
     try {
       // The three steps, in the handler because 19 put them there. `analyse`
@@ -159,7 +198,12 @@ export async function handleUpdateDataElement(
               { version: 'workingArea', analyse: analyseException },
             ),
         ),
-        atStep('update metadata', (current) =>
+        async (current) =>
+          patchedDocument(
+            patchDataElementDocument(current, dataElementChanges(changes)),
+            `data element ${dataElementName}`,
+          ),
+        atStep('update metadata', (document) =>
           withAdtHeaders(context, 'dataElement.updateMetadata', (headers) =>
             client.getDataElement(dataElementDocuments).updateMetadata(
               {
@@ -168,10 +212,7 @@ export async function handleUpdateDataElement(
               },
               {
                 headers,
-                source: patchDataElementXml(
-                  extractXmlString(current, `data element ${dataElementName}`),
-                  changes,
-                ),
+                source: document,
                 lockHandle: lock_handle,
                 analyse: analyseException,
               },
@@ -202,8 +243,8 @@ export async function handleUpdateDataElement(
           null,
           2,
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
+      });
+    } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is
       // where that verdict is read. This catch is left for a genuine bug in
@@ -212,7 +253,7 @@ export async function handleUpdateDataElement(
       // can still produce — that read belongs to `analyseException`, not a
       // second opinion here (found while writing the handler invariant that
       // checks for exactly this).
-      const message = error?.message ?? String(error);
+      const message = messageCarriedBy(error);
       logger?.error(
         `Error updating data element ${dataElementName}: ${message}`,
       );
@@ -221,7 +262,7 @@ export async function handleUpdateDataElement(
         detail: 'terse',
       });
     }
-  } catch (error: any) {
+  } catch (error) {
     return return_error(error);
   }
 }

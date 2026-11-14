@@ -26,18 +26,37 @@
  * not activate" cannot be "activate them separately"; it has to be read out of
  * the run.
  */
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { AdtReading } from './reading';
+import {
+  type IAdtMessageFailure,
+  type IAdtStillInactive,
+  stillInactiveAmong,
+} from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { asciiLower, asciiUpper } from '../plainText';
+import { child, entries, listOf, text, type XmlRead } from '../xml/tree';
+import {
+  type AdtReading,
+  attributeOf,
+  membersNamed,
+  parseStructure,
+} from './reading';
 import { withStep } from './step';
 
 /** What a run answered, once it stopped running. */
 export interface ActivationRunOutcome {
   /** The run's id — `''` when the POST answered no `Location`. */
   runId: string;
-  /** `runs:status` as the server last stated it, lowercased. */
+  /**
+   * `runs:status` as the server last stated it, lowercased — `finished`,
+   * `error` or `failed` unless a read failed (then `failure` says which) or
+   * there was no run id (`''`).
+   */
   status: string;
-  /** Whether that status is one this waits for: `finished`, `error`, `failed`. */
-  settled: boolean;
   /** Every message the results document carries, in wire order. */
   messages: ActivationMessage[];
   /**
@@ -46,7 +65,14 @@ export interface ActivationRunOutcome {
    */
   executed?: boolean;
   /** The results document, for a caller that wants it verbatim. */
-  results?: string;
+  results?: string | undefined;
+  /**
+   * What the inactive list, read once after a silent results checklist
+   * (`activationExecuted="false"`, no message), still names of the run's
+   * references (`stillInactiveAmong`, fr0ster/mcp-abap-adt#351). Absent where
+   * no list was read; empty where none is listed — nothing to activate.
+   */
+  stillInactive?: ReadonlyArray<IAdtStillInactive>;
   /**
    * Reading the run or its results failed: the method's error as it is, with
    * its step (`read activation run`, `read activation results`). The run's
@@ -61,146 +87,166 @@ export interface ActivationMessage {
   objectName?: string;
 }
 
+/** How each read of a run judges SAP's answer: adt-strategies' message-failure reading. */
+export type RunAnalyse = IAnalyse<IAdtMessageFailure>;
+
 /** The members this composite calls, structurally — no client needed to test it. */
 export interface ActivationRunSource {
   getActivationRun(
     runId: string,
-    options: { withLongPolling?: boolean; analyse?: unknown },
-  ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
+    options: {
+      withLongPolling?: boolean | undefined;
+      analyse?: RunAnalyse | undefined;
+    },
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   getActivationResults(
     runId: string,
-    options: { analyse?: unknown },
-  ): Promise<IAdtResponse<AdtReading<unknown> | unknown, IAdtError>>;
+    options: { analyse?: RunAnalyse | undefined },
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
+  /** Read with `wireItself` in the `inactive` slot: the list as it came. */
+  getInactiveObjects(options: {
+    analyse?: RunAnalyse | undefined;
+  }): Promise<IAdtResponse<IAdtWireResponse, IAdtError>>;
 }
 
-/** A status that ends the wait. Anything else is progress. */
+/** The step the read after a silent results checklist arises at. */
+export const INACTIVE_OBJECTS = 'inactiveObjects';
+
+/** The words of an outcome the read after a silent checklist could not decide. */
+const UNDECIDED =
+  "The activation's outcome could not be decided: the run's results say no activation ran and give no message, and";
+
+/** A status that ends the wait. */
 const SETTLED = new Set(['finished', 'error', 'failed']);
 
-/** A reading's parse and its document as it came, from a reading or a bare value. */
-export function readingOf(value: unknown): {
-  parsed: unknown;
-  raw: string;
-} {
-  const reading = value as { value?: unknown; raw?: unknown } | null;
-  if (
-    reading !== null &&
-    typeof reading === 'object' &&
-    ('value' in reading || 'raw' in reading)
-  ) {
-    return {
-      parsed: reading.value,
-      raw: typeof reading.raw === 'string' ? reading.raw : '',
-    };
+/**
+ * A status that says the run is still going, so the wait reads again:
+ * `running`, the one measured on premise and on the cloud (2026-11-04).
+ * adt-clients types the status as text, so nothing else is known to mean
+ * "still running"; any other status ends the wait (`unreadableStatus`).
+ */
+const RUNNING = new Set(['running']);
+
+/**
+ * A run status the wait does not know — none, an empty one, or one that is
+ * neither running nor terminal — in fixed words and the value as SAP sent it.
+ * Not SAP's refusal and not a verdict on the run: the wait cannot tell
+ * whether to read again, so it stops and says why.
+ */
+export class UnreadableRunStatus extends Error {
+  readonly runId: string;
+  readonly status: string;
+  constructor(runId: string, status: string) {
+    super(
+      `The activation run ${runId} answered ${
+        status === '' ? 'no status' : `the status "${status}"`
+      }, which is neither running (read again) nor finished, error or failed (the run ended): the wait stops here, and the run's results are not read.`,
+    );
+    this.name = 'UnreadableRunStatus';
+    this.runId = runId;
+    this.status = status;
   }
-  return { parsed: value, raw: typeof value === 'string' ? value : '' };
 }
 
-function attrs(node: unknown): Record<string, unknown> {
-  const a = (node as { '@'?: Record<string, unknown> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+/** A reading's parse and its document as it came. */
+export function readingOf(value: AdtReading<XmlRead>): {
+  parsed: XmlRead;
+  raw: string;
+} {
+  return { parsed: value.value, raw: value.raw };
 }
 
 /**
- * `runs:status` out of a run document.
+ * The documents a value holds, in the order they are read: its parse, then
+ * its document kept as text, parsed (`parseStructure`) — a caller may hand a
+ * set that keeps only the document.
+ */
+function documentsOf(value: AdtReading<XmlRead>): XmlRead[] {
+  const { parsed, raw } = readingOf(value);
+  return [parsed, parseStructure(raw)];
+}
+
+/** A document's root element: its first member that is not the declaration. */
+function rootOf(document: XmlRead): XmlRead {
+  return entries(document).find(([name]) => !name.startsWith('?'))?.[1];
+}
+
+/**
+ * `runs:status` out of a run document, lowercased; `''` when it states none.
  *
- * The attribute is read from the parse when there is one and off the raw text
+ * Read from the parse when there is one and from the document kept as text
  * otherwise, because `run`'s reading is `structured` in `READING_BY_SLOT` but a
  * caller may hand this a set that keeps the document.
  */
-export function runStatusOf(value: unknown): string {
-  const { parsed, raw } = readingOf(value);
-  const root = (parsed as Record<string, unknown> | undefined)?.['runs:run'];
-  const stated = attrs(root)['runs:status'] ?? attrs(root).status;
-  if (typeof stated === 'string' && stated !== '') return stated.toLowerCase();
-  const fromText = raw.match(/\brun[s]?:status="([^"]+)"/i)?.[1];
-  return (fromText ?? '').toLowerCase();
+export function runStatusOf(value: AdtReading<XmlRead>): string {
+  for (const document of documentsOf(value)) {
+    const root = rootOf(document);
+    const stated =
+      attributeOf(root, 'runs:status') ??
+      attributeOf(root, 'run:status') ??
+      attributeOf(root, 'status');
+    if (stated !== undefined && stated !== '') return stated.toLowerCase();
+  }
+  return '';
+}
+
+/** A message's words: its `shortText`, or the `txt` in it, else its `text` attribute. */
+function wordsOf(msg: XmlRead): string {
+  const shortText = child(msg, 'shortText');
+  const own = text(shortText);
+  if (own !== undefined) return own;
+  const txt = listOf(child(shortText, 'txt'))
+    .map((member) => text(member))
+    .filter((words) => words !== undefined);
+  if (txt.length > 0) return txt.join(',');
+  return attributeOf(msg, 'text') ?? 'Unknown message';
 }
 
 /**
  * Every message a results document carries.
  *
  * The shape is the checklist the single-object `/activation` answers —
- * `chkl:messages` with `msg` children — so this reads the same two spellings
- * `parseActivationResponse` does, and keeps the object each message is about
- * when the document names one. A results document with no messages is not an
- * error: a run that activated everything says nothing.
+ * `chkl:messages` with `msg` children — read at any depth, so a document this
+ * reading does not recognise by its root still has its messages read, and
+ * keeps the object each message is about when the document names one. A
+ * results document with no messages is not an error: a run that activated
+ * everything says nothing. `type` comes back as stated; the caller decides
+ * what `E` means.
  */
-export function activationMessagesOf(value: unknown): ActivationMessage[] {
-  const { parsed, raw } = readingOf(value);
-  const messages: ActivationMessage[] = [];
-  const root =
-    (parsed as Record<string, unknown> | undefined)?.['chkl:messages'] ??
-    (parsed as Record<string, unknown> | undefined)?.messages;
-  const raw_msgs = (root as Record<string, unknown> | undefined)?.msg;
-  const list = Array.isArray(raw_msgs)
-    ? raw_msgs
-    : raw_msgs === undefined
-      ? []
-      : [raw_msgs];
-  for (const msg of list) {
-    const a = attrs(msg);
-    const shortText = (msg as { shortText?: unknown })?.shortText;
-    const text =
-      typeof shortText === 'string'
-        ? shortText
-        : ((shortText as { txt?: unknown })?.txt as string | undefined);
-    messages.push({
-      type: String(a.type ?? a['@_type'] ?? 'info'),
-      text: String(text ?? a.text ?? 'Unknown message'),
-      ...(a.objName !== undefined
-        ? { objectName: String(a.objName) }
-        : a['adtcore:name'] !== undefined
-          ? { objectName: String(a['adtcore:name']) }
-          : {}),
+export function activationMessagesOf(
+  value: AdtReading<XmlRead>,
+): ActivationMessage[] {
+  for (const document of documentsOf(value)) {
+    const messages = membersNamed(document, 'msg').map(({ node: msg }) => {
+      const objectName =
+        attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
+      return {
+        type: attributeOf(msg, 'type') ?? 'info',
+        text: wordsOf(msg),
+        ...(objectName !== undefined ? { objectName } : {}),
+      };
     });
+    if (messages.length > 0) return messages;
   }
-  if (messages.length === 0 && raw !== '') {
-    // A document this parse does not recognise still has its messages in text:
-    // report them rather than answering "no messages" for a document nobody
-    // read. `type` comes back as stated; the caller decides what `E` means. The
-    // object name is picked up too — dropping it here would make a refusal name
-    // no object, which is the one detail that makes a group failure actionable.
-    for (const m of raw.matchAll(
-      /<msg\b([^>]*)>[\s\S]*?<shortText>(?:<txt>)?([^<]*)/gi,
-    )) {
-      const tag = m[1];
-      const named =
-        tag.match(/\bobjName="([^"]*)"/i)?.[1] ??
-        tag.match(/\badtcore:name="([^"]*)"/i)?.[1];
-      messages.push({
-        type: tag.match(/\btype="([^"]*)"/i)?.[1] ?? 'info',
-        text: m[2],
-        ...(named !== undefined ? { objectName: named } : {}),
-      });
-    }
-  }
-  return messages;
+  return [];
 }
 
 /**
  * `activationExecuted` of a results document's `chkl:properties`: SAP's own
  * statement whether the activation ran (`"false"` for a run SAP cancelled,
  * "Activation was cancelled.", or one with nothing to activate). `undefined`
- * where the document states none. Read from the parse, else off the raw
- * text by plain string search (the attribute of the one `chkl:properties`
- * element), never from a message's words.
+ * where the document states none. Read from the parse, else from the
+ * document kept as text, parsed — never from a message's words.
  */
-export function activationExecutedOf(value: unknown): boolean | undefined {
-  const { parsed, raw } = readingOf(value);
-  const root =
-    (parsed as Record<string, unknown> | undefined)?.['chkl:messages'] ??
-    (parsed as Record<string, unknown> | undefined)?.messages;
-  const properties = (root as Record<string, unknown> | undefined)?.[
-    'chkl:properties'
-  ];
-  const stated = attrs(properties).activationExecuted;
-  if (stated === 'true' || stated === 'false') return stated === 'true';
-  const element = raw.indexOf('<chkl:properties');
-  if (element < 0) return undefined;
-  const end = raw.indexOf('>', element);
-  const tag = raw.slice(element, end < 0 ? undefined : end);
-  if (tag.includes(' activationExecuted="true"')) return true;
-  if (tag.includes(' activationExecuted="false"')) return false;
+export function activationExecutedOf(
+  value: AdtReading<XmlRead>,
+): boolean | undefined {
+  for (const document of documentsOf(value)) {
+    for (const { node } of membersNamed(document, 'chkl:properties')) {
+      const stated = attributeOf(node, 'activationExecuted');
+      if (stated === 'true' || stated === 'false') return stated === 'true';
+    }
+  }
   return undefined;
 }
 
@@ -218,38 +264,51 @@ export function activationVerdict(
   return executed !== false && !messages.some(isRefusal);
 }
 
+/** SAP's message-type letters of error severity: error, abort, exit. */
+const ERROR_LETTERS: ReadonlySet<string> = new Set(['E', 'A', 'X']);
+
 /** An error-severity message, by SAP's own letters. */
 export function isRefusal(message: ActivationMessage): boolean {
-  return /^[EAX]$/i.test(message.type) || /^error$/i.test(message.type);
+  return (
+    ERROR_LETTERS.has(asciiUpper(message.type)) ||
+    asciiLower(message.type) === 'error'
+  );
 }
 
 /**
  * Wait for a started run, then read what it produced.
  *
- * `withLongPolling` holds each request open on the server, so this is a bounded
- * number of requests rather than a tight loop: `attempts` of them, and the
- * default of six covers the runs measured on a cloud trial. A run that has not
- * settled by then is reported as it stands — `settled: false` — rather than
- * called a failure, because "still running" and "refused" are different answers
- * and only one of them is the caller's problem.
+ * Every status read is a long poll (`withLongPolling=true`): SAP holds it
+ * until the run ends (measured on premise and on the cloud trial,
+ * 2026-11-04), so the wait is one request in practice. A status that is not
+ * terminal is followed by another long poll — no timer of ours, no attempt
+ * limit: the run ends the wait, or SAP's refusal does. Only `running` is
+ * read again; a status it does not know — none, empty, any other — throws
+ * `UnreadableRunStatus`, naming it, rather than reading on a guess.
  *
  * Never throws for a refusal: a refused `getActivationRun` or
  * `getActivationResults` comes back as the outcome's `failure` — the method's
  * error as it is, with its step — never folded into `messages`, which are
  * SAP's messages about the run.
+ *
+ * **One read more, after a silent results checklist alone**
+ * (`activationExecuted="false"`, no message): `getInactiveObjects`, judged by
+ * `stillInactiveAmong(named, …)` with `named` the uris of the references the
+ * run was started with — the run's references still listed are its
+ * `stillInactive`, none is nothing to activate. A read that fails, or answers
+ * no list, is the outcome's `failure` at step `inactiveObjects`: the outcome
+ * could not be decided. Every other results document is read as it came.
  */
 export async function awaitActivationRun(
   utils: ActivationRunSource,
   runId: string,
-  analyse: unknown,
-  attempts = 6,
-  delayMs = 1000,
+  analyse: RunAnalyse,
+  named: readonly string[],
 ): Promise<ActivationRunOutcome> {
   if (runId === '') {
     return {
       runId,
       status: '',
-      settled: false,
       messages: [
         {
           type: 'E',
@@ -260,7 +319,7 @@ export async function awaitActivationRun(
   }
 
   let status = '';
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  while (!SETTLED.has(status)) {
     const answered = await utils.getActivationRun(runId, {
       withLongPolling: true,
       analyse,
@@ -269,17 +328,13 @@ export async function awaitActivationRun(
       return {
         runId,
         status,
-        settled: false,
         messages: [],
         failure: withStep(answered.getError(), 'read activation run'),
       };
     }
     status = runStatusOf(answered.getResult().value);
-    if (SETTLED.has(status)) break;
-    // `delayMs: 0` asks for no pause and no timer: each request is a long
-    // poll the server holds until the run moves, so the next one simply follows.
-    if (attempt < attempts && delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    if (!SETTLED.has(status) && !RUNNING.has(status)) {
+      throw new UnreadableRunStatus(runId, status);
     }
   }
 
@@ -288,19 +343,53 @@ export async function awaitActivationRun(
     return {
       runId,
       status,
-      settled: SETTLED.has(status),
       messages: [],
       failure: withStep(produced.getError(), 'read activation results'),
     };
   }
   const value = produced.getResult().value;
   const executed = activationExecutedOf(value);
-  return {
+  const messages = activationMessagesOf(value);
+  const outcome: ActivationRunOutcome = {
     runId,
     status,
-    settled: SETTLED.has(status),
-    messages: activationMessagesOf(value),
+    messages,
     ...(executed === undefined ? {} : { executed }),
     results: readingOf(value).raw || undefined,
   };
+  if (executed !== false || messages.length > 0) return outcome;
+
+  // The silent checklist: it answered an activation that had nothing to do
+  // and one that left objects inactive (S/4HANA 2025), so the inactive list
+  // is read once, and the run's references still on it decide
+  // (fr0ster/mcp-abap-adt#351, Q8). The judgement is adt-strategies' own,
+  // the one analyseActivation makes on the synchronous paths.
+  const listed = await utils.getInactiveObjects({ analyse });
+  if (!listed.ok) {
+    const error = listed.getError();
+    return {
+      ...outcome,
+      failure: withStep(
+        {
+          ...error,
+          message: `${UNDECIDED} reading the inactive objects failed: ${error.message}`,
+        },
+        INACTIVE_OBJECTS,
+      ),
+    };
+  }
+  const still = stillInactiveAmong(named, listed.getResult().value);
+  if (still === null) {
+    return {
+      ...outcome,
+      failure: withStep(
+        {
+          origin: 'refusal',
+          message: `${UNDECIDED} the inactive list SAP answered is no list of inactive objects.`,
+        },
+        INACTIVE_OBJECTS,
+      ),
+    };
+  }
+  return { ...outcome, stillInactive: still };
 }

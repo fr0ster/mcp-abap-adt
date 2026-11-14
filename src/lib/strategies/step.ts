@@ -1,6 +1,16 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { FailureEntry } from '../answer';
 import { failureOf } from '../auth/failures';
+import {
+  type AnswerObject,
+  type AnswerValue,
+  isAnswerList,
+  isAnswerObject,
+} from '../json';
 import { SystemContextMissingError } from '../systemContextGuard';
+import { child, isElement, isList } from '../thrownValue';
+import type { Cleanup } from './safeFields';
+import { failed, type StepError, type StepResponse } from './stepResponse';
 
 /**
  * Where a handler's failure arose: the step it was doing.
@@ -15,8 +25,7 @@ export interface StepCarrier {
 }
 
 function stepOf(value: unknown): string | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
-  const step = (value as StepCarrier).step;
+  const step = child(value, 'step');
   return typeof step === 'string' ? step : undefined;
 }
 
@@ -35,18 +44,17 @@ export class StepThrew extends Error {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
     this.name = 'StepThrew';
     this.step = step;
-    const carrier = cause as { cleanup?: unknown; operation?: unknown };
-    if (cause !== null && typeof cause === 'object') {
-      if (carrier.cleanup !== undefined) this.cleanup = carrier.cleanup;
-      if (carrier.operation !== undefined) this.operation = carrier.operation;
-    }
+    const cleanup = child(cause, 'cleanup');
+    const operation = child(cause, 'operation');
+    if (cleanup !== undefined) this.cleanup = cleanup;
+    if (operation !== undefined) this.operation = operation;
   }
 }
 
 /** The method's error, with the step added unless an inner step already named it. */
-export function withStep(error: IAdtError, step: string): IAdtError {
+export function withStep(error: StepError, step: string): StepError {
   if (stepOf(error) !== undefined) return error;
-  return { ...error, step } as IAdtError;
+  return { ...error, step };
 }
 
 /**
@@ -59,10 +67,10 @@ export function withStep(error: IAdtError, step: string): IAdtError {
  */
 export function atStep<A extends unknown[], T>(
   step: string,
-  call: (...args: A) => Promise<IAdtResponse<T, IAdtError>>,
-): (...args: A) => Promise<IAdtResponse<T, IAdtError>> {
+  call: (...args: A) => Promise<StepResponse<T>>,
+): (...args: A) => Promise<StepResponse<T>> {
   return async (...args: A) => {
-    let answered: IAdtResponse<T, IAdtError>;
+    let answered: StepResponse<T>;
     try {
       answered = await call(...args);
     } catch (thrown) {
@@ -76,26 +84,17 @@ export function atStep<A extends unknown[], T>(
       throw new StepThrew(step, thrown);
     }
     // Only a failure gains a step; anything else is returned as it came.
-    if (
-      answered?.ok !== false ||
-      typeof (answered as { getError?: unknown }).getError !== 'function'
-    ) {
+    if (answered?.ok !== false || typeof answered.getError !== 'function') {
       return answered;
     }
     const error = answered.getError();
     if (stepOf(error) !== undefined) return answered;
-    const stepped = withStep(error, step);
-    return {
-      ok: false,
-      getResult: () => {
-        throw new Error('atStep: asked for the result of a failure');
-      },
-      getError: () => stepped,
-    } as unknown as IAdtResponse<T, IAdtError>;
+    return failed(withStep(error, step), 'atStep');
   };
 }
 
-const METHOD_FAILURE = Symbol('methodFailure');
+/** The method's error each throw carries, by the thrown object. */
+const METHOD_FAILURE = new WeakMap<object, StepError>();
 
 /**
  * A handler that works by throws carries the method's error on the throw.
@@ -109,11 +108,7 @@ export function carryingFailure<E extends Error>(
   error: IAdtError,
   step: string,
 ): E {
-  Object.defineProperty(thrown, METHOD_FAILURE, {
-    value: withStep(error, step),
-    enumerable: false,
-    configurable: true,
-  });
+  METHOD_FAILURE.set(thrown, withStep(error, step));
   return thrown;
 }
 
@@ -122,27 +117,45 @@ export function carryingFailure<E extends Error>(
  * failures of their own — each as an entry in the shape of every other
  * failure (`failures`), with notes that are no debt (`notes`).
  */
-export interface LeftBehind {
+export type LeftBehind = {
   message?: string;
-  failures?: readonly unknown[];
-  notes?: readonly unknown[];
-}
+  failures?: readonly FailureEntry[];
+  notes?: readonly FailureEntry[];
+};
 
 /** What was left behind before, with what is added now. */
 export function mergedLeftBehind(
-  prior: unknown,
+  prior: Cleanup | LeftBehind | undefined,
   added: LeftBehind,
 ): LeftBehind {
-  const before = (prior ?? {}) as LeftBehind;
-  const message = [before.message, added.message]
-    .filter((m): m is string => typeof m === 'string' && m !== '')
+  const message = [prior?.message, added.message]
+    .filter((m): m is string => m !== undefined && m !== '')
     .join('; ');
-  const failures = [...(before.failures ?? []), ...(added.failures ?? [])];
-  const notes = [...(before.notes ?? []), ...(added.notes ?? [])];
+  const failures = [...(prior?.failures ?? []), ...(added.failures ?? [])];
+  const priorNotes = prior !== undefined && 'notes' in prior ? prior.notes : [];
+  const notes = [...(priorNotes ?? []), ...(added.notes ?? [])];
   return {
     ...(message ? { message } : {}),
     ...(failures.length ? { failures } : {}),
     ...(notes.length ? { notes } : {}),
+  };
+}
+
+/**
+ * What a carried payload says was left behind (its `cleanup`, written by
+ * `leaveBehind` as a `LeftBehind`), read field by field: its words, and
+ * the entries of its two lists.
+ */
+export function leftBehindRead(value: AnswerValue): LeftBehind | undefined {
+  if (value === undefined) return undefined;
+  if (!isAnswerObject(value)) return {};
+  const { message, failures, notes } = value;
+  return {
+    ...(typeof message === 'string' && { message }),
+    ...(isAnswerList(failures) && {
+      failures: failures.filter(isAnswerObject),
+    }),
+    ...(isAnswerList(notes) && { notes: notes.filter(isAnswerObject) }),
   };
 }
 
@@ -152,26 +165,20 @@ export function mergedLeftBehind(
  * field the `answer()` path already renders for a lock left held. The
  * method's error itself is untouched. Nothing when the throw carries none.
  */
-export function noteLeftBehind(
-  thrown: unknown,
-  note: string | LeftBehind,
-): void {
-  const carried = methodFailureOf(thrown);
+export function noteLeftBehind(thrown: Error, note: string | LeftBehind): void {
+  const carried = METHOD_FAILURE.get(thrown);
   if (carried === undefined) return;
-  Object.defineProperty(thrown, METHOD_FAILURE, {
-    value: {
-      ...carried,
-      cleanup: mergedLeftBehind(
-        (carried as { cleanup?: unknown }).cleanup,
-        typeof note === 'string' ? { message: note } : note,
-      ),
-    },
-    enumerable: false,
-    configurable: true,
+  METHOD_FAILURE.set(thrown, {
+    ...carried,
+    cleanup: mergedLeftBehind(
+      carried.cleanup,
+      typeof note === 'string' ? { message: note } : note,
+    ),
   });
 }
 
-const CARRIED_PAYLOAD = Symbol('carriedPayload');
+/** The whole answer each throw carries, by the thrown object. */
+const CARRIED_PAYLOAD = new WeakMap<object, AnswerObject>();
 
 /**
  * A throw that carries its whole answer: a failure that is several failures
@@ -181,32 +188,22 @@ const CARRIED_PAYLOAD = Symbol('carriedPayload');
  */
 export function carryingPayload<E extends object>(
   thrown: E,
-  payload: Record<string, unknown>,
+  payload: AnswerObject,
 ): E {
-  Object.defineProperty(thrown, CARRIED_PAYLOAD, {
-    value: payload,
-    enumerable: false,
-    configurable: true,
-  });
+  CARRIED_PAYLOAD.set(thrown, payload);
   return thrown;
 }
 
 /** The payload a throw carries, or `undefined`. */
-export function payloadCarriedBy(
-  thrown: unknown,
-): Record<string, unknown> | undefined {
+export function payloadCarriedBy(thrown: unknown): AnswerObject | undefined {
   if (thrown === null || typeof thrown !== 'object') return undefined;
-  const carried = (thrown as { [CARRIED_PAYLOAD]?: unknown })[CARRIED_PAYLOAD];
-  return carried === undefined
-    ? undefined
-    : (carried as Record<string, unknown>);
+  return CARRIED_PAYLOAD.get(thrown);
 }
 
 /** A method failure carried on a throw, or `undefined`. */
-export function methodFailureOf(thrown: unknown): IAdtError | undefined {
+export function methodFailureOf(thrown: unknown): StepError | undefined {
   if (thrown === null || typeof thrown !== 'object') return undefined;
-  const carried = (thrown as { [METHOD_FAILURE]?: unknown })[METHOD_FAILURE];
-  return carried === undefined ? undefined : (carried as IAdtError);
+  return METHOD_FAILURE.get(thrown);
 }
 
 export { stepOf };

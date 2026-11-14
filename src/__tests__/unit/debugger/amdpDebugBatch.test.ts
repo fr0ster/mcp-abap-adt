@@ -19,7 +19,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { corpusBody } from '../../../lib/adtCorpus';
 import type { FailureCode } from '../../../lib/auth/failures';
 import * as refusals from '../../../lib/auth/serverRefusal';
 import {
@@ -42,6 +41,7 @@ import { DebugBatchHandlersGroup } from '../../../lib/handlers/groups/DebugBatch
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import type { IHandlerGroup } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type EnvelopeAnswer,
   envelopeConnection,
@@ -197,6 +197,7 @@ async function stand(set: SetKind): Promise<Stand> {
       closeConnection: async () => undefined,
       // The session's own connections answer through the script; a
       // recorder (a recorded call's connection) through a real debugger.
+      dropConnection: () => {},
       amdpDebugger: (c) =>
         own(c) ? (scripted.dbg as never) : AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',

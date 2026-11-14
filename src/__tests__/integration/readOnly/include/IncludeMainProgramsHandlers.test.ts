@@ -15,9 +15,12 @@
  * Run: npm test -- --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit 'integration/readOnly/include/IncludeMainPrograms'
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import { handleHandlerGet } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleGetMainPrograms } from '../../../../handlers/include/readonly/handleGetMainPrograms';
-import { getTimeout } from '../../helpers/configHelpers';
+
+import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -47,7 +50,7 @@ function mainProgramsOf(answer: unknown): unknown[] {
 describe("An include's main programs", () => {
   let tester: LambdaTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'include_main_programs',
       'delivered_include',
@@ -57,41 +60,37 @@ describe("An include's main programs", () => {
       async (_context: LambdaTesterContext) => {},
       async (_context: LambdaTesterContext) => {},
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
-  it(
-    'GetMainPrograms and HandlerGet part main_programs answer the same main programs',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
-        const includeName = String(params?.include_name ?? '');
-        const handlerContext = createHandlerContext({ connection, logger });
+  it('GetMainPrograms and HandlerGet part main_programs answer the same main programs', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, params } = context;
+      const includeName = String(params?.include_name ?? '');
+      const handlerContext = createHandlerContext({ connection, logger });
 
-        const full = await handleGetMainPrograms(handlerContext, {
-          include_name: includeName,
-        });
-        expect(Reflect.get(full, 'isError')).toBe(false);
-        const programs = mainProgramsOf(full);
-        expect(programs.length).toBeGreaterThan(0);
-        for (const program of programs) {
-          expect(typeof Reflect.get(Object(program), 'name')).toBe('string');
-          expect(typeof Reflect.get(Object(program), 'type')).toBe('string');
-          expect(typeof Reflect.get(Object(program), 'uri')).toBe('string');
-        }
-
-        const compact = await handleHandlerGet(handlerContext, {
-          object_type: 'INCLUDE',
-          include_name: includeName,
-          part: 'main_programs',
-        });
-        expect(mainProgramsOf(compact)).toEqual(programs);
-        logger?.info(`${includeName}: ${programs.length} main program(s)`);
+      const full = await handleGetMainPrograms(handlerContext, {
+        include_name: includeName,
       });
-    },
-    getTimeout('long'),
-  );
+      assert.equal(Reflect.get(full, 'isError'), false);
+      const programs = mainProgramsOf(full);
+      assert.ok(programs.length > 0);
+      for (const program of programs) {
+        assert.equal(typeof Reflect.get(Object(program), 'name'), 'string');
+        assert.equal(typeof Reflect.get(Object(program), 'type'), 'string');
+        assert.equal(typeof Reflect.get(Object(program), 'uri'), 'string');
+      }
+
+      const compact = await handleHandlerGet(handlerContext, {
+        object_type: 'INCLUDE',
+        include_name: includeName,
+        part: 'main_programs',
+      });
+      assertEquals(mainProgramsOf(compact), programs);
+      logger?.info(`${includeName}: ${programs.length} main program(s)`);
+    });
+  });
 });

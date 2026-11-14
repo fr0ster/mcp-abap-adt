@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
  * GetNodeStructure Handler - Low-level handler for node structure
  *
@@ -59,13 +61,17 @@ import {
   isIndeterminateWalkAnswer,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
-import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
+import {
+  type NodeLevel,
+  nodeLevelOf,
+} from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
@@ -76,47 +82,35 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      parent_type: {
-        type: 'string',
-        description: 'Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")',
-      },
-      parent_name: {
-        type: 'string',
-        description: 'Parent object name',
-      },
-      node_id: {
-        type: 'string',
-        description:
-          'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: the server answers it with an empty body.',
-        default: '000000',
-      },
-      with_short_descriptions: {
-        type: 'boolean',
-        description: 'Include short descriptions in response',
-        default: true,
-      },
-    },
-    required: ['parent_type', 'parent_name'],
-  },
+  inputSchema: z.object({
+    parent_type: z
+      .string()
+      .describe('Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")'),
+    parent_name: z.string().describe('Parent object name'),
+    node_id: z
+      .string()
+      .default('000000')
+      .optional()
+      .describe(
+        'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: the server answers it with an empty body.',
+      ),
+    with_short_descriptions: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Include short descriptions in response'),
+  }),
 } as const;
 
-interface GetNodeStructureArgs {
-  parent_type: string;
-  parent_name: string;
-  node_id?: string;
-  with_short_descriptions?: boolean;
-}
+type GetNodeStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The raw body, nothing parsed — this handler needs to see whether it was
  * blank before `nodeLevel` collapses either a blank body or a genuinely
  * empty one into the identical `{objects: [], childNodes: []}`.
  */
-function rawNodeStructureXml(wire: unknown): string {
-  return String((wire as { data?: unknown } | undefined)?.data ?? '');
+function rawNodeStructureXml(wire: IAdtWireResponse): string {
+  return String(wire?.data ?? '');
 }
 
 /**
@@ -126,13 +120,7 @@ function rawNodeStructureXml(wire: unknown): string {
 function succeededLevel(
   level: NodeLevel & { blank?: string },
 ): IAdtResponse<NodeLevel, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value: level }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<NodeLevel, IAdtError>;
+  return succeeded(level);
 }
 
 /**
@@ -217,7 +205,7 @@ async function nodeStructure(
         ),
         async (rawXml) => {
           if (!isIndeterminateWalkAnswer(rawXml)) {
-            return succeededLevel(nodeLevel({ data: rawXml }));
+            return succeededLevel(nodeLevelOf(rawXml));
           }
 
           if (parentType !== 'DEVC/K') {
@@ -248,7 +236,7 @@ async function nodeStructure(
           if (!packageRead.ok) {
             // The package's own refusal, named — not a sentence this
             // handler composed about a call it did not make.
-            return packageRead as unknown as IAdtResponse<NodeLevel, IAdtError>;
+            return packageRead;
           }
 
           // The package exists; the blank body was the genuinely-empty

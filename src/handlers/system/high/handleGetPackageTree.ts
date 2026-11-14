@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
  * GetPackageTree Handler - High-level handler for package tree structure
  *
@@ -5,7 +7,6 @@
  * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   answerFailure,
   failureEntry,
@@ -18,13 +19,14 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { withLongToolAdvice } from '../../../lib/longTools';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   assembleTree,
   batchReader,
   concurrentReader,
   endsTheCall,
+  type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
   readNode,
@@ -42,64 +44,73 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      package_name: {
-        type: 'string',
-        description: 'Package name (give this or package_names)',
-      },
-      package_names: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Several package names, read together (give this or package_name)',
-      },
-      include_subpackages: {
-        type: 'boolean',
-        description:
-          'Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true',
-        default: true,
-      },
-      max_depth: {
-        type: 'integer',
-        description:
-          'Maximum depth for recursive package traversal. Default: 5',
-        default: 5,
-      },
-      include_descriptions: {
-        type: 'boolean',
-        description:
-          "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
-        default: false,
-      },
-      debug: {
-        type: 'boolean',
-        description:
-          'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
-        default: false,
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    package_name: z
+      .string()
+      .optional()
+      .describe('Package name (give this or package_names)'),
+    package_names: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Several package names, read together (give this or package_name)',
+      ),
+    include_subpackages: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe(
+        'Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true',
+      ),
+    max_depth: z
+      .number()
+      .int()
+      .default(5)
+      .optional()
+      .describe('Maximum depth for recursive package traversal. Default: 5'),
+    include_descriptions: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
+      ),
+    debug: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
+      ),
+  }),
 } as const;
 
-interface GetPackageTreeArgs {
-  package_name?: string;
-  package_names?: string[];
-  include_subpackages?: boolean;
-  max_depth?: number;
-  include_descriptions?: boolean;
-  debug?: boolean;
-}
+type GetPackageTreeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-type Metadata = IAdtResponse<unknown, IAdtError>;
+/** A package's metadata read, as `readPackageMetadata` answers it. */
+type Metadata = Awaited<ReturnType<typeof readPackageMetadata>>;
 
 /** One package's metadata read and its walk. */
 interface TreeRead {
   metadata: PhaseResult<Metadata>;
   walked?: PhaseResult<WalkedItem[]>;
+}
+
+/**
+ * A package's walk: every package whose metadata was read is walked, so a
+ * walk is there for each one the answer reads; none, in words, otherwise.
+ */
+function walkOf(
+  read: TreeRead,
+  packageName: string,
+): PhaseResult<WalkedItem[]> {
+  return (
+    read.walked ?? {
+      ok: false,
+      error: new Error(`the package ${packageName} was not walked`),
+    }
+  );
 }
 
 interface TreeOptions {
@@ -110,6 +121,31 @@ interface TreeOptions {
 
 /** An item of the first phase: a package's metadata, or a root node structure. */
 type FirstItem = { metadata: string } | { node: NodeRequest };
+
+/** The answer of a first-phase item, by what the item read. */
+type FirstAnswer =
+  | { of: 'metadata'; response: Metadata }
+  | { of: 'node'; response: NodeAnswer };
+
+/** A first-phase metadata item's answer. */
+function metadataOf(result: PhaseResult<FirstAnswer>): PhaseResult<Metadata> {
+  if (!result.ok) return result;
+  const answer = result.value;
+  if (answer.of !== 'metadata') {
+    throw new Error('a metadata item of the first phase answered a node');
+  }
+  return { ok: true, value: answer.response };
+}
+
+/** A first-phase root node structure item's answer. */
+function rootOf(result: PhaseResult<FirstAnswer>): PhaseResult<NodeAnswer> {
+  if (!result.ok) return result;
+  const answer = result.value;
+  if (answer.of !== 'node') {
+    throw new Error('a node item of the first phase answered metadata');
+  }
+  return { ok: true, value: answer.response };
+}
 
 // Verify package exists before building tree (fixes #38).
 // `IPackageContract` has no `.read()` — a package is a container with no
@@ -157,16 +193,21 @@ async function readTreesBatched(
   packageNames: readonly string[],
   options: TreeOptions,
 ): Promise<TreeRead[]> {
-  const read = batchReader<FirstItem, unknown>(context, (item, c) =>
+  const readLevel = (request: NodeRequest, c: HandlerContext['connection']) =>
+    readNode(
+      nodeStructureOn(
+        context,
+        createAdtClient(c, context.logger).getUtils(ourUtils),
+      ),
+      request,
+    );
+  const read = batchReader<FirstItem, FirstAnswer>(context, async (item, c) =>
     'metadata' in item
-      ? readMetadata(context, c, item.metadata)
-      : readNode(
-          nodeStructureOn(
-            context,
-            createAdtClient(c, context.logger).getUtils(ourUtils),
-          ),
-          item.node,
-        ),
+      ? {
+          of: 'metadata',
+          response: await readMetadata(context, c, item.metadata),
+        }
+      : { of: 'node', response: await readLevel(item.node, c) },
   );
   const first = await read([
     ...packageNames.map((metadata) => ({ metadata })),
@@ -181,19 +222,19 @@ async function readTreesBatched(
     ),
   ]);
   const reads: TreeRead[] = packageNames.map((_, i) => ({
-    metadata: first[i] as PhaseResult<Metadata>,
+    metadata: metadataOf(first[i]),
   }));
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   // Walked further: the packages whose metadata was read.
   const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
-    (requests) => read(requests.map((node) => ({ node }))),
-    kept.map((i) => packageNames[i] as string),
+    batchReader<NodeRequest, NodeAnswer>(context, readLevel),
+    kept.map((i) => packageNames[i]),
     options,
-    kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
+    kept.map((i) => rootOf(first[packageNames.length + i])),
   );
   kept.forEach((i, k) => {
-    (reads[i] as TreeRead).walked = walked[k];
+    reads[i].walked = walked[k];
   });
   return reads;
 }
@@ -220,7 +261,7 @@ async function readTreesConcurrent(
   if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
-    concurrentReader<NodeRequest, unknown>(context, (request, c) =>
+    concurrentReader<NodeRequest, NodeAnswer>(context, (request, c) =>
       readNode(
         nodeStructureOn(
           context,
@@ -229,11 +270,11 @@ async function readTreesConcurrent(
         request,
       ),
     ),
-    kept.map((i) => packageNames[i] as string),
+    kept.map((i) => packageNames[i]),
     options,
   );
   kept.forEach((i, k) => {
-    (reads[i] as TreeRead).walked = walked[k];
+    reads[i].walked = walked[k];
   });
   return reads;
 }
@@ -368,20 +409,20 @@ export async function handleGetPackageTree(
     }
 
     if (single) {
-      const walked = reads[0]?.walked as PhaseResult<WalkedItem[]>;
+      const walked = walkOf(reads[0], packageNames[0]);
       if (!walked.ok) throw walked.error;
       logger?.debug(`Package tree fetched successfully for ${single}`);
       return return_response({
         data: JSON.stringify(
-          treeOf(packageNames[0] as string, walked.value, options),
+          treeOf(packageNames[0], walked.value, options),
           null,
           2,
         ),
-      } as any);
+      });
     }
 
     const entries = reads.map((read, i) => {
-      const package_name = packageNames[i] as string;
+      const package_name = packageNames[i];
       const metadata = read.metadata;
       if (!metadata.ok) {
         return {
@@ -398,7 +439,7 @@ export async function handleGetPackageTree(
           ),
         };
       }
-      const walked = read.walked as PhaseResult<WalkedItem[]>;
+      const walked = walkOf(read, package_name);
       return walked.ok
         ? treeOf(package_name, walked.value, options)
         : {
@@ -408,8 +449,8 @@ export async function handleGetPackageTree(
     });
     return return_response({
       data: JSON.stringify(entries, null, 2),
-    } as any);
-  } catch (error: any) {
+    });
+  } catch (error) {
     logger?.error('Failed to fetch package tree', error);
     return return_error(error);
   }

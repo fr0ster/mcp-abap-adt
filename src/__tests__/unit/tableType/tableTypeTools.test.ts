@@ -15,12 +15,18 @@ import {
   TOOL_DEFINITION as GET_OBJECT_VERSIONS,
   handleGetObjectVersions,
 } from '../../../handlers/common/readonly/handleGetObjectVersions';
-import { handleCheckTableType } from '../../../handlers/table_type/high/handleCheckTableType';
+import {
+  TOOL_DEFINITION as CheckTableType_Tool,
+  handleCheckTableType,
+} from '../../../handlers/table_type/high/handleCheckTableType';
 import {
   TOOL_DEFINITION as CreateTableType_Tool,
   handleCreateTableType,
 } from '../../../handlers/table_type/high/handleCreateTableType';
-import { handleDeleteTableType } from '../../../handlers/table_type/high/handleDeleteTableType';
+import {
+  TOOL_DEFINITION as DeleteTableType_Tool,
+  handleDeleteTableType,
+} from '../../../handlers/table_type/high/handleDeleteTableType';
 import {
   TOOL_DEFINITION as GET_TABLE_TYPE,
   handleGetTableType,
@@ -29,19 +35,27 @@ import {
   handleUpdateTableType,
   TOOL_DEFINITION as UpdateTableType_Tool,
 } from '../../../handlers/table_type/high/handleUpdateTableType';
-import { handleActivateTableType } from '../../../handlers/table_type/low/handleActivateTableType';
-import { corpusBody } from '../../../lib/adtCorpus';
+import {
+  TOOL_DEFINITION as ActivateTableType_Tool,
+  handleActivateTableType,
+} from '../../../handlers/table_type/low/handleActivateTableType';
 import {
   VERSION_SOURCE_KINDS,
   VERSIONED_KINDS,
 } from '../../../lib/adtProjections';
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
-import { READ_VERSION_PROPERTY } from '../../../lib/handlers/readVersion';
+import { defineTool } from '../../../lib/handlers/interfaces';
+import {
+  READ_VERSION_FIELD,
+  READ_VERSIONS,
+} from '../../../lib/handlers/readVersion';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { corpusBody } from '../../helpers/adtCorpus';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 import {
   type RecordingConnection,
   recordingConnection,
@@ -91,12 +105,10 @@ describe('GetTableType', () => {
   });
 
   it('declares the shared read version, active by default', () => {
-    expect(GET_TABLE_TYPE.inputSchema.properties.version).toBe(
-      READ_VERSION_PROPERTY,
-    );
+    expect(GET_TABLE_TYPE.inputSchema.shape.version).toBe(READ_VERSION_FIELD);
   });
 
-  it.each(READ_VERSION_PROPERTY.enum)(
+  it.each(READ_VERSIONS)(
     'reads the version given (%s), and answers it',
     async (version) => {
       const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
@@ -113,7 +125,7 @@ describe('GetTableType', () => {
     },
   );
 
-  it.each(READ_VERSION_PROPERTY.enum)(
+  it.each(READ_VERSIONS)(
     'compact HandlerGet TABLE_TYPE passes its version (%s) to the read',
     async (version) => {
       const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
@@ -131,22 +143,31 @@ describe('GetTableType', () => {
     expect(COMPACT_READ_TAKES.members.TABLE_TYPE).toContain('version');
   });
 
-  it.each([[{}], [{ table_type_name: '' }]])(
-    'refuses a missing table_type_name, sending nothing',
-    async (args) => {
-      const connection = recordingConnection();
-      const result = await handleGetTableType(
+  it('refuses an empty table_type_name, sending nothing', async () => {
+    const connection = recordingConnection();
+    const result = await handleGetTableType(
+      { connection, logger: undefined },
+      { table_type_name: '' },
+    );
+    expect(result.isError).toBe(true);
+    const first = result.content[0];
+    expect(first && 'text' in first ? first.text : '').toBe(
+      'table_type_name is required',
+    );
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('refuses an absent table_type_name at the schema, sending nothing', async () => {
+    const connection = recordingConnection();
+    const refused = expect(
+      defineTool(GET_TABLE_TYPE, handleGetTableType).call(
         { connection, logger: undefined },
-        args,
-      );
-      expect(result.isError).toBe(true);
-      const first = result.content[0];
-      expect(first && 'text' in first ? first.text : '').toBe(
-        'table_type_name is required',
-      );
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+        {},
+      ),
+    ).rejects.toThrow('at table_type_name');
+    await refused;
+    expect(connection.requests).toHaveLength(0);
+  });
 
   it('is served on a connection declared cloud', async () => {
     const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
@@ -307,8 +328,8 @@ describe('CreateTableType', () => {
     );
     const body = String(connection.requests[4]?.data);
     expect(body).toContain('<ttyp:dataType>CHAR</ttyp:dataType>');
-    expect(body).toContain('<ttyp:length>10</ttyp:length>');
-    expect(body).toContain('<ttyp:decimals>2</ttyp:decimals>');
+    expect(body).toContain('<ttyp:length>000010</ttyp:length>');
+    expect(body).toContain('<ttyp:decimals>000002</ttyp:decimals>');
     expect(body).toContain('<ttyp:accessType>sorted</ttyp:accessType>');
     expect(body).toContain('<ttyp:definition>rowType</ttyp:definition>');
     expect(body).toContain('<ttyp:kind>unique</ttyp:kind>');
@@ -344,9 +365,10 @@ describe('CreateTableType', () => {
   });
 
   it('declares a schema default on activate and the shared detail alone', () => {
-    const { properties } = CreateTableType_Tool.inputSchema;
+    const properties =
+      listedJson(CreateTableType_Tool.inputSchema).properties ?? {};
     const defaulted = Object.entries(properties)
-      .filter(([, schema]) => 'default' in schema)
+      .filter(([, schema]) => typeof schema === 'object' && 'default' in schema)
       .map(([name]) => name);
     expect(defaulted).toEqual(['activate', 'detail']);
   });
@@ -377,11 +399,9 @@ describe('CreateTableType', () => {
   });
 
   it.each([
-    ['table_type_name', { package_name: 'ZP' }],
     ['table_type_name', { table_type_name: '', package_name: 'ZP' }],
-    ['package_name', { table_type_name: 'ZTT_X' }],
     ['package_name', { table_type_name: 'ZTT_X', package_name: '' }],
-  ])('refuses a missing %s, sending nothing', async (name, args) => {
+  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
     const result = await handleCreateTableType(
       { connection, logger: undefined },
@@ -391,6 +411,24 @@ describe('CreateTableType', () => {
     expect(textOf(result)).toBe(`${name} is required`);
     expect(connection.requests).toHaveLength(0);
   });
+
+  it.each([
+    ['table_type_name', { package_name: 'ZP' }],
+    ['package_name', { table_type_name: 'ZTT_X' }],
+  ])(
+    'refuses an absent %s at the schema, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const refused = expect(
+        defineTool(CreateTableType_Tool, handleCreateTableType).call(
+          { connection, logger: undefined },
+          args,
+        ),
+      ).rejects.toThrow(`at ${name}`);
+      await refused;
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 
   it('is served on a connection declared cloud', async () => {
     const connection = created();
@@ -461,9 +499,10 @@ describe('UpdateTableType', () => {
   });
 
   it('declares a schema default on activate and the shared detail alone, and takes no package', () => {
-    const { properties } = UpdateTableType_Tool.inputSchema;
+    const properties =
+      listedJson(UpdateTableType_Tool.inputSchema).properties ?? {};
     const defaulted = Object.entries(properties)
-      .filter(([, schema]) => 'default' in schema)
+      .filter(([, schema]) => typeof schema === 'object' && 'default' in schema)
       .map(([name]) => name);
     expect(defaulted).toEqual(['activate', 'detail']);
     expect(Object.keys(properties)).not.toContain('package_name');
@@ -515,19 +554,28 @@ describe('UpdateTableType', () => {
     expect(connection.sessions[4]).toBe('stateful');
   });
 
-  it.each([[{}], [{ table_type_name: '' }]])(
-    'refuses a missing table_type_name, sending nothing',
-    async (args) => {
-      const connection = recordingConnection();
-      const result = await handleUpdateTableType(
+  it('refuses an empty table_type_name, sending nothing', async () => {
+    const connection = recordingConnection();
+    const result = await handleUpdateTableType(
+      { connection, logger: undefined },
+      { table_type_name: '' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe('table_type_name is required');
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('refuses an absent table_type_name at the schema, sending nothing', async () => {
+    const connection = recordingConnection();
+    const refused = expect(
+      defineTool(UpdateTableType_Tool, handleUpdateTableType).call(
         { connection, logger: undefined },
-        args,
-      );
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe('table_type_name is required');
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+        {},
+      ),
+    ).rejects.toThrow('at table_type_name');
+    await refused;
+    expect(connection.requests).toHaveLength(0);
+  });
 
   it('is served on a connection declared cloud', async () => {
     const connection = existing();
@@ -543,7 +591,7 @@ describe('UpdateTableType', () => {
 
 /**
  * What SAP stores when it takes other values than those sent (measured on
- * E19, 2026-11-01: `hashed` forces a unique key): STRING_TABLE with a hashed
+ * on premise, 2026-11-01: `hashed` forces a unique key): STRING_TABLE with a hashed
  * access and a unique key, answered by the wait's read after the unlock.
  */
 const STORED_HASHED = STRING_TABLE.replace(
@@ -574,7 +622,7 @@ function throwingAt(
 ): RecordingConnection {
   return {
     ...inner,
-    async makeAdtRequest<T = unknown, D = unknown>(
+    async makeAdtRequest(
       options: Parameters<RecordingConnection['makeAdtRequest']>[0],
     ) {
       if (options.url === url) {
@@ -583,7 +631,7 @@ function throwingAt(
           response: { ...REFUSED, headers: {} },
         });
       }
-      return inner.makeAdtRequest<T, D>(options);
+      return inner.makeAdtRequest(options);
     },
   };
 }
@@ -981,19 +1029,28 @@ describe('DeleteTableType', () => {
     expect(wire(connection)).toEqual([`POST ${DELETION_CHECK_URL}`]);
   });
 
-  it.each([[{}], [{ table_type_name: '' }]])(
-    'refuses a missing table_type_name, sending nothing',
-    async (args) => {
-      const connection = recordingConnection();
-      const result = await handleDeleteTableType(
+  it('refuses an empty table_type_name, sending nothing', async () => {
+    const connection = recordingConnection();
+    const result = await handleDeleteTableType(
+      { connection, logger: undefined },
+      { table_type_name: '' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe('table_type_name is required');
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('refuses an absent table_type_name at the schema, sending nothing', async () => {
+    const connection = recordingConnection();
+    const refused = expect(
+      defineTool(DeleteTableType_Tool, handleDeleteTableType).call(
         { connection, logger: undefined },
-        args,
-      );
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe('table_type_name is required');
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+        {},
+      ),
+    ).rejects.toThrow('at table_type_name');
+    await refused;
+    expect(connection.requests).toHaveLength(0);
+  });
 
   it('is served on a connection declared cloud', async () => {
     const connection = sessionRecording([
@@ -1034,19 +1091,28 @@ describe('ActivateTableType', () => {
     expect(connection.sessions).toEqual(['stateless']);
   });
 
-  it.each([[{}], [{ table_type_name: '' }]])(
-    'refuses a missing table_type_name, sending nothing',
-    async (args) => {
-      const connection = recordingConnection();
-      const result = await handleActivateTableType(
+  it('refuses an empty table_type_name, sending nothing', async () => {
+    const connection = recordingConnection();
+    const result = await handleActivateTableType(
+      { connection, logger: undefined },
+      { table_type_name: '' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe('table_type_name is required');
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('refuses an absent table_type_name at the schema, sending nothing', async () => {
+    const connection = recordingConnection();
+    const refused = expect(
+      defineTool(ActivateTableType_Tool, handleActivateTableType).call(
         { connection, logger: undefined },
-        args,
-      );
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe('table_type_name is required');
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+        {},
+      ),
+    ).rejects.toThrow('at table_type_name');
+    await refused;
+    expect(connection.requests).toHaveLength(0);
+  });
 
   it('is served on a connection declared cloud', async () => {
     const connection = sessionRecording([
@@ -1107,19 +1173,28 @@ describe('CheckTableType', () => {
     expect(textOf(result)).toContain('no authority for CHECKTT');
   });
 
-  it.each([[{}], [{ table_type_name: '' }]])(
-    'refuses a missing table_type_name, sending nothing',
-    async (args) => {
-      const connection = recordingConnection();
-      const result = await handleCheckTableType(
+  it('refuses an empty table_type_name, sending nothing', async () => {
+    const connection = recordingConnection();
+    const result = await handleCheckTableType(
+      { connection, logger: undefined },
+      { table_type_name: '' },
+    );
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('table_type_name is required');
+    expect(connection.requests).toHaveLength(0);
+  });
+
+  it('refuses an absent table_type_name at the schema, sending nothing', async () => {
+    const connection = recordingConnection();
+    const refused = expect(
+      defineTool(CheckTableType_Tool, handleCheckTableType).call(
         { connection, logger: undefined },
-        args,
-      );
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain('table_type_name is required');
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+        {},
+      ),
+    ).rejects.toThrow('at table_type_name');
+    await refused;
+    expect(connection.requests).toHaveLength(0);
+  });
 
   it('is served on a connection declared cloud', async () => {
     const connection = sessionRecording([{ data: CHECK_OK }]);
@@ -1167,27 +1242,38 @@ describe('the table-type version tools', () => {
       expect(VERSIONED_KINDS[variant]).toContain('table_type');
       expect(VERSION_SOURCE_KINDS[variant]).not.toContain('table_type');
       expect(
-        GET_OBJECT_VERSION_SOURCE.variants[variant].inputSchema.properties
-          .object_type.enum,
+        jsonAt(
+          listedJson(GET_OBJECT_VERSION_SOURCE.variants[variant].inputSchema),
+          'object_type',
+        ).enum,
       ).not.toContain('table_type');
       expect(
-        GET_OBJECT_VERSION_DIFF.variants[variant].inputSchema.properties
-          .object_type.enum,
+        jsonAt(
+          listedJson(GET_OBJECT_VERSION_DIFF.variants[variant].inputSchema),
+          'object_type',
+        ).enum,
       ).not.toContain('table_type');
       expect(
-        GET_OBJECT_VERSIONS.variants[variant].inputSchema.properties.object_type
-          .enum,
+        jsonAt(
+          listedJson(GET_OBJECT_VERSIONS.variants[variant].inputSchema),
+          'object_type',
+        ).enum,
       ).toContain('table_type');
     },
   );
 
-  it('GetObjectVersionSource refuses table_type, sending nothing', async () => {
+  it('GetObjectVersionSource refuses table_type at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const result = await handleGetObjectVersionSource(
-      { connection, logger: undefined },
-      { object_type: 'table_type', content_uri: `${TTYP}/ztt_x/versions/0001` },
-    );
-    expect(result.isError).toBe(true);
+    const refused = expect(
+      defineTool(GET_OBJECT_VERSION_SOURCE, handleGetObjectVersionSource).call(
+        { connection, logger: undefined },
+        {
+          object_type: 'table_type',
+          content_uri: `${TTYP}/ztt_x/versions/0001`,
+        },
+      ),
+    ).rejects.toThrow('Invalid arguments for tool GetObjectVersionSource: ');
+    await refused;
     expect(connection.requests).toHaveLength(0);
   });
 

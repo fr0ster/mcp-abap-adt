@@ -40,6 +40,7 @@ import type { EventEmitter } from 'node:events';
 import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
 import { forceClose, logoffsAnswered } from './ownedConnections';
+import { child } from './thrownValue';
 
 /**
  * **The logoffs at once** (the process's end — stdio's client close, a
@@ -61,11 +62,25 @@ export async function logOffAtOnce(): Promise<void> {
   await logoffsAnswered();
 }
 
-/** What the shutdown listens on: the process, or a test's stand-in. */
-export type ShutdownProcess = EventEmitter & {
-  stdin?: EventEmitter;
-  stdout?: EventEmitter;
-};
+/** A listener as Node's own contract takes one (`EventEmitter.on`). */
+type NodeListener = Parameters<EventEmitter['on']>[1];
+
+/** A stream the shutdown watches: it only registers listeners on it. */
+export interface ShutdownStream {
+  on(event: string, listener: NodeListener): void;
+}
+
+/**
+ * What the shutdown listens on: the process (`processEdges()` hands its
+ * `on`, `stdin` and `stdout`), or a test's stand-in. The shutdown only
+ * registers listeners, so an object that is structurally wider — `process`
+ * itself, an `EventEmitter` — fits.
+ */
+export interface ShutdownProcess {
+  on(event: string, listener: NodeListener): void;
+  stdin?: ShutdownStream | undefined;
+  stdout?: ShutdownStream | undefined;
+}
 
 /**
  * The signals that start the orderly shutdown (a second one forces it):
@@ -87,11 +102,7 @@ export const SHUTDOWN_SIGNALS = [
 
 /** Whether `error` says the other end of a pipe is gone (`EPIPE`): the client closed. */
 function pipeGone(error: unknown): boolean {
-  return (
-    error !== null &&
-    typeof error === 'object' &&
-    (error as { code?: unknown }).code === 'EPIPE'
-  );
+  return child(error, 'code') === 'EPIPE';
 }
 
 /** The orderly sequence's report: the stderr lines of what it could not do. */
@@ -102,7 +113,7 @@ export interface ShutdownRun {
 
 export interface ShutdownSequenceOptions {
   /** Synchronous, in the trigger's tick, after the latch: stop listening, stop admission, stop input. */
-  begin?: () => void;
+  begin?: (() => void) | undefined;
   /**
    * The orderly sequence. `step(words)` names what it waits for now, for the
    * forced close's line (`"the instance close"`, …); `signal` aborts when the
@@ -116,7 +127,7 @@ export interface ShutdownSequenceOptions {
   stderr: (line: string) => void;
   processLike: ShutdownProcess;
   /** Whether the end of stdin starts it (stdio). */
-  onStdinEnd?: boolean;
+  onStdinEnd?: boolean | undefined;
   /** `--shutdown-timeout` in milliseconds: the forced close after this long. Absent: none. */
   shutdownTimeoutMs?: number | undefined;
 }
@@ -156,7 +167,7 @@ export function installShutdownSequence(
   let failed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const forced = new AbortController();
-  let finished!: () => void;
+  let finished: () => void = () => {};
   const done = new Promise<void>((resolve) => {
     finished = resolve;
   });

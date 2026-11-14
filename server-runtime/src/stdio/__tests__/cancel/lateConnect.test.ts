@@ -23,7 +23,7 @@ jest.setTimeout(30_000);
 let s: Stand;
 
 beforeEach(async () => {
-  s = await stand({ shutdown: {} });
+  s = await stand({ kind: 'onprem', shutdown: {} });
 });
 
 afterEach(async () => {

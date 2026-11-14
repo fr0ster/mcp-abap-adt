@@ -214,6 +214,12 @@ describe('one main flow per instance', () => {
       }),
     });
     try {
+      // A's lock first: the unlock is sent only under a handle the instance
+      // holds, checked when the call comes in (#4).
+      await s.call('HandlerLock', {
+        object_type: 'CLASS',
+        object_name: 'ZCL_A',
+      });
       const held = s.standIn.hold((r) => isLock(r) && of('ZCL_B')(r));
       const lock = s.call('HandlerLock', {
         object_type: 'CLASS',

@@ -62,7 +62,7 @@ export function serverSentence(
   }
   if (
     error.kind === 'unknown' &&
-    (error.facts as { operation?: unknown }).operation === 'persisting-tokens'
+    error.facts.operation === 'persisting-tokens'
   ) {
     return PERSISTING_TOKENS_SENTENCE;
   }

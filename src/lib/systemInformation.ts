@@ -25,6 +25,8 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { type JsonValue, jsonAt, jsonValueOf, parseJson } from './json';
+import { childAt } from './thrownValue';
 
 const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
 const SYSTEM_INFORMATION_ACCEPT =
@@ -37,54 +39,34 @@ export type SystemInformation = {
   readonly systemId: string | undefined;
 };
 
-/** The body as a plain JSON object, else `undefined`. */
-function objectOf(data: unknown): Record<string, unknown> | undefined {
-  let value = data;
-  if (typeof value === 'string') {
-    try {
-      value = JSON.parse(value);
-    } catch {
-      return undefined;
-    }
-  }
-  if (value === null || typeof value !== 'object') {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
-}
-
-function fieldOf(
-  body: Record<string, unknown> | undefined,
-  name: string,
-): unknown {
-  if (body === undefined) return undefined;
-  try {
-    return body[name];
-  } catch {
-    return undefined;
-  }
+/**
+ * The body, typed at the parse: a text body read as JSON ({@link parseJson}),
+ * a body the connection already parsed checked as JSON writes it
+ * ({@link jsonValueOf}); `undefined` when it is neither.
+ */
+function bodyOf(data: unknown): JsonValue | undefined {
+  return typeof data === 'string' ? parseJson(data) : jsonValueOf(data);
 }
 
 export async function readSystemInformation(
   connection: IAbapConnection,
 ): Promise<SystemInformation> {
-  const response: { status?: unknown; data?: unknown } =
-    await connection.makeAdtRequest({
-      url: SYSTEM_INFORMATION_URL,
-      method: 'GET',
-      timeout: 0,
-      headers: { Accept: SYSTEM_INFORMATION_ACCEPT },
-      params: { _: Date.now() },
-    });
+  const response = await connection.makeAdtRequest({
+    url: SYSTEM_INFORMATION_URL,
+    method: 'GET',
+    timeout: 0,
+    headers: { Accept: SYSTEM_INFORMATION_ACCEPT },
+    params: { _: Date.now() },
+  });
   // A connection that hands back a status other than a 2xx instead of
   // throwing it (an embedder's own) is read by that status all the same.
   const status = response.status;
-  if (typeof status === 'number' && (status < 200 || status > 299)) {
+  if (status < 200 || status > 299) {
     throw new SystemInformationStatusError(status);
   }
-  const body = objectOf(response.data);
-  const named = fieldOf(body, 'userName');
-  const id = fieldOf(body, 'systemID');
+  const body = bodyOf(response.data);
+  const named = jsonAt(body, 'userName');
+  const id = jsonAt(body, 'systemID');
   return {
     user: typeof named === 'string' && named.trim() !== '' ? named : undefined,
     systemId: typeof id === 'string' ? id : undefined,
@@ -108,8 +90,7 @@ export class SystemInformationStatusError extends Error {
 /** The HTTP status a failed request carries, if any (read guarded). */
 function statusOf(error: unknown): unknown {
   try {
-    return (error as { response?: { status?: unknown } } | null)?.response
-      ?.status;
+    return childAt(error, 'response', 'status');
   } catch {
     return undefined;
   }

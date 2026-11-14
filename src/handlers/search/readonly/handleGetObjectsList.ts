@@ -1,51 +1,50 @@
+import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { succeeded } from '../../../lib/strategies/stepResponse';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
     '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      parent_name: {
-        type: 'string',
-        description:
-          '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
-      },
-      parent_tech_name: {
-        type: 'string',
-        description: '[read-only] Parent technical name',
-      },
-      parent_type: {
-        type: 'string',
-        description: '[read-only] Parent object type (e.g. PROG/P, FUGR)',
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several parents, read together (give this or parent_name)',
-        items: {
-          type: 'object',
-          properties: {
-            parent_type: {
-              type: 'string',
-              description: 'Parent object type (e.g. PROG/P, FUGR)',
-            },
-            parent_name: { type: 'string', description: 'Parent object name' },
-          },
-          required: ['parent_type', 'parent_name'],
-        },
-      },
-      with_short_descriptions: {
-        type: 'boolean',
-        description: '[read-only] Include short descriptions (default: true)',
-      },
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    parent_name: z
+      .string()
+      .optional()
+      .describe(
+        '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
+      ),
+    parent_tech_name: z
+      .string()
+      .optional()
+      .describe('[read-only] Parent technical name'),
+    parent_type: z
+      .string()
+      .optional()
+      .describe('[read-only] Parent object type (e.g. PROG/P, FUGR)'),
+    objects: z
+      .array(
+        z.object({
+          parent_type: z
+            .string()
+            .describe('Parent object type (e.g. PROG/P, FUGR)'),
+          parent_name: z.string().describe('Parent object name'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several parents, read together (give this or parent_name)',
+      ),
+    with_short_descriptions: z
+      .boolean()
+      .optional()
+      .describe('[read-only] Include short descriptions (default: true)'),
+  }),
 } as const;
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -74,9 +73,7 @@ import {
   batchReader,
   endsTheCall,
   type NodeLevel,
-  type NodeRequest,
   nodeStructureOn,
-  readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -104,13 +101,7 @@ interface FlatObject {
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value: objects }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<FlatObject[], IAdtError>;
+  return succeeded(objects);
 }
 
 function flatObjects(level: NodeLevel): FlatObject[] {
@@ -154,9 +145,9 @@ async function collectValidObjects(
         withShortDescriptions,
       }),
   );
-  if (!response.ok) return response as IAdtResponse<FlatObject[], IAdtError>;
+  if (!response.ok) return response;
 
-  const level = response.getResult().value as NodeLevel;
+  const level = response.getResult().value;
   let objects: FlatObject[] = level.objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
@@ -241,15 +232,18 @@ async function walkParentsBatched(
   parents: readonly Parent[],
   withShortDescriptions: boolean,
 ): Promise<ParentWalks> {
-  const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
-    readNode(
-      nodeStructureOn(
-        context,
-        createAdtClient(c, context.logger).getUtils(ourUtils),
-      ),
-      request,
-    ),
-  );
+  // Each node's structure, as `readNode` reads an analysed request.
+  const read = batchReader(context, (node: ListNode, c) => {
+    const parent = parents[node.root];
+    return nodeStructureOn(
+      context,
+      createAdtClient(c, context.logger).getUtils(ourUtils),
+    ).fetchNodeStructure(parent.type, parent.name, {
+      analyse: analyseException,
+      nodeId: node.nodeId,
+      withShortDescriptions,
+    });
+  });
   const failures = new Map<number, IAdtFailure | Thrown>();
   const visited = parents.map(() => new Set<string>(['000000']));
   const roots: ListNode[] = parents.map((_, root) => ({
@@ -261,19 +255,11 @@ async function walkParentsBatched(
 
   let level = roots;
   while (level.length > 0) {
-    const answers = await read(
-      level.map((node) => ({
-        parentType: (parents[node.root] as Parent).type,
-        parentName: (parents[node.root] as Parent).name,
-        nodeId: node.nodeId,
-        withShortDescriptions,
-        analysed: true,
-      })),
-    );
+    const answers = await read(level);
     const next: ListNode[] = [];
     for (const [i, node] of level.entries()) {
       if (failures.has(node.root)) continue;
-      const result = answers[i] as (typeof answers)[number];
+      const result = answers[i];
       // A read that threw is its parent's failure; one that ends the call
       // (a credential failure) is thrown as it came.
       if (!result.ok) {
@@ -281,7 +267,7 @@ async function walkParentsBatched(
         failures.set(node.root, { ok: false, thrown: result.error });
         continue;
       }
-      const response = result.value as IAdtResponse<unknown, IAdtError>;
+      const response = result.value;
       if (!response.ok) {
         if (credentialRefused(response)) {
           return { walks: [], ended: response };
@@ -289,9 +275,9 @@ async function walkParentsBatched(
         failures.set(node.root, response);
         continue;
       }
-      const found = response.getResult().value as NodeLevel;
+      const found = response.getResult().value;
       node.objects = flatObjects(found);
-      const seen = visited[node.root] as Set<string>;
+      const seen = visited[node.root];
       for (const child of found.childNodes) {
         if (seen.has(child.nodeId)) continue;
         seen.add(child.nodeId);
@@ -310,9 +296,7 @@ async function walkParentsBatched(
 
   return {
     walks: roots.map(
-      (root) =>
-        (failures.get(root.root) as ParentWalk | undefined) ??
-        ok(flatten(root)),
+      (root): ParentWalk => failures.get(root.root) ?? ok(flatten(root)),
     ),
   };
 }
@@ -362,13 +346,7 @@ function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
 
 export async function handleGetObjectsList(
   context: HandlerContext,
-  args: {
-    parent_name?: string;
-    parent_tech_name?: string;
-    parent_type?: string;
-    objects?: Array<{ parent_type?: string; parent_name?: string }>;
-    with_short_descriptions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const {
     parent_name,
@@ -428,7 +406,7 @@ export async function handleGetObjectsList(
         );
         // A credential failure SAP answered ends the call as it came.
         if (read.ended !== undefined) {
-          return read.ended as IAdtResponse<FlatObject[], IAdtError>;
+          return read.ended;
         }
         return ok([]);
       },
@@ -503,7 +481,7 @@ export async function handleGetObjectsList(
             [{ type: parentType, name: parentName }],
             withDescriptions,
           );
-          const walk = (read.ended ?? read.walks[0]) as ParentWalk;
+          const walk = read.ended ?? read.walks[0];
           if ('thrown' in walk) throw walk.thrown;
           return walk;
         },

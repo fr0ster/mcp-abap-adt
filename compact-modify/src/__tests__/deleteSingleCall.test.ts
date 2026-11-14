@@ -1,6 +1,8 @@
 /**
  * Compact `HandlerDelete` is one ADT request (spec §4.6, the owner's rule:
- * compact is one request per tool call):
+ * compact is one request per tool call) — a function module's after its
+ * metadata read at the group given (#2: SAP ignores the group of a module's
+ * address):
  *
  * - every type a deletion request removes: that request alone — no lock (a
  *   held lock is what makes ADT refuse a deletion), no deletion check (its own
@@ -17,8 +19,11 @@
 import { compactDeleteSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
+import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
+import { holdingLockOf } from '../../../src/__tests__/helpers/heldLocks';
+import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { DELETION_TYPES } from '../../../src/handlers/common/low/deletionTargets';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
 import {
   handleHandlerDelete,
@@ -65,12 +70,18 @@ function recording(mode: Mode) {
         headers: {},
         data: String(options.url).startsWith('/sap/bc/adt/deletion/delete')
           ? DELETED
-          : '',
+          : String(options.url) === MODULE_METADATA
+            ? moduleMetadataDocument('Z_FM_A', 'ZFG_A')
+            : '',
       };
     },
   };
   return { connection, sent };
 }
+
+/** The function module's metadata read at its group, before its deletion (#2). */
+const MODULE_METADATA =
+  '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea';
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
@@ -97,7 +108,8 @@ async function run(
 ): Promise<Run> {
   const { connection, sent } = recording(mode);
   const pending = handleHandlerDelete(
-    contextOver(connection, heldLocks),
+    // Unless a case gives its own, the instance locked what it writes under.
+    contextOver(connection, heldLocks ?? holdingLockOf(args)),
     args as never,
   ) as Promise<Answer>;
   if (mode === 'pending') {
@@ -212,7 +224,7 @@ describe('HandlerDelete is one request', () => {
   });
 
   it.each(DELETIONS)(
-    '%s: exactly one request, the deletion — no lock, no check — the same held, answered or 404',
+    '%s: exactly one request, the deletion — no lock, no check — the same held, answered or 404 (a function module: its metadata read first)',
     async (objectType, fields, uri) => {
       const args = {
         object_type: objectType,
@@ -223,8 +235,21 @@ describe('HandlerDelete is one request', () => {
       const answered = await run('answered', args);
       const notFound = await run('not-found', args);
 
-      expect(held.sent).toHaveLength(1);
-      const [deletion] = held.sent;
+      // A function module's metadata is read at the group given, and the
+      // deletion sent only when that group holds it (#2).
+      const checked = objectType === 'FUNCTION_MODULE';
+      if (checked) {
+        expect(held.sent).toEqual([
+          { method: 'GET', url: MODULE_METADATA, data: undefined },
+        ]);
+        expect(answered.sent).toHaveLength(2);
+        expect(answered.sent[0]).toEqual(held.sent[0]);
+      } else {
+        expect(held.sent).toHaveLength(1);
+        expect(answered.sent).toEqual(held.sent);
+      }
+      const deletion = checked ? answered.sent[1] : held.sent[0];
+      if (deletion === undefined) throw new Error('no deletion was sent');
       if (objectType === 'METADATA_EXTENSION') {
         // Its deletion is a DELETE on its own URL.
         expect(deletion.method).toBe('DELETE');
@@ -239,7 +264,6 @@ describe('HandlerDelete is one request', () => {
       expect(deletion.url).not.toContain('_action=');
       expect(deletion.url).not.toContain('/deletion/check');
 
-      expect(answered.sent).toEqual(held.sent);
       expect(notFound.sent).toEqual(held.sent);
       expect(answered.answer?.isError).not.toBe(true);
       expect(notFound.answer?.isError).toBe(true);
@@ -372,10 +396,7 @@ describe('HandlerDelete is one request', () => {
   );
 });
 
-const schemaProperties = compactDeleteSchema.properties as Record<
-  string,
-  unknown
->;
+const schemaProperties = listedJson(compactDeleteSchema).properties ?? {};
 
 describe('the HandlerDelete schema and description', () => {
   it.each(['activate_on_delete', 'force_new_connection', 'activate'])(
@@ -392,15 +413,17 @@ describe('the HandlerDelete schema and description', () => {
       .sort();
     expect(
       [
-        ...(compactDeleteSchema.properties.object_type
-          .enum as readonly string[]),
+        ...(jsonAt(listedJson(compactDeleteSchema), 'object_type').enum ?? []),
       ].sort(),
     ).toEqual(withDelete);
   });
 
   it('deletes a table type on ABAP cloud, and no include there', () => {
-    const members: readonly string[] =
-      TOOL_DEFINITION.variants.cloud.inputSchema.properties.object_type.enum;
+    const members =
+      jsonAt(
+        listedJson(TOOL_DEFINITION.variants.cloud.inputSchema),
+        'object_type',
+      ).enum ?? [];
     expect(members).toContain('TABLE_TYPE');
     expect(members).not.toContain('INCLUDE');
   });

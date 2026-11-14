@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ValidateServiceBinding Handler - Validate ABAP service binding parameters
  *
@@ -45,7 +47,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import {
   project,
   terseTransportCheck,
@@ -58,50 +60,39 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[read-only] Validates a new service binding named by service_binding_name for the service definition named by service_definition_name, in the package and version given, through the ADT validation endpoint. The answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      service_binding_name: {
-        type: 'string',
-        description: 'Service binding name to validate.',
-      },
-      description: {
-        type: 'string',
-        description: 'Optional description used during validation.',
-      },
-      service_definition_name: {
-        type: 'string',
-        description:
-          'Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.',
-      },
-      package_name: {
-        type: 'string',
-        description:
-          'ABAP package of the binding, which the validation checks.',
-      },
-      service_binding_version: {
-        type: 'string',
-        description:
-          'Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [
-      'service_binding_name',
-      'service_definition_name',
-      'package_name',
-    ],
-  },
+  inputSchema: z.object({
+    service_binding_name: z
+      .string()
+      .describe('Service binding name to validate.'),
+    description: z
+      .string()
+      .optional()
+      .describe('Optional description used during validation.'),
+    service_definition_name: z
+      .string()
+      .describe(
+        'Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.',
+      ),
+    package_name: z
+      .string()
+      .describe('ABAP package of the binding, which the validation checks.'),
+    service_binding_version: z
+      .string()
+      .optional()
+      .describe(
+        'Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface ValidateServiceBindingArgs {
-  service_binding_name: string;
-  description?: string;
-  service_definition_name?: string;
-  package_name?: string;
-  service_binding_version?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ValidateServiceBindingArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** The refusals of a call without one of its names, in the order they are checked. */
+export const SERVICE_BINDING_NAME_REQUIRED = 'service_binding_name is required';
+export const SERVICE_DEFINITION_NAME_REQUIRED =
+  'service_definition_name is required';
+export const PACKAGE_NAME_REQUIRED = 'package_name is required';
 
 export async function handleValidateServiceBinding(
   context: HandlerContext,
@@ -110,16 +101,16 @@ export async function handleValidateServiceBinding(
   const { connection, logger } = context;
 
   if (!args?.service_binding_name) {
-    return return_error(new Error('service_binding_name is required'));
+    return return_error(new Error(SERVICE_BINDING_NAME_REQUIRED));
   }
   if (!args?.service_definition_name) {
-    return return_error(new Error('service_definition_name is required'));
+    return return_error(new Error(SERVICE_DEFINITION_NAME_REQUIRED));
   }
   // The transport check names the binding's package: without one, adt-clients
   // fails on it before any request (a TypeError), so it is refused here.
   const packageName = args.package_name?.trim();
   if (!packageName) {
-    return return_error(new Error('package_name is required'));
+    return return_error(new Error(PACKAGE_NAME_REQUIRED));
   }
 
   const bindingName = args.service_binding_name.trim().toUpperCase();

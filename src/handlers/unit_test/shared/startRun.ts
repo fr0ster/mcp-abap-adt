@@ -22,7 +22,13 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
+import type {
+  IUnitTestDuration,
+  IUnitTestRiskLevel,
+} from '@mcp-abap-adt/interfaces-adt';
+import type * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import type { compactUnitTestRunSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -32,20 +38,11 @@ import { type RunTargetArgs, runFlagsOf, runTargetOf } from './runTarget';
 
 export type { UnitTestRunner } from './runner';
 
-export interface StartUnitTestRunArgs {
-  tests?: Array<{ container_class: string; test_class: string }>;
-  title?: string;
-  context?: string;
-  scope?: {
-    own_tests?: boolean;
-    foreign_tests?: boolean;
-    add_foreign_tests_as_preview?: boolean;
-  };
-  risk_level?: { harmless?: boolean; dangerous?: boolean; critical?: boolean };
-  duration?: { short?: boolean; medium?: boolean; long?: boolean };
-  target?: RunTargetArgs;
-  runner?: UnitTestRunner;
-}
+/**
+ * The run's arguments, as compact `HandlerUnitTestRun`'s schema parses them
+ * (its one caller).
+ */
+export type StartUnitTestRunArgs = z.output<typeof compactUnitTestRunSchema>;
 
 export async function handleStartUnitTestRun(
   context: HandlerContext,
@@ -66,7 +63,6 @@ export async function handleStartUnitTestRun(
     );
   }
   const runner = runnerOf(args);
-  if (runner instanceof Error) return return_error(runner);
   const definitions = tests.map((test) => ({
     containerClass: test.container_class.toUpperCase(),
     testClass: test.test_class.toUpperCase(),
@@ -86,7 +82,11 @@ export async function handleStartUnitTestRun(
         runTestsSync(
           context,
           { carrier: 'class', target: definitions },
-          { scope: runScope, riskLevel: risk_level, duration },
+          {
+            scope: runScope,
+            riskLevel: riskLevelOf(risk_level),
+            duration: durationOf(duration),
+          },
         ),
       projectSync('terse'),
     );
@@ -104,8 +104,8 @@ export async function handleStartUnitTestRun(
         title,
         context: args.context,
         scope: runScope,
-        riskLevel: risk_level,
-        duration,
+        riskLevel: riskLevelOf(risk_level),
+        duration: durationOf(duration),
       }),
     (runId: string) => ({ success: true, run_id: runId }),
   );
@@ -118,7 +118,6 @@ async function startTargetRun(
   given: RunTargetArgs,
 ) {
   const runner = runnerOf(args);
-  if (runner instanceof Error) return return_error(runner);
   if (runner === 'sync') {
     return return_error(
       new Error(
@@ -128,9 +127,7 @@ async function startTargetRun(
   }
   const target = runTargetOf(given);
   if (target instanceof Error) return return_error(target);
-  const flags = runFlagsOf(args);
-  if (flags instanceof Error) return return_error(flags);
-  const { scope, riskLevel, duration } = flags;
+  const { scope, riskLevel, duration } = runFlagsOf(args);
   const generic = new AdtExecutor(
     context.connection,
     context.logger,
@@ -148,4 +145,31 @@ async function startTargetRun(
       }),
     (runId: string) => ({ success: true, run_id: runId }),
   );
+}
+
+/**
+ * The risk levels the arguments give, each present only when given:
+ * `IUnitTestRiskLevel` declares its flags without `| undefined`.
+ */
+function riskLevelOf(
+  level: StartUnitTestRunArgs['risk_level'],
+): IUnitTestRiskLevel | undefined {
+  if (level === undefined) return undefined;
+  return {
+    ...(level.harmless !== undefined && { harmless: level.harmless }),
+    ...(level.dangerous !== undefined && { dangerous: level.dangerous }),
+    ...(level.critical !== undefined && { critical: level.critical }),
+  };
+}
+
+/** The durations the arguments give, each present only when given (`IUnitTestDuration`). */
+function durationOf(
+  duration: StartUnitTestRunArgs['duration'],
+): IUnitTestDuration | undefined {
+  if (duration === undefined) return undefined;
+  return {
+    ...(duration.short !== undefined && { short: duration.short }),
+    ...(duration.medium !== undefined && { medium: duration.medium }),
+    ...(duration.long !== undefined && { long: duration.long }),
+  };
 }

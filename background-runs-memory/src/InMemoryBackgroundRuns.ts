@@ -4,17 +4,21 @@
  * never installs it. The launchers of `mcp-abap-adt`, `mcp-abap-adt-http`
  * and `mcp-abap-adt-sse` (and the compact binaries on them) create one and
  * hand it to their server instances; lib creates none — an embedder passes
- * this, its own strategy, or none (then `background: true` is refused).
+ * this, its own strategy, or none (then a code run's `background: true` is
+ * refused, and a listed long tool answers its result in the call).
  *
  * - **Handles**: 128 random bits as hex, after the host's `prefix` (an
  *   instance id, when the host routes handles between instances — the
  *   routing is the host's).
- * - **Ownership**: each run is its caller's (URL, client, backend user);
+ * - **Ownership**: each run is its caller's (system, client, backend user);
  *   another caller's handle reads exactly as an unknown one.
  * - **Limit**: {@link BACKGROUND_RUNS_PER_CALLER} per caller, running plus
  *   kept; no process-wide limit.
- * - **No timeouts**: a finished run's answer stays until its caller discards
- *   it; every answer ends with the process.
+ * - **State**: `running`; `finished`; `cancelled` — a kept answer carrying
+ *   `cancelled: true` (a read run its caller cancelled).
+ * - **No timeouts**: an ended run's answer stays until it is discarded (a
+ *   read run's right after it was read, by the library); every answer ends
+ *   with the process.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -26,6 +30,7 @@ import type {
   BackgroundRunRecord,
   BackgroundRunStart,
   BackgroundRunStarted,
+  BackgroundRunState,
   IBackgroundRuns,
 } from '@mcp-abap-adt/lib/embeddable';
 
@@ -44,7 +49,14 @@ interface Kept {
 }
 
 function ownerKey(caller: BackgroundRunCaller): string {
-  return JSON.stringify([caller.url, caller.client, caller.user]);
+  return JSON.stringify([caller.system, caller.client, caller.user]);
+}
+
+/** An ended run's state: `cancelled` when its answer says so. */
+function endedState(
+  answer: BackgroundRunAnswer,
+): Exclude<BackgroundRunState, 'running'> {
+  return answer.cancelled === true ? 'cancelled' : 'finished';
 }
 
 export class InMemoryBackgroundRuns implements IBackgroundRuns {
@@ -96,7 +108,7 @@ export class InMemoryBackgroundRuns implements IBackgroundRuns {
     return {
       ...kept.run,
       run_handle: handle,
-      state: 'finished',
+      state: endedState(kept.finished.answer),
       finished_at: kept.finished.at,
       answer: kept.finished.answer,
     };
@@ -113,7 +125,7 @@ export class InMemoryBackgroundRuns implements IBackgroundRuns {
           : {
               ...kept.run,
               run_handle: handle,
-              state: 'finished',
+              state: endedState(kept.finished.answer),
               finished_at: kept.finished.at,
             },
       );

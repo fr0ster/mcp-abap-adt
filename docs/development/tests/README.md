@@ -22,15 +22,6 @@ Technical overview of the test infrastructure:
 - Migration path for legacy tests
 - Test coverage status
 
-### [CREATE_DOMAIN_TOOL.md](CREATE_DOMAIN_TOOL.md)
-Documentation for the CreateDomain MCP tool:
-- Complete API reference
-- Workflow steps (lock → create → check → unlock → activate → verify)
-- Session management architecture
-- Input parameters and response format
-- Error handling
-- Testing examples
-
 ### [DEBUGGING.md](DEBUGGING.md)
 Guide for debugging integration tests:
 - Environment variables for debugging (DEBUG_TESTS, DEBUG_HANDLERS, etc.)
@@ -62,7 +53,7 @@ Template for test configuration:
    ```bash
    npm run build
    npm run test:integration              # All tests
-   npm test -- --testPathPatterns=class   # Specific object
+   npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts   # One file
    ```
 
 ## 📁 Related Files

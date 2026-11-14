@@ -2,11 +2,11 @@ import { registerConnectionResetHook } from './connectionEvents';
 import { getRequestContext } from './requestContext';
 
 export interface IAdtSystemContext {
-  masterSystem?: string;
-  responsible?: string;
+  masterSystem?: string | undefined;
+  responsible?: string | undefined;
   client?: string;
-  /** Master/original language for created objects (adtcore:masterLanguage). From SAP_LANGUAGE; library defaults to EN when unset. */
-  masterLanguage?: string;
+  /** Original language for created objects, from SAP_LANGUAGE: a create given none states this one (#348); unset, a create states none and SAP takes its logon language. */
+  masterLanguage?: string | undefined;
 }
 
 // The process-wide context: the configuration (`systemContextFromConfiguration`)
@@ -21,6 +21,11 @@ let cached: IAdtSystemContext | undefined;
  * `undefined` when it states none. It fills only what the process context
  * lacks: a value an embedder stated (`setSystemContext`, `systemContext`) survives every request that sets a
  * context up. Sends nothing.
+ *
+ * The environment read here is the process's own: no destination's `.env`
+ * joins it (24.0.0). A destination's master language is its `SAP_LANGUAGE`
+ * in effect, handed with its system context (`withDestinationSystemContext`),
+ * and beats this process value.
  */
 export function systemContextFromConfiguration():
   | IAdtSystemContext

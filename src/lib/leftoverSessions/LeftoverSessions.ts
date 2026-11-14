@@ -60,7 +60,9 @@ import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { resolveSystemKind } from '../connectionFactory';
+import { type JsonValue, jsonAt, parseJson } from '../json';
 import { isEnded, whenLogoffCompleted } from '../ownedConnections';
 import {
   nodeProcessProbe,
@@ -113,8 +115,8 @@ export interface LeftoverListing {
  * named none.
  */
 export interface KnownSystem {
-  responsible?: string;
-  masterSystem?: string;
+  responsible?: string | undefined;
+  masterSystem?: string | undefined;
 }
 
 /**
@@ -134,10 +136,10 @@ export interface ClaimedSession {
 }
 
 /** The system information as the file holds it. */
-interface FileSystem {
+type FileSystem = {
   responsible: string | null;
   master_system: string | null;
-}
+};
 
 /** What the file holds. */
 interface RuntimeFile {
@@ -181,8 +183,8 @@ export const RUNTIME_FILE_FAILED_WORDS =
 const HEX = '0123456789abcdef';
 
 /** A handle: 32 lower-case hex digits (128 bits). Plain code. */
-export function isHandle(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length !== 32) return false;
+export function isHandle(value: string): boolean {
+  if (value.length !== 32) return false;
   for (const c of value) if (!HEX.includes(c)) return false;
   return true;
 }
@@ -201,16 +203,15 @@ function withoutTrailingSlashes(url: string): string {
  * The identity of a session opened for `destination` with `settings`: where
  * they point, and the backend user they state (`SAP_USERNAME`, or the
  * destination's login) — `null` when none (a token credential). `undefined`
- * over RFC — an RFC session is its conversation and keeps no file — and
- * without a URL.
+ * over RFC: an RFC session is its conversation and keeps no file.
  */
 export function sessionIdentity(
   destination: string,
   settings: SapConfig,
   login?: string,
 ): SessionIdentity | undefined {
+  // Narrowed by the wire: an HTTP config states its URL.
   if (settings.connectionType === 'rfc') return undefined;
-  if (typeof settings.url !== 'string') return undefined;
   const user = (settings.username ?? login ?? '').trim().toUpperCase();
   return {
     destination,
@@ -275,14 +276,21 @@ function sameCaller(a: SessionIdentity, b: SessionIdentity): boolean {
   );
 }
 
-/** The connection's session cookies, read structurally; `null` without. */
-function cookiesOf(connection: object): string | null {
-  const reader = (connection as { sessionCookies?: () => string | null })
-    .sessionCookies;
-  if (typeof reader !== 'function') return null;
+/**
+ * A connection as the leftover sessions read it: the members of
+ * `IAbapConnection` they call, each optional here as the registry's are.
+ */
+type LeftoverConnection = Partial<
+  Pick<
+    IAbapConnection,
+    'sessionCookies' | 'makeAdtRequest' | 'disconnect' | 'flushGoodbye'
+  >
+>;
+
+/** The connection's session cookies; `null` without. */
+function cookiesOf(connection: LeftoverConnection): string | null {
   try {
-    const cookies = reader.call(connection);
-    return typeof cookies === 'string' && cookies !== '' ? cookies : null;
+    return connection.sessionCookies?.() || null;
   } catch {
     return null;
   }
@@ -290,49 +298,63 @@ function cookiesOf(connection: object): string | null {
 
 /** A parsed file, or `undefined` for anything that is not one. */
 function parseFile(text: string): RuntimeFile | undefined {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  const file = value as Partial<RuntimeFile> | null;
-  const destination = file?.destination as
-    | Partial<RuntimeFile['destination']>
-    | undefined;
+  const value = parseJson(text);
+  if (value === undefined) return undefined;
+  const format = jsonAt(value, 'format');
+  const pid = jsonAt(value, 'pid');
+  const start = jsonAt(value, 'start');
+  const role = jsonAt(value, 'role');
+  const user = jsonAt(value, 'user');
+  const system = jsonAt(value, 'system');
+  const cookies = jsonAt(value, 'cookies');
+  const writtenAt = jsonAt(value, 'written_at');
+  const destination = jsonAt(value, 'destination');
+  const name = jsonAt(destination, 'name');
+  const url = jsonAt(destination, 'url');
+  const client = jsonAt(destination, 'client');
+  const kind = jsonAt(destination, 'system');
+  const wire = jsonAt(destination, 'wire');
   if (
-    file === null ||
-    typeof file !== 'object' ||
-    file.format !== 3 ||
-    !isFileSystem(file.system) ||
-    typeof file.pid !== 'number' ||
-    !(file.start === null || typeof file.start === 'string') ||
-    (file.role !== 'built' && file.role !== 'debugger') ||
-    typeof destination !== 'object' ||
-    destination === null ||
-    typeof destination.name !== 'string' ||
-    typeof destination.url !== 'string' ||
-    typeof destination.client !== 'string' ||
-    (destination.system !== 'onprem' && destination.system !== 'cloud') ||
-    destination.wire !== 'http' ||
-    !(file.user === null || typeof file.user === 'string') ||
-    typeof file.cookies !== 'string' ||
-    file.cookies === '' ||
-    typeof file.written_at !== 'string'
+    format !== 3 ||
+    !isFileSystem(system) ||
+    typeof pid !== 'number' ||
+    !(start === null || typeof start === 'string') ||
+    (role !== 'built' && role !== 'debugger') ||
+    typeof name !== 'string' ||
+    typeof url !== 'string' ||
+    typeof client !== 'string' ||
+    (kind !== 'onprem' && kind !== 'cloud') ||
+    wire !== 'http' ||
+    !(user === null || typeof user === 'string') ||
+    typeof cookies !== 'string' ||
+    cookies === '' ||
+    typeof writtenAt !== 'string'
   ) {
     return undefined;
   }
-  return file as RuntimeFile;
+  return {
+    format,
+    pid,
+    start,
+    role,
+    destination: { name, url, client, system: kind, wire },
+    user,
+    system,
+    cookies,
+    written_at: writtenAt,
+  };
 }
 
 /** Whether `value` is a file's system information: `null`, or both fields a string or `null`. */
-function isFileSystem(value: unknown): value is FileSystem | null {
+function isFileSystem(
+  value: JsonValue | undefined,
+): value is FileSystem | null {
   if (value === null) return true;
-  if (typeof value !== 'object') return false;
-  const system = value as Partial<FileSystem>;
+  const responsible = jsonAt(value, 'responsible');
+  const master = jsonAt(value, 'master_system');
   return (
-    (system.responsible === null || typeof system.responsible === 'string') &&
-    (system.master_system === null || typeof system.master_system === 'string')
+    (responsible === null || typeof responsible === 'string') &&
+    (master === null || typeof master === 'string')
   );
 }
 
@@ -398,7 +420,7 @@ export class LeftoverSessions {
    * write alone. A connection already ended, or already kept, is left alone.
    */
   track(
-    connection: object,
+    connection: LeftoverConnection,
     role: LeftoverRole,
     identity: SessionIdentity,
     handle: string = newHandle(),
@@ -426,7 +448,11 @@ export class LeftoverSessions {
    * Keeps a file of a connection opened beside `origin` (a debugger's own),
    * for the identity `origin` was built for. Nothing when that is unknown.
    */
-  trackSibling(connection: object, role: LeftoverRole, origin: object): void {
+  trackSibling(
+    connection: LeftoverConnection,
+    role: LeftoverRole,
+    origin: LeftoverConnection,
+  ): void {
     const identity = this.identities.get(origin);
     if (identity !== undefined) this.track(connection, role, identity);
   }
@@ -467,10 +493,7 @@ export class LeftoverSessions {
    * any dead process's file. Ends with `release` (the session stays a
    * leftover), `forget` (logged off) or `adopt` (resumed here).
    */
-  claim(
-    handle: unknown,
-    identity: SessionIdentity,
-  ): ClaimedSession | undefined {
+  claim(handle: string, identity: SessionIdentity): ClaimedSession | undefined {
     if (!isHandle(handle)) return undefined;
     const entry = this.available().find((e) => e.handle === handle);
     if (entry === undefined) return undefined;
@@ -516,7 +539,7 @@ export class LeftoverSessions {
    * in its file from now on (written again now when the file exists), so a
    * resume of it needs no lookup. Nothing for a connection not kept.
    */
-  describeSystem(connection: object, system: KnownSystem): void {
+  describeSystem(connection: LeftoverConnection, system: KnownSystem): void {
     const entry = this.tracked.get(connection);
     if (entry === undefined || entry.ended) return;
     const next: FileSystem = {
@@ -568,7 +591,7 @@ export class LeftoverSessions {
    */
   adopt(
     claimed: ClaimedSession,
-    connection: object,
+    connection: LeftoverConnection,
     identity: SessionIdentity,
   ): void {
     this.track(connection, claimed.role, identity, claimed.handle);
@@ -579,7 +602,7 @@ export class LeftoverSessions {
   }
 
   /** Writes again whatever changed in `connection`'s cookies. */
-  private refresh(connection: object): void {
+  private refresh(connection: LeftoverConnection): void {
     const entry = this.tracked.get(connection);
     if (entry === undefined || entry.ended || isEnded(connection)) return;
     const cookies = cookiesOf(connection);
@@ -602,19 +625,20 @@ export class LeftoverSessions {
    * stateful request brings the context cookie, which a resume needs to
    * reach the context its locks are in.
    */
-  private watch(connection: object): void {
-    const target = connection as {
-      makeAdtRequest?: (...args: unknown[]) => Promise<unknown>;
-    };
-    const original = target.makeAdtRequest;
-    if (typeof original !== 'function') return;
-    target.makeAdtRequest = async (...args: unknown[]) => {
-      try {
-        return await original.apply(connection, args);
-      } finally {
-        this.refresh(connection);
-      }
-    };
+  private watch(connection: LeftoverConnection): void {
+    const original = connection.makeAdtRequest;
+    if (original === undefined) return;
+    // The request passes through as it was made, its arguments and answer
+    // untouched: the wrapper only reads the cookies once it settled.
+    connection.makeAdtRequest = new Proxy(original, {
+      apply: async (original, _this, args) => {
+        try {
+          return await Reflect.apply(original, connection, args);
+        } finally {
+          this.refresh(connection);
+        }
+      },
+    });
   }
 
   private write(entry: Tracked, cookies: string): boolean {

@@ -101,11 +101,17 @@ export function readSessionTrace(lines: string[]): {
 } {
   const requests = new Map<
     string,
-    { what: string; stateful: boolean; sec: string; ctx: string; t?: number }
+    {
+      what: string;
+      stateful: boolean;
+      sec: string;
+      ctx: string;
+      t?: number | undefined;
+    }
   >();
   const answers = new Map<
     string,
-    { status: string; sec: string; ctx: string; t?: number }
+    { status: string; sec: string; ctx: string; t?: number | undefined }
   >();
   for (const line of lines) {
     const fields = line.split('\t');

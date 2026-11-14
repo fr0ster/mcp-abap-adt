@@ -20,7 +20,7 @@ export function requireDebugger(
 ): DebuggerInstance;
 export function requireDebugger(
   context: HandlerContext,
-  args: { state_handle?: string },
+  args: { state_handle?: string | undefined },
   mode: { create: 'abap' | 'amdp' } | 'use',
 ): DebuggerInstance {
   if (!context.state || !context.debugger) {
@@ -36,24 +36,44 @@ export function requireDebugger(
 }
 
 /**
+ * The debug state of this call: the one `requireDebugger` admitted the call
+ * with; refused in its words where the server serves no debugging.
+ */
+export function debugState(
+  context: HandlerContext,
+): NonNullable<HandlerContext['state']> {
+  if (!context.state) throw new Error('debugging is not served by this server');
+  return context.state;
+}
+
+/**
+ * What a debugger answer states beside its reading (`debugAnswer`'s
+ * `extraOf` and `failureExtraOf`): the handle, the SAP ids, the identity in
+ * force, each a string; a member left `undefined` is left out of the text.
+ */
+export type DebugExtra = Readonly<Record<string, string | undefined>>;
+
+/**
  * For a start's error answer: the handle, while the state still holds
  * something (a start that could not undo everything) — the model stops it
  * with this handle. Nothing held: nothing to answer.
  */
-export function heldStateHandle(
-  context: HandlerContext,
-): Record<string, unknown> {
+export function heldStateHandle(context: HandlerContext): DebugExtra {
   return context.state?.holdsState()
     ? { state_handle: context.state.handle }
     : {};
 }
 
 /** What a start answers beside its state: the handle, the SAP ids, and the identity in force. */
-export function startedExtra(context: HandlerContext): Record<string, unknown> {
-  const abap = context.debugger!().abap;
+export function startedExtra(context: HandlerContext): DebugExtra {
+  const { debugger: debuggerOf, state } = context;
+  if (debuggerOf === undefined || state === undefined) {
+    throw new Error('A started debug session has no debugger or state here');
+  }
+  const abap = debuggerOf().abap;
   const identity = abap.currentIdentity();
   return {
-    state_handle: context.state!.handle,
+    state_handle: state.handle,
     terminal_id: identity?.terminalId ?? abap.ids.terminalId,
     ide_id: abap.ids.ideId,
     ...(identity ? { debugging_mode: identity.debuggingMode } : {}),

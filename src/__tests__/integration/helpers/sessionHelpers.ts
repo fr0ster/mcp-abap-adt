@@ -13,7 +13,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { createConnectionLogger, getTestDestination } from './authHelpers';
 import {
@@ -24,7 +23,13 @@ import {
 import { createTestLogger } from './loggerHelpers';
 import { trackConnection } from './openConnections';
 import { primeSystemContext } from './primeSystemContext';
+import {
+  type GuardedConnection,
+  guardedTestConnection,
+  refuseAfterMarker,
+} from './refusalGuard';
 import { extractSessionState } from './testHelpers';
+import { thrownWords } from './thrownValue';
 
 /**
  * The connection logger, with the `csrfToken` channel the connection expects.
@@ -53,9 +58,8 @@ const sessionLogger = createTestLogger('connection');
 export interface SessionInfo {
   session_id: string;
   session_state: {
+    /** The connection's `sessionCookies()`; empty over RFC. A secret. */
     cookies: string;
-    csrf_token: string;
-    cookie_store: Record<string, string>;
   };
 }
 
@@ -64,7 +68,7 @@ export interface SessionInfo {
  * provider from the factory, one provider for the whole process.
  * `null` when the config names no destination or the destination fails.
  */
-async function createConnectionViaBroker(): Promise<IAbapConnection | null> {
+async function createConnectionViaBroker(): Promise<GuardedConnection | null> {
   try {
     const target = await getTestDestination();
     if (!target) return null;
@@ -76,13 +80,11 @@ async function createConnectionViaBroker(): Promise<IAbapConnection | null> {
     // Only pass connection logger if DEBUG_CONNECTION is set
     const connectionLoggerWithCsrf = withCsrfChannel(createConnectionLogger());
     return trackConnection(
-      createAbapConnection(
-        target.settings,
-        target.credential,
-        connectionLoggerWithCsrf,
-      ),
+      guardedTestConnection(target.settings, target.credential, {
+        logger: connectionLoggerWithCsrf,
+      }),
     );
-  } catch (error: any) {
+  } catch (error) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -101,12 +103,14 @@ export async function createTestConnectionAndSession(): Promise<{
   authType?: string;
   connectionSource?: 'auth_broker' | 'env' | 'unknown';
 }> {
+  // Nothing is read or sent once a credential was refused in this run.
+  refuseAfterMarker('a test connection');
   // Ensure environment and tokens are loaded (supports auth-broker fallback)
   try {
     await loadTestEnv();
-  } catch (error: any) {
+  } catch (error) {
     sessionLogger?.warn(
-      `[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`,
+      `[createTestConnectionAndSession] loadTestEnv failed: ${thrownWords(error)}`,
     );
   }
 
@@ -114,7 +118,7 @@ export async function createTestConnectionAndSession(): Promise<{
     // Check if environment.env is explicitly configured — skip auth broker
     const hasExplicitEnv = !!loadTestConfig()?.environment?.env;
 
-    let connection: IAbapConnection | null = null;
+    let connection: GuardedConnection | null = null;
     let connectionSource: 'auth_broker' | 'env' | 'unknown' = 'unknown';
 
     // Try AuthBroker only when no explicit env file is configured
@@ -124,9 +128,9 @@ export async function createTestConnectionAndSession(): Promise<{
         if (connection) {
           connectionSource = 'auth_broker';
         }
-      } catch (brokerError: any) {
+      } catch (brokerError) {
         sessionLogger?.debug(
-          `[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`,
+          `[createTestConnectionAndSession] AuthBroker failed: ${thrownWords(brokerError)}`,
         );
       }
     }
@@ -144,70 +148,15 @@ export async function createTestConnectionAndSession(): Promise<{
 
       // Create connection directly (fallback when AuthBroker is not available)
       connection = trackConnection(
-        createAbapConnection(
-          config,
-          credentialFromSapConfig(config),
-          connectionLoggerWithCsrf,
-        ),
+        guardedTestConnection(config, credentialFromSapConfig(config), {
+          logger: connectionLoggerWithCsrf,
+        }),
       );
       connectionSource = 'env';
     }
 
-    // Log token info from connection (what's actually used in session)
-    if (process.env.DEBUG_TESTS === 'true') {
-      let connectionConfig: any;
-      try {
-        // getConfig() is not part of IAbapConnection interface, use type assertion
-        connectionConfig = (connection as any).getConfig?.();
-      } catch (error: any) {
-        sessionLogger?.warn(
-          `[getTestSession] Failed to get connection config: ${error?.message}`,
-        );
-      }
-
-      const connectionConfigJwtToken = connectionConfig?.jwtToken;
-      const connectionConfigRefreshToken = connectionConfig?.refreshToken;
-
-      // For refresh token, show only first 10 and last 10 chars (it's shorter than JWT)
-      const refreshTokenPreview = connectionConfigRefreshToken
-        ? connectionConfigRefreshToken.length > 20
-          ? `${connectionConfigRefreshToken.substring(0, 10)}...${connectionConfigRefreshToken.substring(connectionConfigRefreshToken.length - 10)}`
-          : `${connectionConfigRefreshToken.substring(0, 10)}...` // If too short, show only first 10
-        : 'empty';
-
-      sessionLogger?.debug(
-        `[getTestSession] Connection tokens: ${JSON.stringify({
-          hasJwtToken: !!connectionConfigJwtToken,
-          jwtTokenStart: connectionConfigJwtToken
-            ? `${connectionConfigJwtToken.substring(0, 20)}...`
-            : 'empty',
-          jwtTokenEnd:
-            connectionConfigJwtToken && connectionConfigJwtToken.length > 20
-              ? `...${connectionConfigJwtToken.substring(connectionConfigJwtToken.length - 20)}`
-              : 'empty',
-          jwtTokenLength: connectionConfigJwtToken?.length || 0,
-          hasRefreshToken: !!connectionConfigRefreshToken,
-          refreshTokenPreview: refreshTokenPreview,
-          refreshTokenLength: connectionConfigRefreshToken?.length || 0,
-          hasUaaUrl: !!connectionConfig?.uaaUrl,
-          hasUaaClientId: !!connectionConfig?.uaaClientId,
-          hasUaaClientSecret: !!connectionConfig?.uaaClientSecret,
-          canRefresh: !!(
-            connectionConfigRefreshToken &&
-            connectionConfig?.uaaUrl &&
-            connectionConfig?.uaaClientId &&
-            connectionConfig?.uaaClientSecret
-          ),
-        })}`,
-      );
-    }
-
     // Connect once (same as adt-clients tests - no double connect)
-    // connect() is not part of IAbapConnection interface, use type assertion
-    const connectionAny = connection as any;
-    if (connectionAny.connect) {
-      await connectionAny.connect();
-    }
+    await connection.connect();
 
     // Resolve system context (legacy detection) so createAdtClient() picks the correct client
     await primeSystemContext(connection);
@@ -215,44 +164,24 @@ export async function createTestConnectionAndSession(): Promise<{
     // Generate session ID
     const sessionId = randomUUID().replace(/-/g, '');
 
-    // Get session state directly from connection (same as adt-clients tests)
-    // Note: getCookies() and getCsrfToken() exist in concrete classes but not in IAbapConnection interface
-    const cookies = connectionAny.getCookies?.() || '';
-    const csrfToken = connectionAny.getCsrfToken?.() || '';
-
-    if (!cookies && !csrfToken) {
-      const isRfc = process.env.SAP_CONNECTION_TYPE?.toLowerCase() === 'rfc';
-      if (!isRfc) {
-        throw new Error(
-          'Failed to get session state. Connection may not be properly initialized.',
-        );
-      }
-    }
-
-    // Get cookie store from connection if available
-    const cookieStore: Record<string, string> = {};
-    try {
-      // Cookie store is typically internal to connection, so we'll use empty object
-      // The cookies string contains all necessary information
-    } catch (error) {
-      // Ignore - cookie store is optional
+    // The session the connection holds, as the guarded connection declares
+    // it: `sessionCookies()`. The concrete class's `getCookies()` /
+    // `getCsrfToken()` are protected and not on the guard, so reading them
+    // found nothing and refused every HTTP connection. `null` before a
+    // session and over RFC, whose session no cookie names.
+    const config = connection.getConfig();
+    const cookies = connection.sessionCookies();
+    if (cookies === null && config.connectionType !== 'rfc') {
+      throw new Error(
+        'Failed to get session state. Connection may not be properly initialized.',
+      );
     }
 
     const session: SessionInfo = {
       session_id: sessionId,
-      session_state: {
-        cookies: cookies || '',
-        csrf_token: csrfToken || '',
-        cookie_store: cookieStore,
-      },
+      session_state: { cookies: cookies ?? '' },
     };
-
-    let authType: string | undefined;
-    try {
-      authType = (connection as any)?.getConfig?.()?.authType;
-    } catch {
-      authType = undefined;
-    }
+    const authType: string = config.authType;
 
     return {
       connection,
@@ -260,11 +189,11 @@ export async function createTestConnectionAndSession(): Promise<{
       authType,
       connectionSource,
     };
-  } catch (error: any) {
+  } catch (error) {
     sessionLogger?.error(
-      `[createTestConnectionAndSession] Error caught: ${error?.message || String(error)}`,
+      `[createTestConnectionAndSession] Error caught: ${thrownWords(error)}`,
     );
-    if (process.env.DEBUG_TESTS === 'true' && error?.stack) {
+    if (process.env.DEBUG_TESTS === 'true' && error instanceof Error) {
       sessionLogger?.debug(
         `[createTestConnectionAndSession] Stack: ${error.stack}`,
       );
@@ -288,7 +217,7 @@ export async function getTestSession(): Promise<SessionInfo> {
  */
 export function updateSessionFromResponse(
   currentSession: SessionInfo | null,
-  handlerResponse: any,
+  handlerResponse: unknown,
 ): SessionInfo {
   const { session_id, session_state } = extractSessionState(handlerResponse);
 
@@ -311,7 +240,7 @@ export function updateSessionFromResponse(
 /**
  * Extract session from Lock response (CRITICAL: must be used for Update/Unlock)
  */
-export function extractLockSession(lockResponse: any): SessionInfo {
+export function extractLockSession(lockResponse: unknown): SessionInfo {
   const { session_id, session_state } = extractSessionState(lockResponse);
 
   if (!session_id || !session_state) {

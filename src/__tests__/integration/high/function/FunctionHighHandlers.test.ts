@@ -16,7 +16,9 @@
  * Run: npm test -- --testPathPattern=integration/function/
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { after, before, describe, it } from 'node:test';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionGroup } from '../../../../handlers/function/high/handleUpdateFunctionGroup';
@@ -27,30 +29,45 @@ import {
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
-  getOperationDelay,
-  getSystemType,
-  getTimeout,
   isTestAvailableForSystem,
   loadTestEnv,
   resolvePackageName,
   resolveTransportRequest,
+  statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
   updateSessionFromResponse,
 } from '../../helpers/sessionHelpers';
 import {
+  readCaseParams,
+  stated,
+  type TestCase,
+} from '../../helpers/testConfigSchema';
+import {
   callTool,
   createHardModeClient,
+  type HardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
-import {
-  debugLog,
-  delay,
-  expectWriteAccepted,
-} from '../../helpers/testHelpers';
+import { debugLog, expectWriteAccepted } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const FunctionParams = z.looseObject({
+  function_group_description: z.string().optional(),
+  function_group_name: z.string(),
+  function_module_description: z.string().optional(),
+  function_module_name: z.string(),
+  update_function_group_description: z.string().optional(),
+  update_source_code: z.string().optional(),
+});
+
+/** A case's parameters, read through FunctionParams. */
+const paramsOf = (testCase: TestCase) =>
+  readCaseParams(testCase.params, FunctionParams, 'create_function');
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -58,19 +75,15 @@ import {
 const testLogger = createTestLogger('function-high');
 
 describe('Function High-Level Handlers Integration', () => {
-  let connection: AbapConnection | null = null;
+  let connection: IAbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-  let mcp: {
-    client: any;
-    toolNames: Set<string>;
-    close: () => Promise<void>;
-  } | null = null;
+  let mcp: HardModeClient | null = null;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       if (isHardModeEnabled()) {
-        mcp = await createHardModeClient();
+        mcp = await createHardModeClient('full');
         hasConfig = true;
         return;
       }
@@ -86,360 +99,349 @@ describe('Function High-Level Handlers Integration', () => {
         process.env.FULL_LOG_LEVEL === 'true'
       ) {
         testLogger?.warn(
-          '⚠️ Skipping tests: No .env file or SAP configuration found',
+          '⚠️ No .env file or SAP configuration found: each case skips',
         );
       }
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
     if (mcp) {
       await mcp.close();
       mcp = null;
     }
   });
 
-  it(
-    'should test all Function high-level handlers',
-    async () => {
-      if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
-        testLogger?.info(
-          '⏭️  Skipping test: No configuration, connection or session',
-        );
-        return;
-      }
+  it('should test all Function high-level handlers', async () => {
+    if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
+      skipRunningTest('No configuration, connection or session');
+      return;
+    }
 
-      // Get test case configuration (single config for both FUGR and FM)
-      const testCase = getEnabledTestCase(
-        'create_function',
-        'full_workflow_high',
+    // Get test case configuration (single config for both FUGR and FM)
+    const testCase = getEnabledTestCase(
+      'create_function',
+      'full_workflow_high',
+    );
+
+    if (!testCase) {
+      skipRunningTest('No test case configuration');
+      return;
+    }
+
+    // Check available_in from test case config
+    if (!isTestAvailableForSystem(testCase.available_in)) {
+      skipRunningTest(
+        `not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
       );
+      return;
+    }
 
-      if (!testCase) {
-        testLogger?.info('⏭️  Skipping test: No test case configuration');
-        return;
+    const functionGroupName = paramsOf(testCase).function_group_name;
+    const functionModuleName = paramsOf(testCase).function_module_name;
+    const packageName = resolvePackageName(testCase);
+    const transportRequest = resolveTransportRequest(testCase);
+    const functionGroupDescription =
+      paramsOf(testCase).function_group_description ||
+      `Test function group for high-level handler`;
+    const functionModuleDescription =
+      paramsOf(testCase).function_module_description ||
+      `Test function module for high-level handler`;
+    const updateFunctionGroupDescription =
+      paramsOf(testCase).update_function_group_description;
+
+    if (!paramsOf(testCase).update_source_code) {
+      throw new Error(
+        'update_source_code is required in test configuration for create_function',
+      );
+    }
+    // Remove comment blocks from update source code as SAP doesn't allow them in function modules
+    let updatedSourceCode = stated(
+      paramsOf(testCase).update_source_code,
+      'update_source_code',
+    );
+    // Remove comment blocks (lines starting with *")
+    updatedSourceCode = updatedSourceCode
+      .split('\n')
+      .filter((line: string) => !line.trim().startsWith('*"'))
+      .join('\n');
+
+    const invoke = async (
+      toolName: string,
+      args: Record<string, unknown>,
+      directCall: () => Promise<any>,
+    ) => {
+      if (!isHardModeEnabled()) {
+        return directCall();
       }
-
-      // Check available_in from test case config
-      if (!isTestAvailableForSystem(testCase.available_in)) {
-        testLogger?.info(
-          `⏭️  Skipping test: not available on ${getSystemType()} (available_in: ${testCase.available_in?.join(', ')})`,
-        );
-        return;
+      if (!mcp) {
+        throw new Error('Hard mode MCP client is not initialized');
       }
-
-      const functionGroupName = testCase.params.function_group_name;
-      const functionModuleName = testCase.params.function_module_name;
-      const packageName = resolvePackageName(testCase);
-      const transportRequest = resolveTransportRequest(testCase);
-      const functionGroupDescription =
-        testCase.params.function_group_description ||
-        `Test function group for high-level handler`;
-      const functionModuleDescription =
-        testCase.params.function_module_description ||
-        `Test function module for high-level handler`;
-      const updateFunctionGroupDescription =
-        testCase.params.update_function_group_description;
-
-      if (!testCase.params.update_source_code) {
-        throw new Error(
-          'update_source_code is required in test configuration for create_function',
-        );
-      }
-      // Remove comment blocks from update source code as SAP doesn't allow them in function modules
-      let updatedSourceCode = testCase.params.update_source_code;
-      // Remove comment blocks (lines starting with *")
-      updatedSourceCode = updatedSourceCode
-        .split('\n')
-        .filter((line: string) => !line.trim().startsWith('*"'))
-        .join('\n');
-
-      const invoke = async (
-        toolName: string,
-        args: Record<string, unknown>,
-        directCall: () => Promise<any>,
-      ) => {
-        if (!isHardModeEnabled()) {
-          return directCall();
-        }
-        if (!mcp) {
-          throw new Error('Hard mode MCP client is not initialized');
-        }
-        try {
-          return await callTool(mcp.client, mcp.toolNames, [toolName], args);
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: error?.message || String(error) }],
-          };
-        }
-      };
-
-      let passed = false;
       try {
-        // Step 1: CreateFunctionGroup (High-Level)
-        // High-level handler does validation internally, but we check the result
-        testLogger?.info(
-          `📦 High Create: Creating function group ${functionGroupName}...`,
-        );
-        testLogger?.info(
-          `📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`,
-        );
-        const createFGResponse = await invoke(
-          'CreateFunctionGroup',
-          {
-            function_group_name: functionGroupName,
-            description: functionGroupDescription,
-            package_name: packageName,
-            transport_request: transportRequest,
-            activate: true,
-          },
-          () =>
-            handleCreateFunctionGroup(
-              { connection: connection!, logger: testLogger },
-              {
-                function_group_name: functionGroupName,
-                description: functionGroupDescription,
-                package_name: packageName,
-                transport_request: transportRequest,
-                activate: true,
-              },
-            ),
-        );
+        return await callTool(mcp, [toolName], args);
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error?.message || String(error) }],
+        };
+      }
+    };
 
-        if (createFGResponse.isError) {
-          throw new Error(
-            `CreateFunctionGroup failed: ${createFGResponse.content[0]?.text || 'Unknown error'}`,
-          );
-        }
-
-        expectWriteAccepted(createFGResponse);
-        testLogger?.info(
-          `✅ High Create: Created function group ${functionGroupName} successfully`,
-        );
-
-        await delay(getOperationDelay('create', testCase));
-
-        // Step 2: UpdateFunctionGroup (High-Level)
-        if (updateFunctionGroupDescription) {
-          testLogger?.info(
-            `📝 High Update: Updating function group ${functionGroupName}...`,
-          );
-          const updateFGResponse = await invoke(
-            'UpdateFunctionGroup',
+    let passed = false;
+    try {
+      // Step 1: CreateFunctionGroup (High-Level)
+      // High-level handler does validation internally, but we check the result
+      testLogger?.info(
+        `📦 High Create: Creating function group ${functionGroupName}...`,
+      );
+      testLogger?.info(
+        `📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`,
+      );
+      const createFGResponse = await invoke(
+        'CreateFunctionGroup',
+        {
+          function_group_name: functionGroupName,
+          description: functionGroupDescription,
+          package_name: packageName,
+          transport_request: transportRequest,
+          activate: true,
+        },
+        () =>
+          handleCreateFunctionGroup(
+            { connection: connection!, logger: testLogger },
             {
               function_group_name: functionGroupName,
-              description: updateFunctionGroupDescription,
+              description: functionGroupDescription,
+              package_name: packageName,
+              transport_request: transportRequest,
+              activate: true,
+            },
+          ),
+      );
+
+      if (createFGResponse.isError) {
+        throw new Error(
+          `CreateFunctionGroup failed: ${createFGResponse.content[0]?.text || 'Unknown error'}`,
+        );
+      }
+
+      expectWriteAccepted(createFGResponse);
+      testLogger?.info(
+        `✅ High Create: Created function group ${functionGroupName} successfully`,
+      );
+
+      // Step 2: UpdateFunctionGroup (High-Level)
+      if (updateFunctionGroupDescription) {
+        testLogger?.info(
+          `📝 High Update: Updating function group ${functionGroupName}...`,
+        );
+        const updateFGResponse = await invoke(
+          'UpdateFunctionGroup',
+          {
+            function_group_name: functionGroupName,
+            description: updateFunctionGroupDescription,
+            transport_request: transportRequest,
+          },
+          () =>
+            handleUpdateFunctionGroup(
+              { connection: connection!, logger: testLogger },
+              {
+                function_group_name: functionGroupName,
+                description: updateFunctionGroupDescription,
+                transport_request: transportRequest,
+              },
+            ),
+        );
+
+        if (updateFGResponse.isError) {
+          throw new Error(
+            `UpdateFunctionGroup failed: ${updateFGResponse.content[0]?.text || 'Unknown error'}`,
+          );
+        }
+
+        expectWriteAccepted(updateFGResponse);
+        testLogger?.info(
+          `✅ High Update: Updated function group ${functionGroupName} successfully`,
+        );
+      }
+
+      // Step 3: CreateFunctionModule (High-Level) — creates in initial state
+      testLogger?.info(
+        `📦 High Create: Creating function module ${functionModuleName}...`,
+      );
+      const createFMResponse = await invoke(
+        'CreateFunctionModule',
+        {
+          function_group_name: functionGroupName,
+          function_module_name: functionModuleName,
+          description: functionModuleDescription,
+          transport_request: transportRequest,
+        },
+        () =>
+          handleCreateFunctionModule(
+            { connection: connection!, logger: testLogger },
+            {
+              function_group_name: functionGroupName,
+              function_module_name: functionModuleName,
+              description: functionModuleDescription,
               transport_request: transportRequest,
             },
-            () =>
-              handleUpdateFunctionGroup(
-                { connection: connection!, logger: testLogger },
-                {
-                  function_group_name: functionGroupName,
-                  description: updateFunctionGroupDescription,
-                  transport_request: transportRequest,
-                },
-              ),
-          );
+          ),
+      );
 
-          if (updateFGResponse.isError) {
-            throw new Error(
-              `UpdateFunctionGroup failed: ${updateFGResponse.content[0]?.text || 'Unknown error'}`,
-            );
-          }
-
-          expectWriteAccepted(updateFGResponse);
-          testLogger?.info(
-            `✅ High Update: Updated function group ${functionGroupName} successfully`,
+      if (createFMResponse.isError) {
+        const errorMsg = createFMResponse.content[0]?.text || 'Unknown error';
+        const errorLower = errorMsg.toLowerCase();
+        // Skip test if authorization error (S_ABPLNGVS or similar)
+        if (
+          errorLower.includes('not authorized') ||
+          errorLower.includes('authorization') ||
+          errorLower.includes('s_abplngvs')
+        ) {
+          skipRunningTest(
+            `No authorization to create function module: ${errorMsg}`,
           );
-          await delay(getOperationDelay('update', testCase));
+          return;
         }
+        throw new Error(`CreateFunctionModule failed: ${errorMsg}`);
+      }
 
-        // Step 3: CreateFunctionModule (High-Level) — creates in initial state
-        testLogger?.info(
-          `📦 High Create: Creating function module ${functionModuleName}...`,
+      expectWriteAccepted(createFMResponse);
+      testLogger?.info(
+        `✅ High Create: Created function module ${functionModuleName} successfully`,
+      );
+
+      // Step 4: UpdateFunctionModule (High-Level)
+      testLogger?.info(
+        `📝 High Update: Updating function module ${functionModuleName}...`,
+      );
+      const updateFMResponse = await invoke(
+        'UpdateFunctionModule',
+        {
+          function_group_name: functionGroupName,
+          function_module_name: functionModuleName,
+          source_code: updatedSourceCode,
+          transport_request: transportRequest,
+          activate: true,
+        },
+        () =>
+          handleUpdateFunctionModule(
+            { connection: connection!, logger: testLogger },
+            {
+              function_group_name: functionGroupName,
+              function_module_name: functionModuleName,
+              source_code: updatedSourceCode,
+              transport_request: transportRequest,
+              activate: true,
+            },
+          ),
+      );
+
+      if (updateFMResponse.isError) {
+        throw new Error(
+          `UpdateFunctionModule failed: ${updateFMResponse.content[0]?.text || 'Unknown error'}`,
         );
-        const createFMResponse = await invoke(
-          'CreateFunctionModule',
-          {
-            function_group_name: functionGroupName,
-            function_module_name: functionModuleName,
-            description: functionModuleDescription,
-            transport_request: transportRequest,
-          },
-          () =>
-            handleCreateFunctionModule(
-              { connection: connection!, logger: testLogger },
+      }
+
+      expectWriteAccepted(updateFMResponse);
+      testLogger?.info(
+        `✅ High Update: Updated function module ${functionModuleName} successfully`,
+      );
+
+      passed = true;
+    } finally {
+      // Cleanup: Optionally delete test function module first, then function group
+      // A failed run keeps its objects for analysis (getCleanupAfterRun).
+      const shouldCleanup = getCleanupAfterRun(testCase, !passed);
+
+      if (session && functionModuleName && functionGroupName) {
+        try {
+          // Delete function module only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteFMResponse = await invoke(
+              'DeleteFunctionModule',
               {
-                function_group_name: functionGroupName,
                 function_module_name: functionModuleName,
-                description: functionModuleDescription,
+                function_group_name: functionGroupName,
                 transport_request: transportRequest,
               },
-            ),
-        );
-
-        if (createFMResponse.isError) {
-          const errorMsg = createFMResponse.content[0]?.text || 'Unknown error';
-          const errorLower = errorMsg.toLowerCase();
-          // Skip test if authorization error (S_ABPLNGVS or similar)
-          if (
-            errorLower.includes('not authorized') ||
-            errorLower.includes('authorization') ||
-            errorLower.includes('s_abplngvs')
-          ) {
-            testLogger?.warn(
-              `⚠️  Skipping test: No authorization to create function module: ${errorMsg}`,
+              () =>
+                handleDeleteFunctionModule(
+                  { connection: connection!, logger: testLogger },
+                  {
+                    function_module_name: functionModuleName,
+                    function_group_name: functionGroupName,
+                    transport_request: transportRequest,
+                  },
+                ),
             );
-            return;
+
+            if (!deleteFMResponse.isError) {
+              testLogger?.info(
+                `🧹 Cleaned up test function module: ${functionModuleName}`,
+              );
+            } else {
+              const errorMsg =
+                deleteFMResponse.content[0]?.text || 'Unknown error';
+              testLogger?.warn(
+                `⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}`,
+              );
+            }
+          } else {
+            testLogger?.info(
+              `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionModuleName}`,
+            );
           }
-          throw new Error(`CreateFunctionModule failed: ${errorMsg}`);
-        }
-
-        expectWriteAccepted(createFMResponse);
-        testLogger?.info(
-          `✅ High Create: Created function module ${functionModuleName} successfully`,
-        );
-
-        await delay(getOperationDelay('create', testCase));
-
-        // Step 4: UpdateFunctionModule (High-Level)
-        testLogger?.info(
-          `📝 High Update: Updating function module ${functionModuleName}...`,
-        );
-        const updateFMResponse = await invoke(
-          'UpdateFunctionModule',
-          {
-            function_group_name: functionGroupName,
-            function_module_name: functionModuleName,
-            source_code: updatedSourceCode,
-            transport_request: transportRequest,
-            activate: true,
-          },
-          () =>
-            handleUpdateFunctionModule(
-              { connection: connection!, logger: testLogger },
-              {
-                function_group_name: functionGroupName,
-                function_module_name: functionModuleName,
-                source_code: updatedSourceCode,
-                transport_request: transportRequest,
-                activate: true,
-              },
-            ),
-        );
-
-        if (updateFMResponse.isError) {
-          throw new Error(
-            `UpdateFunctionModule failed: ${updateFMResponse.content[0]?.text || 'Unknown error'}`,
+        } catch (cleanupError) {
+          testLogger?.warn(
+            `⚠️  Failed to cleanup test function module ${functionModuleName}: ${cleanupError}`,
           );
-        }
-
-        expectWriteAccepted(updateFMResponse);
-        testLogger?.info(
-          `✅ High Update: Updated function module ${functionModuleName} successfully`,
-        );
-
-        await delay(getOperationDelay('update', testCase));
-        passed = true;
-      } finally {
-        // Cleanup: Optionally delete test function module first, then function group
-        // A failed run keeps its objects for analysis (getCleanupAfterRun).
-        const shouldCleanup = getCleanupAfterRun(testCase, !passed);
-
-        if (session && functionModuleName && functionGroupName) {
-          try {
-            // Delete function module only if cleanup_after is true
-            if (shouldCleanup) {
-              await delay(2000); // Ensure function module is ready for deletion
-              const deleteFMResponse = await invoke(
-                'DeleteFunctionModule',
-                {
-                  function_module_name: functionModuleName,
-                  function_group_name: functionGroupName,
-                  transport_request: transportRequest,
-                },
-                () =>
-                  handleDeleteFunctionModule(
-                    { connection: connection!, logger: testLogger },
-                    {
-                      function_module_name: functionModuleName,
-                      function_group_name: functionGroupName,
-                      transport_request: transportRequest,
-                    },
-                  ),
-              );
-
-              if (!deleteFMResponse.isError) {
-                testLogger?.info(
-                  `🧹 Cleaned up test function module: ${functionModuleName}`,
-                );
-              } else {
-                const errorMsg =
-                  deleteFMResponse.content[0]?.text || 'Unknown error';
-                testLogger?.warn(
-                  `⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}`,
-                );
-              }
-            } else {
-              testLogger?.info(
-                `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionModuleName}`,
-              );
-            }
-          } catch (cleanupError) {
-            testLogger?.warn(
-              `⚠️  Failed to cleanup test function module ${functionModuleName}: ${cleanupError}`,
-            );
-          }
-        }
-
-        if (session && functionGroupName) {
-          try {
-            // Delete function group only if cleanup_after is true
-            if (shouldCleanup) {
-              await delay(2000); // Ensure function group is ready for deletion
-              const deleteFGResponse = await invoke(
-                'DeleteFunctionGroup',
-                {
-                  function_group_name: functionGroupName,
-                  transport_request: transportRequest,
-                },
-                () =>
-                  handleDeleteFunctionGroup(
-                    { connection: connection!, logger: testLogger },
-                    {
-                      function_group_name: functionGroupName,
-                      transport_request: transportRequest,
-                    },
-                  ),
-              );
-
-              if (!deleteFGResponse.isError) {
-                testLogger?.info(
-                  `🧹 Cleaned up test function group: ${functionGroupName}`,
-                );
-              } else {
-                const errorMsg =
-                  deleteFGResponse.content[0]?.text || 'Unknown error';
-                testLogger?.warn(
-                  `⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`,
-                );
-              }
-            } else {
-              testLogger?.info(
-                `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`,
-              );
-            }
-          } catch (cleanupError) {
-            testLogger?.warn(
-              `⚠️  Failed to cleanup test function group ${functionGroupName}: ${cleanupError}`,
-            );
-          }
         }
       }
-    },
-    getTimeout('long'),
-  );
+
+      if (session && functionGroupName) {
+        try {
+          // Delete function group only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteFGResponse = await invoke(
+              'DeleteFunctionGroup',
+              {
+                function_group_name: functionGroupName,
+                transport_request: transportRequest,
+              },
+              () =>
+                handleDeleteFunctionGroup(
+                  { connection: connection!, logger: testLogger },
+                  {
+                    function_group_name: functionGroupName,
+                    transport_request: transportRequest,
+                  },
+                ),
+            );
+
+            if (!deleteFGResponse.isError) {
+              testLogger?.info(
+                `🧹 Cleaned up test function group: ${functionGroupName}`,
+              );
+            } else {
+              const errorMsg =
+                deleteFGResponse.content[0]?.text || 'Unknown error';
+              testLogger?.warn(
+                `⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`,
+              );
+            }
+          } else {
+            testLogger?.info(
+              `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`,
+            );
+          }
+        } catch (cleanupError) {
+          testLogger?.warn(
+            `⚠️  Failed to cleanup test function group ${functionGroupName}: ${cleanupError}`,
+          );
+        }
+      }
+    }
+  });
 });

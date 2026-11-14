@@ -102,8 +102,8 @@ const TABLE_ARGUMENTS: readonly (readonly [string, Send])[] = [
     'GetObjectStructure.object_type',
     (context, value) =>
       handleGetObjectStructure(context, {
-        object_type: value,
-        object_name: 'ZV',
+        objecttype: value,
+        objectname: 'ZV',
       }),
   ],
   [

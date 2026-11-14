@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension via its
  * own URL
@@ -33,7 +35,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import {
   project,
   terseDeletion,
@@ -41,35 +43,31 @@ import {
 } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import {
+  child,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      metadata_extension_name: {
-        type: 'string',
-        description: 'MetadataExtension name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['metadata_extension_name'],
-  },
+  inputSchema: z.object({
+    metadata_extension_name: z.string().describe('MetadataExtension name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface DeleteMetadataExtensionArgs {
-  metadata_extension_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteMetadataExtensionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteMetadataExtension(
   context: HandlerContext,
@@ -99,9 +97,9 @@ export async function handleDeleteMetadataExtension(
       ),
     // The check's answer, when the object was not there and no DELETE was
     // sent, is a deletion document; the DELETE's own answer is an empty 2xx.
-    project(detail, (value: any, status) =>
-      value?.['del:checkResponse']
-        ? terseDeletion(value, status)
+    project(detail, (value: XmlRead, status) =>
+      child(value, 'del:checkResponse')
+        ? terseDeletion(value)
         : terseWrite(value, status),
     ),
   );

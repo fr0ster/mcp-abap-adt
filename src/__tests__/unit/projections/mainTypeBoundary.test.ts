@@ -16,7 +16,10 @@ import type { AdtUtilityCode } from '@mcp-abap-adt/interfaces-adt';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
-import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
+import {
+  TOOL_DEFINITION as GetIncludesList,
+  handleGetIncludesList,
+} from '../../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetNodeStructure } from '../../../handlers/system/low/handleGetNodeStructure';
@@ -32,7 +35,10 @@ import {
   WHERE_USED_CODES,
 } from '../../../lib/adtProjections';
 import { mainTypeCodeOf, sharedMainType } from '../../../lib/adtTypeCode';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  defineTool,
+  type HandlerContext,
+} from '../../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -62,8 +68,8 @@ const TABLE_TOOLS: readonly Argument[] = [
     tool: 'GetObjectStructure.object_type',
     send: (context, value) =>
       handleGetObjectStructure(context, {
-        object_type: value,
-        object_name: 'ZA',
+        objecttype: value,
+        objectname: 'ZA',
       }),
     one: ['DSFD', 'DSFD/SCF'],
     shared: ['MSAG', 'MSAG/N, MSAG/NN'],
@@ -200,22 +206,6 @@ const ARGUMENTS: readonly Argument[] = [
       }),
     one: ['ENHS', 'ENHS/XSB'],
     shared: ['ENHO', 'ENHO/XHH, ENHO/XHB'],
-  },
-  {
-    tool: 'GetIncludesList.object_type',
-    send: (context, value) =>
-      handleGetIncludesList(context, { object_type: value, object_name: 'ZA' }),
-    one: ['FUGR', 'FUGR/F'],
-    shared: ['PROG', 'PROG/P, PROG/I'],
-  },
-  {
-    tool: 'GetIncludesList.objects[].object_type',
-    send: (context, value) =>
-      handleGetIncludesList(context, {
-        objects: [{ object_type: value, object_name: 'ZA' }],
-      }),
-    one: ['CLAS', 'CLAS/OC'],
-    shared: ['PROG', 'PROG/P, PROG/I'],
   },
   ...TABLE_TOOLS,
 ];
@@ -589,6 +579,67 @@ describe("each projection's main types", () => {
       const read = mainTypesOf(INCLUDES_PARENTS[variant]);
       expect(read).toEqual({ one: ['FUGR', 'CLAS'], shared: ['PROG'] });
       expect([...INCLUDES_PARENT_MAIN_TYPES[variant]]).toEqual(read.one);
+    },
+  );
+});
+
+/**
+ * GetIncludesList takes the main types its schema lists (an unambiguous one
+ * stands for its code), in upper case. The model's call names them through
+ * the tool's schema: a value it does not list (lower case, or a main type two
+ * codes share) is refused there, before the handler, and nothing is sent.
+ */
+describe('GetIncludesList: a main type at its schema', () => {
+  const entry = defineTool(GetIncludesList, handleGetIncludesList);
+  const SENDS = [
+    [
+      'object_type',
+      (value: string) => ({ object_type: value, object_name: 'ZA' }),
+      ['FUGR', 'FUGR/F'],
+    ],
+    [
+      'objects[].object_type',
+      (value: string) => ({
+        objects: [{ object_type: value, object_name: 'ZA' }],
+      }),
+      ['CLAS', 'CLAS/OC'],
+    ],
+  ] as const;
+  const argument = (
+    tool: string,
+    args: (value: string) => Readonly<Record<string, unknown>>,
+  ): Argument => ({
+    tool,
+    send: (context, value) => entry.call(context, args(value)),
+    one: ['', ''],
+    shared: ['', ''],
+  });
+  const cases = VARIANTS.flatMap((variant) =>
+    SENDS.map(([where, args, one]) => [where, variant, args, one] as const),
+  );
+
+  it.each(cases)(
+    '%s on %s: the main type sends exactly what its code sends',
+    async (where, variant, args, [main, code]) => {
+      const sent = argument(`GetIncludesList.${where}`, args);
+      const byCode = await run(sent, variant, code);
+      const byMain = await run(sent, variant, main);
+      expect(byCode.requests.length).toBeGreaterThan(0);
+      expect(byMain.requests).toEqual(byCode.requests);
+    },
+  );
+
+  it.each(cases)(
+    '%s on %s: lower case and a shared main type are refused at the schema, nothing sent',
+    async (where, variant, args, [main]) => {
+      const sent = argument(`GetIncludesList.${where}`, args);
+      for (const value of [main.toLowerCase(), 'PROG', 'prog']) {
+        const { requests, answered } = await run(sent, variant, value);
+        expect(answered).toContain(
+          'Invalid arguments for tool GetIncludesList: ',
+        );
+        expect(requests).toEqual([]);
+      }
     },
   );
 });

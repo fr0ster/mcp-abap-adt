@@ -15,7 +15,7 @@
     "tool": "SearchSource",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleSearchSource.ts#handleSearchSource",
-    "sends": "quickSearch GETs for masks; POST /sap/bc/adt/repository/nodestructure per package and type node; one source GET per unit (program, include, function module, class), up to max_objects; keeps time_budget_ms (partial hits)"
+    "sends": "a package mask's repository quickSearch GET (/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…), the nodestructure walk of every package (POST /sap/bc/adt/repository/nodestructure), then the source GET of every scan target, each source once per call; in ADT batch envelopes (POST /sap/bc/adt/communication/batch) where the system offers them, sequential reads where it has no communication batch"
   },
   {
     "tool": "GetPackageContents",
@@ -84,12 +84,6 @@
     "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the quickSearch GET of every object, then the quickSearch GET without its type of every object whose first answer was empty or failed; sequential reads where the system has no communication batch"
   },
   {
-    "tool": "GetAbapSystemSymbols",
-    "set": "full",
-    "handler": "src/handlers/system/readonly/handleGetAbapSystemSymbols.ts#handleGetAbapSystemSymbols",
-    "sends": "in one ADT batch envelope (POST /sap/bc/adt/communication/batch): the source GET of every class and interface symbol found in the given code; sequential reads where the system has no communication batch"
-  },
-  {
     "tool": "GetATCFindings",
     "set": "full",
     "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",
@@ -153,6 +147,6 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes (with include_descriptions as single requests, several at a time), as GetPackageContents; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
+    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes (with include_descriptions as single requests, several at a time), as GetPackageContents; background applies to its reads only — UNIT_TEST / CDS_UNIT_TEST and the parts activation_status / activation_results read a run in SAP, run as an ordinary call on the instance's connection, and refuse a background"
   }
 ]

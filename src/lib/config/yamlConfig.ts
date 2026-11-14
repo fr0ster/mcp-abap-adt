@@ -8,6 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
+import { isJsonObject, type JsonObject, jsonValueOf } from '../json';
+import { childAt } from '../thrownValue';
 import {
   CONF_ROW,
   ParameterRefusal,
@@ -16,15 +18,19 @@ import {
   validateYamlParameters,
 } from './authParameters.js';
 
-/** A loaded config file: its top-level mapping. */
-export type YamlConfig = Record<string, unknown>;
+/**
+ * A loaded config file: its top-level mapping, typed at the parse as JSON
+ * ({@link jsonValueOf}: a YAML timestamp is its ISO text).
+ */
+export type YamlConfig = JsonObject;
 
 /**
  * `--conf` / `--config` as given on the command line, or undefined. Plain
- * code over the arguments.
+ * code over the arguments; by default the program's own (`process.argv`
+ * after the executable and the script path, which are never read).
  */
 export function parseConfigArg(
-  argv: readonly string[] = process.argv,
+  argv: readonly string[] = process.argv.slice(2),
 ): string | undefined {
   for (const name of [CONF_ROW.cli, ...(CONF_ROW.cliAliases ?? [])]) {
     for (let i = 0; i < argv.length; i++) {
@@ -83,23 +89,24 @@ export function loadYamlConfig(
     parsed = parseYaml(text);
   } catch (error) {
     // js-yaml's message quotes the file; only the position is passed on.
-    const mark = (error as { mark?: { line?: unknown; column?: unknown } })
-      ?.mark;
+    const line = childAt(error, 'mark', 'line');
+    const column = childAt(error, 'mark', 'column');
     const at =
-      typeof mark?.line === 'number' && typeof mark?.column === 'number'
-        ? ` (line ${mark.line + 1}, column ${mark.column + 1})`
+      typeof line === 'number' && typeof column === 'number'
+        ? ` (line ${line + 1}, column ${column + 1})`
         : '';
     throw new ParameterRefusal(
       `The config file ${configPath} is not valid YAML${at}`,
     );
   }
   if (parsed === undefined || parsed === null) return {};
-  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+  // The parsed document, checked once as JSON writes it: typed from here on.
+  const config = jsonValueOf(parsed);
+  if (config === undefined || !isJsonObject(config)) {
     throw new ParameterRefusal(
       `The config file ${configPath} must be a mapping of parameter keys`,
     );
   }
-  const config = parsed as YamlConfig;
   const { errors } = validateYamlConfig(table, config);
   if (errors.length > 0) {
     throw new ParameterRefusal(

@@ -17,10 +17,18 @@
  */
 
 import * as path from 'node:path';
+import type { ToolArgs, ToolArgValue } from '../handlers/interfaces.js';
+import { type JsonValue, jsonAt, jsonOf } from '../json';
+import { argMember, isArgList } from '../toolArgValue';
 
-/** One condition on a named argument; an entry's `when` holds when all of them do. */
+/**
+ * One condition on a named argument; an entry's `when` holds when all of them
+ * do. With `field`, the argument is a list and `equals` / `notEquals` hold
+ * for the member `field` of each of its entries (a list absent has none).
+ */
 export type WhenRule = {
   argument: string;
+  field?: string;
   equals?: string[];
   notEquals?: string[];
   present?: boolean;
@@ -60,12 +68,87 @@ export const BATCH_HANDLERS_FILE = path.join(
 
 let table: ReadonlyMap<string, readonly BatchEntry[]> | undefined;
 
+/** A list of strings, or `undefined` when `value` is not one. */
+function stringsOf(value: JsonValue): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const strings = value.filter((v): v is string => typeof v === 'string');
+  return strings.length === value.length ? strings : undefined;
+}
+
+/** One `when` rule of a row, or `undefined` when `value` is not one. */
+function whenRuleOf(value: JsonValue): WhenRule[number] | undefined {
+  const argument = jsonAt(value, 'argument');
+  if (typeof argument !== 'string') return undefined;
+  const rule: WhenRule[number] = { argument };
+  const field = jsonAt(value, 'field');
+  if (field !== undefined) {
+    if (typeof field !== 'string') return undefined;
+    rule.field = field;
+  }
+  for (const name of ['equals', 'notEquals'] as const) {
+    const given = jsonAt(value, name);
+    if (given === undefined) continue;
+    const strings = stringsOf(given);
+    if (strings === undefined) return undefined;
+    rule[name] = strings;
+  }
+  const present = jsonAt(value, 'present');
+  if (present !== undefined) {
+    if (typeof present !== 'boolean') return undefined;
+    rule.present = present;
+  }
+  return rule;
+}
+
+/**
+ * Row `at` of the table, read: the file is data, read as it is written —
+ * a row this reading does not recognise stops the load with its index.
+ */
+function batchEntryOf(value: JsonValue, at: number): BatchEntry {
+  const malformed = () =>
+    new Error(`tools/batch-handlers.json: row ${at} is malformed`);
+  const tool = jsonAt(value, 'tool');
+  const set = jsonAt(value, 'set');
+  const handler = jsonAt(value, 'handler');
+  const sends = jsonAt(value, 'sends');
+  if (
+    typeof tool !== 'string' ||
+    (set !== 'full' && set !== 'compact') ||
+    typeof handler !== 'string' ||
+    typeof sends !== 'string'
+  ) {
+    throw malformed();
+  }
+  const entry: BatchEntry = { tool, set, handler, sends };
+  const when = jsonAt(value, 'when');
+  if (when !== undefined) {
+    if (!Array.isArray(when)) throw malformed();
+    const rules: WhenRule = [];
+    for (const given of when) {
+      const rule = whenRuleOf(given);
+      if (rule === undefined) throw malformed();
+      rules.push(rule);
+    }
+    entry.when = rules;
+  }
+  const connection = jsonAt(value, 'connection');
+  if (connection !== undefined) {
+    if (connection !== 'http') throw malformed();
+    entry.connection = connection;
+  }
+  return entry;
+}
+
 /** The entries, by tool — loaded at the first use, then kept. */
 function entriesByTool(): ReadonlyMap<string, readonly BatchEntry[]> {
   if (table === undefined) {
     // `BATCH_HANDLERS_FILE`, as a literal a bundler inlines.
-    const entries =
-      require('../../../tools/batch-handlers.json') as readonly BatchEntry[];
+    // The table, checked once as JSON: typed from here on.
+    const file = jsonOf(require('../../../tools/batch-handlers.json'));
+    if (!Array.isArray(file)) {
+      throw new Error('tools/batch-handlers.json: the table is not a list');
+    }
+    const entries = file.map(batchEntryOf);
     const byTool = new Map<string, BatchEntry[]>();
     for (const entry of entries) {
       const listed = byTool.get(entry.tool) ?? [];
@@ -106,44 +189,70 @@ export function absentReadsAs(
 }
 
 /** An argument's value as the rules compare it: a string or boolean, upper-cased. */
-function compared(value: unknown): string | undefined {
+function compared(value: ToolArgValue): string | undefined {
   if (typeof value === 'string' || typeof value === 'boolean') {
     return String(value).toUpperCase();
   }
   return undefined;
 }
 
-function argumentOf(tool: string, args: unknown, name: string): unknown {
-  const given =
-    args !== null && typeof args === 'object'
-      ? (args as Record<string, unknown>)[name]
-      : undefined;
-  return given === undefined ? ABSENT_READS_AS[tool]?.[name] : given;
+/**
+ * An argument as the call states it, read from the arguments before the
+ * tool's schema. An empty list is no argument: the handlers dispatch on a
+ * list only when it holds an entry (`HandlerActivate`'s `objects: []` is its
+ * single form).
+ */
+function statedArgument(args: ToolArgs, name: string): ToolArgValue {
+  const given = args[name];
+  return isArgList(given) && given.length === 0 ? undefined : given;
 }
 
 const among = (value: string | undefined, values: string[]) =>
   value !== undefined && values.some((v) => v.toUpperCase() === value);
 
-/** Whether every rule of `when` holds for `args`. */
+/** Whether a compared value holds a rule's `equals` and `notEquals`. */
+function valueHolds(
+  rule: WhenRule[number],
+  value: string | undefined,
+): boolean {
+  if (rule.equals !== undefined && !among(value, rule.equals)) {
+    return false;
+  }
+  return !(rule.notEquals !== undefined && among(value, rule.notEquals));
+}
+
+/**
+ * Whether every rule of `when` holds for `args`. An argument the call does
+ * not state reads as its fallback (`ABSENT_READS_AS`).
+ */
 export function whenHolds(
   tool: string,
   when: WhenRule | undefined,
-  args: unknown,
+  args: ToolArgs,
 ): boolean {
   for (const rule of when ?? []) {
-    const value = argumentOf(tool, args, rule.argument);
-    if (rule.present !== undefined && (value !== undefined) !== rule.present) {
+    const given = statedArgument(args, rule.argument);
+    const assumed =
+      given === undefined ? absentReadsAs(tool, rule.argument) : undefined;
+    const present = given !== undefined || assumed !== undefined;
+    if (rule.present !== undefined && present !== rule.present) {
       return false;
     }
-    if (rule.equals !== undefined && !among(compared(value), rule.equals)) {
-      return false;
+    if (rule.field !== undefined) {
+      const field = rule.field;
+      const members = isArgList(given) ? given : [];
+      if (
+        !members.every((member) =>
+          valueHolds(rule, compared(argMember(member, field))),
+        )
+      ) {
+        return false;
+      }
+      continue;
     }
-    if (
-      rule.notEquals !== undefined &&
-      among(compared(value), rule.notEquals)
-    ) {
-      return false;
-    }
+    const value =
+      given === undefined ? assumed?.toUpperCase() : compared(given);
+    if (!valueHolds(rule, value)) return false;
   }
   return true;
 }
@@ -154,7 +263,7 @@ export function whenHolds(
  */
 export function eligible(
   tool: string,
-  args: unknown,
+  args: ToolArgs,
   connection: 'http' | 'rfc',
 ): Eligibility {
   const entries = entriesByTool().get(tool);

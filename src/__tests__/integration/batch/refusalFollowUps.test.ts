@@ -48,8 +48,9 @@
  *    the second one on either transport (measured 2026-10-19): over HTTP a
  *    live session's cookie authenticates it, and a session that ended is
  *    answered `400` by the ICM (`ICMENOSESSION`) for the stateful request
- *    before any logon; over RFC a conversation logs on once and asks no
- *    password again. So the case measures the second `stopListener` failing
+ *    before any logon, which the connection (22) reads as the session gone:
+ *    its own `ADT_SESSION_REPLACED`, nothing resent (measured 2026-11-12);
+ *    over RFC a conversation logs on once and asks no password again. So the case measures the second `stopListener` failing
  *    for the ended session (HTTP) or answered with the password wrong (RFC),
  *    and that the stop then answers, sends nothing more, asks nothing of the
  *    credential and holds nothing. Then the held poll is released.
@@ -67,10 +68,15 @@
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */
 
+import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type {
   AuthOutcome,
   IAuthProvider,
@@ -101,12 +107,13 @@ import { readSystemInformation } from '../../../lib/systemInformation';
 import {
   getEnabledTestCase,
   getSapConfigFromEnv,
-  getTimeout,
   loadTestConfig,
   loadTestEnv,
 } from '../helpers/configHelpers';
+import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { primeSystemContext } from '../helpers/primeSystemContext';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createHandlerContext } from '../helpers/testHelpers';
 
 const testLogger = createTestLogger('refusal-follow-ups');
@@ -159,8 +166,6 @@ const say = (kind: Kind, what: string, answered: unknown): void => {
     `refusal-follow-ups-live\t${kind}\t${what}\t${withoutHandles(String(text)).slice(0, 2000)}\n`,
   );
 };
-
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Content = Array<{ type: string; text?: string }>;
 
@@ -361,7 +366,7 @@ async function logoffAfterRefusalOn(kind: Kind): Promise<void> {
       moments: credential.moments.length,
       cookies: cookies ? 'held' : 'none',
     });
-    if (kind === 'onprem-http') expect(cookies).toBeTruthy();
+    if (kind === 'onprem-http') assert.ok(cookies);
 
     credential.useWrongPassword();
     const before = credential.moments.length;
@@ -373,8 +378,8 @@ async function logoffAfterRefusalOn(kind: Kind): Promise<void> {
       refusal: refusal === undefined ? 'none' : described(refusal),
       moments: credential.since(before),
     });
-    expect(refusal).toBeDefined();
-    expect(isCredentialRefusal(refusal)).toBe(true);
+    assert.ok(refusal !== undefined);
+    assert.equal(isCredentialRefusal(refusal), true);
 
     const mark = credential.moments.length;
     await closed(live);
@@ -391,12 +396,12 @@ async function logoffAfterRefusalOn(kind: Kind): Promise<void> {
             : 'none'
           : 'n/a',
     });
-    expect(asked).toEqual([]);
+    assertEquals(asked, []);
 
     if (kind === 'onprem-http' && cookies) {
       const after = await logOffFromOutside(settings, real, cookies);
       say(kind, 'the live session after its logoff', after);
-      expect(after).toMatch(/^not taken over/);
+      assert.ok(after.startsWith('not taken over'));
     } else {
       say(
         kind,
@@ -438,10 +443,14 @@ class Observer {
   private readonly held: Array<() => void> = [];
   openPolls = 0;
   private opened = 0;
-  onStop?: (
-    connection: IAbapConnection,
-    send: () => Promise<unknown>,
-  ) => Promise<unknown>;
+  private pollWaiters: Array<() => void> = [];
+  /** The hook on a stop, while one is set; `undefined` once a case clears it. */
+  onStop?:
+    | ((
+        connection: IAbapConnection,
+        send: () => Promise<unknown>,
+      ) => Promise<unknown>)
+    | undefined;
 
   instrument(connection: IAbapConnection): IAbapConnection {
     const label = `c${++this.opened}`;
@@ -457,6 +466,7 @@ class Observer {
         }
         if (listeners && method === 'POST') {
           this.openPolls++;
+          for (const resolve of this.pollWaiters.splice(0)) resolve();
           try {
             return await original(options as any);
           } finally {
@@ -468,6 +478,14 @@ class Observer {
         return original(options as any);
       };
     return connection;
+  }
+
+  /** Resolves once a listener's poll is open (at once when one is). */
+  pollOpen(): Promise<void> {
+    if (this.openPolls > 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.pollWaiters.push(resolve);
+    });
   }
 
   release(): void {
@@ -550,12 +568,12 @@ async function secondStopListenerOn(kind: Kind, testCase: any): Promise<void> {
       placed: started.json?.breakpoints?.placed?.length,
       answer: started.isError ? started.text.slice(0, 600) : undefined,
     });
-    expect(started.isError).toBe(false);
-    expect(handle).toMatch(/^[0-9A-F]{32}$/);
+    assert.equal(started.isError, false);
+    assert.ok(isUpperHex(handle, 32));
 
     // The listener's poll is open on the system.
-    for (let i = 0; i < 100 && observer.openPolls === 0; i++) await pause(100);
-    expect(observer.openPolls).toBeGreaterThan(0);
+    await observer.pollOpen();
+    assert.ok(observer.openPolls > 0);
 
     // The stop: the first stopListener answers, then the password is wrong
     // (and over HTTP that connection's session ended from outside); the
@@ -633,27 +651,28 @@ async function secondStopListenerOn(kind: Kind, testCase: any): Promise<void> {
       failures: dbg.failures(),
     });
 
-    expect(stops).toBe(2);
-    expect(second).toBeDefined();
+    assert.equal(stops, 2);
+    assert.ok(second !== undefined);
     if (kind === 'onprem-http') {
       // The ended session's answer, not the credential's: see the header.
-      // Measured: the ICM answers `400` `ICMENOSESSION`; any other failure
-      // (a credential refusal above all) is not what this case measures.
-      expect(second?.outcome.answered).toBeUndefined();
-      expect(second?.refused).toBe(false);
-      expect(second?.outcome.status).toBe(400);
-      expect(JSON.stringify(second?.outcome)).toContain('ICMENOSESSION');
+      // Measured (2026-11-12): the ICM's `400` `ICMENOSESSION` reaches the
+      // caller as the connection's own verdict on it, the session gone
+      // (`ADT_SESSION_REPLACED`); any other failure (a credential refusal
+      // above all) is not what this case measures.
+      assert.equal(second?.outcome.answered, undefined);
+      assert.equal(second?.refused, false);
+      assert.equal(second?.outcome.code, ADT_SESSION_ERROR.SESSION_REPLACED);
     } else {
-      expect(second?.outcome.answered).toBe(true);
+      assert.equal(second?.outcome.answered, true);
     }
     // While the second stopListener went, the credential was asked only to
     // authorize its one attempt (measured 2026-10-19, HTTP and RFC alike: no
     // logon, no rejection); nothing was sent after it.
-    expect(secondMoments).toEqual(['authorize']);
-    expect(after).toEqual([]);
-    expect(stopped.isError).toBe(false);
-    expect(askedAfter).toEqual([]);
-    expect(dbg.holdsState()).toBe(false);
+    assertEquals(secondMoments, ['authorize']);
+    assertEquals(after, []);
+    assert.equal(stopped.isError, false);
+    assertEquals(askedAfter, []);
+    assert.equal(dbg.holdsState(), false);
   } catch (error) {
     failure = error;
   } finally {
@@ -724,31 +743,23 @@ function whereItRuns(kind: Kind): { testCase: any } | { reason: string } {
 describe('after a credential refusal, on the system the test config names', () => {
   const kinds: Kind[] = ['onprem-http', 'onprem-rfc', 'cloud'];
   for (const kind of kinds) {
-    it(
-      `${KIND_WORDS[kind]}: the logoff after a credential refusal asks nothing of the provider`,
-      async () => {
-        const where = whereItRuns(kind);
-        if ('reason' in where) {
-          testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
-          return;
-        }
-        await logoffAfterRefusalOn(kind);
-      },
-      getTimeout('long'),
-    );
+    it(`${KIND_WORDS[kind]}: the logoff after a credential refusal asks nothing of the provider`, async () => {
+      const where = whereItRuns(kind);
+      if ('reason' in where) {
+        skipRunningTest(`${KIND_WORDS[kind]}: ${where.reason}`);
+        return;
+      }
+      await logoffAfterRefusalOn(kind);
+    });
   }
   for (const kind of kinds) {
-    it(
-      `${KIND_WORDS[kind]}: the debugger stop's second stopListener after a refusal`,
-      async () => {
-        const where = whereItRuns(kind);
-        if ('reason' in where) {
-          testLogger?.info(`⏭️  Skipping ${KIND_WORDS[kind]}: ${where.reason}`);
-          return;
-        }
-        await secondStopListenerOn(kind, where.testCase);
-      },
-      getTimeout('long'),
-    );
+    it(`${KIND_WORDS[kind]}: the debugger stop's second stopListener after a refusal`, async () => {
+      const where = whereItRuns(kind);
+      if ('reason' in where) {
+        skipRunningTest(`${KIND_WORDS[kind]}: ${where.reason}`);
+        return;
+      }
+      await secondStopListenerOn(kind, where.testCase);
+    });
   }
 });

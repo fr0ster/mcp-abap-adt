@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { stated } from '../../helpers/testConfigSchema';
 /**
  * Integration test: the five PR227 transport-object tools, end to end
  * (GitHub #221)
@@ -120,6 +123,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
@@ -134,27 +138,58 @@ import { handleReadTransportActionLog } from '../../../../handlers/transport/rea
 import { handleReadTransportObjects } from '../../../../handlers/transport/readonly/handleReadTransportObjects';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
-import {
-  getOperationDelay,
-  getTimeout,
-  loadTestConfig,
-  loadTestEnv,
-} from '../../helpers/configHelpers';
+import { loadTestConfig, loadTestEnv } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
   lockHolderOf,
   sapIsConfigured,
   systemUserName,
 } from '../../helpers/objectLocks';
+import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
 import {
   createHandlerContext,
-  delay,
-  parseHandlerResponse,
+  handlerAnswer,
+  type parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/** What the transport tools answer, as these tests read it. */
+const TransportAnswer = z.looseObject({
+  success: z.unknown().optional(),
+  accepted: z.unknown().optional(),
+  count: z.number().optional(),
+  entries: z.array(z.unknown()).optional(),
+  objects: z
+    .array(
+      z.looseObject({
+        name: z.string(),
+        type: z.string(),
+        position: z.string().optional(),
+        pgmid: z.string().optional(),
+      }),
+    )
+    .default([]),
+  tasks: z.array(z.looseObject({})).default([]),
+  task_number: z.string().optional(),
+  transport_number: z.string().optional(),
+  transport: z.looseObject({ target_system: z.string().optional() }).optional(),
+});
+
+/**
+ * What MoveTransportObjects answers, as these tests read it: `accepted`, and
+ * an echo of the entries it was sent (`object`, `position`), not the
+ * `objects` a read lists.
+ */
+const MoveAnswer = z.looseObject({
+  accepted: z.unknown().optional(),
+});
+
+/** A transport tool's answer, read through TransportAnswer. */
+const answerOf = (response: Parameters<typeof parseHandlerResponse>[0]) =>
+  handlerAnswer(response, TransportAnswer);
 
 /** Asserts a handler response is not an error, logging its content first if it is. */
 function expectOk(
@@ -165,7 +200,7 @@ function expectOk(
   if (response.isError) {
     logger?.warn(`${label} FAILED: ${JSON.stringify(response.content)}`);
   }
-  expect(response.isError).toBe(false);
+  assert.equal(response.isError, false);
 }
 
 describe('Transport object tools end to end (GitHub #221, PR227)', () => {
@@ -199,7 +234,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
   /** The tasks a request holds, by number, as GetTransport answers them. */
   const tasksOf = async (request: string): Promise<string[]> => {
-    const read = parseHandlerResponse(
+    const read = answerOf(
       await handleGetTransport(createHandlerContext({ connection, logger }), {
         transport_number: request,
         include_objects: false,
@@ -214,7 +249,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
   /** The test program's entries on one task. */
   const programEntriesOn = async (task: string): Promise<any[]> =>
     (
-      parseHandlerResponse(
+      answerOf(
         await handleReadTransportObjects(
           createHandlerContext({ connection, logger }),
           { transport_number: task },
@@ -250,7 +285,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     return (await programEntriesOn(task)).length;
   };
 
-  beforeAll(async () => {
+  before(async () => {
     await loadTestEnv();
 
     const config = loadTestConfig();
@@ -278,12 +313,12 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     //     server resolves an empty owner and refuses, and quietly skipping
     //     would hide a real gap behind the same green as case 1.
     //
-    // Every skip is logged with ⏭️ and its reason, because the run says
-    // `passed` either way and the log is the only place the difference
-    // survives.
+    // A skip's reason is kept here; the case marks itself skipped with it
+    // (`skipRunningTest`), so the run counts it skipped.
     if (!sapIsConfigured()) {
-      skipReason = 'no SAP_URL — there is no system to run against';
-      logger?.warn(`⏭️ SKIPPED — ${skipReason}`);
+      skipReason =
+        'no SAP_URL and no RFC address — there is no system to run against';
+      logger?.warn(`No system to run against: ${skipReason}`);
       return;
     }
 
@@ -292,7 +327,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         `this system keeps no transport for the suite to work in ` +
         `(default_transport="${parentTransport}", default_package="${packageName}") ` +
         "— a local-package setup, where a request's object list has nothing to hold";
-      logger?.warn(`⏭️ SKIPPED — ${skipReason}`);
+      logger?.warn(`No system to run against: ${skipReason}`);
       return;
     }
 
@@ -322,9 +357,9 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       `Parent transport: ${parentTransport}, package: ${packageName}, user: ${targetUser}`,
     );
     testEnabled = true;
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     if (!testEnabled || !connection) return;
 
     if (programName) {
@@ -390,7 +425,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     const tasks = [secondTaskNumber, taskNumber];
     if (secondRequestNumber) {
       try {
-        const request = parseHandlerResponse(
+        const request = answerOf(
           await handleGetTransport(
             createHandlerContext({ connection, logger }),
             {
@@ -428,7 +463,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         // ask for the task. `accepted` from a removal is not evidence — the
         // re-read is, exactly as the scenario above asserts it.
         const readCtx = createHandlerContext({ connection, logger });
-        const held = parseHandlerResponse(
+        const held = answerOf(
           await handleReadTransportObjects(readCtx, {
             transport_number: task,
           }),
@@ -453,7 +488,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           logger?.info(`Cleanup: detached ${entry.type} ${entry.name}`);
         }
 
-        const left = parseHandlerResponse(
+        const left = answerOf(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
             { transport_number: task },
@@ -503,397 +538,372 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         logger?.warn(`Cleanup request delete failed: ${e.message}`);
       }
     }
-  }, getTimeout('long'));
+  });
 
-  it(
-    'creates a task, adds/removes/re-adds an object, and confirms via log + re-reads',
-    async () => {
-      if (!testEnabled) {
-        // The only reason to be here is the one `beforeAll` allows: no SAP.
-        // Everything else threw there, which is why this needs no second
-        // list of conditions.
-        logger?.warn(`⏭️ SKIPPED — ${skipReason || 'no system'}`);
-        return;
-      }
+  it('creates a task, adds/removes/re-adds an object, and confirms via log + re-reads', async () => {
+    if (!testEnabled) {
+      // The only reason to be here is the one `beforeAll` allows: no SAP.
+      // Everything else threw there, which is why this needs no second
+      // list of conditions.
+      skipRunningTest(skipReason || 'no system');
+      return;
+    }
 
-      // **Everything below runs inside a `finally` that drops the lock.**
+    // **Everything below runs inside a `finally` that drops the lock.**
+    //
+    // `expectOk` throws on a refusal, and there is a window where a throw
+    // leaves a real ENQUEUE lock behind: `CreateProgram` takes one (SAP's
+    // own EU510 says so) and `UpdateProgram`'s lock/write/unlock is what
+    // closes it. A failure between them — or in any later step — used to
+    // end the run with the object stuck, and `afterAll`'s delete then met
+    // that lock and logged its own refusal. SM12 by hand was the rest of
+    // the procedure.
+    //
+    // Releasing costs two requests and only acts when a lock is actually
+    // held, so a passing run pays nothing.
+    try {
+      // Step 1: task under the pinned request
+      logger?.info(
+        `Step 1: CreateTransportTask under ${parentTransport} for ${targetUser}`,
+      );
+      const taskCtx = createHandlerContext({ connection, logger });
+      const taskResponse = await handleCreateTransportTask(taskCtx, {
+        transport_number: parentTransport,
+        target_user: targetUser,
+      });
+
+      expectOk(taskResponse, 'Step 1 CreateTransportTask', logger);
+      const taskData = answerOf(taskResponse);
+      assert.equal(taskData.success, true);
+      assert.ok(taskData.task_number);
+      taskNumber = taskData.task_number;
+      logger?.success(`Step 1: task ${taskNumber} created`);
+
+      // Step 2: create a program on the REQUEST, not the task.
       //
-      // `expectOk` throws on a refusal, and there is a window where a throw
-      // leaves a real ENQUEUE lock behind: `CreateProgram` takes one (SAP's
-      // own EU510 says so) and `UpdateProgram`'s lock/write/unlock is what
-      // closes it. A failure between them — or in any later step — used to
-      // end the run with the object stuck, and `afterAll`'s delete then met
-      // that lock and logged its own refusal. SM12 by hand was the rest of
-      // the procedure.
-      //
-      // Releasing costs two requests and only acts when a lock is actually
-      // held, so a passing run pays nothing.
-      try {
-        // Step 1: task under the pinned request
-        logger?.info(
-          `Step 1: CreateTransportTask under ${parentTransport} for ${targetUser}`,
-        );
-        const taskCtx = createHandlerContext({ connection, logger });
-        const taskResponse = await handleCreateTransportTask(taskCtx, {
-          transport_number: parentTransport,
-          target_user: targetUser,
-        });
+      // A plain create/edit always takes the REQUEST as its corrNr — the
+      // task is what AddTransportObject/RemoveTransportObject address
+      // afterward, to move an object's entry onto (or off of) one. The
+      // object does not exist yet at create time, so there is nothing yet
+      // to add to a task; the request is the only thing to name.
+      logger?.info(
+        `Step 2: creating program ${programName} on request ${parentTransport}`,
+      );
+      const createCtx = createHandlerContext({ connection, logger });
+      const createResponse = await handleCreateProgram(createCtx, {
+        program_name: programName,
+        package_name: packageName,
+        transport_request: parentTransport,
+        description: 'MCP test program for transport-object-tools (#221)',
+      });
 
-        expectOk(taskResponse, 'Step 1 CreateTransportTask', logger);
-        const taskData = parseHandlerResponse(taskResponse);
-        expect(taskData.success).toBe(true);
-        expect(taskData.task_number).toBeTruthy();
-        taskNumber = taskData.task_number;
-        logger?.success(`Step 1: task ${taskNumber} created`);
+      expectOk(createResponse, 'Step 2 CreateProgram', logger);
+      assert.equal(createResponse.content[0]?.text, 'SUCCESS');
+      logger?.success(
+        `Step 2: program ${programName} created on ${parentTransport}`,
+      );
 
-        await delay(getOperationDelay('create'));
+      // Step 2a: set source via UpdateProgram, same request. Its
+      // lock/write/unlock cycle is what closes out the ENQUEUE lock
+      // CreateProgram leaves behind (see the file header). Skipping this
+      // orphaned SM12 entries more than once while this test was being
+      // written.
+      logger?.info(`Step 2a: UpdateProgram — closing out the create lock`);
+      const updateCtx = createHandlerContext({ connection, logger });
+      const updateResponse = await handleUpdateProgram(updateCtx, {
+        program_name: programName,
+        transport_request: parentTransport,
+        source_code: `REPORT ${programName.toLowerCase()}.`,
+      });
+      expectOk(updateResponse, 'Step 2a UpdateProgram', logger);
+      logger?.success('Step 2a: UpdateProgram succeeded, lock closed out');
 
-        // Step 2: create a program on the REQUEST, not the task.
-        //
-        // A plain create/edit always takes the REQUEST as its corrNr — the
-        // task is what AddTransportObject/RemoveTransportObject address
-        // afterward, to move an object's entry onto (or off of) one. The
-        // object does not exist yet at create time, so there is nothing yet
-        // to add to a task; the request is the only thing to name.
-        logger?.info(
-          `Step 2: creating program ${programName} on request ${parentTransport}`,
-        );
-        const createCtx = createHandlerContext({ connection, logger });
-        const createResponse = await handleCreateProgram(createCtx, {
-          program_name: programName,
-          package_name: packageName,
-          transport_request: parentTransport,
-          description: 'MCP test program for transport-object-tools (#221)',
-        });
+      // Step 2b: AddTransportObject — move the entry onto the task. This
+      // is the tool's own documented purpose: "attach an EXISTING object
+      // to a transport task" — the object exists now (steps 2-2a), and it
+      // currently sits wherever the request put it, not yet on our task.
+      logger?.info(
+        `Step 2b: AddTransportObject — moving entry onto ${taskNumber}`,
+      );
+      const firstAddCtx = createHandlerContext({ connection, logger });
+      const firstAddResponse = await handleAddTransportObject(firstAddCtx, {
+        transport_number: taskNumber,
+        object_name: programName,
+        object_type: 'PROG',
+      });
+      expectOk(firstAddResponse, 'Step 2b AddTransportObject', logger);
+      entryTask = taskNumber;
+      const firstAddData = answerOf(firstAddResponse);
+      assert.equal(firstAddData.accepted, true);
+      logger?.success('Step 2b: AddTransportObject accepted');
 
-        expectOk(createResponse, 'Step 2 CreateProgram', logger);
-        expect(createResponse.content[0]?.text).toBe('SUCCESS');
-        logger?.success(
-          `Step 2: program ${programName} created on ${parentTransport}`,
-        );
+      // Step 3: ReadTransportObjects — find the entry, capture its position
+      logger?.info('Step 3: ReadTransportObjects — locating the entry');
+      const readCtx1 = createHandlerContext({ connection, logger });
+      const readResponse1 = await handleReadTransportObjects(readCtx1, {
+        transport_number: taskNumber,
+      });
 
-        await delay(getOperationDelay('create'));
+      expectOk(readResponse1, 'Step 3 ReadTransportObjects', logger);
+      const readData1 = answerOf(readResponse1);
+      assert.equal(readData1.success, true);
+      const entry1 = readData1.objects.find(
+        (o: any) => o.name === programName && o.type === 'PROG',
+      );
+      assert.ok(entry1 !== undefined);
+      assert.ok(entry1.position);
+      const position = entry1.position as string;
+      logger?.success(`Step 3: found entry at position ${position}`);
 
-        // Step 2a: set source via UpdateProgram, same request. Its
-        // lock/write/unlock cycle is what closes out the ENQUEUE lock
-        // CreateProgram leaves behind (see the file header). Skipping this
-        // orphaned SM12 entries more than once while this test was being
-        // written.
-        logger?.info(`Step 2a: UpdateProgram — closing out the create lock`);
-        const updateCtx = createHandlerContext({ connection, logger });
-        const updateResponse = await handleUpdateProgram(updateCtx, {
-          program_name: programName,
-          transport_request: parentTransport,
-          source_code: `REPORT ${programName.toLowerCase()}.`,
-        });
-        expectOk(updateResponse, 'Step 2a UpdateProgram', logger);
-        logger?.success('Step 2a: UpdateProgram succeeded, lock closed out');
+      // Step 4: RemoveTransportObject
+      logger?.info(`Step 4: RemoveTransportObject at position ${position}`);
+      const removeCtx = createHandlerContext({ connection, logger });
+      const removeResponse = await handleRemoveTransportObject(removeCtx, {
+        transport_number: taskNumber,
+        object_name: programName,
+        object_type: 'PROG',
+        position,
+      });
 
-        await delay(getOperationDelay('update'));
+      expectOk(removeResponse, 'Step 4 RemoveTransportObject', logger);
+      const removeData = answerOf(removeResponse);
+      assert.equal(removeData.accepted, true);
+      logger?.success('Step 4: RemoveTransportObject accepted');
 
-        // Step 2b: AddTransportObject — move the entry onto the task. This
-        // is the tool's own documented purpose: "attach an EXISTING object
-        // to a transport task" — the object exists now (steps 2-2a), and it
-        // currently sits wherever the request put it, not yet on our task.
-        logger?.info(
-          `Step 2b: AddTransportObject — moving entry onto ${taskNumber}`,
-        );
-        const firstAddCtx = createHandlerContext({ connection, logger });
-        const firstAddResponse = await handleAddTransportObject(firstAddCtx, {
-          transport_number: taskNumber,
-          object_name: programName,
-          object_type: 'PROG',
-        });
-        expectOk(firstAddResponse, 'Step 2b AddTransportObject', logger);
-        entryTask = taskNumber;
-        const firstAddData = parseHandlerResponse(firstAddResponse);
-        expect(firstAddData.accepted).toBe(true);
-        logger?.success('Step 2b: AddTransportObject accepted');
+      // Step 5: re-read — the tool's own doc says a 200 above is not proof
+      logger?.info('Step 5: ReadTransportObjects — confirming removal');
+      const readCtx2 = createHandlerContext({ connection, logger });
+      const readResponse2 = await handleReadTransportObjects(readCtx2, {
+        transport_number: taskNumber,
+      });
 
-        await delay(getOperationDelay('update'));
+      expectOk(readResponse2, 'Step 5 ReadTransportObjects', logger);
+      const readData2 = answerOf(readResponse2);
+      const entry2 = readData2.objects.find(
+        (o: any) => o.name === programName && o.type === 'PROG',
+      );
+      assert.equal(entry2, undefined);
+      logger?.success('Step 5: entry confirmed removed');
 
-        // Step 3: ReadTransportObjects — find the entry, capture its position
-        logger?.info('Step 3: ReadTransportObjects — locating the entry');
-        const readCtx1 = createHandlerContext({ connection, logger });
-        const readResponse1 = await handleReadTransportObjects(readCtx1, {
-          transport_number: taskNumber,
-        });
+      // Step 6: AddTransportObject — reattach it
+      logger?.info('Step 6: AddTransportObject — reattaching');
+      const addCtx = createHandlerContext({ connection, logger });
+      const addResponse = await handleAddTransportObject(addCtx, {
+        transport_number: taskNumber,
+        object_name: programName,
+        object_type: 'PROG',
+      });
 
-        expectOk(readResponse1, 'Step 3 ReadTransportObjects', logger);
-        const readData1 = parseHandlerResponse(readResponse1);
-        expect(readData1.success).toBe(true);
-        const entry1 = readData1.objects.find(
-          (o: any) => o.name === programName && o.type === 'PROG',
-        );
-        expect(entry1).toBeDefined();
-        expect(entry1.position).toBeTruthy();
-        const position = entry1.position as string;
-        logger?.success(`Step 3: found entry at position ${position}`);
+      expectOk(addResponse, 'Step 6 AddTransportObject', logger);
+      const addData = answerOf(addResponse);
+      assert.equal(addData.accepted, true);
+      logger?.success('Step 6: AddTransportObject accepted');
 
-        // Step 4: RemoveTransportObject
-        logger?.info(`Step 4: RemoveTransportObject at position ${position}`);
-        const removeCtx = createHandlerContext({ connection, logger });
-        const removeResponse = await handleRemoveTransportObject(removeCtx, {
-          transport_number: taskNumber,
-          object_name: programName,
-          object_type: 'PROG',
-          position,
-        });
+      // Step 7: re-read — confirm it is back
+      logger?.info('Step 7: ReadTransportObjects — confirming re-attachment');
+      const readCtx3 = createHandlerContext({ connection, logger });
+      const readResponse3 = await handleReadTransportObjects(readCtx3, {
+        transport_number: taskNumber,
+      });
 
-        expectOk(removeResponse, 'Step 4 RemoveTransportObject', logger);
-        const removeData = parseHandlerResponse(removeResponse);
-        expect(removeData.accepted).toBe(true);
-        logger?.success('Step 4: RemoveTransportObject accepted');
+      expectOk(readResponse3, 'Step 7 ReadTransportObjects', logger);
+      const readData3 = answerOf(readResponse3);
+      const entry3 = readData3.objects.find(
+        (o: any) => o.name === programName && o.type === 'PROG',
+      );
+      assert.ok(entry3 !== undefined);
+      logger?.success('Step 7: entry confirmed back on the task');
 
-        await delay(getOperationDelay('update'));
+      // Step 8: ReadTransportActionLog — confirm the task recorded activity
+      logger?.info('Step 8: ReadTransportActionLog');
+      const logCtx = createHandlerContext({ connection, logger });
+      const logResponse = await handleReadTransportActionLog(logCtx, {
+        transport_number: taskNumber,
+      });
 
-        // Step 5: re-read — the tool's own doc says a 200 above is not proof
-        logger?.info('Step 5: ReadTransportObjects — confirming removal');
-        const readCtx2 = createHandlerContext({ connection, logger });
-        const readResponse2 = await handleReadTransportObjects(readCtx2, {
-          transport_number: taskNumber,
-        });
+      expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
+      const logData = answerOf(logResponse);
+      assert.equal(logData.success, true);
+      assert.ok((logData.count ?? 0) > 0);
+      assert.equal(Array.isArray(logData.entries), true);
+      logger?.success(
+        `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
+      );
 
-        expectOk(readResponse2, 'Step 5 ReadTransportObjects', logger);
-        const readData2 = parseHandlerResponse(readResponse2);
-        const entry2 = readData2.objects.find(
-          (o: any) => o.name === programName && o.type === 'PROG',
-        );
-        expect(entry2).toBeUndefined();
-        logger?.success('Step 5: entry confirmed removed');
+      // Step 9: SortAndCompressTransportTask — accepted, and the entry is
+      // still there, once. The answer is an empty `200` (measured on
+      // premise, BASIS 816, 2026-10-12), so the re-read is the evidence.
+      logger?.info(`Step 9: SortAndCompressTransportTask on ${taskNumber}`);
+      const sortResponse = await handleSortAndCompressTransportTask(
+        createHandlerContext({ connection, logger }),
+        { transport_number: taskNumber },
+      );
+      expectOk(sortResponse, 'Step 9 SortAndCompressTransportTask', logger);
+      const sortData = answerOf(sortResponse);
+      assert.equal(sortData.accepted, true);
+      assert.equal('success' in sortData, false);
 
-        // Step 6: AddTransportObject — reattach it
-        logger?.info('Step 6: AddTransportObject — reattaching');
-        const addCtx = createHandlerContext({ connection, logger });
-        const addResponse = await handleAddTransportObject(addCtx, {
-          transport_number: taskNumber,
-          object_name: programName,
-          object_type: 'PROG',
-        });
-
-        expectOk(addResponse, 'Step 6 AddTransportObject', logger);
-        const addData = parseHandlerResponse(addResponse);
-        expect(addData.accepted).toBe(true);
-        logger?.success('Step 6: AddTransportObject accepted');
-
-        await delay(getOperationDelay('update'));
-
-        // Step 7: re-read — confirm it is back
-        logger?.info('Step 7: ReadTransportObjects — confirming re-attachment');
-        const readCtx3 = createHandlerContext({ connection, logger });
-        const readResponse3 = await handleReadTransportObjects(readCtx3, {
-          transport_number: taskNumber,
-        });
-
-        expectOk(readResponse3, 'Step 7 ReadTransportObjects', logger);
-        const readData3 = parseHandlerResponse(readResponse3);
-        const entry3 = readData3.objects.find(
-          (o: any) => o.name === programName && o.type === 'PROG',
-        );
-        expect(entry3).toBeDefined();
-        logger?.success('Step 7: entry confirmed back on the task');
-
-        // Step 8: ReadTransportActionLog — confirm the task recorded activity
-        logger?.info('Step 8: ReadTransportActionLog');
-        const logCtx = createHandlerContext({ connection, logger });
-        const logResponse = await handleReadTransportActionLog(logCtx, {
-          transport_number: taskNumber,
-        });
-
-        expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
-        const logData = parseHandlerResponse(logResponse);
-        expect(logData.success).toBe(true);
-        expect(logData.count).toBeGreaterThan(0);
-        expect(Array.isArray(logData.entries)).toBe(true);
-        logger?.success(
-          `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
-        );
-
-        // Step 9: SortAndCompressTransportTask — accepted, and the entry is
-        // still there, once. The answer is an empty `200` (measured on
-        // premise, BASIS 816, 2026-10-12), so the re-read is the evidence.
-        logger?.info(`Step 9: SortAndCompressTransportTask on ${taskNumber}`);
-        const sortResponse = await handleSortAndCompressTransportTask(
+      const sortedData = answerOf(
+        await handleReadTransportObjects(
           createHandlerContext({ connection, logger }),
           { transport_number: taskNumber },
-        );
-        expectOk(sortResponse, 'Step 9 SortAndCompressTransportTask', logger);
-        const sortData = parseHandlerResponse(sortResponse);
-        expect(sortData.accepted).toBe(true);
-        expect('success' in sortData).toBe(false);
+        ),
+      );
+      const afterSort = sortedData.objects.filter(
+        (o: any) => o.name === programName && o.type === 'PROG',
+      );
+      assert.equal(afterSort.length, 1);
+      logger?.success('Step 9: entry still on the task, once');
 
-        await delay(getOperationDelay('update'));
+      // Step 10: a second request, and a task under it, the target of the
+      // move. Not a second task of the pinned request: the system refuses a
+      // move between two tasks of one request (TR 717, "Object can be moved
+      // between different requests only"). It carries the source request's
+      // target: a move to a request with another target is refused ("Object
+      // can only be moved to a request with the same target", measured).
+      logger?.info("Step 10: GetTransport — the source request's target");
+      const sourceResponse = await handleGetTransport(
+        createHandlerContext({ connection, logger }),
+        {
+          transport_number: parentTransport,
+          include_objects: false,
+          include_tasks: false,
+        },
+      );
+      expectOk(sourceResponse, 'Step 10 GetTransport', logger);
+      // GetTransport answers a transport-layer target as SAP keeps it,
+      // `/<name>/`; CreateTransport's `target_system` takes the name, which
+      // the client wraps in the slashes again.
+      const keptTarget = String(
+        answerOf(sourceResponse)?.transport?.target_system ?? '',
+      ).trim();
+      const sourceTarget =
+        keptTarget.length > 2 &&
+        keptTarget.startsWith('/') &&
+        keptTarget.endsWith('/')
+          ? keptTarget.slice(1, -1)
+          : keptTarget;
+      logger?.info(`Step 10: source target ${sourceTarget || '(none)'}`);
 
-        const sortedData = parseHandlerResponse(
+      logger?.info('Step 10: CreateTransport — a second request for the move');
+      const secondRequestResponse = await handleCreateTransport(
+        createHandlerContext({ connection, logger }),
+        {
+          transport_type: 'workbench',
+          description: 'MCP test: move target (transport-object-tools)',
+          owner: targetUser,
+          ...(sourceTarget ? { target_system: sourceTarget } : {}),
+        },
+      );
+      expectOk(secondRequestResponse, 'Step 10 CreateTransport', logger);
+      const answeredTransportNumber = answerOf(
+        secondRequestResponse,
+      ).transport_number;
+      assert.ok(answeredTransportNumber);
+      secondRequestNumber = answeredTransportNumber;
+      logger?.success(`Step 10: request ${secondRequestNumber} created`);
+
+      logger?.info(
+        `Step 10: CreateTransportTask — a task under ${secondRequestNumber}`,
+      );
+      const secondTaskResponse = await handleCreateTransportTask(
+        createHandlerContext({ connection, logger }),
+        { transport_number: secondRequestNumber, target_user: targetUser },
+      );
+      expectOk(secondTaskResponse, 'Step 10 CreateTransportTask', logger);
+      const answeredTaskNumber = answerOf(secondTaskResponse).task_number;
+      assert.ok(answeredTaskNumber);
+      secondTaskNumber = answeredTaskNumber;
+      logger?.success(`Step 10: task ${secondTaskNumber} created`);
+
+      // Step 10a: the program sits on one task only. SAP put it on a task of
+      // its own in the pinned request at creation (step 2), and step 2b
+      // added it to the test's task: an object on two tasks of a request
+      // cannot be moved (TR721, "locked more than once in request",
+      // measured). Its entry comes off every other task of the request.
+      logger?.info(
+        `Step 10a: detaching ${programName} from the other tasks of ${parentTransport}`,
+      );
+      for (const task of await tasksOf(parentTransport)) {
+        if (task === taskNumber) continue;
+        if ((await programEntriesOn(task)).length === 0) continue;
+        assert.equal(await detachProgramFrom(task), 0);
+        logger?.success(`Step 10a: entry detached from task ${task}`);
+      }
+      assert.equal((await programEntriesOn(taskNumber)).length, 1);
+
+      // Step 11: move the entry to the second task, by its position
+      const moving = afterSort[0];
+      assert.ok(moving?.position);
+      logger?.info(
+        `Step 11: MoveTransportObjects ${taskNumber} → ${secondTaskNumber} at position ${moving.position}`,
+      );
+      const moveResponse = await handleMoveTransportObjects(
+        createHandlerContext({ connection, logger }),
+        {
+          transport_number: taskNumber,
+          target_number: secondTaskNumber,
+          objects: [
+            {
+              object_name: programName,
+              object_type: 'PROG',
+              position: moving.position,
+            },
+          ],
+        },
+      );
+      expectOk(moveResponse, 'Step 11 MoveTransportObjects', logger);
+      entryTask = secondTaskNumber;
+      const moveData = handlerAnswer(moveResponse, MoveAnswer);
+      assert.equal(moveData.accepted, true);
+      assert.equal('success' in moveData, false);
+
+      // The echo is not proof: re-read both tasks.
+      const holds = async (task: string) =>
+        answerOf(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
-            { transport_number: taskNumber },
+            { transport_number: task },
           ),
-        );
-        const afterSort = sortedData.objects.filter(
+        ).objects.filter(
           (o: any) => o.name === programName && o.type === 'PROG',
         );
-        expect(afterSort).toHaveLength(1);
-        logger?.success('Step 9: entry still on the task, once');
+      assert.equal((await holds(taskNumber)).length, 0);
+      const onSecond = await holds(secondTaskNumber);
+      assert.equal(onSecond.length, 1);
+      logger?.success(
+        'Step 11: entry moved — off the first task, on the second',
+      );
 
-        // Step 10: a second request, and a task under it, the target of the
-        // move. Not a second task of the pinned request: the system refuses a
-        // move between two tasks of one request (TR 717, "Object can be moved
-        // between different requests only"). It carries the source request's
-        // target: a move to a request with another target is refused ("Object
-        // can only be moved to a request with the same target", measured).
-        logger?.info("Step 10: GetTransport — the source request's target");
-        const sourceResponse = await handleGetTransport(
-          createHandlerContext({ connection, logger }),
-          {
-            transport_number: parentTransport,
-            include_objects: false,
-            include_tasks: false,
-          },
-        );
-        expectOk(sourceResponse, 'Step 10 GetTransport', logger);
-        // GetTransport answers a transport-layer target as SAP keeps it,
-        // `/<name>/`; CreateTransport's `target_system` takes the name, which
-        // the client wraps in the slashes again.
-        const keptTarget = String(
-          parseHandlerResponse(sourceResponse)?.transport?.target_system ?? '',
-        ).trim();
-        const sourceTarget =
-          keptTarget.length > 2 &&
-          keptTarget.startsWith('/') &&
-          keptTarget.endsWith('/')
-            ? keptTarget.slice(1, -1)
-            : keptTarget;
-        logger?.info(`Step 10: source target ${sourceTarget || '(none)'}`);
+      // Step 12: move it back, by its position on the second task
+      logger?.info(
+        `Step 12: MoveTransportObjects ${secondTaskNumber} → ${taskNumber}`,
+      );
+      const backResponse = await handleMoveTransportObjects(
+        createHandlerContext({ connection, logger }),
+        {
+          transport_number: secondTaskNumber,
+          target_number: taskNumber,
+          objects: [
+            {
+              object_name: programName,
+              object_type: 'PROG',
+              position: stated(onSecond[0]?.position, 'position'),
+            },
+          ],
+        },
+      );
+      expectOk(backResponse, 'Step 12 MoveTransportObjects', logger);
+      entryTask = taskNumber;
 
-        logger?.info(
-          'Step 10: CreateTransport — a second request for the move',
-        );
-        const secondRequestResponse = await handleCreateTransport(
-          createHandlerContext({ connection, logger }),
-          {
-            transport_type: 'workbench',
-            description: 'MCP test: move target (transport-object-tools)',
-            owner: targetUser,
-            ...(sourceTarget ? { target_system: sourceTarget } : {}),
-          },
-        );
-        expectOk(secondRequestResponse, 'Step 10 CreateTransport', logger);
-        secondRequestNumber = parseHandlerResponse(
-          secondRequestResponse,
-        ).transport_number;
-        expect(secondRequestNumber).toBeTruthy();
-        logger?.success(`Step 10: request ${secondRequestNumber} created`);
-
-        await delay(getOperationDelay('create'));
-
-        logger?.info(
-          `Step 10: CreateTransportTask — a task under ${secondRequestNumber}`,
-        );
-        const secondTaskResponse = await handleCreateTransportTask(
-          createHandlerContext({ connection, logger }),
-          { transport_number: secondRequestNumber, target_user: targetUser },
-        );
-        expectOk(secondTaskResponse, 'Step 10 CreateTransportTask', logger);
-        secondTaskNumber = parseHandlerResponse(secondTaskResponse).task_number;
-        expect(secondTaskNumber).toBeTruthy();
-        logger?.success(`Step 10: task ${secondTaskNumber} created`);
-
-        await delay(getOperationDelay('create'));
-
-        // Step 10a: the program sits on one task only. SAP put it on a task of
-        // its own in the pinned request at creation (step 2), and step 2b
-        // added it to the test's task: an object on two tasks of a request
-        // cannot be moved (TR721, "locked more than once in request",
-        // measured). Its entry comes off every other task of the request.
-        logger?.info(
-          `Step 10a: detaching ${programName} from the other tasks of ${parentTransport}`,
-        );
-        for (const task of await tasksOf(parentTransport)) {
-          if (task === taskNumber) continue;
-          if ((await programEntriesOn(task)).length === 0) continue;
-          expect(await detachProgramFrom(task)).toBe(0);
-          logger?.success(`Step 10a: entry detached from task ${task}`);
-        }
-        expect(await programEntriesOn(taskNumber)).toHaveLength(1);
-
-        // Step 11: move the entry to the second task, by its position
-        const moving = afterSort[0];
-        logger?.info(
-          `Step 11: MoveTransportObjects ${taskNumber} → ${secondTaskNumber} at position ${moving.position}`,
-        );
-        const moveResponse = await handleMoveTransportObjects(
-          createHandlerContext({ connection, logger }),
-          {
-            transport_number: taskNumber,
-            target_number: secondTaskNumber,
-            objects: [
-              {
-                object_name: programName,
-                object_type: 'PROG',
-                position: moving.position,
-              },
-            ],
-          },
-        );
-        expectOk(moveResponse, 'Step 11 MoveTransportObjects', logger);
-        entryTask = secondTaskNumber;
-        const moveData = parseHandlerResponse(moveResponse);
-        expect(moveData.accepted).toBe(true);
-        expect('success' in moveData).toBe(false);
-
-        await delay(getOperationDelay('update'));
-
-        // The echo is not proof: re-read both tasks.
-        const holds = async (task: string) =>
-          parseHandlerResponse(
-            await handleReadTransportObjects(
-              createHandlerContext({ connection, logger }),
-              { transport_number: task },
-            ),
-          ).objects.filter(
-            (o: any) => o.name === programName && o.type === 'PROG',
-          );
-        expect(await holds(taskNumber)).toHaveLength(0);
-        const onSecond = await holds(secondTaskNumber);
-        expect(onSecond).toHaveLength(1);
-        logger?.success(
-          'Step 11: entry moved — off the first task, on the second',
-        );
-
-        // Step 12: move it back, by its position on the second task
-        logger?.info(
-          `Step 12: MoveTransportObjects ${secondTaskNumber} → ${taskNumber}`,
-        );
-        const backResponse = await handleMoveTransportObjects(
-          createHandlerContext({ connection, logger }),
-          {
-            transport_number: secondTaskNumber,
-            target_number: taskNumber,
-            objects: [
-              {
-                object_name: programName,
-                object_type: 'PROG',
-                position: onSecond[0].position,
-              },
-            ],
-          },
-        );
-        expectOk(backResponse, 'Step 12 MoveTransportObjects', logger);
-        entryTask = taskNumber;
-
-        await delay(getOperationDelay('update'));
-
-        expect(await holds(secondTaskNumber)).toHaveLength(0);
-        expect(await holds(taskNumber)).toHaveLength(1);
-        logger?.success('Step 12: entry back on the first task');
-      } finally {
-        // The suite locks and unlocks its own object, so a lock here means
-        // something went wrong earlier — name the holder rather than pretend it
-        // can be cleared.
-        await lockHolderOf(connection, 'program', programName, logger);
-      }
-    },
-    getTimeout('long'),
-  );
+      assert.equal((await holds(secondTaskNumber)).length, 0);
+      assert.equal((await holds(taskNumber)).length, 1);
+      logger?.success('Step 12: entry back on the first task');
+    } finally {
+      // The suite locks and unlocks its own object, so a lock here means
+      // something went wrong earlier — name the holder rather than pretend it
+      // can be cleared.
+      await lockHolderOf(connection, 'program', programName, logger);
+    }
+  });
 });

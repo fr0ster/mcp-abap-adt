@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateDdl Handler - Update existing CDS/Classic view DDL source
  *
@@ -25,7 +27,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -34,42 +36,31 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ddl_name: {
-        type: 'string',
-        description: 'DDL source name.',
-      },
-      ddl_source: { type: 'string', description: 'Complete DDL source code.' },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after update. Default: false.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['ddl_name', 'ddl_source'],
-  },
+  inputSchema: z.object({
+    ddl_name: z.string().describe('DDL source name.'),
+    ddl_source: z.string().describe('Complete DDL source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after update. Default: false.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateDdlArgs {
-  ddl_name: string;
-  ddl_source: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateDdl(
   context: HandlerContext,
@@ -89,14 +80,14 @@ export async function handleUpdateDdl(
 
   return answer(
     { tool: 'UpdateDdl', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getDdl(
         resultsFor(ddlDocuments),
       );
 
       const written = await withLock(
         () => obj.lock({ ddlName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
           const update = atStep('update', () =>
             withAdtHeaders(context, 'ddl.update', (headers) =>
               obj.update(
@@ -132,7 +123,7 @@ export async function handleUpdateDdl(
         { type: 'DDL', name: ddlName },
       );
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

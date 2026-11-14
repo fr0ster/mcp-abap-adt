@@ -7,9 +7,19 @@ const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
 
 const dotenv = require('dotenv');
+const {
+  isAbapUser,
+  traceIdIn,
+  dumpIdsIn,
+  traceEntryUser,
+  traceEntryTitle,
+} = require('./readings.js');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('../dist/lib/connectionFactory.js');
 const { credentialFromSapConfig } = require('../dist/lib/credentialSources.js');
+const {
+  isAlreadyExistsError: takenNameRefused,
+} = require('../dist/lib/utils.js');
 const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
@@ -76,7 +86,6 @@ function getRequiredEnv(name) {
 function parseAdtException(error) {
   const raw = error?.response?.data;
   if (typeof raw !== 'string') return null;
-  if (!raw.includes('<exc:exception')) return null;
   try {
     const parsed = xmlParser.parse(raw);
     const exc = parsed?.['exc:exception'];
@@ -95,25 +104,22 @@ function parseAdtException(error) {
   }
 }
 
+/**
+ * An existing object, by the error's code or by the library's reading of SAP's
+ * answer (its T100 key, or the exception type where SAP gives none) — never its words.
+ */
 function isAlreadyExistsError(error) {
-  const status = error?.response?.status;
-  const payload = String(error?.response?.data || error?.message || '');
   return (
     error?.code === AdtObjectErrorCodes.VALIDATION_FAILED ||
-    (status === 400 &&
-      (payload.includes('ExceptionResourceAlreadyExists') ||
-        payload.includes('already exist') ||
-        payload.includes('does already exist')))
+    takenNameRefused(error)
   );
 }
 
+/** A missing object, by the status or the exception type SAP names (never its words). */
 function isNotFoundError(error) {
-  const status = error?.response?.status;
-  const payload = String(error?.response?.data || error?.message || '');
   return (
-    status === 404 ||
-    payload.includes('ExceptionResourceNotFound') ||
-    payload.includes('does not exist')
+    error?.response?.status === 404 ||
+    parseAdtException(error)?.type === 'ExceptionResourceNotFound'
   );
 }
 
@@ -187,7 +193,7 @@ function normalizeAbapUser(value, fieldName = 'abapUser') {
       `${fieldName}="${value}" looks like email. Use ABAP logon user (e.g. CB9980000423).`,
     );
   }
-  if (!/^[A-Z0-9_.$-]+$/.test(normalized)) {
+  if (!isAbapUser(normalized)) {
     throw new Error(
       `${fieldName}="${value}" has invalid characters for ABAP user.`,
     );
@@ -340,10 +346,6 @@ function compact(data, max = 2500) {
     typeof data === 'string' ? data : JSON.stringify(data, null, 2) || '';
   if (raw.length <= max) return raw;
   return `${raw.slice(0, max)}\n... [truncated ${raw.length - max} chars]`;
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function buildClassSource(className) {
@@ -517,20 +519,14 @@ ENDFORM.`;
 
 function extractTraceId(raw) {
   const asText = typeof raw === 'string' ? raw : JSON.stringify(raw);
-  const match = asText.match(/\/runtime\/traces\/abaptraces\/([A-F0-9]{32})/i);
-  return match?.[1];
+  return traceIdIn(asText);
 }
 
 function extractDumpIds(raw) {
   const ids = new Set();
   const collect = (value) => {
     if (typeof value === 'string') {
-      const regex = /\/sap\/bc\/adt\/runtime\/dumps\/([^"'?&<\s]+)/g;
-      let match = regex.exec(value);
-      while (match) {
-        ids.add(match[1]);
-        match = regex.exec(value);
-      }
+      for (const id of dumpIdsIn(value)) ids.add(id);
       return;
     }
     if (Array.isArray(value)) {
@@ -568,6 +564,9 @@ function extractTraceEntriesFromFeed(feedPayload) {
           typeof updatedRaw === 'string'
             ? updatedRaw
             : JSON.stringify(updatedRaw),
+        // The entry's user and title, by field.
+        user: traceEntryUser(entry),
+        description: traceEntryTitle(entry),
         raw: JSON.stringify(entry),
       };
     })
@@ -579,8 +578,7 @@ function getTraceIdSetFromFeed(feedPayload, abapUser) {
   const entries = extractTraceEntriesFromFeed(feedPayload);
   const ids = new Set();
   for (const entry of entries) {
-    const raw = String(entry.raw || '').toUpperCase();
-    if (user && !raw.includes(user)) {
+    if (user && entry.user !== user) {
       continue;
     }
     if (entry.traceId) {
@@ -777,62 +775,47 @@ async function upsertExecutableObject(ctx, rl) {
   return;
 }
 
+// The trace the run produced, from one read of the trace files: a trace id
+// not in the baseline, else the one whose title is the run's description —
+// both of the user, by field. No wait and no retry: when the feed does not
+// list it yet, the answer says so and option 3 lists the traces later.
 async function resolveTraceIdFromTraceFiles(runtime, options = {}) {
-  const {
-    logger,
-    description,
-    abapUser,
-    baselineTraceIds,
-    attempts = 10,
-    delayMs = 1500,
-  } = options;
+  const { description, abapUser, baselineTraceIds } = options;
   const marker = String(description || '').trim().toUpperCase();
   const user = String(abapUser || '').trim().toUpperCase();
   const baseline = baselineTraceIds || new Set();
 
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const response = await runtime.listProfilerTraceFiles();
-    const entries = extractTraceEntriesFromFeed(response?.data);
+  const response = await runtime.listProfilerTraceFiles();
+  const entries = extractTraceEntriesFromFeed(response?.data);
+  const ofUser = (entry) => (user ? entry.user === user : true);
 
-    // First priority: a new trace ID not present before run.
-    const newEntry = entries.find((entry) => {
-      if (!entry?.traceId) return false;
-      const raw = String(entry.raw || '').toUpperCase();
-      const matchesUser = user ? raw.includes(user) : true;
-      return matchesUser && !baseline.has(entry.traceId);
-    });
-    if (newEntry?.traceId) {
-      return {
-        traceId: newEntry.traceId,
-        source: 'listProfilerTraceFiles(new-id)',
-      };
-    }
+  // First priority: a new trace ID not present before run.
+  const newEntry = entries.find(
+    (entry) => entry?.traceId && ofUser(entry) && !baseline.has(entry.traceId),
+  );
+  if (newEntry?.traceId) {
+    return {
+      traceId: newEntry.traceId,
+      source: 'listProfilerTraceFiles(new-id)',
+    };
+  }
 
-    // Fallback by explicit marker.
-    const matchedByMarker = entries.find((entry) => {
-      if (!entry?.traceId) return false;
-      const raw = String(entry.raw || '').toUpperCase();
-      const matchesDescription = marker ? raw.includes(marker) : false;
-      const matchesUser = user ? raw.includes(user) : true;
-      return matchesDescription && matchesUser;
-    });
-    if (matchedByMarker?.traceId) {
-      return {
-        traceId: matchedByMarker.traceId,
-        source: 'listProfilerTraceFiles(description)',
-      };
-    }
-
-    logger?.debug?.(
-      `Trace ID not yet available in feed (attempt ${attempt}/${attempts})`,
-    );
-    if (attempt < attempts) {
-      await delay(delayMs);
-    }
+  // Fallback by the trace's title, the description the run was given.
+  const matchedByMarker = marker
+    ? entries.find(
+        (entry) =>
+          entry?.traceId && entry.description === marker && ofUser(entry),
+      )
+    : undefined;
+  if (matchedByMarker?.traceId) {
+    return {
+      traceId: matchedByMarker.traceId,
+      source: 'listProfilerTraceFiles(description)',
+    };
   }
 
   throw new Error(
-    `Trace ID not found in profiler trace files after ${attempts} attempts (description="${description || ''}", user="${abapUser || ''}")`,
+    `Trace ID not listed in the profiler trace files yet (description="${description || ''}", user="${abapUser || ''}"); list the traces with option 3`,
   );
 }
 

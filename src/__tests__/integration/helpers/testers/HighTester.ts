@@ -7,10 +7,16 @@
  * @deprecated Use LambdaTester instead
  */
 
-import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import type {
+  HandlerEntry,
+  ToolArgs,
+} from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter, getSystemType } from '../configHelpers';
 import type { LoggerWithExtras } from '../loggerHelpers';
+import { skipRunningTest } from '../runningTest';
+import type { CaseParams } from '../testConfigSchema';
 import { createHandlerContext, delay } from '../testHelpers';
+import { thrownStatus, thrownWords } from '../thrownValue';
 import {
   callTool,
   isHardModeEnabled,
@@ -20,14 +26,106 @@ import {
 import { LambdaTester, type TLambda } from './LambdaTester';
 import type { LambdaTesterContext } from './types';
 
-// Handler function type: (context: HandlerContext, args: any) => Promise<any>
-type HandlerFunction = (context: HandlerContext, args: any) => Promise<any>;
-
+/**
+ * The tools a high-level test drives, as their entries (`defineTool`): the
+ * arguments built from the case go through the tool's schema, as a model's
+ * call does, and the handler gets its output.
+ */
 export type HighWorkflowFunctions = {
-  create: HandlerFunction;
-  update: HandlerFunction;
-  delete?: HandlerFunction;
+  create: HandlerEntry;
+  update: HandlerEntry;
+  delete?: HandlerEntry;
 };
+
+/** The case's `keys` it states (a truthy value), each under its own name. */
+function statedOf(
+  params: CaseParams,
+  keys: readonly string[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    if (params[key]) out[key] = params[key];
+  }
+  return out;
+}
+
+/** The case's `keys` it gives any value, `false` and `0` included. */
+function givenOf(
+  params: CaseParams,
+  keys: readonly string[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    if (params[key] !== undefined) out[key] = params[key];
+  }
+  return out;
+}
+
+/** `to` from the first of `from` the case states, when it states one. */
+function firstStated(
+  params: CaseParams,
+  to: string,
+  from: readonly string[],
+): Record<string, unknown> {
+  for (const key of from) {
+    if (params[key]) return { [to]: params[key] };
+  }
+  return {};
+}
+
+/** What a create carries from the case when stated, by type: CDS, class, BDEF, BIMP, DTEL, structure, domain, SRVB, SRVD, FUGR. */
+const CREATE_STATED = [
+  'ddl_code',
+  'source_code',
+  'superclass',
+  'root_entity',
+  'implementation_type',
+  'behavior_definition',
+  'implementation_code',
+  'type_kind',
+  'type_name',
+  'data_type',
+  'short_label',
+  'medium_label',
+  'long_label',
+  'heading_label',
+  'fields',
+  'datatype',
+  'service_definition_name',
+  'binding_variant',
+  'service_name',
+  'service_version',
+  'ddl_source',
+  'function_group_name',
+  'function_group_description',
+  'function_module_name',
+  'function_module_description',
+] as const;
+
+/** The case's values a create or an update carries even when false or 0. */
+const GIVEN = ['length', 'decimals', 'lowercase', 'sign_exists'] as const;
+
+/** What an update carries from the case when stated, each under its own name. */
+const UPDATE_STATED = [
+  'root_entity',
+  'behavior_definition',
+  'type_kind',
+  'type_name',
+  'data_type',
+  'fields',
+  'datatype',
+] as const;
+
+/** The text of an axios-shaped thrown value's `response.data`, if it is text. */
+function thrownResponseText(error: unknown): string {
+  if (typeof error !== 'object' || error === null || !('response' in error)) {
+    return '';
+  }
+  const response = error.response;
+  if (typeof response !== 'object' || response === null) return '';
+  const data: unknown = Reflect.get(response, 'data');
+  return typeof data === 'string' ? data : '';
+}
 
 /**
  * @deprecated Use LambdaTester instead
@@ -74,14 +172,11 @@ export class HighTester extends LambdaTester {
         logger?.info?.(`   • cleanup: delete ${objectName}`);
         try {
           if (isHardModeEnabled()) {
-            const entity = resolveEntityFromHandlerName(
-              (this as any).handlerName || '',
-            );
+            const entity = resolveEntityFromHandlerName(this.handlerName);
             const mcp = await this.getHardModeClient();
             const deleteArgs = this.buildDeleteArgs(context);
             await callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('delete', entity, 'high', this.handlerName),
               deleteArgs,
             );
@@ -94,7 +189,7 @@ export class HighTester extends LambdaTester {
             logger: logger || undefined,
           });
           const deleteArgs = this.buildDeleteArgs(context);
-          const deleteResponse = await deleteFunction(
+          const deleteResponse = await deleteFunction.call(
             handlerContext,
             deleteArgs,
           );
@@ -108,9 +203,9 @@ export class HighTester extends LambdaTester {
           } else {
             logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
           }
-        } catch (error: any) {
+        } catch (error) {
           logger?.error?.(
-            `Cleanup delete error: ${error?.message || String(error)}. Object left in SAP system.`,
+            `Cleanup delete error: ${thrownWords(error)}. Object left in SAP system.`,
           );
         }
       };
@@ -130,7 +225,7 @@ export class HighTester extends LambdaTester {
     }
 
     if (!this.context.hasConfig) {
-      this.context.logger?.testSkip(`Skipping test: No configuration found`);
+      skipRunningTest(`No configuration found`);
       return;
     }
 
@@ -153,6 +248,7 @@ export class HighTester extends LambdaTester {
       logger: this.context.logger,
     });
     const logger = this.context.logger;
+    const { create, update } = this.workflowFunctions;
 
     try {
       // Execute create workflow
@@ -160,22 +256,13 @@ export class HighTester extends LambdaTester {
         logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
         await this.retryOnConflict(
-          () => this.workflowFunctions!.create(handlerContext, args),
+          () => create.call(handlerContext, args),
           `Create ${this.context.objectName}`,
           logger,
           5,
           8000,
         );
         logger?.info(`   ✅ create completed`);
-
-        // Wait for SAP to propagate creation before update
-        const createDelay = this.context.getOperationDelay('create');
-        if (createDelay > 0) {
-          logger?.debug?.(
-            `⏳ Waiting ${createDelay}ms for SAP to propagate create...`,
-          );
-          await delay(createDelay);
-        }
       }
 
       // Execute update workflow
@@ -183,17 +270,18 @@ export class HighTester extends LambdaTester {
         logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
         await this.retryOnConflict(
-          () => this.workflowFunctions!.update(handlerContext, args),
+          () => update.call(handlerContext, args),
           `Update ${this.context.objectName}`,
           logger,
         );
         logger?.info(`   ✅ update completed`);
       }
-    } catch (error: any) {
+    } catch (error) {
       // Check if error is a skip condition
-      if (error.message?.startsWith('SKIP:')) {
-        const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+      const words = thrownWords(error);
+      if (words.startsWith('SKIP:')) {
+        const skipReason = words.replace(/^SKIP:\s*/, '');
+        skipRunningTest(`${skipReason}`);
         return;
       }
 
@@ -201,7 +289,7 @@ export class HighTester extends LambdaTester {
       // force-release DDIC lock so cleanup can delete the object
 
       this.testFailed = true;
-      this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      this.context.logger?.error(`❌ Test failed: ${words}`);
       throw error;
     }
   }
@@ -211,9 +299,7 @@ export class HighTester extends LambdaTester {
       throw new Error('Tester not initialized. Call beforeAll() first.');
     }
     const logger = this.context.logger;
-    const entity = resolveEntityFromHandlerName(
-      (this as any).handlerName || '',
-    );
+    const entity = resolveEntityFromHandlerName(this.handlerName);
     const mcp = await this.getHardModeClient();
 
     try {
@@ -223,8 +309,7 @@ export class HighTester extends LambdaTester {
         await this.retryOnConflict(
           () =>
             callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('create', entity, 'high', this.handlerName),
               args,
             ),
@@ -240,8 +325,7 @@ export class HighTester extends LambdaTester {
         await this.retryOnConflict(
           () =>
             callTool(
-              mcp.client,
-              mcp.toolNames,
+              mcp,
               toolCandidates('update', entity, 'high', this.handlerName),
               args,
             ),
@@ -250,15 +334,16 @@ export class HighTester extends LambdaTester {
         );
         logger?.info(`   ✅ update completed`);
       }
-    } catch (error: any) {
-      if (error.message?.startsWith('SKIP:')) {
-        const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+    } catch (error) {
+      const words = thrownWords(error);
+      if (words.startsWith('SKIP:')) {
+        const skipReason = words.replace(/^SKIP:\s*/, '');
+        skipRunningTest(`${skipReason}`);
         return;
       }
 
       this.testFailed = true;
-      this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      this.context.logger?.error(`❌ Test failed: ${words}`);
       throw error;
     }
   }
@@ -278,12 +363,11 @@ export class HighTester extends LambdaTester {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
-      } catch (error: any) {
-        const errorMsg = typeof error.message === 'string' ? error.message : '';
-        const responseData =
-          typeof error.response?.data === 'string' ? error.response.data : '';
+      } catch (error) {
+        const errorMsg = thrownWords(error);
+        const responseData = thrownResponseText(error);
         const isTransientConflict =
-          error.response?.status === 409 ||
+          thrownStatus(error) === 409 ||
           errorMsg.includes('object directory entry') ||
           errorMsg.includes('already exists') ||
           responseData.includes('SWB_TOOL') ||
@@ -301,133 +385,62 @@ export class HighTester extends LambdaTester {
     throw new Error(`${label}: exceeded max retries`);
   }
 
-  private buildCreateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } =
-      context;
+  private buildCreateArgs(context: LambdaTesterContext): ToolArgs {
+    const { objectName, params, packageName, transportRequest } = context;
     const nameField = this.getCreateUpdateNameField();
-    return {
+    return this.declaredBy('create', {
       [nameField]: objectName,
       package_name: packageName,
       description: params.description || objectName,
-      ...(params.ddl_code && { ddl_code: params.ddl_code }),
-      ...(params.source_code && { source_code: params.source_code }),
-      ...(params.superclass && { superclass: params.superclass }),
-      // BehaviorDefinition specific
-      ...(params.root_entity && { root_entity: params.root_entity }),
-      ...(params.implementation_type && {
-        implementation_type: params.implementation_type,
-      }),
-      // BehaviorImplementation specific
-      ...(params.behavior_definition && {
-        behavior_definition: params.behavior_definition,
-      }),
-      ...(params.implementation_code && {
-        implementation_code: params.implementation_code,
-      }),
-      // Data element specific fields
-      ...(params.type_kind && { type_kind: params.type_kind }),
-      ...(params.type_name && { type_name: params.type_name }),
-      ...(params.data_type && { data_type: params.data_type }),
-      ...(params.length !== undefined && { length: params.length }),
-      ...(params.decimals !== undefined && { decimals: params.decimals }),
-      ...(params.short_label && { short_label: params.short_label }),
-      ...(params.medium_label && { medium_label: params.medium_label }),
-      ...(params.long_label && { long_label: params.long_label }),
-      ...(params.heading_label && { heading_label: params.heading_label }),
-      // Structure specific fields
-      ...(params.fields && { fields: params.fields }),
-      // Domain specific fields
-      ...(params.datatype && { datatype: params.datatype }),
-      ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
-      ...(params.sign_exists !== undefined && {
-        sign_exists: params.sign_exists,
-      }),
-      // ServiceBinding specific
-      ...(params.service_definition_name && {
-        service_definition_name: params.service_definition_name,
-      }),
-      ...(params.binding_variant && {
-        binding_variant: params.binding_variant,
-      }),
-      ...(params.service_name && { service_name: params.service_name }),
-      ...(params.service_version && {
-        service_version: params.service_version,
-      }),
-      // ServiceDefinition specific
-      ...(params.ddl_source && { ddl_source: params.ddl_source }),
-      // FunctionGroup specific
-      ...(params.function_group_name && {
-        function_group_name: params.function_group_name,
-      }),
-      ...(params.function_group_description && {
-        function_group_description: params.function_group_description,
-      }),
-      ...(params.function_module_name && {
-        function_module_name: params.function_module_name,
-      }),
-      ...(params.function_module_description && {
-        function_module_description: params.function_module_description,
-      }),
+      ...statedOf(params, CREATE_STATED),
+      ...givenOf(params, GIVEN),
       ...(transportRequest && { transport_request: transportRequest }),
-    };
+    });
   }
 
-  private buildUpdateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } =
-      context;
+  private buildUpdateArgs(context: LambdaTesterContext): ToolArgs {
+    const { objectName, params, packageName, transportRequest } = context;
     const nameField = this.getCreateUpdateNameField();
-    return {
+    return this.declaredBy('update', {
       [nameField]: objectName,
       ...(packageName && { package_name: packageName }),
       ...(transportRequest && { transport_request: transportRequest }),
-      ...(params.update_ddl_code && { ddl_code: params.update_ddl_code }),
-      ...(params.ddl_code &&
-        !params.update_ddl_code && { ddl_code: params.ddl_code }),
-      ...(params.source_code && { source_code: params.source_code }),
-      ...(params.update_source_code && {
-        source_code: params.update_source_code,
-      }),
-      ...(params.update_description && {
-        description: params.update_description,
-      }),
-      // BehaviorDefinition specific for update
-      ...(params.root_entity && { root_entity: params.root_entity }),
-      // BehaviorImplementation specific for update
-      ...(params.behavior_definition && {
-        behavior_definition: params.behavior_definition,
-      }),
-      ...(params.update_implementation_code && {
-        implementation_code: params.update_implementation_code,
-      }),
-      ...(params.implementation_code &&
-        !params.update_implementation_code && {
-          implementation_code: params.implementation_code,
-        }),
-      // Data element specific fields for update
-      ...(params.type_kind && { type_kind: params.type_kind }),
-      ...(params.type_name && { type_name: params.type_name }),
-      ...(params.data_type && { data_type: params.data_type }),
-      ...(params.length !== undefined && { length: params.length }),
-      ...(params.decimals !== undefined && { decimals: params.decimals }),
-      // Structure specific fields for update
-      ...(params.fields && { fields: params.fields }),
-      // Domain specific fields for update
-      ...(params.datatype && { datatype: params.datatype }),
-      ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
-      ...(params.sign_exists !== undefined && {
-        sign_exists: params.sign_exists,
-      }),
-      // ServiceDefinition specific for update
-      ...(params.update_ddl_source && {
-        ddl_source: params.update_ddl_source,
-      }),
-      ...(params.ddl_source &&
-        !params.update_ddl_source && { ddl_source: params.ddl_source }),
-    };
+      ...firstStated(params, 'ddl_code', ['update_ddl_code', 'ddl_code']),
+      ...firstStated(params, 'source_code', [
+        'update_source_code',
+        'source_code',
+      ]),
+      ...firstStated(params, 'description', ['update_description']),
+      ...firstStated(params, 'implementation_code', [
+        'update_implementation_code',
+        'implementation_code',
+      ]),
+      ...statedOf(params, UPDATE_STATED),
+      ...givenOf(params, GIVEN),
+      ...firstStated(params, 'ddl_source', ['update_ddl_source', 'ddl_source']),
+    });
   }
 
-  private buildDeleteArgs(context: LambdaTesterContext): any {
-    const { objectName, transportRequest, session } = context;
+  /**
+   * Of `args`, the ones the `step` tool's schema names: the stated keys are
+   * one list for every object type (a class's `source_code`, a table's
+   * `ddl_code`), and a model sends a tool only the arguments its schema
+   * offers, so a key another type's tool takes is not sent.
+   */
+  private declaredBy(
+    step: 'create' | 'update',
+    args: Record<string, unknown>,
+  ): ToolArgs {
+    const entry = this.workflowFunctions?.[step];
+    if (!entry) return args;
+    const shape = entry.toolDefinition.inputSchema.shape;
+    return Object.fromEntries(
+      Object.entries(args).filter(([key]) => Object.hasOwn(shape, key)),
+    );
+  }
+
+  private buildDeleteArgs(context: LambdaTesterContext): ToolArgs {
+    const { objectName, transportRequest } = context;
     const nameField = this.getNameField();
     return {
       [nameField]: objectName,
@@ -440,7 +453,7 @@ export class HighTester extends LambdaTester {
    * May differ from the create/update name field for some types.
    */
   private getNameField(): string {
-    const handlerName = (this as any).handlerName || '';
+    const handlerName = this.handlerName;
     // behavior_implementation must be checked before behavior_definition (substring)
     if (handlerName.includes('behavior_implementation')) return 'class_name';
     if (handlerName.includes('behavior_definition'))
@@ -466,7 +479,7 @@ export class HighTester extends LambdaTester {
    * For some types this differs from the delete name field.
    */
   private getCreateUpdateNameField(): string {
-    const handlerName = (this as any).handlerName || '';
+    const handlerName = this.handlerName;
     // behavior_implementation: create/update use class_name (same as delete)
     if (handlerName.includes('behavior_implementation')) return 'class_name';
     // behavior_definition: create/update use 'name', delete uses 'behavior_definition_name'

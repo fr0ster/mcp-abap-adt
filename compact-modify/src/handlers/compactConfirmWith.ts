@@ -6,6 +6,8 @@
  * full tool.
  */
 
+import { isJsonObject, jsonAt, jsonOf } from '@mcp-abap-adt/lib/compact-shared';
+
 const FULL_READ = 'ReadTransportObjects';
 const COMPACT_READ = 'HandlerGet with object_type TRANSPORT';
 
@@ -15,31 +17,27 @@ export function namingHandlerGet<T extends Answer>(answer: T): T {
   if (answer.isError || !answer.content) return answer;
   const content = answer.content.map((part) => {
     if (part.type !== 'text') return part;
-    try {
-      const payload = JSON.parse(part.text) as Record<string, unknown>;
-      if (
-        typeof payload.confirm_with !== 'string' ||
-        !payload.confirm_with.includes(FULL_READ)
-      ) {
-        return part;
-      }
-      return {
-        ...part,
-        text: JSON.stringify(
-          {
-            ...payload,
-            confirm_with: payload.confirm_with.replaceAll(
-              FULL_READ,
-              COMPACT_READ,
-            ),
-          },
-          null,
-          2,
-        ),
-      };
-    } catch {
+    const payload = jsonOf(part.text);
+    const confirmWith = jsonAt(payload, 'confirm_with');
+    if (
+      payload === undefined ||
+      !isJsonObject(payload) ||
+      typeof confirmWith !== 'string' ||
+      !confirmWith.includes(FULL_READ)
+    ) {
       return part;
     }
+    return {
+      ...part,
+      text: JSON.stringify(
+        {
+          ...payload,
+          confirm_with: confirmWith.replaceAll(FULL_READ, COMPACT_READ),
+        },
+        null,
+        2,
+      ),
+    };
   });
   return { ...answer, content };
 }

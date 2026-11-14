@@ -4,6 +4,7 @@
  * its provider, the same two things the server's transports use.
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
@@ -20,8 +21,14 @@ import {
   defaultLogger,
   getLogLevel,
 } from '@mcp-abap-adt/logger';
+import * as dotenv from 'dotenv';
+import { getPlatformPaths } from '../../../../server-runtime/src/stdio/config/platformPaths';
 import { loadTestConfig } from './configHelpers';
+import { testDestinationName } from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
+import { guardedSend } from './refusalGuard';
+import type { TestConfig } from './testConfigSchema';
+import { thrownWords } from './thrownValue';
 
 const authLogger = createTestLogger('auth');
 
@@ -160,14 +167,32 @@ export interface TestDestination {
   credential: IAuthProvider;
 }
 
-/** The destination the test config names, or undefined. */
-function configuredDestination(config: any): string | undefined {
-  return (
-    config?.auth_broker?.abap?.destination ||
-    config?.abap?.destination ||
-    config?.environment?.destination ||
-    undefined
-  );
+/**
+ * `key` as the destination's own `sessions/<destination>.env` states it (the
+ * file the launcher joins to the environment for the wire), when readable.
+ */
+export function destinationFileValue(
+  basePath: string | undefined,
+  destination: string,
+  key: string,
+): string | undefined {
+  const sessions = getPlatformPaths(basePath, 'sessions')[0];
+  if (sessions === undefined) return undefined;
+  try {
+    return dotenv.parse(
+      fs.readFileSync(path.join(sessions, `${destination}.env`), 'utf8'),
+    )[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/** `SAP_CONNECTION_TYPE` as the factory takes it; absent unless one of the two. */
+export function connectionTypeOf(stated: string | undefined): {
+  connectionType?: 'http' | 'rfc';
+} {
+  const word = stated?.trim().toLowerCase();
+  return word === 'http' || word === 'rfc' ? { connectionType: word } : {};
 }
 
 /**
@@ -176,7 +201,7 @@ function configuredDestination(config: any): string | undefined {
  * browser strategy (opened only when the destination needs a login).
  */
 export function createTestFactory(
-  config: any,
+  config: TestConfig,
   destination: string,
 ): AuthBrokerFactory {
   // service_keys_dir is ALWAYS a base path - factory adds service-keys/sessions
@@ -189,23 +214,31 @@ export function createTestFactory(
     config?.auth_broker?.unsafe === true ||
     config?.auth_broker?.unsafe_session_store === true;
 
+  const logger = createBrokerLogger();
+  // The test config's browser word, mapped as the server maps --browser.
+  const browser = browserOf(
+    browserFor(
+      { browser: config?.auth_broker?.browser ?? 'system' },
+      process.platform,
+    ),
+  );
   return new AuthBrokerFactory({
     mcpDestination: destination,
-    authBrokerPath: basePath,
+    ...(basePath !== undefined && { authBrokerPath: basePath }),
     unsafe: useUnsafe,
-    // The test config's browser word, mapped as the server maps --browser.
-    browser: browserOf(
-      browserFor(
-        { browser: config?.auth_broker?.browser ?? 'system' },
-        process.platform,
-      ),
-    ),
+    ...(browser !== undefined && { browser }),
     ...(config?.auth_broker?.browser_auth_port !== undefined && {
       browserAuthPort: Number(config.auth_broker.browser_auth_port),
     }),
-    ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
-      connectionType: 'rfc' as const,
-    }),
+    // The wire as the run states it — the test config's
+    // environment.connection_type, the environment, the destination's own
+    // file, in globalSetup's order; none stated is refused by the factory,
+    // naming SAP_CONNECTION_TYPE.
+    ...connectionTypeOf(
+      config?.environment?.connection_type ||
+        process.env.SAP_CONNECTION_TYPE ||
+        destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
+    ),
     browserStrategy: browserCallbackStrategy,
     // A login's prompts reach the person running the tests, on stderr.
     promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {
@@ -215,26 +248,31 @@ export function createTestFactory(
       debug: () => {},
     }),
     // Only when DEBUG_BROKER is set — no default logger
-    logger: createBrokerLogger(),
+    ...(logger !== undefined && { logger }),
   });
 }
 
 let testDestinationPromise: Promise<TestDestination | null> | undefined;
 
 /**
- * The test config's destination — one factory per process, so every test
- * suite in it shares the destination's one provider. `null` when the config
- * names no destination.
+ * The test config's destination — the session `environment.env` names
+ * (`testDestinationName`) — with one factory per process, so every test
+ * suite in it shares the destination's one provider. `null` when
+ * `environment.env` names no session of the stores.
  */
 export function getTestDestination(): Promise<TestDestination | null> {
   if (!testDestinationPromise) {
     testDestinationPromise = (async () => {
       const config = loadTestConfig();
-      const destination = configuredDestination(config);
+      // The destination is the session environment.env names (testDestinationName).
+      const destination = testDestinationName(config);
       if (!destination) return null;
       const factory = createTestFactory(config, destination);
       const settings = await factory.settingsFor(destination);
-      const credential = await factory.getProvider(destination);
+      // A broker's refusal latches the run's marker (refusalGuard).
+      const credential = await guardedSend("the destination's credential", () =>
+        factory.getProvider(destination),
+      );
       return { destination, factory, settings, credential };
     })();
     testDestinationPromise.catch(() => {
@@ -245,31 +283,57 @@ export function getTestDestination(): Promise<TestDestination | null> {
 }
 
 /**
- * Make the configured destination available to the tests: its system URL
- * and client go into process.env (SAP_URL, SAP_CLIENT). The credential stays
- * in the provider — there is no token to copy; a connection gets it from
- * `getTestDestination()`.
+ * Make the configured destination available to the tests through
+ * process.env, by its wire: over HTTP its URL and client (SAP_URL,
+ * SAP_CLIENT); over RFC its stated address, client and language
+ * (SAP_ASHOST / SAP_SYSNR or the message-server keys, SAP_SAPROUTER,
+ * SAP_CLIENT, SAP_LANGUAGE) and no SAP_URL — an RFC destination has none.
+ * The credential stays in the provider — there is no token to copy; a
+ * connection gets it from `getTestDestination()`. Answers whether a
+ * destination was set up.
  * - If destination is specified → use the factory
  * - If destination is not specified → skip (tests will use .env directly)
  */
 export async function setupAuthBrokerForTests(_options?: {
   force?: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const target = await getTestDestination();
     if (!target) {
       authLogger?.debug(
         '[setupAuthBrokerForTests] No destination found, skipping (tests will use .env)',
       );
-      return;
+      return false;
     }
-    process.env.SAP_URL = target.settings.url;
-    if (target.settings.client) {
-      process.env.SAP_CLIENT = target.settings.client;
-    }
-  } catch (error: any) {
-    authLogger?.warn(
-      `[setupAuthBrokerForTests] Failed: ${error?.message || String(error)}`,
-    );
+    exportSettings(target.settings);
+    return true;
+  } catch (error) {
+    authLogger?.warn(`[setupAuthBrokerForTests] Failed: ${thrownWords(error)}`);
+    return false;
   }
+}
+
+/** `settings` into process.env, per wire (see `setupAuthBrokerForTests`). */
+export function exportSettings(settings: SapConfig): void {
+  if (settings.connectionType === 'rfc') {
+    delete process.env.SAP_URL;
+    process.env.SAP_CONNECTION_TYPE = 'rfc';
+    const stated: Array<[string, string | undefined]> = [
+      ['SAP_ASHOST', settings.ashost],
+      ['SAP_SYSNR', settings.sysnr],
+      ['SAP_MSHOST', settings.mshost],
+      ['SAP_MSSERV', settings.msserv],
+      ['SAP_SYSID', settings.sysid],
+      ['SAP_GROUP', settings.group],
+      ['SAP_SAPROUTER', settings.saprouter],
+      ['SAP_CLIENT', settings.client],
+      ['SAP_LANGUAGE', settings.language],
+    ];
+    for (const [name, value] of stated) {
+      if (value !== undefined) process.env[name] = value;
+    }
+    return;
+  }
+  process.env.SAP_URL = settings.url;
+  if (settings.client) process.env.SAP_CLIENT = settings.client;
 }

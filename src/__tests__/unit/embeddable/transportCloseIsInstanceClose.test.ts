@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A transport close that ends the session is the instance's close: an
  * embedder's `BaseMcpServer` on its own connected transport (the default
@@ -64,10 +65,10 @@ function holdThenOpen(seen: Seen): HandlerEntry {
     toolDefinition: {
       name: 'HoldThenOpen',
       description: 'HoldThenOpen',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: z.object({}),
     },
     // Two parameters: the server hands a handler its context only then.
-    handler: async (
+    call: async (
       ctx: { connection: IAbapConnection; state: InstanceState },
       _args: unknown,
     ) => {

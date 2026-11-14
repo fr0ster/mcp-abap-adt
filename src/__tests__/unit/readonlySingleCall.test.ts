@@ -20,6 +20,7 @@
  *  - `resolveVersionedObject` — a synchronous resolver, not a handler; it
  *    makes no call of its own.
  */
+
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { handleGetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
@@ -56,7 +57,10 @@ import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/han
 import { handleGetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery';
 import { handleGetTable } from '../../handlers/table/high/handleGetTable';
-import { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents';
+import {
+  TOOL_DEFINITION as GetTableContents,
+  handleGetTableContents,
+} from '../../handlers/table/readonly/handleGetTableContents';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
 import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
 import { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult';
@@ -64,12 +68,17 @@ import { handleGetCdsUnitTestStatus } from '../../handlers/unit_test/high/handle
 import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest';
 import { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus';
-import { corpusBody } from '../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
-import { parseStructure, structured } from '../../lib/strategies/reading';
+import {
+  parseStructure,
+  structured,
+  verbatim,
+} from '../../lib/strategies/reading';
+import { child, listOf } from '../../lib/thrownValue';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   fakeClientOfWithFactory,
@@ -79,6 +88,7 @@ import {
   refusedResponse,
   refusingClient,
 } from '../helpers/fakeClient';
+import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({
@@ -138,7 +148,7 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
     [
       'GetObjectStructure',
       handleGetObjectStructure,
-      { object_name: 'ZCL_X', object_type: 'class' },
+      { objectname: 'ZCL_X', objecttype: 'class' },
     ],
     ['GetSqlQuery', handleGetSqlQuery, { sql_query: 'SELECT 1' }],
     ['GetTableContents', handleGetTableContents, { table_name: 'ZT' }],
@@ -295,8 +305,8 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetObjectStructure(context as any, {
-      object_name: 'ZCL_X',
-      object_type: 'class',
+      objectname: 'ZCL_X',
+      objecttype: 'class',
     });
     const call = seen.calls
       .filter((c) => c.member === 'getObjectStructure')
@@ -318,10 +328,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
   it('GetTableContents calls getSqlQuery({sql_query: SELECT * FROM <table>, row_number: max_rows}), never getTableContents', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleGetTableContents(context as any, {
-      table_name: 'ZT',
-      max_rows: 7,
-    });
+    await handleGetTableContents(
+      context as any,
+      GetTableContents.inputSchema.parse({ table_name: 'ZT', max_rows: 7 }),
+    );
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
     expect(call?.args).toEqual([
       { sql_query: 'SELECT * FROM ZT', row_number: 7 },
@@ -444,52 +454,86 @@ describe('GetEnhancements', () => {
 
 describe('resolveVersionedObject', () => {
   // Not a handler — a synchronous resolver with no call of its own. Tested on
-  // its own contract: which client factory it picks per object_type, and its
-  // two failure shapes (an unknown type answers null; a function_module with
-  // no group name throws).
+  // its own contract: which client factory it picks per object_type, the
+  // identity it binds to the history read, and its failure shape (a
+  // function_module with no group name throws).
+  const calls: Array<[string, unknown]> = [];
+  const versionable = (factory: string) => () => ({
+    getVersions: async (config: unknown) => {
+      calls.push([factory, config]);
+      return { ok: true, getResult: () => ({ value: [] }) };
+    },
+    getVersionSource: async () => ({
+      ok: true,
+      getResult: () => ({ value: '' }),
+    }),
+  });
   const client = {
-    getClass: () => 'CLASS_OBJ',
-    getProgram: () => 'PROGRAM_OBJ',
-    getInterface: () => 'INTERFACE_OBJ',
-    getFunctionModule: () => 'FM_OBJ',
-    getTable: () => 'TABLE_OBJ',
-    getStructure: () => 'STRUCTURE_OBJ',
-    getDdl: () => 'DDL_OBJ',
-    getBehaviorDefinition: () => 'BDEF_OBJ',
-    getMetadataExtension: () => 'MDE_OBJ',
+    getClass: versionable('getClass'),
+    getProgram: versionable('getProgram'),
+    getInterface: versionable('getInterface'),
+    // A function module's history is read after its metadata names the
+    // group given (#2): the document names ZFG.
+    getFunctionModule: () => ({
+      ...versionable('getFunctionModule')(),
+      readMetadata: async (config: unknown) => {
+        calls.push(['getFunctionModule.readMetadata', config]);
+        return readsModuleIn('ZFG', 'ZFM')();
+      },
+    }),
+    getTable: versionable('getTable'),
+    getStructure: versionable('getStructure'),
+    getDdl: versionable('getDdl'),
+    getBehaviorDefinition: versionable('getBehaviorDefinition'),
+    getMetadataExtension: versionable('getMetadataExtension'),
   } as any;
-
-  it('resolves a class by className', () => {
-    const resolved = resolveVersionedObject(client, 'class', 'zcl_x');
-    expect(resolved).toEqual({
-      obj: 'CLASS_OBJ',
-      config: { className: 'ZCL_X' },
-    });
+  beforeEach(() => {
+    calls.length = 0;
   });
 
-  it('resolves a function_module, given its group', () => {
+  it('resolves a class by className', async () => {
+    const resolved = resolveVersionedObject(client, 'class', 'zcl_x');
+    await resolved.getVersions({ analyse: analyseException });
+    expect(calls).toEqual([['getClass', { className: 'ZCL_X' }]]);
+  });
+
+  it('resolves a function_module, given its group', async () => {
     const resolved = resolveVersionedObject(
       client,
       'function_module',
       'zfm',
       'zfg',
     );
-    expect(resolved).toEqual({
-      obj: 'FM_OBJ',
-      config: { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
-    });
+    await resolved.getVersions({ analyse: analyseException });
+    expect(calls).toEqual([
+      [
+        'getFunctionModule.readMetadata',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+      [
+        'getFunctionModule',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+    ]);
   });
 
-  it('resolves a function_module from GROUP|FM_NAME with no explicit group', () => {
+  it('resolves a function_module from GROUP|FM_NAME with no explicit group', async () => {
     const resolved = resolveVersionedObject(
       client,
       'function_module',
       'zfg|zfm',
     );
-    expect(resolved).toEqual({
-      obj: 'FM_OBJ',
-      config: { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
-    });
+    await resolved.getVersions({ analyse: analyseException });
+    expect(calls).toEqual([
+      [
+        'getFunctionModule.readMetadata',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+      [
+        'getFunctionModule',
+        { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
+      ],
+    ]);
   });
 
   it('throws for a function_module with no group name reachable', () => {
@@ -634,18 +678,18 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       parent_type: 'DEVC/K',
       node_id: '28',
     });
-    const byTypeRow = objectsListCache
-      .getCache()
-      .objects.find((o: any) => o.OBJECT_NAME === 'ZMCP_SHR_FGRP');
+    const byTypeRow = listOf(
+      child(objectsListCache.getCache(), 'objects'),
+    ).find((o) => child(o, 'OBJECT_NAME') === 'ZMCP_SHR_FGRP');
 
     await handleGetObjectsList(context as any, {
       parent_name: 'ZMCP_SHR_PKG',
       parent_tech_name: 'ZMCP_SHR_PKG',
       parent_type: 'DEVC/K',
     });
-    const listRow = objectsListCache
-      .getCache()
-      .objects.find((o: any) => o.OBJECT_NAME === 'ZMCP_SHR_FGRP');
+    const listRow = listOf(child(objectsListCache.getCache(), 'objects')).find(
+      (o) => child(o, 'OBJECT_NAME') === 'ZMCP_SHR_FGRP',
+    );
 
     const expected = {
       OBJECT_TYPE: 'FUGR/F',
@@ -1189,12 +1233,12 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 });
 
 /**
- * `GetFunctionModule`, mapped from the real captured source: one `read`
- * through getFunctionModule() at the group the caller gave, the source under
- * source.
+ * `GetFunctionModule`, mapped from the real captured source: the module's
+ * metadata through getFunctionModule() at the group the caller gave, its
+ * group checked (#2), then one `read` there, the source under source.
  */
 describe('GetFunctionModule, mapped from a real captured source', () => {
-  it('calls read alone, through getFunctionModule(), and answers the real source under source', async () => {
+  it('reads the metadata, then the source, through getFunctionModule(), and answers the real source under source', async () => {
     const source = corpusBody(
       'read-function-module-source-text--01-read-source',
     );
@@ -1202,7 +1246,14 @@ describe('GetFunctionModule, mapped from a real captured source', () => {
     const double = fakeClientOfWithFactory({
       readMetadata: async (...args: unknown[]) => {
         calls.push({ member: 'readMetadata', args });
-        return okResponse(structured({ data: '', status: 200 } as any));
+        return okResponse(
+          verbatim({
+            data: corpusBody(
+              'read-metadata-function-module--01-fmodules-zmcpshrfm',
+            ),
+            status: 200,
+          } as any),
+        );
       },
       read: async (...args: unknown[]) => {
         calls.push({ member: 'read', args });
@@ -1223,12 +1274,12 @@ describe('GetFunctionModule, mapped from a real captured source', () => {
     expect(payload.source).toBe(source);
     expect(double.factory).toBe('getFunctionModule');
 
-    expect(calls.map((c) => c.member)).toEqual(['read']);
-    expect(calls[0]?.args[0]).toEqual({
+    expect(calls.map((c) => c.member)).toEqual(['readMetadata', 'read']);
+    expect(calls[1]?.args[0]).toEqual({
       functionModuleName: 'Z_MCP_SHR_FM',
       functionGroupName: 'ZMCP_SHR_FGRP',
     });
-    const readOptions = calls[0]?.args.at(-1) as
+    const readOptions = calls[1]?.args.at(-1) as
       | { analyse?: unknown }
       | undefined;
     expect(readOptions?.analyse).toBe(analyseException);
@@ -1259,10 +1310,17 @@ describe('two behaviours unpinned before fix round 1', () => {
     expect(options?.version).toBe('inactive');
   });
 
-  // The group is the caller's: one `read` at the group given, no metadata
-  // read first to compare it with the module's own `containerRef`.
-  it('GetFunctionModule reads the source at the group given, in one call', async () => {
-    const seen = recordAnalyse();
+  // SAP ignores the group of the address (#2): the module's metadata is read
+  // at the group given, its `containerRef` compared, then one `read` there.
+  it('GetFunctionModule reads the metadata, then the source, at the group given', async () => {
+    const seen = recordAnalyse({
+      readMetadata: () => {
+        const document = corpusBody(
+          'read-metadata-function-module--01-fmodules-zmcpshrfm',
+        );
+        return { value: document, raw: document, status: 200 };
+      },
+    });
     fakeClient = seen.client;
 
     await handleGetFunctionModule(context as any, {
@@ -1270,11 +1328,13 @@ describe('two behaviours unpinned before fix round 1', () => {
       function_group_name: 'zmcp_shr_fgrp',
     });
 
-    expect(seen.calls.map((c) => c.member)).toEqual(['read']);
-    expect(seen.calls[0]?.args[0]).toEqual({
-      functionModuleName: 'Z_MCP_SHR_FM',
-      functionGroupName: 'ZMCP_SHR_FGRP',
-    });
+    expect(seen.calls.map((c) => c.member)).toEqual(['readMetadata', 'read']);
+    for (const call of seen.calls) {
+      expect(call.args[0]).toEqual({
+        functionModuleName: 'Z_MCP_SHR_FM',
+        functionGroupName: 'ZMCP_SHR_FGRP',
+      });
+    }
   });
 });
 
@@ -1324,9 +1384,10 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     expect(payload.finished).toBe(true);
     expect(payload.run_id).toBe('FA53C505DD7B1FD1ABB8599833A05D44');
     expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
+    // A finished run is read once, without long polling (#3).
     expect(getStatus).toHaveBeenCalledWith(
       'FA53C505DD7B1FD1ABB8599833A05D44',
-      true,
+      false,
       { analyse: analyseException },
     );
     expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44', {
@@ -1425,7 +1486,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     // Read AFTER invoking the handler — see the comment on the analogous
     // assertion in `GetUnitTest`'s own test above.
     expect(double.factory).toBe('getClassTestRunner');
-    expect(getStatus).toHaveBeenCalledWith('r1', true, {
+    expect(getStatus).toHaveBeenCalledWith('r1', false, {
       analyse: analyseException,
     });
     expect(getResult).toHaveBeenCalledWith('r1', {

@@ -11,14 +11,17 @@
  * pulls nothing either half would not have pulled anyway.
  */
 import type { HandlerContext } from '../../handlers/interfaces';
+import type { HandlerEntry, ToolArgs } from '../handlers/interfaces';
+import type { ToolResultLike } from '../toolResult';
 import { return_error } from '../utils';
 import type { CompactCrudOperation } from './compactMatrix';
 import type { CompactObjectType } from './compactObjectTypes';
 
-export type CompactHandler = (
-  context: HandlerContext,
-  args: Record<string, unknown>,
-) => Promise<unknown>;
+/**
+ * A route: the call of the target tool's entry (`defineTool`), so a routed
+ * call is parsed with the target's own schema.
+ */
+export type CompactHandler = HandlerEntry['call'];
 
 export type CompactRouterMap = Record<
   CompactObjectType,
@@ -35,10 +38,10 @@ export type CompactRouterMap = Record<
  */
 export async function dispatchCompact(
   context: HandlerContext,
-  routes: CompactRouterMap,
+  routes: Partial<CompactRouterMap>,
   operation: CompactCrudOperation,
-  args: { object_type?: CompactObjectType } & Record<string, unknown>,
-): Promise<unknown> {
+  args: { readonly object_type?: CompactObjectType | undefined } & ToolArgs,
+): Promise<ToolResultLike> {
   context.logger?.info?.(
     `[compact-router] route operation=${operation} object_type=${args?.object_type ?? 'undefined'}`,
   );

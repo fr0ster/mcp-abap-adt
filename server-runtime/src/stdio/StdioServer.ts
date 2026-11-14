@@ -1,18 +1,30 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
-import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
+import type { IAccessChecks } from '@mcp-abap-adt/lib';
+import {
+  connectionCauseOf,
+  noConnectionWords,
+  type ReadFailure,
+  readGuarded,
+  ServerRefusal,
+} from '@mcp-abap-adt/lib/auth';
 import {
   BaseMcpServer,
   type IBackgroundRuns,
   type InstanceBatch,
   type LeftoverSessions,
+  type LineMatchStrategy,
   type ResolvedConnection,
+  type SapAnswerStrategy,
   type StartedConnection,
+  sapAnswerOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
 import {
+  HeldLocks,
   NO_IDLE_BOUND,
   type StateLogger,
   stateLoggerOf,
@@ -47,11 +59,36 @@ export interface StdioServerOptions {
    */
   backgroundRuns?: IBackgroundRuns;
   /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to the instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy, handed to the instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
+  /**
    * The owner of this instance's batch state (the launcher's, one for the
    * process's one instance). Absent: the batch tools answer
    * `batch_mode_unavailable`.
    */
   batch?: InstanceBatch;
+  /**
+   * `--deferred-logon`: the launcher calls no `connectAtStart`; the first
+   * tool call that needs the connection makes it. Absent: `false`.
+   */
+  deferredLogon?: boolean;
+  /**
+   * `--deferred-logon` with `--restore-session`: the instance's first birth
+   * takes up the destination's one leftover session. Absent: `false`.
+   */
+  restoreAtFirstBirth?: boolean;
 }
 
 /**
@@ -71,6 +108,8 @@ export class StdioServer extends BaseMcpServer {
     | undefined;
   /** The destination served, named by a refusal whose error does not carry it. */
   private destination: string | undefined;
+  /** `--deferred-logon`: a failed build answers `no_connection` (#353). */
+  private readonly deferredLogon: boolean;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -90,15 +129,31 @@ export class StdioServer extends BaseMcpServer {
       ...(opts?.leftoverSessions !== undefined && {
         leftoverSessions: opts.leftoverSessions,
       }),
+      ...(opts?.accessChecks !== undefined && {
+        accessChecks: opts.accessChecks,
+      }),
       ...(opts?.backgroundRuns !== undefined && {
         backgroundRuns: opts.backgroundRuns,
       }),
+      ...(opts?.sapAnswerStrategy !== undefined && {
+        sapAnswerStrategy: opts.sapAnswerStrategy,
+      }),
+      ...(opts?.lineMatchStrategy !== undefined && {
+        lineMatchStrategy: opts.lineMatchStrategy,
+      }),
       ...(opts?.batch !== undefined && { batch: opts.batch }),
+      // --deferred-logon --restore-session: the first call's birth takes up
+      // the destination's leftover session.
+      restoreAtFirstBirth: opts?.restoreAtFirstBirth === true,
+      // The locks the instance took: a write, a delete or an unlock under a
+      // lock_handle is sent only under one it holds.
+      heldLocks: new HeldLocks(),
       // The responsible rules, once, at the start (`connectAtStart`).
       systemContextResolver: defaultSystemContextResolver,
       systemContextRules: responsibleRules,
     });
     this.sentenceFor = opts?.sentenceFor;
+    this.deferredLogon = opts?.deferredLogon === true;
   }
 
   /** The destination layer's failures first, then lib's reader. */
@@ -172,9 +227,49 @@ export class StdioServer extends BaseMcpServer {
    */
   protected override async getConnection(
     signal: AbortSignal,
-  ): Promise<AbapConnection> {
+  ): Promise<IAbapConnection> {
     if (!this.destinations) throw new ServerRefusal('inspection_only');
-    return super.getConnection(signal);
+    if (!this.deferredLogon) return super.getConnection(signal);
+    try {
+      return await super.getConnection(signal);
+    } catch (thrown) {
+      throw this.noConnectionOf(thrown) ?? thrown;
+    }
+  }
+
+  /**
+   * `--deferred-logon`: a build of the instance's connection that failed
+   * because the system cannot be reached — no failure the reader reads, no
+   * answer from SAP, and a listed cause code (`connectionCauseOf`) — is
+   * `no_connection`, naming the code alone. Anything else is answered as
+   * it came. The value is from outside the type system: read guarded.
+   */
+  private noConnectionOf(thrown: unknown): ServerRefusal | undefined {
+    if (readGuarded((t) => this.readFailure(t), thrown) !== undefined) {
+      return undefined;
+    }
+    if (sapAnswerOf(thrown) !== undefined) return undefined;
+    const cause = connectionCauseOf(thrown);
+    return cause === undefined
+      ? undefined
+      : new ServerRefusal('no_connection', cause);
+  }
+
+  /**
+   * `--deferred-logon`: a request on the connection already made that
+   * reached no answer — no response, and a cause code adt-clients names from
+   * its listed codes (`IAdtError.connectionCause`) — is `no_connection`,
+   * naming the code alone. Its message, request and anything else of the
+   * failure are not read. Anything else is answered as it came.
+   */
+  protected override readAdtFailure(
+    failed: IAdtError,
+  ): ReadFailure | undefined {
+    if (!this.deferredLogon) return undefined;
+    if (failed.response !== undefined) return undefined;
+    const cause = failed.connectionCause;
+    if (cause === undefined) return undefined;
+    return { error: 'no_connection', message: noConnectionWords(cause) };
   }
 
   /** Inspection-only mode refuses the leftover-session tools too, before anything is read. */

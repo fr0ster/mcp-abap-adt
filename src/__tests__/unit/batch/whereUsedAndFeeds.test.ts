@@ -10,6 +10,7 @@
  * connection is a fake, answering from a small model — the same model for
  * an envelope's parts and for the sequential version's requests.
  */
+
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -26,7 +27,7 @@ import {
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { eligible } from '../../../lib/batch/eligibility';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
+import { child, listOf } from '../../../lib/thrownValue';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -744,7 +745,9 @@ describe('GetWhereUsed', () => {
       expect(wholeOf(batched)).toEqual(wholeOf(sequential));
       expect(payloadOf(batched)).toMatchObject({ status: 401 });
       expect(batchedCache).toEqual(sequentialCache);
-      expect(batchedCache.content[0].json).toMatchObject({
+      expect(
+        child(listOf(child(batchedCache, 'content'))[0], 'json'),
+      ).toMatchObject({
         object_name: 'ZT_B',
       });
     },
@@ -1074,7 +1077,7 @@ describe('RuntimeListFeeds', () => {
   });
 
   it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {
-    const schema = z.object(jsonSchemaToZod(RUNTIME_LIST_FEEDS.inputSchema));
+    const schema = RUNTIME_LIST_FEEDS.inputSchema;
     const listed = schema.parse({ feed_types: PAGED });
     expect(listed).toEqual({ feed_types: PAGED });
     const fake = system();

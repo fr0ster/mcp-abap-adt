@@ -1,3 +1,4 @@
+import type * as z from 'zod';
 /**
  * Task 28: why this compact facade carries no `detail` of its own.
  *
@@ -41,12 +42,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerCheckRunArgs = {
-  object_type: string;
-  object_name: string;
-  version?: 'active' | 'inactive';
-  source_code?: string;
-};
+type HandlerCheckRunArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerCheckRun(
   context: HandlerContext,

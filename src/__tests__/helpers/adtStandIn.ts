@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * An ADT stand-in on 127.0.0.1 for the transports' credential suites: it
  * answers every request `200` with a CSRF token and a session cookie — or
@@ -37,6 +38,10 @@ export interface StandInRequest {
   accept: string | undefined;
   /** Its body, once it has arrived in full; `''` before. */
   body: string;
+  /** Every header it carried, by lower-case name (a repeated one joined with `, `). */
+  headers: Record<string, string>;
+  /** Its query: the raw target after the first `?`, `''` when none. */
+  query: string;
 }
 
 /** What `respond` answers a request with. */
@@ -145,6 +150,28 @@ function sessionOf(cookie: string | undefined): string | undefined {
   return undefined;
 }
 
+/** Every header of an incoming request, by lower-case name. */
+function headerMap(headers: http.IncomingHttpHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    out[name] = Array.isArray(value) ? value.join(', ') : value;
+  }
+  return out;
+}
+
+/** The query of a raw request target: what follows the first `?`. */
+function queryOf(target: string): string {
+  const at = target.indexOf('?');
+  return at < 0 ? '' : target.slice(at + 1);
+}
+
+/**
+ * The stand-in, on a free port of 127.0.0.1 the system gives (port 0): a
+ * fixed port can be held by any socket of the machine — an outgoing one in
+ * the ephemeral range included — so none is ever asked for; a test reads
+ * the bound port from `url`.
+ */
 export async function adtStandIn(): Promise<AdtStandIn> {
   const requests: StandInRequest[] = [];
   let refusing = false;
@@ -195,6 +222,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       contentType,
       accept: req.headers.accept,
       body: '',
+      headers: headerMap(req.headers),
+      query: queryOf(req.url ?? ''),
     };
     requests.push(request);
     const hold = holds.find((h) => !h.taken && h.match(request));
@@ -284,9 +313,13 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       );
     });
   });
-  await new Promise<void>((resolve) =>
-    server.listen(0, '127.0.0.1', () => resolve()),
-  );
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
   const { port } = server.address() as AddressInfo;
   return {
     url: `http://127.0.0.1:${port}`,
@@ -318,7 +351,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       answers.push({ match, status, once: true });
     },
     body: (match, text, headers) => {
-      bodies.push({ match, text, headers });
+      bodies.push({ match, text, ...(headers !== undefined && { headers }) });
     },
     systemInformation: (user, systemId = 'SID') => {
       systemInfo = user === undefined ? undefined : { user, systemId };
@@ -357,17 +390,13 @@ export function probeGroup(
         toolDefinition: {
           name: 'ProbeAdt',
           description: 'sends one request on its connection',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              delayMs: { type: 'number' },
-              state_handle: { type: 'string' },
-            },
-            required: ['id'],
-          },
+          inputSchema: z.object({
+            id: z.string(),
+            delayMs: z.number().optional(),
+            state_handle: z.string().optional(),
+          }),
         } as never,
-        handler: (async (
+        call: (async (
           context: {
             connection: { makeAdtRequest(o: object): Promise<unknown> };
           },

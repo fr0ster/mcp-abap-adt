@@ -11,7 +11,11 @@ import {
   TOOL_DEFINITION as RuntimeRunProgram_Tool,
 } from '../../../handlers/system/high/handleRuntimeRunProgram';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerContext, HandlerEntry } from '../interfaces.js';
+import {
+  defineTool,
+  type HandlerContext,
+  type HandlerEntry,
+} from '../interfaces.js';
 
 /**
  * The runtime tools that change the system: the runs of a class and of a
@@ -29,19 +33,12 @@ export class RuntimeRunHandlersGroup extends BaseHandlerGroup {
 
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: RuntimeCreateProfilerTraceParameters_Tool,
-        handler: (args: any) =>
-          handleRuntimeCreateProfilerTraceParameters(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunClass_Tool,
-        handler: (args: any) => handleRuntimeRunClass(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunProgram_Tool,
-        handler: (args: any) => handleRuntimeRunProgram(this.context, args),
-      },
+      defineTool(
+        RuntimeCreateProfilerTraceParameters_Tool,
+        handleRuntimeCreateProfilerTraceParameters,
+      ),
+      defineTool(RuntimeRunClass_Tool, handleRuntimeRunClass),
+      defineTool(RuntimeRunProgram_Tool, handleRuntimeRunProgram),
     ];
   }
 }

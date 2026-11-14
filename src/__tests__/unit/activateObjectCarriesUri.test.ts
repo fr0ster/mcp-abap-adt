@@ -1,8 +1,29 @@
 let toClient: unknown;
 
 jest.mock('../../lib/clients', () => {
+  // A function module's metadata names the group the cases give (#2).
+  const metadata =
+    '<?xml version="1.0" encoding="utf-8"?><fmodule:abapFunctionModule adtcore:name="Z_AC_FM01" xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<adtcore:containerRef adtcore:type="FUGR/F" adtcore:name="ZAC_FGR01"/></fmodule:abapFunctionModule>';
   const client = () => ({
+    getFunctionModule: () => ({
+      readMetadata: () =>
+        Promise.resolve({
+          ok: true,
+          getResult: () => ({
+            value: { value: metadata, raw: metadata, status: 200 },
+          }),
+        }),
+    }),
     getUtils: () => ({
+      // The discovery a group activation reads first: runs are offered.
+      discovery: () =>
+        Promise.resolve({
+          ok: true,
+          getResult: () => ({
+            value: new Set(['/sap/bc/adt/activation/runs']),
+          }),
+        }),
       activateObjectsGroup: (objects: unknown) => {
         toClient = objects;
         return Promise.resolve({

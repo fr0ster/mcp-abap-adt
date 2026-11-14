@@ -16,13 +16,13 @@
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleHandlerGet } from '../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
 import { RUN_START_WITHOUT_ID } from '../../../src/handlers/common/low/handleActivateObject';
-import { corpusBody } from '../../../src/lib/adtCorpus';
 import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -94,10 +94,6 @@ const RUN_CALLS: Array<[string, Record<string, unknown>]> = [
       ],
     },
   ],
-  [
-    'objects[] of one function module at its group',
-    { objects: [{ name: 'FM_A', type: 'FUGR/FF', parentName: 'FUGR_A' }] },
-  ],
   ['object_adt_type', { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' }],
   ['PACKAGE', { object_type: 'PACKAGE', object_name: 'PKG_A' }],
   [
@@ -113,6 +109,50 @@ const RUN_CALLS: Array<[string, Record<string, unknown>]> = [
 const STATUS_DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/backgroundrun" runs:status="finished"/>';
 const RESULTS_DOCUMENT = corpusBody('refusal-activation-fails--01-activation');
+
+/**
+ * A function module's group is checked first (#2: SAP ignores the group of a
+ * module's address): its metadata read at the group given, then the one run
+ * start when that group holds it. The corpus module, at its group.
+ */
+describe('compact HandlerActivate: a function module, its group checked, then the one run start', () => {
+  const metadata =
+    'GET /sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm?version=workingArea';
+  it.each([
+    [
+      'objects[] of one function module at its group',
+      {
+        objects: [
+          {
+            name: 'Z_MCP_SHR_FM',
+            type: 'FUGR/FF',
+            parentName: 'ZMCP_SHR_FGRP',
+          },
+        ],
+      },
+    ],
+    [
+      'FUNCTION_MODULE named GROUP|MODULE',
+      {
+        object_type: 'FUNCTION_MODULE',
+        object_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM',
+      },
+    ],
+  ])('%s', async (_label, args) => {
+    const [held, documented, refused] = await Promise.all(
+      MODES.map((mode) => activate(mode, args)),
+    );
+    expect(held.sent).toEqual([metadata]);
+    expect(documented.sent).toHaveLength(2);
+    expect(documented.sent[0]).toBe(metadata);
+    expect(documented.sent[1]?.startsWith(RUN_POST)).toBe(true);
+    expect(jsonOf(documented.answer)).toEqual({ run_id: 'RUN_PLACEHOLDER' });
+    // SAP refused the metadata read: no run is started.
+    expect(refused.sent).toEqual([metadata]);
+    expect(refused.answer?.isError).toBe(true);
+    expect(jsonOf(refused.answer).step).toBe('check function group');
+  });
+});
 
 describe('compact HandlerActivate: an activation run is started in one request', () => {
   describe.each(RUN_CALLS)('%s', (_label, args) => {

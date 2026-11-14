@@ -5,6 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtCodes } from '../adtProjections';
 import type { NodeLevel } from './packageWalk';
+import { succeeded } from './stepResponse';
 
 /**
  * `listFunctionModules`/`listFunctionGroupIncludes`'s replacement — the
@@ -29,15 +30,7 @@ export interface FunctionGroupNodeSource {
 function okObjects(
   objects: NodeLevel['objects'],
 ): IAdtResponse<NodeLevel['objects'], IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value: objects }),
-    getError: () => {
-      throw new Error(
-        'fetchFunctionGroupChildren: asked for the error of a success',
-      );
-    },
-  } as unknown as IAdtResponse<NodeLevel['objects'], IAdtError>;
+  return succeeded(objects, 'fetchFunctionGroupChildren');
 }
 
 /**
@@ -57,7 +50,7 @@ export async function fetchFunctionGroupChildren(
     withShortDescriptions: true,
   });
   if (!root.ok) {
-    return root as unknown as IAdtResponse<NodeLevel['objects'], IAdtError>;
+    return root;
   }
 
   const child = root
@@ -72,7 +65,7 @@ export async function fetchFunctionGroupChildren(
     withShortDescriptions: true,
   });
   if (!level.ok) {
-    return level as unknown as IAdtResponse<NodeLevel['objects'], IAdtError>;
+    return level;
   }
 
   return okObjects(level.getResult().value.objects);

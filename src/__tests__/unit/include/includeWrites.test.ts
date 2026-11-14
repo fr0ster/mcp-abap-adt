@@ -8,16 +8,29 @@ import {
   TOOL_DEFINITION as CREATE_INCLUDE,
   handleCreateInclude,
 } from '../../../handlers/include/high/handleCreateInclude';
-import { handleDeleteInclude } from '../../../handlers/include/high/handleDeleteInclude';
-import { handleUpdateInclude } from '../../../handlers/include/high/handleUpdateInclude';
-import { handleUpdateIncludeMetadata } from '../../../handlers/include/high/handleUpdateIncludeMetadata';
-import { handleActivateInclude } from '../../../handlers/include/low/handleActivateInclude';
-import { corpusBody } from '../../../lib/adtCorpus';
+import {
+  TOOL_DEFINITION as DELETE_INCLUDE,
+  handleDeleteInclude,
+} from '../../../handlers/include/high/handleDeleteInclude';
+import {
+  handleUpdateInclude,
+  TOOL_DEFINITION as UPDATE_INCLUDE,
+} from '../../../handlers/include/high/handleUpdateInclude';
+import {
+  handleUpdateIncludeMetadata,
+  TOOL_DEFINITION as UPDATE_INCLUDE_METADATA,
+} from '../../../handlers/include/high/handleUpdateIncludeMetadata';
+import {
+  TOOL_DEFINITION as ACTIVATE_INCLUDE,
+  handleActivateInclude,
+} from '../../../handlers/include/low/handleActivateInclude';
+import { defineTool } from '../../../lib/handlers/interfaces';
 import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type RecordingConnection,
   recordingConnection,
@@ -107,11 +120,9 @@ describe('CreateInclude', () => {
   });
 
   it.each([
-    ['include_name', { package_name: 'ZP' }],
     ['include_name', { include_name: '', package_name: 'ZP' }],
-    ['package_name', { include_name: 'ZI_X' }],
     ['package_name', { include_name: 'ZI_X', package_name: '' }],
-  ])('refuses a missing %s, sending nothing', async (name, args) => {
+  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
     const result = await handleCreateInclude(
       { connection, logger: undefined },
@@ -121,6 +132,24 @@ describe('CreateInclude', () => {
     expect(result.content[0].text).toBe(`${name} is required`);
     expect(connection.requests).toHaveLength(0);
   });
+
+  it.each([
+    ['include_name', { package_name: 'ZP' }],
+    ['package_name', { include_name: 'ZI_X' }],
+  ])(
+    'refuses an absent %s at the schema, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const refused = expect(
+        defineTool(CREATE_INCLUDE, handleCreateInclude).call(
+          { connection, logger: undefined },
+          args,
+        ),
+      ).rejects.toThrow(`at ${name}`);
+      await refused;
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -267,11 +296,9 @@ describe('UpdateInclude', () => {
   });
 
   it.each([
-    ['include_name', { source_code: 'x' }],
     ['include_name', { include_name: '', source_code: 'x' }],
-    ['source_code', { include_name: 'ZI_X' }],
     ['source_code', { include_name: 'ZI_X', source_code: '' }],
-  ])('refuses a missing %s, sending nothing', async (name, args) => {
+  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
     const result = await handleUpdateInclude(
       { connection, logger: undefined },
@@ -281,6 +308,24 @@ describe('UpdateInclude', () => {
     expect(result.content[0].text).toBe(`${name} is required`);
     expect(connection.requests).toHaveLength(0);
   });
+
+  it.each([
+    ['include_name', { source_code: 'x' }],
+    ['source_code', { include_name: 'ZI_X' }],
+  ])(
+    'refuses an absent %s at the schema, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const refused = expect(
+        defineTool(UPDATE_INCLUDE, handleUpdateInclude).call(
+          { connection, logger: undefined },
+          args,
+        ),
+      ).rejects.toThrow(`at ${name}`);
+      await refused;
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -346,11 +391,9 @@ describe('UpdateIncludeMetadata', () => {
   });
 
   it.each([
-    ['include_name', { metadata: DOCUMENT }],
     ['include_name', { include_name: '', metadata: DOCUMENT }],
-    ['metadata', { include_name: 'ZI_X' }],
     ['metadata', { include_name: 'ZI_X', metadata: '' }],
-  ])('refuses a missing %s, sending nothing', async (name, args) => {
+  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
     const connection = recordingConnection();
     const result = await handleUpdateIncludeMetadata(
       { connection, logger: undefined },
@@ -360,6 +403,24 @@ describe('UpdateIncludeMetadata', () => {
     expect(result.content[0].text).toBe(`${name} is required`);
     expect(connection.requests).toHaveLength(0);
   });
+
+  it.each([
+    ['include_name', { metadata: DOCUMENT }],
+    ['metadata', { include_name: 'ZI_X' }],
+  ])(
+    'refuses an absent %s at the schema, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const refused = expect(
+        defineTool(UPDATE_INCLUDE_METADATA, handleUpdateIncludeMetadata).call(
+          { connection, logger: undefined },
+          args,
+        ),
+      ).rejects.toThrow(`at ${name}`);
+      await refused;
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -454,19 +515,34 @@ describe('DeleteInclude', () => {
     expect(connection.requests.map((r) => r.url)).toEqual([CHECK_URL]);
   });
 
-  it.each([
-    ['include_name', {}],
-    ['include_name', { include_name: '' }],
-  ])('refuses a missing %s, sending nothing', async (name, args) => {
-    const connection = recordingConnection();
-    const result = await handleDeleteInclude(
-      { connection, logger: undefined },
-      args,
-    );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(`${name} is required`);
-    expect(connection.requests).toHaveLength(0);
-  });
+  it.each([['include_name', { include_name: '' }]] as const)(
+    'refuses an empty %s, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const result = await handleDeleteInclude(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(`${name} is required`);
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
+
+  it.each([['include_name', {}]])(
+    'refuses an absent %s at the schema, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const refused = expect(
+        defineTool(DELETE_INCLUDE, handleDeleteInclude).call(
+          { connection, logger: undefined },
+          args,
+        ),
+      ).rejects.toThrow(`at ${name}`);
+      await refused;
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -509,19 +585,34 @@ describe('ActivateInclude', () => {
     expect(connection.sessions).toEqual(['stateless']);
   });
 
-  it.each([
-    ['include_name', {}],
-    ['include_name', { include_name: '' }],
-  ])('refuses a missing %s, sending nothing', async (name, args) => {
-    const connection = recordingConnection();
-    const result = await handleActivateInclude(
-      { connection, logger: undefined },
-      args,
-    );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(`${name} is required`);
-    expect(connection.requests).toHaveLength(0);
-  });
+  it.each([['include_name', { include_name: '' }]] as const)(
+    'refuses an empty %s, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const result = await handleActivateInclude(
+        { connection, logger: undefined },
+        args,
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(`${name} is required`);
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
+
+  it.each([['include_name', {}]])(
+    'refuses an absent %s at the schema, sending nothing',
+    async (name, args) => {
+      const connection = recordingConnection();
+      const refused = expect(
+        defineTool(ACTIVATE_INCLUDE, handleActivateInclude).call(
+          { connection, logger: undefined },
+          args,
+        ),
+      ).rejects.toThrow(`at ${name}`);
+      await refused;
+      expect(connection.requests).toHaveLength(0);
+    },
+  );
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();

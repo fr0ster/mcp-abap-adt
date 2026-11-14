@@ -4,10 +4,17 @@ import {
   COMPACT_WHERE_USED_ROUTES,
   compactWhereUsedDescription,
   compactWhereUsedSchemaFor,
+  isJsonObject,
+  jsonAt,
+  jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleGetWhereUsed } from '@mcp-abap-adt/lib/handlers/read';
+import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import {
+  handleGetWhereUsed,
+  READ_DEFINITIONS,
+} from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerWhereUsed',
@@ -19,18 +26,17 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerWhereUsedArgs = {
-  object_type: string;
-  object_name: string;
-  function_group_name?: string;
-  max_results?: number;
-};
+type HandlerWhereUsedArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** The compact object types, as the where-used tool names them. */
 const WHERE_USED_TYPE: Readonly<Record<string, string>> =
   COMPACT_WHERE_USED_ROUTES;
 
-type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
+/** GetWhereUsed's entry: its schema parses the read. */
+const whereUsed = defineTool(
+  READ_DEFINITIONS.GetWhereUsed,
+  handleGetWhereUsed,
+).call;
 
 export async function handleHandlerWhereUsed(
   context: HandlerContext,
@@ -57,31 +63,33 @@ export async function handleHandlerWhereUsed(
     type === 'functionmodule'
       ? `${args.function_group_name}|${args.object_name}`
       : args.object_name;
-  const answered = (await handleGetWhereUsed(context, {
+  const answered = await whereUsed(context, {
     object_name: objectName,
     object_type: type,
-  } as never)) as Answer;
+  });
 
   // The list is capped here: an object used everywhere answers thousands of
   // references, more than a client takes in one result. The total stays.
   const max = args.max_results ?? 100;
-  const text = answered?.content?.[0]?.text;
-  if (answered?.isError || typeof text !== 'string') return answered;
-  try {
-    const value = JSON.parse(text) as { references?: unknown[] };
-    if (!Array.isArray(value.references) || value.references.length <= max) {
-      return answered;
-    }
-    const capped = {
-      ...value,
-      references: value.references.slice(0, max),
-      returned_references: max,
-    };
-    return {
-      ...answered,
-      content: [{ type: 'text', text: JSON.stringify(capped, null, 2) }],
-    };
-  } catch {
+  const text = answered.content[0]?.text;
+  if (answered.isError || typeof text !== 'string') return answered;
+  const value = jsonOf(text);
+  const references = jsonAt(value, 'references');
+  if (
+    value === undefined ||
+    !isJsonObject(value) ||
+    !Array.isArray(references) ||
+    references.length <= max
+  ) {
     return answered;
   }
+  const capped = {
+    ...value,
+    references: references.slice(0, max),
+    returned_references: max,
+  };
+  return {
+    ...answered,
+    content: [{ type: 'text', text: JSON.stringify(capped, null, 2) }],
+  };
 }

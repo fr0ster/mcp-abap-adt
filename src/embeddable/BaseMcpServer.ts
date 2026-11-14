@@ -1,13 +1,23 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IAccessChecks } from '../lib/access/accessChecks.js';
+import {
+  accessCallOf,
+  checkedArgumentsOf,
+} from '../lib/access/checkedArguments.js';
+import { refusalOf } from '../lib/access/listedAccessChecks.js';
+import { lazyPackageReader } from '../lib/access/packageReader.js';
 import {
   registerActiveTool,
   shutdownRefusalAnswer,
 } from '../lib/activeTools.js';
+import { runWithAdtFailureReader } from '../lib/adtFailureReading.js';
 import {
   AdtHeaderPairs,
   type AdtHeaderPort,
@@ -17,7 +27,7 @@ import {
   adtSystemKey,
   withoutTrailingSlashes,
 } from '../lib/adtHeaders/systemKey.js';
-import { answerRead } from '../lib/auth/answerFailure.js';
+import { answerRead, type FailureAnswer } from '../lib/auth/answerFailure.js';
 import { CurrentCredential } from '../lib/auth/currentCredential.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 import {
@@ -26,6 +36,7 @@ import {
   readGuarded,
 } from '../lib/auth/failures.js';
 import {
+  BACKGROUND_RUNS_NO_SYSTEM_WORDS,
   batchNotRecordableWords,
   batchNotServedWords,
   ServerRefusal,
@@ -36,13 +47,21 @@ import type {
   BackgroundRunCaller,
   IBackgroundRuns,
 } from '../lib/backgroundRuns/contract.js';
+import { BackgroundRunOwner } from '../lib/backgroundRuns/owner.js';
 import { backgroundRunTools } from '../lib/backgroundRuns/port.js';
-import { startBackgroundRun } from '../lib/backgroundRuns/run.js';
+import {
+  type BackgroundRunKind,
+  startBackgroundRun,
+} from '../lib/backgroundRuns/run.js';
 import {
   BACKGROUND_INVALID_WORDS,
   backgroundObjectOf,
+  isBackgroundRunTool,
   isBackgroundTool,
+  longToolInTheCall,
   readBackground,
+  readObjectOf,
+  runToolsOf,
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
 import {
@@ -63,9 +82,11 @@ import {
   withBatchSentence,
 } from '../lib/batch/sentence.js';
 import { runWithCallTransport } from '../lib/callTransport.js';
+import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
   systemKindOf,
+  withSystemKindOf,
 } from '../lib/connectionFactory.js';
 import { isRfcConnection } from '../lib/connectionKind.js';
 import {
@@ -76,17 +97,17 @@ import {
   isDebuggerOwnConnectionTool,
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
+import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import type {
+  HandlerEntry,
+  IHandlerGroup,
   IHandlersRegistry,
   SapEnvironment,
-  ToolHandler,
+  ToolArgs,
 } from '../lib/handlers/interfaces.js';
+import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
-import {
-  callInItsForm,
-  type InGroupContext,
-} from '../lib/handlers/utils/handlerCall.js';
-import { registeredSchema } from '../lib/handlers/utils/schemaUtils.js';
+import { noConnectionContext } from '../lib/handlers/registry/expositionRegistry.js';
 import { closeInstance } from '../lib/instanceClose.js';
 import {
   type ClaimedSession,
@@ -106,12 +127,11 @@ import {
 } from '../lib/listedTool.js';
 import { runLongCall } from '../lib/longCall.js';
 import {
+  BACKGROUND_NOT_FOR_RUN_WORDS,
   isLongRead,
   isLongTool,
-  readTimeout,
-  TIMEOUT_INVALID_WORDS,
-  TIMEOUT_NOT_FOR_RUN_WORDS,
-  withoutTimeout,
+  readLongBackground,
+  statesBackground,
 } from '../lib/longTools.js';
 import {
   closeOwnedConnections,
@@ -142,7 +162,9 @@ import {
   withDestinationSystemContext,
   withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
-import type { HeldLocks } from '../lib/state/heldLocks.js';
+import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
+import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
+import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
   type StateLogger,
@@ -160,9 +182,11 @@ import {
 } from '../lib/systemContext.js';
 import { declareSystemKind } from '../lib/systemKind.js';
 import {
+  isErrorResult,
   normalizeToolContent,
   type ToolResultLike,
 } from '../lib/toolResult.js';
+import { readOnlyToolNames } from '../lib/toolSet.js';
 import { return_error } from '../lib/utils.js';
 import type {
   ConnectionContext,
@@ -191,9 +215,9 @@ interface BuiltConnection {
    * force (`CurrentCredential.take`).
    */
   credential: CurrentCredential;
-  connection: Promise<AbapConnection>;
+  connection: Promise<IAbapConnection>;
   /** The connection once its connect completed. */
-  ready?: AbapConnection;
+  ready?: IAbapConnection;
   /**
    * Calls handed this entry's connection and not yet done with it — counted
    * in the same turn it is handed out, before any await, so a replacement
@@ -215,7 +239,7 @@ interface BuiltConnection {
  * turn.
  */
 const heldFlows = new AsyncLocalStorage<
-  ReadonlyMap<object, AbapConnection | null>
+  ReadonlyMap<object, IAbapConnection | null>
 >();
 
 /**
@@ -227,7 +251,7 @@ const heldFlows = new AsyncLocalStorage<
  */
 function worksOnOwnConnection(
   tool: string,
-  args: unknown,
+  args: ToolArgs,
   inBackground: boolean,
 ): boolean {
   return (
@@ -235,6 +259,16 @@ function worksOnOwnConnection(
     (isLongTool(tool) && isLongRead(tool, args)) ||
     isDebuggerOwnConnectionTool(tool)
   );
+}
+
+/**
+ * Whether `registry` is a composite one, typed by its default group type:
+ * `instanceof` alone would type its groups `any`.
+ */
+function isCompositeRegistry(
+  registry: IHandlersRegistry,
+): registry is CompositeHandlersRegistry {
+  return registry instanceof CompositeHandlersRegistry;
 }
 
 /**
@@ -264,7 +298,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** What each built connection's source stated about who creates objects. */
   private readonly systemContexts = new WeakMap<
-    AbapConnection,
+    IAbapConnection,
     DestinationSystemContext | undefined
   >();
 
@@ -272,7 +306,11 @@ export abstract class BaseMcpServer extends McpServer {
    * Per-instance SAP system type. Overrides process.env.SAP_SYSTEM_TYPE
    * for `available_in` filtering at handler registration time.
    */
-  protected readonly systemType?: SapEnvironment;
+  protected readonly systemType?: SapEnvironment | undefined;
+  /** The access-check strategy the host gave; `undefined`: none. */
+  private readonly accessChecks: IAccessChecks | undefined;
+  /** The tools the `-ro` twins serve, read once when a strategy is given. */
+  private readonly readOnlyTools: ReadonlySet<string> | undefined;
 
   /**
    * Asks a connection's system for its information, when its parameters are
@@ -302,10 +340,10 @@ export abstract class BaseMcpServer extends McpServer {
   private takenDebugger?: DebuggerInstance;
 
   /** Every tool call of this instance still running, tracked from its entry. */
-  private readonly inFlight = new Set<Promise<unknown>>();
+  private readonly inFlight = new Set<Promise<void>>();
 
   /** The built entry of each connection handed out: what a release counts down. */
-  private readonly entries = new WeakMap<AbapConnection, BuiltConnection>();
+  private readonly entries = new WeakMap<IAbapConnection, BuiltConnection>();
 
   /**
    * The process's runtime files of the SAP sessions it holds — their owner,
@@ -315,11 +353,41 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly leftoverSessions: LeftoverSessions | undefined;
 
   /**
+   * stdio with `--deferred-logon --restore-session` (#353): the instance's
+   * first birth, made by a tool call, takes up the destination's one
+   * leftover session, as `bornAtStart` does at a start. False: a call's
+   * birth is a logon.
+   */
+  private readonly restoreAtFirstBirth: boolean;
+
+  /** A birth succeeded: from then on a new connection is a logon. */
+  private bornOnce = false;
+
+  /**
    * Where background runs and their answers are kept — the host's strategy
    * (`backgroundRuns` option); absent, `background: true` and the
    * background-run tools answer "not available here".
    */
   protected readonly backgroundRuns: IBackgroundRuns | undefined;
+
+  /** `SearchSource`'s SAP-answer strategy, from the options; absent, none set. */
+  private readonly searchSapAnswers: SapAnswerStrategy | undefined;
+  /** `SearchSource`'s line-match strategy, from the options; absent, none set. */
+  private readonly searchLineMatch: LineMatchStrategy | undefined;
+
+  /**
+   * The running runs, by `run_handle`: each one's control over its one
+   * execution connection (`backgroundRunOwner` option, else this
+   * instance's own). Never a module's.
+   */
+  protected readonly runOwner: BackgroundRunOwner;
+
+  /**
+   * The listed long tools this instance lists without `background`: it
+   * holds no strategy, or serves no tool that reads their runs. They answer
+   * in the call.
+   */
+  private readonly longToolsInTheCall = new Set<string>();
 
   /**
    * The owner of this instance's batch state (`batch` option), given by the
@@ -328,8 +396,8 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly batch: InstanceBatch | undefined;
 
-  /** The locks this instance holds between requests (`heldLocks` option). */
-  protected readonly heldLocks: HeldLocks | undefined;
+  /** The locks this instance holds between requests (`heldLocks` option, else its own). */
+  protected readonly heldLocks: HeldLocks;
 
   /** The instance's long session (`longSession` option). */
   protected readonly longSession: LongSession | undefined;
@@ -349,31 +417,31 @@ export abstract class BaseMcpServer extends McpServer {
 
   constructor(options: {
     name: string;
-    version?: string;
-    logger?: Logger;
-    systemType?: SapEnvironment;
+    version?: string | undefined;
+    logger?: Logger | undefined;
+    systemType?: SapEnvironment | undefined;
     /** Asks a connection's system for its information; default none. */
-    systemContextResolver?: SystemContextResolver | null;
+    systemContextResolver?: SystemContextResolver | null | undefined;
     /** The rules that make a connection's parameters; default none. */
-    systemContextRules?: SystemContextRules | null;
+    systemContextRules?: SystemContextRules | null | undefined;
     /**
      * The idle bound on held state, in minutes: at least 30, default 30.
      * `NO_IDLE_BOUND`: none — held state never ends on the server's clock
      * (stdio states it: the client governs the server's life).
      */
-    stateIdleMinutes?: StateIdleBound;
+    stateIdleMinutes?: StateIdleBound | undefined;
     /**
      * Where the state's lifecycle lines go (the bound's end of a state, a
      * failed cleanup, a failing observer). Default: the `logger` passed
      * explicitly, else stderr, always on — never a transport logger a host
      * defaulted to silence (such a host passes this option itself).
      */
-    stateLogger?: StateLogger;
+    stateLogger?: StateLogger | undefined;
     /**
      * The host's index of state handles in use (a pool): a handle it answers
      * `true` for is drawn again, so no two instances of the host share one.
      */
-    isStateHandleTaken?: (handle: string) => boolean;
+    isStateHandleTaken?: ((handle: string) => boolean) | undefined;
     /**
      * The owner of the process's runtime session files, created by the host
      * and shared by its instances: each owned HTTP connection holding a
@@ -382,29 +450,54 @@ export abstract class BaseMcpServer extends McpServer {
      * leftover-session tools read it. Absent: no file, and those tools
      * answer "not available here".
      */
-    leftoverSessions?: LeftoverSessions;
+    leftoverSessions?: LeftoverSessions | undefined;
     /**
      * Where background runs and their answers are kept: the host's strategy,
      * shared by its instances (the launchers' `InMemoryBackgroundRuns` of
      * `@mcp-abap-adt/background-runs-memory`, an
-     * embedder's own). Absent: `background: true` and the background-run
-     * tools are refused.
+     * embedder's own). Absent: a code run's `background: true` and the
+     * background-run tools are refused, and a listed long tool answers its
+     * result in the call.
      */
-    backgroundRuns?: IBackgroundRuns;
+    backgroundRuns?: IBackgroundRuns | undefined;
+    /**
+     * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
+     * failed read leads to (`'skip' | 'end' | 'throw'`), asked once per SAP
+     * answer with its place. Only SAP answers reach it: a credential refusal
+     * ends the call, a failed batch envelope and anything that is no SAP
+     * answer are thrown, before any strategy. Absent: the shipped one,
+     * `skipSapAnswers`.
+     */
+    sapAnswerStrategy?: SapAnswerStrategy | undefined;
+    /**
+     * `SearchSource`'s line-match strategy (DO24): which lines of a source are
+     * hits. Absent: the shipped one, `substringLineMatch`.
+     */
+    lineMatchStrategy?: LineMatchStrategy | undefined;
+    /**
+     * The owner of the running background runs (their controls, by
+     * `run_handle`): handed by a host that serves one client through several
+     * instances (Streamable HTTP's per-request instances, SSE's per-stream
+     * ones), so `DiscardBackgroundRun` reaching any of them cancels a
+     * running read. Absent: the instance holds its own.
+     */
+    backgroundRunOwner?: BackgroundRunOwner | undefined;
     /**
      * The owner of this instance's batch state, created by the host for this
      * instance alone (never shared between instances): the open batch and
      * the last batch's answers, held state under the idle bound. Absent:
      * the batch tools answer `batch_mode_unavailable`.
      */
-    batch?: InstanceBatch;
+    batch?: InstanceBatch | undefined;
     /**
-     * The locks this instance holds between requests, created by a host
-     * whose instances last one request each (Streamable HTTP) for this
-     * instance alone: held state, ended by the UNLOCK. Absent: the lock
-     * tools keep nothing (stdio, SSE: the instance keeps its session).
+     * The locks this instance holds between requests, created by the host
+     * for this instance alone (every transport: the Streamable HTTP pool's
+     * instances, each SSE connection's, stdio's one): held state, ended by
+     * the UNLOCK. A write, a delete or an unlock under a `lock_handle` is
+     * sent only under a handle kept here. Absent: the instance makes its
+     * own, as it is constructed.
      */
-    heldLocks?: HeldLocks;
+    heldLocks?: HeldLocks | undefined;
     /**
      * The long session of this instance, created by a host whose instances
      * last one request each (Streamable HTTP) for this instance alone: held
@@ -413,14 +506,14 @@ export abstract class BaseMcpServer extends McpServer {
      * tools answer `long_session_unavailable` (stdio, SSE: the instance
      * keeps its session).
      */
-    longSession?: LongSession;
+    longSession?: LongSession | undefined;
     /**
      * The corrected request header pairs of the systems the process talks
      * to, created by the host and shared by its instances: a pair SAP
      * answered `406`/`415` to, corrected, is sent from then on to that
      * system for that operation. Absent: this instance keeps its own.
      */
-    adtHeaderPairs?: AdtHeaderPairs;
+    adtHeaderPairs?: AdtHeaderPairs | undefined;
     /**
      * Whether the transport's close is the end of this instance's session
      * (default `true`): stdio's transport, an SSE stream, an embedder's
@@ -435,7 +528,7 @@ export abstract class BaseMcpServer extends McpServer {
      * Its calls are interrupted only by the instance's close
      * (`closeInstance`) or the process shutdown.
      */
-    transportCloseEndsSession?: boolean;
+    transportCloseEndsSession?: boolean | undefined;
     /**
      * Whether every tool's input schema declares an optional string
      * `state_handle` (`withStateHandle`; a tool declaring its own keeps it):
@@ -444,12 +537,31 @@ export abstract class BaseMcpServer extends McpServer {
      * header can send it. Default `false`: stdio and SSE register the
      * schemas as the tools declare them.
      */
-    stateHandleArgument?: boolean;
+    stateHandleArgument?: boolean | undefined;
+    /**
+     * The first birth a tool call makes takes up the destination's one
+     * leftover session (stdio's `--deferred-logon --restore-session`).
+     * Default `false`: such a birth is a logon.
+     */
+    restoreAtFirstBirth?: boolean | undefined;
+    /**
+     * The access checks (spec §3.2): decided once per call, after the SDK
+     * parsed the arguments and before the call takes its connection. Absent:
+     * no call is checked, and no `AccessCall` is built.
+     */
+    accessChecks?: IAccessChecks | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
+    this.accessChecks = options.accessChecks;
+    this.readOnlyTools =
+      options.accessChecks === undefined ? undefined : readOnlyToolNames();
     this.leftoverSessions = options.leftoverSessions;
+    this.restoreAtFirstBirth = options.restoreAtFirstBirth === true;
     this.backgroundRuns = options.backgroundRuns;
+    this.searchSapAnswers = options.sapAnswerStrategy;
+    this.searchLineMatch = options.lineMatchStrategy;
+    this.runOwner = options.backgroundRunOwner ?? new BackgroundRunOwner();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
       ...(options.isStateHandleTaken !== undefined && {
@@ -462,8 +574,8 @@ export abstract class BaseMcpServer extends McpServer {
     });
     this.batch = options.batch;
     if (this.batch !== undefined) this.state.attach(this.batch);
-    this.heldLocks = options.heldLocks;
-    if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
+    this.heldLocks = options.heldLocks ?? new HeldLocks();
+    this.state.attach(this.heldLocks);
     this.longSession = options.longSession;
     if (this.longSession !== undefined) this.state.attach(this.longSession);
     this.longSessionPort = this.longSessionPortOf(this.longSession);
@@ -528,7 +640,7 @@ export abstract class BaseMcpServer extends McpServer {
       isOpen: () => session.isOpen(),
       close: () => {
         const holding = {
-          locks: this.heldLocks?.count() ?? 0,
+          locks: this.heldLocks.count(),
           batch: this.batch?.holdsState() === true,
           debug_session: this.takenDebugger?.holdsState() === true,
         };
@@ -573,11 +685,21 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * After the idle bound's stop, whatever its undo answered: the connections
    * held state owns are closed with a logoff. The instance itself lives on
-   * (stdio's, an SSE connection's): its own connection is not touched. A
-   * host whose instance ends with its state (the pool) closes all of them.
+   * (an SSE connection's): its own connection is kept — unless the stop let
+   * go of locks held in it, whose handles are gone: then it is logged off
+   * too, and the logoff releases those locks in SAP; the next call logs on
+   * afresh. A package lock's own session goes the same way. A host whose
+   * instance ends with its state (the pool) closes all of them.
    */
   protected idleStopped(): Promise<void> {
-    return closeOwnedConnections(this, ['state']);
+    const dropped = this.heldLocks.takeDropped();
+    if (dropped.has('main') && this.built !== undefined) {
+      this.retire(this.built);
+    }
+    return closeOwnedConnections(
+      this,
+      dropped.has('own') ? ['state', 'lock'] : ['state'],
+    );
   }
 
   /**
@@ -638,6 +760,17 @@ export abstract class BaseMcpServer extends McpServer {
     return failureOf(thrown);
   }
 
+  /**
+   * A handler's failure on the instance's connection (a call in the main
+   * flow), read before the handler renders it (`answerFailure`): the
+   * instance's own answer, or `undefined` for the failure as it came. The
+   * base reads none; stdio's `--deferred-logon` answers a request that
+   * reached no answer as `no_connection` (#353).
+   */
+  protected readAdtFailure(_failed: IAdtError): ReadFailure | undefined {
+    return undefined;
+  }
+
   /** The tail of the instance's main flow (`enterMainFlow`). */
   private mainFlow: Promise<void> = Promise.resolve();
 
@@ -669,7 +802,7 @@ export abstract class BaseMcpServer extends McpServer {
    * Every connection it returns is a use the caller must end with exactly
    * one `connectionReleased(connection)`.
    */
-  protected async getConnection(signal: AbortSignal): Promise<AbapConnection> {
+  protected async getConnection(signal: AbortSignal): Promise<IAbapConnection> {
     const context = this.connectionContext;
     if (!context) {
       throw new Error(
@@ -695,7 +828,13 @@ export abstract class BaseMcpServer extends McpServer {
       // replacement for the same ones has them at birth (`buildConnection`)
       // and asks nothing.
       if (held) this.retire(held);
-      held = this.buildConnection(resolved, (born) => this.logOn(born));
+      // The first birth, when it is to take up the destination's leftover
+      // session (`restoreAtFirstBirth`), chooses as a start does; any
+      // other is a logon.
+      held =
+        this.restoreAtFirstBirth && !this.bornOnce
+          ? this.birthEntry(resolved).entry
+          : this.buildConnection(resolved, (born) => this.logOn(born));
     } else {
       // The held connection takes the source's credential (http: the
       // request's): the next sends carry it, in the same SAP session.
@@ -704,7 +843,7 @@ export abstract class BaseMcpServer extends McpServer {
     // This call is the entry's user from now on — counted before the await,
     // so a replacement in between cannot end the connection under it.
     held.users += 1;
-    let connection: AbapConnection;
+    let connection: IAbapConnection;
     try {
       // Awaited whatever the signal says: the connect is a send on the
       // instance's connection. The instance close and the process shutdown
@@ -716,6 +855,7 @@ export abstract class BaseMcpServer extends McpServer {
       this.release(held);
       throw error;
     }
+    this.bornOnce = true;
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
@@ -735,7 +875,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private enterMainFlow(signal: AbortSignal): Promise<() => void> {
     const before = this.mainFlow;
-    let leave!: () => void;
+    let leave: () => void = () => {};
     const mine = new Promise<void>((resolve) => {
       leave = resolve;
     });
@@ -786,7 +926,7 @@ export abstract class BaseMcpServer extends McpServer {
   private destinationRecord(destination: Destination): DestinationRecord {
     let targets = this.destinationSystems.get(destination.credential);
     if (targets === undefined) {
-      targets = new Map();
+      targets = new Map<string, DestinationRecord>();
       this.destinationSystems.set(destination.credential, targets);
     }
     let record = targets.get(destination.target);
@@ -802,6 +942,25 @@ export abstract class BaseMcpServer extends McpServer {
    * (`buildConnection`); `undefined` for a connection with no destination
    * (a host's injected one).
    */
+  /**
+   * The `SearchSource` strategies this server was given, for every context
+   * it builds: a field per strategy given, none for one absent (the
+   * handler's default then answers).
+   */
+  private searchStrategies(): Pick<
+    HandlerContext,
+    'sapAnswerStrategy' | 'lineMatchStrategy'
+  > {
+    return {
+      ...(this.searchSapAnswers !== undefined && {
+        sapAnswerStrategy: this.searchSapAnswers,
+      }),
+      ...(this.searchLineMatch !== undefined && {
+        lineMatchStrategy: this.searchLineMatch,
+      }),
+    };
+  }
+
   private batchAvailabilityOf(
     connection: object,
   ): BatchAvailability | undefined {
@@ -849,14 +1008,14 @@ export abstract class BaseMcpServer extends McpServer {
    * `x-sap-login`), its master system —; a host's connection's
    * (`statedCallOf`). The kind is the connection's (`systemKindOf`).
    */
-  private statedCall(connection: object): SystemCall {
+  private statedCall(connection: IAbapConnection): SystemCall {
     const warn = (message: string) => this.logger?.warn?.(message);
     const destination = this.destinationOf.get(connection);
     if (destination === undefined) {
       return { ...statedCallOf(connection, this.systemType), warn };
     }
     return withDestinationSystemContext(
-      this.systemContexts.get(connection as AbapConnection),
+      this.systemContexts.get(connection),
       () => ({
         kind: systemKindOf(connection, process.env, this.systemType),
         responsible: statedResponsibleOf(destination.responsible),
@@ -873,7 +1032,7 @@ export abstract class BaseMcpServer extends McpServer {
    * rules is thrown, and nothing is kept.
    */
   private parametersFrom(
-    connection: object,
+    connection: IAbapConnection,
     lookup: SystemLookup,
   ): ResolvedSystemContext {
     const made = parametersOf(lookup, this.systemContextRules, () =>
@@ -897,7 +1056,7 @@ export abstract class BaseMcpServer extends McpServer {
    * to make (no resolver).
    */
   private async requireSystem(
-    connection: AbapConnection,
+    connection: IAbapConnection,
   ): Promise<ResolvedSystemContext | undefined> {
     const resolver = this.systemContextResolver;
     if (resolver === null) return undefined;
@@ -933,12 +1092,12 @@ export abstract class BaseMcpServer extends McpServer {
    * (`requireSystem`).
    */
   private async systemBeforeTool(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     holdsFlow: boolean,
     signal: AbortSignal,
-    taken: (connection: AbapConnection | undefined) => void,
+    taken: (connection: IAbapConnection | undefined) => void,
   ): Promise<{
-    connection: AbapConnection;
+    connection: IAbapConnection;
     system: ResolvedSystemContext | undefined;
   }> {
     if (this.systemContextResolver === null) {
@@ -976,7 +1135,7 @@ export abstract class BaseMcpServer extends McpServer {
    * replaces it. Nothing else replaces the instance's connection: a
    * changed credential is put in force on it (`getConnection`).
    */
-  private isStaleBuilt(connection: AbapConnection): boolean {
+  private isStaleBuilt(connection: IAbapConnection): boolean {
     if (this.connectionContext?.kind !== 'built') return false;
     if (!this.entries.has(connection)) return false;
     return isSpent(connection);
@@ -988,7 +1147,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private inHeldFlow<T>(
     holds: boolean,
-    connection: AbapConnection | undefined,
+    connection: IAbapConnection | undefined,
     fn: () => T,
   ): T {
     if (!holds || connection === undefined) return fn();
@@ -1009,7 +1168,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected async onMainConnection<T>(
     signal: AbortSignal,
-    send: (connection: AbapConnection) => Promise<T>,
+    send: (connection: IAbapConnection) => Promise<T>,
   ): Promise<T> {
     const held = heldFlows.getStore()?.get(this);
     // Held without a connection: the turn is this call's already.
@@ -1030,7 +1189,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async sendInTurn<T>(
     signal: AbortSignal,
-    send: (connection: AbapConnection) => Promise<T>,
+    send: (connection: IAbapConnection) => Promise<T>,
   ): Promise<T> {
     const connection = await this.getConnection(signal);
     try {
@@ -1059,7 +1218,7 @@ export abstract class BaseMcpServer extends McpServer {
    * release keeps a replaced connection open until the terminal close; a
    * second one would end it under another call.
    */
-  protected connectionReleased(connection: AbapConnection): void {
+  protected connectionReleased(connection: IAbapConnection): void {
     const entry = this.entries.get(connection);
     if (entry !== undefined) this.release(entry);
   }
@@ -1076,7 +1235,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.built === entry) this.built = undefined;
     entry.retired = true;
     // The locks the instance held in that session end with it.
-    if (entry.ready !== undefined) this.heldLocks?.mainSessionEnded();
+    if (entry.ready !== undefined) this.heldLocks.mainSessionEnded();
     entry.connection.then(
       (connection) => {
         if (entry.users === 0) void endConnection(connection);
@@ -1101,9 +1260,10 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private buildConnection(
     resolved: ResolvedConnection,
-    birth: (born: ResolvedConnection) => Promise<AbapConnection>,
-    failed: (connection: AbapConnection) => Promise<void> = (connection) =>
+    birth: (born: ResolvedConnection) => Promise<IAbapConnection>,
+    failed: (connection: IAbapConnection) => Promise<void> = (connection) =>
       endConnection(connection),
+    kept: (connection: IAbapConnection) => void = () => {},
   ): BuiltConnection {
     const credential = resolved.credential;
     const destination: Destination = {
@@ -1115,13 +1275,7 @@ export abstract class BaseMcpServer extends McpServer {
     // The connection presents the credential in force: this one, until a
     // call puts another in force (`getConnection`).
     const current = new CurrentCredential(credential);
-    const entry: BuiltConnection = {
-      credential: current,
-      connection: Promise.resolve() as unknown as Promise<AbapConnection>,
-      users: 0,
-      retired: false,
-    };
-    entry.connection = (async () => {
+    const connecting = (async () => {
       const connection = await birth({ ...resolved, credential: current });
       this.destinationOf.set(connection, destination);
       this.systemContexts.set(connection, resolved.systemContext);
@@ -1143,9 +1297,24 @@ export abstract class BaseMcpServer extends McpServer {
         await failed(connection);
         throw error;
       }
-      entry.ready = connection;
+      // Born whole, its parameters made: the instance's from here on.
+      kept(connection);
       return connection;
     })();
+    const entry: BuiltConnection = {
+      credential: current,
+      connection: connecting,
+      users: 0,
+      retired: false,
+    };
+    // Ready once connected: set before anyone who waits for the connection
+    // is answered (the first reaction registered on it).
+    connecting.then(
+      (connection) => {
+        entry.ready = connection;
+      },
+      () => undefined,
+    );
     this.built = entry;
     // A completed connect stays the instance's whoever still waits for it
     //; a failed one is not kept: the next call connects again.
@@ -1160,7 +1329,7 @@ export abstract class BaseMcpServer extends McpServer {
    * connected, its session is kept in a runtime file when the instance keeps
    * them (`sessionOf`).
    */
-  private async logOn(resolved: ResolvedConnection): Promise<AbapConnection> {
+  private async logOn(resolved: ResolvedConnection): Promise<IAbapConnection> {
     const connection = await this.connectedLogon(resolved);
     const identity = this.sessionOf(resolved);
     if (identity !== undefined) {
@@ -1172,13 +1341,13 @@ export abstract class BaseMcpServer extends McpServer {
   /** A connection built from `resolved`, owned as `built`, and connected with its logon. */
   private async connectedLogon(
     resolved: ResolvedConnection,
-  ): Promise<AbapConnection> {
+  ): Promise<IAbapConnection> {
     // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
     const connection = createAbapConnection(
       resolved.settings,
       resolved.credential,
-    ) as AbapConnection;
+    );
     // The instance's own from here on: it ends with a logoff.
     own(connection, { owner: this, role: 'built' });
     // Establish session (CSRF token + cookies) before first request.
@@ -1208,9 +1377,11 @@ export abstract class BaseMcpServer extends McpServer {
    * Alive: picked up. SAP answering it is gone (`sessionGone`): that
    * instance is spent and logged nothing on — connection's "a new session is
    * a new instance" — so a new one is built with the normal logon, with the
-   * process's settings and credential, and starts a new session. Either way
-   * the file is this process's under the same handle (`adopt`), rewritten
-   * with the connection's cookies; `outcome.session` says which. The system
+   * process's settings and credential, and starts a new session;
+   * `outcome.session` says which. Either way the file becomes this
+   * process's under the same handle (`adopt`, rewritten with the
+   * connection's cookies) only once the birth is whole, its parameters made
+   * (`birthEntry`); a birth that fails after this gives the file back. The system
    * information the file carries is the connection's (same destination, same
    * system): nothing is looked up. Any other failure — the old session's
    * answer or the new logon's — is the start's, as SAP gave it, and gives
@@ -1224,8 +1395,8 @@ export abstract class BaseMcpServer extends McpServer {
     claimed: ClaimedSession,
     identity: SessionIdentity,
     outcome: { session?: 'picked_up' | 'new' },
-  ): Promise<AbapConnection> {
-    let connection: AbapConnection;
+  ): Promise<IAbapConnection> {
+    let connection: IAbapConnection;
     try {
       connection = createAbapConnection(
         resolved.settings,
@@ -1233,7 +1404,7 @@ export abstract class BaseMcpServer extends McpServer {
         undefined,
         undefined,
         claimed.cookies,
-      ) as AbapConnection;
+      );
     } catch (error) {
       owner.release(claimed);
       throw error;
@@ -1257,7 +1428,7 @@ export abstract class BaseMcpServer extends McpServer {
         owner.release(claimed);
         throw error;
       }
-      let fresh: AbapConnection;
+      let fresh: IAbapConnection;
       try {
         fresh = await this.connectedLogon(resolved);
         // Closed since the logon settled: its close swept it; not adopted.
@@ -1266,7 +1437,6 @@ export abstract class BaseMcpServer extends McpServer {
         owner.release(claimed);
         throw logonError;
       }
-      owner.adopt(claimed, fresh, identity);
       if (claimed.system !== undefined)
         this.bornSystems.set(fresh, claimed.system);
       outcome.session = 'new';
@@ -1281,7 +1451,6 @@ export abstract class BaseMcpServer extends McpServer {
       owner.release(claimed);
       throw error;
     }
-    owner.adopt(claimed, connection, identity);
     if (claimed.system !== undefined)
       this.bornSystems.set(connection, claimed.system);
     outcome.session = 'picked_up';
@@ -1311,28 +1480,7 @@ export abstract class BaseMcpServer extends McpServer {
     }
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
-    const owner = this.leftoverSessions;
-    const identity = this.sessionOf(resolved);
-    const claimed =
-      owner !== undefined && identity !== undefined
-        ? owner.claimTheOne(identity)
-        : undefined;
-    const outcome: { session?: 'picked_up' | 'new' } = {};
-    const entry =
-      claimed !== undefined && owner !== undefined && identity !== undefined
-        ? this.buildConnection(
-            resolved,
-            (born) =>
-              this.resumedSession(born, owner, claimed, identity, outcome),
-            // A picked-up session is left as it is: its file is a leftover
-            // again once the process ended.
-            async (connection) => {
-              if (outcome.session !== 'picked_up') {
-                await endConnection(connection);
-              }
-            },
-          )
-        : this.buildConnection(resolved, (born) => this.logOn(born));
+    const { entry, claimed, outcome } = this.birthEntry(resolved);
     // Its parameters are made with it (`buildConnection`): a refusal of the
     // rules ends the start.
     const connection = await entry.connection;
@@ -1346,27 +1494,97 @@ export abstract class BaseMcpServer extends McpServer {
       if (outcome.session !== 'picked_up') await endConnection(connection);
       throw error;
     }
+    this.bornOnce = true;
     return claimed === undefined
       ? { session: 'logged_on' }
       : { session: outcome.session ?? 'picked_up', handle: claimed.handle };
   }
 
   /**
+   * A birth that may take up a leftover session — a stdio start's, or the
+   * first one a call makes with `restoreAtFirstBirth`: the destination's one
+   * leftover session (`claimTheOne`: a dead process's, role `built`) is
+   * taken up (`resumedSession`); none, or more than one, is a logon. A
+   * failed take-up gives the claimed file back (`resumedSession`), so the
+   * next birth claims it again. Answers the entry, the claim and its
+   * outcome.
+   */
+  private birthEntry(resolved: ResolvedConnection): {
+    entry: BuiltConnection;
+    claimed: ClaimedSession | undefined;
+    outcome: { session?: 'picked_up' | 'new' };
+  } {
+    const owner = this.leftoverSessions;
+    const identity = this.sessionOf(resolved);
+    const claimed =
+      owner !== undefined && identity !== undefined
+        ? owner.claimTheOne(identity)
+        : undefined;
+    const outcome: { session?: 'picked_up' | 'new' } = {};
+    const entry =
+      claimed !== undefined && owner !== undefined && identity !== undefined
+        ? this.buildConnection(
+            resolved,
+            (born) =>
+              this.resumedSession(born, owner, claimed, identity, outcome),
+            // A birth that failed after the take-up (its parameters). The
+            // session taken up is left as it is and its file given back — a
+            // leftover again at once, for the next birth and the leftover
+            // tools, whether or not the process goes on (#353: a deferred
+            // server does). A fresh session (the old one was gone) is this
+            // process's under the handle until its logoff completed, which
+            // deletes the record, as before.
+            async (connection) => {
+              if (outcome.session === 'picked_up') {
+                owner.release(claimed);
+                return;
+              }
+              owner.adopt(claimed, connection, identity);
+              await endConnection(connection);
+            },
+            // Born whole: the file is this process's under the same handle,
+            // written with the information its parameters were made from.
+            (connection) => {
+              owner.adopt(claimed, connection, identity);
+              const known = this.systems.get(connection)?.information;
+              if (known !== undefined) owner.describeSystem(connection, known);
+            },
+          )
+        : this.buildConnection(resolved, (born) => this.logOn(born));
+    return { entry, claimed, outcome };
+  }
+
+  /**
    * Registers handlers from registry
    * Wraps handlers to inject connection as first parameter
    *
-   * Handler signature: (connection: AbapConnection, args: any) => Promise<any>
+   * Handler signature: (connection: IAbapConnection, args: any) => Promise<any>
    * Registered as: (args: any) => handler(getConnection(), args)
    *
    * This ensures connection is injected but NOT exposed in MCP tool signature
    */
   protected registerHandlers(handlersRegistry: IHandlersRegistry): void {
     // Get handler groups from registry
-    if (handlersRegistry instanceof CompositeHandlersRegistry) {
-      const groups = handlersRegistry.getHandlerGroups();
+    if (isCompositeRegistry(handlersRegistry)) {
+      const groups = this.withBackgroundRunTools(
+        handlersRegistry.getHandlerGroups(),
+      );
       // Where the instance has a batch owner, every tool's description but
       // a batch tool's ends with its batch sentence (spec §3).
       const sentenced = this.batch !== undefined;
+      // A listed long tool offers `background` only where its run can be
+      // read: this instance holds a strategy and serves the tool that reads
+      // its runs. Elsewhere it is listed without the parameter and answers
+      // in the call.
+      // The background-run tools are listed only where a strategy keeps the
+      // runs: without one, none is listed, whichever registry brought them.
+      const served = new Set(
+        groups.flatMap((group) =>
+          group
+            .getHandlers()
+            .map((entry: HandlerEntry) => entry.toolDefinition.name),
+        ),
+      );
 
       for (const group of groups) {
         const handlers = group.getHandlers();
@@ -1384,7 +1602,23 @@ export abstract class BaseMcpServer extends McpServer {
           const environment = statedEnvironment(
             this.systemType ?? process.env.SAP_SYSTEM_TYPE,
           );
-          const listed = listedTool(entry.toolDefinition, environment);
+          const name = entry.toolDefinition.name;
+          if (this.backgroundRuns === undefined && isBackgroundRunTool(name)) {
+            continue;
+          }
+          if (
+            isLongTool(name) &&
+            (this.backgroundRuns === undefined ||
+              !served.has(runToolsOf(name).get))
+          ) {
+            this.longToolsInTheCall.add(name);
+          }
+          const listed = listedTool(
+            this.longToolsInTheCall.has(name)
+              ? longToolInTheCall(entry.toolDefinition)
+              : entry.toolDefinition,
+            environment,
+          );
           if (!listed.listed) {
             this.logger.debug(
               listed.reason === 'not-served'
@@ -1393,7 +1627,13 @@ export abstract class BaseMcpServer extends McpServer {
             );
             continue;
           }
-          const runCall = async (args: unknown, signal: AbortSignal) => {
+          // What the access checks read of this tool's calls, computed once
+          // here; nothing when the host gave no strategy.
+          const checked =
+            this.readOnlyTools === undefined
+              ? undefined
+              : checkedArgumentsOf(entry.toolDefinition, this.readOnlyTools);
+          const runCall = async (args: ToolArgs, signal: AbortSignal) => {
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
             if (
@@ -1411,9 +1651,9 @@ export abstract class BaseMcpServer extends McpServer {
                   ),
                 );
               }
-              return this.runConnectionless(entry.handler, group, args, signal);
+              return this.runConnectionless(entry.call, args, signal);
             }
-            let inUse: AbapConnection | undefined;
+            let inUse: IAbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
             // The batch a `BatchEnd` (or `DebugBatchEnd`) call ends: the one
             // of its kind open when it came.
@@ -1429,76 +1669,129 @@ export abstract class BaseMcpServer extends McpServer {
             if (nothingToEnd !== undefined) {
               return this.refusalAnswer(nothingToEnd);
             }
+            // A call under a lock handle this instance does not hold is
+            // refused before a connection is taken: nothing is sent, no
+            // logon either — an unknown handle and another instance's alike.
+            const lockHandle = entry.heldLockOf?.(args);
+            if (lockHandle !== undefined && !this.heldLocks.holds(lockHandle)) {
+              return return_error(new Error(lockNotHeldWords(this.heldLocks)));
+            }
+            // A listed long tool's run mode (HandlerGet's run parts) is read
+            // in the call: a `background` on it is refused, nothing sent.
+            const longTool = isLongTool(entry.toolDefinition.name);
+            const longRead =
+              longTool && isLongRead(entry.toolDefinition.name, args);
+            if (longTool && !longRead && statesBackground(args)) {
+              return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
+            }
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —
-              // before any connection — and never handed to the handler.
-              const runsInBackground =
-                isBackgroundTool(entry.toolDefinition.name) &&
-                this.backgroundRequested(args);
-              const handlerArgs = isBackgroundTool(entry.toolDefinition.name)
-                ? withoutBackground(args)
-                : args;
-              // Get connection from context (this.connectionContext), with
-              // the call's signal (the session's end).
-              let connection = await this.getConnection(signal);
-              inUse = connection;
-              // One instance, one connection, one main flow: a call that works
-              // on the instance's connection waits until the call before it
-              // settled, whatever the client sends at once. Entered after the
-              // connection is ready, so concurrent callers still share one
-              // connect(). A background run and a listed long read work
-              // on a connection of their own and take no place in it; so do the
-              // debugger tools whose SAP work is on the debugger's own
-              // connections — their sends on this one (`onMainConnection`)
-              // still take their turn.
-              // While a batch is open every call but a batch tool's takes its
-              // turn: a recorded call is recorded in call order, a refused one
-              // is refused there — a long read in batch mode gets no
-              // connection of its own. The debugger batch is the debugger
-              // tools': they keep working outside the flow, their numbers
-              // in record order (spec §7).
-              const ownConnection =
-                (!this.batchOpenFor(entry.toolDefinition.name) ||
-                  this.inDebuggerBatch(entry.toolDefinition.name)) &&
-                worksOnOwnConnection(
-                  entry.toolDefinition.name,
-                  args,
-                  runsInBackground,
+              // before any connection — and never handed to the handler. A
+              // listed long read's is too: `true` by default, in the call
+              // when the host gave no strategy or a batch is open.
+              const runsInBackground = isBackgroundTool(
+                entry.toolDefinition.name,
+              )
+                ? this.backgroundRequested(args)
+                : longRead &&
+                  this.longReadInBackground(entry.toolDefinition.name, args);
+              const handlerArgs =
+                isBackgroundTool(entry.toolDefinition.name) || longTool
+                  ? withoutBackground(args)
+                  : args;
+              // The call's connection and its turn, taken once: by the access
+              // checks' package reader when it reads first, else here.
+              const acquire = async () => {
+                // Get connection from context (this.connectionContext), with
+                // the call's signal (the session's end).
+                let connection = await this.getConnection(signal);
+                inUse = connection;
+                // One instance, one connection, one main flow: a call that works
+                // on the instance's connection waits until the call before it
+                // settled, whatever the client sends at once. Entered after the
+                // connection is ready, so concurrent callers still share one
+                // connect(). A background run and a listed long read work
+                // on a connection of their own and take no place in it; so do the
+                // debugger tools whose SAP work is on the debugger's own
+                // connections — their sends on this one (`onMainConnection`)
+                // still take their turn.
+                // While a batch is open every call but a batch tool's takes its
+                // turn: a recorded call is recorded in call order, a refused one
+                // is refused there — a long read in batch mode gets no
+                // connection of its own. The debugger batch is the debugger
+                // tools': they keep working outside the flow, their numbers
+                // in record order (spec §7).
+                const ownConnection =
+                  (!this.batchOpenFor(entry.toolDefinition.name) ||
+                    this.inDebuggerBatch(entry.toolDefinition.name)) &&
+                  worksOnOwnConnection(
+                    entry.toolDefinition.name,
+                    args,
+                    runsInBackground,
+                  );
+                if (!ownConnection) {
+                  leaveFlow = await this.enterMainFlow(signal);
+                  // The connection this call took before it waited may be one
+                  // whose session SAP already lost while the call ahead ran. It
+                  // is given back and the instance's connection taken again —
+                  // inside the flow, before the tool runs — so a queued batch
+                  // does not fail on the one lost session.
+                  if (this.isStaleBuilt(connection)) {
+                    inUse = undefined;
+                    this.connectionReleased(connection);
+                    connection = await this.getConnection(signal);
+                    inUse = connection;
+                  }
+                }
+                // The connection's system information, asked before the tool
+                // runs when it has none; its failure is this call's answer, and
+                // the tool never runs twice.
+                const before = await this.systemBeforeTool(
+                  connection,
+                  leaveFlow !== undefined,
+                  signal,
+                  (taken) => {
+                    inUse = taken;
+                  },
                 );
-              if (!ownConnection) {
-                leaveFlow = await this.enterMainFlow(signal);
-                // The connection this call took before it waited may be one
-                // whose session SAP already lost while the call ahead ran. It
-                // is given back and the instance's connection taken again —
-                // inside the flow, before the tool runs — so a queued batch
-                // does not fail on the one lost session.
-                if (this.isStaleBuilt(connection)) {
-                  inUse = undefined;
-                  this.connectionReleased(connection);
-                  connection = await this.getConnection(signal);
-                  inUse = connection;
+                connection = before.connection;
+                const system = before.system;
+                // The call's destination's port, whichever connection
+                // its reads go on (a long read's own one included).
+                const batchAvailability = this.batchAvailabilityOf(connection);
+                // The variant of the call's ADT client: the kind this server
+                // states, for a connection the factory did not build.
+                declareSystemKind(connection, this.systemType);
+                return { connection, system, batchAvailability };
+              };
+              let taken: ReturnType<typeof acquire> | undefined;
+              const take = () => {
+                taken ??= acquire();
+                return taken;
+              };
+              // The access checks (spec §3.2): once, before the call takes
+              // its connection; a refused call takes none, sends nothing and
+              // takes no batch number. A strategy that reads takes the call's
+              // connection through the reader, and the call goes on with it.
+              const accessCall =
+                this.accessChecks === undefined || checked === undefined
+                  ? undefined
+                  : accessCallOf(entry.toolDefinition.name, checked, args);
+              if (this.accessChecks !== undefined && accessCall !== undefined) {
+                const verdict = await this.accessChecks.check(
+                  accessCall,
+                  lazyPackageReader(
+                    async () => (await take()).connection,
+                    this.logger,
+                    signal,
+                  ),
+                );
+                if (!verdict.allowed) {
+                  return this.refusalAnswer(refusalOf(verdict));
                 }
               }
-              // The connection's system information, asked before the tool
-              // runs when it has none; its failure is this call's answer, and
-              // the tool never runs twice.
-              const before = await this.systemBeforeTool(
-                connection,
-                leaveFlow !== undefined,
-                signal,
-                (taken) => {
-                  inUse = taken;
-                },
-              );
-              connection = before.connection;
-              const system = before.system;
-              // The call's destination's port, whichever connection
-              // its reads go on (a long read's own one included).
-              const batchAvailability = this.batchAvailabilityOf(connection);
-              // The variant of the call's ADT client: the kind this server
-              // states, for a connection the factory did not build.
-              declareSystemKind(connection, this.systemType);
+              const { connection, system, batchAvailability } = await take();
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
@@ -1510,9 +1803,8 @@ export abstract class BaseMcpServer extends McpServer {
                 ...(batchAvailability !== undefined
                   ? { batchAvailability }
                   : {}),
-                ...(this.heldLocks !== undefined
-                  ? { heldLocks: this.heldLocks }
-                  : {}),
+                ...this.searchStrategies(),
+                heldLocks: this.heldLocks,
                 ...(this.longSessionPort !== undefined
                   ? { longSession: this.longSessionPort }
                   : {}),
@@ -1560,73 +1852,58 @@ export abstract class BaseMcpServer extends McpServer {
               if (this.batchOpenFor(entry.toolDefinition.name)) {
                 return await this.recordCall({
                   tool: entry.toolDefinition.name,
-                  handler: entry.handler,
-                  group,
+                  call: entry.call,
                   context,
                   args: handlerArgs,
+                  askedBackground: longRead && args.background === true,
                   holdsFlow,
                   runsInBackground,
                   system,
                   signal,
                 });
               }
-              let handlerPromise: Promise<unknown>;
-              const listed = isLongTool(entry.toolDefinition.name);
-              const read =
-                listed && isLongRead(entry.toolDefinition.name, args);
-              if (listed && !read && readTimeout(args) !== undefined) {
-                // A listed tool's run mode takes no `timeout`.
-                return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
-                  isError: true;
-                  content: { type: 'text'; text: string }[];
-                };
-              }
+              let handlerPromise: Promise<ToolResultLike>;
               if (runsInBackground) {
-                // A background run: on a connection of its own, answered at
-                // once with its handle; its answer goes to the strategy.
+                // A background run — a code run, or a listed long read — on
+                // its one connection of its own (the read's handler runs on
+                // it directly, no `runLongCall`), answered at once with its
+                // handle; its answer goes to the strategy.
                 handlerPromise = resolved(() =>
                   this.startBackground(
                     entry.toolDefinition.name,
-                    entry.handler,
-                    group,
+                    longRead ? 'read' : 'code',
+                    entry.call,
                     context,
                     handlerArgs,
                     signal,
                   ),
                 );
-              } else if (read) {
-                // A listed long tool: a read on a connection of
-                // its own, its `timeout` cutting the read.
-                const timeoutSeconds = readTimeout(args);
-                if (timeoutSeconds === null) {
-                  return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
-                    isError: true;
-                    content: { type: 'text'; text: string }[];
-                  };
-                }
+              } else if (longRead) {
+                // A listed long tool in the call: a read on a connection of
+                // its own, logged off after the answer.
                 handlerPromise = resolved(() =>
                   runLongCall({
                     name: entry.toolDefinition.name,
                     connection,
                     logger: this.logger,
-                    timeoutSeconds,
                     run: (own) =>
                       callHandler(
-                        entry.handler,
-                        group,
-                        { ...context, connection: own as AbapConnection },
-                        withoutTimeout(args),
+                        entry.call,
+                        { ...context, connection: own },
+                        handlerArgs,
                       ),
                   }),
                 );
               } else {
+                // On the instance's connection, a handler's failure is read
+                // by the instance first (`readAdtFailure`).
                 handlerPromise = resolved(() =>
-                  callInItsForm(
-                    entry.handler,
-                    context,
-                    handlerArgs,
-                    inGroupContextOf(group),
-                  ),
+                  holdsFlow
+                    ? runWithAdtFailureReader(
+                        (failed) => this.readAdtFailure(failed),
+                        () => entry.call(context, handlerArgs),
+                      )
+                    : entry.call(context, handlerArgs),
                 );
               }
 
@@ -1638,7 +1915,7 @@ export abstract class BaseMcpServer extends McpServer {
 
               // A failed tool returns an isError result — it does not throw.
               // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
-              if ((result as ToolResultLike | undefined)?.isError) {
+              if (isErrorResult(result)) {
                 // `BatchEnd` answering its own error: every number of its
                 // batch answers the same (spec §5.3).
                 if (this.batch !== undefined && ending !== undefined) {
@@ -1687,22 +1964,17 @@ export abstract class BaseMcpServer extends McpServer {
           // its own, or one it cannot extend, is registered as it is and
           // its arguments reach the handler as they came.
           const withHandle = this.stateHandleArgument
-            ? (withStateHandle(
-                listed.inputSchema,
-              ) as typeof entry.toolDefinition.inputSchema)
+            ? withStateHandle(listed.inputSchema)
             : listed.inputSchema;
           const declared = withHandle !== listed.inputSchema;
           const inputSchema = withHandle;
 
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
-          const wrappedHandler = (args: unknown) =>
+          const wrappedHandler = (args: ToolArgs) =>
             this.trackCall(toolName, (signal) =>
               runCall(declared ? withoutStateHandle(args) : args, signal),
             );
-          // A JSON Schema converted to Zod (`registeredSchema`), as the SDK takes it.
-          const zodSchema = registeredSchema(inputSchema);
-
           // Register wrapped handler via SDK registerTool, with the
           // description the declared variant serves beside its schema.
           // Note: connection is NOT part of MCP tool signature
@@ -1716,7 +1988,7 @@ export abstract class BaseMcpServer extends McpServer {
                       entry.toolDefinition.name,
                     )
                   : listed.description,
-              inputSchema: zodSchema,
+              inputSchema,
               ...listed.search,
             },
             wrappedHandler,
@@ -1731,6 +2003,39 @@ export abstract class BaseMcpServer extends McpServer {
       handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
   }
+  /**
+   * The registry's groups, and — on an instance that holds a strategy — the
+   * background-run tools beside every listed long tool they carry (the
+   * owner, D24: a set with a long tool serves the tools that read, list and
+   * end its runs): the full ones beside a full long tool, compact's beside
+   * a compact one, each when the registry does not already carry them.
+   * Without a strategy nothing is added (and none is listed).
+   */
+  private withBackgroundRunTools(groups: IHandlerGroup[]): IHandlerGroup[] {
+    if (this.backgroundRuns === undefined) return groups;
+    const names = new Set(
+      groups.flatMap((group) =>
+        group
+          .getHandlers()
+          .map((entry: HandlerEntry) => entry.toolDefinition.name),
+      ),
+    );
+    const readers = new Set(
+      [...names].filter(isLongTool).map((name) => runToolsOf(name).get),
+    );
+    const added: IHandlerGroup[] = [];
+    if (readers.has('GetBackgroundRun') && !names.has('GetBackgroundRun')) {
+      added.push(new BackgroundRunHandlersGroup(noConnectionContext()));
+    }
+    if (
+      readers.has('HandlerBackgroundRunGet') &&
+      !names.has('HandlerBackgroundRunGet')
+    ) {
+      added.push(new CompactBackgroundRunHandlersGroup(noConnectionContext()));
+    }
+    return [...groups, ...added];
+  }
+
   /**
    * Whether a call of `tool` meets an open batch: a batch is open and `tool`
    * is neither a batch tool nor a long-session tool — those run beside it,
@@ -1760,15 +2065,9 @@ export abstract class BaseMcpServer extends McpServer {
   } {
     const read = readGuarded((t) => this.readFailure(t), error);
     if (read !== undefined) {
-      return answerRead(read) as {
-        content: { type: 'text'; text: string }[];
-        isError: true;
-      };
+      return answerRead(read);
     }
-    return return_error(error) as {
-      content: { type: 'text'; text: string }[];
-      isError: true;
-    };
+    return return_error(error);
   }
 
   /**
@@ -1776,8 +2075,9 @@ export abstract class BaseMcpServer extends McpServer {
    * as the server's refusal, answered by the caller — unless the open
    * batch is a communication batch that admits it: a tool that works on a
    * connection of its own (a debugger tool, a background run) or a call
-   * that holds no turn is not served; a listed long read given `timeout` is
-   * refused `batch_no_timeout`; a call no entry of the eligibility table
+   * that holds no turn is not served; a listed long read given
+   * `background: true` is refused `batch_no_background` (without it, it is
+   * recorded); a call no entry of the eligibility table
    * admits — read on the arguments the handler receives, over the kind of
    * the instance's connection — is refused `batch_not_recordable`. A refusal
    * takes no number.
@@ -1795,10 +2095,11 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async recordCall(call: {
     tool: string;
-    handler: ToolHandler;
-    group: unknown;
+    call: HandlerEntry['call'];
     context: HandlerContext;
-    args: unknown;
+    args: ToolArgs;
+    /** A listed long read whose call stated `background: true`. */
+    askedBackground: boolean;
     holdsFlow: boolean;
     runsInBackground: boolean;
     system: ResolvedSystemContext | undefined;
@@ -1831,8 +2132,8 @@ export abstract class BaseMcpServer extends McpServer {
     ) {
       throw notServed();
     }
-    if (isLongTool(call.tool) && readTimeout(call.args) !== undefined) {
-      throw new ServerRefusal('batch_no_timeout');
+    if (call.askedBackground) {
+      throw new ServerRefusal('batch_no_background');
     }
     const connection = call.context.connection;
     const kind = isRfcConnection(connection) ? 'rfc' : 'http';
@@ -1856,10 +2157,9 @@ export abstract class BaseMcpServer extends McpServer {
   private async runRecorded(
     call: {
       tool: string;
-      handler: ToolHandler;
-      group: unknown;
+      call: HandlerEntry['call'];
       context: HandlerContext;
-      args: unknown;
+      args: ToolArgs;
       holdsFlow: boolean;
       system: ResolvedSystemContext | undefined;
     },
@@ -1874,8 +2174,9 @@ export abstract class BaseMcpServer extends McpServer {
     // taken at its first request, possibly before. Boxed: a promise resolved
     // with the handler's promise would adopt it, and a handler that throws
     // would then reject the answer instead of reaching `recordedAnswer`.
-    let started!: (started: { handler: Promise<unknown> }) => void;
-    const handlerStarted = new Promise<{ handler: Promise<unknown> }>(
+    let started: (started: { handler: Promise<ToolResultLike> }) => void =
+      () => {};
+    const handlerStarted = new Promise<{ handler: Promise<ToolResultLike> }>(
       (resolve) => {
         started = resolve;
       },
@@ -1906,19 +2207,20 @@ export abstract class BaseMcpServer extends McpServer {
     );
     const recordedContext: HandlerContext = {
       ...call.context,
-      connection: recorder as unknown as AbapConnection,
+      // The server's own, whatever the recorded call's context carried.
+      ...this.searchStrategies(),
+      // The call's connection's kind, as the server declared it for it.
+      connection: withSystemKindOf(recorder, connection),
       // The debug sessions are bound to the call's own context, whose
       // connection outlives the batch (`requireDebugger`).
       ...(owner.mode() === 'debugger' ? { recordedFrom: call.context } : {}),
       // Its number is read later: a lock it answers is held only while the
       // SAP session its envelope went out on is still the instance's.
-      ...(this.heldLocks !== undefined
-        ? { heldLocks: this.heldLocks.heldIn(() => open.lockSession) }
-        : {}),
+      heldLocks: this.heldLocks.heldIn(() => open.lockSession),
     };
     open.target?.point(connection);
     try {
-      let handler: Promise<unknown>;
+      let handler: Promise<ToolResultLike>;
       try {
         handler = Promise.resolve(
           this.inHeldFlow(call.holdsFlow, connection, () =>
@@ -1928,12 +2230,7 @@ export abstract class BaseMcpServer extends McpServer {
                 () =>
                   withKnownSystemContext(call.system, () =>
                     asRecordedCall(() =>
-                      callHandler(
-                        call.handler,
-                        call.group,
-                        recordedContext,
-                        call.args,
-                      ),
+                      callHandler(call.call, recordedContext, call.args),
                     ),
                   ),
               ),
@@ -1957,13 +2254,8 @@ export abstract class BaseMcpServer extends McpServer {
       if (recorder.number() !== undefined) return { content: [] };
       // Settled without recording: nothing went into an envelope.
       const result = await handler;
-      const content = normalizeToolContent(result) as {
-        type: 'text';
-        text: string;
-      }[];
-      return (result as ToolResultLike | undefined)?.isError
-        ? { content, isError: true }
-        : { content };
+      const content = normalizeToolContent(result);
+      return isErrorResult(result) ? { content, isError: true } : { content };
     } finally {
       open.target?.point(undefined);
     }
@@ -1980,7 +2272,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private async recordedAnswer(
     number: number,
-    handler: Promise<unknown>,
+    handler: Promise<ToolResultLike>,
     owner: InstanceBatch,
     rawParts: () => BatchAnswer['raw'],
     otherKind: () => ServerRefusal | undefined,
@@ -1990,10 +2282,8 @@ export abstract class BaseMcpServer extends McpServer {
       const result = await handler;
       const refused = otherKind();
       if (refused !== undefined) throw refused;
-      const content = normalizeToolContent(result) as BatchAnswer['content'];
-      answer = (result as ToolResultLike | undefined)?.isError
-        ? { content, isError: true }
-        : { content };
+      const content = normalizeToolContent(result);
+      answer = isErrorResult(result) ? { content, isError: true } : { content };
     } catch (error) {
       answer = this.refusalAnswer(otherKind() ?? error);
     }
@@ -2011,9 +2301,8 @@ export abstract class BaseMcpServer extends McpServer {
    * reader, else `return_error`.
    */
   private async runConnectionless(
-    handler: ToolHandler,
-    group: unknown,
-    args: unknown,
+    call: HandlerEntry['call'],
+    args: ToolArgs,
     signal: AbortSignal,
   ): Promise<{
     content: { type: 'text'; text: string }[];
@@ -2021,12 +2310,14 @@ export abstract class BaseMcpServer extends McpServer {
   }> {
     try {
       const context: HandlerContext = {
-        connection: undefined as never,
+        // No connection of the instance: its every member refuses in words.
+        connection: noConnection,
         logger: this.logger,
         state: this.state,
         debugger: () => this.takeDebugger(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
-        ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
+        ...this.searchStrategies(),
+        heldLocks: this.heldLocks,
         ...(this.longSessionPort !== undefined
           ? { longSession: this.longSessionPort }
           : {}),
@@ -2041,36 +2332,29 @@ export abstract class BaseMcpServer extends McpServer {
           : {}),
         ...(this.backgroundRuns !== undefined
           ? {
-              backgroundRuns: backgroundRunTools(this.backgroundRuns, () =>
-                this.backgroundCaller(signal),
+              backgroundRuns: backgroundRunTools(
+                this.backgroundRuns,
+                () => this.backgroundCaller(signal),
+                this.runOwner,
               ),
             }
           : {}),
       };
       const result = await runWithRequestSignal(signal, () => {
         throwIfRequestAborted(signal);
-        return callHandler(handler, group, context, args);
+        return callHandler(call, context, args);
       });
-      const content = normalizeToolContent(result) as {
-        type: 'text';
-        text: string;
-      }[];
-      if ((result as ToolResultLike | undefined)?.isError) {
+      const content = normalizeToolContent(result);
+      if (isErrorResult(result)) {
         return { content, isError: true };
       }
       return { content };
     } catch (error) {
       const read = readGuarded((t) => this.readFailure(t), error);
       if (read !== undefined) {
-        return answerRead(read) as {
-          content: { type: 'text'; text: string }[];
-          isError: true;
-        };
+        return answerRead(read);
       }
-      return return_error(error) as {
-        isError: true;
-        content: { type: 'text'; text: string }[];
-      };
+      return return_error(error);
     }
   }
 
@@ -2081,7 +2365,7 @@ export abstract class BaseMcpServer extends McpServer {
    * fresh-connection operation is without `freshConnection`, before any
    * connection.
    */
-  private backgroundRequested(args: unknown): boolean {
+  private backgroundRequested(args: ToolArgs): boolean {
     const background = readBackground(args);
     if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
     if (background && this.backgroundRuns === undefined) {
@@ -2091,21 +2375,36 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Starts a background run of a run tool (lib's `startBackgroundRun`): the
-   * caller resolved, the run's own connection opened from the call's, the
-   * handler run on it without the call waiting, its answer — as this
-   * wrapper would answer it, an error included — handed to the strategy.
-   * Answers the handle at once; the shutdown refusal once the shutdown or
-   * this instance's close began.
+   * Whether a listed long read runs in the background: its `background`,
+   * `true` by default; refused in fixed words when it is not a boolean. In
+   * the call when the host gave no strategy, and while a batch is open (the
+   * read is recorded; `background: true` there is refused by `recordCall`).
+   */
+  private longReadInBackground(tool: string, args: ToolArgs): boolean {
+    const background = readLongBackground(args);
+    if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
+    if (this.backgroundRuns === undefined) return false;
+    if (this.longToolsInTheCall.has(tool)) return false;
+    if (this.batchOpenFor(tool) && !this.inDebuggerBatch(tool)) return false;
+    return background;
+  }
+
+  /**
+   * Starts a background run (lib's `startBackgroundRun`) — of a run tool, or
+   * of a listed long read: the caller resolved, the run's one connection
+   * opened from the call's, the handler run on it without the call waiting,
+   * its answer — as this wrapper would answer it, an error included —
+   * handed to the strategy. Answers the handle at once; the shutdown
+   * refusal once the shutdown or this instance's close began.
    */
   private async startBackground(
     tool: string,
-    handler: ToolHandler,
-    group: unknown,
+    kind: BackgroundRunKind,
+    call: HandlerEntry['call'],
     context: HandlerContext,
-    args: unknown,
+    args: ToolArgs,
     signal: AbortSignal,
-  ): Promise<unknown> {
+  ): Promise<ToolResultLike> {
     const strategy = this.backgroundRuns;
     if (strategy === undefined) {
       throw new ServerRefusal('background_runs_unavailable');
@@ -2120,18 +2419,15 @@ export abstract class BaseMcpServer extends McpServer {
       strategy,
       caller,
       tool,
-      object: backgroundObjectOf(args),
+      kind,
+      object: kind === 'read' ? readObjectOf(args) : backgroundObjectOf(args),
       instance: this,
       connection: context.connection,
       logger: this.logger,
       track: (own) => this.trackRun(own),
+      register: (handle, control) => this.runOwner.register(handle, control),
       run: (own) =>
-        this.backgroundAnswer(
-          handler,
-          group,
-          { ...context, connection: own },
-          args,
-        ),
+        this.backgroundAnswer(call, { ...context, connection: own }, args),
     });
     if (started === undefined) return shutdownRefusalAnswer();
     return answerBackgroundStarted(started);
@@ -2177,39 +2473,34 @@ export abstract class BaseMcpServer extends McpServer {
    * call that started it ends long before, and nothing of it reaches here.
    */
   private async backgroundAnswer(
-    handler: ToolHandler,
-    group: unknown,
+    call: HandlerEntry['call'],
     context: HandlerContext,
-    args: unknown,
+    args: ToolArgs,
   ): Promise<BackgroundRunAnswer> {
     try {
       const result = await runWithRequestSignal(
         new AbortController().signal,
-        () => callHandler(handler, group, context, args),
+        () => callHandler(call, context, args),
       );
-      const content = normalizeToolContent(result) as {
-        type: 'text';
-        text: string;
-      }[];
-      return (result as ToolResultLike | undefined)?.isError
-        ? { content, isError: true }
-        : { content };
+      const content = normalizeToolContent(result);
+      return isErrorResult(result) ? { content, isError: true } : { content };
     } catch (error) {
       const read = readGuarded((t) => this.readFailure(t), error);
       if (read !== undefined) {
-        return answerRead(read) as BackgroundRunAnswer;
+        return answerRead(read);
       }
-      return return_error(error) as BackgroundRunAnswer;
+      return return_error(error);
     }
   }
 
   /**
-   * Who calls, for the background runs: the destination (URL, client) and
+   * Who calls, for the background runs: the system (its key), the client and
    * the user its parameters name (`callerUserOf`: the responsible the rules
    * made with the connection — the system's user, else on-premise the
    * stated responsible, else the login), else the stated responsible, else
    * the login (`SAP_USERNAME`, `x-sap-login`), upper case. An injected
-   * connection names its URL. A user that cannot be determined is refused
+   * connection's system is its URL, else the `system` its host states;
+   * with neither, background runs are refused. A user that cannot be determined is refused
    * (`system_user_unknown`): a run is kept only for a known caller.
    */
   protected async backgroundCaller(
@@ -2222,24 +2513,36 @@ export abstract class BaseMcpServer extends McpServer {
     if (context.kind === 'injected') {
       const connection = context.connection;
       const url = await connection.getBaseUrl();
+      // A connection without a URL (RFC) is identified by the system its
+      // host states; with neither, no run is kept.
+      const system =
+        url === undefined
+          ? context.system
+          : JSON.stringify(['http', withoutTrailingSlashes(url.trim()), '']);
+      if (system === undefined) {
+        throw new ServerRefusal(
+          'background_runs_unavailable',
+          BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+        );
+      }
       const named = await this.callerUserOf(signal, () =>
         this.systems.get(connection),
       );
       const stated = statedCallOf(connection, this.systemType);
       return {
-        url: withoutTrailingSlashes(url.trim()),
+        system,
         client: '',
         user: callerUser(named, stated.responsible ?? stated.login),
       };
     }
     const resolved = await this.resolveCaller(signal);
-    const url = withoutTrailingSlashes((resolved.settings.url ?? '').trim());
+    const system = targetOf(resolved.settings);
     const client = (resolved.settings.client ?? '').trim();
     const named = await this.callerUserOf(signal, () =>
       this.destinationSystem(resolved.credential, targetOf(resolved.settings)),
     );
     return {
-      url,
+      system,
       client,
       user: callerUser(
         named,
@@ -2433,26 +2736,29 @@ export abstract class BaseMcpServer extends McpServer {
   private trackCall<T>(
     name: string,
     run: (signal: AbortSignal) => Promise<T>,
-  ): Promise<T> {
+  ): Promise<T | FailureAnswer> {
     const controller = new AbortController();
     const unregister = registerActiveTool(controller, {
       instance: this,
       name,
     });
     if (unregister === undefined) {
-      return Promise.resolve(shutdownRefusalAnswer() as T);
+      return Promise.resolve(shutdownRefusalAnswer());
     }
     this.state.callStarted();
     const call = runAsOwner(this, () => run(controller.signal));
-    this.inFlight.add(call);
-    call
+    const settled: Promise<void> = call
       .finally(() => {
         controller.abort();
         unregister();
-        this.inFlight.delete(call);
+        this.inFlight.delete(settled);
         this.state.callEnded();
       })
-      .catch(() => undefined); // the caller answers the failure; nothing rejects unhandled
+      .then(
+        () => undefined,
+        () => undefined, // the caller answers the failure; nothing rejects unhandled
+      );
+    this.inFlight.add(settled);
     return call;
   }
 
@@ -2481,8 +2787,11 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private trackingRegistrations(): McpServer {
     const track =
-      (name: string, callback: (...callbackArgs: unknown[]) => unknown) =>
-      (...callbackArgs: unknown[]) => {
+      (
+        name: string,
+        callback: RegisteredToolCallback,
+      ): RegisteredToolCallback =>
+      (...callbackArgs) => {
         return this.trackCall(name, async (signal) => {
           // The SDK passes `extra` last: `(args, extra)` or `(extra)`. The
           // callback sees the call's own signal there — the session's end —
@@ -2493,7 +2802,7 @@ export abstract class BaseMcpServer extends McpServer {
               ? [...callbackArgs.slice(0, -1), { ...last, signal }]
               : callbackArgs;
           let leaveFlow: (() => void) | undefined;
-          let inUse: AbapConnection | undefined;
+          let inUse: IAbapConnection | undefined;
           try {
             throwIfRequestAborted(signal);
             // Every call takes its turn, whatever its name or arguments: a
@@ -2551,21 +2860,27 @@ export abstract class BaseMcpServer extends McpServer {
           }
         });
       };
-    const wrapLast = (registerArgs: unknown[]): unknown[] => {
+    const wrapLast = (
+      registerArgs: readonly RegistrationArg[],
+    ): readonly RegistrationArg[] => {
       const last = registerArgs[registerArgs.length - 1];
       const name =
         typeof registerArgs[0] === 'string' ? registerArgs[0] : 'a tool';
       return typeof last === 'function'
         ? [
             ...registerArgs.slice(0, -1),
-            track(name, last as (...callbackArgs: unknown[]) => unknown),
+            track(name, (...callbackArgs: unknown[]): unknown =>
+              Reflect.apply(last, undefined, callbackArgs),
+            ),
           ]
         : registerArgs;
     };
     // A registry's own tool runs outside batch mode: where the instance has
     // a batch owner, its description says so (spec §3) — the same rule as a
     // handler group's tools the eligibility table does not list.
-    const described = (registerArgs: unknown[]): unknown[] => {
+    const described = (
+      registerArgs: readonly RegistrationArg[],
+    ): readonly RegistrationArg[] => {
       if (this.batch === undefined) return registerArgs;
       const name = registerArgs[0];
       if (typeof name !== 'string' || runsBesideBatch(name))
@@ -2580,18 +2895,13 @@ export abstract class BaseMcpServer extends McpServer {
         // `tool(name, description, …)`.
         return [name, appended(second), ...registerArgs.slice(2)];
       }
-      if (
-        second !== null &&
-        typeof second === 'object' &&
-        typeof second !== 'function'
-      ) {
+      if (typeof second === 'object') {
         // `registerTool(name, config, callback)`.
-        const config = second as { description?: unknown };
-        const description =
-          typeof config.description === 'string' ? config.description : '';
+        const given = 'description' in second ? second.description : undefined;
+        const description = typeof given === 'string' ? given : '';
         return [
           name,
-          { ...config, description: appended(description) },
+          { ...second, description: appended(description) },
           ...registerArgs.slice(2),
         ];
       }
@@ -2600,16 +2910,26 @@ export abstract class BaseMcpServer extends McpServer {
     return new Proxy(this, {
       get: (target, property) => {
         if (property === 'registerTool' || property === 'tool') {
-          const register = Reflect.get(target, property) as (
-            ...registerArgs: unknown[]
-          ) => unknown;
+          const register = target[property];
           // Its search texts are attached whatever the batch owner, in
           // either form (`registerTool` or `tool`), once it is registered.
-          return (...registerArgs: unknown[]) =>
-            withSearchMeta(
+          const registerTracked: RegisteredToolCallback = (...registerArgs) => {
+            // Read once: the SDK's forms take strings and objects (a config,
+            // a schema, annotations, the callback); a call holding anything
+            // else is passed on as it came.
+            const registration = registrationOf(registerArgs);
+            return withSearchMeta(
               registerArgs[0],
-              register.apply(target, wrapLast(described(registerArgs))),
+              Reflect.apply(
+                register,
+                target,
+                registration === undefined
+                  ? registerArgs
+                  : wrapLast(described(registration)),
+              ),
             );
+          };
+          return registerTracked;
         }
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;
@@ -2619,44 +2939,15 @@ export abstract class BaseMcpServer extends McpServer {
 }
 
 /**
- * Calls a group's handler with `context`: one that takes `(context, args)`
- * directly, an older one that reads its group's context after it was set.
+ * Calls an entry's handler with `context`, in the call's own transport
+ * request scope (the failure renderer's transport hint, `callTransport.ts`).
  */
 function callHandler(
-  handler: ToolHandler,
-  group: unknown,
+  call: HandlerEntry['call'],
   context: HandlerContext,
-  args: unknown,
-): Promise<unknown> {
-  // The call's own transport request, for the failure renderer's transport
-  // hint (`callTransport.ts`).
-  return runWithCallTransport(args, () =>
-    callInItsForm(handler, context, args, inGroupContextOf(group)),
-  );
-}
-
-/**
- * How a server instance gives an args-only handler the call's context: its
- * group's context set before the call (`setContext` when the group has one),
- * left as the call set it.
- */
-function inGroupContextOf(group: unknown): InGroupContext {
-  return (context, call) => {
-    const contextAwareGroup = group as Partial<{
-      setContext: (ctx: HandlerContext) => void;
-      context: HandlerContext;
-    }>;
-    try {
-      if (typeof contextAwareGroup.setContext === 'function') {
-        contextAwareGroup.setContext(context);
-      } else {
-        contextAwareGroup.context = context;
-      }
-    } catch {
-      // ignore if group doesn't expose context setter
-    }
-    return call();
-  };
+  args: ToolArgs,
+): Promise<ToolResultLike> {
+  return runWithCallTransport(args, () => call(context, args));
 }
 
 /**
@@ -2664,13 +2955,10 @@ function inGroupContextOf(group: unknown): InGroupContext {
  * connection says it is no longer connected (connection 16: a lost session
  * spends the instance). Such a connection is replaced, never reused.
  */
-function isSpent(connection: AbapConnection): boolean {
+function isSpent(connection: IAbapConnection): boolean {
   if (isEnded(connection)) return true;
-  const aware = connection as { isConnected?: () => boolean };
   try {
-    return typeof aware.isConnected === 'function'
-      ? aware.isConnected() === false
-      : false;
+    return connection.isConnected?.() === false;
   } catch {
     return false;
   }
@@ -2754,15 +3042,8 @@ interface Destination {
   responsible: string | undefined;
 }
 
-/**
- * The target system settings point at, as a key: the URL (no trailing
- * slash), the client and the wire.
- */
-function targetOf(settings: {
-  url?: string;
-  client?: string;
-  connectionType?: string;
-}): string {
+/** The target system settings point at, as a key (`adtSystemKey`). */
+function targetOf(settings: SapConfig): string {
   return adtSystemKey(settings);
 }
 
@@ -2782,6 +3063,36 @@ const stderrLogger: Logger = {
 };
 
 /**
+ * An argument of a tool's registration, as the SDK's forms take them
+ * (`registerTool(name, config, callback)`, `tool(name, …, callback)`): a
+ * string, or an object — a config, a schema, annotations, the callback.
+ */
+type RegistrationArg = string | object;
+
+/**
+ * A tool callback a registry registered, as the MCP SDK calls it: what it is
+ * handed — the SDK's arguments and `extra`, the call's own signal in it — goes
+ * on to the callback the registry gave the SDK, and is read by nothing here.
+ */
+type RegisteredToolCallback = (...callbackArgs: unknown[]) => unknown;
+
+/**
+ * The registration's arguments read once at the registry's proxy, which the
+ * compiler sees untyped: each a string or an object, else `undefined`.
+ */
+function registrationOf(
+  args: readonly unknown[],
+): RegistrationArg[] | undefined {
+  const read: RegistrationArg[] = [];
+  for (const arg of args) {
+    if (typeof arg === 'string' || typeof arg === 'function') read.push(arg);
+    else if (typeof arg === 'object' && arg !== null) read.push(arg);
+    else return undefined;
+  }
+  return read;
+}
+
+/**
  * A registry's own registered tool, given the `_meta` its name has in the
  * search table (merged into what it carries); a tool the table does not name,
  * or a registration that answered no updatable tool, is left as it is.
@@ -2789,13 +3100,24 @@ const stderrLogger: Logger = {
 function withSearchMeta(name: unknown, registered: unknown): unknown {
   if (typeof name !== 'string') return registered;
   const search = searchMeta(name)._meta;
-  if (search === undefined || registered === null) return registered;
-  if (typeof registered !== 'object') return registered;
-  const tool = registered as {
-    _meta?: Record<string, unknown>;
-    update?: (updates: { _meta?: Record<string, unknown> }) => void;
-  };
-  if (typeof tool.update !== 'function') return registered;
-  tool.update({ _meta: { ...tool._meta, ...search } });
+  if (
+    search === undefined ||
+    typeof registered !== 'object' ||
+    registered === null ||
+    !('update' in registered)
+  ) {
+    return registered;
+  }
+  const update = registered.update;
+  if (typeof update !== 'function') return registered;
+  const meta = '_meta' in registered ? registered._meta : undefined;
+  update.call(registered, {
+    _meta: {
+      ...(typeof meta === 'object' && meta !== null && !Array.isArray(meta)
+        ? meta
+        : {}),
+      ...search,
+    },
+  });
   return registered;
 }

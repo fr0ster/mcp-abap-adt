@@ -20,6 +20,7 @@
  * - Inside a call recorded in batch mode (`BatchBegin` … `BatchEnd`) the call
  *   is made once: a `406`/`415` part is that call's answer.
  */
+
 import {
   extractSupportedAccept,
   extractSupportedContentType,
@@ -46,7 +47,8 @@ function readSafely(value: unknown, key: string): unknown {
     return undefined;
   }
   try {
-    return (value as Record<string, unknown>)[key];
+    const read: unknown = Reflect.get(value, key);
+    return read;
   } catch {
     return undefined;
   }
@@ -92,9 +94,10 @@ export function correctedPair(
 
 /**
  * The failure a member's answer carries (`ok: false`, `getError()`), else
- * `undefined`.
+ * `undefined`. The answer is whatever the wrapped member answers, of the
+ * call's own type: read through `readSafely`, as a value of any shape.
  */
-function failureOfAnswer(answer: unknown): unknown {
+function failureOfAnswer<T>(answer: T): unknown {
   if (readSafely(answer, 'ok') !== false) return undefined;
   const getError = readSafely(answer, 'getError');
   if (typeof getError !== 'function') return undefined;
@@ -139,21 +142,28 @@ export async function withAdtHeaders<T>(
   const scope = adtCallScope.getStore();
   if (scope?.recorded === true) return call(headers);
   if (scope?.phase !== undefined) {
+    // The call made again with the corrected pair, once the phase made it.
+    const again: { redone: Promise<T> | undefined } = { redone: undefined };
     const invocation: HeaderInvocation = {
       operation,
       sent: headers,
       port,
-      call: (pair) => call(pair),
+      redo: (pair) => {
+        const redone = call(pair);
+        // Read below, as the call's answer; never unhandled here.
+        redone.catch(() => undefined);
+        again.redone = redone;
+        return redone.then(noop, noop);
+      },
       parts: 0,
-      redone: undefined,
     };
     const first = await settle(() =>
       adtCallScope.run({ ...scope, invocation }, () => call(headers)),
     );
     // The phase recorded it again with the corrected pair: that is the
     // call's answer.
-    if (invocation.redone !== undefined) {
-      return (await invocation.redone) as T;
+    if (again.redone !== undefined) {
+      return await again.redone;
     }
     // Recorded nothing in the phase (sent on another connection): corrected
     // here, as outside a phase.
@@ -164,6 +174,8 @@ export async function withAdtHeaders<T>(
   const first = await settle(() => call(headers));
   return correctOnce(port, operation, headers, first, call);
 }
+
+function noop(): void {}
 
 async function correctOnce<T>(
   port: AdtHeaderPort | undefined,
@@ -176,13 +188,4 @@ async function correctOnce<T>(
   if (corrected === undefined) return unwrap(first);
   port?.remember(operation, corrected);
   return call(corrected);
-}
-
-/**
- * The header pairs a value carries as a call's context (`adtHeaders`), read
- * safely: what a debug session bound to a call's context sends with.
- */
-export function adtHeadersOf(origin: unknown): AdtHeadersContext {
-  const port = readSafely(origin, 'adtHeaders') as AdtHeaderPort | undefined;
-  return port === undefined ? {} : { adtHeaders: port };
 }

@@ -51,30 +51,34 @@
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */
 
-import type { ChildProcess } from 'node:child_process';
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-} from '@modelcontextprotocol/sdk/client/stdio.js';
-import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { describe, it } from 'node:test';
+import { patchDomainDocument } from '@mcp-abap-adt/adt-clients';
+import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   assertNotSharedDependency,
   getEnabledTestCase,
-  getTimeout,
   loadTestConfig,
   resolvePackageName,
   resolveTransportRequest,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
+import { stderrTail } from '../helpers/failureText';
+import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
+import {
+  launchStdioScript,
+  testConnectionLogOn,
+} from '../helpers/testers/hardMode';
 
 const testLogger = createTestLogger('communication-batch');
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const MARKER = 'batch-communication-live';
 
 type Content = Array<{ type: string; text?: string }>;
@@ -193,7 +197,7 @@ async function serve(kind: Kind): Promise<Served> {
     process.env.MCP_UNSAFE === 'true' ||
     cfg?.auth_broker?.unsafe === true ||
     cfg?.auth_broker?.unsafe_session_store === true;
-  const envName = String(cfg.environment.env);
+  const envName = String(cfg.environment?.env);
   const args = [
     path.join(REPO, 'node_modules/tsx/dist/cli.mjs'),
     '--tsconfig',
@@ -207,6 +211,9 @@ async function serve(kind: Kind): Promise<Served> {
     /[\\/]/.test(envName) || envName.startsWith('.') || envName.startsWith('~')
       ? `--env-path=${path.resolve(envName)}`
       : `--env=${envName}`,
+    // The kind is stated, never read from credentials: a cloud session
+    // file need not name one, and the server refuses to start without it.
+    `--system-type=${kind === 'cloud' ? 'cloud' : 'onprem'}`,
     `--connection-type=${kind === 'onprem-rfc' ? 'rfc' : 'http'}`,
   );
 
@@ -225,45 +232,34 @@ async function serve(kind: Kind): Promise<Served> {
     }
   }
 
-  const transport = new StdioClientTransport({
-    command: process.execPath,
-    args,
-    cwd: REPO,
-    env,
-    stderr: 'pipe',
-  });
-  const tail: string[] = [];
-  transport.stderr?.on('data', (chunk: Buffer) => {
-    tail.push(...chunk.toString('utf8').split('\n'));
-    if (tail.length > 200) tail.splice(0, tail.length - 200);
-  });
-  const client = new Client({ name: 'communication-batch', version: '1.0.0' });
+  // Guarded: the parent logs on first, and every answer is read for a
+  // credential refusal (launchStdioScript); no SDK client, no timer.
+  let server: Awaited<ReturnType<typeof launchStdioScript>>;
   try {
-    await client.connect(transport);
+    server = await launchStdioScript({
+      argv: [args[0] ?? '', ...args.slice(1)],
+      env,
+      logOn: testConnectionLogOn,
+    });
   } catch (error) {
     fs.rmSync(dir, { recursive: true, force: true });
-    throw new Error(
-      `the server did not start (${String(error)}):\n${tail.join('\n')}`,
-    );
+    throw new Error(`the server did not start: ${String(error)}`);
   }
-  const child = (transport as unknown as { _process?: ChildProcess })._process;
+  const child = server.child;
   if (child === undefined) throw new Error('the server process did not start');
-  const exited = new Promise<number | null>((resolve) => {
-    child.once('exit', (code) => resolve(code));
-  });
+  // Its stderr for a failure, the configuration banner left out.
+  const tail = stderrTail(child);
 
   return {
-    call: async (name, callArgs = {}) =>
-      (await client.callTool({ name, arguments: callArgs })) as Answer,
+    call: (name, callArgs = {}) => server.call(name, callArgs),
     stop: async () => {
       // stdin's end is the shutdown's trigger: every session logged off, then exit.
-      child.stdin?.end();
-      const code = await exited;
-      await client.close().catch(() => undefined);
+      const code = await child.end();
+      await server.close();
       fs.rmSync(dir, { recursive: true, force: true });
       return code;
     },
-    stderrTail: () => tail.join('\n'),
+    stderrTail: () => tail.text(),
   };
 }
 
@@ -290,7 +286,7 @@ async function phase(
   const begun = payloadOf(
     await served.call('HandlerBatch', { action: 'begin' }),
   );
-  expect(begun?.batch).toBe('on');
+  assert.equal(begun?.batch, 'on');
   const started = process.hrtime.bigint();
   for (const { tool, args } of calls) {
     const recorded = await served.call(tool, args);
@@ -324,12 +320,15 @@ async function phase(
       `received=${JSON.stringify(summary.received ?? null)}`,
     ].join('\t')}\n`,
   );
-  expect(ended.isError).not.toBe(true);
-  expect(summary.recorded).toBe(calls.length);
+  assert.notEqual(ended.isError, true);
+  assert.equal(summary.recorded, calls.length);
   // Every call sends one request at least; every part came.
-  expect(summary.sent).toBeGreaterThanOrEqual(calls.length);
-  expect(summary.received).toBe(summary.sent);
-  expect(entries.map((entry) => entry.number)).toEqual(numbers);
+  assert.ok(summary.sent >= calls.length);
+  assert.equal(summary.received, summary.sent);
+  assertEquals(
+    entries.map((entry) => entry.number),
+    numbers,
+  );
   return { summary, entries, recordMs, endMs };
 }
 
@@ -458,12 +457,18 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
       documentRead,
     );
     const document = payloadOf(documentRead.entries[0])?.metadata;
-    expect(typeof document).toBe('string');
-    const domainDocument = patchDomainXml(String(document), {
+    assert.equal(typeof document, 'string');
+    const patchedDomain = patchDomainDocument(String(document), {
       description: `Batch live domain ${MARKER}`,
-      datatype: 'CHAR',
+      dataType: 'CHAR',
       length: 10,
     });
+    if (!patchedDomain.ok) {
+      throw new Error(
+        `The domain document was not patched: ${JSON.stringify(patchedDomain.refusal)}`,
+      );
+    }
+    const domainDocument = patchedDomain.document;
 
     // 4. Lock.
     const lockCalls = objects.map((object) => ({
@@ -482,7 +487,7 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
       }
     }
     expectAllAnswered('lock', lockCalls, lock);
-    expect(held.size).toBe(objects.length);
+    assert.equal(held.size, objects.length);
     const handleOf = (object: TestObject) => held.get(object.name) as string;
 
     // 5. Write under the locks.
@@ -552,12 +557,14 @@ async function runOn(kind: Kind, testCase: any): Promise<void> {
       const object = objects[entry.number - 1] as TestObject;
       const body = payloadOf(entry);
       if (object.type === 'DOMAIN') {
-        expect(String(body?.metadata)).toContain(MARKER);
-        expect(String(body?.metadata)).toContain(
-          '<doma:datatype>CHAR</doma:datatype>',
+        assert.ok(String(body?.metadata).includes(MARKER));
+        assert.ok(
+          String(body?.metadata).includes(
+            '<doma:datatype>CHAR</doma:datatype>',
+          ),
         );
       } else {
-        expect(String(body?.source)).toContain(MARKER);
+        assert.ok(String(body?.source).includes(MARKER));
       }
     }
   } catch (error) {
@@ -666,32 +673,26 @@ async function cleanUp(
 describe('the communication batch through the served compact tools, on the system the test config names', () => {
   const kinds: Kind[] = ['onprem-http', 'onprem-rfc', 'cloud'];
   for (const kind of kinds) {
-    it(
-      `${KIND_WORDS[kind]}: reads, create, lock, write, unlock, activate, each a batch; answers per number; every object deleted`,
-      async () => {
-        const configured = configuredKind();
-        if (typeof configured !== 'string') {
-          testLogger?.info(
-            `⏭️  Skipping ${KIND_WORDS[kind]}: ${configured.reason}`,
-          );
-          return;
-        }
-        if (configured !== kind) {
-          testLogger?.info(
-            `⏭️  Skipping ${KIND_WORDS[kind]}: the test config names ${KIND_WORDS[configured]}; this case runs only there`,
-          );
-          return;
-        }
-        const testCase = getEnabledTestCase('batch', 'communication');
-        if (!testCase) {
-          testLogger?.info(
-            `⏭️  Skipping ${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
-          );
-          return;
-        }
-        await runOn(kind, testCase);
-      },
-      getTimeout('long'),
-    );
+    it(`${KIND_WORDS[kind]}: reads, create, lock, write, unlock, activate, each a batch; answers per number; every object deleted`, async () => {
+      const configured = configuredKind();
+      if (typeof configured !== 'string') {
+        skipRunningTest(`${KIND_WORDS[kind]}: ${configured.reason}`);
+        return;
+      }
+      if (configured !== kind) {
+        skipRunningTest(
+          `${KIND_WORDS[kind]}: the test config names ${KIND_WORDS[configured]}; this case runs only there`,
+        );
+        return;
+      }
+      const testCase = getEnabledTestCase('batch', 'communication');
+      if (!testCase) {
+        skipRunningTest(
+          `${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
+        );
+        return;
+      }
+      await runOn(kind, testCase);
+    });
   }
 });

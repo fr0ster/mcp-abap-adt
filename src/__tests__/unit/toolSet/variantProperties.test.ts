@@ -9,6 +9,7 @@
  * (`TYPE(arg*, …)`) are held to the same takes.
  */
 
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
@@ -96,7 +97,14 @@ async function listed(
   variant: ServerVariant,
 ): Promise<readonly Listed[]> {
   process.env.SAP_SYSTEM_TYPE = variant;
-  const server = new StdioServer(registryOf(set, 'stdio'), undefined);
+  // As the launcher builds it: every set keeps background runs.
+  const server = new StdioServer(
+    registryOf(set, 'stdio', { dataTools: true }),
+    undefined,
+    {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-properties', version: '1' });

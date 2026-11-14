@@ -11,12 +11,21 @@
  * Run: npm test -- --testPathPattern=integration/readOnly/system/SqlQuery
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
+import * as z from 'zod';
 import { handleGetSqlQuery } from '../../../../handlers/system/readonly/handleGetSqlQuery';
-import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+
+/** What this file's cases state, as its tests read them. */
+const SqlQueryParams = z.looseObject({
+  test_row_number: z.number().optional(),
+  test_sql_query: z.string().optional(),
+});
 
 function extractResultData(result: any): any {
   const textContent = result.content.find((c: any) => c.type === 'text') as any;
@@ -30,7 +39,7 @@ describe('GetSqlQuery Handler Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('sql-query-test');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'get_sql_query',
       'simple_select',
@@ -44,81 +53,78 @@ describe('GetSqlQuery Handler Integration', () => {
         // No cleanup needed for read-only handler
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {
       logger?.info('Test suite cleanup complete');
     });
   });
 
-  it(
-    'should execute SQL query and return results',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params } = context;
-        const sqlQuery =
-          params?.test_sql_query || 'SELECT MANDT, MTEXT FROM T000';
-        const rowNumber = params?.test_row_number || 10;
+  it('should execute SQL query and return results', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
+      const params = readCaseParams(
+        context.params,
+        SqlQueryParams,
+        'get_sql_query',
+      );
+      const sqlQuery =
+        params?.test_sql_query || 'SELECT MANDT, MTEXT FROM T000';
+      const rowNumber = params?.test_row_number || 10;
 
-        logger?.info(`Executing SQL query: ${sqlQuery}`);
+      logger?.info(`Executing SQL query: ${sqlQuery}`);
 
-        const result = await tester.invokeToolOrHandler(
-          'GetSqlQuery',
-          { sql_query: sqlQuery, row_number: rowNumber },
-          async () => {
-            const handlerContext = createHandlerContext({ connection, logger });
-            return handleGetSqlQuery(handlerContext, {
-              sql_query: sqlQuery,
-              row_number: rowNumber,
-            });
-          },
-        );
+      const result = await tester.invokeToolOrHandler(
+        'GetSqlQuery',
+        { sql_query: sqlQuery, row_number: rowNumber },
+        async () => {
+          const handlerContext = createHandlerContext({ connection, logger });
+          return handleGetSqlQuery(handlerContext, {
+            sql_query: sqlQuery,
+            row_number: rowNumber,
+          });
+        },
+      );
 
-        expect(result.isError).toBe(false);
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
+      assert.equal(result.isError, false);
+      assert.ok(result.content !== undefined);
+      assert.ok(result.content.length > 0);
 
-        const data = extractResultData(result);
-        expect(data.sql_query).toBe(sqlQuery);
-        expect(data.columns).toBeDefined();
-        expect(Array.isArray(data.columns)).toBe(true);
-        expect(data.columns.length).toBeGreaterThan(0);
-        expect(data.rows).toBeDefined();
-        expect(Array.isArray(data.rows)).toBe(true);
+      const data = extractResultData(result);
+      assert.equal(data.sql_query, sqlQuery);
+      assert.ok(data.columns !== undefined);
+      assert.equal(Array.isArray(data.columns), true);
+      assert.ok(data.columns.length > 0);
+      assert.ok(data.rows !== undefined);
+      assert.equal(Array.isArray(data.rows), true);
 
-        logger?.info(
-          `Query returned ${data.rows.length} rows, ${data.columns.length} columns`,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+      logger?.info(
+        `Query returned ${data.rows.length} rows, ${data.columns.length} columns`,
+      );
+    });
+  });
 
-  it(
-    'should handle missing sql_query parameter',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection } = context;
+  it('should handle missing sql_query parameter', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
 
-        logger?.info('Testing error handling: missing sql_query');
+      logger?.info('Testing error handling: missing sql_query');
 
-        const result = await tester.invokeToolOrHandler(
-          'GetSqlQuery',
-          { sql_query: '' },
-          async () => {
-            const handlerContext = createHandlerContext({ connection, logger });
-            return handleGetSqlQuery(handlerContext, { sql_query: '' });
-          },
-        );
+      const result = await tester.invokeToolOrHandler(
+        'GetSqlQuery',
+        { sql_query: '' },
+        async () => {
+          const handlerContext = createHandlerContext({ connection, logger });
+          return handleGetSqlQuery(handlerContext, { sql_query: '' });
+        },
+      );
 
-        expect(result.isError).toBe(true);
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
+      assert.equal(result.isError, true);
+      assert.ok(result.content !== undefined);
+      assert.ok(result.content.length > 0);
 
-        logger?.info('Error handling validated: missing sql_query');
-      });
-    },
-    getTimeout('default'),
-  );
+      logger?.info('Error handling validated: missing sql_query');
+    });
+  });
 });

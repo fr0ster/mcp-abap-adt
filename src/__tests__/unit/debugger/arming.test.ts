@@ -1,5 +1,4 @@
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   definitionKey,
   mergeDefinitions,
@@ -8,6 +7,7 @@ import {
   wireOf,
 } from '../../../lib/debugger/arming';
 import { readBreakpoints } from '../../../lib/debugger/readings';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { rowsXml } from './fakes';
 
 type LineBreakpoint = Extract<IDebuggerBreakpoint, { kind: 'line' }>;

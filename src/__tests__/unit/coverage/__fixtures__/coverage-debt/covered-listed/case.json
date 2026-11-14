@@ -1,0 +1,4 @@
+{
+  "expect": "debt-covered",
+  "debt": ["GetThing"]
+}

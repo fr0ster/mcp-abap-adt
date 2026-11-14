@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Over real HTTP, every request its own MCP session: the pool keeps the
  * instance that holds state, routes its handle back to it, leases it to one
@@ -16,6 +17,7 @@ import type { InstanceState, StatePart } from '@mcp-abap-adt/lib/state';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { clientTransport } from '../../../../src/__tests__/helpers/clientTransport';
 import { withSystemInformation } from '../../../../src/__tests__/helpers/systemInformationStandIn';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
@@ -79,18 +81,14 @@ let gateEntered = gate();
 type Ctx = { state: InstanceState };
 type Args = { state_handle?: string };
 const text = (t: string) => ({ content: [{ type: 'text', text: t }] });
-const withHandle = {
-  type: 'object',
-  properties: { state_handle: { type: 'string', description: 'h' } },
-  required: ['state_handle'],
-};
+const withHandle = z.object({ state_handle: z.string().describe('h') });
 const tool = (
   name: string,
-  inputSchema: object,
+  inputSchema: z.ZodObject,
   handler: (ctx: Ctx, args: Args) => Promise<unknown>,
 ): HandlerEntry => ({
   toolDefinition: { name, description: 'probe', inputSchema } as never,
-  handler: handler as never,
+  call: handler as never,
 });
 
 const probes = new CompositeHandlersRegistry([
@@ -98,14 +96,10 @@ const probes = new CompositeHandlersRegistry([
     getName: () => 'pool-probes',
     registerHandlers: () => {},
     getHandlers: () => [
-      tool(
-        'PoolProbeHold',
-        { type: 'object', properties: {} },
-        async (ctx, _args) => {
-          partOf(ctx.state).set(true);
-          return text(JSON.stringify({ state_handle: ctx.state.handle }));
-        },
-      ),
+      tool('PoolProbeHold', z.object({}), async (ctx, _args) => {
+        partOf(ctx.state).set(true);
+        return text(JSON.stringify({ state_handle: ctx.state.handle }));
+      }),
       tool('PoolProbeEcho', withHandle, async (ctx, args) => {
         ctx.state.check(args.state_handle);
         return text(ctx.state.handle);
@@ -177,11 +171,16 @@ describe.each([
     async function call(name: string, args: Args = {}, signal?: AbortSignal) {
       const transport = new StreamableHTTPClientTransport(url, {
         requestInit: { headers: CREDENTIALS },
-        fetch: (input, init) =>
-          fetch(input, { ...init, signal: signal ?? init?.signal }),
+        fetch: (input, init) => {
+          const own = signal ?? init?.signal;
+          return fetch(input, {
+            ...init,
+            ...(own !== undefined && { signal: own }),
+          });
+        },
       });
       const client = new Client({ name: 'pool-test', version: '1.0.0' });
-      await client.connect(transport);
+      await client.connect(clientTransport(transport));
       try {
         const result = (await client.callTool({ name, arguments: args })) as {
           content: Array<{ text: string }>;
@@ -290,7 +289,7 @@ describe.each([
         },
       });
       const client = new Client({ name: 'pool-test', version: '1.0.0' });
-      await client.connect(transport);
+      await client.connect(clientTransport(transport));
       try {
         const result = (await client.callTool({ name, arguments: args })) as {
           content: Array<{ text: string }>;
@@ -456,7 +455,7 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
       requestInit: { headers },
     });
     const client = new Client({ name: 'pool-test', version: '1.0.0' });
-    await client.connect(transport);
+    await client.connect(clientTransport(transport));
     try {
       const result = (await client.callTool({ name, arguments: args })) as {
         content: Array<{ text: string }>;

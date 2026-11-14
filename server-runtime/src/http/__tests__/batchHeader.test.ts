@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Batch mode over Streamable HTTP (spec §2, "How each transport reaches
  * it"): every request is an MCP session of its own, so a batch is the pooled
@@ -44,13 +45,10 @@ const echoGroup: IHandlerGroup = {
       toolDefinition: {
         name: 'EchoHandle',
         description: 'answers the handle of the instance it ran on',
-        inputSchema: {
-          type: 'object',
-          properties: { state_handle: { type: 'string' } },
-        },
+        inputSchema: z.object({ state_handle: z.string().optional() }),
       } as never,
       // Two parameters: the registration hands `(context, args)` only then.
-      handler: (async (context: { state: InstanceState }, _args: unknown) => ({
+      call: (async (context: { state: InstanceState }, _args: unknown) => ({
         content: [{ type: 'text', text: context.state.handle }],
       })) as never,
     },

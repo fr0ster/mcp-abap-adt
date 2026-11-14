@@ -1,3 +1,7 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateClass Handler - Create ABAP Class
  *
@@ -11,6 +15,11 @@
  * validate/check/lock/update/unlock/check/activate chain was
  * `AdtClass.create()`'s own internal workflow in adt-clients 18, which v19
  * removed (a member is one request now). Source is `UpdateClass`'s job.
+ *
+ * **No `abstract`.** SAP ignores `class:abstract` on create (measured on
+ * premise: an `abstract="true"` create gave a class that is not abstract,
+ * while `class:final` in the same body was taken), so the tool takes none:
+ * a class is abstract by its source's `ABSTRACT`.
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
@@ -19,7 +28,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -29,62 +38,37 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Class name.',
-      },
-      description: {
-        type: 'string',
-        description: 'Class description (defaults to class_name).',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      superclass: { type: 'string', description: 'Optional superclass name.' },
-      final: {
-        type: 'boolean',
-        description: 'Mark class as final. Default: false',
-      },
-      abstract: {
-        type: 'boolean',
-        description: 'Mark class as abstract. Default: false',
-      },
-      create_protected: {
-        type: 'boolean',
-        description: 'Protected constructor. Default: false',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateClass', {
+    class_name: z.string().describe('Class name.'),
+    description: z
+      .string()
+      .optional()
+      .describe('Class description (defaults to class_name).'),
+    package_name: z.string().describe('Package name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    superclass: z.string().optional().describe('Optional superclass name.'),
+    final: z
+      .boolean()
+      .optional()
+      .describe('Mark class as final. Default: false'),
+    create_protected: z
+      .boolean()
+      .optional()
+      .describe('Protected constructor. Default: false'),
+    master_language: z
+      .string()
+      .optional()
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CreateClassArgs {
-  class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  superclass?: string;
-  final?: boolean;
-  abstract?: boolean;
-  create_protected?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateClass(
   context: HandlerContext,
@@ -115,7 +99,6 @@ export async function handleCreateClass(
               description: args.description || className,
               superclass: args.superclass,
               final: args.final || false,
-              abstract: args.abstract || false,
               createProtected: args.create_protected || false,
               masterLanguage: args.master_language,
             },

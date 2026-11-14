@@ -4,6 +4,7 @@
  * default. The factory gets it in milliseconds.
  */
 
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import { readCoreConfig } from '../../config/coreParameters';
 import { factoryConfigFrom } from '../../launcher';
 import { silentLogger } from '../helpers/factoryFixture';
@@ -11,7 +12,7 @@ import { silentLogger } from '../helpers/factoryFixture';
 const read = (
   argv: string[],
   env: NodeJS.ProcessEnv = {},
-  yaml: Record<string, unknown> | null = null,
+  yaml: YamlConfig | null = null,
 ) => readCoreConfig(argv, env, yaml);
 
 describe('--login-timeout', () => {

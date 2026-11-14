@@ -13,6 +13,9 @@
  * server's clock.
  */
 
+import type { JsonValue } from '../json';
+import { isAsciiDigits } from '../plainText';
+
 /**
  * No idle bound: held state never ends on the server's clock. What stdio
  * states; an instance given it arms no timer.
@@ -37,26 +40,50 @@ export const MAX_STATE_IDLE_MINUTES = Math.floor((2 ** 31 - 1) / 60_000);
  * was given in (`--state-idle-minutes`, the env variable, the YAML key, the
  * option), for the refusal.
  */
-export function parseStateIdleMinutes(raw: unknown, name: string): number {
+/** `-`, then digits, then optionally `.` and digits: a decimal written out, nothing else. */
+function isDecimal(text: string): boolean {
+  const unsigned = text.startsWith('-') ? text.slice(1) : text;
+  const point = unsigned.indexOf('.');
+  if (point === -1) return isAsciiDigits(unsigned);
+  return (
+    isAsciiDigits(unsigned.slice(0, point)) &&
+    isAsciiDigits(unsigned.slice(point + 1))
+  );
+}
+
+export function parseStateIdleMinutes(raw: JsonValue, name: string): number {
   const text = typeof raw === 'string' ? raw.trim() : undefined;
   const value =
     typeof raw === 'number'
       ? raw
-      : text !== undefined && /^-?\d+(\.\d+)?$/.test(text)
+      : text !== undefined && isDecimal(text)
         ? Number(text)
         : Number.NaN;
+  return idleMinutesWithin(value, String(raw), name);
+}
+
+/**
+ * A bound given as a number by a caller's options (`idleMinutes`,
+ * `stateIdleMinutes`): the same range as a written one.
+ */
+export function stateIdleMinutesOf(value: number, name: string): number {
+  return idleMinutesWithin(value, String(value), name);
+}
+
+/** `value` when it is a whole number of minutes in range; `shown` is the value as the refusal quotes it. */
+function idleMinutesWithin(value: number, shown: string, name: string): number {
   if (
     !Number.isFinite(value) ||
     !Number.isInteger(value) ||
     value < MIN_STATE_IDLE_MINUTES
   ) {
     throw new Error(
-      `Invalid ${name}: "${String(raw)}". Must be a whole number of minutes, at least ${MIN_STATE_IDLE_MINUTES}`,
+      `Invalid ${name}: "${shown}". Must be a whole number of minutes, at least ${MIN_STATE_IDLE_MINUTES}`,
     );
   }
   if (value > MAX_STATE_IDLE_MINUTES) {
     throw new Error(
-      `Invalid ${name}: "${String(raw)}". Must be at most ${MAX_STATE_IDLE_MINUTES} minutes, the longest a timer can hold`,
+      `Invalid ${name}: "${shown}". Must be at most ${MAX_STATE_IDLE_MINUTES} minutes, the longest a timer can hold`,
     );
   }
   return value;

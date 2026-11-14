@@ -14,30 +14,41 @@
  * Run: npm test -- --testPathPattern=integration/interface
  */
 
-import { handleCreateInterface } from '../../../../handlers/interface/high/handleCreateInterface';
-import { handleDeleteInterface } from '../../../../handlers/interface/high/handleDeleteInterface';
-import { handleUpdateInterface } from '../../../../handlers/interface/high/handleUpdateInterface';
-import { getTimeout } from '../../helpers/configHelpers';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import {
+  TOOL_DEFINITION as CreateInterfaceTool,
+  handleCreateInterface,
+} from '../../../../handlers/interface/high/handleCreateInterface';
+import {
+  TOOL_DEFINITION as DeleteInterfaceTool,
+  handleDeleteInterface,
+} from '../../../../handlers/interface/high/handleDeleteInterface';
+import {
+  handleUpdateInterface,
+  TOOL_DEFINITION as UpdateInterfaceTool,
+} from '../../../../handlers/interface/high/handleUpdateInterface';
+
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Interface High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_interface',
       'builder_interface',
       'interface-high',
       {
-        create: handleCreateInterface,
-        update: handleUpdateInterface,
-        delete: handleDeleteInterface,
+        create: defineTool(CreateInterfaceTool, handleCreateInterface),
+        update: defineTool(UpdateInterfaceTool, handleUpdateInterface),
+        delete: defineTool(DeleteInterfaceTool, handleDeleteInterface),
       },
     );
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +60,7 @@ describe('Interface High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Interface high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Interface high-level handlers', async () => {
+    await tester.run();
+  });
 });

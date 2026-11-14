@@ -24,10 +24,10 @@ import { handleGetPackageContents } from '../../../handlers/package/readonly/han
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
-import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
+import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import {
   envelopeConnection,
   envelopeResponse as envelopeOf,
@@ -590,7 +590,7 @@ describe('GetPackageContents', () => {
 describe('HandlerGet part contents', () => {
   const contents = (extra: Record<string, unknown>) => ({
     object_type: 'PACKAGE' as const,
-    part: 'contents',
+    part: 'contents' as const,
     ...extra,
   });
 
@@ -1169,7 +1169,9 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
 
 describe('GetObjectsList: the cache', () => {
   it('a list call leaves it as it was; a single call writes it', async () => {
-    const before = { objects: [{ OBJECT_NAME: 'BEFORE' }] };
+    const before = {
+      objects: [{ OBJECT_TYPE: 'PROG/P', OBJECT_NAME: 'BEFORE' }],
+    };
     objectsListCache.setCache(before);
     await withinTurns(
       handleGetObjectsList(contextOn(system()), {

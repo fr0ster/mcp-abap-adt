@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * AddTransportObject — attach an existing object to a request or task.
  *
@@ -22,8 +24,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -32,40 +34,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Adds the existing object named by object_name and object_type to the transport task named by transport_number, so it travels with the task's request.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      transport_number: {
-        type: 'string',
-        description: 'Number of the transport task the object is added to.',
-      },
-      object_name: {
-        type: 'string',
-        description: 'Object name.',
-      },
-      object_type: {
-        type: 'string',
-        description:
-          'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
-      },
-      pgmid: {
-        type: 'string',
-        description: "Program id. Defaults to R3TR, a workbench object's.",
-        default: 'R3TR',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['transport_number', 'object_name', 'object_type'],
-  },
+  inputSchema: z.object({
+    transport_number: z
+      .string()
+      .describe('Number of the transport task the object is added to.'),
+    object_name: z.string().describe('Object name.'),
+    object_type: z
+      .string()
+      .describe(
+        'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
+      ),
+    pgmid: z
+      .string()
+      .default('R3TR')
+      .optional()
+      .describe("Program id. Defaults to R3TR, a workbench object's."),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface AddTransportObjectArgs {
-  transport_number: string;
-  object_name: string;
-  object_type: string;
-  pgmid?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type AddTransportObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleAddTransportObject(
   context: HandlerContext,
@@ -86,7 +74,7 @@ export async function handleAddTransportObject(
   // No `success`, for the reason `RemoveTransportObject` gives at length: the
   // answer is an echo of the request, not a report of what happened, and a
   // reader who stops at `success` would skip the re-read that establishes it.
-  const terseAddition: Terse<unknown> = () => ({
+  const terseAddition = () => ({
     accepted: true,
     added: 'unknown',
     transport_number: args.transport_number,

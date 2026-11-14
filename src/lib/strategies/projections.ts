@@ -1,4 +1,14 @@
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import {
+  attr,
+  child,
+  childAt,
+  listOf,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import type { AdtReading } from './reading';
 
 /**
@@ -23,7 +33,7 @@ import type { AdtReading } from './reading';
 export type AnswerDetail = 'terse' | 'full' | 'raw';
 
 /** The shape of a terse projection: from a parse, the fields worth naming. */
-export type Terse<T> = (value: T, status: number) => unknown;
+export type Terse<T, R> = (value: T, status: number) => R;
 
 /**
  * Build the projection `return_answer` calls.
@@ -32,10 +42,10 @@ export type Terse<T> = (value: T, status: number) => unknown;
  * adapter cannot tell a write with nothing to add from a read that found
  * nothing. So a terse projection that has nothing to say says `'SUCCESS'`.
  */
-export function project<T>(
+export function project<T, R>(
   detail: AnswerDetail,
-  terse: Terse<T>,
-): (reading: AdtReading<T>) => unknown {
+  terse: (value: T, status: number) => R,
+): (reading: AdtReading<T>) => T | string | R {
   return (reading) => {
     if (detail === 'raw') return reading.raw;
     if (detail === 'full') return reading.value ?? reading.raw;
@@ -48,36 +58,38 @@ export function project<T>(
 // from a fixture; see tests/fixtures/adt/README.md.
 // ---------------------------------------------------------------------------
 
-function attrs(node: unknown): Record<string, string> {
-  const a = (node as { '@'?: Record<string, string> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+/** The attribute `name` of `node` (the reading parser groups them under `@`). */
+function attrOf(node: XmlRead, name: string): string | undefined {
+  return attr(child(node, '@'), name);
 }
 
-function first(node: unknown): unknown {
-  return Array.isArray(node) ? node[0] : node;
+/** A repeatable level's first member, or the level itself when it is one. */
+function first(node: XmlRead): XmlRead {
+  return listOf(node)[0];
 }
 
-function text(node: unknown): string {
-  if (typeof node === 'string') return node;
-  const t = (node as { '#text'?: unknown } | undefined)?.['#text'];
-  return typeof t === 'string' ? t : '';
+/** `node`'s text, `''` when it has none. */
+function textOf(node: XmlRead): string {
+  return text(node) ?? '';
 }
 
 /**
  * A write with nothing to report. A class create answers 200 with zero bytes
  * and a successful source write answers the same, so the status is the verdict.
  */
-export const terseWrite: Terse<unknown> = (_value, status) =>
+export const terseWrite = <T>(_value: T, status: number) =>
   status >= 200 && status < 300 ? 'SUCCESS' : undefined;
 
 /**
  * `chkl:messages` — did the activation happen, and what was said.
  *
  * **`activated: false` on a successful answer needs a word beside it.**
- * `activationExecuted="false"` with no messages is SAP saying it had nothing
- * to activate — an object that was already active — which
- * `analyseActivation` (`@mcp-abap-adt/adt-strategies` 0.2.0) reads as the
- * success it is, against the corpus case `activation-nothing-to-activate`.
+ * `activationExecuted="false"` with no messages answered both an object that
+ * was already active and an activation that left objects inactive; the
+ * member reads the inactive list after it, and `analyseActivation`
+ * (`@mcp-abap-adt/adt-strategies` 0.22.0) answers it as a success only when
+ * none of the objects the activation named is still listed — nothing to
+ * activate (fr0ster/mcp-abap-adt#351).
  * Left at `activated: false` alone, that answer reads to a caller as "it did
  * not work" while the tool reports no error. `nothing_to_activate` says which
  * of the two it is, and appears only in the case that was measured: the flag
@@ -87,160 +99,158 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  * whether the answer is a failure, and this decides how a caller reads a
  * success that says nothing was done.
  */
-export const terseActivation: Terse<any> = (value) => {
-  const root = value?.['chkl:messages'];
-  if (root) {
-    const messages = (root.msg ?? []).map((m: unknown) => ({
-      type: attrs(m).type,
-      text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
-    }));
-    const activated =
-      attrs(root['chkl:properties']).activationExecuted === 'true';
-    return {
-      activated,
-      generated: attrs(root['chkl:properties']).generationExecuted === 'true',
-      ...(!activated && messages.length === 0
-        ? { nothing_to_activate: true }
-        : {}),
-      ...(messages.length ? { messages } : {}),
-    };
-  }
+/**
+ * What a successful activation answered, by its form: `analyseActivation`
+ * has refused every failure before a projection runs. Two forms succeed — the
+ * checklist (`chkl:messages`), and an empty `200` (SAP_BASIS 7.40 and 751
+ * activate this way: the objects are gone from the inactive list,
+ * fr0ster/mcp-abap-adt#351). A form this union does not name has no
+ * projection; adding one without its branch in {@link terseActivationAnswer}
+ * fails the type check.
+ */
+export type ActivationAnswer =
+  | { readonly form: 'checklist'; readonly checklist: XmlRead }
+  | { readonly form: 'empty' };
 
-  // `ioc:inactiveObjects` — what a function group's activate call answers
-  // instead of a `chkl:messages` checklist, measured live against
-  // `ActivateFunctionGroupLow` (2026-09-21). Not finding a checklist, this
-  // used to answer `undefined`, which `answer.ts` turns into
-  // `projection_failed`: a real, successful call reported as a broken one.
-  //
-  // **What it does not do is call it activated.** The document is a list of
-  // objects; it contains no verdict, and an activation that failed answers
-  // `200` just as this one did — that masking was the root of #154, and the
-  // rule this library works by is that a status code is not a result, the
-  // answer is. So this reading reports what the answer holds, the objects it
-  // named, and says plainly that the answer stated no outcome.
-  //
-  // Evidence that it is not a failure either, from the same run: a
-  // `GetInactiveObjects` read straight afterwards answered `count: 0`, so
-  // the objects named here were not left inactive. That is a measurement of
-  // the *system*, taken by a second request — which is exactly what
-  // `activation_not_stated` tells a caller to do, and exactly what a
-  // projection over one document cannot do for them.
-  //
-  // **And that read-back is a snapshot, not a proof.** Activation is
-  // asynchronous: the work can still be running when the next request goes
-  // out, so `count: 0` settled that run and `count` above zero would settle
-  // nothing — it would mean "not yet" as readily as "not done". A caller who
-  // needs certainty reads again; an LLM does that naturally, and a test that
-  // asserts once on the first read is asserting a race.
-  //
-  // `ioc:object` is itself an array per entry (`[""]` on the transport-only
-  // entry that opens the list, `[{ "ioc:ref": {...} }]` on an object one) —
-  // `first()` un-wraps it the same way every other reading here does.
-  const inactive = value?.['ioc:inactiveObjects'];
-  if (inactive) {
-    const entriesRaw = inactive['ioc:entry'];
-    const entries = Array.isArray(entriesRaw)
-      ? entriesRaw
-      : entriesRaw
-        ? [entriesRaw]
-        : [];
-    const processed = entries
-      .map((entry: any) =>
-        attrs((first(entry?.['ioc:object']) as any)?.['ioc:ref']),
-      )
-      .filter((a: Record<string, string>) => a['adtcore:name'])
-      .map((a: Record<string, string>) => ({
-        type: a['adtcore:type'] ?? '',
-        name: a['adtcore:name'] ?? '',
-      }));
-    return {
-      // Deliberately not `activated`. The caller reads the state back — with
-      // `GetInactiveObjects`, which answers the question this document does
-      // not.
-      activation_not_stated: true,
-      ...(processed.length ? { objects: processed } : {}),
-    };
-  }
+/** The activation's answer form, read from the reading: the body is text from outside, read here. */
+export function activationAnswerOf(
+  reading: AdtReading<XmlRead>,
+): ActivationAnswer | undefined {
+  if (reading.raw.trim() === '') return { form: 'empty' };
+  const checklist = child(reading.value, 'chkl:messages');
+  return checklist ? { form: 'checklist', checklist } : undefined;
+}
 
-  return undefined;
+/** What an activation answers under terse, in this order. */
+export type TerseActivationAnswer = {
+  activated: boolean;
+  generated?: boolean;
+  nothing_to_activate?: true;
+  messages?: { type: string | undefined; text: string | undefined }[];
 };
 
+/** The terse answer of each form; every form has one. */
+export function terseActivationAnswer(
+  answer: ActivationAnswer,
+): TerseActivationAnswer {
+  switch (answer.form) {
+    case 'checklist': {
+      const root = answer.checklist;
+      const messages = listOf(child(root, 'msg')).map((m) => ({
+        type: attrOf(m, 'type'),
+        text: textOf(childAt(m, 'shortText', 'txt')) || attrOf(m, 'objDescr'),
+      }));
+      const properties = child(root, 'chkl:properties');
+      const activated = attrOf(properties, 'activationExecuted') === 'true';
+      return {
+        activated,
+        generated: attrOf(properties, 'generationExecuted') === 'true',
+        ...(!activated && messages.length === 0
+          ? { nothing_to_activate: true }
+          : {}),
+        ...(messages.length ? { messages } : {}),
+      };
+    }
+    // An empty `200`: activated, and nothing more was said.
+    case 'empty':
+      return { activated: true };
+  }
+}
+
+/**
+ * `chkl:messages` — the checklist's terse answer; any other document has none
+ * (`ioc:inactiveObjects` is no success: `analyseActivation` answers it as not
+ * activated before any projection runs). An activation's answer is projected
+ * by {@link projectActivation}, which reads the empty `200` too.
+ */
+export const terseActivation = (value: XmlRead, _status?: number) => {
+  const checklist = child(value, 'chkl:messages');
+  return checklist
+    ? terseActivationAnswer({ form: 'checklist', checklist })
+    : undefined;
+};
+
+/**
+ * An activation's answer at `detail`: `raw` the document as it came (empty
+ * for an empty `200`), `full` the parse (for an empty `200`, which has none,
+ * its terse answer), `terse` {@link terseActivationAnswer} of its form.
+ */
+export function projectActivation(
+  detail: AnswerDetail,
+): (
+  reading: AdtReading<XmlRead>,
+) => XmlRead | TerseActivationAnswer | undefined {
+  return (reading) => {
+    if (detail === 'raw') return reading.raw;
+    const answer = activationAnswerOf(reading);
+    if (detail === 'full') {
+      return answer?.form === 'empty'
+        ? terseActivationAnswer(answer)
+        : (reading.value ?? reading.raw);
+    }
+    return answer === undefined ? undefined : terseActivationAnswer(answer);
+  };
+}
+
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */
-export const terseCheck: Terse<any> = (value) => {
+export const terseCheck = (value: XmlRead, _status?: number) => {
   const report = first(
-    value?.['chkrun:checkRunReports']?.['chkrun:checkReport'],
+    childAt(value, 'chkrun:checkRunReports', 'chkrun:checkReport'),
   );
   if (!report) return undefined;
-  const a = attrs(report);
-  const messages = (
-    report['chkrun:checkMessageList']?.['chkrun:checkMessage'] ?? []
-  ).map((m: unknown) => ({
-    type: attrs(m)['chkrun:type'],
-    text: attrs(m)['chkrun:shortText'],
-    ...(attrs(m)['chkrun:code'] ? { code: attrs(m)['chkrun:code'] } : {}),
-  }));
+  const messages = listOf(
+    childAt(report, 'chkrun:checkMessageList', 'chkrun:checkMessage'),
+  ).map((m) => {
+    const code = attrOf(m, 'chkrun:code');
+    return {
+      type: attrOf(m, 'chkrun:type'),
+      text: attrOf(m, 'chkrun:shortText'),
+      ...(code ? { code } : {}),
+    };
+  });
   return {
-    ran: a['chkrun:status'] === 'processed',
-    status_text: a['chkrun:statusText'],
+    ran: attrOf(report, 'chkrun:status') === 'processed',
+    status_text: attrOf(report, 'chkrun:statusText'),
     ...(messages.length ? { messages } : {}),
   };
 };
 
 /**
- * `del:deletionResult` and `del:checkResponse` — the verdict is an attribute.
- *
- * A delete tool answers a `del:checkResponse` only when it did not send the
- * delete: the check said the object is not there (`deleteIfDeletable`). So
- * that answer says `deleted: false` beside the check's own verdict and the
- * warning that explains it.
+ * `del:deletionResult` — the verdict is an attribute. A delete tool answers
+ * the delete's own document: a check that permits the delete is followed by
+ * it (`deleteIfDeletable`), and a refused check is a failure, answered as one.
  */
-export const terseDeletion: Terse<any> = (value) => {
-  const result = value?.['del:deletionResult'] ?? value?.['del:checkResponse'];
-  const object = first(result?.['del:object']);
+export const terseDeletion = (value: XmlRead, _status?: number) => {
+  const object = first(childAt(value, 'del:deletionResult', 'del:object'));
   if (!object) return undefined;
-  const a = attrs(object);
-  const message = first(object['del:message']) as
-    | { 'del:text'?: unknown }
-    | undefined;
   return {
-    ...(a['del:isDeleted'] !== undefined
-      ? { deleted: a['del:isDeleted'] === 'true' }
-      : { deleted: false, deletable: a['del:isDeletable'] === 'true' }),
-    object: a['adtcore:name'],
-    ...(text(message?.['del:text'])
-      ? {
-          message: {
-            type: attrs(message)['del:type'],
-            text: text(message?.['del:text']),
-          },
-        }
-      : {}),
+    deleted: attrOf(object, 'del:isDeleted') === 'true',
+    object: attrOf(object, 'adtcore:name'),
+    ...deletionMessage(object),
   };
 };
+
+/** SAP's message on a deletion's object, when it carries text. */
+function deletionMessage(object: XmlRead) {
+  const message = first(child(object, 'del:message'));
+  const said = textOf(child(message, 'del:text'));
+  return said
+    ? { message: { type: attrOf(message, 'del:type'), text: said } }
+    : {};
+}
 
 /**
  * `del:checkResponse` alone — the deletion check's verdict: `deletable`, the
  * object, and SAP's message when it carries text (a permitted check may say
  * the object does not exist; that is SAP's answer, as it came).
  */
-export const terseDeletionCheck: Terse<any> = (value) => {
-  const object = first(value?.['del:checkResponse']?.['del:object']);
+export const terseDeletionCheck = (value: XmlRead, _status?: number) => {
+  const object = first(childAt(value, 'del:checkResponse', 'del:object'));
   if (!object) return undefined;
-  const a = attrs(object);
-  const message = first(object['del:message']) as
-    | { 'del:text'?: unknown }
-    | undefined;
   return {
-    deletable: a['del:isDeletable'] === 'true',
-    object: a['adtcore:name'],
-    ...(text(message?.['del:text'])
-      ? {
-          message: {
-            type: attrs(message)['del:type'],
-            text: text(message?.['del:text']),
-          },
-        }
-      : {}),
+    deletable: attrOf(object, 'del:isDeletable') === 'true',
+    object: attrOf(object, 'adtcore:name'),
+    ...deletionMessage(object),
   };
 };
 
@@ -255,17 +265,14 @@ export const terseDeletionCheck: Terse<any> = (value) => {
  * behind it, so it is answered as `result`, exactly as sent (an absent or
  * empty one as `''`), with SAP's messages and no `admissible` of ours.
  */
-export const terseTransportCheck: Terse<any> = (value) => {
-  const data = value?.['asx:abap']?.['asx:values']?.DATA;
+export const terseTransportCheck = (value: XmlRead, _status?: number) => {
+  const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
-  const result = text(data.RESULT);
-  const listed = data.MESSAGES?.CTS_MESSAGE;
-  const messages = (
-    Array.isArray(listed) ? listed : listed === undefined ? [] : [listed]
-  )
+  const result = textOf(child(data, 'RESULT'));
+  const messages = listOf(childAt(data, 'MESSAGES', 'CTS_MESSAGE'))
     .map((message) => ({
-      type: text(message?.SEVERITY),
-      text: text(message?.TEXT),
+      type: textOf(child(message, 'SEVERITY')),
+      text: textOf(child(message, 'TEXT')),
     }))
     .filter((message) => message.text !== '');
   const said = messages.length > 0 ? { messages } : {};
@@ -275,17 +282,18 @@ export const terseTransportCheck: Terse<any> = (value) => {
 };
 
 /** Validation: `CHECK_RESULT` means admissible, `SEVERITY` carries a verdict. */
-export const terseValidation: Terse<any> = (value) => {
-  const data = value?.['asx:abap']?.['asx:values']?.DATA;
+export const terseValidation = (value: XmlRead, _status?: number) => {
+  const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
-  if (data.CHECK_RESULT !== undefined) {
-    return { admissible: text(data.CHECK_RESULT) === 'X' };
+  const checkResult = child(data, 'CHECK_RESULT');
+  if (checkResult !== undefined) {
+    return { admissible: textOf(checkResult) === 'X' };
   }
-  const severity = text(data.SEVERITY).toUpperCase();
+  const severity = textOf(child(data, 'SEVERITY')).toUpperCase();
   return {
     admissible: severity === 'OK',
     ...(severity !== 'OK'
-      ? { message: { type: severity, text: text(data.SHORT_TEXT) } }
+      ? { message: { type: severity, text: textOf(child(data, 'SHORT_TEXT')) } }
       : {}),
   };
 };

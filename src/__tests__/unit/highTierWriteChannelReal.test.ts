@@ -54,7 +54,10 @@ import { handleCreateMessageClass } from '../../handlers/message_class/high/hand
 import { handleCreateMessageClassMessage } from '../../handlers/message_class/high/handleCreateMessageClassMessage';
 import { handleUpdateMessageClass } from '../../handlers/message_class/high/handleUpdateMessageClass';
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
-import { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage';
+import {
+  TOOL_DEFINITION as CreatePackage,
+  handleCreatePackage,
+} from '../../handlers/package/high/handleCreatePackage';
 import { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
 import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
@@ -320,11 +323,14 @@ const cases: ChannelCase[] = [
     method: 'POST',
     urlContains: '/sap/bc/adt/packages',
     run: (marker, connection) =>
-      handleCreatePackage(ctx(connection) as any, {
-        package_name: 'ZP_X',
-        super_package: 'ZP',
-        description: marker,
-      }),
+      handleCreatePackage(
+        ctx(connection) as any,
+        CreatePackage.inputSchema.parse({
+          package_name: 'ZP_X',
+          super_package: 'ZP',
+          description: marker,
+        }),
+      ),
   },
   {
     name: 'CreateProgram',

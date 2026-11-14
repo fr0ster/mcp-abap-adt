@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateProgramLow Handler - Update ABAP Program Source Code
  *
@@ -22,50 +24,35 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgramLow',
   available_in: ['onprem'] as const,
   description:
     '[low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name. Program must already exist.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP program source code.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'source_code', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    program_name: z
+      .string()
+      .describe('Program name. Program must already exist.'),
+    source_code: z.string().describe('Complete ABAP program source code.'),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockObject. Required for update operation.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateProgramArgs {
-  program_name: string;
-  source_code: string;
-  lock_handle: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateProgram(
   context: HandlerContext,
@@ -77,14 +64,6 @@ export async function handleUpdateProgram(
   if (!program_name || !source_code || !lock_handle) {
     return return_error(
       new Error('program_name, source_code, and lock_handle are required'),
-    );
-  }
-
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
     );
   }
 

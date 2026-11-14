@@ -4,11 +4,13 @@ import {
   handleRunATC,
   TOOL_DEFINITION,
 } from '../../handlers/atc/high/handleRunATC';
-import { corpusBody } from '../../lib/adtCorpus';
 import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
+import { defineTool } from '../../lib/handlers/interfaces';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
 import { declareSystemKind } from '../../lib/systemKind';
+import { corpusBody } from '../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /**
@@ -358,11 +360,11 @@ describe('RunATC composes the three calls', () => {
 });
 
 describe('RunATC: the object kinds the client checks', () => {
-  const objectSchema = () =>
-    (TOOL_DEFINITION.inputSchema.properties.objects.items as any).properties;
+  const objectSchema = (name: string) =>
+    jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'objects', '[]', name);
 
   it('offers every kind the client builds a URI for', () => {
-    expect([...objectSchema().type.enum].sort()).toEqual(
+    expect([...(objectSchema('type').enum ?? [])].sort()).toEqual(
       [
         'behavior_definition',
         'class',
@@ -377,10 +379,10 @@ describe('RunATC: the object kinds the client checks', () => {
         'table',
       ].sort(),
     );
-    expect([...objectSchema().include_kind.enum].sort()).toEqual(
+    expect([...(objectSchema('include_kind').enum ?? [])].sort()).toEqual(
       ['definitions', 'implementations', 'macros', 'testclasses'].sort(),
     );
-    expect(objectSchema().function_group.type).toBe('string');
+    expect(objectSchema('function_group').type).toBe('string');
   });
 
   const capture = () => {
@@ -491,14 +493,15 @@ describe('RunATC: the object kinds of each variant', () => {
   const stated = (variant: 'onprem' | 'cloud') =>
     TOOL_DEFINITION.variants[variant];
   const typeEnum = (variant: 'onprem' | 'cloud') =>
-    stated(variant).inputSchema.properties.objects.items.properties.type.enum;
+    jsonAt(listedJson(stated(variant).inputSchema), 'objects', '[]', 'type')
+      .enum;
 
   it.each([
     ['onprem', ONPREM],
     ['cloud', CLOUD],
   ] as const)('%s offers exactly its kinds', (variant, kinds) => {
     expect(ATC_OBJECT_TYPES[variant]).toEqual(kinds);
-    expect([...typeEnum(variant)]).toEqual(kinds);
+    expect(typeEnum(variant)).toEqual(kinds);
     const words = stated(variant).description;
     for (const kind of kinds) expect(words).toContain(kind);
   });
@@ -523,19 +526,35 @@ describe('RunATC: the object kinds of each variant', () => {
     };
     const connection = recordingConnection();
     declareSystemKind(connection, variant);
-    const answered = await handleRunATC(
-      { connection },
-      { objects: [{ name: 'ZOBJ', type }], check_variant: 'V' },
-    );
+    // The model's call: through the tool's entry, its schema first. A
+    // refusal there is thrown; its words are the answer's text.
+    const answered = await defineTool(TOOL_DEFINITION, handleRunATC)
+      .call(
+        { connection },
+        { objects: [{ name: 'ZOBJ', type }], check_variant: 'V' },
+      )
+      .catch((refused: unknown) => ({
+        isError: true,
+        content: [{ type: 'text', text: String(refused) }],
+      }));
     return { answered, calls };
   }
 
-  it.each(['program', 'program_include', 'PROGRAM'])(
+  it('cloud refuses PROGRAM at the schema, before any call', async () => {
+    const { answered, calls } = await runOn('cloud', 'PROGRAM');
+    expect(answered.isError).toBe(true);
+    expect(answered.content[0]?.text).toContain(
+      'Invalid arguments for tool RunATC: ',
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it.each(['program', 'program_include'])(
     'cloud refuses %s naming its kinds, before any call',
     async (type) => {
       const { answered, calls } = await runOn('cloud', type);
       expect(answered.isError).toBe(true);
-      expect(answered.content[0].text).toContain(
+      expect(answered.content[0]?.text).toContain(
         `objects[].type "${type}" is not one of: ${CLOUD.join(', ')}; nothing was sent`,
       );
       expect(calls).toEqual([]);
@@ -553,10 +572,10 @@ describe('RunATC: the object kinds of each variant', () => {
     expect(calls).toEqual(['createWorklist', 'startRun']);
   });
 
-  it('refuses a kind no variant has, before any call', async () => {
+  it('refuses a kind no variant has at the schema, before any call', async () => {
     const { answered, calls } = await runOn('onprem', 'domain');
-    expect(answered.content[0].text).toContain(
-      `objects[].type "domain" is not one of: ${ONPREM.join(', ')}; nothing was sent`,
+    expect(answered.content[0]?.text).toContain(
+      'Invalid arguments for tool RunATC: ',
     );
     expect(calls).toEqual([]);
   });

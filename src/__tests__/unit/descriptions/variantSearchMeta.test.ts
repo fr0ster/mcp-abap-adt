@@ -46,7 +46,10 @@ async function listed(
   variant: ServerVariant,
 ): Promise<readonly Listed[]> {
   process.env.SAP_SYSTEM_TYPE = variant;
-  const server = new StdioServer(registryOf(set, 'stdio'), undefined);
+  const server = new StdioServer(
+    registryOf(set, 'stdio', { dataTools: true }),
+    undefined,
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-search-meta', version: '1' });
@@ -209,7 +212,7 @@ describe('a compact tool’s search texts name only the members its variant offe
     const table = searchTable();
     const compact = new Set(
       Object.values(SETS).flatMap((set) =>
-        registryOf(set, 'stdio')
+        registryOf(set, 'stdio', { dataTools: true })
           .getHandlerGroups()
           .flatMap((group) => group.getHandlers())
           .map((entry) => entry.toolDefinition.name),

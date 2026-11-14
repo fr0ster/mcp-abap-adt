@@ -1,0 +1,25 @@
+{
+  "case": "activation-sync-activated-751",
+  "step": 1,
+  "stepTag": "activation",
+  "capturedAt": "2026-11-09T00:00:00.000Z",
+  "note": "SAP_BASIS 751 SP02 (S/4HANA 1610), recorded from the wire measurements of fr0ster/mcp-abap-adt#351 (2026-11-09), not captured by this repository: a fresh class ZCL_AI_ACT_PROBE in $TMP with one public method, saved inactive; each request sent the same single reference (uri, type, name). The issue reports the requests in this order: preauditRequested=true on /activation (ioc:inactiveObjects, nothing activated), preauditRequested=false on /activation/runs (404), preauditRequested=false on /activation (200, empty body, activated). This step: preauditRequested=false on /activation answered 200 with an empty body, and the inactive list read afterwards no longer named the class: activated.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/activation?method=activate&preauditRequested=false",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation?method=activate&preauditRequested=false",
+    "headers": {
+      "Content-Type": "application/vnd.sap.adt.activation+xml",
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only, as the issue reports them; the issue records no other header.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/oo/classes/zcl_ai_act_probe\" adtcore:type=\"CLAS/OC\" adtcore:name=\"ZCL_AI_ACT_PROBE\"/>\n</adtcore:objectReferences>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {},
+    "bodyFile": "activation-sync-activated-751--01-activation.body.txt"
+  }
+}

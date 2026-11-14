@@ -14,10 +14,17 @@
  * Run: npm test -- --testPathPattern=integration/package
  */
 
-import { handleCreatePackage } from '../../../../handlers/package/high/handleCreatePackage';
+import assert from 'node:assert/strict';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import * as z from 'zod';
+import {
+  TOOL_DEFINITION as CreatePackage,
+  handleCreatePackage,
+} from '../../../../handlers/package/high/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
-import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -26,11 +33,21 @@ import {
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
+/** What this file's cases state, as its tests read them. */
+const PackageParams = z.looseObject({
+  application_component: z.string().optional(),
+  description: z.string().optional(),
+  package_type: z.string().optional(),
+  record_changes: z.boolean().optional(),
+  software_component: z.string().optional(),
+  transport_layer: z.string().optional(),
+});
+
 describe('Package High-Level Handlers Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('package-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'create_package',
       'builder_package',
@@ -82,9 +99,9 @@ describe('Package High-Level Handlers Integration', () => {
         }
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async () => {});
   });
 
@@ -96,59 +113,58 @@ describe('Package High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Package high-level handlers',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const {
-          connection,
-          objectName,
-          params,
-          packageName,
-          transportRequest,
-        } = context;
+  it('should test all Package high-level handlers', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, objectName, packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        PackageParams,
+        'create_package',
+      );
 
-        expect(objectName).toBeDefined();
-        expect(objectName).not.toBe('');
-        if (!objectName) {
-          throw new Error('objectName is required');
-        }
+      assert.ok(objectName !== undefined);
+      assert.notEqual(objectName, '');
+      if (!objectName) {
+        throw new Error('objectName is required');
+      }
 
-        // For packages: objectName = test_package (package to create),
-        // packageName = parent package (super_package)
-        const superPackage = packageName;
+      // For packages: objectName = test_package (package to create),
+      // packageName = parent package (super_package)
+      const superPackage = packageName;
 
-        // Step 1: Create
-        logger?.info(`   • create: ${objectName}`);
-        const createLogger = createTestLogger('package-high-create');
-        const createResponse = await tester.invokeToolOrHandler(
-          'CreatePackage',
-          {
-            package_name: objectName,
-            super_package: superPackage,
-            description:
-              params.description || `Test package for high-level handler`,
-            package_type: params.package_type || 'development',
-            ...(params.software_component && {
-              software_component: params.software_component,
-            }),
-            ...(params.transport_layer && {
-              transport_layer: params.transport_layer,
-            }),
-            ...(transportRequest && { transport_request: transportRequest }),
-            ...(params.application_component && {
-              application_component: params.application_component,
-            }),
-            ...(params.record_changes !== undefined && {
-              record_changes: params.record_changes,
-            }),
-          },
-          async () => {
-            const createCtx = createHandlerContext({
-              connection,
-              logger: createLogger,
-            });
-            return handleCreatePackage(createCtx, {
+      // Step 1: Create
+      logger?.info(`   • create: ${objectName}`);
+      const createLogger = createTestLogger('package-high-create');
+      const createResponse = await tester.invokeToolOrHandler(
+        'CreatePackage',
+        {
+          package_name: objectName,
+          super_package: superPackage,
+          description:
+            params.description || `Test package for high-level handler`,
+          package_type: params.package_type || 'development',
+          ...(params.software_component && {
+            software_component: params.software_component,
+          }),
+          ...(params.transport_layer && {
+            transport_layer: params.transport_layer,
+          }),
+          ...(transportRequest && { transport_request: transportRequest }),
+          ...(params.application_component && {
+            application_component: params.application_component,
+          }),
+          ...(params.record_changes !== undefined && {
+            record_changes: params.record_changes,
+          }),
+        },
+        async () => {
+          const createCtx = createHandlerContext({
+            connection,
+            logger: createLogger,
+          });
+          return handleCreatePackage(
+            createCtx,
+            CreatePackage.inputSchema.parse({
               package_name: objectName,
               super_package: superPackage,
               description:
@@ -159,37 +175,34 @@ describe('Package High-Level Handlers Integration', () => {
               transport_request: transportRequest,
               application_component: params.application_component,
               record_changes: params.record_changes,
-            });
-          },
-        );
+            }),
+          );
+        },
+      );
 
-        if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          const errorMsgLower = errorMsg.toLowerCase();
-          // If package already exists, that's okay - we'll skip test
-          if (
-            errorMsgLower.includes('already exists') ||
-            errorMsgLower.includes('does already exist') ||
-            errorMsgLower.includes('exceptionresourcealreadyexists') ||
-            errorMsg.includes('InvalidObjName')
-          ) {
-            logger?.info(
-              `⏭️  Package ${objectName} already exists, skipping test`,
-            );
-            return;
-          }
-          throw new Error(`Create failed: ${errorMsg}`);
+      if (createResponse.isError) {
+        const errorMsg = extractErrorMessage(createResponse);
+        const errorMsgLower = errorMsg.toLowerCase();
+        // If package already exists, that's okay - we'll skip test
+        if (
+          errorMsgLower.includes('already exists') ||
+          errorMsgLower.includes('does already exist') ||
+          errorMsgLower.includes('exceptionresourcealreadyexists') ||
+          errorMsg.includes('InvalidObjName')
+        ) {
+          skipRunningTest(`package ${objectName} already exists`);
+          return;
         }
+        throw new Error(`Create failed: ${errorMsg}`);
+      }
 
-        // CreatePackage's terse projection is `terseWrite`: on success it answers
-        // the literal text "SUCCESS", not a JSON object — `success`/`package_name`
-        // no longer exist to read (CHANGELOG Unreleased: "Terse writes answer the
-        // literal string `SUCCESS` ... uniformly across every write tool";
-        // see src/lib/strategies/projections.ts `terseWrite`/`project()`).
-        expect(createResponse.content[0]?.text).toBe('SUCCESS');
-        logger?.success(`✅ create: ${objectName} completed successfully`);
-      });
-    },
-    getTimeout('long'),
-  );
+      // CreatePackage's terse projection is `terseWrite`: on success it answers
+      // the literal text "SUCCESS", not a JSON object — `success`/`package_name`
+      // no longer exist to read (CHANGELOG Unreleased: "Terse writes answer the
+      // literal string `SUCCESS` ... uniformly across every write tool";
+      // see src/lib/strategies/projections.ts `terseWrite`/`project()`).
+      assert.equal(createResponse.content[0]?.text, 'SUCCESS');
+      logger?.success(`✅ create: ${objectName} completed successfully`);
+    });
+  });
 });

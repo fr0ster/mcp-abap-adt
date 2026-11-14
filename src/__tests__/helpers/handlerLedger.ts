@@ -10,12 +10,6 @@ import type {
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
 
-/** The server reads a handler's arity to decide what to pass it: keep it. */
-const withArity = <F extends (...a: never[]) => unknown>(
-  original: { length: number },
-  wrapped: F,
-): F => Object.defineProperty(wrapped, 'length', { value: original.length });
-
 export class HandlerLedger {
   private readonly begun: string[] = [];
   private readonly finished: string[] = [];
@@ -29,19 +23,14 @@ export class HandlerLedger {
         group.getHandlers().map(
           (entry): HandlerEntry => ({
             ...entry,
-            handler: withArity(
-              entry.handler as (...a: unknown[]) => Promise<unknown>,
-              async (...args: unknown[]) => {
-                this.begun.push(entry.toolDefinition.name);
-                try {
-                  return await (
-                    entry.handler as (...a: unknown[]) => Promise<unknown>
-                  )(...args);
-                } finally {
-                  this.finished.push(entry.toolDefinition.name);
-                }
-              },
-            ) as never,
+            call: async (context, args) => {
+              this.begun.push(entry.toolDefinition.name);
+              try {
+                return await entry.call(context, args);
+              } finally {
+                this.finished.push(entry.toolDefinition.name);
+              }
+            },
           }),
         ),
       // The shipped groups read their context through it (batchStand sets it).

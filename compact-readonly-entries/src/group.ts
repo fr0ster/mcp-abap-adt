@@ -1,5 +1,7 @@
 /**
- * The compact tools that change nothing — seventeen of the twenty-nine.
+ * The compact tools that change nothing — seventeen of the twenty-nine: the
+ * sixteen of `compactReadOnlyEntries`, and the data tool `HandlerGetData`,
+ * opt-in, of `compactDataEntries`.
  *
  * **Why a group of its own, and why it matters what it imports.** Compact is a
  * different decomposition of the same surface: the operation is the tool and the
@@ -22,8 +24,11 @@
  * without writing, so they are here.
  */
 
-import type { HandlerContext, HandlerEntry } from '@mcp-abap-adt/lib/handlers';
-import { BaseHandlerGroup } from '@mcp-abap-adt/lib/handlers';
+import {
+  BaseHandlerGroup,
+  defineTool,
+  type HandlerEntry,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   TOOL_DEFINITION as HandlerCdsUnitTestResult_Tool,
   handleHandlerCdsUnitTestResult,
@@ -94,94 +99,33 @@ import {
 } from './handlers/handleHandlerWhereUsed';
 
 /**
- * The entries, built against a LIVE context rather than a snapshot.
- *
- * `BaseMcpServer` sets the context on the group that OWNS an entry, once per
- * request — a fresh connection each time. So an entry must read the context when
- * it is CALLED, never capture the one that existed when the list was built: a
- * composed group that instantiated this one with a snapshot handed its handlers a
- * stale connection, or the initial `null` (found in review on PR #240). Taking a
- * getter means the owning group can be this class or the composed facade, and
- * either way the handler sees that group's current context.
+ * The entries: each takes the call's context at the call, from whichever
+ * registration path runs it, so no entry holds a context of its own.
  */
-export function compactReadOnlyEntries(
-  getContext: () => HandlerContext,
-): HandlerEntry[] {
-  const withContext = <TArgs, TResult>(
-    handler: (context: HandlerContext, args: TArgs) => TResult,
-  ) => {
-    return (args: unknown) => handler(getContext(), args as TArgs);
-  };
-
+export function compactReadOnlyEntries(): HandlerEntry[] {
   return [
-    {
-      toolDefinition: HandlerGet_Tool,
-      handler: withContext(handleHandlerGet),
-    },
-    {
-      toolDefinition: HandlerSearch_Tool,
-      handler: withContext(handleHandlerSearch),
-    },
-    {
-      toolDefinition: HandlerWhereUsed_Tool,
-      handler: withContext(handleHandlerWhereUsed),
-    },
-    {
-      toolDefinition: HandlerGetData_Tool,
-      handler: withContext(handleHandlerGetData),
-    },
-    {
-      toolDefinition: HandlerValidate_Tool,
-      handler: withContext(handleHandlerValidate),
-    },
-    {
-      toolDefinition: HandlerCheckRun_Tool,
-      handler: withContext(handleHandlerCheckRun),
-    },
-    {
-      toolDefinition: HandlerDeletionCheck_Tool,
-      handler: withContext(handleHandlerDeletionCheck),
-    },
-    {
-      toolDefinition: HandlerUnitTestStatus_Tool,
-      handler: withContext(handleHandlerUnitTestStatus),
-    },
-    {
-      toolDefinition: HandlerUnitTestResult_Tool,
-      handler: withContext(handleHandlerUnitTestResult),
-    },
-    {
-      toolDefinition: HandlerCdsUnitTestStatus_Tool,
-      handler: withContext(handleHandlerCdsUnitTestStatus),
-    },
-    {
-      toolDefinition: HandlerCdsUnitTestResult_Tool,
-      handler: withContext(handleHandlerCdsUnitTestResult),
-    },
-    {
-      toolDefinition: HandlerProfileList_Tool,
-      handler: withContext(handleHandlerProfileList),
-    },
-    {
-      toolDefinition: HandlerProfileView_Tool,
-      handler: withContext(handleHandlerProfileView),
-    },
-    {
-      toolDefinition: HandlerDumpList_Tool,
-      handler: withContext(handleHandlerDumpList),
-    },
-    {
-      toolDefinition: HandlerDumpView_Tool,
-      handler: withContext(handleHandlerDumpView),
-    },
-    {
-      toolDefinition: HandlerServiceBindingListTypes_Tool,
-      handler: withContext(handleHandlerServiceBindingListTypes),
-    },
-    {
-      toolDefinition: HandlerServiceBindingValidate_Tool,
-      handler: withContext(handleHandlerServiceBindingValidate),
-    },
+    defineTool(HandlerGet_Tool, handleHandlerGet),
+    defineTool(HandlerSearch_Tool, handleHandlerSearch),
+    defineTool(HandlerWhereUsed_Tool, handleHandlerWhereUsed),
+    defineTool(HandlerValidate_Tool, handleHandlerValidate),
+    defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),
+    defineTool(HandlerDeletionCheck_Tool, handleHandlerDeletionCheck),
+    defineTool(HandlerUnitTestStatus_Tool, handleHandlerUnitTestStatus),
+    defineTool(HandlerUnitTestResult_Tool, handleHandlerUnitTestResult),
+    defineTool(HandlerCdsUnitTestStatus_Tool, handleHandlerCdsUnitTestStatus),
+    defineTool(HandlerCdsUnitTestResult_Tool, handleHandlerCdsUnitTestResult),
+    defineTool(HandlerProfileList_Tool, handleHandlerProfileList),
+    defineTool(HandlerProfileView_Tool, handleHandlerProfileView),
+    defineTool(HandlerDumpList_Tool, handleHandlerDumpList),
+    defineTool(HandlerDumpView_Tool, handleHandlerDumpView),
+    defineTool(
+      HandlerServiceBindingListTypes_Tool,
+      handleHandlerServiceBindingListTypes,
+    ),
+    defineTool(
+      HandlerServiceBindingValidate_Tool,
+      handleHandlerServiceBindingValidate,
+    ),
   ];
 }
 
@@ -189,6 +133,32 @@ export class CompactReadOnlyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactReadOnlyHandlers';
 
   getHandlers(): HandlerEntry[] {
-    return compactReadOnlyEntries(() => this.context);
+    return compactReadOnlyEntries();
+  }
+}
+
+/**
+ * The compact data tool, `HandlerGetData`: the rows of a table or CDS view,
+ * or of a freestyle `SELECT`, through ADT's data preview — the compact form
+ * of `GetTableContents` and `GetSqlQuery`.
+ *
+ * **Opt-in**, and so not among {@link compactReadOnlyEntries}: a compact
+ * binary serves it only with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`,
+ * `enable-data-tools`), handed in as the set's `data` builder; an embedder
+ * only by using this builder or {@link CompactDataHandlersGroup}. SAP API
+ * Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for
+ * reading application tables, exporting business data or running SQL against
+ * SAP systems; whether to serve it is the customer's decision.
+ */
+export function compactDataEntries(): HandlerEntry[] {
+  return [defineTool(HandlerGetData_Tool, handleHandlerGetData)];
+}
+
+/** {@link compactDataEntries} as a group: the compact data tool, opt-in. */
+export class CompactDataHandlersGroup extends BaseHandlerGroup {
+  protected groupName = 'CompactDataHandlers';
+
+  getHandlers(): HandlerEntry[] {
+    return compactDataEntries();
   }
 }

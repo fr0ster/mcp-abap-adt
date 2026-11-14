@@ -13,6 +13,7 @@ import {
   tlsConfigOf,
   validateYamlParameters,
 } from '../../../lib/config/authParameters';
+import type { YamlConfig } from '../../../lib/config/yamlConfig';
 
 const TABLE: ParameterTable = {
   program: 'test-binary',
@@ -154,7 +155,7 @@ describe("a row's own reader", () => {
 
 describe('the template', () => {
   it('nests dotted keys and validates clean', () => {
-    const parsed = load(parametersTemplate(TABLE)) as Record<string, unknown>;
+    const parsed = load(parametersTemplate(TABLE)) as YamlConfig;
     expect(parsed).toEqual({ x: { hosts: null, deep: { port: 4000 } } });
     expect(validateYamlParameters(TABLE, parsed)).toEqual([]);
   });

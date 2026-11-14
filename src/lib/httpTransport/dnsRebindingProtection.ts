@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 
 export interface DnsRebindingOptions {
-  enable?: boolean;
+  enable?: boolean | undefined;
   /** Exact raw Host header values, including port (e.g. "localhost:3000"). */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Exact raw Origin header values, including scheme (e.g. "https://app.example.com"). */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | undefined;
 }
 
 type RouteHandler = (
@@ -14,7 +14,17 @@ type RouteHandler = (
   next?: NextFunction,
 ) => void | Promise<void>;
 
-function reject(message: string): { status: number; body: unknown } {
+/** The refusal a rebinding request is answered: a JSON-RPC error, no id. */
+export interface RebindingRefusal {
+  status: number;
+  body: {
+    jsonrpc: '2.0';
+    error: { code: number; message: string };
+    id: null;
+  };
+}
+
+function reject(message: string): RebindingRefusal {
   return {
     status: 403,
     body: { jsonrpc: '2.0', error: { code: -32000, message }, id: null },
@@ -23,9 +33,9 @@ function reject(message: string): { status: number; body: unknown } {
 
 /** Returns a 403 descriptor if the request must be rejected, else null. */
 export function checkDnsRebinding(
-  headers: { host?: string; origin?: string },
+  headers: { host?: string | undefined; origin?: string | undefined },
   opts: DnsRebindingOptions,
-): { status: number; body: unknown } | null {
+): RebindingRefusal | null {
   if (opts.enable !== true) return null;
   const hosts = opts.allowedHosts ?? [];
   const origins = opts.allowedOrigins ?? [];
@@ -52,8 +62,8 @@ export function withDnsRebindingProtection(
   return (req, res, next) => {
     const rejection = checkDnsRebinding(
       {
-        host: req.headers?.host as string | undefined,
-        origin: req.headers?.origin as string | undefined,
+        host: req.headers.host,
+        origin: req.headers.origin,
       },
       opts,
     );

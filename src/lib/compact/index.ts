@@ -22,11 +22,23 @@ export {
   notAccepted,
   sharedMainType,
 } from '../adtTypeCode.js';
+export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
+export { isJsonObject, type JsonValue, jsonAt } from '../json.js';
+export { jsonOf } from '../jsonText.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
-export { LOCK_NOT_HELD_WORDS, lockHeldHere } from '../state/heldLocks.js';
-export { DETAIL_PROPERTY } from '../strategies/detail.js';
+export { spentBy } from '../sessionLoss.js';
+export {
+  LOCK_NOT_HELD_HERE_WORDS,
+  LOCK_NOT_HELD_WORDS,
+  lockHeldHere,
+  lockNotHeldWords,
+} from '../state/heldLocks.js';
+export { DETAIL_SHAPE } from '../strategies/detail.js';
+export { LOCK_WENT_WITH_SESSION_WORDS } from '../strategies/withLock.js';
+export { argMember, isArgList, isArgObject } from '../toolArgValue.js';
 export { byVariant } from '../variantDefinition.js';
+export { handlerBatchDefinition } from './batch/handleHandlerBatch.js';
 export * from './compactDescriptions.js';
 export {
   COMPACT_CRUD_MATRIX,
@@ -45,6 +57,8 @@ export {
   COMPACT_MAIN_PROGRAMS,
   compactActivateSchema,
   compactActivateSchemaFor,
+  compactActivateSchemaWithNamesFor,
+  compactActivateSchemaWithoutNamesFor,
   compactCdsUnitTestResultSchema,
   compactCdsUnitTestStatusSchema,
   compactCheckRunSchema,
@@ -60,6 +74,8 @@ export {
   compactGetDataSchema,
   compactGetSchema,
   compactGetSchemaFor,
+  compactGetSchemaWithNamesFor,
+  compactGetSchemaWithoutNamesFor,
   compactLockSchema,
   compactLockSchemaFor,
   compactProfileListSchema,
@@ -87,4 +103,22 @@ export {
   DELETABLE_TYPES,
   DELETION_CHECK_TYPES,
   EMPTIED_INCLUDE_TYPES,
+  handlerGetDataDefinition,
+  handlerGetDataWithoutSqlDefinition,
+  handlerGetDataWithSqlDefinition,
 } from './compactSchemas.js';
+export { handlerDebugBatchDefinition } from './debug/handleHandlerDebugBatch.js';
+export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBreakpoints.js';
+export { handlerDebugMaintainDefinition } from './debug/handleHandlerDebugMaintain.js';
+export { handlerDebugSessionDefinition } from './debug/handleHandlerDebugSession.js';
+export { handlerDebugStepDefinition } from './debug/handleHandlerDebugStep.js';
+export { handlerSessionDefinition } from './longSession/handleHandlerSession.js';
+export {
+  either,
+  exampleCodes,
+  type Left,
+  leftOf,
+  listed,
+  textsOf,
+  when,
+} from './memberTexts.js';

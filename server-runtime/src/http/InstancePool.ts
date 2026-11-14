@@ -31,6 +31,7 @@ import {
   type InstanceState,
   StateUnavailableError,
 } from '@mcp-abap-adt/lib/state';
+import { isList, type JsonValue, jsonAt } from '@mcp-abap-adt/lib/utils';
 
 export interface Poolable {
   readonly state: InstanceState;
@@ -79,17 +80,11 @@ export class PoolClosedError extends Error {
   }
 }
 
-interface JsonRpcCall {
-  method?: unknown;
-  params?: { arguments?: { state_handle?: unknown } };
-}
-
 /** The `state_handle` of a single `tools/call`; a batch carrying one is refused. */
-export function handleOf(body: unknown): string | undefined {
-  const one = (m: unknown): string | undefined => {
-    const call = m as JsonRpcCall | null | undefined;
-    const handle = call?.params?.arguments?.state_handle;
-    return call?.method === 'tools/call' && typeof handle === 'string'
+export function handleOf(body: JsonValue | undefined): string | undefined {
+  const one = (m: JsonValue | undefined): string | undefined => {
+    const handle = jsonAt(m, 'params', 'arguments', 'state_handle');
+    return jsonAt(m, 'method') === 'tools/call' && typeof handle === 'string'
       ? handle
       : undefined;
   };
@@ -113,7 +108,7 @@ export const STATE_HANDLE_HEADER = 'x-mcp-state-handle';
  */
 export function handleFrom(
   headers: IncomingHttpHeaders,
-  body: unknown,
+  body: JsonValue | undefined,
 ): string | undefined {
   const argument = handleOf(body);
   const header = headers[STATE_HANDLE_HEADER];
@@ -125,7 +120,7 @@ interface Held<T> {
   /** The handle the index files this entry under; follows rotation. */
   handle: string;
   /** The lease: requests on this instance queue here. */
-  tail: Promise<unknown>;
+  tail: Promise<void>;
   unsubscribe: () => void;
 }
 
@@ -144,11 +139,12 @@ function ownFailures(e: unknown): string[] | undefined {
   if (e === null || typeof e !== 'object') return undefined;
   try {
     const descriptor = Object.getOwnPropertyDescriptor(e, 'failures');
-    const value =
+    const value: unknown =
       descriptor && 'value' in descriptor ? descriptor.value : undefined;
-    return Array.isArray(value) && value.every((f) => typeof f === 'string')
-      ? (value as string[])
-      : undefined;
+    if (!isList(value)) return undefined;
+    const listed = Array.from(value);
+    const failures = listed.filter((f) => typeof f === 'string');
+    return failures.length === listed.length ? failures : undefined;
   } catch {
     return undefined;
   }
@@ -166,7 +162,7 @@ export class InstancePool<T extends Poolable> {
   private readonly failed = new Map<T, string>();
   /** Disposal failed or still finishing: owned for shutdown. */
   private readonly retained = new Set<T>();
-  private readonly active = new Set<Promise<unknown>>();
+  private readonly active = new Set<Promise<void>>();
   /** Instance closes the pool started and that still run: the shutdown awaits them. */
   private readonly closing = new Set<Promise<void>>();
   private admitting = true;
@@ -239,7 +235,7 @@ export class InstancePool<T extends Poolable> {
    * new instance as ever.
    */
   async serve(
-    request: { handle?: string; refuseUnknown?: boolean },
+    request: { handle?: string | undefined; refuseUnknown?: boolean },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
@@ -254,7 +250,7 @@ export class InstancePool<T extends Poolable> {
   }
 
   private route(
-    request: { handle?: string; refuseUnknown?: boolean },
+    request: { handle?: string | undefined; refuseUnknown?: boolean },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
@@ -279,7 +275,10 @@ export class InstancePool<T extends Poolable> {
           ? Promise.reject(new StateUnavailableError())
           : this.run(create(), work),
     );
-    entry.tail = turn.catch(() => undefined);
+    entry.tail = turn.then(
+      () => undefined,
+      () => undefined,
+    );
     return turn;
   }
 
@@ -333,7 +332,7 @@ export class InstancePool<T extends Poolable> {
     if (this.closedOut(instance)) return Promise.resolve();
     const running = this.evicting.get(instance);
     if (running) return running;
-    let done!: () => void;
+    let done: () => void = () => {};
     const eviction = new Promise<void>((resolve) => {
       done = resolve;
     });

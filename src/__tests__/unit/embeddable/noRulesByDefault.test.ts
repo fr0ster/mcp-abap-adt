@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * An embedder gets no rule unless it passes one: lib keeps the mechanism
  * (the resolver hook, the per-destination store, the main flow) and applies
@@ -86,9 +87,9 @@ class ReportingGroup extends BaseHandlerGroup {
         toolDefinition: {
           name: 'Report',
           description: 'd',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema: z.object({}),
         } as never,
-        handler: async () => ({
+        call: async () => ({
           content: [
             {
               type: 'text',

@@ -8,7 +8,10 @@
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { compactReadOnlyToolSetOf } from '@mcp-abap-adt/lib/tool-set';
 import { main, readOnlyToolSet } from '../launcher';
 
@@ -35,7 +38,9 @@ async function stopped(argv: string[]) {
 
 const shape = (set: typeof readOnlyToolSet) =>
   set
-    .groups({ connection: undefined as never, logger: undefined }, 'sse')
+    .groups({ connection: undefined as never, logger: undefined }, 'sse', {
+      dataTools: false,
+    })
     .map((group) => ({
       group: group.getName(),
       tools: group.getHandlers().map((entry) => entry.toolDefinition.name),
@@ -69,12 +74,17 @@ describe('mcp-abap-adt-compact-sse-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 18 tools (HandlerBatch among them), none of a background run or a leftover session', () => {
+  it('serves the read-only set without the data tool: 20 tools (HandlerBatch among them), the background-run tools, none of a leftover session', () => {
     expect(shape(readOnlyToolSet)).toEqual(
-      shape(compactReadOnlyToolSetOf(compactReadOnlyEntries)),
+      shape(
+        compactReadOnlyToolSetOf({
+          readOnly: compactReadOnlyEntries,
+          data: compactDataEntries,
+        }),
+      ),
     );
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(18);
-    expect(readOnlyToolSet.backgroundRuns).toBe(false);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(20);
+    expect(readOnlyToolSet.backgroundRuns).toBe(true);
     // The leftover-session tools are stdio's.
     expect(
       shape(readOnlyToolSet)

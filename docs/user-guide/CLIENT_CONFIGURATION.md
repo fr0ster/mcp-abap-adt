@@ -149,6 +149,17 @@ Destinations are served only by `mcp-abap-adt` (stdio); `mcp-abap-adt-http` and 
 `--mcp`, `--env` and `--env-path` at start, naming `mcp-abap-adt`. Without any of them, stdio starts in
 inspection-only mode (the tool list of the stated system type answers — inspection needs `--system-type` too; a tool call needs a connection).
 
+**Two systems that are never up at the same time** (one server each, as an MCP client starts
+them): `--deferred-logon` starts each without contacting its system, so neither fails at the
+start; a call to the one that is down answers `no_connection` with its cause code, and once the
+system is started the next call logs on — no reconnect by hand
+([--deferred-logon](CLI_OPTIONS.md#--deferred-logon)).
+
+```bash
+mcp-abap-adt --env=system-a --system-type=onprem --deferred-logon
+mcp-abap-adt --env=system-b --system-type=onprem --deferred-logon
+```
+
 ### How It Works
 
 1. **One destination per process.** For another destination, start another process (`--mcp=<other>`).
@@ -232,7 +243,7 @@ It takes no destination and no `.env`: each request carries its credential in `x
 
 ### Environment Variables
 
-The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`, `SAP_LANGUAGE` and the RFC message server's `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` (of an `--env` / `--env-path` file) reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
+The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CONNECTION_TYPE` and `SAP_SYSTEM_TYPE` reach the process environment; the client, the language and the RFC address (`SAP_CLIENT`, `SAP_LANGUAGE`, `SAP_ASHOST`, `SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER`) are the destination's own, read from the file and ranked after the CLI and the process's own environment and before YAML. Process-level settings (`NODE_EXTRA_CA_CERTS`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
 
 **A JWT you hold** is not served over stdio (19.0.0): send it in the `x-sap-jwt-token` header to
 `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. A `.env` stating
@@ -241,6 +252,7 @@ The connection lives in a `.env` file the server is told about (`--env-path`, `-
 **For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
 ```env
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=authorization_code
 SAP_UAA_URL=https://your-uaa.example
@@ -250,27 +262,34 @@ SAP_UAA_CLIENT_SECRET=your_client_secret
 
 **For SNC (passwordless, RFC):**
 ```env
-SAP_URL=https://your-onpremise-system.com:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 ```
-Add `SAP_CONNECTION_TYPE=rfc` to the `.env`, or start the server with `--connection-type=rfc`. No user and no password: the SNC credential is mapped to an ABAP user by its SNC name.
+Add `SAP_CONNECTION_TYPE=rfc` to the `.env`, or start the server with `--connection-type=rfc`. No user and no password: the SNC credential is mapped to an ABAP user by its SNC name. An RFC destination states its address, `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`; nothing is derived from a URL and nothing has a default.
 
-**For RFC through a message server and a logon group** (basic or SNC), add to the `.env`:
+**For RFC through a message server and a logon group** (basic or SNC), in place of `SAP_ASHOST` and `SAP_SYSNR`:
 ```env
 SAP_CONNECTION_TYPE=rfc
 SAP_MSHOST=your-message-server.example
-# SAP_MSSERV or SAP_SYSID is required beside SAP_MSHOST
+# SAP_MSSERV or SAP_SYSID (or both) is required beside SAP_MSHOST
 SAP_SYSID=ABC
-# Optional: the logon group (connection's default PUBLIC) and a SAProuter string
-# SAP_GROUP=PUBLIC
+# The logon group is required
+SAP_GROUP=<logon group>
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
+# Optional: a SAProuter string, with either address
 # SAP_SAPROUTER=/H/your-router.example/S/3299/H/
 ```
-The RFC wire then takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read. The same fields are `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` and the YAML keys of those names; see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
+The same fields are `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` (and `--ashost`, `--sysnr`, `--client`, `--language`) and the YAML keys of those names; see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 **For basic authentication (on-premise):**
 ```env
 SAP_URL=https://your-onpremise-system.com:8000
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
@@ -395,6 +414,7 @@ With a resolver and no rules, the information is applied and no information leav
 **Example `.env` for on-premise:**
 ```env
 SAP_URL=http://your-sap-system:8000
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=JSMITH
 SAP_PASSWORD=secret

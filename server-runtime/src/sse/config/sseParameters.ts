@@ -8,26 +8,33 @@
  */
 
 import {
+  ACCESS_RESTRICTION_ROWS,
   BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
+  ENABLE_DATA_TOOLS_ROW,
+  flagValue,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
+  listValue,
+  numberValue,
   type Parameter,
   type ParameterTable,
-  type ParameterValue,
   parameterSource,
+  readAccessRestrictions,
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   STATE_IDLE_ROW,
   type TlsConfig,
+  textValue,
   tlsConfigOf,
   tlsRows,
   transportRemoved,
+  wordValue,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
+import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 
 const SSE = 'SSE';
 
@@ -50,9 +57,10 @@ export const SSE_ROWS: readonly Parameter[] = [
     env: 'MCP_SSE_PORT',
     yaml: 'sse.port',
     kind: 'port',
+    ephemeral: true,
     default: 3001,
     section: SSE,
-    help: 'Port to listen on, 1-65535 (default 3001)',
+    help: 'Port to listen on, 1-65535, or 0 for a free one the system chooses, announced on the listening line (default 3001)',
   },
   {
     key: 'ssePath',
@@ -119,7 +127,9 @@ export function sseParameters(
       ...tlsRows('sse'),
       STATE_IDLE_ROW,
       BATCH_KEEP_RAW_PARTS_ROW,
+      ENABLE_DATA_TOOLS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
       toolSet.expositionRemoved('sse'),
@@ -135,24 +145,21 @@ export const SSE_PARAMETERS: ParameterTable = sseParameters(fullToolSet);
 
 /** What `mcp-abap-adt-sse` reads. */
 export interface SseConfig extends IServerConfig {
-  host?: string;
-  port?: number;
+  host?: string | undefined;
+  port?: number | undefined;
   /** The path of the GET that opens an SSE connection */
-  ssePath?: string;
+  ssePath?: string | undefined;
   /** The path of a connection's POST messages */
-  postPath?: string;
+  postPath?: string | undefined;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | undefined;
   /** Enable DNS-rebinding protection */
-  enableDnsRebindingProtection?: boolean;
+  enableDnsRebindingProtection?: boolean | undefined;
   /** TLS: cert and key start HTTPS */
-  tls?: TlsConfig;
+  tls?: TlsConfig | undefined;
 }
-
-const list = (v: ParameterValue | undefined): string[] | undefined =>
-  Array.isArray(v) ? [...v] : undefined;
 
 /**
  * `mcp-abap-adt-sse`'s configuration from the arguments, the environment and
@@ -168,20 +175,22 @@ export function readSseConfig(
   const table = sseParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    configFile: values.configFile as string | undefined,
-    systemType: values.systemType as SseConfig['systemType'],
+    configFile: textValue(values.configFile),
+    systemType: wordValue(values.systemType, SYSTEM_TYPES),
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
-    stateIdleMinutes: values.stateIdleMinutes as number,
+    stateIdleMinutes: numberValue(values.stateIdleMinutes),
     batchKeepRawParts: values.batchKeepRawParts === true,
-    shutdownTimeout: values.shutdownTimeout as number | undefined,
-    host: values.host as string,
-    port: values.port as number,
-    ssePath: values.ssePath as string | undefined,
-    postPath: values.postPath as string | undefined,
-    allowedHosts: list(values.allowedHosts),
-    allowedOrigins: list(values.allowedOrigins),
+    enableDataTools: values.enableDataTools === true,
+    accessRestrictions: readAccessRestrictions(argv, env, yaml),
+    shutdownTimeout: numberValue(values.shutdownTimeout),
+    host: textValue(values.host),
+    port: numberValue(values.port),
+    ssePath: textValue(values.ssePath),
+    postPath: textValue(values.postPath),
+    allowedHosts: listValue(values.allowedHosts),
+    allowedOrigins: listValue(values.allowedOrigins),
     enableDnsRebindingProtection:
-      (values.enableDnsRebindingProtection as boolean | undefined) ?? false,
+      flagValue(values.enableDnsRebindingProtection) ?? false,
     tls: tlsConfigOf(values),
   };
 }

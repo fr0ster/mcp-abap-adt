@@ -25,9 +25,9 @@ function firstPlatformSessionsDir(customPath?: string): string {
 }
 
 export function resolveEnvFilePath(options: {
-  envDestination?: string;
-  envPath?: string;
-  authBrokerPath?: string;
+  envDestination?: string | undefined;
+  envPath?: string | undefined;
+  authBrokerPath?: string | undefined;
 }): string | undefined {
   const envPath = options.envPath?.trim();
   if (envPath) {

@@ -20,6 +20,7 @@ import {
   feedGatewayErrors,
   feedSystemMessages,
   feedVariants,
+  type IObjectVersion,
   objectVersions,
   profilerDbAccesses,
   profilerHitList,
@@ -32,9 +33,20 @@ import {
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { XmlNode } from '../xml/node';
 import { nodeLevel } from './packageWalk';
-import { statusOnly, structured, verbatim } from './reading';
+import { type AdtReading, statusOnly, structured, verbatim } from './reading';
 import { sqlPreview } from './sqlPreview';
+
+/**
+ * What a strategy of the table reads an answer into: a reading of the
+ * document (`verbatim`, `structured`, `statusOnly`), the text as it came
+ * (`asItCame`), or the version list (`objectVersions`).
+ */
+type TableReading =
+  | AdtReading<string | XmlNode | null | undefined>
+  | string
+  | readonly IObjectVersion[];
 
 /**
  * Which reading a result-set slot wants — keyed on the slot, because that is
@@ -76,10 +88,11 @@ import { sqlPreview } from './sqlPreview';
  * the same treatment — `search`, `types`, `node`, `inactive`, `status` and
  * `result` in those two sets all read only `answer.data` and are unaffected.
  */
-// `satisfies`, never a `: Record<string, IResultStrategy<unknown>>`
-// annotation — the annotation is what erased every slot's type to `unknown`
-// and made `resultsFor` return its input type untouched. `satisfies` checks
-// the same shape (every value is an `IResultStrategy<unknown>`) without
+// `satisfies`, never a `: Record<string, IResultStrategy<TableReading>>`
+// annotation — the annotation is what erased every slot's type to its
+// constraint and made `resultsFor` return its input type untouched.
+// `satisfies` checks the same shape (every value is an
+// `IResultStrategy<TableReading>`) without
 // widening a single one of them: `READING_BY_SLOT.source` stays the literal
 // type of `verbatim`, `(answer) => AdtReading<string>`, which is what makes
 // the mapped type below able to answer it back per slot. The package's own
@@ -103,6 +116,11 @@ export const READING_BY_SLOT = {
   // to the DDL set in adt-clients 24; it reads the same answer.
   testDoubles: structured,
   activation: structured,
+  // Arrived with adt-clients 45.0.0, on `getUtils().activateObjects`: the
+  // synchronous group activation answers the same document a single object's
+  // activation does (`chkl:messages`, `ioc:inactiveObjects`, or nothing), so
+  // it is read the same way, and `terseActivation` projects it.
+  objectActivation: structured,
   validation: structured,
   deletion: structured,
   deleted: structured,
@@ -292,7 +310,7 @@ export const READING_BY_SLOT = {
   // `opr:objectProperties` document — the object and its facets
   // (application component, package chain). `GetTransaction` reads it.
   objectProperties: structured,
-} satisfies Record<string, IResultStrategy<unknown>>;
+} satisfies Record<string, IResultStrategy<TableReading>>;
 
 /**
  * What `resultsFor` answers for one slot that is NOT in the keep-list: the
@@ -326,17 +344,24 @@ type SlotReading<P extends PropertyKey> = P extends keyof typeof READING_BY_SLOT
  * checked as answering `string` when it actually answers `AdtReading<string>`.
  */
 export function resultsFor<
-  R extends Record<string, unknown>,
+  R extends Readonly<Record<string, object>>,
   const K extends readonly (keyof R)[] = [],
 >(
   shipped: R,
-  keep: K = [] as unknown as K,
-): { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> } {
-  const kept = new Set<keyof R>(keep);
-  const out: Record<string, unknown> = {};
-  const table = READING_BY_SLOT as Record<string, IResultStrategy<unknown>>;
+  keep?: K,
+): { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> };
+// The signature above is the contract; TypeScript cannot follow a mapped
+// type through an object built slot by slot, so the body is checked against
+// this wider one (an overload, not an assertion).
+export function resultsFor(
+  shipped: Readonly<Record<string, object>>,
+  keep: readonly PropertyKey[] = [],
+): Record<string, object> {
+  const kept = new Set<PropertyKey>(keep);
+  const out: Record<string, object> = {};
+  const table: Readonly<Record<string, object>> = READING_BY_SLOT;
   for (const slot of Object.keys(shipped)) {
-    if (kept.has(slot as keyof R)) {
+    if (kept.has(slot)) {
       out[slot] = shipped[slot];
       continue;
     }
@@ -346,7 +371,7 @@ export function resultsFor<
     }
     out[slot] = reading;
   }
-  return out as { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> };
+  return out;
 }
 
 /**

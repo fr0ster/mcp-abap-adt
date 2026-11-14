@@ -13,8 +13,8 @@ import '../instance.js';
 
 /** The variant declared for a connection: what a type argument is checked against. */
 export { variantOf } from '../clients.js';
-// Handler arguments derived from a tool's JSON schema
-export type { ArgsOf } from './argsOf.js';
+export type { SearchMeta } from '../listedTool.js';
+export type { ToolContentItem, ToolResultLike } from '../toolResult.js';
 // Base classes
 export { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 // Handler groups
@@ -37,10 +37,5 @@ export {
   noConnectionContext,
   registryForExposition,
 } from './registry/expositionRegistry.js';
-// The call form of a handler: the one rule every registration path follows
-export {
-  type CallContext,
-  callInItsForm,
-  type InGroupContext,
-  isArgsOnly,
-} from './utils/handlerCall.js';
+// The context one call of a registered tool runs in
+export type { CallContext } from './utils/handlerCall.js';

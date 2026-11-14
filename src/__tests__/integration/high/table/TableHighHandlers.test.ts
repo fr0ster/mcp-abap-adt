@@ -14,25 +14,36 @@
  * Run: npm test -- --testPathPattern=integration/table
  */
 
-import { handleCreateTable } from '../../../../handlers/table/high/handleCreateTable';
-import { handleDeleteTable } from '../../../../handlers/table/high/handleDeleteTable';
-import { handleUpdateTable } from '../../../../handlers/table/high/handleUpdateTable';
-import { getTimeout } from '../../helpers/configHelpers';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import {
+  TOOL_DEFINITION as CreateTableTool,
+  handleCreateTable,
+} from '../../../../handlers/table/high/handleCreateTable';
+import {
+  TOOL_DEFINITION as DeleteTableTool,
+  handleDeleteTable,
+} from '../../../../handlers/table/high/handleDeleteTable';
+import {
+  handleUpdateTable,
+  TOOL_DEFINITION as UpdateTableTool,
+} from '../../../../handlers/table/high/handleUpdateTable';
+
+import { defineTool } from '../../../../lib/handlers/interfaces';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Table High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester('create_table', 'builder_table', 'table-high', {
-      create: handleCreateTable,
-      update: handleUpdateTable,
-      delete: handleDeleteTable,
+      create: defineTool(CreateTableTool, handleCreateTable),
+      update: defineTool(UpdateTableTool, handleUpdateTable),
+      delete: defineTool(DeleteTableTool, handleDeleteTable),
     });
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -44,11 +55,7 @@ describe('Table High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Table high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Table high-level handlers', async () => {
+    await tester.run();
+  });
 });

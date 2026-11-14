@@ -385,6 +385,11 @@ What it typed in the exported surface, read from the built declarations:
   `sessionCookies`, `getConfig`) are optional members of `IAbapConnection`, called with `?.`.
   **What you do:** a connection of your own that has one gives it the contract's type
   (`getSessionType(): 'stateful' | 'stateless'`, `getConfig(): IAbapConnectionConfig`, …).
+- **`/embeddable`:** `OpenBatch.target` (`LateBoundConnection`) has `getSessionType` and
+  `getSessionMode` as optional members (`?: () => 'stateful' | 'stateless'`), each present
+  only while the connection it points at has the same-named one, instead of methods answering
+  `'stateful' | 'stateless' | undefined`. **What you do:** call them with `?.()`; the answer is
+  the one the method gave.
 
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 

@@ -45,12 +45,14 @@ against a `?: T`.
   object's members; a recursive type is cut where it repeats. No flow is followed: a site
   holding `unknown` or `any` is refused unless it is one of the boundaries below, and a form the
   sweep does not know is refused, never passed. Each position is charged once, to the node that
-  writes it: a declaration whose own written type holds it, an object literal's member, an
+  writes it: a declaration whose own written type holds it, an expression whose own written type
+  holds it (`x satisfies T`, `x as T`, `<T>x`, the type arguments of a call, a `new`, a tagged
+  template, an instantiation expression `f<T>` or a JSX element), an object literal's member, an
   instantiation no argument or receiver brought it into.
   - **A third party's type is its contract** and is not walked: what it types `unknown` is the
     boundary itself. **The type arguments we write for one are ours**
-    (`IAdtResponse<unknown, IAdtError>`): they are walked where they are written, at any depth
-    of the written type. The language's own structure (`Record`, `Readonly`, `Array`,
+    (`IAdtResponse<unknown, IAdtError>`): they are walked where they are written, in a
+    declaration or inside an expression, at any depth of the written type. The language's own structure (`Record`, `Readonly`, `Array`,
     `Promise`, `Map`) is walked; a member of a runtime object of the language (`Error.cause`)
     is not a position.
   - **Bound by the caller:** a type parameter's constraint and default are not sites; each
@@ -58,8 +60,11 @@ against a `?: T`.
     included.
   - Three checks run beside it: an expression of type `any` (a library's answer) lands only
     where `unknown` or `any` is expected, is discarded or only inspected; a typed value put
-    where `unknown` is expected is charged to that slot, refused in a parse site and in a third
-    party's member read back by the repository; a sink slot is read only by its one reader.
+    where `unknown` is expected — a container literal landing there whole included — is charged
+    to that slot, refused in a parse site and in a third party's member read back by the
+    repository (by name, by a key, by any destructuring; a read whose value only passes on,
+    where `unknown` or `any` is expected, or is only inspected, reads nothing back); a sink slot
+    is read only by its one reader.
 - **The boundaries** (`BoundaryKind`), the one list a site may pass under:
   - **caught** — a `catch` binding, a promise's rejection handler's parameter;
   - **thrown** — a reader of thrown values or a failure slot (`THROWN_READERS`, by exact site

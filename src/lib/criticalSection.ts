@@ -26,27 +26,19 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
  * section for the whole call. `getConnection` is a thunk because the connection
  * lives on the per-request handler context, resolved when the handler runs.
  *
- * Generic over the handler's own signature so the wrapped function keeps the
- * exact arity/return type (and stays assignable to an entry's `call`).
+ * Generic over the handler's own parameters so the wrapped function keeps the
+ * exact arity/return type (and stays assignable to an entry's `call`), and
+ * hands the handler exactly the arguments it is called with.
  */
-export function withCriticalSection<R>(
-  handler: () => Promise<R>,
+export function withCriticalSection<P extends unknown[], R>(
+  handler: (...args: P) => Promise<R>,
   getConnection: () => IAbapConnection,
-): () => Promise<R>;
-/** A handler of a context and its arguments, wrapped the same. */
-export function withCriticalSection<C, A, R>(
-  handler: (context: C, args: A) => Promise<R>,
-  getConnection: () => IAbapConnection,
-): (context: C, args: A) => Promise<R>;
-export function withCriticalSection<C, A, R>(
-  handler: (context: C, args: A) => Promise<R>,
-  getConnection: () => IAbapConnection,
-): (context: C, args: A) => Promise<R> {
-  return async (context: C, args: A) => {
+): (...args: P) => Promise<R> {
+  return async (...args: P) => {
     const conn = getConnection();
     conn.beginCriticalSection?.();
     try {
-      return await handler(context, args);
+      return await handler(...args);
     } finally {
       conn.endCriticalSection?.();
     }

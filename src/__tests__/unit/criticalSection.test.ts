@@ -92,4 +92,13 @@ describe('withCriticalSection', () => {
     );
     await expect(wrapped()).resolves.toBe('ok');
   });
+
+  it('hands the handler exactly the arguments the wrapper is called with', async () => {
+    const conn = {} as unknown as IAbapConnection;
+    const counted = async (...args: unknown[]) => args.length;
+    await expect(withCriticalSection(counted, () => conn)()).resolves.toBe(0);
+    await expect(
+      withCriticalSection(counted, () => conn)({} as any, {}),
+    ).resolves.toBe(2);
+  });
 });

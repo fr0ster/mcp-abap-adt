@@ -17,7 +17,6 @@
  */
 
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
-import { child } from '../outsideValue';
 
 export type SessionKind = 'lock' | 'unlock' | 'stateless' | 'stateful';
 
@@ -54,7 +53,13 @@ function paramAction(
   if (typeof params === 'string') {
     return new URLSearchParams(params).get('_action');
   }
-  const action = child(params, '_action');
+  const action =
+    typeof params === 'object' &&
+    params !== null &&
+    !Array.isArray(params) &&
+    '_action' in params
+      ? params._action
+      : undefined;
   return action === undefined ? null : String(action);
 }
 

@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
@@ -50,7 +50,7 @@ export async function handleGetUnitTestStatus(
   // by enumerating every `answer()` call's own projection rather than only
   // calls to the shared `project()` helper, which this handler's own
   // hand-written, `AdtReading`-typed projection does not use.
-  const terseRunStatus: Terse<unknown> = (value) => ({
+  const terseRunStatus = (value: unknown) => ({
     run_id,
     finished: runIsFinished(value),
     run_status: runProgressStatus(value),

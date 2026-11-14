@@ -171,7 +171,9 @@ export function escapeOrderedText(value: string): string {
 }
 
 /** A text member of the ordered form holding `value`, escaped ({@link escapeOrderedText}). */
-export function orderedTextMember(value: string): Element {
+export function orderedTextMember(value: string): {
+  readonly [name: string]: string;
+} {
   return { [ORDERED_TEXT]: escapeOrderedText(value) };
 }
 

@@ -24,7 +24,7 @@ import type { AdtReading } from './reading';
 export type AnswerDetail = 'terse' | 'full' | 'raw';
 
 /** The shape of a terse projection: from a parse, the fields worth naming. */
-export type Terse<T> = (value: T, status: number) => unknown;
+export type Terse<T, R> = (value: T, status: number) => R;
 
 /**
  * Build the projection `return_answer` calls.
@@ -68,7 +68,7 @@ function textOf(node: unknown): string {
  * A write with nothing to report. A class create answers 200 with zero bytes
  * and a successful source write answers the same, so the status is the verdict.
  */
-export const terseWrite: Terse<unknown> = (_value, status) =>
+export const terseWrite = (_value: unknown, status: number) =>
   status >= 200 && status < 300 ? 'SUCCESS' : undefined;
 
 /**
@@ -154,7 +154,7 @@ export function terseActivationAnswer(
  * activated before any projection runs). An activation's answer is projected
  * by {@link projectActivation}, which reads the empty `200` too.
  */
-export const terseActivation: Terse<unknown> = (value) => {
+export const terseActivation = (value: unknown, _status?: number) => {
   const checklist = child(value, 'chkl:messages');
   return checklist
     ? terseActivationAnswer({ form: 'checklist', checklist })
@@ -182,7 +182,7 @@ export function projectActivation<T>(
 }
 
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */
-export const terseCheck: Terse<unknown> = (value) => {
+export const terseCheck = (value: unknown, _status?: number) => {
   const report = first(
     childAt(value, 'chkrun:checkRunReports', 'chkrun:checkReport'),
   );
@@ -209,7 +209,7 @@ export const terseCheck: Terse<unknown> = (value) => {
  * the delete's own document: a check that permits the delete is followed by
  * it (`deleteIfDeletable`), and a refused check is a failure, answered as one.
  */
-export const terseDeletion: Terse<unknown> = (value) => {
+export const terseDeletion = (value: unknown, _status?: number) => {
   const object = first(childAt(value, 'del:deletionResult', 'del:object'));
   if (!object) return undefined;
   return {
@@ -233,7 +233,7 @@ function deletionMessage(object: unknown) {
  * object, and SAP's message when it carries text (a permitted check may say
  * the object does not exist; that is SAP's answer, as it came).
  */
-export const terseDeletionCheck: Terse<unknown> = (value) => {
+export const terseDeletionCheck = (value: unknown, _status?: number) => {
   const object = first(childAt(value, 'del:checkResponse', 'del:object'));
   if (!object) return undefined;
   return {
@@ -254,7 +254,7 @@ export const terseDeletionCheck: Terse<unknown> = (value) => {
  * behind it, so it is answered as `result`, exactly as sent (an absent or
  * empty one as `''`), with SAP's messages and no `admissible` of ours.
  */
-export const terseTransportCheck: Terse<unknown> = (value) => {
+export const terseTransportCheck = (value: unknown, _status?: number) => {
   const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
   const result = textOf(child(data, 'RESULT'));
@@ -271,7 +271,7 @@ export const terseTransportCheck: Terse<unknown> = (value) => {
 };
 
 /** Validation: `CHECK_RESULT` means admissible, `SEVERITY` carries a verdict. */
-export const terseValidation: Terse<unknown> = (value) => {
+export const terseValidation = (value: unknown, _status?: number) => {
   const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
   if (!data) return undefined;
   const checkResult = child(data, 'CHECK_RESULT');

@@ -25,7 +25,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -74,7 +74,7 @@ export async function handleAddTransportObject(
   // No `success`, for the reason `RemoveTransportObject` gives at length: the
   // answer is an echo of the request, not a report of what happened, and a
   // reader who stops at `success` would skip the re-read that establishes it.
-  const terseAddition: Terse<unknown> = () => ({
+  const terseAddition = () => ({
     accepted: true,
     added: 'unknown',
     transport_number: args.transport_number,

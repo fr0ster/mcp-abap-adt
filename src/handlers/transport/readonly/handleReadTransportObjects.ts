@@ -32,7 +32,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -153,7 +153,7 @@ export async function handleReadTransportObjects(
 
   const detail = detailOf(args);
 
-  const terseObjects: Terse<unknown> = (value) => {
+  const terseObjects = (value: unknown) => {
     const entries = entriesOf(value);
     return {
       success: true,

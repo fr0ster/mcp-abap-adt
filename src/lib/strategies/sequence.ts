@@ -38,7 +38,7 @@ import { attachCleanup, carryCleanup } from './withLock';
  *
  * This example used to pass `writeProjection` (from `promised.ts`) straight
  * to `answer()` in place of the last line above. That does not compile:
- * `writeProjection` is `Terse<unknown>` — `(value, status)`, same as
+ * `writeProjection` is `(value, status)`, same as
  * `terseWrite` — and `answer()`'s `project` takes one argument. A function
  * that requires a second, required parameter is not assignable where the
  * caller supplies only the first — TS2345, "Target signature provides too

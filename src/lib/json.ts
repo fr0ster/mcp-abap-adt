@@ -98,42 +98,28 @@ export type AnswerValue =
 export type AnswerObject = { readonly [key: string]: AnswerValue };
 
 /**
- * `value` as an answer's value, built afresh from what it holds, or
- * `undefined` when it, or anything it holds, is not one: the one check of a
- * value from outside the type system (a thrown carrier's) before it rides in
- * a payload. An absent member stays absent.
+ * `value` as an answer's value: what its JSON text says, read back and
+ * checked ({@link parseJson}), so it answers exactly what serialising it
+ * would (a `Date` its text, a member JSON leaves out left out). `undefined`
+ * when it has no JSON text (`undefined` itself, a function) or cannot be
+ * serialised (a cycle). The one check of a value from outside the type
+ * system (a thrown carrier's) before it rides in a payload.
  */
 export function answerValueOf(value: unknown): AnswerValue | undefined {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  ) {
-    return value;
+  let text: string | undefined;
+  try {
+    text = JSON.stringify(value);
+  } catch {
+    return undefined;
   }
-  if (Array.isArray(value)) {
-    const items: AnswerValue[] = [];
-    for (const item of value) {
-      const read = answerValueOf(item);
-      if (read === undefined && item !== undefined) return undefined;
-      items.push(read);
-    }
-    return items;
-  }
-  return answerObjectOf(value);
+  return text === undefined ? undefined : parseJson(text);
 }
 
 /** `value` as an answer's JSON object ({@link answerValueOf}), or `undefined`. */
 export function answerObjectOf(value: unknown): AnswerObject | undefined {
   if (!isElement(value)) return undefined;
-  const members: [string, AnswerValue][] = [];
-  for (const [key, member] of Object.entries(value)) {
-    const read = answerValueOf(member);
-    if (read === undefined && member !== undefined) return undefined;
-    members.push([key, read]);
-  }
-  return Object.fromEntries(members);
+  const read = answerValueOf(value);
+  return read !== undefined && isAnswerObject(read) ? read : undefined;
 }
 
 /** Whether an answer's value is an object: neither a list nor a scalar. */

@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
@@ -41,7 +41,7 @@ export async function handleGetCdsUnitTestStatus(
   // Task 28 fix round 1 — same finding, same fix as `GetUnitTestStatus`:
   // `getStatus`'s result is `structured` (a real `AdtReading`), and `detail`
   // was missing while the projection always answered the whole parse.
-  const terseRunStatus: Terse<unknown> = (value) => ({
+  const terseRunStatus = (value: unknown) => ({
     run_id,
     finished: runIsFinished(value),
     run_status: runProgressStatus(value),

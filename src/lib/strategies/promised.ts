@@ -1,5 +1,5 @@
 import { type JsonValue, jsonOf } from '../json';
-import { type Terse, terseWrite } from './projections';
+import { terseWrite } from './projections';
 import type { AdtReading } from './reading';
 import {
   parseStructure,
@@ -54,7 +54,7 @@ export const writeReading = statusOnly;
 /**
  * And its projection: worked, or nothing — never `undefined` on a success.
  *
- * `Terse<T>` — two parameters, `(value, status)` — same as `terseWrite`
+ * `Terse<T, R>` — two parameters, `(value, status)` — same as `terseWrite`
  * itself. **Not what `answer()`'s `project` takes.** `answer<T>(ctx, call,
  * project: (value: T) => unknown)` is one parameter, and a function requiring
  * a second, required one is not assignable where the caller supplies only the
@@ -68,7 +68,7 @@ export const writeReading = statusOnly;
  * it be exercised directly against a reading in `strategyPromised.test.ts`
  * without a caller in between.
  */
-export const writeProjection: Terse<unknown> = terseWrite;
+export const writeProjection = terseWrite;
 
 /**
  * A read's answer, in the promised form, at the requested detail.

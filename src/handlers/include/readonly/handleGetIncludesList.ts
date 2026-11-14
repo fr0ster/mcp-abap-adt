@@ -36,7 +36,11 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { type JsonValue, jsonOrText } from '../../../lib/json';
+import {
+  type AnswerObject,
+  type JsonValue,
+  jsonOrText,
+} from '../../../lib/json';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
@@ -283,7 +287,7 @@ async function includesListOf(
     const utils = client.getUtils(ourUtils);
 
     /** What could not be read, and why — reported beside the tree. */
-    const unreadable: Record<string, unknown>[] = [];
+    const unreadable: AnswerObject[] = [];
     const sourceOf = async (
       what: string,
       read: Promise<SourceAnswer>,
@@ -686,7 +690,7 @@ async function treeFromAnswers(
       if (!result.ok) throw result.error;
       return result.value;
     };
-    const unreadable: Record<string, unknown>[] = [];
+    const unreadable: AnswerObject[] = [];
     const sourceOf = (what: string, read: SourceRead_): string => {
       const answer = readSource(answered(read));
       if (answer.kind === 'text') return answer.text;

@@ -17,7 +17,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { child, childAt, isList } from '../../../lib/xml/tree';
@@ -81,7 +81,7 @@ export async function handleReadTransportActionLog(
 
   const detail = detailOf(args);
 
-  const terseLog: Terse<unknown> = (value) => {
+  const terseLog = (value: unknown) => {
     const entries = entriesOf(value);
     return {
       success: true,

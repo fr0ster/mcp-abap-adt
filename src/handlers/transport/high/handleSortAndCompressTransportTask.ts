@@ -23,7 +23,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -59,7 +59,7 @@ export async function handleSortAndCompressTransportTask(
   // No `success`, for the reason `RemoveTransportObject` gives: the answer is
   // an empty `200` and says nothing about the list, so `success` would claim
   // what nobody measured. `accepted` and the re-read that settles it instead.
-  const terseSort: Terse<unknown> = () => ({
+  const terseSort = () => ({
     accepted: true,
     transport_number: args.transport_number,
     confirm_with: `ReadTransportObjects on ${args.transport_number} — this answer only says the request was understood; it carries no object list.`,

@@ -44,7 +44,7 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
@@ -124,7 +124,7 @@ export async function handleCreateTransportTask(
   // not fail the creation — it is said in the answer instead.
   let typed: { type: TaskType; error?: FailureEntry } = { type: 'X' };
 
-  const terseTask: Terse<unknown> = (value) => {
+  const terseTask = (value: unknown) => {
     const number = taskNumberOf(value);
     return {
       success: true,

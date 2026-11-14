@@ -22,7 +22,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -116,7 +116,7 @@ export async function handleMoveTransportObjects(
   // echoes what it was sent, so the answer says the document was understood,
   // not that any entry changed task. `accepted`, and the re-read of both tasks
   // that settles it.
-  const terseMove: Terse<unknown> = () => ({
+  const terseMove = () => ({
     accepted: true,
     transport_number: args.transport_number,
     target_number: args.target_number,

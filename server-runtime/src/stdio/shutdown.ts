@@ -110,11 +110,14 @@ const birthStates = new WeakMap<StartBirth, StartBirthState>();
 export function startBirth(): StartBirth {
   let began = false;
   let opened = false;
-  let birth: Promise<unknown> = Promise.resolve();
+  let birth: Promise<void> = Promise.resolve();
   const state: StartBirthState = {
     shutdownBegan: () => began,
     joining: (pending) => {
-      birth = pending;
+      birth = pending.then(
+        () => undefined,
+        () => undefined,
+      );
       return pending;
     },
     open: () => {
@@ -126,11 +129,7 @@ export function startBirth(): StartBirth {
       began = true;
     },
     opened: () => opened,
-    settled: () =>
-      birth.then(
-        () => undefined,
-        () => undefined,
-      ),
+    settled: () => birth,
   };
   birthStates.set(state, state);
   return state;

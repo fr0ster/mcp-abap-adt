@@ -94,7 +94,7 @@ export async function handleDeleteMetadataExtension(
     // sent, is a deletion document; the DELETE's own answer is an empty 2xx.
     project(detail, (value: unknown, status) =>
       child(value, 'del:checkResponse')
-        ? terseDeletion(value, status)
+        ? terseDeletion(value)
         : terseWrite(value, status),
     ),
   );

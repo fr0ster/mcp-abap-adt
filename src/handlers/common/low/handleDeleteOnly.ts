@@ -161,9 +161,10 @@ export async function handleDeleteOnly(
       )(),
     // The metadata extension's DELETE answers an empty 2xx; every other
     // deletion a `del:deletionResult`.
-    project(
-      'terse',
-      objectType === 'METADATA_EXTENSION' ? terseWrite : terseDeletion,
+    project('terse', (value: unknown, status: number) =>
+      objectType === 'METADATA_EXTENSION'
+        ? terseWrite(value, status)
+        : terseDeletion(value),
     ),
   );
 }

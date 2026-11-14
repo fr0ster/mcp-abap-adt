@@ -42,8 +42,13 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AnswerValue,
+  isAnswerList,
+  isAnswerObject,
+  parseJson,
+} from '../../../lib/json';
 import { return_error } from '../../../lib/utils';
-import { child, isList } from '../../../lib/xml/tree';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
 /** DescribeByList's arguments, as its schema parses them. */
@@ -126,16 +131,17 @@ function describedBy(
     return { entry: undefined };
   }
   // Handle SearchObject-style payloads containing a results array
-  const allResults: unknown[] = [];
+  const allResults: AnswerValue[] = [];
   for (const item of res.content) {
-    try {
-      const parsedItem: unknown = JSON.parse(item.text);
-      const listed = child(parsedItem, 'results');
-      if (listed && isList(listed)) allResults.push(...listed);
-      else allResults.push(parsedItem);
-    } catch {
-      allResults.push(item);
+    const parsedItem = parseJson(item.text);
+    if (parsedItem === undefined) {
+      allResults.push({ type: item.type, text: item.text });
+      continue;
     }
+    const listed = isAnswerObject(parsedItem) ? parsedItem.results : undefined;
+    if (listed !== undefined && isAnswerList(listed)) {
+      allResults.push(...listed);
+    } else allResults.push(parsedItem);
   }
   return {
     entry: {

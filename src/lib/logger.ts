@@ -7,7 +7,6 @@
  */
 
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { entries } from './xml/tree';
 
 /**
  * What a log line spreads of its data: an object's own members; a value
@@ -17,30 +16,23 @@ function spreadable(data: unknown): object {
   return typeof data === 'object' && data !== null ? data : {};
 }
 
-/**
- * Safely stringifies an object, handling circular references
- */
-/** A header map with the credentials it may hold replaced. */
-function redactedHeaders(headers: unknown): Record<string, unknown> {
-  const sanitizedHeaders: Record<string, unknown> = {};
-  for (const [headerKey, headerValue] of entries(headers)) {
-    if (
-      headerKey.toLowerCase() === 'authorization' ||
-      headerKey.toLowerCase() === 'cookie' ||
-      headerKey.toLowerCase() === 'x-csrf-token'
-    ) {
-      sanitizedHeaders[headerKey] = '[REDACTED]';
-    } else {
-      sanitizedHeaders[headerKey] = headerValue;
-    }
-  }
-  return sanitizedHeaders;
-}
+/** The header names whose values a log line never carries, lower case. */
+const REDACTED_HEADERS: ReadonlySet<string> = new Set([
+  'authorization',
+  'cookie',
+  'x-csrf-token',
+]);
 
-/** A log line's fields as JSON: circular and transport objects named, credentials redacted. */
+/**
+ * A log line's fields as JSON: circular and transport objects named, and the
+ * credentials a header may hold (`Authorization`, `Cookie`, `X-CSRF-Token`,
+ * in any case and at any depth — a request's or an error's `config` headers
+ * among them) replaced.
+ */
 function safeStringify(obj: object): string {
   const seen = new WeakSet();
   return JSON.stringify(obj, (key: string, value: unknown) => {
+    if (REDACTED_HEADERS.has(key.toLowerCase())) return '[REDACTED]';
     if (typeof value === 'object' && value !== null) {
       if (seen.has(value)) {
         return '[Circular]';
@@ -55,30 +47,6 @@ function safeStringify(obj: object): string {
       key === 'req'
     ) {
       return '[HTTP Object]';
-    }
-    // Remove sensitive headers (Authorization, Cookie, etc.)
-    if (key === 'Authorization' || key === 'authorization') {
-      return '[REDACTED]';
-    }
-    // Remove sensitive data from config.headers
-    if (key === 'headers' && value && typeof value === 'object') {
-      return redactedHeaders(value);
-    }
-    // Remove sensitive data from config object (AxiosError.config)
-    if (key === 'config' && value && typeof value === 'object') {
-      const sanitizedConfig: Record<string, unknown> = {};
-      for (const [configKey, configValue] of entries(value)) {
-        if (
-          configKey === 'headers' &&
-          configValue &&
-          typeof configValue === 'object'
-        ) {
-          sanitizedConfig[configKey] = redactedHeaders(configValue);
-        } else {
-          sanitizedConfig[configKey] = configValue;
-        }
-      }
-      return sanitizedConfig;
     }
     return value;
   });

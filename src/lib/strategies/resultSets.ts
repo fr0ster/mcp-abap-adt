@@ -331,7 +331,7 @@ type SlotReading<P extends PropertyKey> = P extends keyof typeof READING_BY_SLOT
  * checked as answering `string` when it actually answers `AdtReading<string>`.
  */
 export function resultsFor<
-  R extends Record<string, unknown>,
+  R extends Readonly<Record<string, object>>,
   const K extends readonly (keyof R)[] = [],
 >(
   shipped: R,
@@ -341,11 +341,11 @@ export function resultsFor<
 // type through an object built slot by slot, so the body is checked against
 // this wider one (an overload, not an assertion).
 export function resultsFor(
-  shipped: Record<string, unknown>,
+  shipped: Readonly<Record<string, object>>,
   keep: readonly PropertyKey[] = [],
-): Record<string, unknown> {
+): Record<string, object> {
   const kept = new Set<PropertyKey>(keep);
-  const out: Record<string, unknown> = {};
+  const out: Record<string, object> = {};
   const table: Readonly<Record<string, IResultStrategy<unknown>>> =
     READING_BY_SLOT;
   for (const slot of Object.keys(shipped)) {

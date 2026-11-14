@@ -116,7 +116,12 @@ export function return_response(response: ResponseText): McpResult {
 function _safeStringifyError(error: unknown): string {
   if (error instanceof AxiosError) {
     // For Axios errors, extract safe information
-    const safeError: Record<string, unknown> = {
+    const safeError: {
+      message: string;
+      status: number | undefined;
+      statusText: string | undefined;
+      responseData?: string;
+    } = {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -168,7 +173,15 @@ export function logErrorSafely(
   }
 
   let errorMessage = `[ERROR] ${operationName} failed`;
-  const errorDetails: Record<string, unknown> = {};
+  const errorDetails: {
+    status?: unknown;
+    statusText?: unknown;
+    responseHeaders?: unknown;
+    responseData?: string;
+    message?: string;
+    stack?: string | undefined;
+    rawError?: string;
+  } = {};
 
   const response = httpFailureOf(error)?.response;
   if (typeof response === 'object' && response !== null) {

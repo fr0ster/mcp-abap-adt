@@ -27,6 +27,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 type Session = 'stateful' | 'stateless';
 /** A member reached while the target points at no connection. */
@@ -41,6 +42,9 @@ export class LateBoundConnection implements IAbapConnection {
   private current: IAbapConnection | undefined;
   private sealed = false;
   private readonly followers: (() => void)[] = [];
+
+  /** `logger` hears, in fixed words, of a follower that threw. */
+  constructor(private readonly logger?: ILogger) {}
 
   /**
    * The pointed connection's own session members, present only while it has
@@ -76,8 +80,19 @@ export class LateBoundConnection implements IAbapConnection {
     this.followers.push(follower);
   }
 
+  /**
+   * Tells every follower, the target's own state already the new one. A
+   * follower that throws is reported and never stops the others or turns
+   * the change into a failure.
+   */
   private notify(): void {
-    for (const follower of this.followers) follower();
+    for (const follower of [...this.followers]) {
+      try {
+        follower();
+      } catch {
+        this.logger?.error('late-bound target: a follower failed');
+      }
+    }
   }
 
   /** The session members of `connection`, each forwarded to the same-named one. */

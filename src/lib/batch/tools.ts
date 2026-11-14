@@ -44,7 +44,7 @@ function ownerOf(context: HandlerContext): InstanceBatch {
  * target, seen by the envelope watch (nothing is sent, no connection taken).
  */
 export function communicationBatch(logger?: ILogger): OpenBatch {
-  const target = new LateBoundConnection();
+  const target = new LateBoundConnection(logger);
   const envelopes = new EnvelopeWatch();
   const connection = new AdtBatchConnection(envelopes.over(target), {
     endpoint: 'communication',

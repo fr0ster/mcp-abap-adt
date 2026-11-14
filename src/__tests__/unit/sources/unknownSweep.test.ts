@@ -543,6 +543,30 @@ describe('the forms round 8 found the flow scan missing are refused', () => {
   });
 });
 
+describe('the forms round 9 found the every-node sweep missing are refused', () => {
+  it('a type written inside an expression: satisfies, an assertion, a call, a tagged template, a new, an instantiation expression', () => {
+    assert.deepEqual(
+      sitesOf('expressionTypes')
+        .filter((site) => site.refused)
+        .map((site) => [
+          site.kind,
+          Number(site.where.split(':').pop()),
+          site.position,
+        ]),
+      [
+        // The tagged template's value lands in its instantiated rest.
+        ['widening', 22, "''"],
+        ['expression', 16, 'Record<1>IResultStrategy<0>'],
+        ['expression', 19, 'consume<0>'],
+        ['expression', 22, 'tagged<0>'],
+        ['expression', 25, 'Recorder<0>'],
+        ['expression', 28, 'consume<0>'],
+        ['expression', 31, "''"],
+      ],
+    );
+  });
+});
+
 describe('tool-argument input until it is checked (the owner rule)', () => {
   it('a value read out of the arguments, a list of them, a nested object and a function handing them on pass', () => {
     const sites = sitesOf('toolArgValue');

@@ -574,6 +574,24 @@ function carrierParent(node: ts.Node): boolean {
   );
 }
 
+/** The name a generic is called by: its callee's, its tag's, its element's. */
+function calleeName(node: ts.Node): string {
+  const callee =
+    ts.isCallExpression(node) ||
+    ts.isNewExpression(node) ||
+    ts.isExpressionWithTypeArguments(node)
+      ? node.expression
+      : ts.isTaggedTemplateExpression(node)
+        ? node.tag
+        : ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)
+          ? node.tagName
+          : undefined;
+  if (callee === undefined) return 'Generic';
+  if (ts.isIdentifier(callee)) return callee.text;
+  if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
+  return 'Generic';
+}
+
 /** The outermost expression a value is carried to unchanged. */
 function outermost(node: ts.Expression): ts.Expression {
   let current: ts.Expression = node;
@@ -722,6 +740,8 @@ export class UnknownSweep {
   /** A third party's members a typed value was put into. */
   private readonly putIntoThirdParty = new Set<ts.Symbol>();
   private readonly found: SweepSite[] = [];
+  /** Expressions charged with the types written inside them. */
+  private readonly writtenCharged = new Set<ts.Node>();
   private readonly boundaryMemo = new Map<
     ts.Node,
     { kind: BoundaryKind | undefined; types: string[] }
@@ -743,6 +763,7 @@ export class UnknownSweep {
     for (const file of this.files) this.indexReferences(file);
     const declarations: ts.Node[] = [];
     const expressions: ts.Expression[] = [];
+    const jsxOpenings: ts.JsxOpeningElement[] = [];
     for (const file of this.files) {
       const visit = (node: ts.Node): void => {
         if (
@@ -754,6 +775,7 @@ export class UnknownSweep {
             expressions.push(node);
           }
         }
+        if (ts.isJsxOpeningElement(node)) jsxOpenings.push(node);
         declarations.push(node);
         ts.forEachChild(node, visit);
       };
@@ -762,7 +784,9 @@ export class UnknownSweep {
     // Widening first: it charges the typed values to their slots.
     for (const expression of expressions) this.widening(expression);
     for (const node of declarations) this.declaration(node);
+    for (const opening of jsxOpenings) this.writtenInExpression(opening);
     for (const expression of expressions) {
+      this.writtenInExpression(expression);
       this.expression(expression);
       this.anyLanding(expression);
       this.readBack(expression);
@@ -1593,6 +1617,7 @@ export class UnknownSweep {
    * not know.
    */
   private expression(node: ts.Expression): void {
+    if (this.writtenCharged.has(node)) return;
     if (carried(node)) return;
     if (this.initialisesWrittenSite(node)) return;
     const type = this.checker.getTypeAtLocation(node);
@@ -1640,6 +1665,59 @@ export class UnknownSweep {
         return;
       }
     }
+    this.report(
+      node,
+      'expression',
+      held.map((each) => pathText(each.path) || "''").join(' '),
+      undefined,
+      true,
+      'holds',
+    );
+  }
+
+  /**
+   * The types written inside an expression are ours, as a declaration's
+   * written type is (the owner's rule): every type node an expression holds
+   * as its own child — `x satisfies T`, `x as T` (not `as const`), `<T>x`,
+   * the type arguments of a call, a `new`, a tagged template, an
+   * instantiation expression (`f<T>`) and a JSX element — is walked as
+   * `ownHeld` walks a declaration's, and the expression is charged with what
+   * it holds, once. A function expression's own parameters and return are
+   * declarations of their own. An instantiation that initialises a
+   * boundary's declaration writing the same type is the declaration's.
+   */
+  private writtenInExpression(
+    node: ts.Expression | ts.JsxOpeningElement,
+  ): void {
+    if (ts.isFunctionLike(node)) return;
+    if (
+      ts.isExpressionWithTypeArguments(node) &&
+      ts.isHeritageClause(node.parent)
+    ) {
+      return;
+    }
+    const typeArguments: readonly ts.TypeNode[] =
+      'typeArguments' in node && node.typeArguments !== undefined
+        ? node.typeArguments
+        : [];
+    const held: Held[] = [];
+    ts.forEachChild(node, (child) => {
+      if (!ts.isTypeNode(child) || ts.isConstTypeReference(child)) return;
+      const at = typeArguments.indexOf(child);
+      const prefix: Path =
+        at < 0 ? [] : [{ kind: 'argument', of: calleeName(node), at }];
+      held.push(
+        ...[
+          ...this.held(this.checker.getTypeFromTypeNode(child)).filter(
+            (each) => each.owner === undefined,
+          ),
+          ...this.suppliedHeld(child),
+        ].map((each) => ({ ...each, path: [...prefix, ...each.path] })),
+      );
+    });
+    if (held.length === 0) return;
+    if (ts.isExpression(node) && this.initialisesWrittenSite(node)) return;
+    this.writtenCharged.add(node);
     this.report(
       node,
       'expression',

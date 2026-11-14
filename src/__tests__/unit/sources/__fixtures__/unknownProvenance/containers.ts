@@ -235,3 +235,49 @@ export function spreadMutators(order: Order): number {
   spreadSet.add(...one);
   return spreadMap.size + spreadSet.size;
 }
+
+// Positions an instantiated type holds below its top: a callback over `T[]`
+// through a generic function type, an inherited generic index signature of
+// lists, and a nested map of promised lists, each instantiated with unknown.
+type EachList<T> = (items: T[]) => void;
+function walkLists(visit: EachList<unknown>, orders: Order[]): void {
+  visit(orders);
+}
+export function genericListVisitor(orders: Order[]): void {
+  walkLists((listVisited) => void listVisited.length, orders);
+}
+interface ListBag<T> {
+  [key: string]: T[];
+}
+interface DerivedListBag<T> extends ListBag<T> {}
+export function inheritedLists(order: Order): DerivedListBag<unknown> {
+  const listedBags: DerivedListBag<unknown> = { orders: [order] };
+  return listedBags;
+}
+type PendingLists<T> = Map<string, Promise<T[]>>;
+export function nestedPending(order: Order): number {
+  const pendingLists: PendingLists<unknown> = new Map([
+    ['x', Promise.resolve([order])],
+  ]);
+  return pendingLists.size;
+}
+
+// Arguments mapped through spreads: a rest parameter's arguments after an
+// array spread, and a resolver called with a tuple spread.
+function takeAfter(first: string, ...restAfter: unknown[]): number {
+  return first.length + restAfter.length;
+}
+export function restAfterSpread(
+  parsed: unknown,
+  before: readonly unknown[],
+  order: Order,
+): number {
+  return takeAfter('x', parsed, ...before, order);
+}
+export function spreadResolve(order: Order): Promise<unknown> {
+  const resolveArgs: [Order] = [order];
+  const spreadResolved: Promise<unknown> = new Promise<unknown>((resolve) =>
+    resolve(...resolveArgs),
+  );
+  return spreadResolved;
+}

@@ -17,8 +17,11 @@ import {
   fixtureProgram,
   ownFile,
   productionProjects,
+  productionSinkSlotReads,
+  SINK_SLOTS,
   scanFiles,
   scanProduction,
+  sinkSlotReads,
   staleReaders,
   THROWN_READERS,
   type UnknownSite,
@@ -129,6 +132,62 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     );
   });
 
+  it("a position under a sink slot is a sink, and the slot's declaration too", () => {
+    const file = path.join(FIXTURES, 'sinkSlot.ts');
+    const slots = new Map([
+      [
+        'ContentItem.json',
+        'src/__tests__/unit/sources/__fixtures__/unknownProvenance/sinkSlot.ts#serialize',
+      ],
+    ]);
+    const sites = scanFiles(
+      fixtureProgram([file]),
+      new Set([file]),
+      new Set(),
+      slots,
+    );
+    const by = (name: string) =>
+      sites
+        .filter((entry) => entry.name === name)
+        .map((entry) => [entry.position, entry.cls, entry.refused]);
+    assert.deepEqual(by('answerOf'), [['.content[].json', 'sink', false]]);
+    assert.deepEqual(by('json'), [['', 'sink', false]]);
+    // Unnamed, the same slot holds an `Order` as unknown.
+    const unnamed = scanFiles(
+      fixtureProgram([file]),
+      new Set([file]),
+      new Set(),
+      new Map(),
+    ).filter((entry) => entry.name === 'answerOf');
+    assert.deepEqual(
+      unnamed.map((entry) => [entry.cls, entry.refused, entry.types]),
+      [['typed', true, ['Order']]],
+    );
+  });
+
+  it('a sink slot read by any function but its own reader is refused', () => {
+    const file = path.join(FIXTURES, 'sinkSlot.ts');
+    const fixture =
+      'src/__tests__/unit/sources/__fixtures__/unknownProvenance/sinkSlot.ts';
+    const found = sinkSlotReads(
+      fixtureProgram([file]),
+      new Set([file]),
+      new Map([['ContentItem.json', `${fixture}#serialize`]]),
+    );
+    assert.deepEqual(
+      found.reads.map((read) => [
+        read.where.split('/').pop(),
+        read.slot,
+        read.reader,
+      ]),
+      [
+        ['sinkSlot.ts:29', 'ContentItem.json', `${fixture}#readBack`],
+        ['sinkSlot.ts:30', 'ContentItem.json', `${fixture}#readBack`],
+      ],
+    );
+    assert.deepEqual([...found.declared], ['ContentItem.json']);
+  });
+
   it('a value a sink hands on is of any type, as the sink took it', () => {
     const sites = sitesOf('sinkForward').filter(
       (entry) => entry.name === 'meta',
@@ -173,6 +232,47 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     );
   });
 
+  it("a runtime object of the language's own is its contract, not a position", () => {
+    // `Error.cause` is the language's `unknown`: a function answering an
+    // `Error` (through a generic `E extends Error`) holds no site.
+    assert.deepEqual(
+      sitesOf('languageObject').map((entry) => entry.key.split('#')[1]),
+      [],
+    );
+  });
+
+  it('a callback typed as its contract instantiates it passes, one wider than its contract is refused', () => {
+    const sites = sitesOf('contractCallback');
+    const by = (name: string) =>
+      sites
+        .filter((entry) => entry.name === name)
+        .map((entry) => [
+          entry.position,
+          entry.cls,
+          entry.refused,
+          entry.types,
+        ]);
+    assert.deepEqual(by('carried'), [['.value', 'callback', false, []]]);
+    assert.deepEqual(by('widenedReading'), [
+      ['.value', 'callback', true, ['Order']],
+    ]);
+  });
+
+  it('a value followed to where it was made is read there at the position asked for', () => {
+    // A generic reading handed on: its `value` is the parse it was made
+    // with, not the reading as a whole.
+    const held = site('positionFollowed', 'heldReading');
+    assert.deepEqual([held.cls, held.refused], ['boundary', false]);
+  });
+
+  it('a list read by key is read at its elements', () => {
+    const rows = site('listByKey', 'rowsOf');
+    assert.deepEqual(
+      [rows.position, rows.cls, rows.refused],
+      ['[]{}', 'boundary', false],
+    );
+  });
+
   it('a file is found however its name is spelled', () => {
     // TypeScript names a file with `/` on every platform, `path.join` with
     // the platform's separator: a Windows run found no site at all. A
@@ -204,6 +304,31 @@ describe('the unknown audit refuses a value the repository has a type for', () =
       [['reader', true]],
     );
     assert.deepEqual(sites[0]?.types, ['Error']);
+  });
+
+  it('a caught value written by shorthand stays a caught value', () => {
+    const error = sitesOf('thrownShorthand').filter(
+      (entry) => entry.name === 'error',
+    );
+    assert.deepEqual(
+      error.map((entry) => [entry.cls, entry.refused, entry.types]),
+      [['reader', true, ['Error', 'string']]],
+    );
+    // Destructured from the slot; a promise's rejection beside a string;
+    // an `Error` of ours beside a value from outside.
+    for (const [name, type] of [
+      ['rethrown', ['Error', 'string']],
+      ['reason', ['string']],
+      ['failure', ['Error']],
+    ] as const) {
+      assert.deepEqual(
+        sitesOf('thrownShorthand')
+          .filter((entry) => entry.name === name)
+          .map((entry) => [entry.cls, entry.refused, entry.types]),
+        [['reader', true, [...type]]],
+        name,
+      );
+    }
   });
 
   it('a listed name no reader has is stale', () => {
@@ -300,6 +425,42 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     }
   });
 
+  it('a position below the top of an instantiated type is read too', () => {
+    // A callback over `T[]`, an inherited `[key: string]: T[]` and a
+    // `Map<string, Promise<T[]>>`, each with `T = unknown`.
+    const sites = sitesOf('containers');
+    for (const [name, position] of [
+      ['listVisited', '[]'],
+      ['listedBags', '{}[]'],
+      ['pendingLists', 'Map<1>Promise<0>[]'],
+    ]) {
+      assert.deepEqual(
+        sites
+          .filter((entry) => entry.name === name)
+          .map((entry) => [
+            entry.position,
+            entry.cls,
+            entry.refused,
+            entry.types,
+          ]),
+        [[position, 'typed', true, ['Order']]],
+        name,
+      );
+    }
+  });
+
+  it("a rest parameter takes every argument after an array spread, and a resolver a tuple spread's members", () => {
+    const sites = sitesOf('containers');
+    const by = (name: string) =>
+      sites
+        .filter((entry) => entry.name === name)
+        .map((entry) => [entry.cls, entry.refused, entry.types]);
+    // `parsed` and the spread `before` are input; `order`, after the
+    // spread, is an element of the rest too.
+    assert.deepEqual(by('restAfter'), [['mixed', true, ['Order']]]);
+    assert.deepEqual(by('spreadResolved'), [['typed', true, ['Order']]]);
+  });
+
   it("every package's sources are the repository's own, installed and built files are not", () => {
     assert.equal(ownFile(path.join(REPO, 'compact-modify/src/x.ts')), true);
     assert.equal(ownFile(path.join(REPO, 'scripts/x.ts')), true);
@@ -345,6 +506,15 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     const args = site('toolInput', 'args');
     assert.equal(args.cls, 'boundary');
     assert.equal(args.refused, false);
+    // Intersected with typed members, it is still the input; with a member
+    // that holds unknown of its own, it is read as any other site.
+    const selected = site('toolInput', 'selected');
+    assert.deepEqual([selected.cls, selected.refused], ['boundary', false]);
+    const mixedIn = site('toolInput', 'mixedIn');
+    assert.deepEqual(
+      [mixedIn.cls, mixedIn.refused, mixedIn.types],
+      ['typed', true, ['string']],
+    );
   });
 
   it('a library call answering any is taken as unknown where it is made', () => {
@@ -370,7 +540,7 @@ describe('production code holds as unknown only what comes from outside the type
         .filter((entry) => entry.refused)
         .map(
           (entry) =>
-            `${entry.where} ${entry.key} ${entry.cls}: ${entry.types.join(' | ')}`,
+            `${entry.where} ${entry.key} at '${entry.position}' ${entry.cls}: ${entry.types.join(' | ')}`,
         ),
       [],
     );
@@ -388,6 +558,15 @@ describe('production code holds as unknown only what comes from outside the type
 
   it('lists every reader of thrown values, and no reader that is gone', () => {
     assert.deepEqual(staleReaders(sites, THROWN_READERS), []);
+  });
+
+  it('reads every sink slot only in its own reader, and names no slot that is gone', () => {
+    const found = productionSinkSlotReads();
+    assert.deepEqual(found.reads, []);
+    assert.deepEqual(
+      [...SINK_SLOTS.keys()].filter((slot) => !found.declared.has(slot)),
+      [],
+    );
   });
 
   it('takes every library answer of type any as unknown where it is made', () => {

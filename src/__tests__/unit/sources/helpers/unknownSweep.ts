@@ -2218,14 +2218,61 @@ export class UnknownSweep {
     });
   }
 
-  /** Whether a value only passes on: where `unknown` or `any` is expected, or inspected. */
+  /**
+   * Whether a value only passes on: inspected, or put where `unknown` or
+   * `any` is expected by its declaration — a parameter, a member or a return
+   * written `unknown` / `any` (a third party's sink such as `JSON.stringify`,
+   * a listed site). A type parameter instantiated to `unknown` is no sink:
+   * the function it belongs to uses the value, so the read is a read-back,
+   * checked like any other (bound by the caller).
+   */
   private passesOn(node: ts.Expression): boolean {
     if (this.inspected(node)) return true;
     const contextual = this.contextualOf(node);
+    if (
+      contextual === undefined ||
+      (contextual.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) === 0
+    ) {
+      return false;
+    }
+    const declared = this.declaredTypeOf(this.slotOf(node));
     return (
-      contextual !== undefined &&
-      (contextual.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) !== 0
+      declared !== undefined &&
+      (declared.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) !== 0
     );
+  }
+
+  /**
+   * The type a slot's declaration writes, before any instantiation: a
+   * parameter's (a rest parameter's element), a member's, a variable's, an
+   * index signature's, a function's return.
+   */
+  private declaredTypeOf(slot: ts.Node | undefined): ts.Type | undefined {
+    if (slot === undefined) return undefined;
+    if (ts.isFunctionLike(slot) && !ts.isIndexSignatureDeclaration(slot)) {
+      return this.checker.getSignatureFromDeclaration(slot)?.getReturnType();
+    }
+    if (
+      !ts.isParameter(slot) &&
+      !ts.isPropertySignature(slot) &&
+      !ts.isPropertyDeclaration(slot) &&
+      !ts.isVariableDeclaration(slot) &&
+      !ts.isIndexSignatureDeclaration(slot) &&
+      !ts.isPropertyAssignment(slot) &&
+      !ts.isShorthandPropertyAssignment(slot)
+    ) {
+      return undefined;
+    }
+    if (ts.isIndexSignatureDeclaration(slot)) {
+      return this.checker.getTypeFromTypeNode(slot.type);
+    }
+    const symbol = this.checker.getSymbolAtLocation(slot.name);
+    if (symbol === undefined) return undefined;
+    const type = this.checker.getTypeOfSymbol(symbol);
+    if (ts.isParameter(slot) && slot.dotDotDotToken !== undefined) {
+      return this.checker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+    }
+    return type;
   }
 
   // ── Projection ───────────────────────────────────────────────────────

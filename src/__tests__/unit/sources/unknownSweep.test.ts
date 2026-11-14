@@ -605,6 +605,10 @@ describe('the forms round 10 found the every-node sweep missing are refused', ()
       .filter((site) => site.kind === 'read-back')
       .map((site) => Number(site.where.split(':').pop()));
 
+  it('a read handed to a type parameter of ours instantiated to unknown is a read-back', () => {
+    assert.deepEqual(readBacks('readBackGeneric'), [21, 25, 29]);
+  });
+
   it('a write by a computed key is charged to the member its literal type names', () => {
     assert.deepEqual(readBacks('computedKeyWrite'), [10, 19]);
   });

@@ -336,6 +336,11 @@ a refused connection, a timeout and a DNS failure from such an `Error` by its `c
   failureExtraOf?)`, `P` the terse answer's type and `F` the full one's, and `debugStateAnswer`
   takes its extras as `() => DebugExtra`. **What you do:** a call that named `debugAnswer<T>`
   names its terse type too (`debugAnswer<T, P>`), or lets both be inferred.
+- `BaseHandlerGroup.registerToolOnServer` (`/handlers`, protected) takes its `search` argument
+  as `{ _meta?: SearchMeta }`, the tool's search texts under `mcp-abap-adt/search`
+  (`{ keywords: string[]; semantic: string }`); `SearchMeta` is exported from `/handlers`.
+  **What you do:** a subclass that passes `search` passes `listedTool`'s `search`, or a `_meta`
+  of that shape; any other `_meta` is refused by the type check.
 
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 

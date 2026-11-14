@@ -43,12 +43,45 @@ against a `?: T`.
   `Record`'s or an index signature's value, a `Map`, `Set` or `Promise` argument, a function
   type's return, an alias of `unknown`, and the parameter of a function expression whose
   function type writes it `unknown`.
-- **Two readings of the unknown audit are rules (the owner's decisions):**
+  The type read is the one the checker instantiates, walked to any depth: an `unknown` a generic
+  is instantiated with (`Visit<unknown>`, `Bag<unknown>` of `[key: string]: T[]`), a member's
+  member, a function type's parameter and return. A call's arguments reach parameters through
+  spreads alike: a fixed tuple's members at their places, and every argument after an array
+  spread to a rest parameter.
+- **Three readings of the unknown audit are rules (the owner's decisions):**
   - a site declared `ToolArgs` (a tool's arguments before their schema, what an entry's `call`
     parses) is input, as `process.argv` and `process.env` are, whoever hands the value on;
   - a function written as a member of an object literal typed by a named sink contract
-    (`SINK_CONTRACTS`: `ILogger`, `IAnswerSerializer`) is that contract's member, so its
-    `unknown` parameter is a sink.
+    (`SINK_CONTRACTS`: `ILogger`, `IAnswerSerializer`, and `RegisteredToolCallback`, a registered
+    tool callback as the MCP SDK calls it, whose arguments go on to the SDK's callback) is that
+    contract's member, so its `unknown` parameter is a sink;
+  - **a sink by reading:** a slot of a contract whose value only leaves the program — handed to
+    JSON serialization or the MCP SDK, never read back — is a sink, named by its contract and
+    member (`SINK_SLOTS`: `ToolContentItem.json` and `ToolContentItem.text`, a tool answer's
+    content), each with the one function that reads it to hand it out (`normalizeToolContent`).
+    Every `unknown` under such a slot is a sink. A read of the slot by any other function reads a
+    typed value back and is refused (`sinkSlotReads`); its contract is then typed instead — made
+    generic, so callers keep their type, or exact. A slot whose content is read back is never a
+    sink.
+- **A reader of thrown values** (`THROWN_READERS`) takes `unknown` because a caught value reaches
+  it untyped; it is named by `file#function(parameter)`, and a listed reader no site has is
+  stale. A function that reads no caught value is typed by its sources instead. A caught value
+  is one a `catch` binds, one a promise's rejection handler takes (`catch`'s, `then`'s second),
+  wherever it is carried (by shorthand, destructured); a slot that holds `Error`s of ours beside
+  values from outside (a rejection reached through a library's combinator) is a failure slot, a
+  reader's too.
+- **How the audit reads what it follows:**
+  - a value followed back to where it was made is read there at the position the site asks
+    for (a reading's `value`, not the reading as a whole);
+  - a runtime object the language declares with no type parameter (`Error`, `AbortSignal`) is
+    the language's contract, like a third party's: what it types `unknown` (`Error.cause`) is no
+    position of the repository's, nor is a member a class of ours inherits from it;
+  - a callback no code of the repository calls is typed by its contract at each position it
+    writes `unknown`: one that takes its contract's instantiation (`(reading: AdtReading<unknown>)`
+    where the call instantiates `T` so) passes; one that writes `unknown` where the contract has a
+    type is refused with that type;
+  - a site declared `ToolArgs` intersected with typed members (`{ object_type?: … } & ToolArgs`,
+    what a compact route selects by) is the input still.
 - **Text is read with plain string code** (`src/lib/plainText.ts`), never a regex.
 - **Biome** (`biome.json`) turns the three rules on as errors for production, with no override.
   `lint:check`, `lint` and the build's check name the same directories, which

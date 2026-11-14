@@ -260,7 +260,13 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   followed one by one). A site declared with `ToolArgs` (a tool's arguments before their schema,
   what an entry's `call` parses) is input, like `process.argv`. Measured before the fix: 250
   container sites in production and 94 sites refused in all (typed and mixed, among them plain
-  ones the contextual reading revealed), none an alias; after it, none.
+  ones the contextual reading revealed), none an alias; after it, none. Measured with the
+  instantiated type walked to any depth and arguments mapped through spreads (round 7): 77
+  sites refused; 63 once a slot that only leaves the program is a sink by reading
+  (`ToolContentItem.json` / `.text`, no other read of them found); 40 once the language's runtime
+  objects (`Error.cause`) are its contract and a callback is read at its positions; 22 once a
+  value followed back is read at the position asked for and the real findings were typed; none
+  once the readers of thrown values were named.
 - **Classes and what each becomes:**
 
   | Class | Origin of every source | Becomes |

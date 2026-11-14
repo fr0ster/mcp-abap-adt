@@ -294,7 +294,7 @@ async function determineObjectTypeAndPath(
 ): Promise<{
   type: 'program' | 'include' | 'class' | 'function_group';
   /** The host's enhancement elements, read with `analyseException`. */
-  readElements: () => Promise<IAdtResponse<unknown, IAdtError>>;
+  readElements: () => Promise<IAdtResponse<string, IAdtError>>;
   context?: string | undefined;
   /** Probes that were refused rather than answering "not this kind". */
   unreadable?: FailureEntry[];
@@ -348,7 +348,7 @@ async function determineObjectTypeAndPath(
   /** A metadata read: its document when found, `undefined` otherwise. */
   const probe = async (
     step: string,
-    read: () => Promise<IAdtResponse<unknown, IAdtError>>,
+    read: () => Promise<IAdtResponse<string, IAdtError>>,
   ): Promise<string | undefined> => {
     try {
       const answer = await read();
@@ -656,7 +656,7 @@ async function getEnhancementsForSingleObject(
   // The host's own adt-clients member, read with the strategy every other
   // read uses: SAP's refusal is the method's error as it is, with the step.
   const step = 'read enhancements';
-  let answer: IAdtResponse<unknown, IAdtError>;
+  let answer: IAdtResponse<string, IAdtError>;
   try {
     answer = await objectInfo.readElements();
   } catch (thrown) {
@@ -1047,7 +1047,7 @@ type NodeAnswer = Awaited<ReturnType<typeof sendNodeRead>>;
 
 /** A read's answer, by what the read was: a document, or a node structure level. */
 type EnhancementAnswer =
-  | { of: 'document'; response: IAdtResponse<unknown, IAdtError> }
+  | { of: 'document'; response: IAdtResponse<string, IAdtError> }
   | { of: 'node'; response: NodeAnswer };
 
 /** `read` sent on `connection`, as the sequential version sends it. */
@@ -1069,7 +1069,7 @@ async function sendEnhancementRead(
 function sendDocumentRead(
   connection: IAbapConnection,
   read: DocumentRead,
-): Promise<IAdtResponse<unknown, IAdtError>> {
+): Promise<IAdtResponse<string, IAdtError>> {
   const client = createAdtClient(connection, logger);
   const analyse = { analyse: analyseException };
   const active: { version: ReadVersion; analyse: typeof analyseException } = {
@@ -1126,14 +1126,12 @@ class Unanswered {
 function enhancementAnswers(context: HandlerContext) {
   const documents = new Map<
     string,
-    PhaseResult<IAdtResponse<unknown, IAdtError>>
+    PhaseResult<IAdtResponse<string, IAdtError>>
   >();
   const nodes = new Map<string, PhaseResult<NodeAnswer>>();
   return {
     /** The answer to a document's read; `Unanswered` thrown when no phase sent it yet. */
-    answered(
-      read: DocumentRead,
-    ): PhaseResult<IAdtResponse<unknown, IAdtError>> {
+    answered(read: DocumentRead): PhaseResult<IAdtResponse<string, IAdtError>> {
       const result = documents.get(enhancementKey(read));
       if (result === undefined) throw new Unanswered(read);
       return result;

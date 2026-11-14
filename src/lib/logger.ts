@@ -53,8 +53,8 @@ function safeStringify(obj: object): string {
 }
 
 // Logger functions for different log levels
-function createLogFn(level: string) {
-  return (message: string, data?: unknown) => {
+function createLogFn(level: string): ILogger['info'] {
+  return (message, data) => {
     // Never log in stdio mode (MCP protocol requires clean JSON only)
     // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
@@ -132,121 +132,14 @@ export const logger = {
       );
     }
   },
-
-  // Special handler for CSRF token
-  csrfToken: (
-    type: 'fetch' | 'success' | 'error' | 'retry',
-    message: string,
-    data?: unknown,
-  ) => {
-    // Never log in stdio mode
-    // `--transport` is gone: only the explicit `--stdio` mark is left.
-    const isStdio = process.argv.includes('--stdio');
-    if (isStdio) {
-      return; // Suppress all logging in stdio mode
-    }
-    const debugEnabled = process.env.DEBUG_CONNECTORS === 'true';
-    if (debugEnabled) {
-      process.stderr.write(
-        `${JSON.stringify({
-          level: type === 'error' ? 'ERROR' : 'INFO',
-          timestamp: new Date().toISOString(),
-          type: `CSRF_${type.toUpperCase()}`,
-          message,
-          ...spreadable(data),
-        })}\n`,
-      );
-    }
-  },
-};
-
-/**
- * Handler-specific logger for detailed debugging
- * Enabled via DEBUG_HANDLERS=true environment variable
- */
-function createHandlerLogFn(level: string) {
-  return (
-    handlerName: string,
-    step: string,
-    message: string,
-    data?: unknown,
-  ) => {
-    // Never log in stdio mode
-    // `--transport` is gone: only the explicit `--stdio` mark is left.
-    const isStdio = process.argv.includes('--stdio');
-    if (isStdio) {
-      return; // Suppress all logging in stdio mode
-    }
-    const debugEnabled = process.env.DEBUG_HANDLERS === 'true';
-    if (debugEnabled) {
-      const logObject = {
-        level,
-        timestamp: new Date().toISOString(),
-        handler: handlerName,
-        step,
-        message,
-        ...spreadable(data),
-      };
-
-      try {
-        process.stderr.write(`${safeStringify(logObject)}\n`);
-      } catch (_e) {
-        process.stderr.write(
-          `${JSON.stringify({
-            level,
-            timestamp: new Date().toISOString(),
-            handler: handlerName,
-            step,
-            message,
-            error: 'Failed to serialize log data',
-          })}\n`,
-        );
-      }
-    }
-  };
-}
-
-export const handlerLogger = {
-  info: (
-    handlerName: string,
-    step: string,
-    message: string,
-    data?: unknown,
-  ) => {
-    createHandlerLogFn('INFO')(handlerName, step, message, data);
-  },
-  warn: (
-    handlerName: string,
-    step: string,
-    message: string,
-    data?: unknown,
-  ) => {
-    createHandlerLogFn('WARN')(handlerName, step, message, data);
-  },
-  error: (
-    handlerName: string,
-    step: string,
-    message: string,
-    data?: unknown,
-  ) => {
-    createHandlerLogFn('ERROR')(handlerName, step, message, data);
-  },
-  debug: (
-    handlerName: string,
-    step: string,
-    message: string,
-    data?: unknown,
-  ) => {
-    createHandlerLogFn('DEBUG')(handlerName, step, message, data);
-  },
 };
 
 /**
  * Connection manager logger - for getManagedConnection debug logs
  * Enabled via DEBUG_CONNECTION_MANAGER=true environment variable
  */
-function createConnectionManagerLogFn(level: string) {
-  return (message: string, data?: unknown) => {
+function createConnectionManagerLogFn(level: string): ILogger['debug'] {
+  return (message, data) => {
     // Never log in stdio mode
     // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');

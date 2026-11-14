@@ -603,7 +603,11 @@ interface TemplateNode {
 }
 
 function newNode(): TemplateNode {
-  return { leaves: new Map(), children: new Map(), order: [] };
+  return {
+    leaves: new Map<string, Parameter>(),
+    children: new Map<string, TemplateNode>(),
+    order: [],
+  };
 }
 
 function renderNode(node: TemplateNode, depth: number): string {

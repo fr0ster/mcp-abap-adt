@@ -393,24 +393,27 @@ export function return_error(error: unknown): FailureAnswer {
           try {
             // Use a replacer function to avoid circular references
             const seen = new WeakSet();
-            errorText = JSON.stringify(responseData, (key, value) => {
-              if (typeof value === 'object' && value !== null) {
-                if (seen.has(value)) {
-                  return '[Circular]';
+            errorText = JSON.stringify(
+              responseData,
+              (key: string, value: unknown) => {
+                if (typeof value === 'object' && value !== null) {
+                  if (seen.has(value)) {
+                    return '[Circular]';
+                  }
+                  seen.add(value);
                 }
-                seen.add(value);
-              }
-              // Remove problematic HTTP objects
-              if (
-                key === 'socket' ||
-                key === '_httpMessage' ||
-                key === 'res' ||
-                key === 'req'
-              ) {
-                return '[HTTP Object]';
-              }
-              return value;
-            }).substring(0, 2000);
+                // Remove problematic HTTP objects
+                if (
+                  key === 'socket' ||
+                  key === '_httpMessage' ||
+                  key === 'res' ||
+                  key === 'req'
+                ) {
+                  return '[HTTP Object]';
+                }
+                return value;
+              },
+            ).substring(0, 2000);
           } catch (_e) {
             errorText = `HTTP ${String(child(http.response, 'status'))}: ${String(child(http.response, 'statusText') || 'Error')}`;
           }
@@ -436,7 +439,7 @@ export function return_error(error: unknown): FailureAnswer {
       // For other types, try safe stringify
       try {
         const seen = new WeakSet();
-        errorText = JSON.stringify(error, (key, value) => {
+        errorText = JSON.stringify(error, (key: string, value: unknown) => {
           if (typeof value === 'object' && value !== null) {
             if (seen.has(value)) {
               return '[Circular]';

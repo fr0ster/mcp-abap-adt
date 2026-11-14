@@ -264,6 +264,16 @@ function worksOnOwnConnection(
 }
 
 /**
+ * Whether `registry` is a composite one, typed by its default group type:
+ * `instanceof` alone would type its groups `any`.
+ */
+function isCompositeRegistry(
+  registry: IHandlersRegistry,
+): registry is CompositeHandlersRegistry {
+  return registry instanceof CompositeHandlersRegistry;
+}
+
+/**
  * Base MCP Server class that extends SDK McpServer
  * Manages connection context and provides connection injection for handlers
  */
@@ -332,7 +342,7 @@ export abstract class BaseMcpServer extends McpServer {
   private takenDebugger?: DebuggerInstance;
 
   /** Every tool call of this instance still running, tracked from its entry. */
-  private readonly inFlight = new Set<Promise<unknown>>();
+  private readonly inFlight = new Set<Promise<void>>();
 
   /** The built entry of each connection handed out: what a release counts down. */
   private readonly entries = new WeakMap<IAbapConnection, BuiltConnection>();
@@ -918,7 +928,7 @@ export abstract class BaseMcpServer extends McpServer {
   private destinationRecord(destination: Destination): DestinationRecord {
     let targets = this.destinationSystems.get(destination.credential);
     if (targets === undefined) {
-      targets = new Map();
+      targets = new Map<string, DestinationRecord>();
       this.destinationSystems.set(destination.credential, targets);
     }
     let record = targets.get(destination.target);
@@ -1557,7 +1567,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected registerHandlers(handlersRegistry: IHandlersRegistry): void {
     // Get handler groups from registry
-    if (handlersRegistry instanceof CompositeHandlersRegistry) {
+    if (isCompositeRegistry(handlersRegistry)) {
       const groups = this.withBackgroundRunTools(
         handlersRegistry.getHandlerGroups(),
       );
@@ -2740,15 +2750,18 @@ export abstract class BaseMcpServer extends McpServer {
     }
     this.state.callStarted();
     const call = runAsOwner(this, () => run(controller.signal));
-    this.inFlight.add(call);
-    call
+    const settled: Promise<void> = call
       .finally(() => {
         controller.abort();
         unregister();
-        this.inFlight.delete(call);
+        this.inFlight.delete(settled);
         this.state.callEnded();
       })
-      .catch(() => undefined); // the caller answers the failure; nothing rejects unhandled
+      .then(
+        () => undefined,
+        () => undefined, // the caller answers the failure; nothing rejects unhandled
+      );
+    this.inFlight.add(settled);
     return call;
   }
 

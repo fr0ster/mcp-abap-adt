@@ -51,7 +51,7 @@ type ParamInfo = { name: string; required: 'yes' | 'no' };
 
 // Required as each schema states it: a field neither optional nor a default
 // over an optional field (a default over a required one stays required).
-const describeInputs = (schema: z.ZodObject): ParamInfo[] =>
+const describeInputs = (schema: z.ZodObject<z.ZodRawShape>): ParamInfo[] =>
   Object.entries(schema.shape).map(([name, value]) => ({
     name,
     required:

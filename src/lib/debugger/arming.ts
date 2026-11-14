@@ -115,7 +115,7 @@ export function pairRows(
   const answered = new Map<string, BreakpointReading>();
   const result: Pairing = {
     requested: [],
-    paired: new Map(),
+    paired: new Map<string, string>(),
     placed: rows.filter(isPlaced),
     refused: [],
     lost: [],

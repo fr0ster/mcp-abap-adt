@@ -15,7 +15,7 @@ export function notArgumentsOf(keys: readonly string[], tool: string): string {
 }
 
 /** `shape` as `tool`'s strict arguments: an undeclared key refused, named. */
-export function createArguments<T extends z.core.$ZodLooseShape>(
+export function createArguments<T extends z.core.$ZodShape>(
   tool: string,
   shape: T,
 ) {

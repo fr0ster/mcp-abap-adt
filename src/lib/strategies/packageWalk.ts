@@ -153,7 +153,7 @@ export function concurrentReader<I, R>(
   stopsAt?: (value: R) => boolean,
 ): LevelReader<I, R> {
   const reader = async (items: readonly I[]): Promise<PhaseResult<R>[]> => {
-    const out: PhaseResult<R>[] = new Array(items.length);
+    const out = new Array<PhaseResult<R>>(items.length);
     let next = 0;
     let ended: { error: unknown } | undefined;
     let stopped = false;

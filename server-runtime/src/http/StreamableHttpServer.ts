@@ -508,7 +508,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         );
         resolve();
       });
-      server.once('error', reject);
+      server.once('error', (error: Error) => reject(error));
     });
   }
 

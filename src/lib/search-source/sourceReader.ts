@@ -692,7 +692,10 @@ export interface AnsweredReads {
 
 /** An empty set of answers. */
 export function noAnsweredReads(): AnsweredReads {
-  return { sources: new Map(), structures: new Map() };
+  return {
+    sources: new Map<string, PhaseResult<ReadAnswer<string>>>(),
+    structures: new Map<string, PhaseResult<ReadAnswer<FugrChild[]>>>(),
+  };
 }
 
 /**

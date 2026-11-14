@@ -31,15 +31,24 @@ import { hasMethod } from './capability';
  * Generic over the handler's own signature so the wrapped function keeps the
  * exact arity/return type (and stays assignable to an entry's `call`).
  */
-export function withCriticalSection<A extends unknown[], R>(
-  handler: (...args: A) => Promise<R>,
+export function withCriticalSection<R>(
+  handler: () => Promise<R>,
   getConnection: () => IAbapConnection,
-): (...args: A) => Promise<R> {
-  return async (...args: A) => {
+): () => Promise<R>;
+/** A handler of a context and its arguments, wrapped the same. */
+export function withCriticalSection<C, A, R>(
+  handler: (context: C, args: A) => Promise<R>,
+  getConnection: () => IAbapConnection,
+): (context: C, args: A) => Promise<R>;
+export function withCriticalSection<C, A, R>(
+  handler: (context: C, args: A) => Promise<R>,
+  getConnection: () => IAbapConnection,
+): (context: C, args: A) => Promise<R> {
+  return async (context: C, args: A) => {
     const conn = getConnection();
     if (hasMethod(conn, 'beginCriticalSection')) conn.beginCriticalSection();
     try {
-      return await handler(...args);
+      return await handler(context, args);
     } finally {
       if (hasMethod(conn, 'endCriticalSection')) conn.endCriticalSection();
     }

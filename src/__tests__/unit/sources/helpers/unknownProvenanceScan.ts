@@ -126,8 +126,6 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/batch/phases.ts#runPhaseOutcome(runPhaseOutcome)',
   'src/lib/debugger/AmdpSession.ts#withNotUndone(withNotUndone)',
   'src/lib/debugger/failures.ts#thrownFailure(thrown)',
-  'src/lib/logger.ts#createLogFn(data)',
-  'src/lib/logger.ts#spreadable(data)',
   'src/lib/search-source/orchestrator.ts#runSearchSourceInPhases(levels)',
   'src/lib/search-source/readFailure.ts#DecidedPrimitive(value)',
   'src/lib/search-source/readFailure.ts#classify(failure)',

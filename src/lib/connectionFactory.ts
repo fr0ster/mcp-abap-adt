@@ -108,8 +108,8 @@ function wireLogger(logger: ILogger | null | undefined): ILogger | undefined {
   if (!rfcWireOptions().logWire) return undefined;
 
   const write =
-    (level: string) =>
-    (message: string, meta?: unknown): void => {
+    (level: string): ILogger['debug'] =>
+    (message, meta) => {
       process.stderr.write(`[${level}] ${message}\n`);
       if (meta !== undefined) process.stderr.write(`${JSON.stringify(meta)}\n`);
     };

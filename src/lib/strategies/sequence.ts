@@ -87,28 +87,46 @@ export async function sequence<A, B, C, D, E>(
   fourth: Step<C, D>,
   fifth: Step<D, E>,
 ): Promise<IAdtResponse<E, IAdtError>>;
-export async function sequence(
-  first: () => Promise<IAdtResponse<unknown, IAdtError>>,
-  ...rest: Array<Step<unknown, unknown>>
-): Promise<IAdtResponse<unknown, IAdtError>> {
-  let answer = await first();
-  for (const step of rest) {
-    // The failing step's answer is the answer. Not re-wrapped, not summarised:
-    // the strategy that judged it already said everything there is to say.
-    if (!answer.ok) return answer;
-    // **A step's answer replaces the one before it; a held lock does not.**
-    // A `withLock` step inside a lifecycle create answers the write with the
-    // unreleased lock hung on it as `cleanup`, and the check that follows
-    // then answered in its place — so the lock vanished one step before
-    // anyone could carry it to the caller. Only that note travels; the answer
-    // is still wholly the latest step's.
-    //
-    // The step is handed over rather than awaited here, so a step that throws
-    // carries the note out on the exception instead of unwinding past it.
-    const previous = answer.getResult().value;
-    answer = await carryCleanup(answer, () => step(previous));
-  }
-  return answer;
+export async function sequence<A, B, C, D, E>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: Step<A, B>,
+  third?: Step<B, C>,
+  fourth?: Step<C, D>,
+  fifth?: Step<D, E>,
+): Promise<
+  | IAdtResponse<B, IAdtError>
+  | IAdtResponse<C, IAdtError>
+  | IAdtResponse<D, IAdtError>
+  | IAdtResponse<E, IAdtError>
+> {
+  const b = await following(await first(), second);
+  if (third === undefined) return b;
+  const c = await following(b, third);
+  if (fourth === undefined) return c;
+  const d = await following(c, fourth);
+  if (fifth === undefined) return d;
+  return following(d, fifth);
+}
+
+/** One step of {@link sequence}: `step` on `answer`'s value, or `answer` itself when it failed. */
+async function following<T, U>(
+  answer: IAdtResponse<T, IAdtError>,
+  step: Step<T, U>,
+): Promise<IAdtResponse<U, IAdtError>> {
+  // The failing step's answer is the answer. Not re-wrapped, not summarised:
+  // the strategy that judged it already said everything there is to say.
+  if (!answer.ok) return answer;
+  // **A step's answer replaces the one before it; a held lock does not.**
+  // A `withLock` step inside a lifecycle create answers the write with the
+  // unreleased lock hung on it as `cleanup`, and the check that follows
+  // then answered in its place — so the lock vanished one step before
+  // anyone could carry it to the caller. Only that note travels; the answer
+  // is still wholly the latest step's.
+  //
+  // The step is handed over rather than awaited here, so a step that throws
+  // carries the note out on the exception instead of unwinding past it.
+  const previous = answer.getResult().value;
+  return await carryCleanup(answer, () => step(previous));
 }
 
 /**

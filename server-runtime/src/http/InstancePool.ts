@@ -162,7 +162,7 @@ export class InstancePool<T extends Poolable> {
   private readonly failed = new Map<T, string>();
   /** Disposal failed or still finishing: owned for shutdown. */
   private readonly retained = new Set<T>();
-  private readonly active = new Set<Promise<unknown>>();
+  private readonly active = new Set<Promise<void>>();
   /** Instance closes the pool started and that still run: the shutdown awaits them. */
   private readonly closing = new Set<Promise<void>>();
   private admitting = true;

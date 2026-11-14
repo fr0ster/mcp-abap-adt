@@ -20,6 +20,7 @@ import {
   feedGatewayErrors,
   feedSystemMessages,
   feedVariants,
+  type IObjectVersion,
   objectVersions,
   profilerDbAccesses,
   profilerHitList,
@@ -32,9 +33,20 @@ import {
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { XmlNode } from '../xml/node';
 import { nodeLevel } from './packageWalk';
-import { statusOnly, structured, verbatim } from './reading';
+import { type AdtReading, statusOnly, structured, verbatim } from './reading';
 import { sqlPreview } from './sqlPreview';
+
+/**
+ * What a strategy of the table reads an answer into: a reading of the
+ * document (`verbatim`, `structured`, `statusOnly`), the text as it came
+ * (`asItCame`), or the version list (`objectVersions`).
+ */
+type TableReading =
+  | AdtReading<string | XmlNode | null | undefined>
+  | string
+  | readonly IObjectVersion[];
 
 /**
  * Which reading a result-set slot wants — keyed on the slot, because that is
@@ -76,10 +88,11 @@ import { sqlPreview } from './sqlPreview';
  * the same treatment — `search`, `types`, `node`, `inactive`, `status` and
  * `result` in those two sets all read only `answer.data` and are unaffected.
  */
-// `satisfies`, never a `: Record<string, IResultStrategy<unknown>>`
-// annotation — the annotation is what erased every slot's type to `unknown`
-// and made `resultsFor` return its input type untouched. `satisfies` checks
-// the same shape (every value is an `IResultStrategy<unknown>`) without
+// `satisfies`, never a `: Record<string, IResultStrategy<TableReading>>`
+// annotation — the annotation is what erased every slot's type to its
+// constraint and made `resultsFor` return its input type untouched.
+// `satisfies` checks the same shape (every value is an
+// `IResultStrategy<TableReading>`) without
 // widening a single one of them: `READING_BY_SLOT.source` stays the literal
 // type of `verbatim`, `(answer) => AdtReading<string>`, which is what makes
 // the mapped type below able to answer it back per slot. The package's own
@@ -297,7 +310,7 @@ export const READING_BY_SLOT = {
   // `opr:objectProperties` document — the object and its facets
   // (application component, package chain). `GetTransaction` reads it.
   objectProperties: structured,
-} satisfies Record<string, IResultStrategy<unknown>>;
+} satisfies Record<string, IResultStrategy<TableReading>>;
 
 /**
  * What `resultsFor` answers for one slot that is NOT in the keep-list: the

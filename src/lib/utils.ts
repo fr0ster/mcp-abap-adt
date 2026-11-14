@@ -11,7 +11,6 @@ import {
 import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
-  IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -719,16 +718,12 @@ export async function makeAdtRequest(
   url: string,
   method: string,
   timeout: number,
-  data?: unknown,
-  params?: IAbapRequestOptions['params'],
   headers?: Record<string, string> | undefined,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url,
     method,
     timeout,
-    data,
-    params,
     ...(headers !== undefined && { headers }),
   });
 }

@@ -596,3 +596,14 @@ describe("an instantiation that builds a listed slot's written type is the slot'
     );
   });
 });
+
+describe("a stand-in for Node's EventEmitter is typed by Node's contract", () => {
+  it("a listener typed by EventEmitter's on passes; one of its own is refused", () => {
+    assert.deepEqual(
+      sitesOf('nodeEmitter')
+        .filter((site) => site.refused)
+        .map((site) => [site.kind, site.key]),
+      [['parameter', key('nodeEmitter', 'on', 'args')]],
+    );
+  });
+});

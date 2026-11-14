@@ -21,7 +21,6 @@ import type {
   ILogonTarget,
   IRequestTarget,
 } from '@mcp-abap-adt/interfaces-auth';
-import { child } from '../outsideValue';
 
 export class CurrentCredential extends AuthProviderBase {
   #current: IAuthProvider;
@@ -41,7 +40,7 @@ export class CurrentCredential extends AuthProviderBase {
   /** The kind of the credential in force (what the connection logs). */
   get kind(): string {
     try {
-      const kind = child(this.#current, 'kind');
+      const kind = 'kind' in this.#current ? this.#current.kind : undefined;
       return typeof kind === 'string' ? kind : 'credential';
     } catch {
       return 'credential';

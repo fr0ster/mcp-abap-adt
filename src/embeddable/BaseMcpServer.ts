@@ -134,7 +134,6 @@ import {
   readLongBackground,
   statesBackground,
 } from '../lib/longTools.js';
-import { child, isElement } from '../lib/outsideValue.js';
 import {
   closeOwnedConnections,
   endConnection,
@@ -1857,8 +1856,7 @@ export abstract class BaseMcpServer extends McpServer {
                   call: entry.call,
                   context,
                   args: handlerArgs,
-                  askedBackground:
-                    longRead && child(args, 'background') === true,
+                  askedBackground: longRead && args.background === true,
                   holdsFlow,
                   runsInBackground,
                   system,
@@ -2897,7 +2895,7 @@ export abstract class BaseMcpServer extends McpServer {
       }
       if (typeof second === 'object') {
         // `registerTool(name, config, callback)`.
-        const given = child(second, 'description');
+        const given = 'description' in second ? second.description : undefined;
         const description = typeof given === 'string' ? given : '';
         return [
           name,
@@ -3103,7 +3101,14 @@ function withSearchMeta(name: unknown, registered: unknown): unknown {
   const search = searchMeta(name)._meta;
   if (search === undefined || registered === null) return registered;
   if (!hasMethod(registered, 'update')) return registered;
-  const meta = child(registered, '_meta');
-  registered.update({ _meta: { ...(isElement(meta) ? meta : {}), ...search } });
+  const meta = '_meta' in registered ? registered._meta : undefined;
+  registered.update({
+    _meta: {
+      ...(typeof meta === 'object' && meta !== null && !Array.isArray(meta)
+        ? meta
+        : {}),
+      ...search,
+    },
+  });
   return registered;
 }

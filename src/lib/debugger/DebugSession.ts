@@ -46,7 +46,6 @@ import {
   isCredentialPayload,
   unlessCredentialFailure,
 } from '../answer';
-import { child } from '../outsideValue';
 import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
@@ -376,9 +375,10 @@ export function refuseConditionOffLine(
 ): void {
   list.forEach((b, i) => {
     // The breakpoints come from the model's arguments: a condition is read.
-    if (b.kind !== 'line' && child(b, 'condition'))
+    const { kind, condition } = b;
+    if (kind !== 'line' && condition)
       throw new DebugRefusedError(
-        `breakpoints[${i}] (${b.kind}): a condition applies to a line breakpoint only`,
+        `breakpoints[${i}] (${kind}): a condition applies to a line breakpoint only`,
       );
   });
 }

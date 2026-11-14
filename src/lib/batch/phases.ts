@@ -62,7 +62,6 @@ import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
 import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
-import { sessionOf } from './sessionOf';
 
 /** One item's settlement in a phase. */
 export type PhaseResult<R> =
@@ -120,8 +119,8 @@ function outerStatusWatch(connection: IAbapConnection): {
     getSessionId: () => connection.getSessionId(),
     setSessionType: (type: Session) => connection.setSessionType(type),
     getSessionType: (): Session =>
-      sessionOf(connection, 'getSessionType') ??
-      sessionOf(connection, 'getSessionMode') ??
+      connection.getSessionType?.() ??
+      connection.getSessionMode?.() ??
       'stateless',
     makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       sent += 1;

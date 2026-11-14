@@ -6,7 +6,10 @@ import type {
   IAdtHeaders,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
 import {
@@ -269,7 +272,9 @@ export interface NodeLevel {
 }
 
 /** Our `node` strategy: one answer in, one level out, descriptions kept. */
-export function nodeLevel(answer: { readonly data?: unknown }): NodeLevel {
+export function nodeLevel(
+  answer: Partial<Pick<IAdtWireResponse, 'data'>>,
+): NodeLevel {
   // The wire's body, from outside the type system, as text.
   return nodeLevelOf(String(answer.data ?? ''));
 }

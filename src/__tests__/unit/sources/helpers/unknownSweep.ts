@@ -2495,7 +2495,9 @@ export function sinkSlotReads(
  * them: a member read (by name, by a computed key that may name it, never
  * the target of `=`), a destructuring in a declaration or a parameter
  * (renamed, with a default, nested, a rest reading every member) and in an
- * assignment or a `for … of` head, nested or by array pattern.
+ * assignment or a `for … of` head, nested or by array pattern; and a call
+ * of the language's reflective or whole-object reads (`REFLECTIVE_READS`),
+ * reading every member of the value it is given.
  */
 function memberReads(
   checker: ts.TypeChecker,
@@ -2574,6 +2576,10 @@ function memberReads(
         );
     read(node, members);
   }
+  if (ts.isCallExpression(node)) {
+    const members = reflectiveReads(checker, node);
+    if (members !== undefined && members.length > 0) read(node, members);
+  }
   if (
     ts.isBinaryExpression(node) &&
     node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
@@ -2607,6 +2613,69 @@ function memberReads(
       );
     }
   }
+}
+
+/**
+ * The language's reflective and whole-object reads (a closed list): each
+ * reads every member of the value it is given, the values whose arguments
+ * it names — `first`, the first argument; `sources`, every argument after
+ * the first (`Object.assign`'s sources); `keyed`, the first argument by the
+ * key the second names. `Object.keys`, `Reflect.ownKeys` and `for … in`
+ * read keys alone.
+ */
+const REFLECTIVE_READS: ReadonlyMap<string, 'first' | 'sources' | 'keyed'> =
+  new Map([
+    ['Object.entries', 'first'],
+    ['Object.values', 'first'],
+    ['Object.getOwnPropertyDescriptors', 'first'],
+    ['Object.getOwnPropertyDescriptor', 'keyed'],
+    ['Object.assign', 'sources'],
+    ['Reflect.get', 'keyed'],
+    ['Reflect.getOwnPropertyDescriptor', 'keyed'],
+    ['structuredClone', 'first'],
+  ]);
+
+/** The members a call of `REFLECTIVE_READS` reads, or `undefined`. */
+function reflectiveReads(
+  checker: ts.TypeChecker,
+  call: ts.CallExpression,
+): (ts.Symbol | undefined)[] | undefined {
+  const callee = call.expression;
+  const name = ts.isIdentifier(callee)
+    ? callee.text
+    : ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression)
+      ? `${callee.expression.text}.${callee.name.text}`
+      : undefined;
+  const reads = name === undefined ? undefined : REFLECTIVE_READS.get(name);
+  if (reads === undefined) return undefined;
+  // The language's own, never a function of ours so named.
+  const declarations = checker.getSymbolAtLocation(callee)?.declarations ?? [];
+  if (
+    declarations.length === 0 ||
+    declarations.some((declaration) => ownNode(declaration))
+  ) {
+    return undefined;
+  }
+  const membersOf = (argument: ts.Expression): ts.Symbol[] => {
+    const type = checker.getNonNullableType(
+      checker.getTypeAtLocation(argument),
+    );
+    return (type.isUnion() ? type.types : [type]).flatMap((part) =>
+      checker.getPropertiesOfType(part),
+    );
+  };
+  const [first, second] = call.arguments;
+  if (first === undefined) return undefined;
+  if (reads === 'first') return membersOf(first);
+  if (reads === 'sources') return call.arguments.slice(1).flatMap(membersOf);
+  return second === undefined
+    ? membersOf(first)
+    : keyedMembers(
+        checker,
+        checker.getTypeAtLocation(first),
+        checker.getTypeAtLocation(second),
+      );
 }
 
 function keyedMembers(

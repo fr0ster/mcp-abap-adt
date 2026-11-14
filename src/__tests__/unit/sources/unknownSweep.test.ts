@@ -609,6 +609,13 @@ describe('the forms round 10 found the every-node sweep missing are refused', ()
     assert.deepEqual(readBacks('readBackGeneric'), [21, 25, 29]);
   });
 
+  it('a reflective or whole-object read of a value holding such a member is a read-back', () => {
+    assert.deepEqual(
+      readBacks('readBackReflective'),
+      [13, 17, 21, 26, 27, 32, 36, 41],
+    );
+  });
+
   it('a write by a computed key is charged to the member its literal type names', () => {
     assert.deepEqual(readBacks('computedKeyWrite'), [10, 19]);
   });

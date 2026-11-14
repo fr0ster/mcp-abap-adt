@@ -30,7 +30,7 @@ import { bodyFailureText } from './readings';
 export type DebugFailure = FailureEntry;
 
 /** A throw read as a failed answer: what was thrown, kept beside it. */
-const thrownBehind = new WeakMap<object, unknown>();
+const thrownBehind: WeakMap<object, unknown> = new WeakMap();
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

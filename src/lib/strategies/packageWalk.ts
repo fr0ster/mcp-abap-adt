@@ -685,7 +685,7 @@ export async function walkPackages(
   const objectOf = (o: NodeLevel['objects'][number], packageName: string) =>
     withShortDescriptions ? { ...o, packageName } : undescribed(o, packageName);
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
-  const failures = new Map<number, unknown>();
+  const failures: Map<number, unknown> = new Map<number, unknown>();
   const seen = packageNames.map((name) => new Set([name.toUpperCase()]));
   const walks: PackageWalk[] = packageNames.map((name, root) => ({
     root,

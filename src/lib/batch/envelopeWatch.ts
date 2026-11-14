@@ -23,7 +23,7 @@ import { sessionOf } from './sessionOf';
 
 type Session = 'stateful' | 'stateless';
 export class EnvelopeWatch {
-  private readonly thrown = new Set<unknown>();
+  private readonly thrown: Set<unknown> = new Set();
   private answers = 0;
 
   /** A forwarding connection over `connection`, seen by this watch. */

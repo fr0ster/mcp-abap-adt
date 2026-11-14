@@ -65,13 +65,31 @@ against a `?: T`.
     repository (by name, by a key, by any destructuring; a read whose value only passes on,
     where `unknown` or `any` is expected, or is only inspected, reads nothing back); a sink slot
     is read only by its one reader.
+  - **Where a value passes on** is decided by the declaration it lands in, before any
+    instantiation: a parameter, a member or a return written `unknown` or `any` (a third
+    party's sink such as `JSON.stringify`, a listed site). A type parameter instantiated to
+    `unknown` — inferred or written, `consume(box.data)` with `consume<T>(value: T)` — is no
+    sink: the function it belongs to uses the value, so the read is a read-back.
+  - **A write by a computed key** (`box[key] = value`) lands in each member the key's literal
+    type names, a union of literals naming each.
+  - **A whole-object read** is a read of every member of the value it is given, a closed list
+    of the language's reflective reads (`REFLECTIVE_READS`): `Object.entries`,
+    `Object.values`, `Object.getOwnPropertyDescriptors`, `Object.getOwnPropertyDescriptor`,
+    `Object.assign` (its sources), `Reflect.get`, `Reflect.getOwnPropertyDescriptor`,
+    `structuredClone` — each resolved outside the repository. `Object.keys`, `Reflect.ownKeys`
+    and `for … in` read keys alone (a value read by such a key does not compile without an
+    assertion); a spread copy keeps its members' declarations, so a read of the copy's member
+    is the read-back.
 - **The boundaries** (`BoundaryKind`), the one list a site may pass under:
   - **caught** — a `catch` binding, a promise's rejection handler's parameter;
   - **thrown** — a reader of thrown values or a failure slot (`THROWN_READERS`, by exact site
     `file#owner(name)`): a caught value reaches it untyped;
   - **parse** — **typed at the parse** (the owner's rule): `unknown` lives only inside a parse
     function, up to the code that checks it (`PARSE_SITES`); JSON is `JsonValue` / `JsonObject`
-    (`src/lib/json.ts`), XML is `XmlNode` (`src/lib/xml/node.ts`) from there on;
+    (`src/lib/json.ts`), XML is `XmlNode` (`src/lib/xml/node.ts`) from there on. One site
+    reads a contract's own `unknown`: a request's `params` (`IAbapRequestOptions.params`, the
+    caller's), read for `_action` by `sessionKind.ts#paramAction` — typing it is a change of
+    the connection contract, after 24.0.0;
   - **program-input** — a value of `process.argv` / `process.env` (`PROGRAM_INPUT_SITES`);
   - **tool-args** — **input until checked** (the owner's rule): a declaration written
     `ToolArgs` or `X & ToolArgs` with a typed `X`, a value read out of them (`ToolArgValue`: a

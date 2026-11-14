@@ -388,8 +388,10 @@ What it typed in the exported surface, read from the built declarations:
 - **`/embeddable`:** `OpenBatch.target` (`LateBoundConnection`) has `getSessionType` and
   `getSessionMode` as optional members (`?: () => 'stateful' | 'stateless'`), each present
   only while the connection it points at has the same-named one, instead of methods answering
-  `'stateful' | 'stateless' | undefined`. **What you do:** call them with `?.()`; the answer is
-  the one the method gave.
+  `'stateful' | 'stateless' | undefined`. It also has `onPoint(follower)`, called after every
+  `point()` and `seal()`, through which the envelope watch placed over it (`OpenBatch.envelopes`)
+  follows the connection it points at. **What you do:** call the session members with `?.()`;
+  the answer is the one the method gave, read at the call.
 
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 

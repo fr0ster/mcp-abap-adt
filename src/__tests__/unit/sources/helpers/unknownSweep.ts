@@ -275,6 +275,10 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
 
 /** Parse results held up to the function that checks them, by exact site. */
 export const PARSE_SITES: ReadonlySet<string> = new Set<string>([
+  // A request's `params`: the connection contract (`IAbapRequestOptions`)
+  // types them `unknown` and they are the caller's (adt-clients'), so the
+  // batch reads `_action` out of them as a parse. Typing `params` is a
+  // contract change of its own, after 24.0.0 (the owner, 2026-11-14).
   'src/lib/batch/sessionKind.ts#paramAction(params)',
   'src/lib/config/yamlConfig.ts#loadYamlConfig(parsed)',
   'src/lib/instance.ts#isRegistry(value)',

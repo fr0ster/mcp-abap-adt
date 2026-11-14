@@ -1,3 +1,4 @@
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   child,
   localName,
@@ -39,7 +40,10 @@ function textOf(entry: XmlRead, name: string): string {
   return text(child(entry, name)) ?? '';
 }
 
-export function feedVariantsOf(answer: { data?: unknown }): FeedVariants[] {
+/** The feed list's variants: the library's result strategy for its `feeds` slot. */
+export function feedVariantsOf(
+  answer: Pick<IAdtWireResponse, 'data'>,
+): FeedVariants[] {
   const feeds: FeedVariants[] = [];
   // The wire's body is a boundary: anything but text reads as no document.
   const body = answer?.data;

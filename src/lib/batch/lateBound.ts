@@ -27,7 +27,6 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { sessionOf } from './sessionOf';
 
 type Session = 'stateful' | 'stateless';
 /** A member reached while the target points at no connection. */
@@ -80,12 +79,24 @@ export class LateBoundConnection implements IAbapConnection {
     this.target().setSessionType(type);
   }
 
-  getSessionType(): Session | undefined {
-    return sessionOf(this.current, 'getSessionType');
+  /**
+   * The pointed connection's session, read as the batch connection reads a
+   * wrapped one (`getSessionType`, else `getSessionMode`, else stateless):
+   * the contract's members answer a session, so none is no session stated.
+   */
+  getSessionType(): Session {
+    const current = this.current;
+    return (
+      current?.getSessionType?.() ?? current?.getSessionMode?.() ?? 'stateless'
+    );
   }
 
-  getSessionMode(): Session | undefined {
-    return sessionOf(this.current, 'getSessionMode');
+  /** The pointed connection's session, its `getSessionMode` read first. */
+  getSessionMode(): Session {
+    const current = this.current;
+    return (
+      current?.getSessionMode?.() ?? current?.getSessionType?.() ?? 'stateless'
+    );
   }
 
   async makeAdtRequest(

@@ -19,7 +19,6 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { sessionOf } from './sessionOf';
 
 type Session = 'stateful' | 'stateless';
 export class EnvelopeWatch {
@@ -37,8 +36,16 @@ export class EnvelopeWatch {
       getBaseUrl: () => connection.getBaseUrl(),
       getSessionId: () => connection.getSessionId(),
       setSessionType: (type: Session) => connection.setSessionType(type),
-      getSessionType: () => sessionOf(connection, 'getSessionType'),
-      getSessionMode: () => sessionOf(connection, 'getSessionMode'),
+      // Read as the batch connection reads a wrapped one: the contract's
+      // members answer a session, so none is no session stated.
+      getSessionType: (): Session =>
+        connection.getSessionType?.() ??
+        connection.getSessionMode?.() ??
+        'stateless',
+      getSessionMode: (): Session =>
+        connection.getSessionMode?.() ??
+        connection.getSessionType?.() ??
+        'stateless',
       makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
         let sending: Promise<IAdtWireResponse>;
         try {

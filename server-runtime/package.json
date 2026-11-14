@@ -106,7 +106,7 @@
     "@mcp-abap-adt/auth-stores": "^5.1.0",
     "@mcp-abap-adt/connection": "^25.0.0",
     "@mcp-abap-adt/interfaces-adt": "^27.4.0",
-    "@mcp-abap-adt/interfaces-adt-connection": "^5.0.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^5.1.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@mcp-abap-adt/interfaces-auth-broker": "^1.4.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",

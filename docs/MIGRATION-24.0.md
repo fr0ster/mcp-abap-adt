@@ -352,7 +352,7 @@ What it typed in the exported surface, read from the built declarations:
 
 - **`/utils`:** `makeAdtRequest(connection, url, method, timeout, headers?)` — the `data` and
   `params` parameters are gone (its one caller sends a GET with neither). **What you do:** a call
-  that passed `undefined, undefined, headers` passes `headers` fourth; a request with a body or
+  that passed `undefined, undefined, headers` passes `headers` fifth, after `timeout`; a request with a body or
   parameters goes through `connection.makeAdtRequest(options)`.
 - **`/utils`:** `logErrorSafely(logger, …)` takes `Partial<Pick<ILogger, 'error'>> | undefined`;
   `parseValidationResponse(response)` takes `Pick<IAdtWireResponse, 'data' | 'status'>`;

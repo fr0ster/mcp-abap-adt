@@ -803,6 +803,17 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it('a destructuring of a variable, a parameter, an assignment, nested, renamed, by a rest or in a callback is refused', () => {
+    assert.deepEqual(
+      refusedReads('thirdPartyDestructuring'),
+      [8, 13, 19, 24, 30, 35, 40],
+    );
+    assert.deepEqual(
+      sitesOf('thirdPartyDestructuring').filter((site) => lineOf(site) === 45),
+      [],
+    );
+  });
+
   it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
     assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
     assert.deepEqual(

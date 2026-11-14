@@ -2439,8 +2439,8 @@ export class UnknownSweep {
 
   /**
    * The closed rule (the owner's decision): a member a declaration outside
-   * the repository types `unknown` or `any` is read — by name or by a
-   * key — only at a boundary.
+   * the repository types `unknown` or `any` is read — by name, by a key, by
+   * any destructuring — only at a boundary.
    */
   private thirdPartyRead(node: ts.Node): void {
     if (ts.isPartOfTypeNode(node) || typeHeritage(node)) return;
@@ -2449,13 +2449,7 @@ export class UnknownSweep {
       node,
       (found) => {
         const { at } = found;
-        if (
-          !ts.isPropertyAccessExpression(at) &&
-          !ts.isElementAccessExpression(at)
-        ) {
-          return;
-        }
-        if (this.called(at)) return;
+        if (ts.isExpression(at) && this.called(at)) return;
         if (ts.isDeleteExpression(at.parent)) return;
         const read = this.foreignRead(found);
         if (read === undefined) return;

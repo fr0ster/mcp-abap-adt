@@ -1,7 +1,7 @@
 // The closed rule, member reads: a member a declaration outside the
 // repository types `unknown` or `any` is read only at a boundary — inside a
-// listed function, whole into a sink, keys alone. Inspecting it is reading
-// it. A whole third-party value held as such reads nothing.
+// listed function, whole into a sink, keys alone. Inspecting or discarding
+// it is reading it. A whole third-party value held as such reads nothing.
 import type {
   IAbapRequestOptions,
   IAdtWireResponse,
@@ -38,7 +38,7 @@ export function inspected(answer: IAdtWireResponse): number {
   return seen;
 }
 
-// Passes: whole into a sink, discarded, keys alone, as tool arguments.
+// Refused: discarded, a read all the same. Passes: whole into a sink.
 export function passedOn(answer: IAdtWireResponse): string {
   answer.data;
   void answer.request;

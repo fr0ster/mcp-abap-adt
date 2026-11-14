@@ -33,9 +33,9 @@
  *   brings in — a member read by name or by a key, a call whose signature
  *   answers it or is instantiated with it, a destructuring, a callback's
  *   parameter the contract hands it — is read only at a boundary: inside a
- *   listed function, whole into a sink or tool arguments, discarded, or for
- *   its keys alone (`KEYS_ONLY`); inspecting it is reading it. What we
- *   supplied (a type argument or a slot type we wrote) is ours, charged
+ *   listed function, whole into a sink or tool arguments, or for its keys
+ *   alone (`KEYS_ONLY`); inspecting it is reading it, and so is discarding
+ *   it (a statement of its own, `void`). What we supplied (a type argument or a slot type we wrote) is ours, charged
  *   where written. No write is tracked: the read is the site;
  * - **any**: an expression of type `any` (a library's answer) lands only
  *   where `unknown` or `any` is expected, is discarded, only inspected
@@ -2500,7 +2500,7 @@ export class UnknownSweep {
     }
     if (ts.isExpression(node)) {
       const outer = this.awaitedOut(node);
-      if (this.discarded(outer) || this.keysOnly(outer)) return;
+      if (this.keysOnly(outer)) return;
       const lands = this.passesOn(outer);
       if (lands !== undefined) {
         this.report(
@@ -2528,13 +2528,6 @@ export class UnknownSweep {
     let outer = outermost(node);
     while (ts.isAwaitExpression(outer.parent)) outer = outermost(outer.parent);
     return outer;
-  }
-
-  /** Discarded: a statement of its own, or `void`. */
-  private discarded(node: ts.Expression): boolean {
-    return (
-      ts.isExpressionStatement(node.parent) || ts.isVoidExpression(node.parent)
-    );
   }
 
   /**
@@ -2581,11 +2574,7 @@ export class UnknownSweep {
       symbol === undefined ? [] : (this.references.get(symbol) ?? []);
     return uses.every((use) => {
       const outer = this.awaitedOut(use);
-      return (
-        this.discarded(outer) ||
-        this.keysOnly(outer) ||
-        this.passesOn(outer) !== undefined
-      );
+      return this.keysOnly(outer) || this.passesOn(outer) !== undefined;
     });
   }
 

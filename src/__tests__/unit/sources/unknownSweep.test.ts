@@ -736,14 +736,14 @@ function refusedReads(fixture: string, listing: Listing = {}): number[] {
 describe("the closed rule: a third party's unknown is read only at a boundary (the owner's decision)", () => {
   const member = { parse: [key('thirdPartyMember', 'parseBody', 'answer')] };
 
-  it('a member read by name, by a key, through an optional chain, or inspected is refused', () => {
+  it('a member read by name, by a key, through an optional chain, inspected or discarded is refused', () => {
     assert.deepEqual(
       refusedReads('thirdPartyMember', member),
-      [17, 22, 27, 33, 34, 35, 36, 37, 81],
+      [17, 22, 27, 33, 34, 35, 36, 37, 43, 44, 81],
     );
   });
 
-  it('a member read whole into a sink, as tool arguments or inside a listed function passes; discarded or for its keys alone it reads nothing', () => {
+  it('a member read whole into a sink, as tool arguments or inside a listed function passes; for its keys alone it reads nothing', () => {
     assert.deepEqual(
       thirdPartyReads('thirdPartyMember', member).filter(
         ([, judged]) => judged !== 'refused',
@@ -755,10 +755,10 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
         [69, 'parse'],
       ],
     );
-    const keysOrDiscarded = [43, 44, 48, 49, 50];
+    const keysAlone = [48, 49, 50];
     assert.deepEqual(
       sitesOf('thirdPartyMember', member).filter((site) =>
-        keysOrDiscarded.includes(lineOf(site)),
+        keysAlone.includes(lineOf(site)),
       ),
       [],
     );
@@ -831,6 +831,20 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
     // Instantiated with a type of ours: ours.
     assert.deepEqual(judged(sites, 'reading'), [['callback', false, []]]);
+  });
+
+  it('a discarded read is a read: a member, a call answering one, awaited or not, a callback parameter used only discarded are refused', () => {
+    // The parse the reviver is handed to passes whole into a sink.
+    assert.deepEqual(thirdPartyReads('discardedReads'), [
+      [8, 'refused'],
+      [9, 'refused'],
+      [10, 'refused'],
+      [15, 'refused'],
+      [16, 'refused'],
+      [17, 'refused'],
+      [23, 'refused'],
+      [23, 'sink-contract'],
+    ]);
   });
 
   it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {

@@ -331,8 +331,6 @@ a refused connection, a timeout and a DNS failure from such an `Error` by its `c
   as `JsonValue`, checked once where the YAML was read. **What you do:** a parameter of your own
   reads a `JsonValue`; a YAML value is read as JSON writes it, so a timestamp (which YAML parses to
   a `Date`) reaches it as its ISO text (`"2026-11-14T07:00:00.000Z"`).
-- `failurePayload` (`/auth`) answers a JSON object (`AnswerObject`), not `Record<string, unknown>`.
-  **What you do:** read its members as JSON values.
 - `/debugger`: `heldStateHandle` and `startedExtra` answer `DebugExtra` (string members);
   `debugAnswer` is `debugAnswer<T, P, F = T>(args, work, terse, full?, extraOf?,
   failureExtraOf?)`, `P` the terse answer's type and `F` the full one's, and `debugStateAnswer`

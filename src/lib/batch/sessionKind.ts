@@ -36,20 +36,18 @@ export function requestKind(
   if (endpoint === 'debugger') return 'stateful';
   const action =
     new URL(request.url, 'https://batch.invalid').searchParams.get('_action') ??
-    paramAction(request);
+    paramAction(request.params);
   if (action === 'LOCK') return 'lock';
   if (action === 'UNLOCK') return 'unlock';
   return 'stateful';
 }
 
 /**
- * The `_action` of a request's `params`: a query string read as one, an
- * object's member written out; else none.
+ * The `_action` of a request's `params` — `unknown` by the request's
+ * contract, the caller's (adt-clients') own, so read here as a parse: a
+ * query string read as one, an object's member written out; else none.
  */
-function paramAction(
-  request: Pick<IAbapRequestOptions, 'params'>,
-): string | null {
-  const params = request.params;
+function paramAction(params: unknown): string | null {
   if (typeof params === 'string') {
     return new URLSearchParams(params).get('_action');
   }

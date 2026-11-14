@@ -275,6 +275,7 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
 
 /** Parse results held up to the function that checks them, by exact site. */
 export const PARSE_SITES: ReadonlySet<string> = new Set<string>([
+  'src/lib/batch/sessionKind.ts#paramAction(params)',
   'src/lib/config/yamlConfig.ts#loadYamlConfig(parsed)',
   'src/lib/instance.ts#isRegistry(value)',
   'src/lib/instance.ts#registry(found)',

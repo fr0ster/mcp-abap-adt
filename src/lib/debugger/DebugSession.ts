@@ -250,6 +250,14 @@ export class DebugCleanupError extends Error {
   }
 }
 /**
+ * `thrown` when it is a stop's failure ({@link DebugCleanupError}), else
+ * `undefined`: a reader of thrown values, for a settled side's rejection.
+ */
+export function cleanupErrorOf(thrown: unknown): DebugCleanupError | undefined {
+  return thrown instanceof DebugCleanupError ? thrown : undefined;
+}
+
+/**
  * Refused before anything was sent, or refused by the system before anything
  * of ours was left to undo. `placed`: breakpoints the system keeps, when a
  * start was refused after its arming placed them.

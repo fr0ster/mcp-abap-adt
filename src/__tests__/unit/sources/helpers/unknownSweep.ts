@@ -189,6 +189,7 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/debugger/AmdpSession.ts#thrown(e)',
   'src/lib/debugger/AmdpSession.ts#withNotUndone(error)',
   'src/lib/debugger/AmdpSession.ts#withNotUndone(withNotUndone)',
+  'src/lib/debugger/DebugSession.ts#cleanupErrorOf(thrown)',
   'src/lib/debugger/DebugSession.ts#credentialEntryOf(error)',
   'src/lib/debugger/DebugSession.ts#listenerThrown(e)',
   'src/lib/debugger/DebugSession.ts#thrown(e)',

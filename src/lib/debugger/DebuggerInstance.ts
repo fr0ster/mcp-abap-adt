@@ -2,6 +2,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { StatePart } from '../state/InstanceState';
 import { AmdpSession } from './AmdpSession';
 import {
+  cleanupErrorOf,
   DebugCleanupError,
   DebugSession,
   type DebugView,
@@ -65,26 +66,27 @@ export class DebuggerInstance implements StatePart {
     ]);
     // Each side's failures as entries: a side's cleanup error carries its
     // own; anything else it threw is one entry, with the step.
-    const failures = results.flatMap((r, i) =>
-      r.status !== 'rejected'
-        ? []
-        : r.reason instanceof DebugCleanupError
-          ? [...r.reason.failures]
-          : [thrownFailure(r.reason, i === 0 ? 'stop' : 'stop AMDP')],
-    );
+    // A side's rejection is a caught value: read by the thrown-value readers.
+    const failures = results.flatMap((r, i) => {
+      if (r.status !== 'rejected') return [];
+      const cleanup = cleanupErrorOf(r.reason);
+      return cleanup !== undefined
+        ? [...cleanup.failures]
+        : [thrownFailure(r.reason, i === 0 ? 'stop' : 'stop AMDP')];
+    });
     const notes = results.flatMap((r) =>
       r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : [],
     );
     if (failures.length) {
       const failedNotes = results.flatMap((r) =>
-        r.status === 'rejected' && r.reason instanceof DebugCleanupError
-          ? [...r.reason.notes]
+        r.status === 'rejected'
+          ? [...(cleanupErrorOf(r.reason)?.notes ?? [])]
           : [],
       );
       // The steps either side did not attempt once the credential was refused.
       const notAttempted = results.flatMap((r) =>
-        r.status === 'rejected' && r.reason instanceof DebugCleanupError
-          ? [...r.reason.notAttempted]
+        r.status === 'rejected'
+          ? [...(cleanupErrorOf(r.reason)?.notAttempted ?? [])]
           : [],
       );
       throw new DebugCleanupError(
@@ -106,13 +108,13 @@ export class DebuggerInstance implements StatePart {
       this.abap.endOnce(),
       this.amdp.endOnce(),
     ]);
-    const failures = results.flatMap((r) =>
-      r.status === 'rejected'
-        ? r.reason instanceof DebugCleanupError
-          ? [...r.reason.failures]
-          : [thrownFailure(r.reason, 'end')]
-        : [],
-    );
+    const failures = results.flatMap((r) => {
+      if (r.status !== 'rejected') return [];
+      const cleanup = cleanupErrorOf(r.reason);
+      return cleanup !== undefined
+        ? [...cleanup.failures]
+        : [thrownFailure(r.reason, 'end')];
+    });
     if (failures.length) throw new DebugCleanupError(failures);
     const logoffs = results.reduce(
       (n, r) => n + (r.status === 'fulfilled' ? r.value.value.logoffs : 0),

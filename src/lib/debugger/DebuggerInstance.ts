@@ -2,7 +2,6 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { StatePart } from '../state/InstanceState';
 import { AmdpSession } from './AmdpSession';
 import {
-  cleanupErrorOf,
   DebugCleanupError,
   DebugSession,
   type DebugView,
@@ -15,6 +14,14 @@ import {
   resolveDebuggerIds,
 } from './ids';
 import { liveAmdpPorts, liveDebugPorts } from './ports';
+
+/**
+ * `thrown` when it is a stop's failure ({@link DebugCleanupError}), else
+ * `undefined`: a reader of thrown values, for a settled side's rejection.
+ */
+function cleanupErrorOf(thrown: unknown): DebugCleanupError | undefined {
+  return thrown instanceof DebugCleanupError ? thrown : undefined;
+}
 
 /** One server instance's debugger — a part of its state: both kinds, the SAP ids. */
 export class DebuggerInstance implements StatePart {

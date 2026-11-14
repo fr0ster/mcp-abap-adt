@@ -13,9 +13,8 @@ import * as z from 'zod';
  */
 import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
-import type { HandlerContext } from '../../handlers/index';
+import type { HandlerContext, ToolArgs } from '../../handlers/index';
 import { listedValues } from '../../handlers/listedValues';
-import { child } from '../../outsideValue';
 import { textsOf } from '../memberTexts';
 
 /** `HandlerBatch`'s actions. */
@@ -109,12 +108,11 @@ type BatchArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * well-formed `end` — `begin` and `answers` never take one, and a call
  * refused for its arguments is refused before any is taken.
  */
-export function batchActionIsConnectionless(args: unknown): boolean {
-  const action = child(args, 'action');
+export function batchActionIsConnectionless(args: ToolArgs): boolean {
   return (
-    action !== 'end' ||
-    child(args, 'number') !== undefined ||
-    child(args, 'numbers') !== undefined
+    args.action !== 'end' ||
+    args.number !== undefined ||
+    args.numbers !== undefined
   );
 }
 

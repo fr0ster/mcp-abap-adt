@@ -25,7 +25,6 @@ import {
 } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
-import { child } from '../../outsideValue';
 import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
@@ -263,7 +262,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const content = normalizeToolContent(result);
 
           // A failed tool returns an isError result — it does not throw.
-          if (child(result, 'isError')) {
+          if (result.isError) {
             return { content, isError: true };
           }
 

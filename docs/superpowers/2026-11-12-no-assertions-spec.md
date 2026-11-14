@@ -236,6 +236,20 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
 
 ## 4. The `unknown` audit
 
+- **The gate is the every-node sweep (the owner's decision, replacing the method below).**
+  `src/__tests__/unit/sources/helpers/unknownSweep.ts` visits every production declaration and
+  expression, walks the checker's type to any depth, and refuses `unknown` / `any` outside the
+  boundary kinds (caught, thrown, parse, program-input, tool-args, sink-contract, sink-slot,
+  callback); no flow is followed. A third party's type is its contract, but the type arguments
+  the repository writes for one are walked where written. The owner's rules it applies: typed at
+  the parse (JSON `JsonValue` / `JsonObject`, XML `XmlNode`), by reading (a slot of our own
+  contract whose content is read back is typed), bound by the caller (a type parameter is no
+  site; each instantiation is), input until checked (`ToolArgValue`). Measured 2026-11-14: it
+  refuses no production site, with `THROWN_READERS` 161, `PARSE_SITES` 11, `SINK_SITES` 4,
+  `SINK_SLOTS` 2, `SINK_CONTRACTS` 3, `PROGRAM_INPUT_SITES` 0. The flow-following scan
+  (`unknownSources.test.ts`, `unknownProvenanceScan.ts`) is gone. `docs/development/CODE_GATES.md`
+  is the reference. The rest of this section is the history that led there.
+
 - **Method: the compiler decides, site by site, by where the value comes from.**
   - A script on the compiler's language service finds every in-repository source of each
     production `unknown`: a parameter's call sites; a variable's initializer and assignments; a

@@ -628,6 +628,12 @@ below is what it carries besides.
 
 ### S3. The `unknown` audit (spec §4; order step 4)
 
+- **Done as the every-node sweep (spec §4, its first point).** `unknownSweep.test.ts` holds the
+  fixtures and the production describe; it refuses no production site (Measured 2026-11-14),
+  and setting a production value back to `unknown` turns it red. S3a's flow scan
+  (`unknownSources.test.ts`) and `measure:unknown`'s scan are gone; the steps below are the
+  record of how the sites were found and typed.
+
 - **S3a. The provenance script as a source test** (`unknownSources.test.ts`), written first
   with its fixtures. It runs over the
   code as it is, with the language service and the type checker, following sources through

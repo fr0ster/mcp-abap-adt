@@ -26,66 +26,64 @@ against a `?: T`.
 | `!` | a non-null assertion (`x!`) and a definite assignment (`let x!: T`, `field!: T`) | `staticTypes.test.ts` |
 | Suppression | `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, `biome-ignore` in any comment | `staticTypes.test.ts` |
 | Regex | a regex literal, any reference to `RegExp`, `match` / `matchAll` / `search` on a string, called or taken off it (`call`, `bind`, `String.prototype`, destructuring) | `noRegexOverInput.test.ts` |
-| `unknown` | a value typed `unknown` whose origin has a contract type | `unknownSources.test.ts` |
+| `unknown` | a declaration or an expression whose type holds `unknown` or `any` at any depth, outside the boundaries | `unknownSweep.test.ts` |
 
 - **The scans read syntax trees, never text** (`src/__tests__/unit/sources/helpers/typeEscapeScan.ts`,
-  `regexScan.ts`, `unknownProvenanceScan.ts`), over every git-tracked or new production source,
-  `.ts`, `.mts`, `.cts`, `.js`, `.mjs` and `.cjs`. The unknown audit follows types, so it reads
-  the TypeScript sources: every package's `src` and the root's `scripts`; a JavaScript source
-  carries no type for it to follow. There is no allow-list: a finding is fixed in the code.
+  `regexScan.ts`), over every git-tracked or new production source, `.ts`, `.mts`, `.cts`, `.js`,
+  `.mjs` and `.cjs`. The unknown audit (`helpers/unknownSweep.ts`) reads types, so it reads the
+  TypeScript sources: every package's `src` and the root's `scripts`; a JavaScript source carries
+  no type for it to read.
 - **A value from outside the type system** — a tool's arguments from the model, SAP's answers, a
   parsed document, the environment, a file, a caught value — is checked at run time, in plain
   code, once, at the boundary where it enters; it is typed after. A value that has a contract type
   is typed by that contract (the interface's declared type, the handler's argument type,
-  `ReturnType<…>`), never held as `unknown` and narrowed by hand. The unknown audit follows each
-  `unknown` back to where its value comes from and refuses one whose origin is typed. An
-  `unknown` inside a written type is read the same way: an array's or a tuple's element, a
-  `Record`'s or an index signature's value, a `Map`, `Set` or `Promise` argument, a function
-  type's return, an alias of `unknown`, and the parameter of a function expression whose
-  function type writes it `unknown`.
-  The type read is the one the checker instantiates, walked to any depth: an `unknown` a generic
-  is instantiated with (`Visit<unknown>`, `Bag<unknown>` of `[key: string]: T[]`), a member's
-  member, a function type's parameter and return. A call's arguments reach parameters through
-  spreads alike: a fixed tuple's members at their places, and every argument after an array
-  spread to a rest parameter.
-- **Three readings of the unknown audit are rules (the owner's decisions):**
-  - a site declared `ToolArgs` (a tool's arguments before their schema, what an entry's `call`
-    parses) is input, as `process.argv` and `process.env` are, whoever hands the value on;
-  - a function written as a member of an object literal typed by a named sink contract
-    (`SINK_CONTRACTS`: `ILogger`, `IAnswerSerializer`, and `RegisteredToolCallback`, a registered
-    tool callback as the MCP SDK calls it, whose arguments go on to the SDK's callback) is that
-    contract's member, so its `unknown` parameter is a sink;
-  - **a sink by reading:** a slot of a contract whose value only leaves the program — handed to
-    JSON serialization or the MCP SDK, never read back — is a sink, named by its contract and
-    member (`SINK_SLOTS`: `ToolContentItem.json` and `ToolContentItem.text`, a tool answer's
-    content), each with the one function that reads it to hand it out (`normalizeToolContent`).
-    Every `unknown` under such a slot is a sink. A read of the slot by any other function — by
-    name, by a computed key that may name it, destructured in a declaration or an assignment —
-    reads a typed value back and is refused (`sinkSlotReads`); its contract is then typed
-    instead — made generic, so callers keep their type, or exact. A slot whose content is read
-    back is never a sink.
-- **A reader of thrown values** (`THROWN_READERS`) takes `unknown` because a caught value reaches
-  it untyped; it is named by `file#function(parameter)`, and a listed reader no site has is
-  stale. A function that reads no caught value is typed by its sources instead. A caught value
-  is one a `catch` binds, one a promise's rejection handler takes (`catch`'s, `then`'s second),
-  wherever it is carried (by shorthand, destructured); a slot that holds `Error`s of ours beside
-  values from outside (a rejection reached through a library's combinator) is a failure slot, a
-  reader's too.
-- **How the audit reads what it follows:**
-  - a value followed back to where it was made is read there at the position the site asks
-    for (a reading's `value`, not the reading as a whole);
-  - a runtime object the language declares with no type parameter (`Error`, `AbortSignal`) is
-    the language's contract, like a third party's: what it types `unknown` (`Error.cause`) is no
-    position of the repository's, nor is a member a class of ours inherits from it;
-  - a callback no code of the repository calls — a function expression, or a named function
-    handed on by name — is typed by each contract it is handed to, at each position it writes
-    `unknown`: one that takes its contract's instantiation (`AdtReading<unknown>` where the call
-    instantiates `T` so) passes; one that writes `unknown` where the contract has a type is
-    refused with that type;
-  - a member is named as the checker names it (`'raw-value'`, `value` written `'value'`), and a
-    type is walked to any depth, a recursive one cut where it repeats;
-  - a site declared `ToolArgs` intersected with typed members (`{ object_type?: … } & ToolArgs`,
-    what a compact route selects by) is the input still.
+  `ReturnType<…>`), never held as `unknown` and narrowed by hand.
+- **The unknown audit is a sweep of every node.** Every declaration and every expression of
+  production code is visited; its type is taken from the checker and walked to any depth —
+  array and tuple elements, type arguments, index signatures (own and inherited, as
+  instantiated), union and intersection members, a function's parameters and return, an
+  object's members; a recursive type is cut where it repeats. No flow is followed: a site
+  holding `unknown` or `any` is refused unless it is one of the boundaries below, and a form the
+  sweep does not know is refused, never passed. Each position is charged once, to the node that
+  writes it: a declaration whose own written type holds it, an object literal's member, an
+  instantiation no argument or receiver brought it into.
+  - **A third party's type is its contract** and is not walked: what it types `unknown` is the
+    boundary itself. **The type arguments we write for one are ours**
+    (`IAdtResponse<unknown, IAdtError>`): they are walked where they are written, at any depth
+    of the written type. The language's own structure (`Record`, `Readonly`, `Array`,
+    `Promise`, `Map`) is walked; a member of a runtime object of the language (`Error.cause`)
+    is not a position.
+  - **Bound by the caller:** a type parameter's constraint and default are not sites; each
+    instantiation is judged where it is written, a default that falls back to `unknown`
+    included.
+  - Three checks run beside it: an expression of type `any` (a library's answer) lands only
+    where `unknown` or `any` is expected, is discarded or only inspected; a typed value put
+    where `unknown` is expected is charged to that slot, refused in a parse site and in a third
+    party's member read back by the repository; a sink slot is read only by its one reader.
+- **The boundaries** (`BoundaryKind`), the one list a site may pass under:
+  - **caught** — a `catch` binding, a promise's rejection handler's parameter;
+  - **thrown** — a reader of thrown values or a failure slot (`THROWN_READERS`, by exact site
+    `file#owner(name)`): a caught value reaches it untyped;
+  - **parse** — **typed at the parse** (the owner's rule): `unknown` lives only inside a parse
+    function, up to the code that checks it (`PARSE_SITES`); JSON is `JsonValue` / `JsonObject`
+    (`src/lib/json.ts`), XML is `XmlNode` (`src/lib/xml/node.ts`) from there on;
+  - **program-input** — a value of `process.argv` / `process.env` (`PROGRAM_INPUT_SITES`);
+  - **tool-args** — **input until checked** (the owner's rule): a declaration written
+    `ToolArgs` or `X & ToolArgs` with a typed `X`, a value read out of them (`ToolArgValue`: a
+    member, a nested object's, a list's element), and a function returning them;
+  - **sink-contract** — a member of a contract of `SINK_CONTRACTS` (`ILogger`,
+    `IAnswerSerializer`, `RegisteredToolCallback`), a function implementing one, or a listed
+    sink site (`SINK_SITES`);
+  - **sink-slot** — **by reading** (the owner's rule): a slot of `SINK_SLOTS`
+    (`ToolContentItem.json`, `ToolContentItem.text`), whose value only leaves the program, each
+    with the one function that reads it to hand it out (`normalizeToolContent`); a read of the
+    slot by any other function reads a typed value back and is refused — a slot of our own
+    contract whose content is read back is typed;
+  - **callback** — a parameter or a return a contract outside the repository (or a boundary of
+    the repository's) types `unknown` at every place the function is handed to it.
+- **The lists name exact sites and stay short:** an entry no site has is stale and refused. A
+  finding is fixed in the code — typed by its contract, its wire or parse answer, or made
+  generic — never by widening a list.
 - **Text is read with plain string code** (`src/lib/plainText.ts`), never a regex.
 - **Biome** (`biome.json`) turns the three rules on as errors for production, with no override.
   `lint:check`, `lint` and the build's check name the same directories, which
@@ -122,6 +120,8 @@ deliberately wrong value to prove a check at a boundary, or prove a refusal of t
 - `staticTypes.test.ts` "holds no escape" lists each finding as `{ rule, where: 'file:line',
   text }`; "holds no any" the same for the test infrastructure.
 - `noRegexOverInput.test.ts` lists each site as `file:line` and its first line.
-- `unknownSources.test.ts` lists each `unknown` whose origin is typed, with that origin.
+- `unknownSweep.test.ts` "refuses no site" lists each refused site as `file:line kind
+  file#owner(name) at '<position>' <reason>: <typed values put there>`; the position is the path
+  inside the site's type (`IAdtResponse<0>`, `[]`, `.member`, `()`).
 - A fixture per refusal lives under `src/__tests__/unit/sources/__fixtures__/`; a new rule comes
   with a fixture its scan refuses and a clean one it accepts.

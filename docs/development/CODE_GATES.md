@@ -77,13 +77,17 @@ against a `?: T`.
     matched by `file#function(`, closures inside it included); landing whole where `unknown`
     or `any` is declared — a parameter, a member or a return written so (a sink:
     `JSON.stringify`, `String`, a logger's meta, a listed site) — or in a slot written
-    `ToolArgs` (input until checked), an `await` handing on what it settles with; discarded
-    (a statement of its own, `void`); or read for its keys alone — `Object.keys`,
+    `ToolArgs` (input until checked), an `await` handing on what it settles with; or read
+    for its keys alone — `Object.keys`,
     `Reflect.ownKeys` (the language's) and `for … in`, the closed list `KEYS_ONLY` (an `any`
     so read is no `any` landing either). A type parameter instantiated to `unknown` —
     `consume(box.data)` with `consume<T>(value: T)` — is no sink: the function uses the value.
     **Inspecting it is reading it:** `typeof x.data === 'string'`, `x.data === undefined`,
-    `x.data instanceof T`, a truthiness test are refused outside a boundary; the check moves
+    `x.data instanceof T`, a truthiness test — the left operand of `||`, `&&` and `??`
+    included, wherever the result lands (`JSON.stringify(x.data ?? '')`; the right operand
+    and a conditional's branches hand on whole) — are refused outside a boundary, and so is
+    a discarded read (a statement of its own, `void x.data`): it is a read all the same. An
+    answer's body as text is `bodyTextOf` (`src/lib/wireValue.ts`); the check moves
     into the parse function (`wireValueOf`, `src/lib/wireValue.ts`, tells a wire value apart
     once). A settled promise's `reason` is a caught value: handed whole to a reader of thrown
     values it passes as `caught`.

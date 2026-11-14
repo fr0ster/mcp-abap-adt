@@ -33,3 +33,12 @@ function each(visit: (visited: unknown) => void, text: string): void {
 export function fromVisitor(text: string): void {
   each((visited) => void String(visited), text);
 }
+
+// A tuple's typed member written after it is made leaves its `unknown`
+// member a boundary.
+export function tupleMember(raw: string): number {
+  const parsed: unknown = JSON.parse(raw);
+  const member: [unknown, string] = [parsed, ''];
+  member[1] = 'x';
+  return member.length;
+}

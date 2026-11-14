@@ -74,3 +74,129 @@ export interface Holder {
 export function holder(order: Order): Holder {
   return { held: [order] };
 }
+
+// Written into after it is made: a mutator, an element, a member.
+export function pushed(order: Order): number {
+  const into: unknown[] = [];
+  into.push(order);
+  return into.length;
+}
+export function assigned(order: Order): number {
+  const slots: [unknown] = [undefined];
+  slots[0] = order;
+  const members: Record<string, unknown> = {};
+  members.order = order;
+  return slots.length + Object.keys(members).length;
+}
+export function stored(order: Order): number {
+  const entries: Map<string, unknown> = new Map();
+  entries.set('x', order);
+  const kept: Set<unknown> = new Set();
+  kept.add(order);
+  return entries.size + kept.size;
+}
+
+// An interface's index signature, and a library call widened by its
+// written type argument.
+interface Bag {
+  [key: string]: unknown;
+}
+export function viaInterface(order: Order): Bag {
+  const indexed: Bag = { order };
+  return indexed;
+}
+export function widened(order: Order): Promise<unknown> {
+  const promised: Promise<unknown> = Promise.resolve<unknown>(order);
+  return promised;
+}
+
+// A spread's elements, a map's key, a nested receiver, a write through an
+// alias, and an inherited index signature.
+export function spreadInto(order: Order): number {
+  const spread: unknown[] = [];
+  spread.push(...[order]);
+  return spread.length;
+}
+export function keyed(order: Order): number {
+  const keys: Map<unknown, string> = new Map();
+  keys.set(order, 'x');
+  return keys.size;
+}
+export function nested(order: Order): number {
+  const rows: unknown[][] = [[]];
+  rows[0]?.push(order);
+  return rows.length;
+}
+export function throughAlias(order: Order): number {
+  const heldOrders: unknown[] = [];
+  const alias = heldOrders;
+  alias.push(order);
+  return heldOrders.length;
+}
+interface BaseBag {
+  [key: string]: unknown;
+}
+interface DerivedBag extends BaseBag {}
+export function inherited(order: Order): DerivedBag {
+  const derived: DerivedBag = { order };
+  return derived;
+}
+
+// Made by a library constructor from values, written through a generic
+// alias or an indexed alias, spread into a call, keyed by number.
+export function constructed(order: Order): number {
+  const made: Map<string, unknown> = new Map<string, unknown>([['x', order]]);
+  const grouped: Set<unknown> = new Set<unknown>([order]);
+  const resolved: Promise<unknown> = new Promise<unknown>((resolve) =>
+    resolve(order),
+  );
+  return made.size + grouped.size + (resolved === undefined ? 0 : 1);
+}
+type Values<T> = T[];
+export function genericAlias(order: Order): number {
+  const listed: Values<unknown> = [order];
+  return listed.length;
+}
+export function indexedAlias(order: Order): number {
+  const table: unknown[][] = [[]];
+  const row = table[0];
+  row?.push(order);
+  return table.length;
+}
+function take(spreadInto: unknown[]): number {
+  return spreadInto.length;
+}
+export function spreadCall(order: Order): number {
+  const args: [Order[]] = [[order]];
+  return take(...args);
+}
+export function numbered(order: Order): number {
+  const orders: Record<number, Order> = { 0: order };
+  const byNumber: Record<number, unknown> = orders;
+  return Object.keys(byNumber).length;
+}
+
+// An argument after a tuple spread, a generic interface's index signature,
+// and a Promise resolver copied to another name.
+function takeOne(afterSpread: unknown): boolean {
+  return afterSpread !== null;
+}
+export function afterTuple(order: Order): boolean {
+  const none: [] = [];
+  return takeOne(...none, order);
+}
+interface TaggedBag<Tag> {
+  tag?: Tag;
+  [key: string]: unknown;
+}
+export function genericInterface(order: Order): TaggedBag<string> {
+  const tagged: TaggedBag<string> = { order };
+  return tagged;
+}
+export function copiedResolver(order: Order): Promise<unknown> {
+  const finished: Promise<unknown> = new Promise<unknown>((resolve) => {
+    const finish = resolve;
+    finish(order);
+  });
+  return finished;
+}

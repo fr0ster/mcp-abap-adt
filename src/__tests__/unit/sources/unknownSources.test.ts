@@ -15,6 +15,7 @@ import { describe, it } from 'node:test';
 import { REPO } from './helpers/failureScan';
 import {
   fixtureProgram,
+  ownFile,
   productionProjects,
   scanFiles,
   scanProduction,
@@ -248,6 +249,59 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     assert.deepEqual(by('held'), [['typed', true, ['Order']]]);
   });
 
+  it('a value written into a container after it is made is read at its position', () => {
+    const sites = sitesOf('containers');
+    for (const name of [
+      'into',
+      'slots',
+      'members',
+      'entries',
+      'kept',
+      'spread',
+      'keys',
+      'rows',
+      'heldOrders',
+      'made',
+      'grouped',
+      'resolved',
+      'listed',
+      'table',
+      'spreadInto',
+      'byNumber',
+      'afterSpread',
+      'tagged',
+      'finished',
+    ]) {
+      assert.deepEqual(
+        sites
+          .filter((entry) => entry.name === name)
+          .map((entry) => [entry.cls, entry.refused, entry.types]),
+        [['typed', true, ['Order']]],
+        name,
+      );
+    }
+  });
+
+  it("an interface's index signature and a library call widened to unknown are read too", () => {
+    const sites = sitesOf('containers');
+    for (const name of ['indexed', 'promised', 'derived']) {
+      assert.deepEqual(
+        sites
+          .filter((entry) => entry.name === name)
+          .map((entry) => [entry.cls, entry.refused, entry.types]),
+        [['typed', true, ['Order']]],
+        name,
+      );
+    }
+  });
+
+  it("every package's sources are the repository's own, installed and built files are not", () => {
+    assert.equal(ownFile(path.join(REPO, 'compact-modify/src/x.ts')), true);
+    assert.equal(ownFile(path.join(REPO, 'scripts/x.ts')), true);
+    assert.equal(ownFile(path.join(REPO, 'node_modules/a/index.d.ts')), false);
+    assert.equal(ownFile(path.join(REPO, 'server-runtime/dist/x.d.ts')), false);
+  });
+
   it('an alias of unknown is read as a plain unknown', () => {
     const aliased = site('containers', 'aliased');
     assert.deepEqual(
@@ -258,7 +312,7 @@ describe('the unknown audit refuses a value the repository has a type for', () =
 
   it('an unknown inside a container fed from outside the type system passes', () => {
     const sites = sitesOf('containerBoundary').filter((entry) =>
-      ['items', 'bag', 'make', 'visited'].includes(entry.name),
+      ['items', 'bag', 'make', 'visited', 'member'].includes(entry.name),
     );
     assert.deepEqual(
       sites.map((entry) => [entry.name, entry.cls, entry.refused]),
@@ -267,6 +321,7 @@ describe('the unknown audit refuses a value the repository has a type for', () =
         ['bag', 'boundary', false],
         ['make', 'boundary', false],
         ['visited', 'boundary', false],
+        ['member', 'boundary', false],
       ],
     );
   });

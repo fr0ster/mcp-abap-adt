@@ -3,7 +3,14 @@
  * where it is parsed, in plain code, and typed `JsonValue` after.
  */
 import { XMLParser } from 'fast-xml-parser';
-import { jsonFields, jsonOf, jsonOrText, parseJson } from '../../lib/json';
+import {
+  answerValueOf,
+  jsonFields,
+  jsonOf,
+  jsonOrText,
+  parseJson,
+} from '../../lib/json';
+import { thrownCleanup } from '../../lib/strategies/safeFields';
 
 describe('a parsed value is checked once, where it is parsed', () => {
   it('takes every JSON value as it is, built afresh', () => {
@@ -78,5 +85,31 @@ describe('our own fields as a JSON object', () => {
     const json = jsonFields(fields);
     expect(JSON.stringify(json)).toBe('{"__proto__":"x"}');
     expect(Object.getPrototypeOf(json)).toBe(Object.prototype);
+  });
+});
+
+describe("a thrown carrier's value reads as its JSON text says", () => {
+  it('a Date reads as the text JSON.stringify writes for it', () => {
+    const when = new Date('2026-01-01T00:00:00Z');
+    expect(answerValueOf({ when, message: 'failed' })).toEqual({
+      when: '2026-01-01T00:00:00.000Z',
+      message: 'failed',
+    });
+  });
+
+  it('a member JSON leaves out is left out, a list entry it writes null is null', () => {
+    expect(answerValueOf({ a: 1, gone: () => 1, list: [() => 1, 2] })).toEqual({
+      a: 1,
+      list: [null, 2],
+    });
+  });
+
+  it('a cleanup failure carrying a Date answers it as text', () => {
+    const cleanup = thrownCleanup({
+      failures: [{ when: new Date('2026-01-01T00:00:00Z'), message: 'm' }],
+    });
+    expect(JSON.stringify(cleanup)).toContain(
+      '"when":"2026-01-01T00:00:00.000Z"',
+    );
   });
 });

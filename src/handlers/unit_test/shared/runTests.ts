@@ -51,7 +51,7 @@ export interface IUnitTestRunner extends IUnitTestRunInformation {
   run(
     objectName: string,
     options: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<unknown, IAdtError>>;
+  ): Promise<IAdtResponse<string, IAdtError>>;
 }
 
 /**
@@ -125,13 +125,13 @@ export async function runAndWait(
 export async function waitForRun(
   runner: IUnitTestRunInformation,
   wait: boolean,
-  start: () => Promise<IAdtResponse<unknown, IAdtError>>,
+  start: () => Promise<IAdtResponse<string, IAdtError>>,
 ): Promise<IAdtResponse<StartedRun, IAdtError>> {
   const started = await atStep('run', start)();
   if (!started.ok) {
     return started;
   }
-  const runId = String(started.getResult().value);
+  const runId = started.getResult().value;
   const outcome = wait
     ? await readRunOnce(
         (id, withLongPolling) =>

@@ -245,7 +245,7 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   the parse (JSON `JsonValue` / `JsonObject`, XML `XmlNode`), by reading (a slot of our own
   contract whose content is read back is typed), bound by the caller (a type parameter is no
   site; each instantiation is), input until checked (`ToolArgValue`). Measured 2026-11-14: it
-  refuses no production site, with `THROWN_READERS` 161, `PARSE_SITES` 11, `SINK_SITES` 4,
+  refuses no production site, with `THROWN_READERS` 160, `PARSE_SITES` 12, `SINK_SITES` 4,
   `SINK_SLOTS` 2, `SINK_CONTRACTS` 3, `PROGRAM_INPUT_SITES` 0. The flow-following scan
   (`unknownSources.test.ts`, `unknownProvenanceScan.ts`) is gone. `docs/development/CODE_GATES.md`
   is the reference. The rest of this section is the history that led there.

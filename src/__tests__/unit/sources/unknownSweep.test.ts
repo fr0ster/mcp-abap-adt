@@ -607,3 +607,19 @@ describe("a stand-in for Node's EventEmitter is typed by Node's contract", () =>
     );
   });
 });
+
+describe("the type arguments we supply to a third party's generic type are ours", () => {
+  it('an unknown written as its argument is refused where it is written, at any depth', () => {
+    assert.deepEqual(
+      sitesOf('suppliedArguments')
+        .filter((site) => site.refused)
+        .map((site) => [site.kind, site.name, site.position]),
+      [
+        ['alias', 'Answer', 'IAdtResponse<0>'],
+        ['return', 'read', 'Promise<0>IAdtResponse<0>[]'],
+        ['parameter', 'answer', 'IAdtResponse<0>{}'],
+        ['variable', 'pending', 'Array<0>Promise<0>IAdtResponse<0>'],
+      ],
+    );
+  });
+});

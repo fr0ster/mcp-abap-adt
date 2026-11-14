@@ -11,7 +11,9 @@
  * instantiated), union and intersection members, a function's parameters
  * and return, an object's members; a recursive type is cut where it repeats.
  * A third party's type (declared outside the repository) is its contract and
- * is not walked: what it types `unknown` is the boundary itself. The
+ * is not walked: what it types `unknown` is the boundary itself. The type
+ * arguments the repository writes for one (`IAdtResponse<unknown, …>`) are
+ * ours, and are walked where they are written. The
  * language's own structure (`Record`, `Readonly`, `Array`, `Promise`, `Map`)
  * is walked; a member of a runtime object of the language (`Error.cause`) is
  * not a position.
@@ -1049,17 +1051,108 @@ export class UnknownSweep {
     return undefined;
   }
 
+  /** The type node a declaration writes for itself, when it writes one. */
+  private writtenTypeNode(node: ts.Node): ts.Node | undefined {
+    if (ts.isExpressionWithTypeArguments(node)) return node;
+    if (ts.isTypeParameterDeclaration(node)) {
+      return node.constraint ?? node.default;
+    }
+    if (
+      ts.isFunctionLike(node) ||
+      ts.isParameter(node) ||
+      ts.isVariableDeclaration(node) ||
+      ts.isPropertySignature(node) ||
+      ts.isPropertyDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isTypeAliasDeclaration(node) ||
+      ts.isIndexSignatureDeclaration(node)
+    ) {
+      return node.type;
+    }
+    return undefined;
+  }
+
+  /**
+   * The positions of `unknown` in the type arguments a written type supplies
+   * to a third party's generic type (`IAdtResponse<unknown, IAdtError>`):
+   * the third party's type is its contract and is not walked, but what we
+   * write as its arguments is ours, at any depth of the written type. A
+   * declaration of the repository nested in it (a type literal's member, a
+   * function type's parameter) is its own site and is not entered.
+   */
+  private suppliedHeld(root: ts.Node | undefined): Held[] {
+    if (root === undefined) return [];
+    const walk = (node: ts.Node, prefix: Path): Held[] => {
+      if (node !== root && this.siteKind(node) !== undefined) return [];
+      if (ts.isArrayTypeNode(node)) {
+        return walk(node.elementType, [...prefix, { kind: 'element' }]);
+      }
+      if (ts.isTupleTypeNode(node)) {
+        return node.elements.flatMap((element, at) =>
+          walk(element, [...prefix, { kind: 'element', at }]),
+        );
+      }
+      const generic =
+        ts.isTypeReferenceNode(node) || ts.isExpressionWithTypeArguments(node)
+          ? node
+          : undefined;
+      if (generic?.typeArguments !== undefined) {
+        const target = this.referencedSymbol(generic);
+        const name = target?.getName() ?? 'Generic';
+        const theirs =
+          target !== undefined &&
+          (target.declarations ?? []).length > 0 &&
+          (target.declarations ?? []).every((each) => thirdParty(each));
+        return generic.typeArguments.flatMap((argument, at) => {
+          const path: Path = [...prefix, { kind: 'argument', of: name, at }];
+          const own = theirs
+            ? this.held(this.checker.getTypeFromTypeNode(argument))
+                .filter((each) => each.owner === undefined)
+                .map((each) => ({ ...each, path: [...path, ...each.path] }))
+            : [];
+          return [...own, ...walk(argument, path)];
+        });
+      }
+      const out: Held[] = [];
+      ts.forEachChild(node, (child) => {
+        out.push(...walk(child, prefix));
+      });
+      return out;
+    };
+    return walk(root, []);
+  }
+
+  /** The type a reference names, through an import's alias. */
+  private referencedSymbol(
+    node: ts.TypeReferenceNode | ts.ExpressionWithTypeArguments,
+  ): ts.Symbol | undefined {
+    const symbol = this.checker.getSymbolAtLocation(
+      ts.isTypeReferenceNode(node) ? node.typeName : node.expression,
+    );
+    if (symbol === undefined) return undefined;
+    return symbol.flags & ts.SymbolFlags.Alias
+      ? this.checker.getAliasedSymbol(symbol)
+      : symbol;
+  }
+
   /** The positions of `unknown` a declaration's own written type holds. */
   private ownHeld(node: ts.Node): readonly Held[] {
+    const supplied = this.suppliedHeld(this.writtenTypeNode(node));
     if (ts.isIndexSignatureDeclaration(node)) {
-      return this.held(this.checker.getTypeFromTypeNode(node.type)).filter(
-        (each) => each.owner === undefined,
-      );
+      return [
+        ...this.held(this.checker.getTypeFromTypeNode(node.type)).filter(
+          (each) => each.owner === undefined,
+        ),
+        ...supplied,
+      ];
     }
     const type = this.writtenType(node);
-    return type === undefined
-      ? []
-      : this.held(type).filter((each) => each.owner === undefined);
+    return [
+      ...(type === undefined
+        ? []
+        : this.held(type).filter((each) => each.owner === undefined)),
+      ...supplied,
+    ];
   }
 
   /** Whether a declaration's own written type holds `unknown` or `any`. */

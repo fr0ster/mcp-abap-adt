@@ -115,7 +115,9 @@ export async function handleCreateTransport(
           ),
       ),
     (reading) =>
-      project(detail, () => terseCreatedTransport(reading.created()))(reading),
+      project(detail, (_value: typeof reading.value) =>
+        terseCreatedTransport(reading.created()),
+      )(reading),
   );
 }
 

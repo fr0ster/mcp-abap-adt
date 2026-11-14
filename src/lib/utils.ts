@@ -11,7 +11,6 @@ import {
 import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
 import type {
   IAbapConnection,
-  IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -714,13 +713,17 @@ export async function getBaseUrl() {
   return getManagedConnection().getBaseUrl();
 }
 
+/**
+ * One request on `connection`: a body as text, query parameters as text,
+ * the server's own use of the connection's `makeAdtRequest`.
+ */
 export async function makeAdtRequest(
   connection: IAbapConnection,
   url: string,
   method: string,
   timeout: number,
-  data?: unknown,
-  params?: IAbapRequestOptions['params'],
+  data?: string | undefined,
+  params?: Readonly<Record<string, string>> | undefined,
   headers?: Record<string, string> | undefined,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({

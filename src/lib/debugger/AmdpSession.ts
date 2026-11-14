@@ -150,15 +150,15 @@ interface OnceAmdp {
   stopped: boolean;
 }
 
-const bodyOf = (a: IAdtResponse<unknown>): string =>
+const bodyOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
-const messageOf = (a: IAdtResponse<unknown>): string =>
+const messageOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** A debug error that carries the method's error as it is, with its step. */
 const failedAt = <E extends Error>(
   error: E,
-  a: IAdtResponse<unknown>,
+  a: IAdtResponse<string | void>,
   step: string,
 ): E =>
   a.ok || isFromThrow(a.getError())

@@ -323,9 +323,9 @@ interface OwedRelease {
   what: string;
 }
 
-const bodyOf = (a: IAdtResponse<unknown>): string =>
+const bodyOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
-const messageOf = (a: IAdtResponse<unknown>): string =>
+const messageOf = (a: IAdtResponse<string | void>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /**
@@ -338,7 +338,7 @@ const listenerThrown = (e: unknown, step: string): DebugListenerError =>
 /** A debug error that carries the method's error as it is, with its step. */
 const failedAt = <E extends Error>(
   error: E,
-  a: IAdtResponse<unknown>,
+  a: IAdtResponse<string | void>,
   step: string,
 ): E =>
   a.ok || isFromThrow(a.getError())
@@ -396,7 +396,7 @@ export function refuseConditionOffLine(
  * a safety net a conforming server does not reach. Any other failure is not
  * read as this.
  */
-function refusesUser(answer: IAdtResponse<unknown>): boolean {
+function refusesUser(answer: IAdtResponse<string | void>): boolean {
   if (answer.ok) return false;
   const response = answer.getError().response;
   const subType = readExceptionSubType(response?.data);
@@ -431,7 +431,7 @@ function credentialEntryOf(error: unknown): DebugFailure | undefined {
 
 /** A failed listener answer: the holder named when it is the system's conflict. */
 function listenerError(
-  answer: IAdtResponse<unknown>,
+  answer: IAdtResponse<string | void>,
   step: string,
 ): DebugListenerError {
   if (!answer.ok && isFromThrow(answer.getError()))
@@ -483,7 +483,7 @@ function variablesView(
 
 /** A stack position answer: the position asked; its failure at `set stack position`. */
 function positionView(
-  answer: IAdtResponse<unknown>,
+  answer: IAdtResponse<string | void>,
   position: number,
 ): DebugView<{ position: number }> {
   if (!answer.ok)
@@ -1369,7 +1369,7 @@ export class DebugSession<O = unknown> {
 
   private async afterMove(
     stop: Stop,
-    answer: IAdtResponse<unknown>,
+    answer: IAdtResponse<string | void>,
     step: string,
   ): Promise<DebugState> {
     if (!answer.ok) {
@@ -1681,7 +1681,7 @@ export class DebugSession<O = unknown> {
 
   private document(
     step: string,
-    call: (d: Debugger) => Promise<IAdtResponse<unknown>>,
+    call: (d: Debugger) => Promise<IAdtResponse<string | void>>,
   ): Promise<DebugView<string>> {
     return this.mutate(async () => {
       const answer = await call(this.requireStop().debugger);
@@ -1998,7 +1998,7 @@ export class DebugSession<O = unknown> {
 
   private afterStepOnce(
     stop: Stop,
-    answer: IAdtResponse<unknown>,
+    answer: IAdtResponse<string | void>,
     step: string,
   ): DebugView<OnceStep> {
     if (!answer.ok)

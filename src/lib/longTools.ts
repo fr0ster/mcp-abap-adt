@@ -14,7 +14,7 @@
  */
 
 import * as z from 'zod';
-import { child } from './outsideValue';
+import type { ToolArgs } from './handlers/interfaces.js';
 
 /**
  * The approved list, by tool name: the same names as
@@ -77,11 +77,11 @@ const NOT_A_READ: Readonly<
 };
 
 /** Whether a call of the listed `tool` with `args` is a read (the long path). */
-export function isLongRead(tool: string, args: unknown): boolean {
+export function isLongRead(tool: string, args: ToolArgs): boolean {
   const rules = NOT_A_READ[tool];
   if (rules === undefined) return true;
   return !rules.some((rule) => {
-    const value = child(args, rule.argument);
+    const value = args[rule.argument];
     return (
       typeof value === 'string' && rule.equals.includes(value.toUpperCase())
     );
@@ -132,15 +132,15 @@ export const COMPACT_LONG_BACKGROUND_FIELD = z
  * A listed read's `background`: `true` when not given (the default),
  * `null` when given and not a boolean.
  */
-export function readLongBackground(args: unknown): boolean | null {
-  const value = child(args, 'background');
+export function readLongBackground(args: ToolArgs): boolean | null {
+  const value = args.background;
   if (value === undefined) return true;
   return typeof value === 'boolean' ? value : null;
 }
 
 /** Whether a call states `background` at all. */
-export function statesBackground(args: unknown): boolean {
-  return child(args, 'background') !== undefined;
+export function statesBackground(args: ToolArgs): boolean {
+  return args.background !== undefined;
 }
 
 /** A listed tool's description, with the words every listed tool carries. */

@@ -13,9 +13,8 @@
  */
 
 import * as z from 'zod';
-import type { ToolDefinition } from '../handlers/interfaces.js';
+import type { ToolArgs, ToolDefinition } from '../handlers/interfaces.js';
 import { LONG_TOOL_ADVICE, LONG_TOOL_IN_CALL_ADVICE } from '../longTools';
-import { child } from '../outsideValue';
 
 /** The tools that take `background`, with the names of the tools that read and discard their runs. */
 export const BACKGROUND_TOOLS: Readonly<
@@ -175,16 +174,14 @@ export const COMPACT_BACKGROUND_FIELD = z
  * The call's `background`: `true` asks for a background run; `undefined` or
  * `false` is an ordinary run; `null` is a value that is not a boolean.
  */
-export function readBackground(args: unknown): boolean | null {
-  const value = child(args, 'background');
+export function readBackground(args: ToolArgs): boolean | null {
+  const value = args.background;
   if (value === undefined) return false;
   return typeof value === 'boolean' ? value : null;
 }
 
 /** The arguments a run tool's handler receives: `background` is the wrapper's. */
-export function withoutBackground(
-  args: Readonly<Record<string, unknown>>,
-): Readonly<Record<string, unknown>> {
+export function withoutBackground(args: ToolArgs): ToolArgs {
   if (!('background' in args)) return args;
   const { background: _taken, ...rest } = args;
   return rest;
@@ -209,9 +206,9 @@ const READ_OBJECT_ARGUMENTS = [
 ] as const;
 
 /** What a listed read's call reads: the first object it names, upper case; `''` when none. */
-export function readObjectOf(args: unknown): string {
+export function readObjectOf(args: ToolArgs): string {
   for (const argument of READ_OBJECT_ARGUMENTS) {
-    const value = child(args, argument);
+    const value = args[argument];
     if (typeof value === 'string' && value.trim() !== '') {
       return value.trim().toUpperCase();
     }
@@ -220,10 +217,10 @@ export function readObjectOf(args: unknown): string {
 }
 
 /** What a run tool's call runs: its class or program, upper case; `''` when none is named. */
-export function backgroundObjectOf(args: unknown): string {
-  const targetType = child(args, 'target_type');
-  const className = child(args, 'class_name');
-  const programName = child(args, 'program_name');
+export function backgroundObjectOf(args: ToolArgs): string {
+  const targetType = args.target_type;
+  const className = args.class_name;
+  const programName = args.program_name;
   const pick =
     targetType === 'PROGRAM'
       ? programName

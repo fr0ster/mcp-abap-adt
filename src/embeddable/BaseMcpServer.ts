@@ -253,7 +253,7 @@ const heldFlows = new AsyncLocalStorage<
  */
 function worksOnOwnConnection(
   tool: string,
-  args: unknown,
+  args: ToolArgs,
   inBackground: boolean,
 ): boolean {
   return (
@@ -2368,7 +2368,7 @@ export abstract class BaseMcpServer extends McpServer {
    * fresh-connection operation is without `freshConnection`, before any
    * connection.
    */
-  private backgroundRequested(args: unknown): boolean {
+  private backgroundRequested(args: ToolArgs): boolean {
     const background = readBackground(args);
     if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
     if (background && this.backgroundRuns === undefined) {
@@ -2383,7 +2383,7 @@ export abstract class BaseMcpServer extends McpServer {
    * the call when the host gave no strategy, and while a batch is open (the
    * read is recorded; `background: true` there is refused by `recordCall`).
    */
-  private longReadInBackground(tool: string, args: unknown): boolean {
+  private longReadInBackground(tool: string, args: ToolArgs): boolean {
     const background = readLongBackground(args);
     if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
     if (this.backgroundRuns === undefined) return false;

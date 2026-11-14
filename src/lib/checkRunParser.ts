@@ -36,13 +36,9 @@ export interface ParsedCheckRunResult {
   has_warnings: boolean;
 }
 
-/** A body that is not text, as text: its own `toString()`, else nothing. */
-function textOf(body: unknown): string {
-  return body !== null && body !== undefined ? String(body) || '' : '';
-}
-
+/** A check run's document parsed: `response.data`, the document's text. */
 export function parseCheckRunResponse(response: {
-  data: unknown;
+  data: string;
 }): ParsedCheckRunResult {
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -50,9 +46,7 @@ export function parseCheckRunResponse(response: {
   });
 
   try {
-    const body: unknown = response.data;
-    const data = typeof body === 'string' ? body : textOf(body);
-    const result: XmlRead = parseXml(parser, data);
+    const result: XmlRead = parseXml(parser, response.data);
 
     const checkReport =
       childAt(result, 'chkrun:checkRunReports', 'chkrun:checkReport') ??

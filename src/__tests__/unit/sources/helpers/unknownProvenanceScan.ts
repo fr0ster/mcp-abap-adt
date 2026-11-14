@@ -446,8 +446,12 @@ export class ProvenanceScan {
       /** The steps from the container to the position written. */
       readonly path: Path;
       readonly value: ts.Expression;
-      /** A spread: `value` holds the elements, at the same position. */
-      readonly whole: boolean;
+      /**
+       * The steps into `value` before the position is read: none for the
+       * value itself, `[]` for a spread array's elements, `[k]` for a spread
+       * tuple's member `k`.
+       */
+      readonly inside: Path;
     }[]
   >();
   /** Functions handed on as a value (an argument, an initializer, a member). */
@@ -598,13 +602,13 @@ export class ProvenanceScan {
     receiver: ts.Expression,
     step: Step,
     value: ts.Expression,
-    whole = false,
+    inside: Path = [],
   ): void {
     for (const found of this.containersOf(receiver)) {
       this.push(this.contents, found.node, {
         path: [...found.prefix, step],
         value,
-        whole,
+        inside,
       });
     }
   }
@@ -651,23 +655,30 @@ export class ProvenanceScan {
               : [];
       for (const value of values) {
         if (ts.isSpreadElement(value)) {
-          this.writeInto(receiver, { kind: 'element' }, value.expression, true);
+          this.writeInto(receiver, { kind: 'element' }, value.expression, [
+            { kind: 'element' },
+          ]);
         } else this.writeInto(receiver, { kind: 'element' }, value);
       }
       return;
     }
     if (name === undefined) return;
-    if (family === 'Map' && method === 'set') {
-      call.arguments.slice(0, 2).forEach((value, at) => {
-        if (!ts.isSpreadElement(value)) {
-          this.writeInto(receiver, { kind: 'argument', of: name, at }, value);
-        }
-      });
-    }
-    if (family === 'Set' && method === 'add') {
-      const [value] = call.arguments;
-      if (value !== undefined && !ts.isSpreadElement(value)) {
-        this.writeInto(receiver, { kind: 'argument', of: name, at: 0 }, value);
+    // `set(key, value)` and `add(value)`: each argument position the type
+    // argument it fills, a spread's members counted at their places.
+    const filled =
+      family === 'Map' && method === 'set'
+        ? 2
+        : family === 'Set' && method === 'add'
+          ? 1
+          : 0;
+    for (let at = 0; at < filled; at += 1) {
+      for (const reached of this.argumentAt(call.arguments, at, false)) {
+        this.writeInto(
+          receiver,
+          { kind: 'argument', of: name, at },
+          reached.value,
+          reached.inside,
+        );
       }
     }
   }
@@ -783,10 +794,36 @@ export class ProvenanceScan {
     return declaration;
   }
 
+  /**
+   * The paths to `unknown` a declaration's type holds: those its written
+   * type writes, or — for a function expression's parameter whose
+   * repository function type is generic (`Visit<unknown>`) — the parameter
+   * itself when its instantiated type is `unknown`.
+   */
+  private writtenPaths(node: ts.Node): readonly Path[] {
+    const type = this.writtenTypeOf(node);
+    const paths = type === undefined ? [] : this.unknownPaths(type, new Set());
+    if (paths.length > 0 || !ts.isParameter(node) || node.type !== undefined) {
+      return paths;
+    }
+    const fn = node.parent;
+    if (
+      (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) ||
+      this.contextualDeclaration(fn) === undefined
+    ) {
+      return paths;
+    }
+    const parameter = this.checker.getContextualType(fn)?.getCallSignatures()[0]
+      ?.parameters[fn.parameters.indexOf(node)];
+    return parameter !== undefined &&
+      this.checker.getTypeOfSymbol(parameter).flags & ts.TypeFlags.Unknown
+      ? [[]]
+      : paths;
+  }
+
   /** Whether a declaration's written type is or holds `unknown`. */
   private holdsUnknown(node: ts.Node): boolean {
-    const type = this.writtenTypeOf(node);
-    return type !== undefined && this.unknownPaths(type, new Set()).length > 0;
+    return this.writtenPaths(node).length > 0;
   }
 
   /**
@@ -914,22 +951,30 @@ export class ProvenanceScan {
         );
       }
       if (ts.isInterfaceDeclaration(declaration)) {
-        // Its index signatures, its own and those it inherits.
-        return this.checker
-          .getIndexInfosOfType(this.checker.getTypeAtLocation(declaration))
-          .flatMap((info) => {
-            const signature = info.declaration;
-            return signature !== undefined &&
-              ownFile(signature.getSourceFile().fileName)
-              ? this.unknownPaths(
-                  signature.type,
-                  deeper,
-                  ts.isInterfaceDeclaration(signature.parent)
-                    ? interfaceBound(signature.parent)
-                    : new Map(),
-                ).map((path) => [{ kind: 'index' } satisfies Step, ...path])
-              : [];
-          });
+        // An index signature its arguments make `unknown` (`Derived<unknown>`
+        // of `[key: string]: T`, inherited or not), and every index signature
+        // that writes `unknown` itself, its own and those it inherits.
+        const instantiated = this.checker
+          .getIndexInfosOfType(this.checker.getTypeFromTypeNode(node))
+          .some((info) => (info.type.flags & ts.TypeFlags.Unknown) !== 0);
+        return [
+          ...(instantiated ? [[{ kind: 'index' } satisfies Step]] : []),
+          ...this.checker
+            .getIndexInfosOfType(this.checker.getTypeAtLocation(declaration))
+            .flatMap((info) => {
+              const signature = info.declaration;
+              return signature !== undefined &&
+                ownFile(signature.getSourceFile().fileName)
+                ? this.unknownPaths(
+                    signature.type,
+                    deeper,
+                    ts.isInterfaceDeclaration(signature.parent)
+                      ? interfaceBound(signature.parent)
+                      : new Map(),
+                  ).map((path) => [{ kind: 'index' } satisfies Step, ...path])
+                : [];
+            }),
+        ];
       }
       return [];
     });
@@ -941,8 +986,7 @@ export class ProvenanceScan {
    * function's returns are the values its `Promise` holds.
    */
   private pathsOf(node: ts.Node): readonly Path[] {
-    const type = this.writtenTypeOf(node);
-    const paths = type === undefined ? [] : this.unknownPaths(type, new Set());
+    const paths = this.writtenPaths(node);
     if (paths.length === 0) return [[]];
     if (!ts.isFunctionLike(node) || !isAsync(node)) return paths;
     return paths.map((path) => {
@@ -993,11 +1037,7 @@ export class ProvenanceScan {
       cls = 'boundary';
       refused = false;
     }
-    const type = this.writtenTypeOf(node);
-    const position =
-      type === undefined
-        ? ''
-        : this.unknownPaths(type, new Set()).map(pathText).join(' ');
+    const position = this.writtenPaths(node).map(pathText).join(' ');
     return {
       kind,
       position,
@@ -1132,17 +1172,10 @@ export class ProvenanceScan {
   private sourcesOf(node: ts.Node): ts.Expression[] {
     const place = this.parameterPlace(node);
     if (place) {
-      const out: ts.Expression[] = [];
-      for (const alias of this.aliasesOf(place.fn)) {
-        for (const args of this.calls.get(alias) ?? []) {
-          // After a spread the positions are counted by spreadSources.
-          const spread = args.findIndex(ts.isSpreadElement);
-          if (spread >= 0 && spread <= place.at) continue;
-          const argument = args[place.at];
-          if (argument) out.push(argument);
-        }
-      }
-      return out;
+      // Whole arguments only; the rest is `argumentSources`'.
+      return this.argumentSources(node).flatMap((reached) =>
+        reached.inside.length === 0 && !reached.element ? [reached.value] : [],
+      );
     }
     if (ts.isFunctionLike(node)) return this.returnsOf(node);
     const out = [...(this.writes.get(node) ?? [])];
@@ -1156,41 +1189,37 @@ export class ProvenanceScan {
   }
 
   /**
-   * A parameter's spread arguments: `f(...args)` hands the parameter at
-   * index `i` the element `i - k` of the spread at index `k`, the first one.
+   * What a call's arguments hand parameter `at` (`rest`: a rest parameter,
+   * which takes every argument from `at` on as its elements). Each reached
+   * value comes with the steps into it before the parameter's own position:
+   * none for a plain argument, `[k]` for a fixed tuple spread's member,
+   * `[]` for an array spread's element. Positions are counted through fixed
+   * tuple spreads; after an array spread, every later argument may reach
+   * any parameter at or after the spread's place.
    */
-  private spreadSources(
-    node: ts.Node,
-  ): { readonly value: ts.Expression; readonly at: number }[] {
-    const place = this.parameterPlace(node);
-    if (!place) return [];
-    const out: { value: ts.Expression; at: number }[] = [];
-    for (const alias of this.aliasesOf(place.fn)) {
-      for (const args of this.calls.get(alias) ?? []) {
-        out.push(...this.spreadReaching(args, place.at));
-      }
-    }
-    return out;
-  }
-
-  /**
-   * What reaches parameter `at` of a call whose arguments hold a spread: a
-   * fixed tuple's member at its place, an array's element from its place
-   * on, a plain argument at its counted place; after an array spread,
-   * every later argument may reach it too (`at` `-1`: the argument itself).
-   */
-  private spreadReaching(
+  private argumentAt(
     args: ts.NodeArray<ts.Expression>,
     at: number,
-  ): { value: ts.Expression; at: number }[] {
-    const out: { value: ts.Expression; at: number }[] = [];
+    rest: boolean,
+  ): {
+    readonly value: ts.Expression;
+    readonly inside: Path;
+    readonly element: boolean;
+  }[] {
+    const out: { value: ts.Expression; inside: Path; element: boolean }[] = [];
     let place = 0;
-    let open = false;
+    // The place an array spread opened at: from there on, places are not known.
+    let openFrom: number | undefined;
+    const reaches = (position: number): boolean =>
+      openFrom !== undefined
+        ? at >= openFrom
+        : rest
+          ? position >= at
+          : position === at;
     for (const argument of args) {
       if (!ts.isSpreadElement(argument)) {
-        if (open || place === at) {
-          out.push({ value: argument, at: -1 });
-        }
+        if (reaches(place))
+          out.push({ value: argument, inside: [], element: rest });
         place += 1;
         continue;
       }
@@ -1200,14 +1229,46 @@ export class ProvenanceScan {
           ? this.checker.getTypeArguments(type).length
           : undefined;
       if (fixed === undefined) {
-        if (at >= place)
-          out.push({ value: argument.expression, at: at - place });
-        open = true;
-      } else {
-        if (at >= place && at < place + fixed) {
-          out.push({ value: argument.expression, at: at - place });
+        if (
+          openFrom === undefined ? (rest ? true : at >= place) : at >= openFrom
+        ) {
+          // Its elements: a rest parameter's elements, or the parameter itself.
+          out.push({
+            value: argument.expression,
+            inside: [{ kind: 'element' }],
+            element: rest,
+          });
         }
-        place += fixed;
+        openFrom ??= place;
+        continue;
+      }
+      for (let member = 0; member < fixed; member += 1) {
+        if (reaches(place + member)) {
+          out.push({
+            value: argument.expression,
+            inside: [{ kind: 'element', at: member }],
+            element: rest,
+          });
+        }
+      }
+      place += fixed;
+    }
+    return out;
+  }
+
+  /** Every value the calls of a parameter's function hand it ({@link argumentAt}). */
+  private argumentSources(node: ts.Node): {
+    readonly value: ts.Expression;
+    readonly inside: Path;
+    readonly element: boolean;
+  }[] {
+    const place = this.parameterPlace(node);
+    if (!place || !ts.isParameter(node)) return [];
+    const rest = node.dotDotDotToken !== undefined;
+    const out: { value: ts.Expression; inside: Path; element: boolean }[] = [];
+    for (const alias of this.aliasesOf(place.fn)) {
+      for (const args of this.calls.get(alias) ?? []) {
+        out.push(...this.argumentAt(args, place.at, rest));
       }
     }
     return out;
@@ -1234,13 +1295,22 @@ export class ProvenanceScan {
     this.active.add(node);
     const paths = this.pathsOf(node);
     const origins = [
-      // A spread argument that reaches the parameter: its element there.
-      ...this.spreadSources(node).flatMap(({ value, at }) =>
-        paths.flatMap((path) =>
-          at < 0
-            ? this.originsAt(value, path)
-            : this.originsAt(value, [{ kind: 'element', at }, ...path]),
-        ),
+      // An argument reached inside a spread, or an element of a rest
+      // parameter: read at the parameter's position, below the element.
+      ...this.argumentSources(node).flatMap(({ value, inside, element }) =>
+        inside.length === 0 && !element
+          ? []
+          : paths.flatMap((path) => {
+              const [first, ...below] = path;
+              const own = element
+                ? first?.kind === 'element'
+                  ? below
+                  : undefined
+                : path;
+              return own === undefined
+                ? this.originsAt(value, [...inside, ...path])
+                : this.originsAt(value, [...inside, ...own]);
+            }),
       ),
       ...this.sourcesOf(node).flatMap((source) =>
         paths.flatMap((path) => this.originsAt(source, path)),
@@ -1258,12 +1328,10 @@ export class ProvenanceScan {
           ) {
             return [];
           }
-          // A spread is a container of the elements written: read it at
-          // the element's position and below.
-          return this.originsAt(
-            written.value,
-            written.whole ? path.slice(at - 1) : path.slice(at),
-          );
+          return this.originsAt(written.value, [
+            ...written.inside,
+            ...path.slice(at),
+          ]);
         }),
       ),
     ];
@@ -1664,8 +1732,11 @@ export class ProvenanceScan {
     }
     const resolve = executor.parameters[0];
     if (resolve === undefined || !ts.isIdentifier(resolve.name)) return [];
-    // The resolver, and every name it is copied to (`const finish = resolve`).
-    const names = new Set([resolve.name.text]);
+    // The resolver, and every variable it is copied to (`const finish =
+    // resolve`), by symbol: a name shadowed in a nested function is another.
+    const resolver = this.checker.getSymbolAtLocation(resolve.name);
+    if (resolver === undefined) return [];
+    const symbols = new Set([resolver]);
     const collect = (node: ts.Node): void => {
       if (
         ts.isVariableDeclaration(node) &&
@@ -1673,8 +1744,12 @@ export class ProvenanceScan {
         node.initializer !== undefined
       ) {
         const made = strip(node.initializer);
-        if (ts.isIdentifier(made) && names.has(made.text)) {
-          names.add(node.name.text);
+        const source = ts.isIdentifier(made)
+          ? this.checker.getSymbolAtLocation(made)
+          : undefined;
+        const copy = this.checker.getSymbolAtLocation(node.name);
+        if (source !== undefined && symbols.has(source) && copy !== undefined) {
+          symbols.add(copy);
         }
       }
       ts.forEachChild(node, collect);
@@ -1682,10 +1757,14 @@ export class ProvenanceScan {
     collect(executor.body);
     const out: Origin[] = [];
     const visit = (node: ts.Node): void => {
+      const callee =
+        ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+          ? this.checker.getSymbolAtLocation(node.expression)
+          : undefined;
       if (
         ts.isCallExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        names.has(node.expression.text)
+        callee !== undefined &&
+        symbols.has(callee)
       ) {
         const [value] = node.arguments;
         if (value !== undefined && !ts.isSpreadElement(value)) {

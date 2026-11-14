@@ -271,6 +271,11 @@ describe('the unknown audit refuses a value the repository has a type for', () =
       'afterSpread',
       'tagged',
       'finished',
+      'inheritedValues',
+      'genericVisited',
+      'restItems',
+      'spreadMap',
+      'spreadSet',
     ]) {
       assert.deepEqual(
         sites
@@ -312,7 +317,15 @@ describe('the unknown audit refuses a value the repository has a type for', () =
 
   it('an unknown inside a container fed from outside the type system passes', () => {
     const sites = sitesOf('containerBoundary').filter((entry) =>
-      ['items', 'bag', 'make', 'visited', 'member'].includes(entry.name),
+      [
+        'items',
+        'bag',
+        'make',
+        'visited',
+        'member',
+        'firstOnly',
+        'awaited',
+      ].includes(entry.name),
     );
     assert.deepEqual(
       sites.map((entry) => [entry.name, entry.cls, entry.refused]),
@@ -322,6 +335,8 @@ describe('the unknown audit refuses a value the repository has a type for', () =
         ['make', 'boundary', false],
         ['visited', 'boundary', false],
         ['member', 'boundary', false],
+        ['firstOnly', 'boundary', false],
+        ['awaited', 'boundary', false],
       ],
     );
   });

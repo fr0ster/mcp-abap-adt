@@ -42,3 +42,25 @@ export function tupleMember(raw: string): number {
   member[1] = 'x';
   return member.length;
 }
+
+// A parameter before an array spread receives only what is written before
+// it; a resolver shadowed in a nested function is another one.
+function takeFirst(firstOnly: unknown, ...others: unknown[]): number {
+  return others.length + (firstOnly === null ? 0 : 1);
+}
+export function beforeSpread(raw: string, typed: number): number {
+  const parsed: unknown = JSON.parse(raw);
+  const none: unknown[] = [];
+  return takeFirst(parsed, ...none, typed);
+}
+export function shadowedResolver(raw: string): Promise<unknown> {
+  const parsed: unknown = JSON.parse(raw);
+  const awaited: Promise<unknown> = new Promise<unknown>((resolve) => {
+    function other(resolve: (value: number) => void): void {
+      resolve(1);
+    }
+    other(() => undefined);
+    resolve(parsed);
+  });
+  return awaited;
+}

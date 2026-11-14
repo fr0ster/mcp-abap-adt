@@ -200,3 +200,38 @@ export function copiedResolver(order: Order): Promise<unknown> {
   });
   return finished;
 }
+
+// An inherited generic index signature made unknown by its argument, a
+// generic function type's parameter, a rest parameter's later arguments,
+// and a map or set filled through a tuple spread.
+interface ValueBag<T> {
+  [key: string]: T;
+}
+interface DerivedValueBag<T> extends ValueBag<T> {}
+export function inheritedGeneric(order: Order): DerivedValueBag<unknown> {
+  const inheritedValues: DerivedValueBag<unknown> = { order };
+  return inheritedValues;
+}
+type Visit<T> = (value: T) => void;
+function eachVisit(visit: Visit<unknown>, order: Order): void {
+  visit(order);
+}
+export function genericVisitor(order: Order): void {
+  eachVisit((genericVisited) => void String(genericVisited), order);
+}
+function takeAll(...restItems: unknown[]): number {
+  return restItems.length;
+}
+export function restCall(order: Order): number {
+  // The second argument and on are the rest's elements too.
+  return takeAll(undefined, order);
+}
+export function spreadMutators(order: Order): number {
+  const spreadMap: Map<string, unknown> = new Map();
+  const pair: [string, Order] = ['x', order];
+  spreadMap.set(...pair);
+  const spreadSet: Set<unknown> = new Set();
+  const one: [Order] = [order];
+  spreadSet.add(...one);
+  return spreadMap.size + spreadSet.size;
+}

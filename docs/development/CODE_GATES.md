@@ -42,8 +42,13 @@ against a `?: T`.
   `unknown` inside a written type is read the same way: an array's or a tuple's element, a
   `Record`'s or an index signature's value, a `Map`, `Set` or `Promise` argument, a function
   type's return, an alias of `unknown`, and the parameter of a function expression whose
-  function type writes it `unknown`. A site declared `ToolArgs` (a tool's arguments before their
-  schema) is input, as `process.argv` and `process.env` are.
+  function type writes it `unknown`.
+- **Two readings of the unknown audit are rules (the owner's decisions):**
+  - a site declared `ToolArgs` (a tool's arguments before their schema, what an entry's `call`
+    parses) is input, as `process.argv` and `process.env` are, whoever hands the value on;
+  - a function written as a member of an object literal typed by a named sink contract
+    (`SINK_CONTRACTS`: `ILogger`, `IAnswerSerializer`) is that contract's member, so its
+    `unknown` parameter is a sink.
 - **Text is read with plain string code** (`src/lib/plainText.ts`), never a regex.
 - **Biome** (`biome.json`) turns the three rules on as errors for production, with no override.
   `lint:check`, `lint` and the build's check name the same directories, which

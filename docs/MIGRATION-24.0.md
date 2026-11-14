@@ -329,8 +329,8 @@ a refused connection, a timeout and a DNS failure from such an `Error` by its `c
   **What you do:** pass the metadata as strings (`String(value)` for a number or a flag).
 - `Parameter.parse` (`/config`) and `parseStateIdleMinutes` (`/state`) take the configured value
   as `JsonValue`, checked once where the YAML was read. **What you do:** a parameter of your own
-  reads a `JsonValue`; a value YAML parses to something that is no JSON value (a timestamp's
-  `Date`) reaches it as `{}`.
+  reads a `JsonValue`; a YAML value is read as JSON writes it, so a timestamp (which YAML parses to
+  a `Date`) reaches it as its ISO text (`"2026-11-14T07:00:00.000Z"`).
 - `failurePayload` (`/auth`) answers a JSON object (`AnswerObject`), not `Record<string, unknown>`.
   **What you do:** read its members as JSON values.
 - `/debugger`: `heldStateHandle` and `startedExtra` answer `DebugExtra` (string members);

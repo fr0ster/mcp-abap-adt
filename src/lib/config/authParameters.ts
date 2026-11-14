@@ -20,7 +20,7 @@
  * Plain code over the arguments, no regular expression.
  */
 
-import { type JsonValue, jsonOf } from '../json';
+import { type JsonValue, jsonValueOf } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
@@ -159,8 +159,9 @@ function yamlAt(
     if (!isElement(node)) return undefined;
     node = node[segment];
   }
-  // The parsed document's value, checked once: JSON from here on.
-  return jsonOf(node);
+  // The parsed document's value, checked once as JSON writes it (a YAML
+  // timestamp's `Date` its ISO text): JSON from here on.
+  return jsonValueOf(node);
 }
 
 /**

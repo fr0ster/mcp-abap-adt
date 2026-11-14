@@ -98,14 +98,13 @@ export type AnswerValue =
 export type AnswerObject = { readonly [key: string]: AnswerValue };
 
 /**
- * `value` as an answer's value: what its JSON text says, read back and
- * checked ({@link parseJson}), so it answers exactly what serialising it
- * would (a `Date` its text, a member JSON leaves out left out). `undefined`
- * when it has no JSON text (`undefined` itself, a function) or cannot be
- * serialised (a cycle). The one check of a value from outside the type
- * system (a thrown carrier's) before it rides in a payload.
+ * `value` as JSON writes it, read back and checked ({@link parseJson}): a
+ * `Date` its ISO text, a member JSON leaves out left out. `undefined` when
+ * it has no JSON text (`undefined` itself, a function) or cannot be
+ * serialised (a cycle). For a value from outside the type system that is
+ * no parser's output (a YAML document's, a thrown carrier's).
  */
-export function answerValueOf(value: unknown): AnswerValue | undefined {
+export function jsonValueOf(value: unknown): JsonValue | undefined {
   let text: string | undefined;
   try {
     text = JSON.stringify(value);
@@ -113,6 +112,15 @@ export function answerValueOf(value: unknown): AnswerValue | undefined {
     return undefined;
   }
   return text === undefined ? undefined : parseJson(text);
+}
+
+/**
+ * `value` as an answer's value ({@link jsonValueOf}): it answers exactly
+ * what serialising it would. The one check of a value from outside the type
+ * system (a thrown carrier's) before it rides in a payload.
+ */
+export function answerValueOf(value: unknown): AnswerValue | undefined {
+  return jsonValueOf(value);
 }
 
 /** `value` as an answer's JSON object ({@link answerValueOf}), or `undefined`. */

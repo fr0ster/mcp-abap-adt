@@ -487,40 +487,6 @@ export function failedPayloadOf(
   return 'step' in payload ? payload : { ...payload, step };
 }
 
-/**
- * Another handler's failed answer, delegated to, with the step it arose at
- * added beside its payload — nothing of the payload changes. A success, a
- * payload that already names a step, or text that is not a JSON object is
- * returned as it is.
- */
-export function failedAtStep(
-  result: { isError?: boolean; content?: unknown },
-  step: string,
-): { isError?: boolean; content?: unknown } {
-  if (result?.isError !== true || !isList(result.content)) return result;
-  const [first, ...rest] = result.content;
-  const shown = child(first, 'text');
-  if (!isElement(first) || typeof shown !== 'string') return result;
-  let payload: unknown;
-  try {
-    payload = JSON.parse(shown);
-  } catch {
-    return result;
-  }
-  if (!isElement(payload)) return result;
-  if ('step' in payload) return result;
-  return {
-    ...result,
-    content: [
-      {
-        ...first,
-        text: JSON.stringify({ ...payload, step }, null, 2),
-      },
-      ...rest,
-    ],
-  };
-}
-
 export function return_answer<T, R>(
   answer: IAdtResponse<T, IAdtError>,
   project: (value: T) => R,

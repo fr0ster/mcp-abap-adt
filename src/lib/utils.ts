@@ -813,7 +813,7 @@ export function parseValidationResponse(
       ignoreAttributes: false,
       attributeNamePrefix: '@_',
     });
-    result = parseXml(parser, xmlTextOf(response.data));
+    result = parseXml(parser, xmlTextOf(response));
   } catch (_error) {
     return validationFromStatus(response);
   }
@@ -1040,8 +1040,16 @@ export function formatAuthConfigForDisplay(
   return lines.join('\n');
 }
 
-/** What fast-xml-parser reads of `value`: its text, as `parse` reads it. */
-function xmlTextOf(value: unknown): string | Uint8Array {
+/** An attribute that reads `true`, as text or as a parsed boolean. */
+function isTrue(value: XmlRead): boolean {
+  return value === 'true' || value === true;
+}
+
+/** What fast-xml-parser reads of a frame's `data`: its text, as `parse` reads it. */
+function xmlTextOf(
+  frame: Partial<Pick<IAdtWireResponse, 'data'>>,
+): string | Uint8Array {
+  const value = frame.data;
   if (typeof value === 'string' || value instanceof Uint8Array) return value;
   if (value === undefined || value === null) {
     throw new TypeError('XML data is accepted in String or Bytes[] form.');
@@ -1050,23 +1058,11 @@ function xmlTextOf(value: unknown): string | Uint8Array {
 }
 
 /**
- * The text of an activation answer that is not text: its `data` member as
- * fast-xml-parser reads it, else the whole answer written as JSON.
+ * An activation answer parsed: the document, text as it is; an answer that
+ * is not text read by its `data` member as fast-xml-parser reads it, else
+ * written whole as JSON. No answer at all is refused in fast-xml-parser's
+ * own words.
  */
-function activationText(responseData: unknown): string | Uint8Array {
-  const data = child(responseData, 'data');
-  if (data) return xmlTextOf(data);
-  // No answer at all is refused in fast-xml-parser's own words.
-  return responseData === undefined
-    ? xmlTextOf(responseData)
-    : JSON.stringify(responseData);
-}
-
-/** An attribute that reads `true`, as text or as a parsed boolean. */
-function isTrue(value: XmlRead): boolean {
-  return value === 'true' || value === true;
-}
-
 export function parseActivationResponse(responseData: unknown) {
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -1075,11 +1071,22 @@ export function parseActivationResponse(responseData: unknown) {
   });
 
   try {
+    const member =
+      typeof responseData === 'object' &&
+      responseData !== null &&
+      !Array.isArray(responseData) &&
+      'data' in responseData
+        ? responseData.data
+        : undefined;
     const result = parseXml(
       parser,
       typeof responseData === 'string'
         ? responseData
-        : activationText(responseData),
+        : member
+          ? xmlTextOf({ data: member })
+          : responseData === undefined
+            ? xmlTextOf({})
+            : JSON.stringify(responseData),
     );
     const properties = nodeAt(result, 'chkl:messages', 'chkl:properties');
     const activated = isTrue(nodeChild(properties, '@_activationExecuted'));

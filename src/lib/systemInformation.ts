@@ -25,7 +25,8 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { childAt, isElement } from './outsideValue';
+import { type JsonValue, jsonAt, jsonValueOf, parseJson } from './json';
+import { childAt } from './outsideValue';
 
 const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
 const SYSTEM_INFORMATION_ACCEPT =
@@ -38,29 +39,13 @@ export type SystemInformation = {
   readonly systemId: string | undefined;
 };
 
-/** The body as a plain JSON object, else `undefined`. */
-function objectOf(data: unknown): Record<string, unknown> | undefined {
-  let value = data;
-  if (typeof value === 'string') {
-    try {
-      value = JSON.parse(value);
-    } catch {
-      return undefined;
-    }
-  }
-  return isElement(value) ? value : undefined;
-}
-
-function fieldOf(
-  body: Record<string, unknown> | undefined,
-  name: string,
-): unknown {
-  if (body === undefined) return undefined;
-  try {
-    return body[name];
-  } catch {
-    return undefined;
-  }
+/**
+ * The body, typed at the parse: a text body read as JSON ({@link parseJson}),
+ * a body the connection already parsed checked as JSON writes it
+ * ({@link jsonValueOf}); `undefined` when it is neither.
+ */
+function bodyOf(data: unknown): JsonValue | undefined {
+  return typeof data === 'string' ? parseJson(data) : jsonValueOf(data);
 }
 
 export async function readSystemInformation(
@@ -79,9 +64,9 @@ export async function readSystemInformation(
   if (status < 200 || status > 299) {
     throw new SystemInformationStatusError(status);
   }
-  const body = objectOf(response.data);
-  const named = fieldOf(body, 'userName');
-  const id = fieldOf(body, 'systemID');
+  const body = bodyOf(response.data);
+  const named = jsonAt(body, 'userName');
+  const id = jsonAt(body, 'systemID');
   return {
     user: typeof named === 'string' && named.trim() !== '' ? named : undefined,
     systemId: typeof id === 'string' ? id : undefined,

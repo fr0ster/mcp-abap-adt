@@ -20,6 +20,7 @@ import {
 } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { makeAdtRequest } from '../../../lib/utils';
+import { wireValueOf } from '../../../lib/wireValue';
 
 /**
  * `endpoint` reading the active version: `version=active` in its query, the
@@ -99,8 +100,9 @@ export async function handleGetObjectNodeFromCache(
         'read OBJECT_URI',
       );
     }
+    const body = wireValueOf(resp.data);
     const objectUriResponse =
-      typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+      body.kind === 'text' ? body.text : JSON.stringify(resp.data);
     node = { ...node, object_uri_response: objectUriResponse };
 
     // Persist the fetched OBJECT_URI payload back into the cache entry

@@ -1,4 +1,5 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { wireValueOf } from '../wireValue';
 import {
   child,
   localName,
@@ -46,8 +47,8 @@ export function feedVariantsOf(
 ): FeedVariants[] {
   const feeds: FeedVariants[] = [];
   // The wire's body is a boundary: anything but text reads as no document.
-  const body = answer?.data;
-  const document = typeof body === 'string' ? parseStructure(body) : null;
+  const body = wireValueOf(answer?.data);
+  const document = body.kind === 'text' ? parseStructure(body.text) : null;
   for (const entry of membersNamed(document, 'atom:entry')) {
     const variants = walkStructure(entry.node)
       .filter((visit) => localName(visit.name) === 'queryVariant')

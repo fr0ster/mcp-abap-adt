@@ -25,6 +25,7 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { wireValueOf } from '../wireValue';
 import {
   attr,
   child,
@@ -52,9 +53,9 @@ export function carriesLockHandle(
   // The answer is optional (`IAnalyse`); a wire answer's `headers` are not.
   if (headerValue(answer?.headers['sap-adt-lm-handle'])) return true;
   // The wire's body is a boundary: anything but text names no handle.
-  const body = answer?.data;
+  const body = wireValueOf(answer?.data);
   const handle = childAt(
-    typeof body === 'string' ? parseStructure(body) : null,
+    body.kind === 'text' ? parseStructure(body.text) : null,
     'asx:abap',
     'asx:values',
     'DATA',
@@ -67,29 +68,13 @@ export const analyseLock: IAnalyse<IAdtError> = (verdict, answer) => {
   const judged = analyseException(verdict, answer);
   if (judged !== ADT_NO_FAILURE) return judged;
   if (carriesLockHandle(answer)) return ADT_NO_FAILURE;
-  // The wire answer's `request` is the transport's, typed `unknown`: read.
-  const request = answer?.request;
-  const fields =
-    typeof request === 'object' && request !== null && !Array.isArray(request)
-      ? request
-      : undefined;
-  // Each member written out when it is a string, a number or a boolean.
-  const urlMember =
-    fields !== undefined && 'url' in fields ? fields.url : undefined;
-  const methodMember =
-    fields !== undefined && 'method' in fields ? fields.method : undefined;
-  const url =
-    typeof urlMember === 'string' ||
-    typeof urlMember === 'number' ||
-    typeof urlMember === 'boolean'
-      ? String(urlMember)
-      : undefined;
+  // The wire answer's `request` is the transport's, typed `unknown`: read
+  // as a wire value, each member written out when it is a string, a number
+  // or a boolean.
+  const request = wireValueOf(answer?.request);
+  const url = request.kind === 'object' ? request.attribute('url') : undefined;
   const method =
-    typeof methodMember === 'string' ||
-    typeof methodMember === 'number' ||
-    typeof methodMember === 'boolean'
-      ? String(methodMember)
-      : undefined;
+    request.kind === 'object' ? request.attribute('method') : undefined;
   return {
     origin: 'refusal',
     message:

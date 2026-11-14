@@ -1,6 +1,7 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { withoutNamePrefix } from '../plainText';
+import { wireValueOf } from '../wireValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import { attr, child, type Visit, walk, type XmlRead } from '../xml/tree';
 
@@ -171,17 +172,24 @@ export function firstAttributeOn(
 
 /** `answer.data` as text, without pretending an object was ever a string. */
 export function rawOf(answer: IAdtWireResponse): string {
-  const body = answer.data;
-  if (typeof body === 'string') return body;
-  if (body === undefined || body === null) return '';
-  if (typeof body === 'object') {
-    try {
-      return JSON.stringify(body);
-    } catch {
-      return String(body);
-    }
+  const body = wireValueOf(answer.data);
+  switch (body.kind) {
+    case 'text':
+      return body.text;
+    case 'undefined':
+    case 'null':
+      return '';
+    case 'bytes':
+    case 'list':
+    case 'object':
+      try {
+        return JSON.stringify(answer.data);
+      } catch {
+        return String(answer.data);
+      }
+    case 'other':
+      return String(answer.data);
   }
-  return String(body);
 }
 
 /** Wrap a parse as a result strategy that keeps the document beside it. */

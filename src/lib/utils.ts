@@ -36,6 +36,7 @@ import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
 import { child, childAt } from './thrownValue';
+import { wireValueOf } from './wireValue';
 import { parseXml, type XmlNode } from './xml/node';
 import {
   childAt as nodeAt,
@@ -763,8 +764,9 @@ function validationFromStatus(
     return { valid: true };
   }
   let errorMessage = `Validation failed with status ${response.status}`;
-  if (typeof response.data === 'string') {
-    const text = response.data.trim();
+  const body = wireValueOf(response.data);
+  if (body.kind === 'text') {
+    const text = body.text.trim();
     if (text.length > 0 && text.length < 1000) errorMessage = text;
   }
   return {
@@ -1043,12 +1045,13 @@ function isTrue(value: XmlRead): boolean {
 function xmlTextOf(
   frame: Partial<Pick<IAdtWireResponse, 'data'>>,
 ): string | Uint8Array {
-  const value = frame.data;
-  if (typeof value === 'string' || value instanceof Uint8Array) return value;
-  if (value === undefined || value === null) {
+  const value = wireValueOf(frame.data);
+  if (value.kind === 'text') return value.text;
+  if (value.kind === 'bytes') return value.bytes;
+  if (value.kind === 'undefined' || value.kind === 'null') {
     throw new TypeError('XML data is accepted in String or Bytes[] form.');
   }
-  return String(value);
+  return String(frame.data);
 }
 
 /**

@@ -32,6 +32,7 @@ import {
   stateSystemKind,
 } from './systemKind';
 import { child, childAt, entries } from './thrownValue';
+import { wireValueOf } from './wireValue';
 
 export type { AbapSystemKind } from './systemKind';
 export { statedSystemKind } from './systemKind';
@@ -216,8 +217,8 @@ function clip(
   body: Partial<Pick<IAdtWireResponse, 'data'>>,
   ceiling: number,
 ): string {
-  const value = body.data;
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  const value = wireValueOf(body.data);
+  const text = value.kind === 'text' ? value.text : JSON.stringify(body.data);
   if (text === undefined || text === null) return '';
   if (ceiling === 0) return `(${text.length} chars, not logged)`;
   return text.length > ceiling
@@ -251,7 +252,7 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
     process.stderr.write(
       `[WIRE ${id}] ${String(options.method ?? '?')} ${String(options.url ?? '?')}\n`,
     );
-    if (options.params !== undefined) {
+    if (wireValueOf(options.params).kind !== 'undefined') {
       process.stderr.write(
         `[WIRE ${id}] params ${JSON.stringify(options.params)}\n`,
       );
@@ -261,7 +262,7 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
         `[WIRE ${id}] headers ${safeHeaders(options.headers)}\n`,
       );
     }
-    if (options.data !== undefined) {
+    if (wireValueOf(options.data).kind !== 'undefined') {
       process.stderr.write(`[WIRE ${id}] body ${clip(options, bodyChars)}\n`);
     }
     try {
@@ -269,7 +270,7 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
       process.stderr.write(
         `[WIRE ${id}] → ${String(answer.status ?? '?')} ${String(answer.statusText ?? '')}\n`,
       );
-      if (answer.data !== undefined) {
+      if (wireValueOf(answer.data).kind !== 'undefined') {
         process.stderr.write(
           `[WIRE ${id}] → body ${clip(answer, bodyChars)}\n`,
         );

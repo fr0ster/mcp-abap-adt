@@ -48,6 +48,7 @@ import type {
 import { batchOtherKindWords, ServerRefusal } from '../auth/serverRefusal';
 import { raceRequestSignal } from '../requestSignal';
 import { child, entries, isList } from '../thrownValue';
+import { wireValueOf } from '../wireValue';
 import type { InstanceBatch, PartSettlement, RawPart } from './InstanceBatch';
 import { requestKind, sessionKindLabel } from './sessionKind';
 
@@ -84,9 +85,9 @@ export interface Recorder extends IAbapConnection {
 
 /** A part's body as text: a string as it is, anything else as JSON; none is empty. */
 function bodyText(response: Pick<IAdtWireResponse, 'data'>): string {
-  const data = response.data;
-  if (data === undefined || data === null) return '';
-  return typeof data === 'string' ? data : JSON.stringify(data);
+  const data = wireValueOf(response.data);
+  if (data.kind === 'undefined' || data.kind === 'null') return '';
+  return data.kind === 'text' ? data.text : JSON.stringify(response.data);
 }
 
 /** A header's value as one line: a list joined, anything else as text. */

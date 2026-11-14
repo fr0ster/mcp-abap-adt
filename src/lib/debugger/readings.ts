@@ -8,6 +8,7 @@ import { readExceptionSubType } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { wireValueOf } from '../wireValue';
 import { parseXml } from '../xml/node';
 import {
   child,
@@ -458,10 +459,10 @@ export function failureText(error: {
   readonly message: string;
   readonly response?: Pick<IAdtWireResponse, 'data'> | undefined;
 }): string {
-  const data = error.response?.data;
+  const data = wireValueOf(error.response?.data);
   return bodyFailureText(
     error.message,
-    typeof data === 'string' ? data : undefined,
+    data.kind === 'text' ? data.text : undefined,
   );
 }
 

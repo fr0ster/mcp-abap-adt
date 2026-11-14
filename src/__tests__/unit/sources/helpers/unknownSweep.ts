@@ -289,6 +289,9 @@ export const PARSE_SITES: ReadonlySet<string> = new Set<string>([
   'src/lib/packageManifest.ts#packageManifestOf(value)',
   'src/lib/systemInformation.ts#bodyOf(data)',
   'src/lib/utils.ts#parseActivationResponse(responseData)',
+  // A value a wire contract types `unknown` (an answer's `data`, a request's
+  // `params`, the transport's `request`), told apart once.
+  'src/lib/wireValue.ts#wireValueOf(value)',
   'src/lib/xml/node.ts#parseXml(parsed)',
   'src/lib/xml/node.ts#xmlNodeOf(value)',
 ]);

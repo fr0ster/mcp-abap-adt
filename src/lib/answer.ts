@@ -43,6 +43,7 @@ import {
 } from './systemContextGuard';
 import { child, isElement, isList } from './thrownValue';
 import { wireResponseOf } from './wireResponse';
+import { wireValueOf } from './wireValue';
 
 export type { AnswerDetail };
 
@@ -372,15 +373,15 @@ export function failurePayload(
   //
   // The empty string is not a document — emitting `raw_body: ""` would read as
   // "SAP sent an empty body" when nothing was sent at all.
-  const body = error.response?.data;
+  const body = wireValueOf(error.response?.data);
   const answeredOk =
     typeof status === 'number' && status >= 200 && status < 300;
   if (
-    typeof body === 'string' &&
-    body !== '' &&
+    body.kind === 'text' &&
+    body.text !== '' &&
     (!answeredOk || detail === 'raw')
   ) {
-    payload.raw_body = body;
+    payload.raw_body = body.text;
   }
   return payload;
 }

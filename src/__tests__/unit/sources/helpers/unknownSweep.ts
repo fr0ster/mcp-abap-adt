@@ -1852,10 +1852,12 @@ export class UnknownSweep {
    * party's member.
    */
   private widening(node: ts.Expression): void {
-    // A carrier's operands and a literal's members land one by one.
+    // A carrier's operands land one by one, and so do a literal's members
+    // where they have a type expected of their own; a container literal
+    // landing whole where `unknown` is expected is a typed value itself.
+    const literal =
+      ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node);
     if (
-      ts.isObjectLiteralExpression(node) ||
-      ts.isArrayLiteralExpression(node) ||
       ts.isParenthesizedExpression(node) ||
       ts.isConditionalExpression(node) ||
       ts.isSatisfiesExpression(node) ||
@@ -1872,6 +1874,8 @@ export class UnknownSweep {
       for (const each of this.held(landing.contextual)) {
         // An `any` only a library writes: its slot is the library's.
         if (each.any) continue;
+        // Deeper in, the literal's own member or element lands there.
+        if (literal && each.path.length > 0) continue;
         const reached = this.along(landing.type, each.path).filter((t) =>
           this.concrete(t),
         );

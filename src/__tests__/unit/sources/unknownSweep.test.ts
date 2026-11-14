@@ -574,6 +574,29 @@ describe('the forms round 9 found the every-node sweep missing are refused', () 
       [13, 18, 23, 28, 34, 39, 47, 52],
     );
   });
+
+  it('a container literal put where unknown is expected is charged to its slot, and read back', () => {
+    const sites = sitesOf('literalWidening', {
+      parse: [key('literalWidening', 'parse', 'value')],
+    });
+    assert.deepEqual(
+      sites
+        .filter((site) => site.kind === 'widening')
+        .map((site) => [Number(site.where.split(':').pop()), site.types]),
+      [
+        [9, ['number']],
+        [10, ['{ n: number; }']],
+        [11, ['number[]']],
+        [12, ['{ list: { n: number; }[]; }']],
+      ],
+    );
+    assert.deepEqual(
+      sites
+        .filter((site) => site.kind === 'read-back')
+        .map((site) => Number(site.where.split(':').pop())),
+      [18],
+    );
+  });
 });
 
 describe('tool-argument input until it is checked (the owner rule)', () => {

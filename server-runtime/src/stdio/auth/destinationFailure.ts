@@ -28,6 +28,7 @@ import {
   destinationAddressHint,
   destinationAddressWords,
 } from '@mcp-abap-adt/lib/config';
+import { isList } from '@mcp-abap-adt/lib/utils';
 import type { AuthType } from './vocabulary';
 
 /**
@@ -161,10 +162,10 @@ function destinationConfigFailure(
   // answers differently on a second read cannot change what was checked.
   const destination = readOwn(thrown, 'destination');
   const listed = readOwn(thrown, 'missingFields');
-  if (typeof destination !== 'string' || !Array.isArray(listed)) {
+  if (typeof destination !== 'string' || !isList(listed)) {
     return undefined;
   }
-  const copied = Array.from<unknown>(listed);
+  const copied = Array.from(listed);
   const fields = copied.filter((field) => typeof field === 'string');
   if (fields.length !== copied.length) return undefined;
   const carried = readOwn(thrown, 'error');

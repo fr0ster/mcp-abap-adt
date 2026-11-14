@@ -31,7 +31,7 @@ import {
   type InstanceState,
   StateUnavailableError,
 } from '@mcp-abap-adt/lib/state';
-import { type JsonValue, jsonAt } from '@mcp-abap-adt/lib/utils';
+import { isList, type JsonValue, jsonAt } from '@mcp-abap-adt/lib/utils';
 
 export interface Poolable {
   readonly state: InstanceState;
@@ -141,8 +141,8 @@ function ownFailures(e: unknown): string[] | undefined {
     const descriptor = Object.getOwnPropertyDescriptor(e, 'failures');
     const value: unknown =
       descriptor && 'value' in descriptor ? descriptor.value : undefined;
-    if (!Array.isArray(value)) return undefined;
-    const listed = Array.from<unknown>(value);
+    if (!isList(value)) return undefined;
+    const listed = Array.from(value);
     const failures = listed.filter((f) => typeof f === 'string');
     return failures.length === listed.length ? failures : undefined;
   } catch {

@@ -28,7 +28,7 @@ export function withoutStateHandle(args: ToolArgs): ToolArgs {
  * required where it is required.
  */
 export function withStateHandle(inputSchema: z.ZodObject): z.ZodObject {
-  return 'state_handle' in inputSchema.shape
+  return Object.keys(inputSchema.shape).includes('state_handle')
     ? inputSchema
     : inputSchema.extend({
         state_handle: z

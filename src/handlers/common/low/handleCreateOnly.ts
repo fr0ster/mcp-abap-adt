@@ -175,15 +175,15 @@ function delegate<S extends z.ZodObject, R extends ToolResultLike>(
   handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
 ): (context: HandlerContext, args: ToolArgs) => Promise<R> {
   const entry = defineTool(definition, handler);
-  return (context, args) =>
-    entry.call(
+  return (context, args) => {
+    const declared = Object.keys(definition.inputSchema.shape);
+    return entry.call(
       context,
       Object.fromEntries(
-        Object.entries(args).filter(([name]) =>
-          Object.hasOwn(definition.inputSchema.shape, name),
-        ),
+        Object.entries(args).filter(([name]) => declared.includes(name)),
       ),
     );
+  };
 }
 
 /**

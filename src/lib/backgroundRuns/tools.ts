@@ -155,7 +155,7 @@ function inTheCallWords(description: string): string {
 function schemaWithoutBackground(
   schema: ToolDefinition['inputSchema'],
 ): ToolDefinition['inputSchema'] {
-  return 'background' in schema.shape
+  return Object.keys(schema.shape).includes('background')
     ? schema.omit({ background: true })
     : schema;
 }

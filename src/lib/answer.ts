@@ -189,8 +189,8 @@ const TRANSPORT_HINTS: ReadonlyMap<string, string> = new Map([
  * A transport request number: three letters or digits of the system, `K`, six
  * digits. Read by plain code, not a pattern.
  */
-function isRequestNumber(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length !== 10) return false;
+function isRequestNumber(value: string): boolean {
+  if (value.length !== 10) return false;
   for (let i = 0; i < 3; i += 1) {
     const c = value.charAt(i);
     const letter = c >= 'A' && c <= 'Z';

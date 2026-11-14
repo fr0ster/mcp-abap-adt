@@ -231,11 +231,14 @@ function isDigits(text: string): boolean {
   return true;
 }
 
+/** A configured value as a parameter's reader takes it (`Parameter.parse`). */
+type ConfiguredValue = Parameters<NonNullable<Parameter['parse']>>[0];
+
 /**
  * `--login-timeout`'s value: a whole number of seconds from 1 to 86 400,
  * read by plain code — digits only, as a string or a YAML number.
  */
-export function parseLoginTimeout(raw: unknown, name: string): number {
+export function parseLoginTimeout(raw: ConfiguredValue, name: string): number {
   const text = typeof raw === 'string' ? raw.trim() : String(raw);
   const value =
     typeof raw === 'number'

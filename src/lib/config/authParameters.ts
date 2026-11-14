@@ -764,7 +764,7 @@ export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
  * `--shutdown-timeout`'s value: a whole number of seconds from 1 to 86 400,
  * read by plain code — ASCII digits only, as a string or a YAML number.
  */
-export function parseShutdownTimeout(raw: unknown, name: string): number {
+export function parseShutdownTimeout(raw: JsonValue, name: string): number {
   const text = typeof raw === 'string' ? raw.trim() : String(raw);
   let digits = text.length > 0;
   for (let i = 0; i < text.length; i += 1) {

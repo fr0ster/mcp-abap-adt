@@ -32,6 +32,7 @@ import type {
   HandlerEntry,
   IHandlerGroup,
   SapEnvironment,
+  ToolArgs,
 } from '../interfaces.js';
 import { type CallContext, inStatedScope } from '../utils/handlerCall.js';
 
@@ -171,7 +172,8 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         inputSchema,
         ...search,
       },
-      async (given: Record<string, unknown>) => {
+      // The model's arguments, before any schema: input until checked.
+      async (given: ToolArgs) => {
         try {
           // A run tool's `background` is the server instance's to serve: a
           // group registered on its own has no strategy, so a background run

@@ -15,6 +15,7 @@ import {
 } from '../../lib/search-source/readFailure';
 import {
   type NodeAnswer,
+  type NodeLevel,
   type NodeRequest,
   type NodeStructureSource,
   type WalkFailurePlace,
@@ -31,7 +32,7 @@ const classified = (failure: unknown, place: WalkFailurePlace) =>
  * `P` lists a subpackage node (1) and a program node (2); its subpackages are
  * `SA` (one program) and `SB` (one program).
  */
-const LEVELS: Record<string, unknown> = {
+const LEVELS: Record<string, NodeLevel> = {
   'P|root': {
     objects: [],
     childNodes: [
@@ -269,7 +270,7 @@ describe('a level of any size', () => {
     name: `P${i}`,
     type: 'PROG/P',
   }));
-  const big: Record<string, unknown> = {
+  const big: Record<string, NodeLevel> = {
     'P|root': { objects: [], childNodes: [{ type: 'DEVC/K', nodeId: '1' }] },
     'P|1': { objects: [{ name: 'S', type: 'DEVC/K' }], childNodes: [] },
     'S|root': { objects: [], childNodes: [{ type: 'PROG/P', nodeId: '2' }] },

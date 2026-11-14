@@ -27,14 +27,7 @@ import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
-import {
-  child,
-  childAt,
-  entries,
-  isElement,
-  isList,
-  listOf,
-} from '../thrownValue';
+import { child } from '../thrownValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
   childAt as nodeAt,
@@ -74,8 +67,8 @@ export interface NodeStructureSourceOf<R> {
 /** A source of node structure reads, each answer read as a `NodeAnswer`. */
 export type NodeStructureSource = NodeStructureSourceOf<NodeAnswer>;
 
-/** What one node structure read answers: the level, as the reading read it. */
-export type NodeAnswer = IAdtResponse<unknown, IAdtError>;
+/** What one node structure read answers: the level, as our `node` reading (`nodeLevel`) read it. */
+export type NodeAnswer = IAdtResponse<NodeLevel, IAdtError>;
 
 /** The options a node structure read takes, beside its header pair. */
 type NodeStructureOptions = {
@@ -312,71 +305,6 @@ export function nodeLevelOf(xml: string): NodeLevel {
   };
 }
 
-/** The list member `name` of `value`, or none when it is not a list. */
-function listed(value: unknown, name: string): readonly unknown[] {
-  const member = child(value, name);
-  return isList(member) ? member : [];
-}
-
-/** A string as it is; anything else is absent. */
-function stringOrNone(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-/** Ours: objects carry `name`, child nodes carry `type`. */
-function isOurLevel(value: unknown): boolean {
-  const first = listed(value, 'objects')[0] ?? listed(value, 'childNodes')[0];
-  return (
-    first === undefined ||
-    (isElement(first) && ('name' in first || 'type' in first))
-  );
-}
-
-/** Our own reading's level, read field by field. */
-function ourLevel(value: unknown): NodeLevel {
-  return {
-    objects: listed(value, 'objects').map((o) => ({
-      name: String(child(o, 'name') ?? ''),
-      type: String(child(o, 'type') ?? ''),
-      description: stringOrNone(child(o, 'description')),
-      techName: stringOrNone(child(o, 'techName')),
-      uri: stringOrNone(child(o, 'uri')),
-    })),
-    childNodes: listed(value, 'childNodes').map((c) => ({
-      type: String(child(c, 'type') ?? ''),
-      nodeId: String(child(c, 'nodeId') ?? ''),
-    })),
-  };
-}
-
-/**
- * The library's own `nodeContents` reading, in our shape. It carries no
- * description — a caller wanting one passes `ourUtils` — but names, types,
- * tech names and URIs are all there.
- */
-function fromLibraryLevel(value: unknown): NodeLevel {
-  return {
-    objects: listed(value, 'objects')
-      .map((o) => {
-        const techName = child(o, 'techName');
-        const uri = child(o, 'objectUri');
-        return {
-          name: String(child(o, 'objectName') ?? ''),
-          type: String(child(o, 'objectType') ?? ''),
-          techName: techName ? String(techName) : undefined,
-          uri: uri ? String(uri) : undefined,
-        };
-      })
-      .filter((o) => o.name && o.type),
-    childNodes: listed(value, 'childNodes')
-      .map((c) => ({
-        type: String(child(c, 'objectType') ?? ''),
-        nodeId: String(Number(child(c, 'nodeId'))),
-      }))
-      .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
-  };
-}
-
 /** `fetchNodeStructure` answers an IAdtResponse; this is the level inside it. */
 function levelOf(
   answer: NodeAnswer,
@@ -396,16 +324,7 @@ function levelOf(
       'read package node structure',
     );
   }
-  const value = answer.getResult().value;
-  // The injected reading may be ours, the library's own, or the raw wire;
-  // each is recognised by what it carries, never assumed. Having
-  // `childNodes` is NOT enough to be ours: the library's reading has them
-  // too, keyed `objectType`/`objectName`, and passing it through as ours
-  // answered nameless, typeless rows (on premise, 2026-09-25).
-  if (isElement(value) && 'childNodes' in value) {
-    return isOurLevel(value) ? ourLevel(value) : fromLibraryLevel(value);
-  }
-  return nodeLevel({ data: value });
+  return answer.getResult().value;
 }
 
 /**

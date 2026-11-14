@@ -1396,6 +1396,7 @@ export class UnknownSweep {
    */
   private expression(node: ts.Expression): void {
     if (carried(node)) return;
+    if (this.initialisesWrittenSite(node)) return;
     const type = this.checker.getTypeAtLocation(node);
     const held = this.held(type).filter((each) => each.owner === undefined);
     if (held.length === 0) return;
@@ -1472,6 +1473,28 @@ export class UnknownSweep {
    * expected, or is discarded or inspected; an `any` inside its type lands
    * nowhere the contract has a type.
    */
+  /**
+   * An instantiation that initialises a boundary's declaration writing its
+   * own type with `unknown` in it (a listed failure slot `thrown:
+   * Set<unknown> = new Set()`) only builds that type: the boundary answers
+   * for it. Any other declaration's initializer is charged as before.
+   */
+  private initialisesWrittenSite(node: ts.Expression): boolean {
+    if (!ts.isNewExpression(node) && !ts.isCallExpression(node)) return false;
+    const outer = outermost(node);
+    const parent = outer.parent;
+    if (
+      (ts.isVariableDeclaration(parent) || ts.isPropertyDeclaration(parent)) &&
+      parent.initializer === outer &&
+      parent.type !== undefined
+    ) {
+      return (
+        this.ownsUnknown(parent) && this.boundaryOf(parent).kind !== undefined
+      );
+    }
+    return false;
+  }
+
   private anyLanding(node: ts.Expression): void {
     if (carrierParent(node)) return;
     // A name is no value of its own (`#field`, `import(…)`).

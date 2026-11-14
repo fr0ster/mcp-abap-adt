@@ -579,3 +579,20 @@ describe("a generic's type parameters are bound by the caller (the owner rule)",
     );
   });
 });
+
+describe("an instantiation that builds a listed slot's written type is the slot's", () => {
+  it('a listed slot answers for its initializer; an unlisted one is refused with it', () => {
+    const refused = sitesOf('initialisedSlot').filter((site) => site.refused);
+    assert.deepEqual(
+      refused.map((site) => site.kind),
+      ['property', 'expression'],
+    );
+    const listed = sitesOf('initialisedSlot', {
+      thrown: [key('initialisedSlot', 'Watch', 'thrown')],
+    });
+    assert.deepEqual(
+      listed.filter((site) => site.refused),
+      [],
+    );
+  });
+});

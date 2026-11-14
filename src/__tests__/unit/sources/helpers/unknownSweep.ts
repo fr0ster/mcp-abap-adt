@@ -309,6 +309,9 @@ export const SINK_SITES: ReadonlySet<string> = new Set<string>([
   'src/embeddable/BaseMcpServer.ts#withSearchMeta(name)',
   'src/embeddable/BaseMcpServer.ts#withSearchMeta(registered)',
   'src/embeddable/BaseMcpServer.ts#withSearchMeta(withSearchMeta)',
+  // A log line's replacer, which `JSON.stringify` hands every value it
+  // serialises: only serialised on.
+  'src/lib/logger.ts#safeStringify(value)',
 ]);
 
 export const PRODUCTION_LISTS: ListedSites = {

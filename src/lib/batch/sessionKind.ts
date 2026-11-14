@@ -37,7 +37,7 @@ export function requestKind(
   if (endpoint === 'debugger') return 'stateful';
   const action =
     new URL(request.url, 'https://batch.invalid').searchParams.get('_action') ??
-    paramAction(request.params);
+    paramAction(request);
   if (action === 'LOCK') return 'lock';
   if (action === 'UNLOCK') return 'unlock';
   return 'stateful';
@@ -47,7 +47,10 @@ export function requestKind(
  * The `_action` of a request's `params`: a query string read as one, an
  * object's member written out; else none.
  */
-function paramAction(params: unknown): string | null {
+function paramAction(
+  request: Pick<IAbapRequestOptions, 'params'>,
+): string | null {
+  const params = request.params;
   if (typeof params === 'string') {
     return new URLSearchParams(params).get('_action');
   }

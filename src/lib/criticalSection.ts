@@ -15,13 +15,11 @@
  * completion instead of being aborted. We bracket the whole mutating handler
  * with it — begin before it runs, end in a `finally`.
  *
- * The methods are feature-detected (`hasMethod`), so this degrades to a
- * no-op against an older connection that lacks them (no hard dependency on the
- * IAbapConnection interface shape).
+ * The methods are optional members of `IAbapConnection`, called with `?.`,
+ * so this is a no-op against a connection that lacks them.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { hasMethod } from './capability';
 
 /**
  * Wrap a handler so the connection is held in an uninterruptible critical
@@ -46,11 +44,11 @@ export function withCriticalSection<C, A, R>(
 ): (context: C, args: A) => Promise<R> {
   return async (context: C, args: A) => {
     const conn = getConnection();
-    if (hasMethod(conn, 'beginCriticalSection')) conn.beginCriticalSection();
+    conn.beginCriticalSection?.();
     try {
       return await handler(context, args);
     } finally {
-      if (hasMethod(conn, 'endCriticalSection')) conn.endCriticalSection();
+      conn.endCriticalSection?.();
     }
   };
 }

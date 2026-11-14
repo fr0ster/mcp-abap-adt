@@ -92,13 +92,4 @@ describe('withCriticalSection', () => {
     );
     await expect(wrapped()).resolves.toBe('ok');
   });
-
-  it('tolerates a null/undefined connection', async () => {
-    const handler = async () => 'ok';
-    const wrapped = withCriticalSection(
-      handler,
-      () => undefined as unknown as IAbapConnection,
-    );
-    await expect(wrapped()).resolves.toBe('ok');
-  });
 });

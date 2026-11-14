@@ -130,6 +130,7 @@
   "src/__tests__/unit/sources/typeCodeLiterals.test.ts",
   "src/__tests__/unit/sources/typeCodeScan.test.ts",
   "src/__tests__/unit/sources/unknownSources.test.ts",
+  "src/__tests__/unit/sources/unknownSweep.test.ts",
   "src/__tests__/unit/testConfigSchema.test.ts",
   "src/__tests__/unit/toolSet/dataTools.test.ts",
   "src/__tests__/unit/toolSet/fixtureBytes.test.ts",

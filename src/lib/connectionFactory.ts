@@ -211,7 +211,12 @@ function httpWireOptions(): { logWire: boolean; bodyChars: number } {
   };
 }
 
-function clip(value: unknown, ceiling: number): string {
+/** A body as a log line shows it: text as it is, anything else as JSON, clipped at `ceiling`. */
+function clip(
+  body: Partial<Pick<IAdtWireResponse, 'data'>>,
+  ceiling: number,
+): string {
+  const value = body.data;
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   if (text === undefined || text === null) return '';
   if (ceiling === 0) return `(${text.length} chars, not logged)`;
@@ -257,9 +262,7 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
       );
     }
     if (options.data !== undefined) {
-      process.stderr.write(
-        `[WIRE ${id}] body ${clip(options.data, bodyChars)}\n`,
-      );
+      process.stderr.write(`[WIRE ${id}] body ${clip(options, bodyChars)}\n`);
     }
     try {
       const answer = await original(options);
@@ -268,7 +271,7 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
       );
       if (answer.data !== undefined) {
         process.stderr.write(
-          `[WIRE ${id}] → body ${clip(answer.data, bodyChars)}\n`,
+          `[WIRE ${id}] → body ${clip(answer, bodyChars)}\n`,
         );
       }
       return answer;
@@ -279,7 +282,9 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
         `[WIRE ${id}] → threw ${String(status ?? '')} ${String(child(error, 'message') ?? error)}\n`,
       );
       if (body !== undefined) {
-        process.stderr.write(`[WIRE ${id}] → body ${clip(body, bodyChars)}\n`);
+        process.stderr.write(
+          `[WIRE ${id}] → body ${clip({ data: body }, bodyChars)}\n`,
+        );
       }
       throw error;
     }

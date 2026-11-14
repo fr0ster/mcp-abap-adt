@@ -14,6 +14,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { answerFailure, type McpResult } from './answer';
@@ -180,7 +181,7 @@ function _safeStringifyError(error: unknown): string {
  * Safely logs an error without circular reference issues
  */
 export function logErrorSafely(
-  logger: { error?: (message: string, data?: unknown) => void } | undefined,
+  logger: Partial<Pick<ILogger, 'error'>> | undefined,
   operationName: string,
   error: unknown,
 ): void {
@@ -761,10 +762,9 @@ interface ValidationReading {
  * `parseValidationResponse` answers when the document cannot be read. A
  * short body is SAP's text, relayed as it came.
  */
-function validationFromStatus(response: {
-  data: unknown;
-  status: number;
-}): ValidationReading {
+function validationFromStatus(
+  response: Pick<IAdtWireResponse, 'data' | 'status'>,
+): ValidationReading {
   if (response.status === 200) {
     return { valid: true };
   }
@@ -791,10 +791,9 @@ function validationFromStatus(response: {
  *   `exists` is not stated.
  * @param response - the validation's answer: status and body
  */
-export function parseValidationResponse(response: {
-  data: unknown;
-  status: number;
-}): ValidationReading {
+export function parseValidationResponse(
+  response: Pick<IAdtWireResponse, 'data' | 'status'>,
+): ValidationReading {
   const exception = readExceptionRefusal(response.data);
   if (exception) {
     const exists = namesTakenName(exception);

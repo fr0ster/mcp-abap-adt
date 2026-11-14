@@ -345,6 +345,47 @@ a refused connection, a timeout and a DNS failure from such an `Error` by its `c
   configured value as `Parameter.parse` hands it (a JSON value), not `unknown`. **What you do:**
   call it with the value a parameter's reader gets, or with a string or a number.
 
+## Embedders: what the every-node sweep typed
+
+The `unknown` audit reads every declaration and expression (`docs/development/CODE_GATES.md`).
+What it typed in the exported surface, read from the built declarations:
+
+- **`/utils`:** `makeAdtRequest(connection, url, method, timeout, headers?)` — the `data` and
+  `params` parameters are gone (its one caller sends a GET with neither). **What you do:** a call
+  that passed `undefined, undefined, headers` passes `headers` fourth; a request with a body or
+  parameters goes through `connection.makeAdtRequest(options)`.
+- **`/utils`:** `logErrorSafely(logger, …)` takes `Partial<Pick<ILogger, 'error'>> | undefined`;
+  `parseValidationResponse(response)` takes `Pick<IAdtWireResponse, 'data' | 'status'>`;
+  `child`, `childAt`, `Element`, `isElement` and `isList` are the same readers, re-exported from
+  their new module. **What you do:** nothing for an `ILogger` or a wire response.
+- **`/compact-shared`:** `argMember`, `isArgList` and `isArgObject` (reading a value out of a
+  tool's arguments, `ToolArgValue`) replace `child`, `Element`, `isElement` and `isList`.
+  **What you do:** read a tool argument with `argMember(args, name)` and narrow with
+  `isArgList` / `isArgObject`; a value from elsewhere is read by its own type.
+- **`/compact-shared`:** `withLock<H, T, U>` — the release's answer type is a type parameter
+  (`release: (handle: H) => Promise<IAdtResponse<U, IAdtError>>`). **What you do:** nothing
+  when the types are inferred; a call naming `withLock<H, T>` names `U` too or lets it be
+  inferred.
+- **`/handlers`:** `ToolArgValue` (`ToolArgs[string]`) is new; `ResultOnceArgs.run_id` is
+  `string | undefined`.
+- **`/debugger`:** `failureText` takes `{ message, response?: Pick<IAdtWireResponse, 'data'> }`;
+  `bodyFailureText(message, body)` is new; `locationId` and `readAmdpStart` take
+  `Partial<Pick<IAdtWireResponse, …>>` (`'headers'`, `'headers' | 'data'`). **What you do:**
+  pass the wire response, or an object of those members.
+- **`/state`:** `ShutdownProcess`'s and `ShutdownStream`'s `on(event, listener)` take a listener
+  as Node's `EventEmitter.on` types it. **What you do:** nothing for `process` or a stream.
+- **`/embeddable`:** `LeftoverSessions`' `track`, `trackSibling`, `describeSystem` and `adopt`
+  take a connection typed by the optional members of `IAbapConnection` they call
+  (`sessionCookies`, `makeAdtRequest`, `disconnect`, `flushGoodbye`) instead of `object`.
+  **What you do:** nothing for an `IAbapConnection`; an object of your own that carries a
+  `makeAdtRequest` or `sessionCookies` gives them their contract's types.
+- **`@mcp-abap-adt/interfaces-adt-connection` `^5.1.0`:** the connection members the server
+  used to detect at run time (`disconnect`, `flushGoodbye`, `isConnected`,
+  `beginCriticalSection`, `endCriticalSection`, `getSessionMode`, `getSessionType`,
+  `sessionCookies`, `getConfig`) are optional members of `IAbapConnection`, called with `?.`.
+  **What you do:** a connection of your own that has one gives it the contract's type
+  (`getSessionType(): 'stateful' | 'stateless'`, `getConfig(): IAbapConnectionConfig`, …).
+
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 
 **Removed: `isCloudConnection`.** It reported an on-premise system with JWT authentication as

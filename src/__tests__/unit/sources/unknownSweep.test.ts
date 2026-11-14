@@ -803,6 +803,14 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
+    assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
+    assert.deepEqual(
+      sitesOf('thirdPartyLaundering').filter((site) => lineOf(site) === 24),
+      [],
+    );
+  });
+
   it("a settled promise's reason is a caught value: handed whole to a thrown-value reader it passes, inspected it is refused", () => {
     const listing = { thrown: [key('settledReason', 'describe', 'thrown')] };
     assert.deepEqual(thirdPartyReads('settledReason', listing), [

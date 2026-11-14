@@ -2339,6 +2339,9 @@ export class UnknownSweep {
    * instantiation's and an input of ours brought it in — a type argument of
    * a language generic (`Map<string, unknown>`), or a name whose own
    * written type holds it (bound by the caller: charged where written).
+   * A member of an intersection reads every declaration it has, so a typed
+   * member of ours beside a third party's `unknown` one still reads the
+   * third party's (`Object.assign(typed, theirs).data`).
    */
   private foreignRead(found: MemberRead): string | undefined {
     const { members, holder, value, receiver } = found;
@@ -2373,10 +2376,6 @@ export class UnknownSweep {
     );
     const foreign = declarations.filter((declaration) => !ownNode(declaration));
     if (foreign.length === 0) return undefined;
-    // What reads no `unknown` reads nothing.
-    if (this.held(value).every((each) => each.owner !== undefined)) {
-      return undefined;
-    }
     const direct = foreign.find((declaration) =>
       this.declaredHolds(declaration),
     );

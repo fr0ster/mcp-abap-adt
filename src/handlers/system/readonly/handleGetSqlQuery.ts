@@ -10,9 +10,7 @@ import {
 } from '../../../lib/longTools';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import type { SqlPreview } from '../../../lib/strategies/sqlPreview';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -87,7 +85,7 @@ export async function handleGetSqlQuery(
             { headers, analyse: analyseException },
           ),
       ),
-    (reading: AdtReading<SqlPreview>) => {
+    (reading) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;
       logger?.debug(

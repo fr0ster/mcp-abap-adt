@@ -5,7 +5,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { child, entries, isList } from '../../../lib/xml/tree';
@@ -85,7 +84,7 @@ export async function handleGetTransaction(
         .getObjectProperties(transactionUri(name), {
           analyse: analyseObjectProperties,
         }),
-    (reading: AdtReading<unknown>) => {
+    (reading) => {
       if (detail === 'raw') return reading.raw;
       const answered = {
         success: true,

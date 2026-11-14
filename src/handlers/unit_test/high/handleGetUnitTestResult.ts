@@ -3,9 +3,8 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
-import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -69,7 +68,7 @@ export async function handleGetUnitTestResult(
     // document; `terse`/`full` both answer the parse (no fixture proves a
     // safe further reduction of a test-run result — see this tool's own
     // description above), so `raw` is where the parameter genuinely differs.
-    (outcome: RunOutcome<AdtReading<unknown>>) =>
+    (outcome) =>
       !outcome.finished
         ? unfinishedRun(run_id, outcome.runStatus)
         : {

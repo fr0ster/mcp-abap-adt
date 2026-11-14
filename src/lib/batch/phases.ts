@@ -210,7 +210,7 @@ function settledOf(answer: Promise<IAdtWireResponse>): Promise<PartAnswer> {
  * of whose parts SAP answered `406`/`415` naming what its pair did not send
  * is recorded again — the same member call, with the corrected pair (kept
  * for the system) — in one envelope of its own; that call's answer there is
- * its answer (`HeaderInvocation.redone`). One round; nothing else is sent.
+ * its answer (`HeaderInvocation.redo`). One round; nothing else is sent.
  */
 async function correctPhaseParts(
   context: HandlerContext,
@@ -254,12 +254,11 @@ async function correctPhaseParts(
           },
         },
       },
-      () => invocation.call(pair),
+      () => invocation.redo(pair),
     );
-    // Read by the call (`withAdtHeaders`); never unhandled here.
-    redone.catch(() => undefined);
-    invocation.redone = redone;
-    return Promise.race([recorded, redone.then(noop, noop)]);
+    // The call reads its own answer (`withAdtHeaders`); the phase waits for
+    // it to be recorded, or to settle.
+    return Promise.race([recorded, redone]);
   });
   await Promise.all(waits);
   await new Promise((resolve) => setImmediate(resolve));
@@ -270,8 +269,6 @@ async function correctPhaseParts(
     // call's answer.
   }
 }
-
-function noop(): void {}
 
 /**
  * One phase: `read(item, batch)` for every item, recorded on one batch

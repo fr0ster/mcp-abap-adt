@@ -2777,7 +2777,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private trackingRegistrations(): McpServer {
     const track =
-      (name: string, callback: (...callbackArgs: unknown[]) => unknown) =>
+      (name: string, callback: RegisteredToolCallback) =>
       (...callbackArgs: unknown[]) => {
         return this.trackCall(name, async (signal) => {
           // The SDK passes `extra` last: `(args, extra)` or `(extra)`. The
@@ -3056,6 +3056,13 @@ const stderrLogger: Logger = {
  * string, or an object — a config, a schema, annotations, the callback.
  */
 type RegistrationArg = string | object;
+
+/**
+ * A tool callback a registry registered, as the MCP SDK calls it: what it is
+ * handed — the SDK's arguments and `extra`, the call's own signal in it — goes
+ * on to the callback the registry gave the SDK, and is read by nothing here.
+ */
+type RegisteredToolCallback = (...callbackArgs: unknown[]) => unknown;
 
 /**
  * The registration's arguments read once at the registry's proxy, which the

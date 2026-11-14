@@ -142,21 +142,28 @@ export async function withAdtHeaders<T>(
   const scope = adtCallScope.getStore();
   if (scope?.recorded === true) return call(headers);
   if (scope?.phase !== undefined) {
-    const invocation: HeaderInvocation<T> = {
+    // The call made again with the corrected pair, once the phase made it.
+    const again: { redone: Promise<T> | undefined } = { redone: undefined };
+    const invocation: HeaderInvocation = {
       operation,
       sent: headers,
       port,
-      call: (pair) => call(pair),
+      redo: (pair) => {
+        const redone = call(pair);
+        // Read below, as the call's answer; never unhandled here.
+        redone.catch(() => undefined);
+        again.redone = redone;
+        return redone.then(noop, noop);
+      },
       parts: 0,
-      redone: undefined,
     };
     const first = await settle(() =>
       adtCallScope.run({ ...scope, invocation }, () => call(headers)),
     );
     // The phase recorded it again with the corrected pair: that is the
     // call's answer.
-    if (invocation.redone !== undefined) {
-      return await invocation.redone;
+    if (again.redone !== undefined) {
+      return await again.redone;
     }
     // Recorded nothing in the phase (sent on another connection): corrected
     // here, as outside a phase.
@@ -167,6 +174,8 @@ export async function withAdtHeaders<T>(
   const first = await settle(() => call(headers));
   return correctOnce(port, operation, headers, first, call);
 }
+
+function noop(): void {}
 
 async function correctOnce<T>(
   port: AdtHeaderPort | undefined,

@@ -13,7 +13,6 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { testRunner } from './runTests';
@@ -50,7 +49,7 @@ export async function readResultOnce(
         format: args.format,
       }),
     ),
-    (result: AdtReading<unknown>) => ({
+    (result) => ({
       success: true,
       run_id: runId,
       run_result: detail === 'raw' ? result.raw : result.value,

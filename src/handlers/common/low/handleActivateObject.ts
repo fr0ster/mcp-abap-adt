@@ -678,7 +678,7 @@ export async function handleActivateObject(
       if (refusal !== undefined) return failedWith<GroupAnswer>(refusal);
       return succeededWith<GroupAnswer>({ runs: outcome });
     },
-    (answered: GroupAnswer) =>
+    (answered) =>
       'synchronous' in answered
         ? projectActivation(detail)(answered.synchronous)
         : runAnswer(answered.runs, activationObjects),

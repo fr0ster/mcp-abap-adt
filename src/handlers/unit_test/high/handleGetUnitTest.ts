@@ -3,9 +3,8 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
-import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
@@ -59,7 +58,7 @@ export async function handleGetUnitTest(
     // is safe (see `GetCdsUnitTestResult`'s own doc comment on the same
     // point) — `detail` is still genuinely different at `raw`, which is
     // what makes the parameter real rather than decorative.
-    (outcome: RunOutcome<AdtReading<unknown>>) =>
+    (outcome) =>
       !outcome.finished
         ? unfinishedRun(run_id, outcome.runStatus)
         : {

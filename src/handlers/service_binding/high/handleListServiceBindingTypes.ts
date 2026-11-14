@@ -59,7 +59,7 @@ export async function handleListServiceBindingTypes(
   return answer(
     { tool: 'ListServiceBindingTypes', detail: 'terse' },
     () => obj.getServiceBindingTypes({ analyse: analyseException }),
-    (reading: AdtReading<unknown>) => ({
+    (reading) => ({
       success: true,
       response_format: responseFormat,
       payload: parseServiceBindingPayload(reading.raw, responseFormat),

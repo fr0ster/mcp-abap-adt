@@ -3,9 +3,8 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
-import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -61,7 +60,7 @@ export async function handleGetCdsUnitTestResult(
           }),
       ),
     // Task 28 fix round 1 — same finding, same fix as `GetUnitTestResult`.
-    (outcome: RunOutcome<AdtReading<unknown>>) =>
+    (outcome) =>
       !outcome.finished
         ? unfinishedRun(run_id, outcome.runStatus)
         : {

@@ -26,7 +26,6 @@ import {
   readingOf,
   runStatusOf,
 } from '../../../lib/strategies/activationRun';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -77,7 +76,7 @@ export async function handleGetActivationStatus(
             ? args.with_long_polling
             : undefined,
       }),
-    (value: AdtReading<unknown>) => ({
+    (value) => ({
       run_id: runId,
       part: 'activation_status',
       status: runStatusOf(value),
@@ -99,7 +98,7 @@ export async function handleGetActivationResults(
   return answer(
     { tool: 'HandlerGet', detail: 'raw' },
     () => utils.getActivationResults(runId, { analyse: analyseException }),
-    (value: AdtReading<unknown>) => {
+    (value) => {
       const messages = activationMessagesOf(value);
       const executed = activationExecutedOf(value);
       return {

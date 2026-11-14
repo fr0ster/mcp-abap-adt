@@ -296,8 +296,8 @@ async function answered<T>(result: PhaseResult<T> | undefined): Promise<T> {
 }
 
 /** Whether a phase's answer is SAP's refusal of the credential: it ends the call. */
-function refusesCredential(
-  result: PhaseResult<IAdtResponse<unknown, IAdtError>> | undefined,
+function refusesCredential<T>(
+  result: PhaseResult<IAdtResponse<T, IAdtError>> | undefined,
   step: string,
 ): boolean {
   return (

@@ -32,6 +32,14 @@ import {
   isList,
   listOf,
 } from '../outsideValue';
+import { parseXml, type XmlNode } from '../xml/node';
+import {
+  childAt as nodeAt,
+  child as nodeChild,
+  entries as nodeEntries,
+  listOf as nodeList,
+  type XmlRead,
+} from '../xml/tree';
 import {
   type MetadataRead,
   type MetadataTarget,
@@ -268,32 +276,32 @@ export function nodeLevel(answer: { readonly data?: unknown }): NodeLevel {
 
 /** One level of a node-structure document's text, descriptions kept. */
 export function nodeLevelOf(xml: string): NodeLevel {
-  const data = childAt(parser.parse(xml), 'asx:abap', 'asx:values', 'DATA');
+  const data = nodeAt(parseXml(parser, xml), 'asx:abap', 'asx:values', 'DATA');
   return {
-    objects: listOf(
-      childAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
+    objects: nodeList(
+      nodeAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
     )
       .map((n) => ({
-        name: textOf(child(n, 'OBJECT_NAME')),
-        type: textOf(child(n, 'OBJECT_TYPE')),
-        description: textOf(child(n, 'DESCRIPTION')) || undefined,
-        techName: textOf(child(n, 'TECH_NAME')) || undefined,
-        uri: textOf(child(n, 'OBJECT_URI')) || undefined,
+        name: textOf(nodeChild(n, 'OBJECT_NAME')),
+        type: textOf(nodeChild(n, 'OBJECT_TYPE')),
+        description: textOf(nodeChild(n, 'DESCRIPTION')) || undefined,
+        techName: textOf(nodeChild(n, 'TECH_NAME')) || undefined,
+        uri: textOf(nodeChild(n, 'OBJECT_URI')) || undefined,
       }))
       // Every object has a type. An entry without one is SAP's message for
       // a node it could not load ("Error loading node:", on premise 2026-09-25),
       // not an object.
       .filter((o) => o.name && o.type),
-    childNodes: listOf(
-      childAt(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
+    childNodes: nodeList(
+      nodeAt(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
     )
       .map((t) => ({
-        type: textOf(child(t, 'OBJECT_TYPE')),
+        type: textOf(nodeChild(t, 'OBJECT_TYPE')),
         // The document writes the id padded — `000031` — and the request the
         // corpus recorded sends `31`. The system accepts both, verified
         // live, but sending what ADT itself sends keeps the wire comparable
         // with the fixtures and with a trace.
-        nodeId: String(Number(textOf(child(t, 'NODE_ID')))),
+        nodeId: String(Number(textOf(nodeChild(t, 'NODE_ID')))),
       }))
       .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
   };
@@ -561,13 +569,13 @@ const RESTORABLE = new Set<string>([
   'behaviorImplementation',
 ]);
 
-function textOf(value: unknown): string {
+function textOf(value: XmlRead): string {
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
   if (value && typeof value === 'object') {
-    const t = child(value, '#text');
+    const t = nodeChild(value, '#text');
     if (typeof t === 'string' || typeof t === 'number') return String(t).trim();
   }
   return '';
@@ -927,17 +935,17 @@ export const METADATA_STEP = 'read object metadata';
 
 /** The `adtcore:description` of a metadata document's root element. */
 export function metadataDescriptionOf(xml: string): string | undefined {
-  let doc: unknown;
+  let doc: XmlNode | undefined;
   try {
-    doc = parser.parse(xml);
+    doc = parseXml(parser, xml);
   } catch {
     return undefined;
   }
-  for (const [name, root] of entries(doc)) {
-    if (name.startsWith('?') || root === null || typeof root !== 'object') {
+  for (const [name, root] of nodeEntries(doc)) {
+    if (name.startsWith('?') || typeof root !== 'object') {
       continue;
     }
-    const description = child(root, 'adtcore:description');
+    const description = nodeChild(root, 'adtcore:description');
     return typeof description === 'string'
       ? description.trim() || undefined
       : undefined;

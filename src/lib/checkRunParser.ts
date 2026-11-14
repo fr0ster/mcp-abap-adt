@@ -1,5 +1,13 @@
 import { XMLParser } from 'fast-xml-parser';
-import { child, childAt, isList } from './outsideValue';
+import { parseXml } from './xml/node';
+import {
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from './xml/tree';
 
 export interface ParsedCheckRunResult {
   success: boolean;
@@ -44,7 +52,7 @@ export function parseCheckRunResponse(response: {
   try {
     const body: unknown = response.data;
     const data = typeof body === 'string' ? body : textOf(body);
-    const result: unknown = parser.parse(data);
+    const result: XmlRead = parseXml(parser, data);
 
     const checkReport =
       childAt(result, 'chkrun:checkRunReports', 'chkrun:checkReport') ??

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+
 /**
  * GetTransport Handler - Retrieve ABAP transport request information via ADT API
  *
@@ -19,11 +20,22 @@ import { XMLParser } from 'fast-xml-parser';
 import { answerCaught, answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { type AnswerObject, type JsonValue, jsonOf } from '../../../lib/json';
-import { child, isList } from '../../../lib/outsideValue';
+import {
+  type AnswerObject,
+  type JsonValue,
+  jsonOfNode,
+} from '../../../lib/json';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
+import { parseXml } from '../../../lib/xml/node';
+import {
+  child,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
@@ -71,7 +83,7 @@ function parseTransportXml(
     },
   });
 
-  const result: unknown = parser.parse(xmlData);
+  const result: XmlRead = parseXml(parser, xmlData);
   const root = child(result, 'tm:root') || child(result, 'root');
 
   if (!root) {
@@ -123,12 +135,14 @@ function parseTransportXml(
   };
 
   /** A member that may repeat, as a list: a list as it is, one member alone. */
-  const repeated = (value: unknown): readonly unknown[] =>
+  const repeated = (value: XmlNode): XmlList =>
     isList(value) ? value : [value];
 
   /** A member of a parsed row, checked once: JSON, or absent. */
-  const field = (node: unknown, name: string): JsonValue | undefined =>
-    jsonOf(child(node, name));
+  const field = (node: XmlRead, name: string): JsonValue | undefined => {
+    const member = child(node, name);
+    return member === undefined ? undefined : jsonOfNode(member);
+  };
 
   // Extract objects if requested
   let objects: TransportRow[] = [];

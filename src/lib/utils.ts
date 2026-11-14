@@ -33,10 +33,17 @@ import {
   hasT100Key,
   NAME_TAKEN_KEYS,
 } from './messageKeys';
-import { child, childAt, listOf } from './outsideValue';
+import { child, childAt } from './outsideValue';
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
+import { parseXml, type XmlNode } from './xml/node';
+import {
+  childAt as nodeAt,
+  child as nodeChild,
+  listOf as nodeList,
+  type XmlRead,
+} from './xml/tree';
 
 /** The readers of a value from outside the type system (`outsideValue`), for the packages. */
 export {
@@ -792,33 +799,33 @@ export function parseValidationResponse(response: {
 
   // A document this reading cannot take apart — not XML, or a field that is
   // not text where text is read — is answered from the status and the text.
-  let result: unknown;
+  let result: XmlNode | undefined;
   try {
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@_',
     });
-    result = parser.parse(xmlTextOf(response.data));
+    result = parseXml(parser, xmlTextOf(response.data));
   } catch (_error) {
     return validationFromStatus(response);
   }
 
   // Check for standard format (<asx:abap><asx:values><DATA>)
-  const data = childAt(result, 'asx:abap', 'asx:values', 'DATA');
+  const data = nodeAt(result, 'asx:abap', 'asx:values', 'DATA');
   if (!data) {
     // No data means validation passed
     return { valid: true };
   }
 
   // Check for CHECK_RESULT=X (success)
-  if (child(data, 'CHECK_RESULT') === 'X') {
+  if (nodeChild(data, 'CHECK_RESULT') === 'X') {
     return { valid: true };
   }
 
   // SEVERITY (error/warning) decides; the texts are relayed.
-  const severity = child(data, 'SEVERITY');
-  const shortText = child(data, 'SHORT_TEXT') || '';
-  const longText = child(data, 'LONG_TEXT') || '';
+  const severity = nodeChild(data, 'SEVERITY');
+  const shortText = nodeChild(data, 'SHORT_TEXT') || '';
+  const longText = nodeChild(data, 'LONG_TEXT') || '';
   if (typeof shortText !== 'string') return validationFromStatus(response);
 
   return {
@@ -1048,7 +1055,7 @@ function activationText(responseData: unknown): string | Uint8Array {
 }
 
 /** An attribute that reads `true`, as text or as a parsed boolean. */
-function isTrue(value: unknown): boolean {
+function isTrue(value: XmlRead): boolean {
   return value === 'true' || value === true;
 }
 
@@ -1060,34 +1067,35 @@ export function parseActivationResponse(responseData: unknown) {
   });
 
   try {
-    const result: unknown = parser.parse(
+    const result = parseXml(
+      parser,
       typeof responseData === 'string'
         ? responseData
         : activationText(responseData),
     );
-    const properties = childAt(result, 'chkl:messages', 'chkl:properties');
-    const activated = isTrue(child(properties, '@_activationExecuted'));
-    const checked = isTrue(child(properties, '@_checkExecuted'));
-    const generated = isTrue(child(properties, '@_generationExecuted'));
+    const properties = nodeAt(result, 'chkl:messages', 'chkl:properties');
+    const activated = isTrue(nodeChild(properties, '@_activationExecuted'));
+    const checked = isTrue(nodeChild(properties, '@_checkExecuted'));
+    const generated = isTrue(nodeChild(properties, '@_generationExecuted'));
     const messages: Array<{
       type: string;
       text: string;
       line?: number | undefined;
       column?: number | undefined;
     }> = [];
-    const numberOrNone = (value: unknown) =>
+    const numberOrNone = (value: XmlRead) =>
       typeof value === 'number' ? value : undefined;
-    const msgData = childAt(result, 'chkl:messages', 'msg');
+    const msgData = nodeAt(result, 'chkl:messages', 'msg');
     if (msgData) {
-      for (const msg of listOf(msgData)) {
-        const shortText = child(msg, 'shortText');
+      for (const msg of nodeList(msgData)) {
+        const shortText = nodeChild(msg, 'shortText');
         messages.push({
-          type: String(child(msg, '@_type') || 'info'),
+          type: String(nodeChild(msg, '@_type') || 'info'),
           text: String(
-            child(shortText, 'txt') || shortText || 'Unknown message',
+            nodeChild(shortText, 'txt') || shortText || 'Unknown message',
           ),
-          line: numberOrNone(child(msg, '@_line')),
-          column: numberOrNone(child(msg, '@_column')),
+          line: numberOrNone(nodeChild(msg, '@_line')),
+          column: numberOrNone(nodeChild(msg, '@_column')),
         });
       }
     }

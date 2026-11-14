@@ -70,7 +70,7 @@ export function xmlNodeOf(value: unknown): XmlNode | undefined {
  */
 export function parseXml(
   parser: XMLParser,
-  document: string,
+  document: string | Uint8Array,
 ): XmlNode | undefined {
   const parsed: unknown = parser.parse(document);
   return xmlNodeOf(parsed);

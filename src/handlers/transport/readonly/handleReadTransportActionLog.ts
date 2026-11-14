@@ -16,11 +16,18 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { child, childAt, isList } from '../../../lib/outsideValue';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import {
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportActionLog',
@@ -50,7 +57,7 @@ type ReadTransportActionLogArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * entries. The `log:text` spellings stay for the shape this was first
  * written against.
  */
-const textOf = (entry: unknown): string => {
+const textOf = (entry: XmlRead): string => {
   const message = childAt(entry, 'log:message', 'log:messageText');
   const text =
     (typeof message === 'object' ? child(message, '#text') : message) ??
@@ -60,7 +67,7 @@ const textOf = (entry: unknown): string => {
   return String(text);
 };
 
-const entriesOf = (value: unknown): { text: string }[] => {
+const entriesOf = (value: XmlRead): { text: string }[] => {
   const log = child(value, 'log:log') ?? value;
   const raw = child(log, 'log:entry');
   const list = isList(raw) ? raw : raw ? [raw] : [];
@@ -81,7 +88,7 @@ export async function handleReadTransportActionLog(
 
   const detail = detailOf(args);
 
-  const terseLog = (value: unknown) => {
+  const terseLog = (value: XmlRead) => {
     const entries = entriesOf(value);
     return {
       success: true,

@@ -8,6 +8,8 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { parseXml } from '../../../lib/xml/node';
+import { child, isElement, listOf } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetMainPrograms',
@@ -32,27 +34,21 @@ const parser = new XMLParser({
 });
 
 /**
- * The references of SAP's `adtcore:objectReferences` document (data from
- * outside the type system): one entry per `adtcore:objectReference` that
+ * The references of SAP's `adtcore:objectReferences` document (typed at the
+ * parse): one entry per `adtcore:objectReference` that
  * carries a name, a type and a uri; none for an empty document.
  */
 export function mainProgramsOf(document: string): MainProgram[] {
-  const parsed: unknown = parser.parse(document);
-  if (typeof parsed !== 'object' || parsed === null) return [];
-  const root: unknown = Reflect.get(parsed, 'adtcore:objectReferences');
-  if (typeof root !== 'object' || root === null) return [];
-  const listed: unknown = Reflect.get(root, 'adtcore:objectReference');
-  const each: unknown[] = Array.isArray(listed)
-    ? listed
-    : listed === undefined
-      ? []
-      : [listed];
+  const parsed = parseXml(parser, document);
+  const root = child(parsed, 'adtcore:objectReferences');
+  if (!isElement(root)) return [];
+  const each = listOf(child(root, 'adtcore:objectReference'));
   const programs: MainProgram[] = [];
   for (const reference of each) {
-    if (typeof reference !== 'object' || reference === null) continue;
-    const name: unknown = Reflect.get(reference, '@_adtcore:name');
-    const type: unknown = Reflect.get(reference, '@_adtcore:type');
-    const uri: unknown = Reflect.get(reference, '@_adtcore:uri');
+    if (!isElement(reference)) continue;
+    const name = reference['@_adtcore:name'];
+    const type = reference['@_adtcore:type'];
+    const uri = reference['@_adtcore:uri'];
     if (
       typeof name === 'string' &&
       typeof type === 'string' &&

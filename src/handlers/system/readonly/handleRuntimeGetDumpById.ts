@@ -5,9 +5,18 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { JsonValue } from '../../../lib/json';
-import { attr, child, childAt, isList } from '../../../lib/outsideValue';
 import { afterLast, digitsAfter } from '../../../lib/plainText';
 import { return_error } from '../../../lib/utils';
+import { parseXml } from '../../../lib/xml/node';
+import {
+  attr,
+  child,
+  childAt,
+  isList,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
@@ -85,9 +94,9 @@ export type DumpSummary = { [field in DumpSummaryField]?: string } & {
  */
 export function dumpSummaryOf(raw: string): DumpSummary | undefined {
   if (!raw.trim().startsWith('<')) return undefined;
-  let parsed: unknown;
+  let parsed: XmlRead;
   try {
-    parsed = dumpXmlParser.parse(raw);
+    parsed = parseXml(dumpXmlParser, raw);
   } catch {
     return undefined;
   }

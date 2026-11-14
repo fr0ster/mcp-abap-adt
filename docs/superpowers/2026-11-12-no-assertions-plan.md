@@ -660,7 +660,8 @@ below is what it carries besides.
   - **Round 7 (measured):** the instantiated type walked to any depth and arguments mapped
     through spreads refused 77 production sites; the sink-by-reading rule, the language-object
     and callback readings, the positional follow, the retypes and the readers named in
-    `THROWN_READERS` bring it to 0, each reading with a fixture and a break that turns it red.
+    `THROWN_READERS` bring it to 0, each reading with a fixture and a break that turns it red;
+    the named-callback reading added in review found three more, typed, and it is 0 again.
 - **S3b. The sites,** per the spec's appendix and the script's output:
   - typed parameters retyped;
   - mixed ones split at the boundary or given a union, but for readers of thrown values,

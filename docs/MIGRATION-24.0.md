@@ -341,6 +341,9 @@ a refused connection, a timeout and a DNS failure from such an `Error` by its `c
   (`{ keywords: string[]; semantic: string }`); `SearchMeta` is exported from `/handlers`.
   **What you do:** a subclass that passes `search` passes `listedTool`'s `search`, or a `_meta`
   of that shape; any other `_meta` is refused by the type check.
+- `parseLoginTimeout` (`@mcp-abap-adt/core`, from `@mcp-abap-adt/server-runtime`) takes the
+  configured value as `Parameter.parse` hands it (a JSON value), not `unknown`. **What you do:**
+  call it with the value a parameter's reader gets, or with a string or a number.
 
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 

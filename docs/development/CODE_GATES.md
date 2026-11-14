@@ -59,10 +59,11 @@ against a `?: T`.
     JSON serialization or the MCP SDK, never read back — is a sink, named by its contract and
     member (`SINK_SLOTS`: `ToolContentItem.json` and `ToolContentItem.text`, a tool answer's
     content), each with the one function that reads it to hand it out (`normalizeToolContent`).
-    Every `unknown` under such a slot is a sink. A read of the slot by any other function reads a
-    typed value back and is refused (`sinkSlotReads`); its contract is then typed instead — made
-    generic, so callers keep their type, or exact. A slot whose content is read back is never a
-    sink.
+    Every `unknown` under such a slot is a sink. A read of the slot by any other function — by
+    name, by a computed key that may name it, destructured in a declaration or an assignment —
+    reads a typed value back and is refused (`sinkSlotReads`); its contract is then typed
+    instead — made generic, so callers keep their type, or exact. A slot whose content is read
+    back is never a sink.
 - **A reader of thrown values** (`THROWN_READERS`) takes `unknown` because a caught value reaches
   it untyped; it is named by `file#function(parameter)`, and a listed reader no site has is
   stale. A function that reads no caught value is typed by its sources instead. A caught value
@@ -76,10 +77,13 @@ against a `?: T`.
   - a runtime object the language declares with no type parameter (`Error`, `AbortSignal`) is
     the language's contract, like a third party's: what it types `unknown` (`Error.cause`) is no
     position of the repository's, nor is a member a class of ours inherits from it;
-  - a callback no code of the repository calls is typed by its contract at each position it
-    writes `unknown`: one that takes its contract's instantiation (`(reading: AdtReading<unknown>)`
-    where the call instantiates `T` so) passes; one that writes `unknown` where the contract has a
-    type is refused with that type;
+  - a callback no code of the repository calls — a function expression, or a named function
+    handed on by name — is typed by each contract it is handed to, at each position it writes
+    `unknown`: one that takes its contract's instantiation (`AdtReading<unknown>` where the call
+    instantiates `T` so) passes; one that writes `unknown` where the contract has a type is
+    refused with that type;
+  - a member is named as the checker names it (`'raw-value'`, `value` written `'value'`), and a
+    type is walked to any depth, a recursive one cut where it repeats;
   - a site declared `ToolArgs` intersected with typed members (`{ object_type?: … } & ToolArgs`,
     what a compact route selects by) is the input still.
 - **Text is read with plain string code** (`src/lib/plainText.ts`), never a regex.

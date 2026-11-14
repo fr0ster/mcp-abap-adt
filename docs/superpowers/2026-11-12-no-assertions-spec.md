@@ -266,7 +266,9 @@ Goal: `2026-11-12-no-assertions-goal.md`. This spec decides what the goal left o
   (`ToolContentItem.json` / `.text`, no other read of them found); 40 once the language's runtime
   objects (`Error.cause`) are its contract and a callback is read at its positions; 22 once a
   value followed back is read at the position asked for and the real findings were typed; none
-  once the readers of thrown values were named.
+  once the readers of thrown values were named. Reading a named function handed on as a
+  callback by the contracts it is handed to found three more (`isRequestNumber`,
+  `parseShutdownTimeout`, `parseLoginTimeout`), typed by those contracts: none again.
 - **Classes and what each becomes:**
 
   | Class | Origin of every source | Becomes |

@@ -24,6 +24,7 @@ export {
 } from '../adtTypeCode.js';
 export { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes.js';
 export type { ReadVersion } from '../handlers/readVersion.js';
+export { isJsonObject, type JsonValue, jsonAt } from '../json.js';
 export { jsonOf } from '../jsonText.js';
 export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { child, type Element, isElement, isList } from '../outsideValue.js';

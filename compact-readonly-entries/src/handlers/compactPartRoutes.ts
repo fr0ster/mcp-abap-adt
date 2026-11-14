@@ -17,11 +17,12 @@ import {
   COMPACT_MAIN_PROGRAMS,
   type CompactHandler,
   type CompactObjectType,
-  child,
   dispatchCompact,
   HANDLER_GET_DRAFT_TYPES,
-  isElement,
+  isJsonObject,
   isList,
+  type JsonValue,
+  jsonAt,
   jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolResultLike } from '@mcp-abap-adt/lib/handlers';
@@ -95,8 +96,8 @@ export const compactContentsRoutes: Partial<
 };
 
 /** A member's field as its listing line shows it: `''` when absent. */
-function fieldOf(item: unknown, name: string): string {
-  return String(child(item, name) ?? '');
+function fieldOf(item: JsonValue, name: string): string {
+  return String(jsonAt(item, name) ?? '');
 }
 
 /**
@@ -106,7 +107,7 @@ function fieldOf(item: unknown, name: string): string {
  * for a package with a few hundred members that is tens of kilobytes
  * carrying three facts per object.
  */
-function contentsLines(items: readonly unknown[], max: number): string {
+function contentsLines(items: readonly JsonValue[], max: number): string {
   const lines = ['name\ttype\tdescription'];
   for (const item of items.slice(0, max)) {
     lines.push(
@@ -138,12 +139,12 @@ async function packageContentsLines(
       ? args.max_results
       : 100;
   const parsed = jsonOf(text);
-  if (!isList(parsed)) return answered;
+  if (!Array.isArray(parsed)) return answered;
   const listed = isList(args.package_names)
     ? JSON.stringify(
         parsed.map((entry) => {
-          const objects = child(entry, 'objects');
-          return isElement(entry) && isList(objects)
+          const objects = jsonAt(entry, 'objects');
+          return isJsonObject(entry) && Array.isArray(objects)
             ? {
                 package_name: entry.package_name,
                 contents: contentsLines(objects, max),

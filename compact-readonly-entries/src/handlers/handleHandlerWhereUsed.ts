@@ -2,11 +2,10 @@ import {
   byVariant,
   COMPACT_WHERE_USED,
   COMPACT_WHERE_USED_ROUTES,
-  child,
   compactWhereUsedDescription,
   compactWhereUsedSchemaFor,
-  isElement,
-  isList,
+  isJsonObject,
+  jsonAt,
   jsonOf,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
@@ -75,8 +74,13 @@ export async function handleHandlerWhereUsed(
   const text = answered.content[0]?.text;
   if (answered.isError || typeof text !== 'string') return answered;
   const value = jsonOf(text);
-  const references = child(value, 'references');
-  if (!isElement(value) || !isList(references) || references.length <= max) {
+  const references = jsonAt(value, 'references');
+  if (
+    value === undefined ||
+    !isJsonObject(value) ||
+    !Array.isArray(references) ||
+    references.length <= max
+  ) {
     return answered;
   }
   const capped = {

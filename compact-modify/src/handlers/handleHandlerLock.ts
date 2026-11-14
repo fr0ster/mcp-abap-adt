@@ -6,7 +6,7 @@ import {
   COMPACT_LOCK_KINDS,
   compactLockDescription,
   compactLockSchemaFor,
-  isElement,
+  isJsonObject,
   jsonOf,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
@@ -82,7 +82,7 @@ function keptLock(
     return answered;
   }
   const read = jsonOf(text);
-  if (!isElement(read)) return answered;
+  if (read === undefined || !isJsonObject(read)) return answered;
   const handle = read.lock_handle;
   if (typeof handle !== 'string' || handle === '') return answered;
   locks.hold(handle, session);

@@ -76,6 +76,7 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { bodyTextOf } from '../../../lib/wireValue';
 
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
@@ -110,7 +111,7 @@ type GetNodeStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * empty one into the identical `{objects: [], childNodes: []}`.
  */
 function rawNodeStructureXml(wire: IAdtWireResponse): string {
-  return String(wire?.data ?? '');
+  return bodyTextOf(wire);
 }
 
 /**

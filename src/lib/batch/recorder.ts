@@ -83,7 +83,8 @@ export interface Recorder extends IAbapConnection {
 }
 
 /** A part's body as text: a string as it is, anything else as JSON; none is empty. */
-function bodyText(data: unknown): string {
+function bodyText(response: Pick<IAdtWireResponse, 'data'>): string {
+  const data = response.data;
   if (data === undefined || data === null) return '';
   return typeof data === 'string' ? data : JSON.stringify(data);
 }
@@ -104,7 +105,7 @@ function rawPartOf(response: IAdtWireResponse): RawPart {
     status: response.status,
     status_text: response.statusText,
     headers,
-    body: bodyText(response.data),
+    body: bodyText(response),
   };
 }
 
@@ -125,7 +126,7 @@ function thrownRawPart(response: unknown): RawPart | undefined {
     status,
     status_text: typeof statusText === 'string' ? statusText : '',
     headers,
-    body: bodyText(child(response, 'data')),
+    body: bodyText({ data: child(response, 'data') }),
   };
 }
 

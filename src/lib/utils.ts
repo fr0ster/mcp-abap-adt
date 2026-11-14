@@ -51,6 +51,7 @@ export {
   type JsonValue,
   jsonAt,
   jsonOf,
+  parseJson,
 } from './json';
 
 /** The readers of a value from outside the type system (`outsideValue`), for the packages. */

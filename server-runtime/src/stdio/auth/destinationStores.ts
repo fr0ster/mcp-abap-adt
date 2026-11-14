@@ -26,6 +26,7 @@ import {
   assertDestinationName,
   type DestinationSystemContext,
 } from '@mcp-abap-adt/lib/auth';
+import { type JsonValue, jsonAt, parseJson } from '@mcp-abap-adt/lib/utils';
 import * as dotenv from 'dotenv';
 import { DestinationRefusal } from './destinationFailure';
 
@@ -101,17 +102,13 @@ export function readDestinationSystemContext(
  * A parsed key with `url`, `clientid` and `clientsecret` at its root, and no
  * `uaa` object: read in plain code, the file being outside the type system.
  */
-function isXsuaaKey(raw: unknown): boolean {
-  if (typeof raw !== 'object' || raw === null) return false;
-  const uaa = 'uaa' in raw ? raw.uaa : undefined;
-  if (uaa && typeof uaa === 'object') return false;
+function isXsuaaKey(raw: JsonValue | undefined): boolean {
+  const uaa = jsonAt(raw, 'uaa');
+  if (typeof uaa === 'object' && uaa !== null) return false;
   return Boolean(
-    'url' in raw &&
-      raw.url &&
-      'clientid' in raw &&
-      raw.clientid &&
-      'clientsecret' in raw &&
-      raw.clientsecret,
+    jsonAt(raw, 'url') &&
+      jsonAt(raw, 'clientid') &&
+      jsonAt(raw, 'clientsecret'),
   );
 }
 
@@ -122,7 +119,8 @@ function isXsuaaKey(raw: unknown): boolean {
 export function keyShapeOf(keysDir: string, name: string): 'abap' | 'xsuaa' {
   assertDestinationName(name, 'destination');
   try {
-    const raw: unknown = JSON.parse(
+    // The key file, read as JSON and checked: typed from here on.
+    const raw = parseJson(
       fs.readFileSync(path.join(keysDir, `${name}.json`), 'utf8'),
     );
     if (isXsuaaKey(raw)) return 'xsuaa';

@@ -60,7 +60,7 @@ import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import { hasMethod } from '../capability';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { resolveSystemKind } from '../connectionFactory';
 import { type JsonValue, jsonAt, parseJson } from '../json';
 import { isEnded, whenLogoffCompleted } from '../ownedConnections';
@@ -276,12 +276,21 @@ function sameCaller(a: SessionIdentity, b: SessionIdentity): boolean {
   );
 }
 
-/** The connection's session cookies, read structurally; `null` without. */
-function cookiesOf(connection: object): string | null {
-  if (!hasMethod(connection, 'sessionCookies')) return null;
+/**
+ * A connection as the leftover sessions read it: the members of
+ * `IAbapConnection` they call, each optional here as the registry's are.
+ */
+type LeftoverConnection = Partial<
+  Pick<
+    IAbapConnection,
+    'sessionCookies' | 'makeAdtRequest' | 'disconnect' | 'flushGoodbye'
+  >
+>;
+
+/** The connection's session cookies; `null` without. */
+function cookiesOf(connection: LeftoverConnection): string | null {
   try {
-    const cookies = connection.sessionCookies();
-    return typeof cookies === 'string' && cookies !== '' ? cookies : null;
+    return connection.sessionCookies?.() || null;
   } catch {
     return null;
   }
@@ -411,7 +420,7 @@ export class LeftoverSessions {
    * write alone. A connection already ended, or already kept, is left alone.
    */
   track(
-    connection: object,
+    connection: LeftoverConnection,
     role: LeftoverRole,
     identity: SessionIdentity,
     handle: string = newHandle(),
@@ -439,7 +448,11 @@ export class LeftoverSessions {
    * Keeps a file of a connection opened beside `origin` (a debugger's own),
    * for the identity `origin` was built for. Nothing when that is unknown.
    */
-  trackSibling(connection: object, role: LeftoverRole, origin: object): void {
+  trackSibling(
+    connection: LeftoverConnection,
+    role: LeftoverRole,
+    origin: LeftoverConnection,
+  ): void {
     const identity = this.identities.get(origin);
     if (identity !== undefined) this.track(connection, role, identity);
   }
@@ -526,7 +539,7 @@ export class LeftoverSessions {
    * in its file from now on (written again now when the file exists), so a
    * resume of it needs no lookup. Nothing for a connection not kept.
    */
-  describeSystem(connection: object, system: KnownSystem): void {
+  describeSystem(connection: LeftoverConnection, system: KnownSystem): void {
     const entry = this.tracked.get(connection);
     if (entry === undefined || entry.ended) return;
     const next: FileSystem = {
@@ -578,7 +591,7 @@ export class LeftoverSessions {
    */
   adopt(
     claimed: ClaimedSession,
-    connection: object,
+    connection: LeftoverConnection,
     identity: SessionIdentity,
   ): void {
     this.track(connection, claimed.role, identity, claimed.handle);
@@ -589,7 +602,7 @@ export class LeftoverSessions {
   }
 
   /** Writes again whatever changed in `connection`'s cookies. */
-  private refresh(connection: object): void {
+  private refresh(connection: LeftoverConnection): void {
     const entry = this.tracked.get(connection);
     if (entry === undefined || entry.ended || isEnded(connection)) return;
     const cookies = cookiesOf(connection);
@@ -612,11 +625,12 @@ export class LeftoverSessions {
    * stateful request brings the context cookie, which a resume needs to
    * reach the context its locks are in.
    */
-  private watch(connection: object): void {
-    if (!hasMethod(connection, 'makeAdtRequest')) return;
+  private watch(connection: LeftoverConnection): void {
+    const original = connection.makeAdtRequest;
+    if (original === undefined) return;
     // The request passes through as it was made, its arguments and answer
     // untouched: the wrapper only reads the cookies once it settled.
-    connection.makeAdtRequest = new Proxy(connection.makeAdtRequest, {
+    connection.makeAdtRequest = new Proxy(original, {
       apply: async (original, _this, args) => {
         try {
           return await Reflect.apply(original, connection, args);

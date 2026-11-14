@@ -9,6 +9,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { LEFTOVER_SESSION_NOT_AVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import {
   LeftoverSessions,
@@ -124,7 +125,12 @@ describe('the owner', () => {
       return {
         held,
         sessionCookies: () => held.cookies,
-        makeAdtRequest: async () => undefined,
+        makeAdtRequest: async (): Promise<IAdtWireResponse> => ({
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          data: '',
+        }),
       };
     };
 

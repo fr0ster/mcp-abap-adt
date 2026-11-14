@@ -66,12 +66,12 @@ function leftLocked<H>(
   };
 }
 
-async function runRelease<H>(
-  release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+async function runRelease<H, U>(
+  release: (handle: H) => Promise<IAdtResponse<U, IAdtError>>,
   handle: H,
   object: LockedObject,
 ): Promise<Released> {
-  let answered: IAdtResponse<unknown, IAdtError>;
+  let answered: IAdtResponse<U, IAdtError>;
   try {
     answered = await release(handle);
   } catch (error) {
@@ -134,10 +134,10 @@ async function runRelease<H>(
  * `object` names what `acquire` locks. A release that fails says the object
  * may be left locked, with its handle and this identity (`left_locked`).
  */
-export async function withLock<H, T>(
+export async function withLock<H, T, U>(
   acquire: () => Promise<IAdtResponse<H, IAdtError>>,
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
-  release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+  release: (handle: H) => Promise<IAdtResponse<U, IAdtError>>,
   object: LockedObject,
 ): Promise<StepResponse<T>> {
   // The lock is a step of its own: a refused or thrown lock says so.

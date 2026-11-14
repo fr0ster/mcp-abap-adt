@@ -563,3 +563,19 @@ describe('tool-argument input until it is checked (the owner rule)', () => {
     );
   });
 });
+
+describe("a generic's type parameters are bound by the caller (the owner rule)", () => {
+  it('a constraint or a default of unknown is no site; an instantiation through the default is refused where it is written', () => {
+    const sites = sitesOf('boundGenerics');
+    assert.deepEqual(
+      sites.filter((site) => site.kind === 'type-parameter'),
+      [],
+    );
+    assert.deepEqual(
+      sites
+        .filter((site) => site.refused)
+        .map((site) => [site.kind, Number(site.where.split(':').pop())]),
+      [['expression', 19]],
+    );
+  });
+});

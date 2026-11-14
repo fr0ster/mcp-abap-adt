@@ -996,6 +996,11 @@ export class UnknownSweep {
   private declaration(node: ts.Node): void {
     const kind = this.siteKind(node);
     if (kind === undefined) return;
+    // Bound by the caller (the owner's decision): a type parameter's
+    // constraint and default are not positions. Each instantiation is
+    // judged where it is written — an explicit `unknown` argument, or the
+    // default it falls back to, holds `unknown` in the instantiated type.
+    if (kind === 'type-parameter') return;
     if (ts.isVariableDeclaration(node) && ts.isCatchClause(node.parent)) {
       this.report(node, kind, "''", 'caught', false, 'holds');
       return;
@@ -1422,7 +1427,10 @@ export class UnknownSweep {
         ) {
           inputs.push(callee.expression);
         }
-        inputs.push(callee);
+        // A class or a function the repository declares brings nothing in
+        // by being named: its type parameters are bound at this call (a
+        // class's `prototype` is typed with `any` for them).
+        if (!this.declaredCallable(callee)) inputs.push(callee);
       }
       if (
         inputs.some(
@@ -1440,6 +1448,22 @@ export class UnknownSweep {
       undefined,
       true,
       'holds',
+    );
+  }
+
+  /** Whether `callee` names a class, a function or a method the repository declares. */
+  private declaredCallable(callee: ts.Expression): boolean {
+    const name = ts.isPropertyAccessExpression(callee) ? callee.name : callee;
+    if (!ts.isIdentifier(name)) return false;
+    const symbol = this.valueSymbol(name);
+    return (
+      symbol !== undefined &&
+      (symbol.flags &
+        (ts.SymbolFlags.Class |
+          ts.SymbolFlags.Function |
+          ts.SymbolFlags.Method)) !==
+        0 &&
+      (symbol.declarations ?? []).some((declaration) => ownNode(declaration))
     );
   }
 

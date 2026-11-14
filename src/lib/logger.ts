@@ -8,14 +8,6 @@
 
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
-/**
- * What a log line spreads of its data: an object's own members; a value
- * that is not an object adds none.
- */
-function spreadable(data: unknown): object {
-  return typeof data === 'object' && data !== null ? data : {};
-}
-
 /** The header names whose values a log line never carries, lower case. */
 const REDACTED_HEADERS: ReadonlySet<string> = new Set([
   'authorization',
@@ -79,7 +71,8 @@ function createLogFn(level: string): ILogger['info'] {
         level,
         timestamp: new Date().toISOString(),
         message,
-        ...spreadable(data),
+        // An object's own members; a value that is not an object adds none.
+        ...(typeof data === 'object' && data !== null ? data : {}),
       };
 
       // Output to stderr which won't interfere with MCP communication
@@ -152,7 +145,8 @@ function createConnectionManagerLogFn(level: string): ILogger['debug'] {
         level,
         timestamp: new Date().toISOString(),
         message,
-        ...spreadable(data),
+        // An object's own members; a value that is not an object adds none.
+        ...(typeof data === 'object' && data !== null ? data : {}),
       };
 
       try {

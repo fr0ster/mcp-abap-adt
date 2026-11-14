@@ -201,7 +201,6 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/json.ts#answerObjectOf(value)',
   'src/lib/json.ts#answerValueOf(value)',
   'src/lib/leftoverSessions/port.ts#sapAnswerOf(thrown)',
-  'src/lib/logger.ts#spreadable(data)',
   'src/lib/requestSystemResolution.ts#isCredentialFailure(error)',
   'src/lib/search-source/orchestrator.ts#runWithLimit(error)',
   'src/lib/search-source/readFailure.ts#DecidedPrimitive(value)',

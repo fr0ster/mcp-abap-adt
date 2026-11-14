@@ -1,12 +1,14 @@
 /**
- * Reading a value from outside the type system that is no parsed document —
- * a thrown value, an SDK's or a library's object — by its members, as
- * `xml/tree` read every value before documents were typed at their parse
- * (`xml/node`). Each predicate checks what it claims: `Array.isArray` and
- * `Object.entries` are read here, never on `unknown` elsewhere.
+ * Reading a thrown value — what a `catch` binding or a rejection handler
+ * holds, or a failure slot keeps beside our own `Error` — by its members:
+ * outside the type system, read field by field. Each reader is a reader of
+ * thrown values (`THROWN_READERS`, `docs/development/CODE_GATES.md`); a value
+ * of any other source is read by its own type. Each predicate checks what
+ * it claims: `Array.isArray` and `Object.entries` are read here, never on
+ * `unknown` elsewhere.
  */
 
-/** An element of a parsed document: an object (never an array), keyed by name. */
+/** An object a thrown value holds: never an array, keyed by name. */
 export interface Element {
   readonly [name: string]: unknown;
 }

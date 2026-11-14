@@ -26,7 +26,7 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type JsonValue, jsonAt, jsonValueOf, parseJson } from './json';
-import { childAt } from './outsideValue';
+import { childAt } from './thrownValue';
 
 const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
 const SYSTEM_INFORMATION_ACCEPT =

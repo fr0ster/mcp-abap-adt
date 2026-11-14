@@ -1,7 +1,7 @@
 // Refused (search ×2): the old validation reading — a single word searched in
 // the exception's message, read out of the parsed document.
 import { XMLParser } from 'fast-xml-parser';
-import { child } from '../../../../../../lib/outsideValue';
+import { child } from '../../../../../../lib/thrownValue';
 
 export function exists(body: string): boolean {
   const parser = new XMLParser({ ignoreAttributes: false });

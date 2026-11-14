@@ -27,7 +27,7 @@ import {
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { eligible } from '../../../lib/batch/eligibility';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { child, listOf } from '../../../lib/outsideValue';
+import { child, listOf } from '../../../lib/thrownValue';
 import {
   envelopeConnection,
   envelopeResponse,

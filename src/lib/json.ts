@@ -1,4 +1,4 @@
-import { isElement } from './outsideValue';
+import { isElement } from './thrownValue';
 import type { XmlNode } from './xml/node';
 
 /**

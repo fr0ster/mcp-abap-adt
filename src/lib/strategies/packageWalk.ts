@@ -31,7 +31,7 @@ import {
   isElement,
   isList,
   listOf,
-} from '../outsideValue';
+} from '../thrownValue';
 import { parseXml, type XmlNode } from '../xml/node';
 import {
   childAt as nodeAt,

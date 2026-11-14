@@ -14,7 +14,6 @@ import {
 } from '../answer';
 import { failureOf } from '../auth/failures';
 import type { AnswerObject } from '../json';
-import { child } from '../outsideValue';
 import {
   carryingPayload,
   type LeftBehind,
@@ -25,6 +24,7 @@ import {
   payloadCarriedBy,
 } from '../strategies/step';
 import { failed } from '../strategies/stepResponse';
+import { child } from '../thrownValue';
 import { bodyFailureText } from './readings';
 
 export type DebugFailure = FailureEntry;

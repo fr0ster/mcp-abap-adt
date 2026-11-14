@@ -1,6 +1,6 @@
 // Refused (search ×2): the old `isAlreadyExistsError` — an error's message and
 // body, read by key, joined and searched for words.
-import { child, childAt } from '../../../../../../lib/outsideValue';
+import { child, childAt } from '../../../../../../lib/thrownValue';
 
 export function isAlreadyExistsError(error: unknown): boolean {
   const errorMessage = String(child(error, 'message') || '');

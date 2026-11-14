@@ -1,6 +1,6 @@
 // Refused (search ×3): the old `isAlreadyCheckedError` — an error's message,
 // read by key from a value of no type, searched for words.
-import { child } from '../../../../../../lib/outsideValue';
+import { child } from '../../../../../../lib/thrownValue';
 
 export function isAlreadyCheckedError(error: unknown): boolean {
   const errorMessage = String(child(error, 'message') || String(error || ''));

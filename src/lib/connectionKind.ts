@@ -7,7 +7,7 @@
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { hasMethod } from './capability';
-import { child } from './outsideValue';
+import { child } from './thrownValue';
 
 export function isRfcConnection(connection: IAbapConnection): boolean {
   if (!hasMethod(connection, 'getConfig')) return false;

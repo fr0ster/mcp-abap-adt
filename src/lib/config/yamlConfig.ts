@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { isJsonObject, type JsonObject, jsonValueOf } from '../json';
-import { childAt } from '../outsideValue';
+import { childAt } from '../thrownValue';
 import {
   CONF_ROW,
   ParameterRefusal,

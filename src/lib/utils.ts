@@ -34,10 +34,10 @@ import {
   hasT100Key,
   NAME_TAKEN_KEYS,
 } from './messageKeys';
-import { child, childAt } from './outsideValue';
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
+import { child, childAt } from './thrownValue';
 import { parseXml, type XmlNode } from './xml/node';
 import {
   childAt as nodeAt,
@@ -55,14 +55,14 @@ export {
   parseJson,
 } from './json';
 
-/** The readers of a value from outside the type system (`outsideValue`), for the packages. */
+/** The readers of a value from outside the type system (`thrownValue`), for the packages. */
 export {
   child,
   childAt,
   type Element,
   isElement,
   isList,
-} from './outsideValue';
+} from './thrownValue';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues

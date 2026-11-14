@@ -28,7 +28,6 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { child } from '../../../lib/outsideValue';
 import {
   afterBlanksAt,
   asciiLower,
@@ -48,6 +47,7 @@ import {
   type WhereUsedSource,
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
+import { child } from '../../../lib/thrownValue';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {

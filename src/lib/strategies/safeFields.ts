@@ -13,7 +13,7 @@ import {
   answerValueOf,
   isAnswerList,
 } from '../json';
-import { child, isElement, isList } from '../outsideValue';
+import { child, isElement, isList } from '../thrownValue';
 import type { LeftBehind } from './step';
 
 /**

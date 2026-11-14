@@ -7,8 +7,8 @@ import {
   isAnswerList,
   isAnswerObject,
 } from '../json';
-import { child, isElement, isList } from '../outsideValue';
 import { SystemContextMissingError } from '../systemContextGuard';
+import { child, isElement, isList } from '../thrownValue';
 import type { Cleanup } from './safeFields';
 import { failed, type StepError, type StepResponse } from './stepResponse';
 

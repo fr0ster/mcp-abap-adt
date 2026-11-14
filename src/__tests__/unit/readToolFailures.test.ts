@@ -27,7 +27,7 @@ import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeI
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
-import { child, listOf } from '../../lib/outsideValue';
+import { child, listOf } from '../../lib/thrownValue';
 import {
   fakeClientOf,
   okResponse,

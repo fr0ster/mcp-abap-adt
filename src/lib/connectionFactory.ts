@@ -23,7 +23,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal } from './auth/serverRefusal';
-import { child, childAt, entries } from './outsideValue';
 import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
@@ -32,6 +31,7 @@ import {
   statedSystemKind,
   stateSystemKind,
 } from './systemKind';
+import { child, childAt, entries } from './thrownValue';
 
 export type { AbapSystemKind } from './systemKind';
 export { statedSystemKind } from './systemKind';

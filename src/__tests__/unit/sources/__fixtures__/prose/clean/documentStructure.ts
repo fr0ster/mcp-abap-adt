@@ -1,7 +1,7 @@
 // Passes: a parsed document's structured values — an attribute, a code
 // element, an exact relation — compared; a URI's fragment cut.
 import { XMLParser } from 'fast-xml-parser';
-import { attr, child, childAt } from '../../../../../../lib/outsideValue';
+import { attr, child, childAt } from '../../../../../../lib/thrownValue';
 
 const parser = new XMLParser({ ignoreAttributes: false });
 

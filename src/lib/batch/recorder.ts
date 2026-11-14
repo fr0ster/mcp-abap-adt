@@ -46,8 +46,8 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { batchOtherKindWords, ServerRefusal } from '../auth/serverRefusal';
-import { child, entries, isList } from '../outsideValue';
 import { raceRequestSignal } from '../requestSignal';
+import { child, entries, isList } from '../thrownValue';
 import type { InstanceBatch, PartSettlement, RawPart } from './InstanceBatch';
 import { requestKind, sessionKindLabel } from './sessionKind';
 

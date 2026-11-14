@@ -738,8 +738,8 @@ export class UnknownSweep {
   private readonly references = new Map<ts.Symbol, ts.Expression[]>();
   /** Slot declaration → the typed values put where it holds `unknown`. */
   private readonly putInto = new Map<ts.Node, Set<string>>();
-  /** A third party's members a typed value was put into. */
-  private readonly putIntoThirdParty = new Set<ts.Symbol>();
+  /** A third party's member declarations a typed value was put into. */
+  private readonly putIntoThirdParty = new Set<ts.Node>();
   private readonly found: SweepSite[] = [];
   /** Expressions charged with the types written inside them. */
   private readonly writtenCharged = new Set<ts.Node>();
@@ -785,12 +785,12 @@ export class UnknownSweep {
     // Widening first: it charges the typed values to their slots.
     for (const expression of expressions) this.widening(expression);
     for (const node of declarations) this.declaration(node);
+    for (const node of declarations) this.readBack(node);
     for (const opening of jsxOpenings) this.writtenInExpression(opening);
     for (const expression of expressions) {
       this.writtenInExpression(expression);
       this.expression(expression);
       this.anyLanding(expression);
-      this.readBack(expression);
     }
     return this.found;
   }
@@ -1995,12 +1995,15 @@ export class UnknownSweep {
       return;
     }
     if (!ownNode(slot)) {
-      const symbol = this.memberSymbol(slot);
-      if (symbol !== undefined && thirdParty(slot)) {
-        this.putIntoThirdParty.add(symbol);
+      if (
+        thirdParty(slot) &&
+        (ts.isPropertySignature(slot) || ts.isPropertyDeclaration(slot))
+      ) {
+        this.putIntoThirdParty.add(slot);
       }
       return;
     }
+
     const into = this.putInto.get(slot) ?? new Set<string>();
     for (const text of types) into.add(text);
     this.putInto.set(slot, into);
@@ -2030,17 +2033,6 @@ export class UnknownSweep {
         : this.checker.getTypeOfSymbol(member);
     }
     return this.checker.getContextualType(node);
-  }
-
-  private memberSymbol(declaration: ts.Node): ts.Symbol | undefined {
-    if (
-      (ts.isPropertySignature(declaration) ||
-        ts.isPropertyDeclaration(declaration)) &&
-      ts.isIdentifier(declaration.name)
-    ) {
-      return this.checker.getSymbolAtLocation(declaration.name);
-    }
-    return undefined;
   }
 
   /** The declaration a value lands in: a parameter, a variable, a member. */
@@ -2144,21 +2136,37 @@ export class UnknownSweep {
     return name !== undefined && PROGRAM_TYPES.has(name);
   }
 
-  /** A read back of a third party's member a typed value was put into. */
-  private readBack(node: ts.Expression): void {
-    if (!ts.isPropertyAccessExpression(node)) return;
-    const parent = node.parent;
-    if (
-      ts.isBinaryExpression(parent) &&
-      parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      parent.left === node
-    ) {
-      return;
-    }
-    const symbol = this.checker.getSymbolAtLocation(node.name);
-    if (symbol !== undefined && this.putIntoThirdParty.has(symbol)) {
-      this.report(node, 'read-back', "''", undefined, true, 'read-back');
-    }
+  /**
+   * A read back of a third party's member a typed value was put into, in
+   * every form `memberReads` knows: by name, by a key, by destructuring.
+   * By reading (the owner's rule): a read whose value only passes on —
+   * where `unknown` or `any` is expected (a parse site, a sink such as
+   * `JSON.stringify`), or discarded or only inspected — reads nothing back.
+   */
+  private readBack(node: ts.Node): void {
+    if (this.putIntoThirdParty.size === 0) return;
+    memberReads(this.checker, node, (at, members) => {
+      if (ts.isExpression(at) && this.passesOn(outermost(at))) return;
+      if (
+        members.some((member) =>
+          (member?.declarations ?? []).some((declaration) =>
+            this.putIntoThirdParty.has(declaration),
+          ),
+        )
+      ) {
+        this.report(at, 'read-back', "''", undefined, true, 'read-back');
+      }
+    });
+  }
+
+  /** Whether a value only passes on: where `unknown` or `any` is expected, or inspected. */
+  private passesOn(node: ts.Expression): boolean {
+    if (this.inspected(node)) return true;
+    const contextual = this.contextualOf(node);
+    return (
+      contextual !== undefined &&
+      (contextual.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) !== 0
+    );
   }
 
   // ── Projection ───────────────────────────────────────────────────────
@@ -2365,125 +2373,134 @@ export function sinkSlotReads(
         }
       }
     };
-    /** Each member an assignment pattern reads off `source`, at any depth. */
-    const notePattern = (pattern: ts.Expression, source: ts.Type): void => {
-      const holder = checker.getNonNullableType(source);
-      if (ts.isObjectLiteralExpression(pattern)) {
-        for (const element of pattern.properties) {
-          if (ts.isSpreadAssignment(element)) {
-            noteReads(element, checker.getPropertiesOfType(holder));
-            continue;
-          }
-          if (
-            !ts.isPropertyAssignment(element) &&
-            !ts.isShorthandPropertyAssignment(element)
-          ) {
-            continue;
-          }
-          const key = propertyName(element.name);
-          const member =
-            key === undefined
-              ? undefined
-              : checker.getPropertyOfType(holder, key);
-          noteReads(
-            element,
-            key === undefined ? checker.getPropertiesOfType(holder) : [member],
-          );
-          const inner = ts.isPropertyAssignment(element)
-            ? element.initializer
-            : undefined;
-          if (inner !== undefined && member !== undefined) {
-            const target =
-              ts.isBinaryExpression(inner) &&
-              inner.operatorToken.kind === ts.SyntaxKind.EqualsToken
-                ? inner.left
-                : inner;
-            notePattern(target, checker.getTypeOfSymbol(member));
-          }
-        }
-      } else if (ts.isArrayLiteralExpression(pattern)) {
-        const element =
-          checker.getIndexTypeOfType(holder, ts.IndexKind.Number) ?? holder;
-        pattern.elements.forEach((item, at) => {
-          const tuple =
-            checker.isTupleType(holder) && isReference(holder)
-              ? checker.getTypeArguments(holder)[at]
-              : undefined;
-          const target = ts.isSpreadElement(item)
-            ? item.expression
-            : ts.isBinaryExpression(item) &&
-                item.operatorToken.kind === ts.SyntaxKind.EqualsToken
-              ? item.left
-              : item;
-          notePattern(target, tuple ?? element);
-        });
-      }
-    };
     const visit = (node: ts.Node): void => {
       const slot = slotName(node);
       if (slot !== undefined && slots.has(slot)) declared.add(slot);
-      if (
-        (ts.isPropertyAccessExpression(node) ||
-          ts.isElementAccessExpression(node)) &&
-        !(
-          ts.isBinaryExpression(node.parent) &&
-          node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-          node.parent.left === node
-        )
-      ) {
-        const members = ts.isPropertyAccessExpression(node)
-          ? [checker.getSymbolAtLocation(node.name)]
-          : keyedMembers(
-              checker,
-              checker.getTypeAtLocation(node.expression),
-              checker.getTypeAtLocation(node.argumentExpression),
-            );
-        noteReads(node, members);
-      }
-      if (
-        ts.isBinaryExpression(node) &&
-        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-        (ts.isObjectLiteralExpression(node.left) ||
-          ts.isArrayLiteralExpression(node.left))
-      ) {
-        notePattern(node.left, checker.getTypeAtLocation(node.right));
-      }
-      if (
-        ts.isForOfStatement(node) &&
-        (ts.isObjectLiteralExpression(node.initializer) ||
-          ts.isArrayLiteralExpression(node.initializer))
-      ) {
-        const iterated = checker.getTypeAtLocation(node.expression);
-        notePattern(
-          node.initializer,
-          checker.getIndexTypeOfType(iterated, ts.IndexKind.Number) ?? iterated,
-        );
-      }
-      if (ts.isBindingElement(node) && node.dotDotDotToken === undefined) {
-        const source = checker.getTypeAtLocation(node.parent);
-        if (ts.isObjectBindingPattern(node.parent)) {
-          const key = propertyName(node.propertyName ?? node.name);
-          noteReads(
-            node,
-            key === undefined
-              ? checker.getPropertiesOfType(source)
-              : [checker.getNonNullableType(source).getProperty(key)],
-          );
-        }
-      }
-      if (ts.isBindingElement(node) && node.dotDotDotToken !== undefined) {
-        if (ts.isObjectBindingPattern(node.parent)) {
-          noteReads(
-            node,
-            checker.getPropertiesOfType(checker.getTypeAtLocation(node.parent)),
-          );
-        }
-      }
+      memberReads(checker, node, noteReads);
       ts.forEachChild(node, visit);
     };
     visit(file);
   }
   return { reads, declared };
+}
+
+/**
+ * The members a node reads, handed to `read` with the node that reads
+ * them: a member read (by name, by a computed key that may name it, never
+ * the target of `=`), a destructuring in a declaration or a parameter
+ * (renamed, with a default, nested, a rest reading every member) and in an
+ * assignment or a `for … of` head, nested or by array pattern.
+ */
+function memberReads(
+  checker: ts.TypeChecker,
+  node: ts.Node,
+  read: (at: ts.Node, members: readonly (ts.Symbol | undefined)[]) => void,
+): void {
+  /** Each member an assignment pattern reads off `source`, at any depth. */
+  const notePattern = (pattern: ts.Expression, source: ts.Type): void => {
+    const holder = checker.getNonNullableType(source);
+    if (ts.isObjectLiteralExpression(pattern)) {
+      for (const element of pattern.properties) {
+        if (ts.isSpreadAssignment(element)) {
+          read(element, checker.getPropertiesOfType(holder));
+          continue;
+        }
+        if (
+          !ts.isPropertyAssignment(element) &&
+          !ts.isShorthandPropertyAssignment(element)
+        ) {
+          continue;
+        }
+        const key = propertyName(element.name);
+        const member =
+          key === undefined
+            ? undefined
+            : checker.getPropertyOfType(holder, key);
+        read(
+          element,
+          key === undefined ? checker.getPropertiesOfType(holder) : [member],
+        );
+        const inner = ts.isPropertyAssignment(element)
+          ? element.initializer
+          : undefined;
+        if (inner !== undefined && member !== undefined) {
+          const target =
+            ts.isBinaryExpression(inner) &&
+            inner.operatorToken.kind === ts.SyntaxKind.EqualsToken
+              ? inner.left
+              : inner;
+          notePattern(target, checker.getTypeOfSymbol(member));
+        }
+      }
+    } else if (ts.isArrayLiteralExpression(pattern)) {
+      const element =
+        checker.getIndexTypeOfType(holder, ts.IndexKind.Number) ?? holder;
+      pattern.elements.forEach((item, at) => {
+        const tuple =
+          checker.isTupleType(holder) && isReference(holder)
+            ? checker.getTypeArguments(holder)[at]
+            : undefined;
+        const target = ts.isSpreadElement(item)
+          ? item.expression
+          : ts.isBinaryExpression(item) &&
+              item.operatorToken.kind === ts.SyntaxKind.EqualsToken
+            ? item.left
+            : item;
+        notePattern(target, tuple ?? element);
+      });
+    }
+  };
+  if (
+    (ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node)) &&
+    !(
+      ts.isBinaryExpression(node.parent) &&
+      node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      node.parent.left === node
+    )
+  ) {
+    const members = ts.isPropertyAccessExpression(node)
+      ? [checker.getSymbolAtLocation(node.name)]
+      : keyedMembers(
+          checker,
+          checker.getTypeAtLocation(node.expression),
+          checker.getTypeAtLocation(node.argumentExpression),
+        );
+    read(node, members);
+  }
+  if (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    (ts.isObjectLiteralExpression(node.left) ||
+      ts.isArrayLiteralExpression(node.left))
+  ) {
+    notePattern(node.left, checker.getTypeAtLocation(node.right));
+  }
+  if (
+    ts.isForOfStatement(node) &&
+    (ts.isObjectLiteralExpression(node.initializer) ||
+      ts.isArrayLiteralExpression(node.initializer))
+  ) {
+    const iterated = checker.getTypeAtLocation(node.expression);
+    notePattern(
+      node.initializer,
+      checker.getIndexTypeOfType(iterated, ts.IndexKind.Number) ?? iterated,
+    );
+  }
+  if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
+    const source = checker.getTypeAtLocation(node.parent);
+    if (node.dotDotDotToken !== undefined) {
+      read(node, checker.getPropertiesOfType(source));
+    } else {
+      const key = propertyName(node.propertyName ?? node.name);
+      read(
+        node,
+        key === undefined
+          ? checker.getPropertiesOfType(source)
+          : [checker.getNonNullableType(source).getProperty(key)],
+      );
+    }
+  }
 }
 
 function keyedMembers(

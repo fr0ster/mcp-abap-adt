@@ -565,6 +565,15 @@ describe('the forms round 9 found the every-node sweep missing are refused', () 
       ],
     );
   });
+
+  it("a third party's member read back by a literal key or a destructuring, however nested", () => {
+    assert.deepEqual(
+      sitesOf('readBackForms')
+        .filter((site) => site.kind === 'read-back')
+        .map((site) => Number(site.where.split(':').pop())),
+      [13, 18, 23, 28, 34, 39, 47, 52],
+    );
+  });
 });
 
 describe('tool-argument input until it is checked (the owner rule)', () => {

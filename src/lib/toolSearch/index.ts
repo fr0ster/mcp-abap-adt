@@ -21,7 +21,7 @@
  * ({@link toolSearchText}); without, every word stays.
  */
 
-import { isList, entries as membersOf } from '../outsideValue';
+import { isJsonObject, type JsonValue, jsonAt, jsonOf } from '../json';
 import '../instance.js';
 
 /** The search texts of one tool. */
@@ -63,8 +63,11 @@ function malformed(where: string): Error {
 }
 
 /** `value` as a list of strings, or the refusal. */
-function strings(value: unknown, where: string): readonly string[] {
-  if (!isList(value)) throw malformed(where);
+function strings(
+  value: JsonValue | undefined,
+  where: string,
+): readonly string[] {
+  if (!Array.isArray(value)) throw malformed(where);
   return value.map((item) => {
     if (typeof item !== 'string') throw malformed(where);
     return item;
@@ -72,24 +75,31 @@ function strings(value: unknown, where: string): readonly string[] {
 }
 
 /** `value[key]` as a string, or the refusal. */
-function stringAt(value: object, key: string, where: string): string {
-  const read: unknown = Reflect.get(value, key);
+function stringAt(value: JsonValue, key: string, where: string): string {
+  const read = jsonAt(value, key);
   if (typeof read !== 'string') throw malformed(`${where}.${key}`);
   return read;
 }
 
+/** The members of an object, in their order; none for a list. */
+function membersOf(value: JsonValue | undefined): [string, JsonValue][] {
+  return value !== undefined && isJsonObject(value)
+    ? Object.entries(value)
+    : [];
+}
+
 /** A semantic list as the file states it, or the refusal. */
-function semanticList(value: object, where: string): SemanticList {
+function semanticList(value: JsonValue, where: string): SemanticList {
   const join = stringAt(value, 'join', where);
   if (join !== 'and' && join !== 'or') throw malformed(`${where}.join`);
-  const items: unknown = Reflect.get(value, 'items');
-  if (!isList(items)) throw malformed(`${where}.items`);
+  const items = jsonAt(value, 'items');
+  if (!Array.isArray(items)) throw malformed(`${where}.items`);
   return {
     before: stringAt(value, 'before', where),
-    items: items.map((item: unknown, index) => {
+    items: items.map((item, index) => {
       const at = `${where}.items[${index}]`;
       if (typeof item !== 'object' || item === null) throw malformed(at);
-      const member: unknown = Reflect.get(item, 'member');
+      const member = jsonAt(item, 'member');
       if (member !== undefined && typeof member !== 'string') {
         throw malformed(`${at}.member`);
       }
@@ -101,22 +111,25 @@ function semanticList(value: object, where: string): SemanticList {
 }
 
 /** The semantic text as the file states it, or the refusal. */
-function semanticOf(value: unknown, where: string): string | SemanticList {
+function semanticOf(
+  value: JsonValue | undefined,
+  where: string,
+): string | SemanticList {
   if (typeof value === 'string') return value;
   if (typeof value !== 'object' || value === null) throw malformed(where);
   return semanticList(value, where);
 }
 
 /** One entry as the file states it, or the refusal. */
-function entryOf(name: string, value: unknown): SearchEntry {
+function entryOf(name: string, value: JsonValue): SearchEntry {
   if (typeof value !== 'object' || value === null) throw malformed(name);
-  const groups: unknown = Reflect.get(value, 'members');
+  const groups = jsonAt(value, 'members');
   if (groups !== undefined && (typeof groups !== 'object' || groups === null)) {
     throw malformed(`${name}.members`);
   }
   return {
-    keywords: strings(Reflect.get(value, 'keywords'), `${name}.keywords`),
-    semantic: semanticOf(Reflect.get(value, 'semantic'), `${name}.semantic`),
+    keywords: strings(jsonAt(value, 'keywords'), `${name}.keywords`),
+    semantic: semanticOf(jsonAt(value, 'semantic'), `${name}.semantic`),
     members: new Map(
       membersOf(groups).map(([member, words]) => [
         member,
@@ -171,8 +184,9 @@ let table: ReadonlyMap<string, ToolSearchText> | undefined;
 /** Every entry of the table, by tool name, in name order. */
 function searchEntries(): ReadonlyMap<string, SearchEntry> {
   if (entries === undefined) {
-    const file: unknown = require('../../../tools/tool-search.json');
-    if (typeof file !== 'object' || file === null) {
+    // The table, checked once as JSON: typed from here on.
+    const file = jsonOf(require('../../../tools/tool-search.json'));
+    if (file === undefined || typeof file !== 'object' || file === null) {
       throw malformed('the table');
     }
     entries = new Map(

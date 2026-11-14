@@ -17,6 +17,7 @@
  */
 
 import * as path from 'node:path';
+import { type JsonValue, jsonAt, jsonOf } from '../json';
 import { child, isList } from '../outsideValue';
 
 /**
@@ -67,30 +68,30 @@ export const BATCH_HANDLERS_FILE = path.join(
 let table: ReadonlyMap<string, readonly BatchEntry[]> | undefined;
 
 /** A list of strings, or `undefined` when `value` is not one. */
-function stringsOf(value: unknown): string[] | undefined {
-  if (!isList(value)) return undefined;
+function stringsOf(value: JsonValue): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
   const strings = value.filter((v): v is string => typeof v === 'string');
   return strings.length === value.length ? strings : undefined;
 }
 
 /** One `when` rule of a row, or `undefined` when `value` is not one. */
-function whenRuleOf(value: unknown): WhenRule[number] | undefined {
-  const argument = child(value, 'argument');
+function whenRuleOf(value: JsonValue): WhenRule[number] | undefined {
+  const argument = jsonAt(value, 'argument');
   if (typeof argument !== 'string') return undefined;
   const rule: WhenRule[number] = { argument };
-  const field = child(value, 'field');
+  const field = jsonAt(value, 'field');
   if (field !== undefined) {
     if (typeof field !== 'string') return undefined;
     rule.field = field;
   }
   for (const name of ['equals', 'notEquals'] as const) {
-    const given = child(value, name);
+    const given = jsonAt(value, name);
     if (given === undefined) continue;
     const strings = stringsOf(given);
     if (strings === undefined) return undefined;
     rule[name] = strings;
   }
-  const present = child(value, 'present');
+  const present = jsonAt(value, 'present');
   if (present !== undefined) {
     if (typeof present !== 'boolean') return undefined;
     rule.present = present;
@@ -102,13 +103,13 @@ function whenRuleOf(value: unknown): WhenRule[number] | undefined {
  * Row `at` of the table, read: the file is data, read as it is written —
  * a row this reading does not recognise stops the load with its index.
  */
-function batchEntryOf(value: unknown, at: number): BatchEntry {
+function batchEntryOf(value: JsonValue, at: number): BatchEntry {
   const malformed = () =>
     new Error(`tools/batch-handlers.json: row ${at} is malformed`);
-  const tool = child(value, 'tool');
-  const set = child(value, 'set');
-  const handler = child(value, 'handler');
-  const sends = child(value, 'sends');
+  const tool = jsonAt(value, 'tool');
+  const set = jsonAt(value, 'set');
+  const handler = jsonAt(value, 'handler');
+  const sends = jsonAt(value, 'sends');
   if (
     typeof tool !== 'string' ||
     (set !== 'full' && set !== 'compact') ||
@@ -118,9 +119,9 @@ function batchEntryOf(value: unknown, at: number): BatchEntry {
     throw malformed();
   }
   const entry: BatchEntry = { tool, set, handler, sends };
-  const when = child(value, 'when');
+  const when = jsonAt(value, 'when');
   if (when !== undefined) {
-    if (!isList(when)) throw malformed();
+    if (!Array.isArray(when)) throw malformed();
     const rules: WhenRule = [];
     for (const given of when) {
       const rule = whenRuleOf(given);
@@ -129,7 +130,7 @@ function batchEntryOf(value: unknown, at: number): BatchEntry {
     }
     entry.when = rules;
   }
-  const connection = child(value, 'connection');
+  const connection = jsonAt(value, 'connection');
   if (connection !== undefined) {
     if (connection !== 'http') throw malformed();
     entry.connection = connection;
@@ -141,8 +142,9 @@ function batchEntryOf(value: unknown, at: number): BatchEntry {
 function entriesByTool(): ReadonlyMap<string, readonly BatchEntry[]> {
   if (table === undefined) {
     // `BATCH_HANDLERS_FILE`, as a literal a bundler inlines.
-    const file: unknown = require('../../../tools/batch-handlers.json');
-    if (!isList(file)) {
+    // The table, checked once as JSON: typed from here on.
+    const file = jsonOf(require('../../../tools/batch-handlers.json'));
+    if (!Array.isArray(file)) {
       throw new Error('tools/batch-handlers.json: the table is not a list');
     }
     const entries = file.map(batchEntryOf);

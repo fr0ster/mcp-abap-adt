@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { jsonAt, jsonOf } from '@mcp-abap-adt/lib/utils';
 
 /**
  * `@mcp-abap-adt/server-runtime`'s own version, read from its own manifest, as
@@ -13,14 +14,12 @@ import { join } from 'node:path';
  * its own version through `main`, so `--version` and `serverInfo.version` stay
  * the binary's.
  */
-const manifest: unknown = JSON.parse(
-  readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+const version = jsonAt(
+  jsonOf(
+    JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')),
+  ),
+  'version',
 );
 
 export const RUNTIME_VERSION: string =
-  typeof manifest === 'object' &&
-  manifest !== null &&
-  'version' in manifest &&
-  typeof manifest.version === 'string'
-    ? manifest.version
-    : '';
+  typeof version === 'string' ? version : '';

@@ -6,7 +6,7 @@
  * by its shape, never assumed: a manifest without a text `name` and a text
  * `version` stops the start in words.
  */
-import { child } from './outsideValue';
+import { jsonAt, jsonOf } from './json';
 
 /** What a launcher reads of its manifest. */
 export interface PackageManifest {
@@ -16,8 +16,10 @@ export interface PackageManifest {
 
 /** `value`, a package's parsed `package.json`, as its name and version. */
 export function packageManifestOf(value: unknown): PackageManifest {
-  const name = child(value, 'name');
-  const version = child(value, 'version');
+  // The manifest, checked once as JSON: typed from here on.
+  const manifest = jsonOf(value);
+  const name = jsonAt(manifest, 'name');
+  const version = jsonAt(manifest, 'version');
   if (typeof name !== 'string' || typeof version !== 'string') {
     throw new Error('package.json names no name and version');
   }

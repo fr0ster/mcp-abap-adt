@@ -62,7 +62,7 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { hasMethod } from '../capability';
 import { resolveSystemKind } from '../connectionFactory';
-import { child } from '../outsideValue';
+import { type JsonValue, jsonAt, parseJson } from '../json';
 import { isEnded, whenLogoffCompleted } from '../ownedConnections';
 import {
   nodeProcessProbe,
@@ -136,10 +136,10 @@ export interface ClaimedSession {
 }
 
 /** The system information as the file holds it. */
-interface FileSystem {
+type FileSystem = {
   responsible: string | null;
   master_system: string | null;
-}
+};
 
 /** What the file holds. */
 interface RuntimeFile {
@@ -289,26 +289,22 @@ function cookiesOf(connection: object): string | null {
 
 /** A parsed file, or `undefined` for anything that is not one. */
 function parseFile(text: string): RuntimeFile | undefined {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  const format = child(value, 'format');
-  const pid = child(value, 'pid');
-  const start = child(value, 'start');
-  const role = child(value, 'role');
-  const user = child(value, 'user');
-  const system = child(value, 'system');
-  const cookies = child(value, 'cookies');
-  const writtenAt = child(value, 'written_at');
-  const destination = child(value, 'destination');
-  const name = child(destination, 'name');
-  const url = child(destination, 'url');
-  const client = child(destination, 'client');
-  const kind = child(destination, 'system');
-  const wire = child(destination, 'wire');
+  const value = parseJson(text);
+  if (value === undefined) return undefined;
+  const format = jsonAt(value, 'format');
+  const pid = jsonAt(value, 'pid');
+  const start = jsonAt(value, 'start');
+  const role = jsonAt(value, 'role');
+  const user = jsonAt(value, 'user');
+  const system = jsonAt(value, 'system');
+  const cookies = jsonAt(value, 'cookies');
+  const writtenAt = jsonAt(value, 'written_at');
+  const destination = jsonAt(value, 'destination');
+  const name = jsonAt(destination, 'name');
+  const url = jsonAt(destination, 'url');
+  const client = jsonAt(destination, 'client');
+  const kind = jsonAt(destination, 'system');
+  const wire = jsonAt(destination, 'wire');
   if (
     format !== 3 ||
     !isFileSystem(system) ||
@@ -341,10 +337,12 @@ function parseFile(text: string): RuntimeFile | undefined {
 }
 
 /** Whether `value` is a file's system information: `null`, or both fields a string or `null`. */
-function isFileSystem(value: unknown): value is FileSystem | null {
+function isFileSystem(
+  value: JsonValue | undefined,
+): value is FileSystem | null {
   if (value === null) return true;
-  const responsible = child(value, 'responsible');
-  const master = child(value, 'master_system');
+  const responsible = jsonAt(value, 'responsible');
+  const master = jsonAt(value, 'master_system');
   return (
     (responsible === null || typeof responsible === 'string') &&
     (master === null || typeof master === 'string')

@@ -2,6 +2,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtResponse,
+  IAdtUpdateOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -210,7 +211,7 @@ type AdtClient = IServerAdtClient;
 export type IncludeWriter = {
   update(
     config: object,
-    options: { headers: IAdtHeaders } & Record<string, unknown>,
+    options: IAdtUpdateOptions & { headers: IAdtHeaders },
   ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 };
 

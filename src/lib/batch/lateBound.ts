@@ -40,6 +40,7 @@ export const LATE_BOUND_DROPPED_WORDS =
 export class LateBoundConnection implements IAbapConnection {
   private current: IAbapConnection | undefined;
   private sealed = false;
+  private readonly followers: (() => void)[] = [];
 
   /**
    * The pointed connection's own session members, present only while it has
@@ -55,6 +56,7 @@ export class LateBoundConnection implements IAbapConnection {
     if (this.sealed) return;
     this.current = connection;
     this.forwardSession(connection);
+    this.notify();
   }
 
   /** The batch was dropped: the target is cleared for good. */
@@ -62,6 +64,20 @@ export class LateBoundConnection implements IAbapConnection {
     this.sealed = true;
     this.current = undefined;
     this.forwardSession(undefined);
+    this.notify();
+  }
+
+  /**
+   * Calls `follower` after every change of the connection pointed at, so a
+   * connection placed over this target (`EnvelopeWatch.over`) has the session
+   * members the target has now.
+   */
+  onPoint(follower: () => void): void {
+    this.followers.push(follower);
+  }
+
+  private notify(): void {
+    for (const follower of this.followers) follower();
   }
 
   /** The session members of `connection`, each forwarded to the same-named one. */

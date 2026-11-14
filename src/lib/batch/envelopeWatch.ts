@@ -11,7 +11,8 @@
  * plain errors; the server never reads their messages.
  *
  * The watch only forwards: every member reaches the connection it is placed
- * over, the session members as that connection has them.
+ * over, the session members as that connection has them at the call — over
+ * a late-bound target, as the connection the target points at then.
  */
 
 import type {
@@ -19,8 +20,58 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { LateBoundConnection } from './lateBound';
 
 type Session = 'stateful' | 'stateless';
+
+/**
+ * The forwarding connection `EnvelopeWatch.over` answers. Its session members
+ * are the connection's as it has them now: each forwards to the same-named
+ * member and is present only while the connection has it. Over a late-bound
+ * target they follow every `point()` / `seal()`, so a target wrapped before
+ * it is pointed answers as the connection it is pointed at.
+ */
+class WatchedConnection implements IAbapConnection {
+  declare getSessionType?: () => Session;
+  declare getSessionMode?: () => Session;
+
+  /** `makeAdtRequest` as the watch sends it: through the connection, seen. */
+  readonly makeAdtRequest: (
+    request: IAbapRequestOptions,
+  ) => Promise<IAdtWireResponse>;
+
+  constructor(
+    private readonly connection: IAbapConnection,
+    send: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
+  ) {
+    this.makeAdtRequest = send;
+    this.follow();
+    if (connection instanceof LateBoundConnection) {
+      connection.onPoint(() => this.follow());
+    }
+  }
+
+  /** The connection's session members as it has them now. */
+  private follow(): void {
+    const connection = this.connection;
+    const type = connection.getSessionType;
+    if (type === undefined) delete this.getSessionType;
+    else this.getSessionType = () => type.call(connection);
+    const mode = connection.getSessionMode;
+    if (mode === undefined) delete this.getSessionMode;
+    else this.getSessionMode = () => mode.call(connection);
+  }
+
+  // Own members, as the forwarding literal had them: one taken off the
+  // connection still forwards.
+  readonly connect = (): Promise<void> => this.connection.connect();
+  readonly getBaseUrl = (): Promise<string | undefined> =>
+    this.connection.getBaseUrl();
+  readonly getSessionId = (): string | null => this.connection.getSessionId();
+  readonly setSessionType = (type: Session): void =>
+    this.connection.setSessionType(type);
+}
+
 export class EnvelopeWatch {
   private readonly thrown: Set<unknown> = new Set();
   private answers = 0;
@@ -31,22 +82,9 @@ export class EnvelopeWatch {
     const answered = () => {
       this.answers += 1;
     };
-    // The session members as the connection has them: each forwarded to
-    // the same-named one, absent when the connection lacks it.
-    const sessionType = connection.getSessionType;
-    const sessionMode = connection.getSessionMode;
-    const forwarding = {
-      connect: () => connection.connect(),
-      getBaseUrl: () => connection.getBaseUrl(),
-      getSessionId: () => connection.getSessionId(),
-      setSessionType: (type: Session) => connection.setSessionType(type),
-      ...(sessionType === undefined
-        ? {}
-        : { getSessionType: () => sessionType.call(connection) }),
-      ...(sessionMode === undefined
-        ? {}
-        : { getSessionMode: () => sessionMode.call(connection) }),
-      makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
+    return new WatchedConnection(
+      connection,
+      (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
         let sending: Promise<IAdtWireResponse>;
         try {
           sending = connection.makeAdtRequest(request);
@@ -65,8 +103,7 @@ export class EnvelopeWatch {
           },
         );
       },
-    };
-    return forwarding;
+    );
   }
 
   /** Whether the connection threw `error` for an envelope. */

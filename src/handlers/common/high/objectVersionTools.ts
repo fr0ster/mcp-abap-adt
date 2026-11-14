@@ -25,6 +25,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,
   SapEnvironment,
+  ToolArgs,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
@@ -42,7 +43,7 @@ import {
  */
 type RawHandler = (
   context: HandlerContext,
-  args: Readonly<Record<string, unknown>>,
+  args: ToolArgs,
 ) => Promise<McpResult>;
 
 export interface ObjectVersionToolEntry {

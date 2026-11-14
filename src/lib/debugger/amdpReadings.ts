@@ -4,6 +4,7 @@
  * debuggee, a stop, a data preview).
  */
 
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { digitsAfter } from '../plainText';
 import { parseXml, type XmlNode } from '../xml/node';
@@ -206,9 +207,9 @@ export function readAmdpEvents(xml: string): AmdpEvent[] {
  * its session by a path, the breakpoint sync its request by a bare id
  * (measured on premise, 2026-10-11).
  */
-export function locationId(wire: {
-  headers?: Record<string, unknown>;
-}): string {
+export function locationId(
+  wire: Partial<Pick<IAdtWireResponse, 'headers'>>,
+): string {
   const location = String(
     wire.headers?.location ?? wire.headers?.Location ?? '',
   ).trim();
@@ -239,10 +240,9 @@ function lastSegmentOf(location: string): string {
   return '';
 }
 
-export function readAmdpStart(wire: {
-  headers?: Record<string, unknown>;
-  data?: unknown;
-}): { mainId: string; hanaSession: string } {
+export function readAmdpStart(
+  wire: Partial<Pick<IAdtWireResponse, 'headers' | 'data'>>,
+): { mainId: string; hanaSession: string } {
   const body = String(wire.data ?? '');
   // The start's parameters, read with this module's parser (no prefixes): the
   // one whose key is the HANA session names it in its value.

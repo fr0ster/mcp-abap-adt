@@ -23,13 +23,15 @@ import {
   type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
-import { child, isElement } from '../outsideValue';
 import { currentRequestSignal } from '../requestSignal';
 import { spentBy } from '../sessionLoss';
 import {
@@ -162,14 +164,14 @@ const failedAt = <E extends Error>(
   a.ok || isFromThrow(a.getError())
     ? error
     : carryingFailure(error, a.getError(), step);
-type Wire = { headers?: Record<string, unknown>; data?: unknown };
-const wireOf = (a: IAdtResponse<unknown>): Wire => {
+/** The frame a start or a command answers, as the library's reading keeps it. */
+type Wire = Partial<Pick<IAdtWireResponse, 'headers' | 'data'>>;
+const wireOf = (a: IAdtResponse<IAdtWireResponse>): Wire => {
   const value = a.ok ? a.getResult().value : undefined;
-  const headers = child(value, 'headers');
-  const data = child(value, 'data');
+  if (value === undefined) return {};
   return {
-    ...(isElement(headers) ? { headers } : {}),
-    ...(data !== undefined ? { data } : {}),
+    headers: value.headers,
+    ...(value.data !== undefined ? { data: value.data } : {}),
   };
 };
 
@@ -1103,7 +1105,7 @@ export class AmdpSession<O = unknown> {
 
   private command(
     step: string,
-    send: (once: OnceAmdp) => Promise<IAdtResponse<unknown>>,
+    send: (once: OnceAmdp) => Promise<IAdtResponse<IAdtWireResponse>>,
   ): Promise<DebugView<{ requestId: string }>> {
     return this.mutate(async () => {
       const answer = await send(this.requireOnce());

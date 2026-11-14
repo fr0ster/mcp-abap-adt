@@ -232,13 +232,6 @@ const GENERIC_FAMILIES: ReadonlyMap<string, string> = new Map([
   ['PromiseLike', 'Promise'],
 ]);
 
-/**
- * How deep the walk of a declaration's type goes: a recursive type is cut
- * where it repeats, and an object graph (a contract's members' members)
- * here.
- */
-const MAX_TYPE_DEPTH = 6;
-
 /** Generics that keep the shape of their argument. */
 const SHAPE_KEEPING = new Set([
   'Readonly',
@@ -526,6 +519,34 @@ function languageObject(declaration: ts.Node): boolean {
   );
 }
 
+/**
+ * A property name as the checker names it: an identifier's text, a string
+ * or a number literal's value (`'value'` is `value`), a computed key's
+ * literal; `undefined` for a computed key of no literal.
+ */
+function propertyName(
+  name: ts.PropertyName | ts.BindingName,
+): string | undefined {
+  if (
+    ts.isIdentifier(name) ||
+    ts.isPrivateIdentifier(name) ||
+    ts.isStringLiteral(name) ||
+    ts.isNumericLiteral(name) ||
+    ts.isNoSubstitutionTemplateLiteral(name)
+  ) {
+    return name.text;
+  }
+  if (ts.isComputedPropertyName(name)) {
+    const key = name.expression;
+    return ts.isStringLiteral(key) ||
+      ts.isNumericLiteral(key) ||
+      ts.isNoSubstitutionTemplateLiteral(key)
+      ? key.text
+      : undefined;
+  }
+  return undefined;
+}
+
 /** Whether a path passes through a slot of `SINK_SLOTS`. */
 function intoSink(path: Path): boolean {
   return path.some((step) => step.kind === 'member' && step.sink === true);
@@ -553,7 +574,8 @@ function slotName(declaration: ts.Node): string | undefined {
       ts.isTypeAliasDeclaration(owner)) &&
     owner.name !== undefined
   ) {
-    return `${owner.name.text}.${declaration.name.getText()}`;
+    const member = propertyName(declaration.name);
+    return member === undefined ? undefined : `${owner.name.text}.${member}`;
   }
   return undefined;
 }
@@ -586,10 +608,14 @@ export class ProvenanceScan {
   >();
   /** Functions handed on as a value (an argument, an initializer, a member). */
   private readonly handedOn = new Set<ts.Node>();
+  /** A named function → the expressions that hand it on by name. */
+  private readonly handedAt = new Map<ts.Node, ts.Expression[]>();
   private readonly memo = new Map<ts.Node, readonly Origin[]>();
   /** Origins of a declaration's values at one position, by node and path. */
   private readonly memoAt = new Map<ts.Node, Map<string, readonly Origin[]>>();
   private readonly typePathMemo = new Map<ts.Type, Path[]>();
+  /** How many times a walk was cut where a type repeats: a cut walk is not kept. */
+  private cuts = 0;
   private readonly active = new Set<ts.Node>();
   private readonly readers: ReadonlySet<string>;
   private readonly slots: ReadonlyMap<string, string>;
@@ -834,6 +860,7 @@ export class ProvenanceScan {
         this.checker.getSymbolAtLocation(inner),
       )) {
         this.handedOn.add(declaration);
+        this.push(this.handedAt, declaration, inner);
       }
     }
   }
@@ -852,9 +879,12 @@ export class ProvenanceScan {
       ) {
         continue;
       }
-      const key = element.name.getText();
-      for (const owner of owners) {
-        const member = this.checker.getPropertyOfType(owner, key);
+      const key = propertyName(element.name);
+      const members =
+        key === undefined
+          ? []
+          : owners.map((owner) => this.checker.getPropertyOfType(owner, key));
+      for (const member of members) {
         for (const declaration of member?.declarations ?? []) {
           if (ts.isPropertyAssignment(element)) {
             this.push(this.writes, declaration, element.initializer);
@@ -980,11 +1010,15 @@ export class ProvenanceScan {
    */
   private typePaths(type: ts.Type, seen: ReadonlySet<ts.Type>): Path[] {
     if (type.flags & ts.TypeFlags.Unknown) return [[]];
-    // A type met again on the way, or deeper than any type written here
-    // nests, is not walked again.
-    if (seen.has(type) || seen.size >= MAX_TYPE_DEPTH) return [];
-    const known = seen.size === 0 ? this.typePathMemo.get(type) : undefined;
+    // A type met again on the way (a recursive type) is not walked again;
+    // a walk cut so is kept for no other site.
+    if (seen.has(type)) {
+      this.cuts += 1;
+      return [];
+    }
+    const known = this.typePathMemo.get(type);
     if (known !== undefined) return known;
+    const cutsBefore = this.cuts;
     const deeper = new Set([...seen, type]);
     const under = (step: Step, inner: ts.Type): Path[] =>
       this.typePaths(inner, deeper).map((path) => [step, ...path]);
@@ -1072,7 +1106,7 @@ export class ProvenanceScan {
       texts.add(text);
       return true;
     });
-    if (seen.size === 0) this.typePathMemo.set(type, paths);
+    if (this.cuts === cutsBefore) this.typePathMemo.set(type, paths);
     return paths;
   }
 
@@ -1475,26 +1509,37 @@ export class ProvenanceScan {
     const place = this.parameterPlace(node);
     if (!place) return undefined;
     const { fn, at } = place;
-    const contextual =
+    // The contracts it is handed to: a function expression's own context,
+    // or the context of every place a named function is handed on by name.
+    const contexts =
       ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)
-        ? this.checker.getContextualType(fn)
-        : undefined;
-    const signature =
-      contextual === undefined
-        ? undefined
-        : this.checker.getNonNullableType(contextual).getCallSignatures()[0];
-    if (signature) {
-      const parameter = signature.parameters[at];
-      if (!parameter) return 'open';
+        ? [this.checker.getContextualType(fn)]
+        : this.aliasesOf(fn).flatMap((alias) =>
+            (this.handedAt.get(alias) ?? []).map((handed) =>
+              this.checker.getContextualType(handed),
+            ),
+          );
+    const signatures = contexts.flatMap((contextual) => {
+      const signature =
+        contextual === undefined
+          ? undefined
+          : this.checker.getNonNullableType(contextual).getCallSignatures()[0];
+      return signature === undefined ? [] : [signature];
+    });
+    if (signatures.length > 0) {
       // The contract's type at each position the site writes `unknown`: a
       // callback typed as its contract instantiates it is open, wherever
       // the instantiation put `unknown`; one that writes `unknown` where
       // the contract has a type is refused with that type.
-      const typed = this.pathsOf(node).flatMap((path) =>
-        this.typesAlong(this.checker.getTypeOfSymbol(parameter), path).filter(
-          (each) => !this.absent(each) && !this.contractless(each),
-        ),
-      );
+      const typed = signatures.flatMap((signature) => {
+        const parameter = signature.parameters[at];
+        if (!parameter) return [];
+        return this.pathsOf(node).flatMap((path) =>
+          this.typesAlong(this.checker.getTypeOfSymbol(parameter), path).filter(
+            (each) => !this.absent(each) && !this.contractless(each),
+          ),
+        );
+      });
       return typed.length === 0
         ? 'open'
         : [...new Set(typed.map((each) => this.checker.typeToString(each)))]
@@ -2072,7 +2117,10 @@ export class ProvenanceScan {
         if (
           step.kind === 'member' &&
           !ts.isSpreadAssignment(member) &&
-          member.name?.getText() !== step.name
+          member.name !== undefined &&
+          // A computed key of no literal may be any member.
+          propertyName(member.name) !== undefined &&
+          propertyName(member.name) !== step.name
         ) {
           return [];
         }
@@ -2345,13 +2393,11 @@ export class ProvenanceScan {
       target.dotDotDotToken === undefined
     ) {
       const pattern = target.parent;
+      const key = propertyName(target.propertyName ?? target.name);
       const step: Step | undefined = ts.isObjectBindingPattern(pattern)
-        ? ts.isIdentifier(target.propertyName ?? target.name)
-          ? {
-              kind: 'member',
-              name: (target.propertyName ?? target.name).getText(),
-            }
-          : undefined
+        ? key === undefined
+          ? undefined
+          : { kind: 'member', name: key }
         : { kind: 'element', at: pattern.elements.indexOf(target) };
       if (step !== undefined) {
         return this.originsAt(target.parent.parent.initializer, [
@@ -2441,6 +2487,25 @@ export function sinkSlotReads(
   const declared = new Set<string>();
   for (const file of program.getSourceFiles()) {
     if (!own.has(fileKey(file.fileName))) continue;
+    /** Each member read at `node` that is a slot, read outside its reader. */
+    const noteReads = (
+      node: ts.Node,
+      members: readonly (ts.Symbol | undefined)[],
+    ): void => {
+      const reader = `${rel(file.fileName)}#${ownerOf(node)}`;
+      for (const member of members) {
+        for (const declaration of member?.declarations ?? []) {
+          const read = slotName(declaration);
+          if (
+            read !== undefined &&
+            slots.has(read) &&
+            slots.get(read) !== reader
+          ) {
+            reads.push({ where: lineOf(node), slot: read, reader });
+          }
+        }
+      }
+    };
     const visit = (node: ts.Node): void => {
       const slot = slotName(node);
       if (slot !== undefined && slots.has(slot)) declared.add(slot);
@@ -2453,20 +2518,40 @@ export function sinkSlotReads(
           node.parent.left === node
         )
       ) {
-        const symbol = checker.getSymbolAtLocation(
-          ts.isPropertyAccessExpression(node)
-            ? node.name
-            : node.argumentExpression,
-        );
-        for (const declaration of symbol?.declarations ?? []) {
-          const read = slotName(declaration);
-          const reader = `${rel(file.fileName)}#${ownerOf(node)}`;
-          if (
-            read !== undefined &&
-            slots.has(read) &&
-            slots.get(read) !== reader
-          ) {
-            reads.push({ where: lineOf(node), slot: read, reader });
+        // A read by a computed key reads every member its key may name: a
+        // literal's, each of a union of literals', any for another key.
+        const members = ts.isPropertyAccessExpression(node)
+          ? [checker.getSymbolAtLocation(node.name)]
+          : keyedMembers(
+              checker,
+              checker.getTypeAtLocation(node.expression),
+              checker.getTypeAtLocation(node.argumentExpression),
+            );
+        noteReads(node, members);
+      }
+      // An assignment destructuring (`({ json: value } = item)`).
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isObjectLiteralExpression(strip(node.left))
+      ) {
+        const pattern = strip(node.left);
+        const source = checker.getTypeAtLocation(node.right);
+        if (ts.isObjectLiteralExpression(pattern)) {
+          for (const element of pattern.properties) {
+            if (
+              !ts.isPropertyAssignment(element) &&
+              !ts.isShorthandPropertyAssignment(element)
+            ) {
+              continue;
+            }
+            const key = propertyName(element.name);
+            noteReads(
+              element,
+              key === undefined
+                ? checker.getPropertiesOfType(source)
+                : [checker.getPropertyOfType(source, key)],
+            );
           }
         }
       }
@@ -2476,25 +2561,41 @@ export function sinkSlotReads(
         ts.isObjectBindingPattern(node.parent) &&
         node.dotDotDotToken === undefined
       ) {
-        const key = (node.propertyName ?? node.name).getText();
-        const symbol = checker.getTypeAtLocation(node.parent).getProperty(key);
-        for (const declaration of symbol?.declarations ?? []) {
-          const read = slotName(declaration);
-          const reader = `${rel(file.fileName)}#${ownerOf(node)}`;
-          if (
-            read !== undefined &&
-            slots.has(read) &&
-            slots.get(read) !== reader
-          ) {
-            reads.push({ where: lineOf(node), slot: read, reader });
-          }
-        }
+        const key = propertyName(node.propertyName ?? node.name);
+        const source = checker.getTypeAtLocation(node.parent);
+        noteReads(
+          node,
+          key === undefined
+            ? checker.getPropertiesOfType(source)
+            : [source.getProperty(key)],
+        );
       }
       ts.forEachChild(node, visit);
     };
     visit(file);
   }
   return { reads, declared };
+}
+
+/**
+ * The members a computed key may read on a receiver: the member a literal
+ * key names, each a union of literals names, every member for any other key.
+ */
+function keyedMembers(
+  checker: ts.TypeChecker,
+  receiver: ts.Type,
+  key: ts.Type,
+): (ts.Symbol | undefined)[] {
+  const holders = checker.getNonNullableType(receiver);
+  const keys = key.isUnion() ? key.types : [key];
+  if (keys.every((each) => each.isStringLiteral() || each.isNumberLiteral())) {
+    return keys.flatMap((each) =>
+      each.isStringLiteral() || each.isNumberLiteral()
+        ? [checker.getPropertyOfType(holders, String(each.value))]
+        : [],
+    );
+  }
+  return checker.getPropertiesOfType(holders);
 }
 
 /** Every stray read of a sink slot in every production project, and the slots declared. */

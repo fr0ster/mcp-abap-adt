@@ -29,3 +29,16 @@ export function readBack(answer: Answer): boolean {
   const { json } = first;
   return first.json !== undefined && json !== null;
 }
+
+export function readByKey(answer: Answer, key: 'json' | 'type'): boolean {
+  const first = answer.content?.[0];
+  return first !== undefined && first[key] !== undefined;
+}
+
+export function readByAssignment(answer: Answer): boolean {
+  let value: unknown;
+  const first = answer.content?.[0];
+  if (first === undefined) return false;
+  ({ json: value } = first);
+  return value !== undefined;
+}

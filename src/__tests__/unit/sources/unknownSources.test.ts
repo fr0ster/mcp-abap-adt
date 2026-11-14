@@ -183,6 +183,9 @@ describe('the unknown audit refuses a value the repository has a type for', () =
       [
         ['sinkSlot.ts:29', 'ContentItem.json', `${fixture}#readBack`],
         ['sinkSlot.ts:30', 'ContentItem.json', `${fixture}#readBack`],
+        // By a computed key, and by an assignment's destructuring.
+        ['sinkSlot.ts:35', 'ContentItem.json', `${fixture}#readByKey`],
+        ['sinkSlot.ts:42', 'ContentItem.json', `${fixture}#readByAssignment`],
       ],
     );
     assert.deepEqual([...found.declared], ['ContentItem.json']);
@@ -263,6 +266,35 @@ describe('the unknown audit refuses a value the repository has a type for', () =
     // with, not the reading as a whole.
     const held = site('positionFollowed', 'heldReading');
     assert.deepEqual([held.cls, held.refused], ['boundary', false]);
+  });
+
+  it('a member written by a quoted key is the member', () => {
+    for (const name of ["'raw-value'", 'held']) {
+      const found = site('quotedKey', name);
+      assert.deepEqual(
+        [found.cls, found.refused, found.types],
+        ['typed', true, ['number']],
+        name,
+      );
+    }
+  });
+
+  it('a named callback is judged by the contracts it is handed to', () => {
+    const named = site('namedCallback', 'namedValue');
+    assert.deepEqual(
+      [named.cls, named.refused, named.types],
+      ['callback', true, ['number']],
+    );
+    const revived = site('namedCallback', 'revived');
+    assert.deepEqual([revived.cls, revived.refused], ['callback', false]);
+  });
+
+  it('a position is read however deep it lies in a finite type', () => {
+    const boxed = site('deepBox', 'boxed');
+    assert.deepEqual(
+      [boxed.position, boxed.cls, boxed.refused, boxed.types],
+      ['.value.value.value.value.value.value.value', 'typed', true, ['number']],
+    );
   });
 
   it('a list read by key is read at its elements', () => {

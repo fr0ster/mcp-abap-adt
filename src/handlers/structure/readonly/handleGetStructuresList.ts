@@ -207,20 +207,8 @@ function namedInclude(
  * rather than relying on a caught exception for the ordinary "not this
  * endpoint, try the other one" case.
  */
-function extractSource(
-  result: IAdtResponse<unknown, IAdtError>,
-): string | null {
-  if (result.ok) {
-    const value = result.getResult().value;
-    if (value == null) return null;
-    if (typeof value === 'string') return value;
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-  return null;
+function extractSource(result: IAdtResponse<string, IAdtError>): string | null {
+  return result.ok ? result.getResult().value : null;
 }
 
 async function structuresListOf(
@@ -268,7 +256,7 @@ async function structuresListOf(
       let answered = 0; // endpoints that answered 404 (or nothing to read)
       const attempt = async (
         step: 'read structure' | 'read table',
-        read: () => Promise<IAdtResponse<unknown, IAdtError>>,
+        read: () => Promise<IAdtResponse<string, IAdtError>>,
       ): Promise<string | null> => {
         try {
           const answer = await read();
@@ -537,7 +525,7 @@ function attemptOf(
 }
 
 /** What a DDL read answered. */
-type DdlAnswer = IAdtResponse<unknown, IAdtError>;
+type DdlAnswer = IAdtResponse<string, IAdtError>;
 
 /** One name's DDL attempts so far: the failures recorded, the `404`s counted. */
 interface AttemptState {

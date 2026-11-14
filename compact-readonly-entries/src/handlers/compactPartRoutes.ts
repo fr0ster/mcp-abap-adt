@@ -19,8 +19,8 @@ import {
   type CompactObjectType,
   dispatchCompact,
   HANDLER_GET_DRAFT_TYPES,
+  isArgList,
   isJsonObject,
-  isList,
   type JsonValue,
   jsonAt,
   jsonOf,
@@ -140,7 +140,7 @@ async function packageContentsLines(
       : 100;
   const parsed = jsonOf(text);
   if (!Array.isArray(parsed)) return answered;
-  const listed = isList(args.package_names)
+  const listed = isArgList(args.package_names)
     ? JSON.stringify(
         parsed.map((entry) => {
           const objects = jsonAt(entry, 'objects');

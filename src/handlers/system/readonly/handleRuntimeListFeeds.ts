@@ -523,8 +523,7 @@ export function roundConnection(
   connection: HandlerContext['connection'],
   ask: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): HandlerContext['connection'] {
-  // `getSessionType` beside the contract: a connection the server builds
-  // has it, and a reader asks for it (`hasMethod`).
+  // `getSessionType`, optional in the contract: this view states its session.
   const view: HandlerContext['connection'] & {
     getSessionType(): 'stateful' | 'stateless';
   } = {

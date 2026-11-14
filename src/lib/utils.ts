@@ -19,7 +19,6 @@ import { XMLParser } from 'fast-xml-parser';
 import { answerFailure, type McpResult } from './answer';
 import { answerRead, type FailureAnswer } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
-import { hasMethod } from './capability';
 import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,

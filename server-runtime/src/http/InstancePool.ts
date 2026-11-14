@@ -120,7 +120,7 @@ interface Held<T> {
   /** The handle the index files this entry under; follows rotation. */
   handle: string;
   /** The lease: requests on this instance queue here. */
-  tail: Promise<unknown>;
+  tail: Promise<void>;
   unsubscribe: () => void;
 }
 
@@ -275,7 +275,10 @@ export class InstancePool<T extends Poolable> {
           ? Promise.reject(new StateUnavailableError())
           : this.run(create(), work),
     );
-    entry.tail = turn.catch(() => undefined);
+    entry.tail = turn.then(
+      () => undefined,
+      () => undefined,
+    );
     return turn;
   }
 

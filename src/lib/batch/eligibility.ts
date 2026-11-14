@@ -17,9 +17,9 @@
  */
 
 import * as path from 'node:path';
-import type { ToolArgs } from '../handlers/interfaces.js';
+import type { ToolArgs, ToolArgValue } from '../handlers/interfaces.js';
 import { type JsonValue, jsonAt, jsonOf } from '../json';
-import { child, isList } from '../outsideValue';
+import { argMember, isArgList } from '../toolArgValue';
 
 /**
  * One condition on a named argument; an entry's `when` holds when all of them
@@ -189,7 +189,7 @@ export function absentReadsAs(
 }
 
 /** An argument's value as the rules compare it: a string or boolean, upper-cased. */
-function compared(value: unknown): string | undefined {
+function compared(value: ToolArgValue): string | undefined {
   if (typeof value === 'string' || typeof value === 'boolean') {
     return String(value).toUpperCase();
   }
@@ -202,9 +202,9 @@ function compared(value: unknown): string | undefined {
  * list only when it holds an entry (`HandlerActivate`'s `objects: []` is its
  * single form).
  */
-function statedArgument(args: ToolArgs, name: string): unknown {
+function statedArgument(args: ToolArgs, name: string): ToolArgValue {
   const given = args[name];
-  return isList(given) && given.length === 0 ? undefined : given;
+  return isArgList(given) && given.length === 0 ? undefined : given;
 }
 
 const among = (value: string | undefined, values: string[]) =>
@@ -240,10 +240,10 @@ export function whenHolds(
     }
     if (rule.field !== undefined) {
       const field = rule.field;
-      const members = isList(given) ? given : [];
+      const members = isArgList(given) ? given : [];
       if (
         !members.every((member) =>
-          valueHolds(rule, compared(child(member, field))),
+          valueHolds(rule, compared(argMember(member, field))),
         )
       ) {
         return false;

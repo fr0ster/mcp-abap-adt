@@ -36,8 +36,10 @@ import {
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { child } from '../../../lib/outsideValue';
+import type {
+  HandlerContext,
+  ToolArgValue,
+} from '../../../lib/handlers/interfaces';
 import {
   clearableText,
   givenCount,
@@ -82,7 +84,7 @@ type UpdateDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * clearing the conversion exit and the value table, the fixed values a list
  * (each `low` and `text` written out); a value of no such kind is left out.
  */
-function domainChangesOf(properties: unknown): DomainChanges {
+function domainChangesOf(properties: ToolArgValue): DomainChanges {
   const fixedValues = givenElements(properties, 'fixed_values');
   return {
     description: givenText(properties, 'description'),
@@ -94,8 +96,8 @@ function domainChangesOf(properties: unknown): DomainChanges {
     lowercase: givenFlag(properties, 'lowercase'),
     value_table: clearableText(properties, 'value_table'),
     fixed_values: fixedValues?.map((fixed) => ({
-      low: String(child(fixed, 'low')),
-      text: String(child(fixed, 'text')),
+      low: String(fixed.low),
+      text: String(fixed.text),
     })),
   };
 }

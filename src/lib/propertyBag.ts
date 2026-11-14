@@ -1,21 +1,23 @@
 /**
  * Reading a free-form `properties` argument — a low-level update's bag of
  * changes, the model's own object, from outside the type system — member by
- * member, as the patch it feeds writes each one.
+ * member, as the patch it feeds writes each one: tool-argument input
+ * (`ToolArgValue`) until each reader checks it.
  */
-import { child, type Element, isElement, isList } from './outsideValue';
+import type { ToolArgs, ToolArgValue } from './handlers/interfaces';
+import { argMember, isArgList, isArgObject } from './toolArgValue';
 
 /** The first of `names` the bag carries (neither `undefined` nor `null`), as given. */
-export function given(bag: unknown, ...names: string[]): unknown {
+export function given(bag: ToolArgValue, ...names: string[]): ToolArgValue {
   for (const name of names) {
-    const value = child(bag, name);
+    const value = argMember(bag, name);
     if (value !== undefined && value !== null) return value;
   }
   return undefined;
 }
 
 /** A scalar written out: a string as it is, a number or a boolean as text; else none. */
-export function scalarText(value: unknown): string | undefined {
+export function scalarText(value: ToolArgValue): string | undefined {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
@@ -25,7 +27,7 @@ export function scalarText(value: unknown): string | undefined {
 
 /** The first of `names` the bag carries, as text ({@link scalarText}). */
 export function givenText(
-  bag: unknown,
+  bag: ToolArgValue,
   ...names: string[]
 ): string | undefined {
   return scalarText(given(bag, ...names));
@@ -46,7 +48,7 @@ function isDigits(text: string): boolean {
  * for anything else.
  */
 export function givenCount(
-  bag: unknown,
+  bag: ToolArgValue,
   ...names: string[]
 ): number | undefined {
   const value = given(bag, ...names);
@@ -62,7 +64,7 @@ export function givenCount(
  * none for anything else.
  */
 export function givenFlag(
-  bag: unknown,
+  bag: ToolArgValue,
   ...names: string[]
 ): boolean | undefined {
   const value = given(bag, ...names);
@@ -78,8 +80,11 @@ export function givenFlag(
  * The member `name` of the bag where `null` is a value of its own — "clear
  * it": `''` for `null`, text for a scalar, none when absent or not a scalar.
  */
-export function clearableText(bag: unknown, name: string): string | undefined {
-  const value = child(bag, name);
+export function clearableText(
+  bag: ToolArgValue,
+  name: string,
+): string | undefined {
+  const value = argMember(bag, name);
   return value === null ? '' : scalarText(value);
 }
 
@@ -88,10 +93,10 @@ export function clearableText(bag: unknown, name: string): string | undefined {
  * not a list (`null` included); `undefined` when absent.
  */
 export function givenElements(
-  bag: unknown,
+  bag: ToolArgValue,
   name: string,
-): Element[] | undefined {
-  const value = child(bag, name);
+): ToolArgs[] | undefined {
+  const value = argMember(bag, name);
   if (value === undefined) return undefined;
-  return isList(value) ? value.filter(isElement) : [];
+  return isArgList(value) ? value.filter(isArgObject) : [];
 }

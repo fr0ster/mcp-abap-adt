@@ -40,7 +40,10 @@ import {
   messageCarriedBy,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type {
+  HandlerContext,
+  ToolArgValue,
+} from '../../../lib/handlers/interfaces';
 import { givenCount, givenText } from '../../../lib/propertyBag';
 import {
   type DataElementChanges,
@@ -96,7 +99,7 @@ function typeKindOf(text: string): DataElementTypeKind | undefined {
  * kind is read apart (`typeKindOf`): one SAP does not know is refused.
  */
 function changesOf(
-  properties: unknown,
+  properties: ToolArgValue,
   typeKind: DataElementTypeKind | undefined,
 ): DataElementChanges {
   return {

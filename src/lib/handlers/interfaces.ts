@@ -62,6 +62,14 @@ export interface VariantToolDefinition {
 export type ToolArgs = Readonly<Record<string, unknown>>;
 
 /**
+ * A value read out of a tool's arguments and not yet checked — a member, a
+ * nested object's member, a list's element: tool-argument input until its
+ * reader checks it (`docs/development/CODE_GATES.md`). Where a tool's schema describes
+ * the field, its reader takes the schema's output type instead.
+ */
+export type ToolArgValue = ToolArgs[string];
+
+/**
  * Handler registration entry: the tool's definition and how one of its calls
  * runs, given the call's context and its arguments. Every registration path
  * passes the call's context at the call.

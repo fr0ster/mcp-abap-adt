@@ -10,10 +10,10 @@ import {
   acceptedOf,
   EMPTIED_INCLUDE_TYPES,
 } from '@mcp-abap-adt/lib/compact-shared';
-import type { ToolArgs } from '@mcp-abap-adt/lib/handlers';
+import type { ToolArgs, ToolArgValue } from '@mcp-abap-adt/lib/handlers';
 
 /** A non-blank string, trimmed, as the handlers read it. */
-const text = (value: unknown): string | undefined =>
+const text = (value: ToolArgValue): string | undefined =>
   typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 
 /** `HandlerUnlock`: its handle, except a service binding's empty one (nothing to unlock). */

@@ -1,4 +1,4 @@
-import { isElement, isList } from './outsideValue';
+import { isJsonObject, parseJson } from './json';
 
 type McpResponse = {
   isError: boolean;
@@ -16,16 +16,16 @@ export function normalizeCheckResponse(
 ): McpResponse {
   if (result.isError) return result;
 
-  let data: unknown;
-  try {
-    data = JSON.parse(result.content[0].text);
-  } catch {
-    return result;
-  }
+  // The text read as JSON: an answer that is none is passed through as it is.
+  const first = result.content[0];
+  const data = first === undefined ? undefined : parseJson(first.text);
+  if (data === undefined) return result;
   // A list takes no field and is written again as it is; any other value
   // that is not an object is answered unchanged.
-  if (!isElement(data) && !isList(data)) return result;
-  const named = isElement(data) ? { ...data, object_name: objectName } : data;
+  if (!isJsonObject(data) && !Array.isArray(data)) return result;
+  const named = isJsonObject(data)
+    ? { ...data, object_name: objectName }
+    : data;
   return {
     isError: false,
     content: [{ type: 'text', text: JSON.stringify(named, null, 2) }],

@@ -41,7 +41,7 @@ import {
   stateIdleMinutesOf,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
-import { child } from '@mcp-abap-adt/lib/utils';
+import { jsonAt, jsonOf } from '@mcp-abap-adt/lib/utils';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -560,8 +560,8 @@ export class SseServer {
       (typeof header === 'string' ? header : undefined) ||
       '';
 
-    const body: unknown = req.body;
-    const isPing = child(body, 'method') === 'ping';
+    // express.json()'s parse, checked once as JSON: typed from here on.
+    const isPing = jsonAt(jsonOf(req.body), 'method') === 'ping';
 
     if (!isPing) {
       console.error(

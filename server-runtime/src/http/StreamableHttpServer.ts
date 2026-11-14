@@ -41,7 +41,7 @@ import {
   StateUnavailableError,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
-import { child, childAt } from '@mcp-abap-adt/lib/utils';
+import { type JsonValue, jsonAt, jsonOf } from '@mcp-abap-adt/lib/utils';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -150,15 +150,16 @@ interface PerRequestServerApi extends Poolable {
 }
 
 /** Whether a request body is, or holds, a `tools/call`: a JSON-RPC batch counts by its elements. */
-function carriesToolCall(body: unknown): boolean {
-  const isCall = (m: unknown) => child(m, 'method') === 'tools/call';
+function carriesToolCall(body: JsonValue | undefined): boolean {
+  const isCall = (m: JsonValue | undefined) =>
+    jsonAt(m, 'method') === 'tools/call';
   return Array.isArray(body) ? body.some(isCall) : isCall(body);
 }
 
 /** The tool error a request of the body is answered: its own `id`, as the client sent it. */
 interface NotAvailableAnswer {
   readonly jsonrpc: '2.0';
-  readonly id: unknown;
+  readonly id: JsonValue;
   readonly result: {
     readonly content: readonly {
       readonly type: 'text';
@@ -170,10 +171,12 @@ interface NotAvailableAnswer {
 
 /** One tool error per request (an element with an id), in the body's shape; none: nothing to answer. */
 function notAvailableAnswers(
-  body: unknown,
+  body: JsonValue | undefined,
 ): NotAvailableAnswer | NotAvailableAnswer[] | undefined {
-  const answerOf = (m: unknown): NotAvailableAnswer | undefined => {
-    const id = child(m, 'id');
+  const answerOf = (
+    m: JsonValue | undefined,
+  ): NotAvailableAnswer | undefined => {
+    const id = jsonAt(m, 'id');
     return id === undefined
       ? undefined
       : {
@@ -279,11 +282,12 @@ export class StreamableHttpServer extends BaseMcpServer {
   ) => Promise<void> {
     return async (req: Request, res: Response) => {
       const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
-      const body: unknown = req.body;
-      const method = child(body, 'method');
+      // express.json()'s parse, checked once as JSON: typed from here on.
+      const body = jsonOf(req.body);
+      const method = jsonAt(body, 'method');
       const mcpMethod = typeof method === 'string' ? method : undefined;
-      const mcpId = child(body, 'id');
-      const name = childAt(body, 'params', 'name');
+      const mcpId = jsonAt(body, 'id');
+      const name = jsonAt(body, 'params', 'name');
       const toolName =
         mcpMethod === 'tools/call' && typeof name === 'string'
           ? name
@@ -309,7 +313,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         // `tools/call` argument. A bearer value: never logged.
         let handle: string | undefined;
         try {
-          handle = handleFrom(req.headers, req.body);
+          handle = handleFrom(req.headers, body);
         } catch (err) {
           if (err instanceof BatchWithHandleError) {
             res.status(400).send(BATCH_WITH_HANDLE_WORDS);
@@ -325,7 +329,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
 
         await this.pool.serve(
-          { handle, refuseUnknown: carriesToolCall(req.body) },
+          { handle, refuseUnknown: carriesToolCall(body) },
           () => this.createPerRequestServer(),
           async (server) => {
             // A client that left while this request waited for the lease gets nothing.
@@ -392,7 +396,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         // tool's — no instance was made, nothing logged on.
         if (err instanceof StateUnavailableError) {
           if (!res.headersSent) {
-            const answered = notAvailableAnswers(req.body);
+            const answered = notAvailableAnswers(body);
             if (answered === undefined) res.status(202).end();
             else res.status(200).json(answered);
           }

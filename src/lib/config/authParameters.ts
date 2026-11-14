@@ -20,7 +20,7 @@
  * Plain code over the arguments, no regular expression.
  */
 
-import { isJsonObject, type JsonValue } from '../json';
+import { type JsonValue, jsonAt } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
@@ -154,12 +154,7 @@ function yamlAt(
   dotted: string | undefined,
 ): JsonValue | undefined {
   if (!yaml || dotted === undefined) return undefined;
-  let node: JsonValue | undefined = yaml;
-  for (const segment of dotted.split('.')) {
-    if (node === undefined || !isJsonObject(node)) return undefined;
-    node = node[segment];
-  }
-  return node;
+  return jsonAt(yaml, ...dotted.split('.'));
 }
 
 /**

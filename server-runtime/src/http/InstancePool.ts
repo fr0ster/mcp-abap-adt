@@ -31,7 +31,7 @@ import {
   type InstanceState,
   StateUnavailableError,
 } from '@mcp-abap-adt/lib/state';
-import { child, childAt } from '@mcp-abap-adt/lib/utils';
+import { type JsonValue, jsonAt } from '@mcp-abap-adt/lib/utils';
 
 export interface Poolable {
   readonly state: InstanceState;
@@ -81,10 +81,10 @@ export class PoolClosedError extends Error {
 }
 
 /** The `state_handle` of a single `tools/call`; a batch carrying one is refused. */
-export function handleOf(body: unknown): string | undefined {
-  const one = (m: unknown): string | undefined => {
-    const handle = childAt(m, 'params', 'arguments', 'state_handle');
-    return child(m, 'method') === 'tools/call' && typeof handle === 'string'
+export function handleOf(body: JsonValue | undefined): string | undefined {
+  const one = (m: JsonValue | undefined): string | undefined => {
+    const handle = jsonAt(m, 'params', 'arguments', 'state_handle');
+    return jsonAt(m, 'method') === 'tools/call' && typeof handle === 'string'
       ? handle
       : undefined;
   };
@@ -108,7 +108,7 @@ export const STATE_HANDLE_HEADER = 'x-mcp-state-handle';
  */
 export function handleFrom(
   headers: IncomingHttpHeaders,
-  body: unknown,
+  body: JsonValue | undefined,
 ): string | undefined {
   const argument = handleOf(body);
   const header = headers[STATE_HANDLE_HEADER];

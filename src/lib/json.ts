@@ -23,6 +23,23 @@ export function isJsonObject(value: JsonValue): value is JsonObject {
 }
 
 /**
+ * The member at `path` under a JSON value: at each step an object's own
+ * member (never one it inherits), else `undefined`.
+ */
+export function jsonAt(
+  value: JsonValue | undefined,
+  ...path: readonly string[]
+): JsonValue | undefined {
+  let node = value;
+  for (const name of path) {
+    if (node === undefined || !isJsonObject(node) || !Object.hasOwn(node, name))
+      return undefined;
+    node = node[name];
+  }
+  return node;
+}
+
+/**
  * `value` as a JSON value, built afresh from what it holds, or `undefined`
  * when it, or anything it holds, is not one: plain code over a parser's
  * output, the one check its values pass.

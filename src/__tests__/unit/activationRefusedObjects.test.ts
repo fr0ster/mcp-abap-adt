@@ -124,6 +124,7 @@ describe("a message's object is the run's object its href points into", () => {
     ['the uri itself', BROKEN_URI, BROKEN],
     ['a part under it', `${BROKEN_URI}/source/main`, BROKEN],
     ['a position in it', `${BROKEN_URI}#start=1,1`, BROKEN],
+    ['a query on it', `${BROKEN_URI}?version=inactive`, BROKEN],
     ['a part with a position', `${BROKEN_URI}/source/main#start=7,4`, BROKEN],
   ] as const)('%s', (_case, href, name) => {
     expect(runObjectOf(href, REFERENCES)?.name).toBe(name);

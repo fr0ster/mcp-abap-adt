@@ -107,8 +107,8 @@ function comparablePath(path: string): string {
 
 /**
  * The object of the run a message's `href` points into: the reference whose
- * uri is the href itself, or its prefix followed by `/` or `#` (a source part,
- * a position) — the longest such uri, so a part addressed under its owner
+ * uri is the href itself, or its prefix followed by `/`, `#` or `?` (a
+ * source part, a position, a query) — the longest such uri, so a part addressed under its owner
  * goes to the part. Both compared as `comparablePath` reads them. `undefined`
  * for an empty href, or one inside none of them. Plain string comparison.
  */
@@ -124,7 +124,9 @@ export function runObjectOf(
     const uri = comparablePath(reference.uri);
     if (uri === '' || !seen.startsWith(uri)) continue;
     const next = seen.charAt(uri.length);
-    if (next !== '' && next !== '/' && next !== '#') continue;
+    if (next !== '' && next !== '/' && next !== '#' && next !== '?') {
+      continue;
+    }
     if (found === undefined || uri.length > foundLength) {
       found = reference;
       foundLength = uri.length;

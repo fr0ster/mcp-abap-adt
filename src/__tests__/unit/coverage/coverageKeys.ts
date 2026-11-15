@@ -266,6 +266,10 @@ export const SENDS_NOTHING: ReadonlySet<CoverageKey> = new Set([
   // The breakpoints the session armed, as it holds them: nothing is read
   // from SAP (`DebugSession.listBreakpoints`).
   'DebugListBreakpoints',
+  // The leftover sessions this server's destination left, read from the
+  // runtime files: nothing is asked of SAP (`BaseMcpServer.leftoverCaller`).
+  'ListLeftoverSessions',
+  'HandlerLeftoverSessionList',
 ]);
 
 /**

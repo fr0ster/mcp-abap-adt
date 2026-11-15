@@ -582,6 +582,20 @@
       "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
     }
   },
+  "HandlerLeftoverSessionList": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "HandlerLeftoverSessionLogoff": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
   "HandlerUnitTestResult": {
     "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
     "live": {
@@ -594,6 +608,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "ListLeftoverSessions": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "LogoffLeftoverSession": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
     }
   },
   "MemorySnapshotDelta": {

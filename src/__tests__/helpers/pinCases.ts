@@ -43,6 +43,7 @@ import {
   isLogoff,
   type StandInHold,
   type StandInRequest,
+  type StandInResponse,
 } from './adtStandIn';
 import { holdingLockOf } from './heldLocks';
 import type { PinnedRequest } from './pinnedRequest';
@@ -93,6 +94,46 @@ export interface Binding {
   field: string;
 }
 
+/**
+ * One request an opted-in case answers by what it is (`matched`), not by the
+ * index it arrives at: its method and path (the target up to `?`), and a
+ * fragment of its body only where those do not tell two requests apart.
+ */
+export interface MatchedRequest {
+  method: string;
+  path: string;
+  bodyIncludes?: string;
+  /**
+   * How many times the case sends it, from the server's logon to its close;
+   * when not stated, the `answers` given (and one more held, with `hold`),
+   * else 1.
+   */
+  times?: number;
+  /** SAP's answer to every arrival; the stand-in's own when absent. */
+  answer?: MatchedAnswer;
+  /** SAP's answers, one per arrival in turn (a read whose answers follow one another). */
+  answers?: readonly MatchedAnswer[];
+  /** Held unanswered until the case closes: every arrival after `answers` (an event read SAP keeps open). */
+  hold?: true;
+}
+
+/**
+ * An answer, or one built from the request it answers — given at once, or
+ * later (a read SAP holds until something it waits for has come).
+ */
+export type MatchedAnswer =
+  | StandInResponse
+  | ((request: StandInRequest) => StandInResponse | Promise<StandInResponse>);
+
+/** How many times a matcher's request is sent. */
+function timesOf(matcher: MatchedRequest): number {
+  if (matcher.times !== undefined) return matcher.times;
+  if (matcher.answers !== undefined) {
+    return matcher.answers.length + (matcher.hold === true ? 1 : 0);
+  }
+  return 1;
+}
+
 export interface PinCase {
   tool: string;
   variant: SystemKind;
@@ -101,6 +142,17 @@ export interface PinCase {
   args: ToolArgs;
   bind?: Readonly<Record<string, Binding>>;
   answers?: ReadonlyArray<Partial<IAdtWireResponse> | undefined>;
+  /**
+   * Opt-in, for a case whose code sends requests concurrently (a session
+   * that keeps an event read open beside its commands), so their arrival
+   * order is not the code's: every request the stand-in receives, from the
+   * server's logon to its close, is answered by the one matcher it fits —
+   * a request no matcher fits, one two matchers fit, or a matcher sent other
+   * than its `times` fails the case — and the case's window is compared
+   * sorted by method, URL and body, its order not asserted. Not with
+   * `answers`, and not on the `recording` stand.
+   */
+  matched?: readonly MatchedRequest[];
   before?: ReadonlyArray<{
     tool: string;
     args: ToolArgs;
@@ -384,6 +436,129 @@ export interface Recording {
   thrown: unknown;
 }
 
+/** Whether `request` is one `matcher` names. */
+function fits(matcher: MatchedRequest, request: StandInRequest): boolean {
+  const query = request.url.indexOf('?');
+  const target = query < 0 ? request.url : request.url.slice(0, query);
+  return (
+    request.method === matcher.method &&
+    target === matcher.path &&
+    (matcher.bodyIncludes === undefined ||
+      request.body.includes(matcher.bodyIncludes))
+  );
+}
+
+/**
+ * The stand-in answers or holds each request by the matcher it fits
+ * (`matched`); a request no matcher fits is answered as ever, and refused
+ * afterwards by `matchProblems`.
+ */
+function answerByMatch(
+  stand: AdtStandIn,
+  matched: readonly MatchedRequest[],
+): Held[] {
+  const holds: Held[] = [];
+  for (const matcher of matched) {
+    // The request's place among those this matcher fits, from 0.
+    const ordinal = (request: StandInRequest) =>
+      stand.requests.filter((each) => fits(matcher, each)).indexOf(request);
+    const answers = matcher.answers ?? [];
+    if (matcher.hold === true) {
+      const held = timesOf(matcher) - answers.length;
+      for (let at = 0; at < held; at += 1) {
+        // Every arrival after the answers given; released only as the case
+        // closes (`releaseHolds`).
+        const hold = stand.hold(
+          (request) =>
+            fits(matcher, request) && ordinal(request) >= answers.length,
+        );
+        let came = false;
+        hold.arrived.then(() => {
+          came = true;
+        });
+        holds.push({ hold, came: () => came });
+      }
+    }
+    const { answer } = matcher;
+    if (answer !== undefined || answers.length > 0) {
+      stand.respond(
+        (request) =>
+          fits(matcher, request) &&
+          (answer !== undefined || ordinal(request) < answers.length),
+        (request) => {
+          const given = answer ?? answers[ordinal(request)];
+          if (given === undefined) throw new Error('no answer to give');
+          return typeof given === 'function' ? given(request) : given;
+        },
+      );
+    }
+  }
+  return holds;
+}
+
+/** A held request, and whether it has arrived. */
+interface Held {
+  hold: StandInHold;
+  came(): boolean;
+}
+
+/**
+ * Releases every held request and waits until the answer of each that
+ * arrived was written whole, before anything else of the case closes: a
+ * held read is answered while its connection is still open, so nothing of
+ * it outlives the case.
+ */
+async function releaseHolds(holds: readonly Held[]): Promise<void> {
+  for (const { hold } of holds) hold.release();
+  await Promise.all(
+    holds.filter((each) => each.came()).map((each) => each.hold.answered),
+  );
+}
+
+/**
+ * What the requests a matched case's stand-in received break: a request no
+ * matcher fits or two fit, and a matcher sent other than its `times`.
+ */
+export function matchProblems(
+  matched: readonly MatchedRequest[],
+  requests: readonly StandInRequest[],
+): string[] {
+  const problems: string[] = [];
+  const counts = matched.map(() => 0);
+  for (const request of requests) {
+    const which = matched.flatMap((matcher, at) =>
+      fits(matcher, request) ? [at] : [],
+    );
+    const [only] = which;
+    if (only === undefined) {
+      problems.push(`no matcher fits ${request.method} ${request.url}`);
+    } else if (which.length > 1) {
+      problems.push(
+        `${which.length} matchers fit ${request.method} ${request.url}`,
+      );
+    } else {
+      counts[only] = (counts[only] ?? 0) + 1;
+    }
+  }
+  for (const [at, matcher] of matched.entries()) {
+    const sent = counts[at] ?? 0;
+    if (sent !== timesOf(matcher)) {
+      problems.push(
+        `${matcher.method} ${matcher.path} was sent ${sent} time(s), not ${timesOf(matcher)}`,
+      );
+    }
+  }
+  return problems;
+}
+
+/** A matched case's window, in a deterministic form: by method, URL and body. */
+function sortedRequests(requests: PinnedRequest[]): PinnedRequest[] {
+  const key = (r: PinnedRequest) => `${r.method} ${r.url} ${r.body ?? ''}`;
+  return [...requests].sort((a, b) =>
+    key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0,
+  );
+}
+
 /** The stand-in answers `answers[i]` to its i-th request, where one is given. */
 function answerByIndex(stand: AdtStandIn, answers: PinCase['answers']): void {
   if (answers === undefined) return;
@@ -449,8 +624,17 @@ export async function recordCase(
   c: PinCase,
   options: PinOptions = {},
 ): Promise<Recording> {
+  if (c.matched !== undefined && c.answers !== undefined) {
+    throw new Error('a case answers by matched or by answers, not both');
+  }
+  if (c.matched !== undefined && c.stand === 'recording') {
+    throw new Error("matched needs a stand-in: stand 'adtStandIn' or 'server'");
+  }
   const restore = installPinFakes(`${keyOf(c.tool, c.args)} ${c.variant}`);
   const closing: Array<() => Promise<void>> = [];
+  // A matched case's stand-in, checked once it has closed, and its holds.
+  let matchedStand: AdtStandIn | undefined;
+  let held: readonly Held[] = [];
   try {
     if (c.stand === 'recording') {
       if (c.settle !== undefined) {
@@ -492,6 +676,12 @@ export async function recordCase(
       withPinHost(toPinned(request), standHost);
     closing.push(() => stand.close());
     answerByIndex(stand, c.answers);
+    if (c.matched !== undefined) {
+      held = answerByMatch(stand, c.matched);
+      matchedStand = stand;
+    }
+    const inOrder = (requests: PinnedRequest[]) =>
+      c.matched === undefined ? requests : sortedRequests(requests);
     let call: (tool: string, args: ToolArgs) => Promise<McpResult>;
     // What the case waits for before its own call (`settle`).
     let between: (() => Promise<void>) | undefined;
@@ -551,18 +741,27 @@ export async function recordCase(
         between,
       );
       if (own.logoff !== undefined) await own.logoff;
-      const requests = stand.requests.slice(mark.from).map(pinned);
+      const requests = inOrder(stand.requests.slice(mark.from).map(pinned));
       return { requests, answer, thrown: undefined };
     } catch (thrown) {
       return {
-        requests: stand.requests.slice(mark.from).map(pinned),
+        requests: inOrder(stand.requests.slice(mark.from).map(pinned)),
         answer: undefined,
         thrown,
       };
     }
   } finally {
+    // First of everything that closes: the held reads answered.
+    await releaseHolds(held);
     for (const close of closing) await close();
     restore();
+    if (matchedStand !== undefined && c.matched !== undefined) {
+      const problems = matchProblems(c.matched, matchedStand.requests);
+      if (problems.length > 0) {
+        // biome-ignore lint/correctness/noUnsafeFinally: the stand-in's whole request list is known only once it closed
+        throw new Error(`the matched requests: ${problems.join('; ')}`);
+      }
+    }
   }
 }
 

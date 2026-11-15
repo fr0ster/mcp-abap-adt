@@ -80,7 +80,9 @@ export interface AdtStandIn {
    */
   respond(
     match: (request: StandInRequest) => boolean,
-    respond: (request: StandInRequest) => StandInResponse,
+    respond: (
+      request: StandInRequest,
+    ) => StandInResponse | Promise<StandInResponse>,
   ): void;
   /** The next request `match` accepts is answered `status`, once. */
   answerOnce(match: (request: StandInRequest) => boolean, status: number): void;
@@ -131,6 +133,8 @@ export interface StandInHold {
   arrived: Promise<void>;
   /** Answers the held request (and any held later, if it has not come yet). */
   release(): void;
+  /** Resolves once the held request's answer was written whole (after `release`). */
+  answered: Promise<void>;
 }
 
 export const PROBE_PATH = '/sap/bc/adt/probe/';
@@ -187,12 +191,15 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     match: (request: StandInRequest) => boolean;
     taken: boolean;
     arrive: () => void;
+    answer: () => void;
     released: Promise<void>;
     release: () => void;
   }> = [];
   const responders: Array<{
     match: (request: StandInRequest) => boolean;
-    respond: (request: StandInRequest) => StandInResponse;
+    respond: (
+      request: StandInRequest,
+    ) => StandInResponse | Promise<StandInResponse>;
   }> = [];
   const bodies: Array<{
     match: (request: StandInRequest) => boolean;
@@ -235,7 +242,10 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', async () => {
       request.body = Buffer.concat(chunks).toString('utf8');
-      if (hold) await hold.released;
+      if (hold) {
+        await hold.released;
+        res.once('finish', hold.answer);
+      }
       if (refusing) {
         res.writeHead(401, { 'content-type': 'text/plain' });
         res.end('');
@@ -243,7 +253,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       }
       const responder = responders.find((r) => r.match(request));
       if (responder) {
-        const answered = responder.respond(request);
+        // A responder may answer later (a read SAP holds until an event).
+        const answered = await responder.respond(request);
         res.writeHead(answered.status, {
           'content-type': 'text/plain',
           ...answered.headers,
@@ -338,8 +349,12 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       const released = new Promise<void>((resolve) => {
         release = resolve;
       });
-      holds.push({ match, taken: false, arrive, released, release });
-      return { arrived, release };
+      let answer!: () => void;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      holds.push({ match, taken: false, arrive, answer, released, release });
+      return { arrived, release, answered };
     },
     answer: (match, status, text) => {
       answers.push({ match, status, ...(text !== undefined && { text }) });

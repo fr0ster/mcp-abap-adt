@@ -23,6 +23,7 @@ import {
 } from '../../helpers/adtStandIn';
 import {
   installPinFakes,
+  type MatchedRequest,
   PIN_STAND_HOST,
   type PinCase,
   recordCase,
@@ -519,5 +520,134 @@ describe('no test server listens on a fixed port', () => {
   it('the ADT stand-in takes no port', () => {
     const arity: Parameters<typeof adtStandIn>['length'] = 0;
     expect(adtStandIn.length).toBe(arity);
+  });
+});
+
+describe('a matched case', () => {
+  /** What the stub's connection sends on its own: its logon and its logoff. */
+  const SESSION: MatchedRequest[] = [
+    { method: 'GET', path: '/sap/bc/adt/core/discovery' },
+    { method: 'GET', path: '/sap/public/bc/icf/logoff' },
+  ];
+
+  /** A stub that sends a GET to each of `paths`, one after another. */
+  const sender = (...paths: string[]) =>
+    stub('StubSends', async (context) => {
+      for (const url of paths) {
+        await context.connection.makeAdtRequest({
+          url,
+          method: 'GET',
+          timeout: 0,
+        });
+      }
+      return textAnswer('{}');
+    });
+
+  const sends = (matched: MatchedRequest[]): PinCase => ({
+    tool: 'StubSends',
+    variant: 'onprem',
+    stand: 'adtStandIn',
+    args: {},
+    matched,
+    expected: [],
+  });
+
+  it('answers by the matcher and compares the window sorted, whatever the order sent', async () => {
+    const tools = {
+      entries: entries(sender('/sap/bc/adt/b', '/sap/bc/adt/a')),
+    };
+    const c = sends([
+      ...SESSION,
+      {
+        method: 'GET',
+        path: '/sap/bc/adt/a',
+        answer: { status: 200, text: 'A' },
+      },
+      { method: 'GET', path: '/sap/bc/adt/b' },
+    ]);
+    const recorded = await recordCase(c, tools);
+    expect(recorded.requests.map((r) => r.url)).toEqual([
+      '/sap/bc/adt/a',
+      '/sap/bc/adt/b',
+    ]);
+    await expect(
+      runPinCase({ ...c, expected: recorded.requests }, tools),
+    ).resolves.toBeUndefined();
+  });
+
+  it('fails on a request no matcher fits', async () => {
+    const tools = { entries: entries(sender('/sap/bc/adt/a')) };
+    await expect(recordCase(sends([...SESSION]), tools)).rejects.toThrow(
+      'no matcher fits GET /sap/bc/adt/a',
+    );
+  });
+
+  it('fails on a request sent more often than its matcher states', async () => {
+    const tools = {
+      entries: entries(sender('/sap/bc/adt/a', '/sap/bc/adt/a')),
+    };
+    await expect(
+      recordCase(
+        sends([...SESSION, { method: 'GET', path: '/sap/bc/adt/a' }]),
+        tools,
+      ),
+    ).rejects.toThrow('GET /sap/bc/adt/a was sent 2 time(s), not 1');
+  });
+
+  it('a held request never answered has settled once the case returned', async () => {
+    let settled = false;
+    const tools = {
+      entries: entries(
+        stub('StubSends', async (context) => {
+          // Not awaited: a read SAP keeps open beside the call.
+          context.connection
+            .makeAdtRequest({
+              url: '/sap/bc/adt/held',
+              method: 'GET',
+              timeout: 0,
+            })
+            .then(
+              () => {
+                settled = true;
+              },
+              () => {
+                settled = true;
+              },
+            );
+          await context.connection.makeAdtRequest({
+            url: '/sap/bc/adt/a',
+            method: 'GET',
+            timeout: 0,
+          });
+          return textAnswer('{}');
+        }),
+      ),
+    };
+    const recorded = await recordCase(
+      sends([
+        ...SESSION,
+        { method: 'GET', path: '/sap/bc/adt/a' },
+        { method: 'GET', path: '/sap/bc/adt/held', hold: true },
+      ]),
+      tools,
+    );
+    expect(recorded.requests.map((r) => r.url)).toEqual([
+      '/sap/bc/adt/a',
+      '/sap/bc/adt/held',
+    ]);
+    // Settled by the stand-in's close, before the case returned: nothing
+    // of it outlives the case.
+    expect(settled).toBe(true);
+  });
+
+  it('is refused beside answers, and on the recording stand', async () => {
+    await expect(
+      recordCase({ ...sends([...SESSION]), answers: [] }),
+    ).rejects.toThrow('a case answers by matched or by answers, not both');
+    await expect(
+      recordCase({ ...sends([...SESSION]), stand: 'recording' }),
+    ).rejects.toThrow(
+      "matched needs a stand-in: stand 'adtStandIn' or 'server'",
+    );
   });
 });

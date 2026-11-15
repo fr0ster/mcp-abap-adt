@@ -42,6 +42,7 @@ import {
 } from '../helpers/live';
 import {
   member,
+  onPremise,
   onRequest,
   ownPackage,
   payloadOf,
@@ -143,6 +144,10 @@ async function unpublish(): Promise<void> {
     attempt('unpublish', answered.isError ? 'refused' : 'unpublished');
     if (!answered.isError) {
       state.published = false;
+      assert.equal(
+        member(payloadOf(answered), 'completion'),
+        onPremise() ? 'done' : 'background',
+      );
       break;
     }
     if (Date.now() - started >= UNPUBLISH_LIMIT_MS) {
@@ -275,21 +280,37 @@ liveSuite(['onprem', 'cloud'], 'Service bindings', () => {
     });
     state.published = true;
     state.publishedAt = Date.now();
-    assert.ok(
-      succeeded('UpdateServiceBinding published', published).text.includes(
-        'SUCCESS',
-      ),
+    // On premise SAP publishes inside the request; on the cloud system it
+    // starts a background job (see the head).
+    const answered = payloadOf(
+      succeeded('UpdateServiceBinding published', published),
     );
+    assert.equal(
+      member(answered, 'completion'),
+      onPremise() ? 'done' : 'background',
+    );
+    assert.equal(
+      member(answered, 'result'),
+      onPremise() ? 'SUCCESS' : 'STARTED',
+    );
+    assert.equal(member(answered, 'severity'), 'OK');
 
     // The publish has completed when the service answers (see the head).
     const located = await livePrepare('GetServiceBindingPreviewUrl', {
       service_binding_name: BINDING,
       entity_set: 'Root',
     });
-    const metadataUrl = member(
-      payloadOf(succeeded('GetServiceBindingPreviewUrl', located)),
-      'metadata_url',
-    );
+    const first = payloadOf(succeeded('GetServiceBindingPreviewUrl', located));
+    // Right after the answer: live at once on premise; on the cloud system
+    // the gateway still blocks the service (measured: 95 s and 129 s more).
+    if (onPremise()) {
+      assert.equal(member(first, 'live'), true);
+    } else {
+      assert.equal(member(first, 'live'), false);
+      assert.equal(member(first, 'live_status'), 403);
+      assert.ok(String(member(first, 'live_text')).includes('UCON'));
+    }
+    const metadataUrl = member(first, 'metadata_url');
     assert.equal(typeof metadataUrl, 'string');
     state.metadata = pathOf(String(metadataUrl));
     await untilMetadata(
@@ -305,6 +326,7 @@ liveSuite(['onprem', 'cloud'], 'Service bindings', () => {
     });
     succeeded('GetServiceBindingPreviewUrl', preview);
     assert.equal(member(payloadOf(preview), 'published'), true);
+    assert.equal(member(payloadOf(preview), 'live'), true);
     assert.equal(typeof member(payloadOf(preview), 'preview_url'), 'string');
   });
 });

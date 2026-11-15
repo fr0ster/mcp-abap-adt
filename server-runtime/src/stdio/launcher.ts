@@ -807,8 +807,9 @@ async function launchStdio(
     connectionType = effectiveConnectionType(config, process.env);
     systemType = effectiveSystemType(config, process.env);
   } catch (error) {
+    const refusal = thrownAs(error, LauncherRefusal);
     deps.stderr(
-      `[MCP] ${thrownAs(error, LauncherRefusal)?.words ?? 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
+      `[MCP] ${refusal !== undefined ? refusal.words : 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
     );
     deps.exit(1);
     return;

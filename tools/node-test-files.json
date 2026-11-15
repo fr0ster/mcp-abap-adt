@@ -88,6 +88,7 @@
   "src/__tests__/unit/auth/connectionCause.test.ts",
   "src/__tests__/unit/binSmoke.test.ts",
   "src/__tests__/unit/config/accessRestrictions.test.ts",
+  "src/__tests__/unit/config/caughtRefusalWords.test.ts",
   "src/__tests__/unit/config/enableDataTools.test.ts",
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/failureTextBanner.test.ts",

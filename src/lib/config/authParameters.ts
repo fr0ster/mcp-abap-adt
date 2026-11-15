@@ -287,8 +287,9 @@ function convert(
     } catch (error) {
       // A row's reader words its refusal as a ParameterRefusal; any other
       // throw gets fixed words — its message never reaches the refusal.
+      const refusal = thrownAs(error, ParameterRefusal);
       throw new ParameterRefusal(
-        thrownAs(error, ParameterRefusal)?.words ?? `Invalid ${name}`,
+        refusal !== undefined ? refusal.words : `Invalid ${name}`,
       );
     }
   }
@@ -486,9 +487,8 @@ export function validateYamlParameters(
     try {
       convert(p, nameIn(p, 'yaml'), yamlAt(yaml, p.yaml));
     } catch (error) {
-      errors.push(
-        thrownAs(error, ParameterRefusal)?.words ?? `Invalid ${p.yaml}`,
-      );
+      const refusal = thrownAs(error, ParameterRefusal);
+      errors.push(refusal !== undefined ? refusal.words : `Invalid ${p.yaml}`);
     }
   }
   return errors;
@@ -697,8 +697,9 @@ export const STATE_IDLE_ROW: Parameter = {
     } catch (error) {
       // main's own reader words the refusal (it quotes only the user's value);
       // the row hands those words on as its refusal, as main prints them.
+      const failure = thrownAs(error, Error);
       throw new ParameterRefusal(
-        thrownAs(error, Error)?.message ?? `Invalid ${name}`,
+        failure !== undefined ? failure.message : `Invalid ${name}`,
       );
     }
   },

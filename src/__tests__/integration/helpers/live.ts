@@ -144,9 +144,22 @@ function isCredentialRefusal(answer: LiveAnswer): boolean {
   return refusalAnswered(answer.isError, answer.text);
 }
 
-/** Whether an answer is SAP's "not found" (`404`). */
-function isNotFound(answer: LiveAnswer): boolean {
-  return answer.isError && member(jsonOf(answer), 'status') === 404;
+/**
+ * Whether an answer is "not found": SAP's `404`, or the strategies' explicit
+ * not-found verdict — a refusal (`origin: 'refusal'`) of code
+ * `ADT_OBJECT_NOT_FOUND`. A message class message has no ADT resource of its
+ * own: SAP answers its parent class read with `200`, and the message's
+ * absence is that refusal (`analyseMessageClassMessage`). Nothing broader:
+ * no other refusal, no other code.
+ */
+export function isNotFound(answer: LiveAnswer): boolean {
+  if (!answer.isError) return false;
+  const payload = jsonOf(answer);
+  return (
+    member(payload, 'status') === 404 ||
+    (member(payload, 'origin') === 'refusal' &&
+      member(payload, 'code') === 'ADT_OBJECT_NOT_FOUND')
+  );
 }
 
 function liveAnswerOf(value: unknown): LiveAnswer {

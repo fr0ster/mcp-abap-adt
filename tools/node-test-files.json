@@ -99,6 +99,7 @@
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/failureTextBanner.test.ts",
   "src/__tests__/unit/coverage/hardModeBinaries.test.ts",
+  "src/__tests__/unit/coverage/isNotFound.test.ts",
   "src/__tests__/unit/coverage/live.test.ts",
   "src/__tests__/unit/coverage/liveDescribe.test.ts",
   "src/__tests__/unit/coverage/liveScripts.test.ts",

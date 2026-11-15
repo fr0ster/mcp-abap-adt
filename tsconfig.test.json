@@ -49,6 +49,10 @@
     // on purpose; the scan reads them in its own program.
     "src/__tests__/unit/sources/__fixtures__/configConstruction/refused",
     "src/__tests__/unit/sources/__fixtures__/configConstruction/limits",
+    // The sweep's gate refuses a project whose program has a diagnostic: this
+    // one imports a sibling never built, on purpose; the gate reads it in its
+    // own program.
+    "src/__tests__/unit/sources/__fixtures__/sweepProjects",
     // The analyse verdicts on an `analyse` key present as `undefined`: code
     // the compiler refuses under exactOptionalPropertyTypes, kept for the
     // analyser, which reads them in its own program.

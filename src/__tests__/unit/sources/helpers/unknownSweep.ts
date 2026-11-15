@@ -3619,14 +3619,51 @@ export function productionProjects(): { tsconfig: string; dir: string }[] {
 export function eachProductionProject<T>(
   scan: (program: ts.Program, own: ReadonlySet<string>) => T[],
 ): T[] {
+  return eachProject(productionProjects(), scan);
+}
+
+/** A diagnostic as one line: where, and the compiler's words. */
+function diagnosticLine(diagnostic: ts.Diagnostic): string {
+  const words = ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ');
+  const file = diagnostic.file;
+  if (file === undefined || diagnostic.start === undefined) return words;
+  const { line } = file.getLineAndCharacterOfPosition(diagnostic.start);
+  return `${rel(file.fileName)}:${line + 1} ${words}`;
+}
+
+/**
+ * `scan` over each project's program and the files it owns. A project whose
+ * configuration does not parse, or whose program has a diagnostic before
+ * emit, fails the sweep, naming the project and its first diagnostics: an
+ * import left unresolved (a sibling's `dist` not built) types what it
+ * names as the error type, which would read as `any` unnoticed.
+ */
+export function eachProject<T>(
+  projects: readonly { tsconfig: string; dir: string }[],
+  scan: (program: ts.Program, own: ReadonlySet<string>) => T[],
+): T[] {
   const out: T[] = [];
-  for (const project of productionProjects()) {
+  for (const project of projects) {
+    const unrecoverable: ts.Diagnostic[] = [];
     const parsed = ts.getParsedCommandLineOfConfigFile(
       path.join(REPO, project.tsconfig),
       { noEmit: true },
-      { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined },
+      {
+        ...ts.sys,
+        onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+          unrecoverable.push(diagnostic);
+        },
+      },
     );
-    if (!parsed) continue;
+    const configured = [...unrecoverable, ...(parsed?.errors ?? [])];
+    if (parsed === undefined || configured.length > 0) {
+      throw new Error(
+        `the sweep cannot read ${project.tsconfig}: ${
+          configured.slice(0, 3).map(diagnosticLine).join('; ') ||
+          'no configuration'
+        }`,
+      );
+    }
     const dir = fileKey(path.join(REPO, project.dir)) + path.sep;
     const own = new Set(
       parsed.fileNames
@@ -3643,6 +3680,15 @@ export function eachProductionProject<T>(
       rootNames: parsed.fileNames,
       options: parsed.options,
     });
+    const diagnostics = ts.getPreEmitDiagnostics(program);
+    if (diagnostics.length > 0) {
+      throw new Error(
+        `the sweep refuses ${project.tsconfig}: ${diagnostics.length} diagnostic(s) before emit, first ${diagnostics
+          .slice(0, 3)
+          .map(diagnosticLine)
+          .join('; ')}`,
+      );
+    }
     out.push(...scan(program, own));
   }
   return out;

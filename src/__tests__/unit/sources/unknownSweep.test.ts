@@ -16,6 +16,7 @@ import { describe, it } from 'node:test';
 import { REPO } from './helpers/failureScan';
 import {
   type BoundaryKind,
+  eachProject,
   fixtureProgram,
   type ListedSites,
   ownFile,
@@ -977,6 +978,30 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     assert.deepEqual(
       sitesOf('round11').filter((site) => lineOf(site) >= 59),
       [],
+    );
+  });
+});
+
+describe('the sweep reads only programs the compiler accepts', () => {
+  const base = 'src/__tests__/unit/sources/__fixtures__/sweepProjects';
+  const project = (name: string) => ({
+    tsconfig: `${base}/${name}/tsconfig.json`,
+    dir: `${base}/${name}/src`,
+  });
+
+  it('a project with a diagnostic before emit fails the sweep, naming the project and its first diagnostics', () => {
+    assert.throws(
+      () => eachProject([project('unresolved')], () => []),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes(`${base}/unresolved/tsconfig.json`) &&
+        error.message.includes("Cannot find module '@sibling/unbuilt'"),
+    );
+    assert.deepEqual(
+      eachProject([project('resolved')], (program) => [
+        program.getRootFileNames().length,
+      ]),
+      [1],
     );
   });
 });

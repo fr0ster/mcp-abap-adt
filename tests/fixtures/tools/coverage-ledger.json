@@ -1,4 +1,87 @@
 {
+  "ActivateBehaviorDefinition": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateDdl": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateDomain": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateFunctionGroup": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateFunctionModule": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateInterface": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateMetadataExtension": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateProgram": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateServiceDefinition": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateStructure": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateTable": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateTableType": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
   "AmdpDebugCancel": {
     "unit": "src/__tests__/unit/pins/amdpDebugger.pins.test.ts",
     "live": {

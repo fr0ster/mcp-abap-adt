@@ -71,8 +71,11 @@ against a `?: T`.
       nested, renamed, with a default, by a rest;
     - a callback's parameter to which a contract hands its own `unknown` (a `JSON.parse`
       reviver's value, a predicate over a list the language types `any[]`), written with a
-      type or taking the contract's (the type its declaration writes; a type parameter is
-      bound by the caller, a slot written `ToolArgs` is input until checked): it passes as a
+      type or taking the contract's — the parameter of the callee it is handed to, or of the
+      member an object literal's method or setter implements, as that declaration writes it,
+      every overload: a type argument written there (`Listener<unknown>`) is the third
+      party's, a type parameter is bound by the caller, a slot written `ToolArgs` is input
+      until checked. Once any contract hands it the `unknown`, it passes as a
       `callback` only when every use of it passes on (below) and it has no default — a
       default tests for `undefined` and may replace the value. A position in a parameter of
       a function the contract hands (`reject(reason?: any)`) is written into by a call, not

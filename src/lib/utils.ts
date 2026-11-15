@@ -56,11 +56,13 @@ export {
 
 /** The readers of a value from outside the type system (`thrownValue`), for the packages. */
 export {
+  asError,
   child,
   childAt,
   type Element,
   isElement,
   isList,
+  thrownAs,
 } from './thrownValue';
 
 // Initialize connection variables before exports to avoid circular dependency issues

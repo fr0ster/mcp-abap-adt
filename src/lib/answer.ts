@@ -539,7 +539,8 @@ export function return_answer<T, R>(
     : answers.json(projected);
 }
 
-function messageOf(thrown: unknown): string {
+/** A thrown value's words: an `Error`'s `message`, else the value written out. */
+export function messageOf(thrown: unknown): string {
   return thrown instanceof Error ? thrown.message : String(thrown);
 }
 

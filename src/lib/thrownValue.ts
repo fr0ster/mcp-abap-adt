@@ -60,3 +60,19 @@ export function attr(value: unknown, name: string): string | undefined {
 export function entries(value: unknown): Array<[string, unknown]> {
   return isElement(value) ? Object.entries(value) : [];
 }
+
+/**
+ * `thrown` as an instance of `kind` — a class of ours, or `Error` — when it is
+ * one (`instanceof`); else `undefined`.
+ */
+export function thrownAs<T>(
+  thrown: unknown,
+  kind: abstract new (...args: never[]) => T,
+): T | undefined {
+  return thrown instanceof kind ? thrown : undefined;
+}
+
+/** `thrown` as an `Error`: itself when it is one, else one of its text. */
+export function asError(thrown: unknown): Error {
+  return thrown instanceof Error ? thrown : new Error(String(thrown));
+}

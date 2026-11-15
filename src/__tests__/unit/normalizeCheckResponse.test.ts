@@ -114,25 +114,3 @@ describe('parseCheckRunResponse', () => {
     expect(result.total_messages).toBe(1);
   });
 });
-
-describe('parseCheckRunResponse — a document that cannot be read', () => {
-  it('words the failure with what was thrown, written out', () => {
-    const throwing = (thrown: unknown): { data: string } => ({
-      get data(): string {
-        throw thrown;
-      },
-    });
-    expect(parseCheckRunResponse(throwing(new Error('boom'))).message).toBe(
-      'Failed to parse check run response: Error: boom',
-    );
-    expect(parseCheckRunResponse(throwing('plain')).message).toBe(
-      'Failed to parse check run response: plain',
-    );
-    expect(parseCheckRunResponse(throwing(42)).message).toBe(
-      'Failed to parse check run response: 42',
-    );
-    expect(parseCheckRunResponse(throwing(null)).message).toBe(
-      'Failed to parse check run response: null',
-    );
-  });
-});

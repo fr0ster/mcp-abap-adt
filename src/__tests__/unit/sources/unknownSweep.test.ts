@@ -981,6 +981,38 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it('a member, an accessor, a return or a re-export of ours is ours only when its written type binds the unknown, else traced to what it holds', () => {
+    // A literal's member, an accessor, an interface member `typeof` their
+    // value, a generic wrapper, a namespace re-export; an own factory with
+    // no written return, called and kept; a member traced to a factory
+    // whose type's base holds the unknown; a member written `typeof` their
+    // value, read off `this`.
+    assert.deepEqual(thirdPartyReads('writtenMembers'), [
+      [47, 'refused'],
+      [48, 'refused'],
+      [49, 'refused'],
+      [50, 'refused'],
+      [53, 'refused'],
+      [60, 'refused'],
+      [62, 'refused'],
+      [87, 'refused'],
+      [122, 'refused'],
+    ]);
+    // Ours: bound by text we wrote — a member, a return, a wrapper of ours,
+    // a third party's generic instantiated by us, `unknown` included, and a
+    // value of ours re-exported through a namespace of ours.
+    assert.deepEqual(
+      sitesOf('writtenMembers').filter(
+        (site) =>
+          ((lineOf(site) >= 65 && lineOf(site) <= 83) ||
+            (lineOf(site) >= 90 && lineOf(site) <= 116) ||
+            lineOf(site) >= 125) &&
+          site.reason === 'third-party',
+      ),
+      [],
+    );
+  });
+
   it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
     // The parse each reviver is handed to passes whole into a sink.
     assert.deepEqual(thirdPartyReads('callbackDefaults'), [

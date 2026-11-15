@@ -628,7 +628,8 @@ function typeParametersOf(
 /**
  * Whether a type mentions `unknown` or `any`: itself, a union's or an
  * intersection's member, a reference's type argument (a third party's
- * `Generic<unknown>` included), a few levels deep.
+ * `Generic<unknown>` included), a class's or an interface's base, a few
+ * levels deep.
  */
 function mentionsUnknown(
   checker: ts.TypeChecker,
@@ -640,12 +641,23 @@ function mentionsUnknown(
   if (type.isUnionOrIntersection()) {
     return type.types.some((part) => mentionsUnknown(checker, part, depth + 1));
   }
-  if (isReference(type)) {
-    return checker
+  if (
+    isReference(type) &&
+    checker
       .getTypeArguments(type)
-      .some((argument) => mentionsUnknown(checker, argument, depth + 1));
+      .some((argument) => mentionsUnknown(checker, argument, depth + 1))
+  ) {
+    return true;
   }
-  return false;
+  // A class's or an interface's bases (`interface Fixed extends
+  // Generic<unknown>`), the type of a reference's target included.
+  const target = isReference(type) ? type.target : type;
+  return (
+    target.isClassOrInterface() &&
+    (checker.getBaseTypes(target) ?? []).some((base) =>
+      mentionsUnknown(checker, base, depth + 1),
+    )
+  );
 }
 
 /** The type parameters of the class a `new` instantiates. */
@@ -653,11 +665,14 @@ function classParameters(
   checker: ts.TypeChecker,
   call: ts.NewExpression,
 ): ts.Type[] {
-  const declaration = checker
-    .getSymbolAtLocation(call.expression)
-    ?.declarations?.find(
-      (each) => ts.isClassLike(each) || ts.isInterfaceDeclaration(each),
-    );
+  const symbol = checker.getSymbolAtLocation(call.expression);
+  const resolved =
+    symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
+      ? checker.getAliasedSymbol(symbol)
+      : symbol;
+  const declaration = resolved?.declarations?.find(
+    (each) => ts.isClassLike(each) || ts.isInterfaceDeclaration(each),
+  );
   return (
     declaration?.typeParameters?.map((parameter) =>
       checker.getTypeAtLocation(parameter),
@@ -3087,11 +3102,17 @@ export class UnknownSweep {
     }
     if (ts.isIdentifier(current)) return this.nameOurs(current, seen);
     if (ts.isPropertyAccessExpression(current)) {
-      const declarations =
-        this.checker.getSymbolAtLocation(current.name)?.declarations ?? [];
+      const symbol = this.checker.getSymbolAtLocation(current.name);
+      const resolved =
+        symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
+          ? this.checker.getAliasedSymbol(symbol)
+          : symbol;
+      const declarations = resolved?.declarations ?? [];
       return (
         declarations.length > 0 &&
-        declarations.every((declaration) => ownNode(declaration))
+        declarations.every((declaration) =>
+          this.memberOurs(declaration, current.expression, seen),
+        )
       );
     }
     if (ts.isElementAccessExpression(current)) {
@@ -3230,7 +3251,19 @@ export class UnknownSweep {
   ): boolean {
     // A member the repository declares is ours, as when it is read by name
     // (charged where it is declared).
-    if (ts.isBindingElement(node) && this.ownMember(node)) return true;
+    if (ts.isBindingElement(node)) {
+      const members = this.destructuredMember(node);
+      const holder = node.parent.parent;
+      const receiver = ts.isVariableDeclaration(holder)
+        ? (holder.initializer ?? this.forOfSource(holder))
+        : undefined;
+      if (
+        members.length > 0 &&
+        members.every((member) => this.memberOurs(member, receiver, seen))
+      ) {
+        return true;
+      }
+    }
     const source = this.bindingSource(node);
     if (source !== undefined) return this.writtenOurs(source, seen);
     if (!ts.isBindingElement(node) || node.initializer !== undefined) {
@@ -3297,14 +3330,6 @@ export class UnknownSweep {
     return this.destructuredMember(node).some((each) => !ownNode(each));
   }
 
-  /** Whether an object destructuring's element reads a member of ours. */
-  private ownMember(node: ts.BindingElement): boolean {
-    const declarations = this.destructuredMember(node);
-    return (
-      declarations.length > 0 && declarations.every((each) => ownNode(each))
-    );
-  }
-
   /** What a `for … of` (or `for await … of`) declaring it walks. */
   private forOfSource(node: ts.VariableDeclaration): ts.Expression | undefined {
     const list = node.parent;
@@ -3314,7 +3339,97 @@ export class UnknownSweep {
       : undefined;
   }
 
-  /** `writtenOurs` of a call or a `new`. */
+  /**
+   * `writtenOurs` of a member a name or a destructuring reads off
+   * `receiver`: one the repository declares, whose written type holds the
+   * `unknown` through our text (`ownsUnknown`; `typeof` a third party's value
+   * or its alias is not), or brings in none of its own (bound by the
+   * receiver, then ours when the receiver is); one with no written type,
+   * traced to its initializer, its shorthand's name, or what it returns.
+   */
+  private memberOurs(
+    declaration: ts.Node,
+    receiver: ts.Expression | undefined,
+    seen: Set<ts.Node>,
+  ): boolean {
+    if (!ownNode(declaration)) return false;
+    const written =
+      ts.isPropertySignature(declaration) ||
+      ts.isPropertyDeclaration(declaration) ||
+      ts.isVariableDeclaration(declaration) ||
+      ts.isParameter(declaration) ||
+      ts.isGetAccessorDeclaration(declaration) ||
+      ts.isMethodDeclaration(declaration) ||
+      ts.isMethodSignature(declaration)
+        ? declaration.type
+        : undefined;
+    if (written !== undefined) {
+      if (this.ownsUnknown(declaration)) return true;
+      if (
+        mentionsUnknown(this.checker, this.checker.getTypeFromTypeNode(written))
+      ) {
+        return false;
+      }
+      return receiver === undefined || this.writtenOurs(receiver, seen);
+    }
+    if (ts.isPropertyAssignment(declaration)) {
+      return this.writtenOurs(declaration.initializer, seen);
+    }
+    if (ts.isShorthandPropertyAssignment(declaration)) {
+      return this.nameOurs(declaration.name, seen);
+    }
+    if (
+      ts.isPropertyDeclaration(declaration) ||
+      ts.isVariableDeclaration(declaration)
+    ) {
+      return (
+        declaration.initializer !== undefined &&
+        this.writtenOurs(declaration.initializer, seen)
+      );
+    }
+    if (ts.isGetAccessorDeclaration(declaration)) {
+      return this.returnsOurs(declaration, seen);
+    }
+    return false;
+  }
+
+  /**
+   * Whether every value a function of ours with no written return type
+   * returns is ours (`writtenOurs`): each `return`'s expression, an arrow's
+   * body — none at all is no proof.
+   */
+  private returnsOurs(
+    fn: ts.SignatureDeclaration,
+    seen: Set<ts.Node>,
+  ): boolean {
+    const body = 'body' in fn ? fn.body : undefined;
+    if (body === undefined) return false;
+    if (!ts.isBlock(body)) {
+      return ts.isExpression(body) && this.writtenOurs(body, seen);
+    }
+    const returned: ts.Expression[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+      if (ts.isReturnStatement(node) && node.expression !== undefined) {
+        returned.push(node.expression);
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(body, visit);
+    return (
+      returned.length > 0 &&
+      returned.every((expression) => this.writtenOurs(expression, seen))
+    );
+  }
+
+  /**
+   * `writtenOurs` of a call or a `new`: type arguments written; or a callee
+   * of ours whose written return holds it (`ownsUnknown`), or, with no
+   * written return, whose every return is ours; never a declared return that
+   * mentions an `unknown` of its own (a third party's factory, `typeof` its
+   * value); and every type parameter of the signature, and of a generic
+   * receiver's type, bound by arguments or the receiver of ours.
+   */
   private callOurs(
     call: ts.CallExpression | ts.NewExpression,
     seen: Set<ts.Node>,
@@ -3323,48 +3438,60 @@ export class UnknownSweep {
     const declaration = this.checker
       .getResolvedSignature(call)
       ?.getDeclaration();
-    if (declaration === undefined) return false;
+    if (declaration === undefined) {
+      // A class with no constructor of its own: bound by nothing we wrote,
+      // unless it has no type parameters.
+      return (
+        ts.isNewExpression(call) &&
+        classParameters(this.checker, call).length === 0
+      );
+    }
+    if (ownNode(declaration) && declaration.type !== undefined) {
+      if (this.ownsUnknown(declaration)) return true;
+    }
     if (
       ownNode(declaration) &&
-      declaration.type !== undefined &&
-      this.ownsUnknown(declaration)
+      declaration.type === undefined &&
+      !ts.isConstructorDeclaration(declaration) &&
+      !this.returnsOurs(declaration, seen)
     ) {
-      return true;
+      return false;
     }
-    const returned = ts.isConstructorDeclaration(declaration)
-      ? undefined
-      : this.checker.getSignatureFromDeclaration(declaration)?.getReturnType();
-    const declared =
-      returned ??
-      (ts.isNewExpression(call)
-        ? this.checker.getTypeAtLocation(call.expression)
-        : undefined);
-    if (declared === undefined) return false;
-    if (mentionsUnknown(this.checker, declared)) return ownNode(declaration);
+    if (
+      declaration.type !== undefined &&
+      mentionsUnknown(
+        this.checker,
+        this.checker.getTypeFromTypeNode(declaration.type),
+      )
+    ) {
+      return false;
+    }
+    if (!ownNode(declaration) && !ts.isConstructorDeclaration(declaration)) {
+      const returned = this.checker
+        .getSignatureFromDeclaration(declaration)
+        ?.getReturnType();
+      if (returned === undefined || mentionsUnknown(this.checker, returned)) {
+        return false;
+      }
+    }
     const callee = call.expression;
     const receiver = ts.isPropertyAccessExpression(callee)
       ? callee.expression
       : undefined;
+    const container = declaration.parent;
+    const receiverBound =
+      receiver !== undefined &&
+      (ts.isClassLike(container) || ts.isInterfaceDeclaration(container)) &&
+      (container.typeParameters?.length ?? 0) > 0;
+    if (receiverBound && !this.writtenOurs(receiver, seen)) return false;
     const parameters = ts.isNewExpression(call)
       ? classParameters(this.checker, call)
-      : typeParametersOf(this.checker, declared);
-    return parameters.every((parameter) => {
-      const owner = parameter.getSymbol()?.declarations?.[0]?.parent;
-      if (owner === undefined) return false;
-      if (ts.isClassLike(owner) || ts.isInterfaceDeclaration(owner)) {
-        if (
-          ts.isNewExpression(call) &&
-          ts.isConstructorDeclaration(declaration)
-        ) {
-          return this.boundAtCall(parameter, declaration, call, undefined);
-        }
-        return receiver !== undefined && this.writtenOurs(receiver, seen);
-      }
-      return (
-        ts.isFunctionLike(owner) &&
-        this.boundAtCall(parameter, owner, call, undefined)
-      );
-    });
+      : (declaration.typeParameters ?? []).map((parameter) =>
+          this.checker.getTypeAtLocation(parameter),
+        );
+    return parameters.every((parameter) =>
+      this.boundAtCall(parameter, declaration, call, undefined),
+    );
   }
 
   /**

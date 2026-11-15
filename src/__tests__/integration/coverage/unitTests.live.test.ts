@@ -218,4 +218,52 @@ liveSuite(['onprem', 'cloud'], 'ABAP Unit run reads', () => {
     assert.equal(member(payload, 'run_id'), runId);
     assert.ok(JSON.stringify(member(payload, 'run_result')).includes('WAITS'));
   });
+
+  it('HandlerUnitTestRun starts a run of the class, HandlerUnitTestStatus reads it running, then finished', async () => {
+    const started = await liveCall('HandlerUnitTestRun', {
+      target: { kind: 'object', name: CLASS, type: 'CLAS/OC' },
+    });
+    const runId = member(
+      payloadOf(succeeded('HandlerUnitTestRun', started)),
+      'run_id',
+    );
+    if (typeof runId !== 'string' || runId === '') {
+      throw new Error(`HandlerUnitTestRun answered no run_id: ${started.text}`);
+    }
+    const running = await liveCall('HandlerUnitTestStatus', {
+      run_id: runId,
+      with_long_polling: false,
+    });
+    assert.ok(
+      succeeded('HandlerUnitTestStatus', running).text.includes('RUNNING'),
+    );
+    succeeded(
+      'GetUnitTestResult',
+      await livePrepare('GetUnitTestResult', { run_id: runId }),
+    );
+    assert.ok((await plainStatus(runId)).includes('FINISHED'));
+  });
+
+  it('HandlerCdsUnitTestStatus and HandlerCdsUnitTestResult read a run by its id', async () => {
+    // The CDS reads read a run of the same endpoint by its id (Code:
+    // `AdtCdsUnitTest extends AdtUnitTest`, `getStatus` inherited): the run
+    // here is the class's.
+    const runId = await startedRun();
+    const running = await liveCall('HandlerCdsUnitTestStatus', {
+      run_id: runId,
+      with_long_polling: false,
+    });
+    assert.ok(
+      succeeded('HandlerCdsUnitTestStatus', running).text.includes('RUNNING'),
+    );
+    succeeded(
+      'GetUnitTestResult',
+      await livePrepare('GetUnitTestResult', { run_id: runId }),
+    );
+    const result = await liveCall('HandlerCdsUnitTestResult', {
+      run_id: runId,
+    });
+    const payload = payloadOf(succeeded('HandlerCdsUnitTestResult', result));
+    assert.ok(JSON.stringify(payload).includes('WAITS'));
+  });
 });

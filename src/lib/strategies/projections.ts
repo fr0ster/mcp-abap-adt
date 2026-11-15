@@ -80,6 +80,59 @@ function textOf(node: XmlRead): string {
 export const terseWrite = <T>(_value: T, status: number) =>
   status >= 200 && status < 300 ? 'SUCCESS' : undefined;
 
+/** How a publication SAP answered as accepted stands: done, or still running as SAP's background job. */
+export type PublicationCompletion = 'done' | 'background';
+
+/** A publication's terse answer: what SAP said, and whether it has completed. */
+export interface PublicationAnswer {
+  /** `SUCCESS` when the change is done; `STARTED` when SAP runs it in the background. */
+  result: 'SUCCESS' | 'STARTED';
+  completion: PublicationCompletion;
+  /** SAP's `SEVERITY`, when its status message carries one. */
+  severity?: string;
+  /** SAP's `SHORT_TEXT`, when its status message carries one. */
+  short_text?: string;
+  /** What `STARTED` means, on a system whose publication is a background job. */
+  note?: string;
+}
+
+/**
+ * A publication job's status message (`asx:abap` `DATA`: `SEVERITY`,
+ * `SHORT_TEXT`), read for what it says about completion. On premise SAP
+ * publishes inside the request: `completion: 'done'`. On ABAP Cloud SAP
+ * starts the publication as a background job and answers once its handler
+ * has waited up to 120 s for it, whatever its state (SAP's
+ * `CL_RAP_SERVICES_CLOUD_ACTIVATE`; measured: the service answered 95 s and
+ * 129 s after that answer): `completion: 'background'`. Nothing waits here.
+ */
+export function tersePublication(
+  kind: 'onprem' | 'cloud',
+  desired: 'published' | 'unpublished',
+): (value: XmlRead, status: number) => PublicationAnswer | undefined {
+  return (value, status) => {
+    if (status < 200 || status >= 300) return undefined;
+    const data = childAt(value, 'asx:abap', 'asx:values', 'DATA');
+    const severity = data ? textOf(child(data, 'SEVERITY')) : '';
+    const shortText = data ? textOf(child(data, 'SHORT_TEXT')) : '';
+    const said = {
+      ...(severity !== '' ? { severity } : {}),
+      ...(shortText !== '' ? { short_text: shortText } : {}),
+    };
+    if (kind === 'onprem')
+      return { result: 'SUCCESS', completion: 'done', ...said };
+    const usable =
+      desired === 'published'
+        ? 'becomes usable once that job ends'
+        : 'stops being usable once that job ends';
+    return {
+      result: 'STARTED',
+      completion: 'background',
+      ...said,
+      note: `SAP started the ${desired === 'published' ? 'publication' : 'unpublication'} as a background job; the service ${usable}. GetServiceBindingPreviewUrl answers the service's live state.`,
+    };
+  };
+}
+
 /**
  * `chkl:messages` — did the activation happen, and what was said.
  *

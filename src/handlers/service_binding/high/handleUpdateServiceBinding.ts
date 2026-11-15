@@ -97,11 +97,11 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
+import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
-import { project, terseWrite } from '../../../lib/strategies/projections';
+import { project, tersePublication } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
@@ -113,7 +113,8 @@ type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Update publication state of an existing ABAP service binding.',
+  description:
+    "Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends — GetServiceBindingPreviewUrl's live field tells.",
   inputSchema: z.object({
     service_binding_name: z
       .string()
@@ -188,6 +189,8 @@ export async function handleUpdateServiceBinding(
   const { serviceType } = SERVICE_BINDING_VARIANT_MAP[bindingVariant];
   const desiredPublicationState = args.desired_publication_state;
   const detail = detailOf(args);
+  // The stated system kind (never guessed): a cloud publication is SAP's background job.
+  const kind = variantOf(connection);
 
   return answer(
     { tool: 'UpdateServiceBinding', detail },
@@ -251,6 +254,6 @@ export async function handleUpdateServiceBinding(
         );
       })();
     },
-    project(detail, terseWrite),
+    project(detail, tersePublication(kind, desiredPublicationState)),
   );
 }

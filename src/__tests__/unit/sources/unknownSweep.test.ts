@@ -918,6 +918,17 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it("a name read whose declaration is outside the repository is the third party's, judged where it is read", () => {
+    // `raw`, `many` (indexed) and `anything`, each where it is read.
+    assert.deepEqual(thirdPartyReads('externalNames'), [
+      [9, 'refused'],
+      [10, 'refused'],
+      [10, 'refused'],
+      [10, 'refused'],
+      [15, 'sink-contract'],
+    ]);
+  });
+
   it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
     // The parse each reviver is handed to passes whole into a sink.
     assert.deepEqual(thirdPartyReads('callbackDefaults'), [

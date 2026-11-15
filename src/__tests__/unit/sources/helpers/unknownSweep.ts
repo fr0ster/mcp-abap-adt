@@ -1732,6 +1732,7 @@ export class UnknownSweep {
    */
   private expression(node: ts.Expression): void {
     if (this.writtenCharged.has(node)) return;
+    if (ts.isIdentifier(node)) this.foreignName(node);
     if (carried(node)) return;
     if (this.initialisesWrittenSite(node)) return;
     const type = this.checker.getTypeAtLocation(node);
@@ -2493,6 +2494,52 @@ export class UnknownSweep {
       ownNode(declaration) &&
       this.ownsUnknown(declaration)
     );
+  }
+
+  /**
+   * A name read whose every declaration is outside the repository (a third
+   * party's value, the language's global): what its type holds at the top,
+   * in a list or a promise — not in a member, read where the member is, nor
+   * in a parameter, written by a call — is the third party's, judged where
+   * the name is read. A callee is judged at its call.
+   */
+  private foreignName(node: ts.Identifier): void {
+    const parent = node.parent;
+    if (
+      ts.isPartOfTypeNode(node) ||
+      typeHeritage(node) ||
+      (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+      (ts.isQualifiedName(parent) && parent.right === node) ||
+      declarationName(parent) === node ||
+      ts.isShorthandPropertyAssignment(parent) ||
+      ts.isImportSpecifier(parent) ||
+      ts.isExportSpecifier(parent) ||
+      ts.isImportClause(parent) ||
+      ts.isNamespaceImport(parent) ||
+      ts.isLabeledStatement(parent) ||
+      ts.isBreakOrContinueStatement(parent) ||
+      this.called(node)
+    ) {
+      return;
+    }
+    const symbol = this.checker.getSymbolAtLocation(node);
+    const resolved =
+      symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
+        ? this.checker.getAliasedSymbol(symbol)
+        : symbol;
+    const declarations = resolved?.declarations ?? [];
+    const declaration = declarations[0];
+    if (
+      declaration === undefined ||
+      declarations.some((each) => ownNode(each))
+    ) {
+      return;
+    }
+    const held = this.held(this.checker.getTypeAtLocation(node)).filter(
+      (each) => each.owner === undefined && this.contractsUnknown([each]),
+    );
+    if (held.length === 0) return;
+    this.foreignSite(node, held, this.declarationText(declaration));
   }
 
   /** Whether an expression is called, not read: a callee, a tag. */

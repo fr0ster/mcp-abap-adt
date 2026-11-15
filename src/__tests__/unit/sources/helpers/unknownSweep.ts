@@ -2636,7 +2636,33 @@ export class UnknownSweep {
   ): readonly Held[] {
     if (node.type !== undefined) return [];
     const fn = node.parent;
+    const at = fn.parameters.indexOf(node);
     if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return [];
+    // Handed to a call: the callee's parameter, as its declaration writes
+    // it — a type argument written there is the third party's
+    // (`Listener<unknown>`), a type parameter is bound by the caller.
+    const outer = outermost(fn);
+    const call = outer.parent;
+    if (
+      (ts.isCallExpression(call) || ts.isNewExpression(call)) &&
+      call.expression !== outer
+    ) {
+      const parameters =
+        this.checker.getResolvedSignature(call)?.getParameters() ?? [];
+      const last = parameters.at(-1)?.valueDeclaration;
+      const rest =
+        last !== undefined &&
+        ts.isParameter(last) &&
+        last.dotDotDotToken !== undefined;
+      const handed: readonly ts.Expression[] = call.arguments ?? [];
+      const index = handed.indexOf(outer);
+      const slot = (parameters[index] ?? (rest ? parameters.at(-1) : undefined))
+        ?.valueDeclaration;
+      if (slot === undefined || ownNode(slot) || this.toolArgs(slot)) {
+        return [];
+      }
+      return this.slotParameterHeld(slot, at);
+    }
     // An optional callback's contract is `… | undefined`: its signatures
     // are the function's.
     const contextual = this.checker.getContextualType(fn);
@@ -2644,7 +2670,6 @@ export class UnknownSweep {
       contextual === undefined
         ? []
         : this.checker.getNonNullableType(contextual).getCallSignatures();
-    const at = fn.parameters.indexOf(node);
     const declarations = signatures.map((signature) => {
       const parameters = signature.getParameters();
       const last = parameters.at(-1)?.valueDeclaration;
@@ -2674,6 +2699,39 @@ export class UnknownSweep {
       this.held(this.checker.getTypeAtLocation(declaration)).filter(
         (each) => each.owner === undefined,
       ),
+    );
+  }
+
+  /**
+   * The positions of `unknown` or `any` the parameter `at` of each call
+   * signature a slot's declaration writes holds: every overload, an
+   * instantiation the declaration writes (`Listener<unknown>`) included.
+   */
+  private slotParameterHeld(slot: ts.Node, at: number): readonly Held[] {
+    return callSignatures(
+      this.checker,
+      this.checker.getTypeAtLocation(slot),
+    ).flatMap((signature) => {
+      const parameters = signature.getParameters();
+      const last = parameters.at(-1)?.valueDeclaration;
+      const rest =
+        last !== undefined &&
+        ts.isParameter(last) &&
+        last.dotDotDotToken !== undefined;
+      const parameter =
+        parameters[at] ?? (rest ? parameters.at(-1) : undefined);
+      return parameter === undefined
+        ? []
+        : this.held(this.checker.getTypeOfSymbol(parameter)).filter(
+            (each) => each.owner === undefined,
+          );
+    });
+  }
+
+  /** The positions of `unknown` or `any` a declaration's type writes. */
+  private declaredHeld(declaration: ts.Node): readonly Held[] {
+    return this.held(this.checker.getTypeAtLocation(declaration)).filter(
+      (each) => each.owner === undefined,
     );
   }
 

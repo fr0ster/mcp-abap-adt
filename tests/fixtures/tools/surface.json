@@ -45,7 +45,7 @@
     "group": "readonly",
     "name": "GetEnhancementImpl",
     "inputs": "enhancement_spot*, enhancement_name*",
-    "available_in": "cloud, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "readonly",

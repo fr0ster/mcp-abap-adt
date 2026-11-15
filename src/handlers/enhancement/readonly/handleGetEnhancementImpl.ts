@@ -53,7 +53,9 @@ function explainByType(
 
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementImpl',
-  available_in: ['onprem', 'cloud'] as const,
+  // On premise only: it reads a source code plugin (`ENHO/XHH`), which ABAP
+  // Cloud does not support (SAP's CL_ENH_ADT_HOOK_IMPL_WB_ACCESS says so).
+  available_in: ['onprem'] as const,
   description:
     '[read-only] Retrieve the active source code of a specific enhancement implementation by its name and enhancement spot.',
   inputSchema: z.object({

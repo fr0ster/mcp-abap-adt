@@ -285,6 +285,12 @@
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
+  "GetEnhancementImpl": {
+    "unit": "src/__tests__/unit/pins/enhancements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/enhancements.live.test.ts"
+    }
+  },
   "GetEnhancementSpot": {
     "unit": "src/__tests__/unit/pins/enhancements.pins.test.ts",
     "live": {

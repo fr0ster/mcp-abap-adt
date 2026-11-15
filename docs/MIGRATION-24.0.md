@@ -914,6 +914,16 @@ This holds for every tool that activates: the `Activate*` tools, `ActivateObject
   (SAP_BASIS 751, 7.40), it answers SAP's refusal; a group activation there is `ActivateObjects` (the
   full set) or `ActivateObjectLow` (the low handlers group).
 
+## Callers of `GetEnhancementImpl` on a cloud system: not offered
+
+`GetEnhancementImpl` reads a source code plugin (`ENHO/XHH`). Source code plugins are not
+supported in ABAP Cloud, so the cloud binaries no longer list the tool; on premise it is unchanged.
+
+| System | 23.x | 24.0 |
+| --- | --- | --- |
+| cloud | `GetEnhancementImpl` listed | not listed: `GetEnhancementSpot` and `GetEnhancements` for the enhancements a cloud system holds |
+| on premise | `GetEnhancementImpl` listed | unchanged |
+
 ## Callers of `GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols`: removed
 
 The three tools parsed ABAP in this process with regular expressions; SAP states an object's

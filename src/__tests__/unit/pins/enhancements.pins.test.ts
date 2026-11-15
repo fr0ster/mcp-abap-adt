@@ -1,9 +1,10 @@
 /**
- * GetEnhancementSpot, pinned on each variant through the server's dispatch
+ * GetEnhancementImpl (on premise, the one variant serving it) and
+ * GetEnhancementSpot (on each variant), pinned through the server's dispatch
  * (`pinServer`: the tool answers a JSON item, which the server's
  * registration serialises): the connection's logon and its one read of the
- * spot, each answered by what it is (`matched`). SAP's
- * answer is a minimal BAdI spot document.
+ * spot or the plugin's source, each answered by what it is (`matched`).
+ * SAP's answers are a minimal BAdI spot document and a minimal plugin source.
  */
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
@@ -13,6 +14,25 @@ const SPOT_ANSWER = {
   headers: { 'content-type': 'application/xml' },
   text: '<?xml version="1.0" encoding="utf-8"?><enhs:enhancementSpot xmlns:enhs="http://www.sap.com/adt/enhancements/enhs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMCP_PIN_SPOT" adtcore:type="ENHS/XSB" adtcore:description="pin"/>',
 };
+
+/** A source code plugin's source, as SAP answers its read (on premise only). */
+const PLUGIN_SOURCE = {
+  status: 200,
+  headers: { 'content-type': 'text/plain' },
+  text: 'ENHANCEMENT 1  ZMCP_PIN_PLUGIN.    "active version\nENDENHANCEMENT.',
+};
+
+/** The requests of a plugin read on premise, answered by what each is. */
+const PLUGIN_MATCHED = [
+  { method: 'GET', path: '/sap/bc/adt/core/discovery' },
+  { method: 'GET', path: '/sap/bc/adt/core/http/systeminformation' },
+  { method: 'GET', path: '/sap/public/bc/icf/logoff' },
+  {
+    method: 'GET',
+    path: '/sap/bc/adt/enhancements/enhoxhh/zmcp_pin_plugin/source/main',
+    answer: PLUGIN_SOURCE,
+  },
+];
 
 /** The requests of a spot read, answered by what each is. */
 const MATCHED = {
@@ -112,6 +132,77 @@ describe('onprem', () => {
             'sap-adt-saplb': 'fetch',
             'sap-adt-connection-id': 'aae0cb02-018a-4026-a9ca-3bc9c758b509',
             'sap-adt-request-id': '533be76b27244216a0b25a5139919bf9',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-1; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'GetEnhancementImpl',
+      variant: 'onprem',
+      stand: 'server',
+      matched: PLUGIN_MATCHED,
+      args: {
+        enhancement_spot: 'enhoxhh',
+        enhancement_name: 'ZMCP_PIN_PLUGIN',
+      },
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/core/discovery',
+          headers: {
+            accept: 'application/atomsvc+xml',
+            'sap-adt-saplb': 'fetch',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'sap-adt-connection-id': 'f63b72f0-6a7a-4e71-ad03-15eaec48d08f',
+            'x-csrf-token': 'fetch',
+            'sap-client': '100',
+            cookie: 'sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: undefined,
+        },
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/core/http/systeminformation?_=1767225600000',
+          headers: {
+            accept:
+              'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+            'sap-adt-saplb': 'fetch',
+            'sap-adt-connection-id': 'f63b72f0-6a7a-4e71-ad03-15eaec48d08f',
+            'sap-adt-request-id': '471b6e57e1a3465ea6c1e43d7733aeb6',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-1; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: undefined,
+        },
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/enhancements/enhoxhh/zmcp_pin_plugin/source/main?version=active',
+          headers: {
+            accept: 'text/plain',
+            'sap-adt-saplb': 'fetch',
+            'sap-adt-connection-id': 'f63b72f0-6a7a-4e71-ad03-15eaec48d08f',
+            'sap-adt-request-id': 'bf75034c89874a19a0119f6024c74d1d',
             'x-sap-adt-profiling': 'server-time',
             authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
             'sap-client': '100',

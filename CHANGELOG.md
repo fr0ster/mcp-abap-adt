@@ -128,6 +128,10 @@ Every TypeScript project of the repository compiles with `exactOptionalPropertyT
 
 - **`lock_handle` is removed from `UpdateBehaviorDefinition` and `UpdateMetadataExtension`** (#4): no tool of the full set issues a lock handle, and a handle the instance did not issue is refused, so the argument could only be refused. Both lock, write and unlock themselves, as the other full updates do; a call that still sends `lock_handle` has it dropped by the parse (only the create tools are strict), so the update takes its own lock and the handle is not used. A write under a held lock is compact `HandlerUpdate`'s. Migrating: `docs/MIGRATION-24.0.md`, "Callers of the lock tools".
 
+### Removed — breaking for a caller of `GetEnhancementImpl` on a cloud system
+
+- **`GetEnhancementImpl` is no longer offered on cloud systems** (the owner): it reads a source code plugin (`ENHO/XHH`), and source code plugins are not supported in ABAP Cloud. The cloud binaries no longer list it; on premise it is unchanged. **Migrating:** on a cloud system, read BAdI implementations and enhancement spots with `GetEnhancementSpot` and `GetEnhancements`.
+
 ### Removed — breaking for a caller of `GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols`
 
 - **`GetAbapAST`, `GetAbapSemanticAnalysis` and `GetAbapSystemSymbols` are removed** (the owner): they parsed ABAP in this process with regular expressions, and SAP states an object's structure itself. The handlers (`handleGetAbapAST`, `handleGetAbapSemanticAnalysis`, `handleGetAbapSystemSymbols`) go with them. **Migrating:** for an object's structure, `GetObjectOutline` (Added) with the source reads, which take a line range now; for what an object defines and uses, `GetObjectOutline` and `GetWhereUsed` (MIGRATION-24.0).

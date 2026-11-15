@@ -153,7 +153,9 @@ export async function handleUpdateDataElement(
 ) {
   const { connection, logger } = context;
   try {
-    const { data_element_name, properties, lock_handle } = args;
+    const { data_element_name, lock_handle } = args;
+    // The tool's `properties` bag, input until checked.
+    const properties: ToolArgValue = args.properties;
 
     if (!data_element_name || !properties || !lock_handle) {
       return return_error(

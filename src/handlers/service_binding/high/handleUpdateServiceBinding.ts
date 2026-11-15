@@ -102,6 +102,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
 import { project, tersePublication } from '../../../lib/strategies/projections';
+import { structured } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
@@ -195,9 +196,12 @@ export async function handleUpdateServiceBinding(
   return answer(
     { tool: 'UpdateServiceBinding', detail },
     () => {
-      const obj = createAdtClient(connection, logger).getServiceBinding(
-        resultsFor(serviceDocuments),
-      );
+      // The publication job answers a status message (`SEVERITY`,
+      // `SHORT_TEXT`): read it structured, not as a status alone.
+      const obj = createAdtClient(connection, logger).getServiceBinding({
+        ...resultsFor(serviceDocuments),
+        updated: structured,
+      });
       return (async () => {
         // **`analysePublicationLockAnswer`.** The `403` on this LOCK
         // means an editing session holds the binding, and the publication job

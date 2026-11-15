@@ -87,13 +87,20 @@ against a `?: T`.
       parameters bound by text we wrote — a signature's, when the call writes its type
       arguments or infers it from arguments of ours (at least one; a third party's default
       is theirs), or a class's or an interface's whose receiver is ours. **Ours is traced to
-      written text**: a name whose written type holds the unknown, or one without a type
-      whose initializer and every assignment are ours; a member the repository declares; a
-      call or a `new` with type arguments written, one of ours whose written return holds
-      it, or one answering only type parameters bound by arguments and a receiver of ours;
-      a literal or a carrier whose parts are ours. A third party's name, factory or default,
-      and a type alias's type parameter instantiated outside (`Listener<unknown>`), prove
-      nothing.
+      written text**, never to where a declaration lives: a name whose written type holds
+      the unknown, or one without a type whose initializer and every assignment are ours; a
+      member, an accessor, a return or a re-export of ours whose written type holds it, or,
+      with no written type, whose initializer, shorthand name or every returned value is
+      ours (a written type bringing in an unknown of its own — `typeof` a third party's
+      value, its alias — is theirs); a call or a `new` with type arguments written, or
+      whose signature's type parameters, and a generic receiver's, are bound by arguments
+      and a receiver of ours; a literal or a carrier whose parts are ours. **A type
+      argument we write is ours, `unknown` included** (the owner's decision: the generic is
+      foreign, an instantiation we write is ours — `receiver: Generic<unknown>`,
+      `new Holder<unknown>()`); one written in a third party's text — its declared value,
+      a default, a factory's declared return, a base (`interface Fixed extends
+      Generic<unknown>`) — is theirs, and a type alias's type parameter instantiated
+      outside (`Listener<unknown>`) proves nothing.
     - a binding without a written type — what a `for … of` or `for await … of` declares,
       an element of a destructuring — by the same rule: the third party's unless its source
       is ours, it reads a member the repository declares, or the destructured parameter is

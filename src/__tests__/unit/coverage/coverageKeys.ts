@@ -263,6 +263,9 @@ export const SENDS_NOTHING: ReadonlySet<CoverageKey> = new Set([
   'HandlerBackgroundRunDiscard',
   'HandlerBatch#begin',
   'HandlerBatch#answers',
+  // The breakpoints the session armed, as it holds them: nothing is read
+  // from SAP (`DebugSession.listBreakpoints`).
+  'DebugListBreakpoints',
 ]);
 
 /**

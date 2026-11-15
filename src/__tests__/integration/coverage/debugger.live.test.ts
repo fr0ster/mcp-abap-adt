@@ -195,13 +195,11 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
     );
   });
 
-  it('DebugDeleteBreakpoint deletes the second of the two breakpoints listed', async () => {
-    // DebugListBreakpoints is read through livePrepare: its key has no ledger
-    // row yet (it sends nothing; the guard admits no `none` pin for it).
-    const listed = succeeded(
-      'DebugListBreakpoints',
-      await livePrepare('DebugListBreakpoints', { state_handle: handle() }),
-    );
+  it('DebugListBreakpoints lists both, DebugDeleteBreakpoint deletes the second', async () => {
+    const listed = await liveCall('DebugListBreakpoints', {
+      state_handle: handle(),
+    });
+    succeeded('DebugListBreakpoints', listed);
     const both = breakpointsOf(listed);
     assert.equal(both.length, 2);
     const second = both.find((each) => each.line === LINE.second);

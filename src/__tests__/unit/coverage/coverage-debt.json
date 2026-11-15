@@ -73,7 +73,6 @@
   "DebugGetMemorySizes",
   "DebugGetStack",
   "DebugGetVariables",
-  "DebugListBreakpoints",
   "DebugSetBreakpoints",
   "DebugSetSettings",
   "DebugStartListener",

@@ -34,6 +34,13 @@
       "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
     }
   },
+  "DebugListBreakpoints": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
   "DebugListWatchpoints": {
     "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
     "live": {

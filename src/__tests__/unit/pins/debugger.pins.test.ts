@@ -82,6 +82,23 @@ const START = {
 const PLACED =
   'KIND=0.SOURCETYPE=ABAP.MAIN_PROGRAM=ZCL_CV_DBG_MEASURE============CP.INCLUDE=ZCL_CV_DBG_MEASURE============CM002.LINE_NR=9';
 
+/**
+ * DebugListBreakpoints sends nothing: it answers the breakpoints the session
+ * armed, the one the stop placed among them.
+ */
+function expectPlaced(answer: { content: Array<{ text: string }> }): void {
+  const listed: unknown = JSON.parse(answer.content[0]?.text ?? 'null');
+  expect(
+    Array.isArray(listed)
+      ? listed.map((row: unknown) =>
+          typeof row === 'object' && row !== null
+            ? Reflect.get(row, 'id')
+            : row,
+        )
+      : listed,
+  ).toEqual([PLACED]);
+}
+
 /** A watchpoint document, as SAP answers its create and its list. */
 const WATCHPOINTS: Answer = {
   status: 200,
@@ -134,6 +151,17 @@ function statedAs(variant: 'onprem' | 'cloud'): void {
 describe('onprem', () => {
   statedAs('onprem');
   pinCases([
+    {
+      tool: 'DebugListBreakpoints',
+      variant: 'onprem',
+      stand: 'server',
+      before: [START],
+      bind: { state_handle: { from: 0, field: 'state_handle' } },
+      answers: atStop('onprem'),
+      args: {},
+      expected: 'none',
+      ran: expectPlaced,
+    },
     {
       tool: 'DebugSetStackPosition',
       variant: 'onprem',
@@ -535,6 +563,17 @@ describe('onprem', () => {
 describe('cloud', () => {
   statedAs('cloud');
   pinCases([
+    {
+      tool: 'DebugListBreakpoints',
+      variant: 'cloud',
+      stand: 'server',
+      before: [START],
+      bind: { state_handle: { from: 0, field: 'state_handle' } },
+      answers: atStop('cloud'),
+      args: {},
+      expected: 'none',
+      ran: expectPlaced,
+    },
     {
       tool: 'DebugSetStackPosition',
       variant: 'cloud',

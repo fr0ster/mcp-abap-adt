@@ -388,19 +388,20 @@ async function activateWithMainProgram(
       ),
     );
   }
+  // The group the run activates, and the references its messages name.
+  const group: Parameters<typeof utils.activateObjectsGroup>[0] = [
+    { type: 'FUGR/I', name: includeName, parentName: groupName },
+    { type: 'FUGR/F', name: groupName },
+    { type: 'FUGR/I', name: mainProgram, parentName: groupName },
+  ];
   const started = await withAdtHeaders(
     context,
     'utils.activateObjectsGroup',
     (headers) =>
-      utils.activateObjectsGroup(
-        [
-          { type: 'FUGR/I', name: includeName, parentName: groupName },
-          { type: 'FUGR/F', name: groupName },
-          { type: 'FUGR/I', name: mainProgram, parentName: groupName },
-        ],
-        false,
-        { headers, analyse: analyseException },
-      ),
+      utils.activateObjectsGroup(group, false, {
+        headers,
+        analyse: analyseException,
+      }),
   );
   if (!started.ok) return started;
   // Long polls back to back, no timer of ours: the server holds each one
@@ -409,23 +410,11 @@ async function activateWithMainProgram(
     utils,
     started.getResult().value,
     analyseException,
-    [
-      {
-        name: includeName,
-        type: 'FUGR/I',
-        uri: buildObjectUri(includeName, 'FUGR/I', groupName),
-      },
-      {
-        name: groupName,
-        type: 'FUGR/F',
-        uri: buildObjectUri(groupName, 'FUGR/F'),
-      },
-      {
-        name: mainProgram,
-        type: 'FUGR/I',
-        uri: buildObjectUri(mainProgram, 'FUGR/I', groupName),
-      },
-    ],
+    group.map((object) => ({
+      name: object.name,
+      type: object.type,
+      uri: buildObjectUri(object.name, object.type, object.parentName),
+    })),
   );
   // Reading the run failed: the method's error as it is, with its step.
   if (outcome.failure !== undefined) return failedWith(outcome.failure);

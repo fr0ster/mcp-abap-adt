@@ -455,7 +455,9 @@ describe('ActivateObjectLow', () => {
       {
         type: 'E',
         text: 'Interface ZIF_MCP_SHARED is not active',
+        // The message's objName names a sent object: its name and uri.
         objectName: 'ZIF_MCP_SHARED',
+        uri: '/sap/bc/adt/oo/interfaces/zif_mcp_shared',
       },
     ]);
     // The message a caller could not see before this sequence existed: the

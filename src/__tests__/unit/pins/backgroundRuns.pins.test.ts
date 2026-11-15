@@ -11,7 +11,8 @@
  *   so the window holds the read's session alone. SAP's answer to the read
  *   is the document the corpus captured.
  * - `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`,
- *   `HandlerBackgroundRunGet`: the run a `before` step started has ended
+ *   `HandlerBackgroundRunGet`, `HandlerBackgroundRunList`,
+ *   `HandlerBackgroundRunDiscard`: the run a `before` step started has ended
  *   and its session is logged off before the case (`settle:
  *   'background-runs'`); the run tool sends nothing, and the case asserts
  *   what it answered.
@@ -273,6 +274,37 @@ describe('onprem', () => {
       expected: 'none',
       ran: (answer) => expectFinished(answer, 'HandlerGetData'),
     },
+    {
+      tool: 'HandlerBackgroundRunList',
+      variant: 'onprem',
+      stand: 'server',
+      settle: 'background-runs',
+      before: [
+        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+      ],
+      args: {},
+      expected: 'none',
+      ran: (answer) => {
+        const runs = member(itemOf(answer, 0), 'runs');
+        expect(
+          Array.isArray(runs) ? runs.map((run) => member(run, 'state')) : runs,
+        ).toEqual(['finished']);
+      },
+    },
+    {
+      tool: 'HandlerBackgroundRunDiscard',
+      variant: 'onprem',
+      stand: 'server',
+      settle: 'background-runs',
+      before: [
+        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+      ],
+      bind: { run_handle: { from: 0, field: 'run_handle' } },
+      args: {},
+      expected: 'none',
+      ran: (answer) =>
+        expect(member(itemOf(answer, 0), 'state')).toBe('discarded'),
+    },
   ]);
 });
 
@@ -525,6 +557,37 @@ describe('cloud', () => {
       args: {},
       expected: 'none',
       ran: (answer) => expectFinished(answer, 'HandlerGetData'),
+    },
+    {
+      tool: 'HandlerBackgroundRunList',
+      variant: 'cloud',
+      stand: 'server',
+      settle: 'background-runs',
+      before: [
+        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+      ],
+      args: {},
+      expected: 'none',
+      ran: (answer) => {
+        const runs = member(itemOf(answer, 0), 'runs');
+        expect(
+          Array.isArray(runs) ? runs.map((run) => member(run, 'state')) : runs,
+        ).toEqual(['finished']);
+      },
+    },
+    {
+      tool: 'HandlerBackgroundRunDiscard',
+      variant: 'cloud',
+      stand: 'server',
+      settle: 'background-runs',
+      before: [
+        { tool: 'HandlerGetData', args: { sql_query: QUERY, max_rows: 5 } },
+      ],
+      bind: { run_handle: { from: 0, field: 'run_handle' } },
+      args: {},
+      expected: 'none',
+      ran: (answer) =>
+        expect(member(itemOf(answer, 0), 'state')).toBe('discarded'),
     },
   ]);
 });

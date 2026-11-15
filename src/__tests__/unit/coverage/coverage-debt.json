@@ -219,8 +219,6 @@
   "HandlerActivate#STRUCTURE",
   "HandlerActivate#TABLE",
   "HandlerActivate#TABLE_TYPE",
-  "HandlerBackgroundRunDiscard",
-  "HandlerBackgroundRunList",
   "HandlerBatch#answers",
   "HandlerBatch#begin",
   "HandlerBatch#end",

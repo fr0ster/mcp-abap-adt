@@ -726,5 +726,41 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       );
       assert.equal(current().runs.finishCount(handle), 1);
     });
+
+    it('HandlerBackgroundRunList lists a finished run, HandlerBackgroundRunDiscard discards it', async () => {
+      const handle = startedHandle(
+        'HandlerGetData',
+        await livePrepare('HandlerGetData', {
+          sql_query: query(),
+          max_rows: 5,
+        }),
+      );
+      await current().runs.ended(handle);
+
+      const listed = await liveCall('HandlerBackgroundRunList', {});
+      const runs = member(
+        itemOf(succeeded('HandlerBackgroundRunList', listed), 0),
+        'runs',
+      );
+      assertEquals(
+        Array.isArray(runs)
+          ? runs
+              .filter((run) => member(run, 'run_handle') === handle)
+              .map((run) => member(run, 'state'))
+          : runs,
+        ['finished'],
+      );
+
+      const discarded = await liveCall('HandlerBackgroundRunDiscard', {
+        run_handle: handle,
+      });
+      assertEquals(
+        itemOf(succeeded('HandlerBackgroundRunDiscard', discarded), 0),
+        { run_handle: handle, state: 'discarded' },
+      );
+      expectNotAvailable(
+        await livePrepare('HandlerBackgroundRunGet', { run_handle: handle }),
+      );
+    });
   });
 });

@@ -493,7 +493,21 @@
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
     }
   },
+  "HandlerBackgroundRunDiscard": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
   "HandlerBackgroundRunGet": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerBackgroundRunList": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {
       "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",

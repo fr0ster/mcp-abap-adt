@@ -929,6 +929,18 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     ]);
   });
 
+  it("a third party's unknown whose parent is a position the pass-on list does not name is refused", () => {
+    assert.deepEqual(thirdPartyReads('unknownParents'), [
+      [8, 'refused'],
+      [9, 'refused'],
+      [10, 'refused'],
+      [15, 'refused'],
+      [19, 'refused'],
+      [24, 'sink-contract'],
+      [24, 'sink-contract'],
+    ]);
+  });
+
   it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
     // The parse each reviver is handed to passes whole into a sink.
     assert.deepEqual(thirdPartyReads('callbackDefaults'), [

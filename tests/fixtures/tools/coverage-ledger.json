@@ -229,6 +229,20 @@
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
+  "GetBehaviorImplementation#metadata": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetBehaviorImplementation#source": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
   "GetClassVersionDiff": {
     "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
     "live": {
@@ -492,6 +506,20 @@
       "onprem": "src/__tests__/integration/coverage/outline.live.test.ts"
     }
   },
+  "GetObjectStructure": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetPackage": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
   "GetProgramVersionDiff": {
     "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
     "live": {
@@ -567,6 +595,13 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTransaction": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
     }
   },
   "GetUnitTestResult": {
@@ -747,6 +782,13 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "HandlerSearch": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
     }
   },
   "HandlerUnitTestResult": {

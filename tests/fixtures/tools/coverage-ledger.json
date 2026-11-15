@@ -1,4 +1,18 @@
 {
+  "BatchBegin": {
+    "unit": "src/__tests__/unit/pins/batch.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/batch.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/batch.live.test.ts"
+    }
+  },
+  "BatchEnd": {
+    "unit": "src/__tests__/unit/pins/batch.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/batch.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/batch.live.test.ts"
+    }
+  },
   "DiscardBackgroundRun": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {

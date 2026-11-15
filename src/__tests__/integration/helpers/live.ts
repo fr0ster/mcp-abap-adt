@@ -476,13 +476,55 @@ export function liveDescribe(
 }
 
 /**
+ * The enclosing describe's cases run on an in-process server started with
+ * `restriction` (nothing denied by default): every call, a read-back and a
+ * cleanup included, goes through its dispatch, on the suite's own
+ * connection and as its user — so a call the entry would answer alone (a
+ * read recorded into a communication batch) is dispatched by the server
+ * that owns the batch. In hard mode too: a launched binary takes no
+ * restriction from a test. Installed in the describe's `before` over the
+ * suite's runner, and the suite's runner restored and the server closed in
+ * its `after`; one server per describe. Call it in a `describe` callback
+ * inside a `liveSuite`.
+ */
+export function throughServer(
+  restriction: ServerRestriction | (() => Promise<ServerRestriction>) = {},
+): void {
+  let outer: LiveRunner | undefined;
+  before(async () => {
+    const base = current();
+    outer = base;
+    // A restriction that needs the system (a package's super package) is
+    // read here, on the suite's own runner.
+    const stated =
+      typeof restriction === 'function' ? await restriction() : restriction;
+    const server = await inProcessServer(
+      base.system,
+      { injected: base.connection() },
+      undefined,
+      stated,
+    );
+    useLiveRunner({
+      system: base.system,
+      user: base.user,
+      connection: () => base.connection(),
+      call: async (tool, args) => liveAnswerOf(await server.call(tool, args)),
+      close: () => server.close(),
+    });
+  });
+  after(async () => {
+    const restricted = runner;
+    if (outer !== undefined) useLiveRunner(outer);
+    if (restricted !== undefined && restricted !== outer) {
+      await restricted.close();
+    }
+  });
+}
+
+/**
  * A suite's cases run on a server started with `restriction` (plan Task 14
- * Step 1b): every call, a read-back and a cleanup included, goes through an
- * in-process server carrying the denied actions and the access-check
- * strategy, on the suite's own connection and as its user. In hard mode too:
- * a launched binary takes no restriction from a test. Installed in the
- * describe's `before` over the suite's runner, and the suite's runner
- * restored and the server closed in its `after`; one server per describe.
+ * Step 1b): `throughServer` in a describe of its own, carrying the denied
+ * actions and the access-check strategy.
  */
 export function withRestriction(
   title: string,
@@ -490,35 +532,7 @@ export function withRestriction(
   body: () => void,
 ): void {
   describe(title, () => {
-    let outer: LiveRunner | undefined;
-    before(async () => {
-      const base = current();
-      outer = base;
-      // A restriction that needs the system (a package's super package) is
-      // read here, on the suite's own runner.
-      const stated =
-        typeof restriction === 'function' ? await restriction() : restriction;
-      const server = await inProcessServer(
-        base.system,
-        { injected: base.connection() },
-        undefined,
-        stated,
-      );
-      useLiveRunner({
-        system: base.system,
-        user: base.user,
-        connection: () => base.connection(),
-        call: async (tool, args) => liveAnswerOf(await server.call(tool, args)),
-        close: () => server.close(),
-      });
-    });
-    after(async () => {
-      const restricted = runner;
-      if (outer !== undefined) useLiveRunner(outer);
-      if (restricted !== undefined && restricted !== outer) {
-        await restricted.close();
-      }
-    });
+    throughServer(restriction);
     body();
   });
 }

@@ -26,8 +26,6 @@
   "AmdpDebugStop",
   "AmdpDebugWait",
   "BatchAnswers",
-  "BatchBegin",
-  "BatchEnd",
   "CheckBehaviorDefinition",
   "CheckClass",
   "CheckDataElement",

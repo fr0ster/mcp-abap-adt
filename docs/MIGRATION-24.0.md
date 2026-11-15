@@ -393,6 +393,16 @@ What it typed in the exported surface, read from the built declarations:
   follows the connection it points at. **What you do:** call the session members with `?.()`;
   the answer is the one the method gave, read at the call.
 
+## Embedders: the public signatures the type gate narrowed
+
+What each public entry point now declares, and what a caller on the old contract must do:
+
+- `withAdtHeaders(context, operation, call)` (`@mcp-abap-adt/lib/adt-headers`) takes a `call` that answers an `IAdtResponse` (`T` is constrained to its halves: a success, `ok: true`, or an `IAdtFailure`), and reads its failure as an `IAdtError`. A call answering anything else (`async () => 123`) no longer compiles (TS2322): answer an `IAdtResponse`, or make that call outside `withAdtHeaders`.
+- `findSecretYamlKeys(value, prefix?)` (`@mcp-abap-adt/lib/config`) takes a `JsonValue` instead of `unknown`, and `decidingWord(value)` a `JsonValue | undefined`: hand them a parsed JSON value (what the config's parse answers), not a value of any type.
+- `YamlConfig` (`@mcp-abap-adt/lib/config`) is a `JsonObject` instead of `Record<string, unknown>`: its members are JSON values (a YAML timestamp is its ISO text). A config built by hand writes JSON values.
+- `readXmlDocument(xml)` (`@mcp-abap-adt/lib/debugger`) answers an `XmlRead` (`XmlNode | null | undefined`) instead of `unknown`, and `jsonOf(text)` (`@mcp-abap-adt/lib/compact-shared`, `@mcp-abap-adt/lib/utils`) a `JsonValue | undefined`: code that narrowed the `unknown` by hand reads the typed value directly.
+- New, nothing to migrate: `isJsonObject` and `JsonObject` (`@mcp-abap-adt/lib/compact-shared`, `@mcp-abap-adt/lib/utils`), and the readers of a thrown value `thrownAs(thrown, Class)` and `asError(thrown)` (`@mcp-abap-adt/lib/utils`).
+
 ## Embedders: an answer serializer's payload and a tool result's content are typed
 
 `IAnswerSerializer<A>.json` is generic in the payload: `json<P>(payload: P, isError?: boolean): A`. A serializer of your own writes its `json` with the type parameter instead of `payload: unknown`; the value is handed on whole to the text, as before.

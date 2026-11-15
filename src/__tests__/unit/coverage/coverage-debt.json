@@ -109,7 +109,6 @@
   "GetDdl#source",
   "GetDomain",
   "GetEnhancementImpl",
-  "GetEnhancementSpot",
   "GetEnhancements",
   "GetFunctionGroup",
   "GetFunctionInclude#metadata",

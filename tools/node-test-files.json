@@ -24,6 +24,7 @@
   "src/__tests__/integration/coverage/batch.live.test.ts",
   "src/__tests__/integration/coverage/createLanguage.live.test.ts",
   "src/__tests__/integration/coverage/debugger.live.test.ts",
+  "src/__tests__/integration/coverage/enhancements.live.test.ts",
   "src/__tests__/integration/coverage/functionModuleGroup.live.test.ts",
   "src/__tests__/integration/coverage/heldLocks.live.test.ts",
   "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",

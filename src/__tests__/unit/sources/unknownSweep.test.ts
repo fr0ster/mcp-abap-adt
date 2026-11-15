@@ -941,6 +941,39 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     ]);
   });
 
+  it("an unknown is ours only when text we wrote binds it: a third party's value or default is theirs", () => {
+    assert.deepEqual(thirdPartyReads('writtenBinding'), [
+      [26, 'refused'],
+      [27, 'refused'],
+      [28, 'refused'],
+      [29, 'refused'],
+      [32, 'refused'],
+      [37, 'refused'],
+      [50, 'refused'],
+      [51, 'refused'],
+      [52, 'refused'],
+      [82, 'refused'],
+    ]);
+    // Ours: a member the repository declares, destructured.
+    assert.deepEqual(
+      sitesOf('writtenBinding').filter(
+        (site) => lineOf(site) >= 85 && site.reason === 'third-party',
+      ),
+      [],
+    );
+    // Ours: a type argument written here, an annotation of ours, a value
+    // inferred from one, a binding over a list of ours.
+    assert.deepEqual(
+      sitesOf('writtenBinding').filter(
+        (site) =>
+          lineOf(site) >= 56 &&
+          lineOf(site) <= 77 &&
+          site.reason === 'third-party',
+      ),
+      [],
+    );
+  });
+
   it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
     // The parse each reviver is handed to passes whole into a sink.
     assert.deepEqual(thirdPartyReads('callbackDefaults'), [

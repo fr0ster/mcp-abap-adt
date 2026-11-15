@@ -625,6 +625,46 @@ function typeParametersOf(
   return [];
 }
 
+/**
+ * Whether a type mentions `unknown` or `any`: itself, a union's or an
+ * intersection's member, a reference's type argument (a third party's
+ * `Generic<unknown>` included), a few levels deep.
+ */
+function mentionsUnknown(
+  checker: ts.TypeChecker,
+  type: ts.Type,
+  depth = 0,
+): boolean {
+  if (type.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) return true;
+  if (depth > 3) return false;
+  if (type.isUnionOrIntersection()) {
+    return type.types.some((part) => mentionsUnknown(checker, part, depth + 1));
+  }
+  if (isReference(type)) {
+    return checker
+      .getTypeArguments(type)
+      .some((argument) => mentionsUnknown(checker, argument, depth + 1));
+  }
+  return false;
+}
+
+/** The type parameters of the class a `new` instantiates. */
+function classParameters(
+  checker: ts.TypeChecker,
+  call: ts.NewExpression,
+): ts.Type[] {
+  const declaration = checker
+    .getSymbolAtLocation(call.expression)
+    ?.declarations?.find(
+      (each) => ts.isClassLike(each) || ts.isInterfaceDeclaration(each),
+    );
+  return (
+    declaration?.typeParameters?.map((parameter) =>
+      checker.getTypeAtLocation(parameter),
+    ) ?? []
+  );
+}
+
 /** The wrappers a value passes through unchanged. */
 function carrierParent(node: ts.Node): boolean {
   const parent = node.parent;
@@ -2522,12 +2562,7 @@ export class UnknownSweep {
     ) {
       return;
     }
-    const symbol = this.checker.getSymbolAtLocation(node);
-    const resolved =
-      symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
-        ? this.checker.getAliasedSymbol(symbol)
-        : symbol;
-    const declarations = resolved?.declarations ?? [];
+    const declarations = this.valueSymbol(node)?.declarations ?? [];
     const declaration = declarations[0];
     if (
       declaration === undefined ||
@@ -2778,7 +2813,7 @@ export class UnknownSweep {
                 each.owner === undefined && this.contractsUnknown([each]),
             ) &&
             typeParametersOf(this.checker, type).every((parameter) =>
-              this.boundByUs(parameter, handed.receiver),
+              this.boundByUs(parameter, handed),
             ),
         )
       ) {
@@ -2800,7 +2835,7 @@ export class UnknownSweep {
       const bound = typeParametersOf(this.checker, declared);
       return (
         bound.length > 0 &&
-        bound.every((parameter) => this.boundByUs(parameter, handed.receiver))
+        bound.every((parameter) => this.boundByUs(parameter, handed))
       );
     });
   }
@@ -2856,6 +2891,10 @@ export class UnknownSweep {
     annotated?: ts.Node | undefined;
     /** The callee's parameter it is handed to straight, through parentheses. */
     slot?: ts.Node | undefined;
+    /** The call or the `new` it is handed to. */
+    call?: ts.CallExpression | ts.NewExpression | undefined;
+    /** The argument of that call it is in. */
+    argument?: ts.Expression | undefined;
   } {
     let straight = true;
     let current: ts.Node = fn;
@@ -2890,6 +2929,8 @@ export class UnknownSweep {
           ts.isParameter(last) &&
           last.dotDotDotToken !== undefined;
         return {
+          call: parent,
+          argument: handed[index],
           receiver: ts.isPropertyAccessExpression(callee)
             ? callee.expression
             : ts.isNewExpression(parent)
@@ -2939,76 +2980,349 @@ export class UnknownSweep {
   }
 
   /**
-   * Whether a type parameter is bound by us: one of a signature is bound at
-   * the call (by a type argument we wrote, or a value of ours); one of a
-   * class or an interface by its receiver, when the receiver is ours.
+   * Whether a type parameter is bound by text we wrote. One of a signature
+   * is bound at the call the function is handed to: by type arguments
+   * written there, or inferred from arguments that are each ours
+   * (`writtenOurs`) — none inferring it (a default) is the third party's.
+   * One of a class or an interface is bound by its receiver, when the
+   * receiver is ours. Any other proves nothing.
    */
   private boundByUs(
     parameter: ts.Type,
-    receiver: ts.Expression | undefined,
+    handed: {
+      receiver?: ts.Expression | undefined;
+      call?: ts.CallExpression | ts.NewExpression | undefined;
+      argument?: ts.Expression | undefined;
+    },
   ): boolean {
     const declaration = parameter.getSymbol()?.declarations?.[0];
     const owner = declaration?.parent;
     if (owner === undefined) return false;
-    if (ts.isFunctionLike(owner) && !ts.isTypeAliasDeclaration(owner)) {
-      return true;
-    }
     if (ts.isClassLike(owner) || ts.isInterfaceDeclaration(owner)) {
-      return receiver !== undefined && this.receiverOurs(receiver);
+      return handed.receiver !== undefined && this.writtenOurs(handed.receiver);
     }
-    return false;
+    if (!ts.isFunctionLike(owner) || handed.call === undefined) return false;
+    return this.boundAtCall(parameter, owner, handed.call, handed.argument);
   }
 
   /**
-   * Whether a receiver is ours: `this`, a literal or a `new` we wrote, a
-   * name or a member declared in the repository, a call of a function the
-   * repository declares, or one whose declaration answers no `unknown` of
-   * its own (what it holds came from what we handed it).
+   * Whether a call binds a type parameter of the signature it calls by text
+   * we wrote: its type arguments, or every argument whose declared type
+   * names the parameter ours — at least one, the function being judged
+   * left out.
    */
-  private receiverOurs(receiver: ts.Expression): boolean {
-    let current: ts.Expression = receiver;
+  private boundAtCall(
+    parameter: ts.Type,
+    owner: ts.SignatureDeclaration,
+    call: ts.CallExpression | ts.NewExpression,
+    judged: ts.Expression | undefined,
+  ): boolean {
+    if (this.checker.getResolvedSignature(call)?.getDeclaration() !== owner) {
+      return false;
+    }
+    if (call.typeArguments !== undefined) return true;
+    const handed: readonly ts.Expression[] = call.arguments ?? [];
+    const inferring = owner.parameters.flatMap((declared, at) => {
+      const names = typeParametersOf(
+        this.checker,
+        this.checker.getTypeAtLocation(declared),
+      ).includes(parameter);
+      if (!names) return [];
+      const given =
+        declared.dotDotDotToken !== undefined
+          ? handed.slice(at)
+          : handed.slice(at, at + 1);
+      return given.filter((argument) => argument !== judged);
+    });
+    return (
+      inferring.length > 0 &&
+      inferring.every((argument) => this.writtenOurs(argument))
+    );
+  }
+
+  /**
+   * Whether the `unknown` an expression holds is bound by text we wrote:
+   * a name of ours whose written type holds it (`ownsUnknown`), or, written
+   * without a type, whose initializer and every assignment are ours; a
+   * member of ours so written, or one read off a receiver of ours; a call or
+   * a `new` with type arguments written, one of ours whose written return
+   * holds it, or one answering nothing but type parameters bound by
+   * arguments and a receiver of ours; a literal, a conditional or a logical
+   * operator whose parts are each ours; an assertion's written type. A
+   * third party's name, member, factory or default, a binding with no
+   * written type that cannot be traced, and anything else are not ours.
+   */
+  private writtenOurs(
+    expression: ts.Expression,
+    seen: Set<ts.Node> = new Set(),
+  ): boolean {
+    let current = expression;
     while (
       ts.isParenthesizedExpression(current) ||
       ts.isNonNullExpression(current) ||
-      ts.isAsExpression(current) ||
-      ts.isSatisfiesExpression(current)
+      ts.isSatisfiesExpression(current) ||
+      ts.isAwaitExpression(current)
     ) {
       current = current.expression;
     }
+    if (seen.has(current)) return false;
+    seen.add(current);
     if (
-      current.kind === ts.SyntaxKind.ThisKeyword ||
-      ts.isArrayLiteralExpression(current) ||
-      ts.isObjectLiteralExpression(current) ||
-      ts.isNewExpression(current)
+      ts.isAsExpression(current) ||
+      ts.isTypeAssertionExpression(current) ||
+      ts.isStringLiteral(current) ||
+      ts.isNumericLiteral(current) ||
+      ts.isNoSubstitutionTemplateLiteral(current) ||
+      ts.isTemplateExpression(current) ||
+      ts.isArrowFunction(current) ||
+      ts.isFunctionExpression(current) ||
+      current.kind === ts.SyntaxKind.TrueKeyword ||
+      current.kind === ts.SyntaxKind.FalseKeyword ||
+      current.kind === ts.SyntaxKind.NullKeyword ||
+      current.kind === ts.SyntaxKind.ThisKeyword
     ) {
       return true;
     }
-    if (ts.isIdentifier(current) || ts.isPropertyAccessExpression(current)) {
-      const symbol = this.checker.getSymbolAtLocation(
-        ts.isIdentifier(current) ? current : current.name,
-      );
-      const resolved =
-        symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
-          ? this.checker.getAliasedSymbol(symbol)
-          : symbol;
-      const declarations = resolved?.declarations ?? [];
+    if (ts.isIdentifier(current)) return this.nameOurs(current, seen);
+    if (ts.isPropertyAccessExpression(current)) {
+      const declarations =
+        this.checker.getSymbolAtLocation(current.name)?.declarations ?? [];
       return (
         declarations.length > 0 &&
         declarations.every((declaration) => ownNode(declaration))
       );
     }
-    if (ts.isCallExpression(current)) {
-      const declaration = this.checker
-        .getResolvedSignature(current)
-        ?.getDeclaration();
-      if (declaration === undefined) return false;
-      if (ownNode(declaration)) return true;
-      const declared = this.checker
-        .getSignatureFromDeclaration(declaration)
-        ?.getReturnType();
-      return declared !== undefined && this.held(declared).length === 0;
+    if (ts.isElementAccessExpression(current)) {
+      return this.writtenOurs(current.expression, seen);
+    }
+    if (ts.isCallExpression(current) || ts.isNewExpression(current)) {
+      return this.callOurs(current, seen);
+    }
+    if (ts.isArrayLiteralExpression(current)) {
+      return current.elements.every((element) =>
+        this.writtenOurs(
+          ts.isSpreadElement(element) ? element.expression : element,
+          seen,
+        ),
+      );
+    }
+    if (ts.isObjectLiteralExpression(current)) {
+      return current.properties.every((property) =>
+        ts.isPropertyAssignment(property)
+          ? this.writtenOurs(property.initializer, seen)
+          : ts.isShorthandPropertyAssignment(property)
+            ? this.nameOurs(property.name, seen)
+            : ts.isSpreadAssignment(property)
+              ? this.writtenOurs(property.expression, seen)
+              : true,
+      );
+    }
+    if (ts.isConditionalExpression(current)) {
+      return (
+        this.writtenOurs(current.whenTrue, seen) &&
+        this.writtenOurs(current.whenFalse, seen)
+      );
+    }
+    if (ts.isBinaryExpression(current)) {
+      const kind = current.operatorToken.kind;
+      if (kind === ts.SyntaxKind.CommaToken) {
+        return this.writtenOurs(current.right, seen);
+      }
+      if (
+        kind === ts.SyntaxKind.BarBarToken ||
+        kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+        kind === ts.SyntaxKind.QuestionQuestionToken
+      ) {
+        return (
+          this.writtenOurs(current.left, seen) &&
+          this.writtenOurs(current.right, seen)
+        );
+      }
     }
     return false;
+  }
+
+  /** `writtenOurs` of a name: what its declaration writes or is given. */
+  private nameOurs(node: ts.Identifier, seen: Set<ts.Node>): boolean {
+    const symbol = this.valueSymbol(node);
+    const declarations = symbol?.declarations ?? [];
+    const declaration = declarations[0];
+    if (
+      symbol === undefined ||
+      declaration === undefined ||
+      declarations.some((each) => !ownNode(each))
+    ) {
+      return false;
+    }
+    if (
+      ts.isFunctionDeclaration(declaration) ||
+      ts.isClassDeclaration(declaration) ||
+      ts.isEnumDeclaration(declaration) ||
+      ts.isModuleDeclaration(declaration)
+    ) {
+      return true;
+    }
+    if (
+      (ts.isParameter(declaration) ||
+        ts.isVariableDeclaration(declaration) ||
+        ts.isPropertyDeclaration(declaration)) &&
+      declaration.type !== undefined
+    ) {
+      return this.ownsUnknown(declaration);
+    }
+    if (ts.isParameter(declaration)) {
+      const fn = declaration.parent;
+      return (
+        this.unwrittenParameterHeld(declaration).length === 0 &&
+        (ts.isArrowFunction(fn) ||
+          ts.isFunctionExpression(fn) ||
+          ts.isMethodDeclaration(fn))
+      );
+    }
+    if (
+      ts.isVariableDeclaration(declaration) ||
+      ts.isBindingElement(declaration)
+    ) {
+      if (!this.bindingOurs(declaration, seen)) return false;
+      // Every assignment to it, too (`later = specialised`).
+      return (this.references.get(symbol) ?? []).every((use) => {
+        const parent = use.parent;
+        return (
+          !(
+            ts.isBinaryExpression(parent) &&
+            parent.left === use &&
+            parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          ) || this.writtenOurs(parent.right, seen)
+        );
+      });
+    }
+    return false;
+  }
+
+  /**
+   * What a binding with no written type takes its value from: a variable's
+   * initializer, what a `for … of` walks, a destructuring's source; a
+   * default is a source beside it, so a binding with one has none here.
+   */
+  private bindingSource(
+    node: ts.VariableDeclaration | ts.BindingElement,
+  ): ts.Expression | undefined {
+    if (ts.isBindingElement(node)) {
+      if (node.initializer !== undefined) return undefined;
+      const holder = node.parent.parent;
+      return ts.isVariableDeclaration(holder)
+        ? (holder.initializer ?? this.forOfSource(holder))
+        : undefined;
+    }
+    return node.initializer ?? this.forOfSource(node);
+  }
+
+  /**
+   * Whether what a binding with no written type holds is ours: its source
+   * (`bindingSource`) is, or, an element of a parameter's destructuring, the
+   * parameter is — written so (`ownsUnknown`), or proven ours.
+   */
+  private bindingOurs(
+    node: ts.VariableDeclaration | ts.BindingElement,
+    seen: Set<ts.Node> = new Set(),
+  ): boolean {
+    // A member the repository declares is ours, as when it is read by name
+    // (charged where it is declared).
+    if (ts.isBindingElement(node) && this.ownMember(node)) return true;
+    const source = this.bindingSource(node);
+    if (source !== undefined) return this.writtenOurs(source, seen);
+    if (!ts.isBindingElement(node) || node.initializer !== undefined) {
+      return false;
+    }
+    const holder = node.parent.parent;
+    if (!ts.isParameter(holder)) return false;
+    return holder.type !== undefined
+      ? this.ownsUnknown(holder)
+      : this.unwrittenParameterHeld(holder).length === 0;
+  }
+
+  /** The declarations of the member an object destructuring's element reads. */
+  private destructuredMember(node: ts.BindingElement): readonly ts.Node[] {
+    if (!ts.isObjectBindingPattern(node.parent)) return [];
+    const key = node.propertyName ?? node.name;
+    const name =
+      ts.isIdentifier(key) || ts.isStringLiteral(key) ? key.text : undefined;
+    if (name === undefined) return [];
+    const member = this.checker.getPropertyOfType(
+      this.checker.getTypeAtLocation(node.parent),
+      name,
+    );
+    return member?.declarations ?? [];
+  }
+
+  /** Whether an object destructuring's element reads a member of ours. */
+  private ownMember(node: ts.BindingElement): boolean {
+    const declarations = this.destructuredMember(node);
+    return (
+      declarations.length > 0 && declarations.every((each) => ownNode(each))
+    );
+  }
+
+  /** What a `for … of` (or `for await … of`) declaring it walks. */
+  private forOfSource(node: ts.VariableDeclaration): ts.Expression | undefined {
+    const list = node.parent;
+    const loop = ts.isVariableDeclarationList(list) ? list.parent : undefined;
+    return loop !== undefined && ts.isForOfStatement(loop)
+      ? loop.expression
+      : undefined;
+  }
+
+  /** `writtenOurs` of a call or a `new`. */
+  private callOurs(
+    call: ts.CallExpression | ts.NewExpression,
+    seen: Set<ts.Node>,
+  ): boolean {
+    if (call.typeArguments !== undefined) return true;
+    const declaration = this.checker
+      .getResolvedSignature(call)
+      ?.getDeclaration();
+    if (declaration === undefined) return false;
+    if (
+      ownNode(declaration) &&
+      declaration.type !== undefined &&
+      this.ownsUnknown(declaration)
+    ) {
+      return true;
+    }
+    const returned = ts.isConstructorDeclaration(declaration)
+      ? undefined
+      : this.checker.getSignatureFromDeclaration(declaration)?.getReturnType();
+    const declared =
+      returned ??
+      (ts.isNewExpression(call)
+        ? this.checker.getTypeAtLocation(call.expression)
+        : undefined);
+    if (declared === undefined) return false;
+    if (mentionsUnknown(this.checker, declared)) return ownNode(declaration);
+    const callee = call.expression;
+    const receiver = ts.isPropertyAccessExpression(callee)
+      ? callee.expression
+      : undefined;
+    const parameters = ts.isNewExpression(call)
+      ? classParameters(this.checker, call)
+      : typeParametersOf(this.checker, declared);
+    return parameters.every((parameter) => {
+      const owner = parameter.getSymbol()?.declarations?.[0]?.parent;
+      if (owner === undefined) return false;
+      if (ts.isClassLike(owner) || ts.isInterfaceDeclaration(owner)) {
+        if (
+          ts.isNewExpression(call) &&
+          ts.isConstructorDeclaration(declaration)
+        ) {
+          return this.boundAtCall(parameter, declaration, call, undefined);
+        }
+        return receiver !== undefined && this.writtenOurs(receiver, seen);
+      }
+      return (
+        ts.isFunctionLike(owner) &&
+        this.boundAtCall(parameter, owner, call, undefined)
+      );
+    });
   }
 
   /**

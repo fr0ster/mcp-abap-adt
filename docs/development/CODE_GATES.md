@@ -69,26 +69,35 @@ against a `?: T`.
       holds one no argument or receiver of ours brought in (`Reflect.get(box, 'data')`);
     - a destructuring — of a variable, a parameter, an assignment or a `for … of` head;
       nested, renamed, with a default, by a rest;
+    - a name whose every declaration is outside the repository (a third party's value, a
+      global of the language), for what its type holds at the top, in a list or a promise;
     - a callback's parameter to which a contract hands its own `unknown` (a `JSON.parse`
       reviver's value, a predicate over a list the language types `any[]`), written with a
-      type or taking the contract's — the parameter of the callee it is handed to, or of the
-      member an object literal's method implements, as that declaration writes it,
-      every overload: a type argument written there (`Listener<unknown>`) is the third
-      party's, a type parameter is bound by the caller, a slot written `ToolArgs` is input
-      until checked. Once any contract hands it the `unknown`, it passes as a
-      `callback` only when every use of it passes on (below) and it has no default — a
-      default tests for `undefined` and may replace the value. A position in a parameter of
-      a function the contract hands (`reject(reason?: any)`) is written into by a call, not
-      read.
+      type or not. One written without a type takes its type as the checker gives it, in
+      whatever position the contract types it (a call's argument, a list, a tuple, a rest,
+      a spread, an object literal's method, a receiver's member, called or assigned), and
+      its `unknown` is **the third party's unless proven ours** for every contract
+      signature: the contract's parameter declared in the repository or written
+      `ToolArgs`; an annotation of ours whose written type holds it; or nothing but type
+      parameters bound by us — a signature's (bound at our call: a type argument we wrote,
+      a value of ours), or a class's or an interface's whose receiver is ours (`this`, a
+      literal, a `new`, a name or a member the repository declares, a call answering no
+      `unknown` of its own). A type alias's type parameter instantiated outside
+      (`Listener<unknown>`) proves nothing. It passes as a `callback` only when every use
+      of it passes on (below) and it has no default — a default tests for `undefined` and
+      may replace the value. A position in a parameter of a function the contract hands
+      (`reject(reason?: any)`) is written into by a call, not read.
 
     It passes only inside a listed function (`PARSE_SITES`, `THROWN_READERS`, `SINK_SITES`,
     matched by `file#function(`, closures inside it included); landing whole where `unknown`
     or `any` is declared — a parameter, a member or a return written so (a sink:
     `JSON.stringify`, `String`, a logger's meta, a listed site) — or in a slot written
-    `ToolArgs` (input until checked), an `await` handing on what it settles with; or read
-    for its keys alone — `Object.keys`,
+    `ToolArgs` (input until checked), a list literal landing there whole included, through
+    parentheses, a conditional's branch, the right operand of `||`, `&&` and `??`, and an
+    `await` handing on what it settles with; or read for its keys alone — `Object.keys`,
     `Reflect.ownKeys` (the language's) and `for … in`, the closed list `KEYS_ONLY` (an `any`
-    so read is no `any` landing either). A type parameter instantiated to `unknown` —
+    so read is no `any` landing either). The list is closed: any other parent — a list
+    kept, a template's span, a comma's left operand, a `throw`, a `yield` — refuses. A type parameter instantiated to `unknown` —
     `consume(box.data)` with `consume<T>(value: T)` — is no sink: the function uses the value.
     **Inspecting it is reading it:** `typeof x.data === 'string'`, `x.data === undefined`,
     `x.data instanceof T`, a truthiness test — the left operand of `||`, `&&` and `??`

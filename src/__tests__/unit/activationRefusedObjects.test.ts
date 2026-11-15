@@ -26,6 +26,7 @@ import {
   setSystemContext,
 } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { MEASURED_RUNS } from '../helpers/activationRunsByType';
 import { corpusBody } from '../helpers/adtCorpus';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -234,6 +235,78 @@ describe('ActivateObjects answers the measured refusal', () => {
       );
       expect(payload.message).toContain(`${BROKEN}: ${DAAT}`);
       expect(payload.messages).toEqual(messages);
+    },
+  );
+});
+
+/**
+ * Every type measured (`MEASURED_RUNS`): each error message names the broken
+ * object of its run by its href, and the refusal counts one object of two,
+ * saying none was activated only where the results state
+ * activationExecuted="false".
+ */
+describe('the measured runs of every type', () => {
+  const runs = MEASURED_RUNS.map((run) => [run.system, run.kind, run] as const);
+
+  it.each(runs)(
+    '%s %s: each error message names the broken object, no other message names the good one',
+    (_system, _kind, run) => {
+      const [good, broken] = run.references;
+      const messages = activationMessagesOf(kept(run.results), run.references);
+      const errors = messages.filter((m) => m.type === 'E');
+      expect(errors.length).toBeGreaterThan(0);
+      for (const error of errors) {
+        expect(error.objectName).toBe(run.broken);
+        expect(error.uri).toBe(broken?.uri);
+      }
+      expect(messages.some((m) => m.objectName === good?.name)).toBe(false);
+      expect(activationExecutedOf(kept(run.results))).toBe(run.executed);
+    },
+  );
+
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  beforeEach(() => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    setSystemContext({
+      masterSystem: 'SYSTEM_PLACEHOLDER',
+      responsible: 'USER_PLACEHOLDER',
+    });
+  });
+  afterEach(() => {
+    resetSystemContextCache();
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  // A function module's reference is checked against its group first (one
+  // metadata read per module), which this run's answers do not hold: its
+  // naming is the case above.
+  it.each(runs.filter(([, kind]) => kind !== 'FUGR/FF'))(
+    '%s %s: ActivateObjects refuses one object of two',
+    async (_system, kind, run) => {
+      const connection = finishedRun(run.results);
+      declareSystemKind(connection, 'onprem');
+      const answered = await handleActivateObjects(
+        { connection },
+        {
+          objects: run.references.map((reference) => ({
+            name: reference.name,
+            type: kind,
+          })),
+        },
+      );
+      expect(answered.isError).toBe(true);
+      const payload = payloadOf(answered);
+      expect(payload.origin).toBe('refusal');
+      expect(payload.message).toContain(
+        `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
+      );
+      expect(
+        String(payload.message).includes(
+          'none of the 2 object(s) was activated',
+        ),
+      ).toBe(!run.executed);
+      expect(payload.message).toContain(`${run.broken}: `);
     },
   );
 });

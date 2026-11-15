@@ -179,6 +179,8 @@ describe('the type gate: any is an error', () => {
       [48, 'unknown'],
       [60, 'unknown'],
       [61, 'any'],
+      [67, 'unknown'],
+      [70, 'any'],
     ]);
   });
 });

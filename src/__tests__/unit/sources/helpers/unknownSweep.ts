@@ -471,21 +471,12 @@ function listed(node: ts.Node): boolean {
  * type names it (an implementation written as a literal).
  */
 function inSinkContract(node: ts.Node): boolean {
-  const names = (type: ts.TypeNode | undefined): boolean => {
-    if (type === undefined) return false;
-    let found = false;
-    const visit = (at: ts.Node): void => {
-      if (
-        ts.isTypeReferenceNode(at) &&
-        SINK_CONTRACTS.includes(at.typeName.getText())
-      ) {
-        found = true;
-      }
-      ts.forEachChild(at, visit);
-    };
-    visit(type);
-    return found;
-  };
+  // The declaration's written type is the contract itself, not a type that
+  // merely holds it somewhere (`{ sink?: ILogger; answer: boolean }`).
+  const names = (type: ts.TypeNode | undefined): boolean =>
+    type !== undefined &&
+    ts.isTypeReferenceNode(type) &&
+    SINK_CONTRACTS.includes(type.typeName.getText());
   for (let at: ts.Node | undefined = node; at; at = at.parent) {
     if (
       (ts.isInterfaceDeclaration(at) || ts.isTypeAliasDeclaration(at)) &&
@@ -747,7 +738,6 @@ export function gateSites(
         valueNode(node) &&
         checker.getTypeAtLocation(node).flags & ts.TypeFlags.Any &&
         !listed(node) &&
-        !inSinkContract(node) &&
         !handedOnWhole(checker, node)
       ) {
         out.push({

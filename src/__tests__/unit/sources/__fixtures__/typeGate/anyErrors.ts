@@ -60,3 +60,12 @@ export const proxied = new Proxy(
 export async function awaited(text: string): Promise<unknown> {
   return JSON.parse(text);
 }
+
+// Error: a declaration whose type merely holds a sink contract somewhere
+// exempts nothing inside it.
+interface ILogger {
+  info(message: string, meta?: unknown): void;
+}
+export const disguised: { sink?: ILogger; answer: boolean } = {
+  answer: typeof JSON.parse('0') === 'string',
+};

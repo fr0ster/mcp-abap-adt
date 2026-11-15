@@ -600,6 +600,31 @@ function declarationName(node: ts.Node): ts.Node | undefined {
   return undefined;
 }
 
+/**
+ * The type parameters a declared type is made of: itself, the members of a
+ * union or an intersection, a reference's type arguments (a list's
+ * element), a few levels deep.
+ */
+function typeParametersOf(
+  checker: ts.TypeChecker,
+  type: ts.Type,
+  depth = 0,
+): ts.Type[] {
+  if (type.flags & ts.TypeFlags.TypeParameter) return [type];
+  if (depth > 3) return [];
+  if (type.isUnionOrIntersection()) {
+    return type.types.flatMap((part) =>
+      typeParametersOf(checker, part, depth + 1),
+    );
+  }
+  if (isReference(type)) {
+    return checker
+      .getTypeArguments(type)
+      .flatMap((argument) => typeParametersOf(checker, argument, depth + 1));
+  }
+  return [];
+}
+
 /** The wrappers a value passes through unchanged. */
 function carrierParent(node: ts.Node): boolean {
   const parent = node.parent;
@@ -1272,7 +1297,7 @@ export class UnknownSweep {
     const held = this.ownHeld(node);
     if (held.length === 0) {
       if (!ts.isParameter(node)) return;
-      const contract = this.contractParameterHeld(node);
+      const contract = this.unwrittenParameterHeld(node);
       if (contract.length === 0) return;
       // Written without a type, it takes the contract's: judged exactly as
       // one written with it. A boundary of its own (a rejection handler's
@@ -2629,18 +2654,116 @@ export class UnknownSweep {
   }
 
   /**
-   * The positions of `unknown` or `any` a callback's parameter written
-   * without a type takes from its contract, when the contract is declared
-   * outside the repository (one of ours is charged where it is written).
+   * The positions of `unknown` or `any` a parameter written without a type
+   * holds as the checker types it — a function expression's, an arrow's, an
+   * object literal's method's: its contract's, in whatever position the
+   * contract types it (a list, a tuple, a rest, a spread, a receiver's
+   * member). They are the third party's unless proven ours (`provenOurs`),
+   * so refused by default.
    */
-  private contractParameterHeld(
+  private unwrittenParameterHeld(
     node: ts.ParameterDeclaration,
   ): readonly Held[] {
     if (node.type !== undefined) return [];
     const fn = node.parent;
+    if (
+      !ts.isArrowFunction(fn) &&
+      !ts.isFunctionExpression(fn) &&
+      !(ts.isMethodDeclaration(fn) && ts.isObjectLiteralExpression(fn.parent))
+    ) {
+      return [];
+    }
+    const held = this.held(this.checker.getTypeAtLocation(node)).filter(
+      (each) => each.owner === undefined,
+    );
+    if (held.length === 0 || this.provenOurs(node, fn)) return [];
+    return held;
+  }
+
+  /**
+   * Whether the `unknown` a parameter written without a type takes is
+   * proven ours, for every contract signature that types it: the
+   * signature's parameter declared in the repository (charged there) or
+   * written `ToolArgs` (input until checked); the contextual type a type
+   * of ours writes the `unknown` in (charged there); or the declared
+   * parameter holding nothing but type parameters each bound by us — one
+   * of a signature (bound at our call, by a type argument we wrote or a
+   * value of ours) or of a class or interface whose receiver is ours. A
+   * type parameter of a type alias, or anything else, proves nothing.
+   */
+  private provenOurs(
+    node: ts.ParameterDeclaration,
+    fn: ts.SignatureDeclaration,
+  ): boolean {
     const at = fn.parameters.indexOf(node);
-    // A method of an object literal: the member its contract declares, as
-    // declared. (A setter's parameter is not typed by the contract.)
+    const handed = this.handedTo(fn);
+    if (handed.annotated !== undefined && this.ownsUnknown(handed.annotated)) {
+      return true;
+    }
+    // Handed straight to a call: the callee's parameter, as its declaration
+    // writes it, says what the call binds (`subscribeTo<T>(listener:
+    // Listener<T>, value: T)` with a value of ours).
+    if (handed.slot !== undefined) {
+      const slot = handed.slot;
+      if (ownNode(slot) || this.toolArgs(slot)) return true;
+      const positions = callSignatures(
+        this.checker,
+        this.checker.getTypeAtLocation(slot),
+      ).flatMap((signature) => {
+        const parameters = signature.getParameters();
+        const last = parameters.at(-1)?.valueDeclaration;
+        const rest =
+          last !== undefined &&
+          ts.isParameter(last) &&
+          last.dotDotDotToken !== undefined;
+        const parameter =
+          parameters[at] ?? (rest ? parameters.at(-1) : undefined);
+        return parameter === undefined
+          ? []
+          : [this.checker.getTypeOfSymbol(parameter)];
+      });
+      if (
+        positions.length > 0 &&
+        positions.every(
+          (type) =>
+            !this.held(type).some(
+              (each) =>
+                each.owner === undefined && this.contractsUnknown([each]),
+            ) &&
+            typeParametersOf(this.checker, type).every((parameter) =>
+              this.boundByUs(parameter, handed.receiver),
+            ),
+        )
+      ) {
+        return true;
+      }
+    }
+    const contracts = this.contractParameters(fn, at);
+    if (contracts.length === 0) return false;
+    return contracts.every((declaration) => {
+      if (ownNode(declaration) || this.toolArgs(declaration)) return true;
+      const declared = this.checker.getTypeAtLocation(declaration);
+      if (
+        this.held(declared).some(
+          (each) => each.owner === undefined && this.contractsUnknown([each]),
+        )
+      ) {
+        return false;
+      }
+      const bound = typeParametersOf(this.checker, declared);
+      return (
+        bound.length > 0 &&
+        bound.every((parameter) => this.boundByUs(parameter, handed.receiver))
+      );
+    });
+  }
+
+  /** The declarations of each contract signature's parameter `at`. */
+  private contractParameters(
+    fn: ts.SignatureDeclaration,
+    at: number,
+  ): ts.Node[] {
+    let contextual: ts.Type | undefined;
     if (ts.isMethodDeclaration(fn) && ts.isObjectLiteralExpression(fn.parent)) {
       const literal = this.checker.getContextualType(fn.parent);
       const name = propertyName(fn.name);
@@ -2651,106 +2774,194 @@ export class UnknownSweep {
               this.checker.getNonNullableType(literal),
               name,
             );
-      const declarations = member?.declarations ?? [];
-      if (
-        declarations.length === 0 ||
-        declarations.some((declaration) => ownNode(declaration))
-      ) {
-        return [];
-      }
-      return declarations.flatMap((declaration) =>
-        this.slotParameterHeld(declaration, at),
-      );
+      contextual =
+        member === undefined ? undefined : this.checker.getTypeOfSymbol(member);
+    } else if (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) {
+      contextual = this.checker.getContextualType(fn);
     }
-    if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return [];
-    // Handed to a call: the callee's parameter, as its declaration writes
-    // it — a type argument written there is the third party's
-    // (`Listener<unknown>`), a type parameter is bound by the caller.
-    const outer = outermost(fn);
-    const call = outer.parent;
-    if (
-      (ts.isCallExpression(call) || ts.isNewExpression(call)) &&
-      call.expression !== outer
-    ) {
-      const parameters =
-        this.checker.getResolvedSignature(call)?.getParameters() ?? [];
-      const last = parameters.at(-1)?.valueDeclaration;
-      const rest =
-        last !== undefined &&
-        ts.isParameter(last) &&
-        last.dotDotDotToken !== undefined;
-      const handed: readonly ts.Expression[] = call.arguments ?? [];
-      const index = handed.indexOf(outer);
-      const slot = (parameters[index] ?? (rest ? parameters.at(-1) : undefined))
-        ?.valueDeclaration;
-      if (slot === undefined || ownNode(slot) || this.toolArgs(slot)) {
-        return [];
-      }
-      return this.slotParameterHeld(slot, at);
-    }
-    // An optional callback's contract is `… | undefined`: its signatures
-    // are the function's.
-    const contextual = this.checker.getContextualType(fn);
-    const signatures =
-      contextual === undefined
-        ? []
-        : this.checker.getNonNullableType(contextual).getCallSignatures();
-    const declarations = signatures.map((signature) => {
+    const declarations: ts.Node[] = [];
+    for (const signature of callSignatures(this.checker, contextual)) {
       const parameters = signature.getParameters();
       const last = parameters.at(-1)?.valueDeclaration;
       const rest =
         last !== undefined &&
         ts.isParameter(last) &&
         last.dotDotDotToken !== undefined;
-      return (parameters[at] ?? (rest ? parameters.at(-1) : undefined))
-        ?.valueDeclaration;
-    });
-    // Every contract it may take is a third party's, and none writes the
-    // slot `ToolArgs` (input until checked, as when written here).
-    const contracts: ts.Node[] = [];
-    for (const declaration of declarations) {
-      if (
-        declaration === undefined ||
-        ownNode(declaration) ||
-        this.toolArgs(declaration)
-      ) {
-        return [];
-      }
-      contracts.push(declaration);
+      const declaration = (
+        parameters[at] ?? (rest ? parameters.at(-1) : undefined)
+      )?.valueDeclaration;
+      // A contract with no declaration for it proves nothing.
+      if (declaration === undefined) return [];
+      declarations.push(declaration);
     }
-    // The contract's declared type: a type parameter it is instantiated
-    // with is bound by the caller, where it is written.
-    return contracts.flatMap((declaration) =>
-      this.held(this.checker.getTypeAtLocation(declaration)).filter(
-        (each) => each.owner === undefined,
-      ),
-    );
+    return declarations;
   }
 
   /**
-   * The positions of `unknown` or `any` the parameter `at` of each call
-   * signature a slot's declaration writes holds: every overload, an
-   * instantiation the declaration writes (`Listener<unknown>`) included.
+   * Where a function is handed, through the wrappers that carry it (a list,
+   * a spread, an object literal, a conditional's branch, parentheses): the
+   * receiver of the call or the assignment that takes it, and the
+   * declaration of ours whose written type types it (a variable's, a
+   * return's), when there is one.
    */
-  private slotParameterHeld(slot: ts.Node, at: number): readonly Held[] {
-    return callSignatures(
-      this.checker,
-      this.checker.getTypeAtLocation(slot),
-    ).flatMap((signature) => {
-      const parameters = signature.getParameters();
-      const last = parameters.at(-1)?.valueDeclaration;
-      const rest =
-        last !== undefined &&
-        ts.isParameter(last) &&
-        last.dotDotDotToken !== undefined;
-      const parameter =
-        parameters[at] ?? (rest ? parameters.at(-1) : undefined);
-      return parameter === undefined
-        ? []
-        : this.held(this.checker.getTypeOfSymbol(parameter)).filter(
-            (each) => each.owner === undefined,
-          );
-    });
+  private handedTo(fn: ts.SignatureDeclaration): {
+    receiver?: ts.Expression | undefined;
+    annotated?: ts.Node | undefined;
+    /** The callee's parameter it is handed to straight, through parentheses. */
+    slot?: ts.Node | undefined;
+  } {
+    let straight = true;
+    let current: ts.Node = fn;
+    for (;;) {
+      const parent = current.parent;
+      if (
+        ts.isParenthesizedExpression(parent) ||
+        ts.isArrayLiteralExpression(parent) ||
+        ts.isSpreadElement(parent) ||
+        ts.isObjectLiteralExpression(parent) ||
+        ts.isAsExpression(parent) ||
+        ts.isSatisfiesExpression(parent) ||
+        (ts.isPropertyAssignment(parent) && parent.initializer === current) ||
+        (ts.isConditionalExpression(parent) && parent.condition !== current)
+      ) {
+        if (!ts.isParenthesizedExpression(parent)) straight = false;
+        current = parent;
+        continue;
+      }
+      if (
+        (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+        parent.expression !== current
+      ) {
+        const callee = parent.expression;
+        const handed: readonly ts.Expression[] = parent.arguments ?? [];
+        const index = handed.findIndex((argument) => argument === current);
+        const parameters =
+          this.checker.getResolvedSignature(parent)?.getParameters() ?? [];
+        const last = parameters.at(-1)?.valueDeclaration;
+        const rest =
+          last !== undefined &&
+          ts.isParameter(last) &&
+          last.dotDotDotToken !== undefined;
+        return {
+          receiver: ts.isPropertyAccessExpression(callee)
+            ? callee.expression
+            : ts.isNewExpression(parent)
+              ? parent
+              : undefined,
+          slot: straight
+            ? (parameters[index] ?? (rest ? parameters.at(-1) : undefined))
+                ?.valueDeclaration
+            : undefined,
+        };
+      }
+      if (
+        ts.isBinaryExpression(parent) &&
+        parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        parent.right === current
+      ) {
+        const target = parent.left;
+        return {
+          receiver: ts.isPropertyAccessExpression(target)
+            ? target.expression
+            : undefined,
+        };
+      }
+      if (
+        (ts.isVariableDeclaration(parent) ||
+          ts.isPropertyDeclaration(parent)) &&
+        parent.initializer === current &&
+        parent.type !== undefined &&
+        ownNode(parent)
+      ) {
+        return { annotated: parent };
+      }
+      const returned = ts.isReturnStatement(parent)
+        ? ts.findAncestor(parent, ts.isFunctionLike)
+        : ts.isArrowFunction(parent) && parent.body === current
+          ? parent
+          : undefined;
+      if (
+        returned !== undefined &&
+        returned.type !== undefined &&
+        ownNode(returned)
+      ) {
+        return { annotated: returned };
+      }
+      return {};
+    }
+  }
+
+  /**
+   * Whether a type parameter is bound by us: one of a signature is bound at
+   * the call (by a type argument we wrote, or a value of ours); one of a
+   * class or an interface by its receiver, when the receiver is ours.
+   */
+  private boundByUs(
+    parameter: ts.Type,
+    receiver: ts.Expression | undefined,
+  ): boolean {
+    const declaration = parameter.getSymbol()?.declarations?.[0];
+    const owner = declaration?.parent;
+    if (owner === undefined) return false;
+    if (ts.isFunctionLike(owner) && !ts.isTypeAliasDeclaration(owner)) {
+      return true;
+    }
+    if (ts.isClassLike(owner) || ts.isInterfaceDeclaration(owner)) {
+      return receiver !== undefined && this.receiverOurs(receiver);
+    }
+    return false;
+  }
+
+  /**
+   * Whether a receiver is ours: `this`, a literal or a `new` we wrote, a
+   * name or a member declared in the repository, a call of a function the
+   * repository declares, or one whose declaration answers no `unknown` of
+   * its own (what it holds came from what we handed it).
+   */
+  private receiverOurs(receiver: ts.Expression): boolean {
+    let current: ts.Expression = receiver;
+    while (
+      ts.isParenthesizedExpression(current) ||
+      ts.isNonNullExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current)
+    ) {
+      current = current.expression;
+    }
+    if (
+      current.kind === ts.SyntaxKind.ThisKeyword ||
+      ts.isArrayLiteralExpression(current) ||
+      ts.isObjectLiteralExpression(current) ||
+      ts.isNewExpression(current)
+    ) {
+      return true;
+    }
+    if (ts.isIdentifier(current) || ts.isPropertyAccessExpression(current)) {
+      const symbol = this.checker.getSymbolAtLocation(
+        ts.isIdentifier(current) ? current : current.name,
+      );
+      const resolved =
+        symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
+          ? this.checker.getAliasedSymbol(symbol)
+          : symbol;
+      const declarations = resolved?.declarations ?? [];
+      return (
+        declarations.length > 0 &&
+        declarations.every((declaration) => ownNode(declaration))
+      );
+    }
+    if (ts.isCallExpression(current)) {
+      const declaration = this.checker
+        .getResolvedSignature(current)
+        ?.getDeclaration();
+      if (declaration === undefined) return false;
+      if (ownNode(declaration)) return true;
+      const declared = this.checker
+        .getSignatureFromDeclaration(declaration)
+        ?.getReturnType();
+      return declared !== undefined && this.held(declared).length === 0;
+    }
+    return false;
   }
 
   /**

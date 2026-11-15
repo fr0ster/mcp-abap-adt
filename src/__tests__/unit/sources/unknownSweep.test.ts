@@ -900,6 +900,24 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it("a callback's parameter written without a type, in a list, a tuple, a rest, a spread or from a receiver the third party instantiated, is the third party's unless proven ours", () => {
+    assert.deepEqual(thirdPartyReads('externalShapes'), [
+      [20, 'refused'],
+      [21, 'refused'],
+      [22, 'refused'],
+      [24, 'refused'],
+      [29, 'refused'],
+      [30, 'refused'],
+    ]);
+    // A receiver of ours, a value of ours, a type argument we wrote: ours.
+    assert.deepEqual(
+      sitesOf('externalShapes').filter(
+        (site) => lineOf(site) >= 32 && site.reason === 'third-party',
+      ),
+      [],
+    );
+  });
+
   it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
     // The parse each reviver is handed to passes whole into a sink.
     assert.deepEqual(thirdPartyReads('callbackDefaults'), [

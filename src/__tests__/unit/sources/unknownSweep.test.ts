@@ -949,6 +949,7 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
       [29, 'refused'],
       [32, 'refused'],
       [37, 'refused'],
+      [42, 'refused'],
       [50, 'refused'],
       [51, 'refused'],
       [52, 'refused'],

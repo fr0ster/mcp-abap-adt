@@ -2545,13 +2545,14 @@ export class UnknownSweep {
    */
   private foreignName(node: ts.Identifier): void {
     const parent = node.parent;
+    // A shorthand property (`{ raw }`) reads the name it writes.
+    const shorthand = ts.isShorthandPropertyAssignment(parent);
     if (
       ts.isPartOfTypeNode(node) ||
       typeHeritage(node) ||
       (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
       (ts.isQualifiedName(parent) && parent.right === node) ||
-      declarationName(parent) === node ||
-      ts.isShorthandPropertyAssignment(parent) ||
+      (!shorthand && declarationName(parent) === node) ||
       ts.isImportSpecifier(parent) ||
       ts.isExportSpecifier(parent) ||
       ts.isImportClause(parent) ||

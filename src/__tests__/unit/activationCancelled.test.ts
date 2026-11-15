@@ -314,7 +314,7 @@ describe('a run document kept as text, read through the XML parser', () => {
   const FAILED = corpusBody('refusal-activation-fails--01-activation');
 
   it('the recorded refusal: its message, type and words — tests/fixtures/adt/refusal-activation-fails--01-activation.body.xml', () => {
-    expect(activationMessagesOf(kept(FAILED))).toEqual([
+    expect(activationMessagesOf(kept(FAILED), [])).toEqual([
       { type: 'E', text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.' },
     ]);
     expect(activationExecutedOf(kept(FAILED))).toBe(false);
@@ -322,7 +322,7 @@ describe('a run document kept as text, read through the XML parser', () => {
 
   it('the recorded success: no messages, activation executed — tests/fixtures/adt/activation-success-verdict--01-activation.body.xml', () => {
     const success = corpusBody('activation-success-verdict--01-activation');
-    expect(activationMessagesOf(kept(success))).toEqual([]);
+    expect(activationMessagesOf(kept(success), [])).toEqual([]);
     expect(activationExecutedOf(kept(success))).toBe(true);
   });
 
@@ -350,7 +350,7 @@ describe('a run document kept as text, read through the XML parser', () => {
     const document =
       `<chkl:messages ${CHECKLIST}><msg type='E' objName='ZMCP_X'>` +
       '<shortText><txt>A &lt; B</txt></shortText></msg></chkl:messages>';
-    expect(activationMessagesOf(kept(document))).toEqual([
+    expect(activationMessagesOf(kept(document), [])).toEqual([
       { type: 'E', text: 'A < B', objectName: 'ZMCP_X' },
     ]);
   });

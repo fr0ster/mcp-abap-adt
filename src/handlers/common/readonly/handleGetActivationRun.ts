@@ -99,7 +99,8 @@ export async function handleGetActivationResults(
     { tool: 'HandlerGet', detail: 'raw' },
     () => utils.getActivationResults(runId, { analyse: analyseException }),
     (value) => {
-      const messages = activationMessagesOf(value);
+      // A run read by its id alone: no references to name objects by.
+      const messages = activationMessagesOf(value, []);
       const executed = activationExecutedOf(value);
       return {
         run_id: runId,

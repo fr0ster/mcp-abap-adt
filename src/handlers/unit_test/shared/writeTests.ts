@@ -410,9 +410,15 @@ async function activateWithMainProgram(
     started.getResult().value,
     analyseException,
     [
-      buildObjectUri(includeName, 'FUGR/I', groupName),
-      buildObjectUri(groupName, 'FUGR/F'),
-      buildObjectUri(mainProgram, 'FUGR/I', groupName),
+      {
+        name: includeName,
+        uri: buildObjectUri(includeName, 'FUGR/I', groupName),
+      },
+      { name: groupName, uri: buildObjectUri(groupName, 'FUGR/F') },
+      {
+        name: mainProgram,
+        uri: buildObjectUri(mainProgram, 'FUGR/I', groupName),
+      },
     ],
   );
   // Reading the run failed: the method's error as it is, with its step.

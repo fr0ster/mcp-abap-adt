@@ -171,10 +171,13 @@ async function forceSaveViewSource(
 }
 
 /** The uris a run's silent results are checked against, one per object. */
-function runUris(objects: GroupObject<AdtGroupActivationCode<'onprem'>>[]) {
-  return objects.map((obj) =>
-    buildObjectUri(obj.name, obj.type, obj.parentName),
-  );
+function runReferences(
+  objects: GroupObject<AdtGroupActivationCode<'onprem'>>[],
+) {
+  return objects.map((obj) => ({
+    name: obj.name,
+    uri: buildObjectUri(obj.name, obj.type, obj.parentName),
+  }));
 }
 
 /**
@@ -289,7 +292,10 @@ async function activateGroupOnce(
     }
     return {
       said: 'POST /sap/bc/adt/activation',
-      messages: activationMessagesOf(answered.getResult().value),
+      messages: activationMessagesOf(
+        answered.getResult().value,
+        runReferences(objects),
+      ),
     };
   }
   // **The messages are in the run's results, not in the POST.**
@@ -307,7 +313,7 @@ async function activateGroupOnce(
     group.utils as unknown as ActivationRunSource,
     started.getResult().value,
     analyseException,
-    runUris(objects),
+    runReferences(objects),
   );
   if (outcome.failure) throw new Error(outcome.failure.message);
   if (outcome.stillInactive?.length) {

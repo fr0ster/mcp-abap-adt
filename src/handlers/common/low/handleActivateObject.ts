@@ -659,9 +659,14 @@ export async function handleActivateObject(
         utils,
         runId,
         analyseException,
-        plan.group.references.map((reference) =>
-          buildObjectUri(reference.name, reference.type, reference.parentName),
-        ),
+        plan.group.references.map((reference) => ({
+          name: reference.name,
+          uri: buildObjectUri(
+            reference.name,
+            reference.type,
+            reference.parentName,
+          ),
+        })),
       );
       // Reading the run failed: the method's error as it is, with its step.
       if (outcome.failure !== undefined)

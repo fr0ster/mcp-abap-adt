@@ -85,6 +85,39 @@ export interface ActivationMessage {
   type: string;
   text: string;
   objectName?: string;
+  /** The uri of the object of the run the message is about (`runObjectOf`). */
+  uri?: string;
+}
+
+/** An object a run was started with: its name and its ADT uri. */
+export interface RunReference {
+  readonly name: string;
+  readonly uri: string;
+}
+
+/**
+ * The object of the run a message's `href` points into: the reference whose
+ * uri is the href itself, or its prefix followed by `/` or `#` (a source part,
+ * a position) — the longest such uri, so a part addressed under its owner
+ * goes to the part. `undefined` for an empty href, or one inside none of
+ * them. Plain string comparison.
+ */
+export function runObjectOf(
+  href: string | undefined,
+  references: readonly RunReference[],
+): RunReference | undefined {
+  if (href === undefined) return undefined;
+  let found: RunReference | undefined;
+  for (const reference of references) {
+    const { uri } = reference;
+    if (uri === '' || !href.startsWith(uri)) continue;
+    const next = href.charAt(uri.length);
+    if (next !== '' && next !== '/' && next !== '#') continue;
+    if (found === undefined || uri.length > found.uri.length) {
+      found = reference;
+    }
+  }
+  return found;
 }
 
 /** How each read of a run judges SAP's answer: adt-strategies' message-failure reading. */
@@ -207,25 +240,38 @@ function wordsOf(msg: XmlRead): string {
  *
  * The shape is the checklist the single-object `/activation` answers —
  * `chkl:messages` with `msg` children — read at any depth, so a document this
- * reading does not recognise by its root still has its messages read, and
- * keeps the object each message is about when the document names one. A
+ * reading does not recognise by its root still has its messages read. A
  * results document with no messages is not an error: a run that activated
  * everything says nothing. `type` comes back as stated; the caller decides
  * what `E` means.
+ *
+ * The object a message is about: the one of `references` (the objects the
+ * run was started with) its `href` points into (`runObjectOf`) — its name
+ * and uri; else the `objName` / `adtcore:name` the message states, if any.
+ * A run's results name the object only by `href` (measured on premise and
+ * on the cloud, 2026-11-15); a message with an empty `href` ("Activation was
+ * cancelled.") is about none.
  */
 export function activationMessagesOf(
   value: AdtReading<XmlRead>,
+  references: readonly RunReference[],
 ): ActivationMessage[] {
   for (const document of documentsOf(value)) {
-    const messages = membersNamed(document, 'msg').map(({ node: msg }) => {
-      const objectName =
-        attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
-      return {
-        type: attributeOf(msg, 'type') ?? 'info',
-        text: wordsOf(msg),
-        ...(objectName !== undefined ? { objectName } : {}),
-      };
-    });
+    const messages = membersNamed(document, 'msg').map(
+      ({ node: msg }): ActivationMessage => {
+        const words = {
+          type: attributeOf(msg, 'type') ?? 'info',
+          text: wordsOf(msg),
+        };
+        const sent = runObjectOf(attributeOf(msg, 'href'), references);
+        if (sent !== undefined) {
+          return { ...words, objectName: sent.name, uri: sent.uri };
+        }
+        const objectName =
+          attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
+        return objectName !== undefined ? { ...words, objectName } : words;
+      },
+    );
     if (messages.length > 0) return messages;
   }
   return [];
@@ -293,8 +339,8 @@ export function isRefusal(message: ActivationMessage): boolean {
  *
  * **One read more, after a silent results checklist alone**
  * (`activationExecuted="false"`, no message): `getInactiveObjects`, judged by
- * `stillInactiveAmong(named, …)` with `named` the uris of the references the
- * run was started with — the run's references still listed are its
+ * `stillInactiveAmong(…)` over the uris of `references`, the objects the run
+ * was started with (which also name each message's object) — the run's references still listed are its
  * `stillInactive`, none is nothing to activate. A read that fails, or answers
  * no list, is the outcome's `failure` at step `inactiveObjects`: the outcome
  * could not be decided. Every other results document is read as it came.
@@ -303,7 +349,7 @@ export async function awaitActivationRun(
   utils: ActivationRunSource,
   runId: string,
   analyse: RunAnalyse,
-  named: readonly string[],
+  references: readonly RunReference[],
 ): Promise<ActivationRunOutcome> {
   if (runId === '') {
     return {
@@ -349,7 +395,7 @@ export async function awaitActivationRun(
   }
   const value = produced.getResult().value;
   const executed = activationExecutedOf(value);
-  const messages = activationMessagesOf(value);
+  const messages = activationMessagesOf(value, references);
   const outcome: ActivationRunOutcome = {
     runId,
     status,
@@ -378,7 +424,10 @@ export async function awaitActivationRun(
       ),
     };
   }
-  const still = stillInactiveAmong(named, listed.getResult().value);
+  const still = stillInactiveAmong(
+    references.map((reference) => reference.uri),
+    listed.getResult().value,
+  );
   if (still === null) {
     return {
       ...outcome,

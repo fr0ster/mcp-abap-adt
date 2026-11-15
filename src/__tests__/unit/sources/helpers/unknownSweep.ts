@@ -1275,10 +1275,12 @@ export class UnknownSweep {
       const contract = this.contractParameterHeld(node);
       if (contract.length === 0) return;
       // Written without a type, it takes the contract's: judged exactly as
-      // one written with it.
+      // one written with it. A boundary of its own (a rejection handler's
+      // reason) passes; any contract that hands the `unknown` judges it,
+      // though another overload hands a type.
       const decided = this.boundaryOf(node, contract);
       if (
-        decided.kind !== 'callback' ||
+        (decided.kind !== undefined && decided.kind !== 'callback') ||
         !this.contractsUnknown(contract) ||
         this.usesPassOn(node)
       ) {

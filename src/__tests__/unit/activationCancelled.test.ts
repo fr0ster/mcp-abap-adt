@@ -14,6 +14,7 @@
  * the run start (`202`, the run id in `Location`), the run's status, its
  * results.
  */
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleHandlerActivate } from '../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
@@ -119,24 +120,46 @@ const OBJECTS = [
   { name: 'ZMCPW', type: 'VIEW/DV' },
 ];
 
-/** The full forms: a group activation, waited for and answered with its verdict. */
-const FULL_FORMS: readonly (readonly [string, Activate])[] = [
+/**
+ * The full forms: a group activation, waited for and answered with its
+ * verdict — and the names it sends, whose messages carry the object's uri.
+ */
+const FULL_FORMS: readonly (readonly [string, Activate, readonly string[]])[] =
   [
-    'ActivateObjects',
-    (context) => handleActivateObjects(context, { objects: OBJECTS }),
-  ],
-  [
-    'ActivateObjectLow',
-    (context) => handleActivateObject(context, { objects: OBJECTS }),
-  ],
-  [
-    'ActivateObjectLow, one object of a group-only code',
-    (context) =>
-      handleActivateObject(context, {
-        objects: [{ name: 'ZMCPV', type: 'VIEW/DV' }],
-      }),
-  ],
-];
+    [
+      'ActivateObjects',
+      (context) => handleActivateObjects(context, { objects: OBJECTS }),
+      ['ZMCPV', 'ZMCPW'],
+    ],
+    [
+      'ActivateObjectLow',
+      (context) => handleActivateObject(context, { objects: OBJECTS }),
+      ['ZMCPV', 'ZMCPW'],
+    ],
+    [
+      'ActivateObjectLow, one object of a group-only code',
+      (context) =>
+        handleActivateObject(context, {
+          objects: [{ name: 'ZMCPV', type: 'VIEW/DV' }],
+        }),
+      ['ZMCPV'],
+    ],
+  ];
+
+/**
+ * A message about the view `name`, as answered: the sent object's uri beside
+ * its name where the form sent it (`activationMessagesOf` resolves the
+ * message's `objName` to it), the name alone where it did not.
+ */
+function aboutView(
+  message: { type: string; text: string },
+  name: string,
+  sent: readonly string[],
+) {
+  return sent.includes(name)
+    ? { ...message, uri: buildObjectUri(name, 'VIEW/DV'), objectName: name }
+    : { ...message, objectName: name };
+}
 
 describe('activation answers follow SAP’s verdict', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
@@ -179,12 +202,16 @@ describe('activation answers follow SAP’s verdict', () => {
 
   it.each(FULL_FORMS)(
     '%s: a run SAP cancelled is not activated, and its messages are returned',
-    async (_form, activate) => {
+    async (_form, activate, sent) => {
       const payload = await full(activate, CANCELLED);
       expect(payload.run_status).toBe('finished');
       expect(payload.activated).toBe(false);
       expect(payload.messages).toEqual([
-        { type: 'W', text: 'Activation was cancelled.', objectName: 'ZMCPV' },
+        aboutView(
+          { type: 'W', text: 'Activation was cancelled.' },
+          'ZMCPV',
+          sent,
+        ),
       ]);
       expect(payload.nothing_to_activate).toBeUndefined();
       expect(payload.message).toContain('activationExecuted="false"');
@@ -194,7 +221,7 @@ describe('activation answers follow SAP’s verdict', () => {
 
   it.each(FULL_FORMS)(
     '%s: a run with an error-severity message is an error, naming the refusal, its messages returned',
-    async (_form, activate) => {
+    async (_form, activate, sent) => {
       const payload = await full(activate, REFUSED, true);
       expect(payload.origin).toBe('refusal');
       expect(payload.message).toContain(
@@ -204,12 +231,19 @@ describe('activation answers follow SAP’s verdict', () => {
         'ZMCPW: View ZMCPW refers to a field that does not exist.',
       );
       expect(payload.messages).toEqual([
-        {
-          type: 'E',
-          text: 'View ZMCPW refers to a field that does not exist.',
-          objectName: 'ZMCPW',
-        },
-        { type: 'W', text: 'Activation was cancelled.', objectName: 'ZMCPV' },
+        aboutView(
+          {
+            type: 'E',
+            text: 'View ZMCPW refers to a field that does not exist.',
+          },
+          'ZMCPW',
+          sent,
+        ),
+        aboutView(
+          { type: 'W', text: 'Activation was cancelled.' },
+          'ZMCPV',
+          sent,
+        ),
       ]);
       expect(payload.activated).toBeUndefined();
     },

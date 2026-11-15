@@ -176,6 +176,7 @@ function runReferences(
 ) {
   return objects.map((obj) => ({
     name: obj.name,
+    type: obj.type,
     uri: buildObjectUri(obj.name, obj.type, obj.parentName),
   }));
 }

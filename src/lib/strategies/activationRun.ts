@@ -89,9 +89,10 @@ export interface ActivationMessage {
   uri?: string;
 }
 
-/** An object a run was started with: its name and its ADT uri. */
+/** An object a run was started with: its name, its type code and its ADT uri. */
 export interface RunReference {
   readonly name: string;
+  readonly type: string;
   readonly uri: string;
 }
 
@@ -133,6 +134,27 @@ export function runObjectOf(
     }
   }
   return found;
+}
+
+/**
+ * The object of the run a message names by its `objName` (or
+ * `adtcore:name`): the reference of that name, compared with ASCII letters in
+ * upper case, and of the message's type where it states one
+ * (`adtcore:type`). `undefined` for no name, or one of no reference.
+ */
+export function namedRunObject(
+  name: string | undefined,
+  type: string | undefined,
+  references: readonly RunReference[],
+): RunReference | undefined {
+  if (name === undefined || name === '') return undefined;
+  const wanted = asciiUpper(name);
+  const wantedType = type === undefined ? undefined : asciiUpper(type);
+  return references.find(
+    (reference) =>
+      asciiUpper(reference.name) === wanted &&
+      (wantedType === undefined || asciiUpper(reference.type) === wantedType),
+  );
 }
 
 /** How each read of a run judges SAP's answer: adt-strategies' message-failure reading. */
@@ -261,8 +283,10 @@ function wordsOf(msg: XmlRead): string {
  * what `E` means.
  *
  * The object a message is about: the one of `references` (the objects the
- * run was started with) its `href` points into (`runObjectOf`) — its name
- * and uri; else the `objName` / `adtcore:name` the message states, if any.
+ * run was started with) its `href` points into (`runObjectOf`), else the one
+ * its `objName` / `adtcore:name` names (`namedRunObject`) — its name and
+ * uri, so two messages about one object name it alike however each names
+ * it; else the `objName` / `adtcore:name` the message states, if any.
  * A run's results name the object only by `href` (measured on premise and
  * on the cloud, 2026-11-15); a message with an empty `href` ("Activation was
  * cancelled.") is about none.
@@ -278,12 +302,18 @@ export function activationMessagesOf(
           type: attributeOf(msg, 'type') ?? 'info',
           text: wordsOf(msg),
         };
-        const sent = runObjectOf(attributeOf(msg, 'href'), references);
+        const objectName =
+          attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
+        const sent =
+          runObjectOf(attributeOf(msg, 'href'), references) ??
+          namedRunObject(
+            objectName,
+            attributeOf(msg, 'adtcore:type'),
+            references,
+          );
         if (sent !== undefined) {
           return { ...words, objectName: sent.name, uri: sent.uri };
         }
-        const objectName =
-          attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
         return objectName !== undefined ? { ...words, objectName } : words;
       },
     );

@@ -412,11 +412,17 @@ async function activateWithMainProgram(
     [
       {
         name: includeName,
+        type: 'FUGR/I',
         uri: buildObjectUri(includeName, 'FUGR/I', groupName),
       },
-      { name: groupName, uri: buildObjectUri(groupName, 'FUGR/F') },
+      {
+        name: groupName,
+        type: 'FUGR/F',
+        uri: buildObjectUri(groupName, 'FUGR/F'),
+      },
       {
         name: mainProgram,
+        type: 'FUGR/I',
         uri: buildObjectUri(mainProgram, 'FUGR/I', groupName),
       },
     ],

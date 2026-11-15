@@ -18,6 +18,7 @@ import type { HandlerContext } from '../../lib/handlers/interfaces';
 import {
   activationExecutedOf,
   activationMessagesOf,
+  namedRunObject,
   type RunReference,
   runObjectOf,
 } from '../../lib/strategies/activationRun';
@@ -43,8 +44,8 @@ const BROKEN_URI = '/sap/bc/adt/oo/classes/zobj_broken';
 
 /** The run's objects, as the run was started with them. */
 const REFERENCES: readonly RunReference[] = [
-  { name: GOOD, uri: GOOD_URI },
-  { name: BROKEN, uri: BROKEN_URI },
+  { name: GOOD, type: 'CLAS/OC', uri: GOOD_URI },
+  { name: BROKEN, type: 'CLAS/OC', uri: BROKEN_URI },
 ];
 
 const HINTS =
@@ -144,6 +145,7 @@ describe("a message's object is the run's object its href points into", () => {
     // href may spell the escape %2f, and the letters in either case.
     const sent = {
       name: '/NS/ZBROKEN',
+      type: 'CLAS/OC',
       uri: buildObjectUri('/NS/ZBROKEN', 'CLAS/OC'),
     };
     expect(sent.uri).toBe('/sap/bc/adt/oo/classes/%2Fns%2Fzbroken');
@@ -161,17 +163,21 @@ describe("a message's object is the run's object its href points into", () => {
 
   it('a reference with an empty uri is no object of any href', () => {
     expect(
-      runObjectOf(`${BROKEN_URI}/source/main`, [{ name: 'ZEMPTY', uri: '' }]),
+      runObjectOf(`${BROKEN_URI}/source/main`, [
+        { name: 'ZEMPTY', type: 'CLAS/OC', uri: '' },
+      ]),
     ).toBeUndefined();
   });
 
   it('the longest uri wins: a part addressed under its owner goes to the part', () => {
     const owner = {
       name: 'ZGROUP',
+      type: 'FUGR/F',
       uri: '/sap/bc/adt/functions/groups/zgroup',
     };
     const part = {
       name: 'ZMODULE',
+      type: 'FUGR/FF',
       uri: '/sap/bc/adt/functions/groups/zgroup/fmodules/zmodule',
     };
     expect(
@@ -183,6 +189,25 @@ describe("a message's object is the run's object its href points into", () => {
     expect(runObjectOf(`${owner.uri}/source/main`, [part, owner])?.name).toBe(
       'ZGROUP',
     );
+  });
+});
+
+describe("a message's object named by objName is the run's object of that name", () => {
+  it.each([
+    ['the name as sent', BROKEN, undefined, BROKEN],
+    ['the name in lower case', 'zobj_broken', undefined, BROKEN],
+    ['the name with the type of the sent object', BROKEN, 'clas/oc', BROKEN],
+  ] as const)('%s', (_case, name, type, expected) => {
+    expect(namedRunObject(name, type, REFERENCES)?.name).toBe(expected);
+  });
+
+  it.each([
+    ['no name', undefined, undefined],
+    ['an empty name', '', undefined],
+    ['a name no object of the run has', 'ZOBJ_OTHER', undefined],
+    ['the name with another type', BROKEN, 'INTF/OI'],
+  ] as const)('%s names none', (_case, name, type) => {
+    expect(namedRunObject(name, type, REFERENCES)).toBeUndefined();
   });
 });
 
@@ -237,6 +262,22 @@ describe('ActivateObjects answers the measured refusal', () => {
     return payloadOf(answered);
   }
 
+  it('one object named by href in one message and by objName in another is counted once', async () => {
+    const mixed =
+      `${HEAD}` +
+      `<msg type="E" href="${BROKEN_URI}/source/main#start=7,4"><shortText><txt>${DAAT}</txt></shortText></msg>` +
+      `<msg type="E" objName="${BROKEN}"><shortText><txt>${LV}</txt></shortText></msg>` +
+      '</chkl:messages>';
+    const payload = await refused(mixed);
+    expect(payload.message).toContain(
+      `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
+    );
+    expect(payload.messages).toEqual([
+      { type: 'E', text: DAAT, objectName: BROKEN, uri: BROKEN_URI },
+      { type: 'E', text: LV, objectName: BROKEN, uri: BROKEN_URI },
+    ]);
+  });
+
   it.each([
     ['cloud', CLOUD, READ_BROKEN],
     [
@@ -267,6 +308,11 @@ describe('ActivateObjects answers the measured refusal', () => {
  * saying none was activated only where the results state
  * activationExecuted="false".
  */
+/** A measured run's objects as the run was started with them: both of its type. */
+function referencesOf(run: (typeof MEASURED_RUNS)[number]): RunReference[] {
+  return run.references.map((reference) => ({ ...reference, type: run.kind }));
+}
+
 describe('the measured runs of every type', () => {
   const runs = MEASURED_RUNS.map((run) => [run.system, run.kind, run] as const);
 
@@ -274,7 +320,10 @@ describe('the measured runs of every type', () => {
     '%s %s: each error message names the broken object, no other message names the good one',
     (_system, _kind, run) => {
       const [good, broken] = run.references;
-      const messages = activationMessagesOf(kept(run.results), run.references);
+      const messages = activationMessagesOf(
+        kept(run.results),
+        referencesOf(run),
+      );
       const errors = messages.filter((m) => m.type === 'E');
       expect(errors.length).toBeGreaterThan(0);
       for (const error of errors) {

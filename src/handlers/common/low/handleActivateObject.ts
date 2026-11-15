@@ -661,6 +661,7 @@ export async function handleActivateObject(
         analyseException,
         plan.group.references.map((reference) => ({
           name: reference.name,
+          type: reference.type,
           uri: buildObjectUri(
             reference.name,
             reference.type,
@@ -709,8 +710,9 @@ function notActivatedRun(outcome: ActivationRunOutcome) {
  * A run whose results carry an error-severity message: a refusal naming each
  * refused object and SAP's words, with every message of the results as SAP
  * listed them. The count is of objects, not messages: the distinct objects
- * an error-severity message is about — the run's object its `href` points
- * into (`uri`), else the `objName` it states.
+ * an error-severity message is about — the run's object it names, by `href`
+ * or by `objName` (`uri`, `activationMessagesOf`), else the `objName` it
+ * states, once.
  * Where the results state `activationExecuted="false"`, SAP activated none
  * of the objects, and the words say so. `undefined` for a run with no such
  * message, and for one that answered no run id (no run was read, so no

@@ -1013,6 +1013,29 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it("this is ours only for what our class's own text binds; a chain of bases is walked whole", () => {
+    // An inherited default, a base of ours inheriting it, an unknown five
+    // bases down (called, kept, a member), a function rebinding `this`, a
+    // base whose own base takes a default, a default nested five deep.
+    assert.deepEqual(thirdPartyReads('thisAndChains'), [
+      [29, 'refused'],
+      [31, 'refused'],
+      [33, 'refused'],
+      [70, 'refused'],
+    ]);
+    // Type arguments we wrote, `unknown` included, and a base of ours so
+    // written.
+    assert.deepEqual(
+      sitesOf('thisAndChains').filter(
+        (site) =>
+          lineOf(site) >= 47 &&
+          lineOf(site) <= 59 &&
+          site.reason === 'third-party',
+      ),
+      [],
+    );
+  });
+
   it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
     // The parse each reviver is handed to passes whole into a sink.
     assert.deepEqual(thirdPartyReads('callbackDefaults'), [

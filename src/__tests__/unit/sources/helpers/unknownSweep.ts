@@ -603,24 +603,23 @@ function declarationName(node: ts.Node): ts.Node | undefined {
 /**
  * The type parameters a declared type is made of: itself, the members of a
  * union or an intersection, a reference's type arguments (a list's
- * element), a few levels deep.
+ * element), to any depth — a type already walked is not walked again.
  */
 function typeParametersOf(
   checker: ts.TypeChecker,
   type: ts.Type,
-  depth = 0,
+  seen: Set<ts.Type> = new Set(),
 ): ts.Type[] {
   if (type.flags & ts.TypeFlags.TypeParameter) return [type];
-  if (depth > 3) return [];
+  if (seen.has(type)) return [];
+  seen.add(type);
   if (type.isUnionOrIntersection()) {
-    return type.types.flatMap((part) =>
-      typeParametersOf(checker, part, depth + 1),
-    );
+    return type.types.flatMap((part) => typeParametersOf(checker, part, seen));
   }
   if (isReference(type)) {
     return checker
       .getTypeArguments(type)
-      .flatMap((argument) => typeParametersOf(checker, argument, depth + 1));
+      .flatMap((argument) => typeParametersOf(checker, argument, seen));
   }
   return [];
 }
@@ -628,24 +627,26 @@ function typeParametersOf(
 /**
  * Whether a type mentions `unknown` or `any`: itself, a union's or an
  * intersection's member, a reference's type argument (a third party's
- * `Generic<unknown>` included), a class's or an interface's base, a few
- * levels deep.
+ * `Generic<unknown>` included), a class's or an interface's base — the
+ * whole chain, to any depth; a type already walked is not walked again (a
+ * cycle adds nothing), so no bound answers "none".
  */
 function mentionsUnknown(
   checker: ts.TypeChecker,
   type: ts.Type,
-  depth = 0,
+  seen: Set<ts.Type> = new Set(),
 ): boolean {
   if (type.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Any)) return true;
-  if (depth > 3) return false;
+  if (seen.has(type)) return false;
+  seen.add(type);
   if (type.isUnionOrIntersection()) {
-    return type.types.some((part) => mentionsUnknown(checker, part, depth + 1));
+    return type.types.some((part) => mentionsUnknown(checker, part, seen));
   }
   if (
     isReference(type) &&
     checker
       .getTypeArguments(type)
-      .some((argument) => mentionsUnknown(checker, argument, depth + 1))
+      .some((argument) => mentionsUnknown(checker, argument, seen))
   ) {
     return true;
   }
@@ -655,7 +656,7 @@ function mentionsUnknown(
   return (
     target.isClassOrInterface() &&
     (checker.getBaseTypes(target) ?? []).some((base) =>
-      mentionsUnknown(checker, base, depth + 1),
+      mentionsUnknown(checker, base, seen),
     )
   );
 }
@@ -3095,11 +3096,11 @@ export class UnknownSweep {
       ts.isFunctionExpression(current) ||
       current.kind === ts.SyntaxKind.TrueKeyword ||
       current.kind === ts.SyntaxKind.FalseKeyword ||
-      current.kind === ts.SyntaxKind.NullKeyword ||
-      current.kind === ts.SyntaxKind.ThisKeyword
+      current.kind === ts.SyntaxKind.NullKeyword
     ) {
       return true;
     }
+    if (current.kind === ts.SyntaxKind.ThisKeyword) return true;
     if (ts.isIdentifier(current)) return this.nameOurs(current, seen);
     if (ts.isPropertyAccessExpression(current)) {
       const symbol = this.checker.getSymbolAtLocation(current.name);

@@ -107,6 +107,18 @@ const SERVICE_BINDING_METADATA_WAIT = [
   'src/__tests__/integration/coverage/serviceBinding.live.test.ts#untilMetadata',
   'src/__tests__/integration/coverage/serviceBinding.live.test.ts#pause',
 ];
+/**
+ * The compact dump and profiler case's waits (owner, 2026-11-16: tests may
+ * bound their waits): SAP lists a dump and finishes a trace only after the
+ * run that made it, so the case reads the dump feed and the trace list at a
+ * fixed pause until it is there, failing at its own limit; the pause goes
+ * with them.
+ */
+const DUMPS_PROFILES_WAIT = [
+  'src/__tests__/integration/coverage/dumpsProfiles.live.test.ts#untilDumpListed',
+  'src/__tests__/integration/coverage/dumpsProfiles.live.test.ts#untilTraceFinished',
+  'src/__tests__/integration/coverage/dumpsProfiles.live.test.ts#pause',
+];
 /** The pause the retry remainder calls; it goes with it. */
 const REMAINDER_PAUSE =
   'src/__tests__/integration/helpers/testHelpers.ts#delay';
@@ -117,6 +129,7 @@ const ALLOWED_SITES = new Set([
   SNAPSHOT_LIST_WAIT,
   SERVICE_BINDING_UNPUBLISH,
   ...SERVICE_BINDING_METADATA_WAIT,
+  ...DUMPS_PROFILES_WAIT,
 ]);
 
 /** Every key path of a parsed YAML value: `a.b.c`. */

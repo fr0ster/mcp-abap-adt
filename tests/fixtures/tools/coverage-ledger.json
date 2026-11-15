@@ -694,6 +694,20 @@
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
     }
   },
+  "HandlerDumpList": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerDumpView": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
   "HandlerGet#-#activation_status": {
     "unit": "src/__tests__/unit/pins/activate.pins.test.ts",
     "live": {
@@ -830,6 +844,34 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "HandlerProfileList": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerProfileRun": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerProfileSchedule": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerProfileView": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
     }
   },
   "HandlerSearch": {

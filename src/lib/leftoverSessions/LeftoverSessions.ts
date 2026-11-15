@@ -631,7 +631,11 @@ export class LeftoverSessions {
     // The request passes through as it was made, its arguments and answer
     // untouched: the wrapper only reads the cookies once it settled.
     connection.makeAdtRequest = new Proxy(original, {
-      apply: async (original, _this, args) => {
+      apply: async (
+        original,
+        _this,
+        args: Parameters<IAbapConnection['makeAdtRequest']>,
+      ) => {
         try {
           return await Reflect.apply(original, connection, args);
         } finally {

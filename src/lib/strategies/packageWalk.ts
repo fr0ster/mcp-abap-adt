@@ -13,6 +13,7 @@ import type {
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
 import {
+  type AdtAnswer,
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
@@ -91,7 +92,7 @@ export interface NodeStructureMembers<R> {
  * `utils`' node structure read with the header pair of
  * `utils.fetchNodeStructure` for the call's system (`withAdtHeaders`).
  */
-export function nodeStructureOn<R>(
+export function nodeStructureOn<R extends AdtAnswer>(
   context: AdtHeadersContext,
   utils: NodeStructureMembers<R>,
 ): {

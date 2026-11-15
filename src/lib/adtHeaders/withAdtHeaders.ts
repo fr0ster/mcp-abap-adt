@@ -25,7 +25,11 @@ import {
   extractSupportedAccept,
   extractSupportedContentType,
 } from '@mcp-abap-adt/adt-clients';
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtFailure,
+  IAdtHeaders,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { AdtHeaderPort } from './AdtHeaderPairs';
 import { type AdtOperation, DEFAULT_ADT_HEADERS } from './defaultPairs';
 import { adtCallScope, type HeaderInvocation } from './scope';
@@ -93,16 +97,16 @@ export function correctedPair(
 }
 
 /**
- * The failure a member's answer carries (`ok: false`, `getError()`), else
- * `undefined`. The answer is whatever the wrapped member answers, of the
- * call's own type: read through `readSafely`, as a value of any shape.
+ * What a wrapped member answers: an `IAdtResponse`, read by its halves — a
+ * success (`ok: true`, whatever its value) or a failure (`IAdtFailure`).
  */
-function failureOfAnswer<T>(answer: T): unknown {
-  if (readSafely(answer, 'ok') !== false) return undefined;
-  const getError = readSafely(answer, 'getError');
-  if (typeof getError !== 'function') return undefined;
+export type AdtAnswer = { readonly ok: true } | IAdtFailure;
+
+/** The failure a member's answer carries (`ok: false`, `getError()`), else `undefined`. */
+function failureOfAnswer(answer: AdtAnswer): IAdtError | undefined {
+  if (answer.ok) return undefined;
   try {
-    return getError.call(answer);
+    return answer.getError();
   } catch {
     return undefined;
   }
@@ -111,7 +115,7 @@ function failureOfAnswer<T>(answer: T): unknown {
 /** The failure of a settled call: its answer's, or what it threw. */
 type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
 
-function failureOf<T>(settled: Settled<T>): unknown {
+function failureOf<T extends AdtAnswer>(settled: Settled<T>): unknown {
   return settled.ok ? failureOfAnswer(settled.value) : settled.error;
 }
 
@@ -132,7 +136,7 @@ function unwrap<T>(settled: Settled<T>): T {
  * `call` with the pair of `operation` for the call's system, corrected once
  * on a `406`/`415` (see the file header).
  */
-export async function withAdtHeaders<T>(
+export async function withAdtHeaders<T extends AdtAnswer>(
   context: AdtHeadersContext,
   operation: AdtOperation,
   call: (headers: IAdtHeaders) => Promise<T>,
@@ -177,7 +181,7 @@ export async function withAdtHeaders<T>(
 
 function noop(): void {}
 
-async function correctOnce<T>(
+async function correctOnce<T extends AdtAnswer>(
   port: AdtHeaderPort | undefined,
   operation: AdtOperation,
   sent: IAdtHeaders,

@@ -154,7 +154,6 @@ export const THROWN_READERS: ReadonlySet<string> = new Set<string>([
   'src/lib/adtHeaders/withAdtHeaders.ts#Settled(error)',
   'src/lib/adtHeaders/withAdtHeaders.ts#correctedPair(failure)',
   'src/lib/adtHeaders/withAdtHeaders.ts#failureOf(failureOf)',
-  'src/lib/adtHeaders/withAdtHeaders.ts#failureOfAnswer(failureOfAnswer)',
   'src/lib/adtHeaders/withAdtHeaders.ts#readSafely(read)',
   'src/lib/adtHeaders/withAdtHeaders.ts#readSafely(readSafely)',
   'src/lib/adtHeaders/withAdtHeaders.ts#readSafely(value)',

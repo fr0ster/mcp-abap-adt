@@ -88,10 +88,10 @@ describe('the one-shot correction through the subpath', () => {
       async (headers) => {
         sent.push(headers.accept);
         if (sent.length === 1) throw notAcceptable();
-        return 'answered';
+        return { ok: true as const, getResult: () => ({ value: 'answered' }) };
       },
     );
-    expect(answer).toBe('answered');
+    expect(answer.getResult().value).toBe('answered');
     expect(sent).toEqual([
       DEFAULT_ADT_HEADERS['utils.getWhereUsed'].accept,
       NEWER,

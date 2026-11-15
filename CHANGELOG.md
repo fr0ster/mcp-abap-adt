@@ -128,6 +128,14 @@ Every TypeScript project of the repository compiles with `exactOptionalPropertyT
 
 - **`lock_handle` is removed from `UpdateBehaviorDefinition` and `UpdateMetadataExtension`** (#4): no tool of the full set issues a lock handle, and a handle the instance did not issue is refused, so the argument could only be refused. Both lock, write and unlock themselves, as the other full updates do; a call that still sends `lock_handle` has it dropped by the parse (only the create tools are strict), so the update takes its own lock and the handle is not used. A write under a held lock is compact `HandlerUpdate`'s. Migrating: `docs/MIGRATION-24.0.md`, "Callers of the lock tools".
 
+### Changed — breaking for a caller of `UpdateServiceBinding`: a publication's answer says whether it has completed
+
+- **`UpdateServiceBinding` answers a typed publication result instead of a bare `SUCCESS`.** On premise SAP publishes inside the request: `{ result: 'SUCCESS', completion: 'done', severity, short_text }`. On ABAP Cloud SAP starts the publication or unpublication as a background job and answers once its handler has waited up to 120 s, whatever the job's state (measured: the service answered 95 s and 129 s after that answer): `{ result: 'STARTED', completion: 'background', severity, short_text, note }`, where `note` says the service becomes usable (or stops being usable) once that job ends. `severity` and `short_text` are SAP's `SEVERITY` and `SHORT_TEXT`. The system kind decides, as stated; nothing waits. **Migrating:** read `completion` instead of the word `SUCCESS`; on `background`, read `GetServiceBindingPreviewUrl`'s `live`.
+
+### Added — `GetServiceBindingPreviewUrl` answers the service's live state
+
+- **For a published binding, `GetServiceBindingPreviewUrl` reads the service's `$metadata` once** and answers `live: true` when it answers `200`, else `live: false` with SAP's `live_status` and `live_text` — on ABAP Cloud the gateway answers `403` "The request has been blocked by UCON." until SAP's publication job ends; on premise an unpublished service answers `404`. One request, no retry; a credential refusal ends the call, and a failure with no answer from SAP is `live_failure`, without failing the read. An unpublished binding answers `live: false` with no request.
+
 ### Removed — breaking for a caller of `GetEnhancementImpl` on a cloud system
 
 - **`GetEnhancementImpl` is no longer offered on cloud systems** (the owner): it reads a source code plugin (`ENHO/XHH`), and source code plugins are not supported in ABAP Cloud. The cloud binaries no longer list it; on premise it is unchanged. **Migrating:** on a cloud system, read BAdI implementations and enhancement spots with `GetEnhancementSpot` and `GetEnhancements`.

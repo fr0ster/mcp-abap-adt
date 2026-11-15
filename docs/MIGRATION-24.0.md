@@ -914,6 +914,23 @@ This holds for every tool that activates: the `Activate*` tools, `ActivateObject
   (SAP_BASIS 751, 7.40), it answers SAP's refusal; a group activation there is `ActivateObjects` (the
   full set) or `ActivateObjectLow` (the low handlers group).
 
+## Callers of `UpdateServiceBinding` and `GetServiceBindingPreviewUrl`: completion and the live state
+
+On ABAP Cloud a publication is a background job of SAP: SAP answers once its handler has waited up
+to 120 s, whether or not the job has ended, and the service answers only after it has.
+`UpdateServiceBinding` says so instead of a bare `SUCCESS`, and `GetServiceBindingPreviewUrl`
+reads whether the service answers.
+
+| Tool | 23.x answered | 24.0 answers |
+| --- | --- | --- |
+| `UpdateServiceBinding`, on premise | `SUCCESS` | `{ result: 'SUCCESS', completion: 'done', severity, short_text }` |
+| `UpdateServiceBinding`, cloud | `SUCCESS` | `{ result: 'STARTED', completion: 'background', severity, short_text, note }`: the service becomes usable (or stops being usable) once SAP's job ends |
+| `GetServiceBindingPreviewUrl`, a published binding | no live state | `live: true` when its `$metadata` answers 200; `live: false` with `live_status` and `live_text` otherwise (cloud: 403, "The request has been blocked by UCON.", while the job runs) |
+| `GetServiceBindingPreviewUrl`, an unpublished binding | no live state | `live: false`, nothing read |
+
+A caller that waited for `SUCCESS` reads `completion`; on `background` it reads
+`GetServiceBindingPreviewUrl` again until `live` is `true`.
+
 ## Callers of `GetEnhancementImpl` on a cloud system: not offered
 
 `GetEnhancementImpl` reads a source code plugin (`ENHO/XHH`). Source code plugins are not

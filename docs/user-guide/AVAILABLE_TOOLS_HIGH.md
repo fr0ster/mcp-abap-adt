@@ -2173,7 +2173,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Update publication state of an existing ABAP service binding.
+**Description:** Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends — GetServiceBindingPreviewUrl's live field tells.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -2998,4 +2998,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-11-13*
+*Last updated: 2026-11-15*

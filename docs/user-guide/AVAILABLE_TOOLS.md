@@ -1068,7 +1068,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getservicebindingpreviewurl-read-only-system"></a>
 #### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. For a published binding it also reads the $metadata of the service once and answers live: true when the service answers 200, or live: false with the status (live_status) and the words (live_text) SAP answered — on ABAP Cloud a publication is a background job of SAP, and the service answers 403, blocked by UCON, until that job ends. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.
 
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
@@ -3333,7 +3333,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Update publication state of an existing ABAP service binding.
+**Description:** Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends — GetServiceBindingPreviewUrl's live field tells.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -4680,4 +4680,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-13*
+*Last updated: 2026-11-15*

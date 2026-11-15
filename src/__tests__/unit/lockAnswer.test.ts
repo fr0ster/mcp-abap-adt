@@ -37,6 +37,23 @@ describe('analyseLock', () => {
     expect(analyseLock(ADT_NO_FAILURE, wire)).toBe(ADT_NO_FAILURE);
   });
 
+  it('reads a handle header given as a list by its first entry, and only when it is text', () => {
+    const withHeader = (value: IAdtWireResponse['headers'][string]) => ({
+      ...wireAnswer(''),
+      headers: { 'sap-adt-lm-handle': value },
+    });
+    expect(carriesLockHandle(withHeader([' FUGR_HANDLE ', 'other']))).toBe(
+      true,
+    );
+    expect(carriesLockHandle(withHeader(['  ', 'FUGR_HANDLE']))).toBe(false);
+    expect(carriesLockHandle(withHeader([]))).toBe(false);
+    expect(carriesLockHandle(withHeader(42))).toBe(false);
+    expect(carriesLockHandle(withHeader(null))).toBe(false);
+    expect(carriesLockHandle(withHeader({ handle: 'FUGR_HANDLE' }))).toBe(
+      false,
+    );
+  });
+
   it('refuses a 2xx that names no handle, with the answer beside it', () => {
     const wire = {
       ...wireAnswer(LOGIN_PAGE),

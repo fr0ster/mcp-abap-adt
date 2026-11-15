@@ -39,7 +39,23 @@ const values: [string, unknown][] = [
   ['an Error from another realm', runInNewContext('new Error("far")')],
   ['an Error with no message', new Error()],
   ['an Error whose message was deleted', withoutMessage()],
+  ['a class of ours whose member is undefined', refusalWithoutWords()],
+  ['an Error whose message is undefined', errorWithoutMessage()],
 ];
+
+/** A refusal whose `words` were defined as `undefined`. */
+function refusalWithoutWords(): Refusal {
+  const refusal = new Refusal('said');
+  Object.defineProperty(refusal, 'words', { value: undefined });
+  return refusal;
+}
+
+/** An Error whose `message` was defined as `undefined`. */
+function errorWithoutMessage(): Error {
+  const error = new Error('said');
+  Object.defineProperty(error, 'message', { value: undefined });
+  return error;
+}
 
 /** An Error whose own `message` was deleted: it reads the prototype's. */
 function withoutMessage(): Error {
@@ -95,12 +111,14 @@ describe('messageOf', () => {
 describe('the call sites read as the inline expressions they replaced', () => {
   for (const [name, value] of values) {
     it(`a class's member or its fallback, for ${name}`, () => {
+      const refusal = thrownAs(value, Refusal);
       assert.equal(
-        thrownAs(value, Refusal)?.words ?? 'fallback',
+        refusal !== undefined ? refusal.words : 'fallback',
         value instanceof Refusal ? value.words : 'fallback',
       );
+      const failure = thrownAs(value, Error);
       assert.equal(
-        thrownAs(value, Error)?.message ?? 'fallback',
+        failure !== undefined ? failure.message : 'fallback',
         value instanceof Error ? value.message : 'fallback',
       );
     });
@@ -110,8 +128,11 @@ describe('the call sites read as the inline expressions they replaced', () => {
         thrownAs(value, Refusal) !== undefined,
         value instanceof Refusal,
       );
-      const kept = thrownAs(value, Error) ?? 'wrapped';
-      assert.equal(kept, value instanceof Error ? value : 'wrapped');
+      const own = thrownAs(value, Error);
+      assert.equal(
+        own !== undefined ? own : 'wrapped',
+        value instanceof Error ? value : 'wrapped',
+      );
     });
   }
 });

@@ -3100,7 +3100,23 @@ export class UnknownSweep {
     ) {
       return true;
     }
-    if (current.kind === ts.SyntaxKind.ThisKeyword) return true;
+    if (current.kind === ts.SyntaxKind.ThisKeyword) {
+      // The class `this` is an instance of: reached through arrows and a
+      // class's own members only; a function that rebinds it proves nothing.
+      let scope: ts.Node = current.parent;
+      while (!ts.isClassLike(scope)) {
+        if (
+          ts.isFunctionLike(scope) &&
+          !ts.isArrowFunction(scope) &&
+          !ts.isClassLike(scope.parent)
+        ) {
+          return false;
+        }
+        if (ts.isSourceFile(scope)) return false;
+        scope = scope.parent;
+      }
+      return this.heritageOurs(scope, seen);
+    }
     if (ts.isIdentifier(current)) return this.nameOurs(current, seen);
     if (ts.isPropertyAccessExpression(current)) {
       const symbol = this.checker.getSymbolAtLocation(current.name);
@@ -3164,6 +3180,47 @@ export class UnknownSweep {
       }
     }
     return false;
+  }
+
+  /**
+   * Whether what a class of ours inherits is bound by text we wrote: each
+   * base it extends or implements is one of ours whose own heritage is, one
+   * whose type arguments we write (`extends Holder<unknown>`, the owner's
+   * decision) and whose own bases bring in no unknown, or one that brings
+   * in none at all. A base taken with a third party's default
+   * (`extends Holder`) or holding an unknown in its bases is theirs.
+   */
+  private heritageOurs(
+    holder: ts.ClassLikeDeclaration,
+    seen: Set<ts.Node>,
+  ): boolean {
+    if (seen.has(holder)) return true;
+    seen.add(holder);
+    return (holder.heritageClauses ?? []).every((clause) =>
+      clause.types.every((heritage) => {
+        const base = this.checker.getTypeAtLocation(heritage);
+        const declaration = (isReference(base) ? base.target : base)
+          .getSymbol()
+          ?.declarations?.find(
+            (each) => ts.isClassLike(each) || ts.isInterfaceDeclaration(each),
+          );
+        if (declaration !== undefined && ownNode(declaration)) {
+          return ts.isClassLike(declaration)
+            ? this.heritageOurs(declaration, seen)
+            : true;
+        }
+        if (heritage.typeArguments === undefined) {
+          return !mentionsUnknown(this.checker, base);
+        }
+        const target = isReference(base) ? base.target : base;
+        return !(
+          target.isClassOrInterface() &&
+          (this.checker.getBaseTypes(target) ?? []).some((each) =>
+            mentionsUnknown(this.checker, each),
+          )
+        );
+      }),
+    );
   }
 
   /** `writtenOurs` of a name: what its declaration writes or is given. */

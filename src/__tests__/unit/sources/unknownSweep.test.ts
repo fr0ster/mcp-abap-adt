@@ -1018,9 +1018,13 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     // bases down (called, kept, a member), a function rebinding `this`, a
     // base whose own base takes a default, a default nested five deep.
     assert.deepEqual(thirdPartyReads('thisAndChains'), [
+      [16, 'refused'],
+      [23, 'refused'],
       [29, 'refused'],
       [31, 'refused'],
       [33, 'refused'],
+      [41, 'refused'],
+      [64, 'refused'],
       [70, 'refused'],
     ]);
     // Type arguments we wrote, `unknown` included, and a base of ours so

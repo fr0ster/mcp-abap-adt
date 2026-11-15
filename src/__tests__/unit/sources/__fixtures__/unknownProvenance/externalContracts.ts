@@ -1,8 +1,8 @@
 // The closed rule, a contract declared outside the repository
 // (`node_modules/external-contracts`): a callback's parameter written
 // without a type takes the `unknown` or `any` the third party wrote —
-// through a generic it instantiated, a method or a setter of an object
-// literal its contract types, any of its overloads — and is judged exactly
+// through a generic it instantiated, a method of an object literal its
+// contract types, any of its overloads — and is judged exactly
 // as one written with it. A type argument of ours is ours.
 import {
   drain,
@@ -18,13 +18,10 @@ export function generic(): void {
   });
 }
 
-// Refused: a shorthand method, and a setter, of a literal its contract types.
+// Refused: a shorthand method of a literal its contract types.
 export function method(): void {
   receive({
     consume(value) {
-      if (typeof value === 'string') drain(String);
-    },
-    set latest(value) {
       if (typeof value === 'string') drain(String);
     },
   });

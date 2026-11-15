@@ -2639,12 +2639,9 @@ export class UnknownSweep {
     if (node.type !== undefined) return [];
     const fn = node.parent;
     const at = fn.parameters.indexOf(node);
-    // A method or a setter of an object literal: the member its contract
-    // declares, as declared.
-    if (
-      (ts.isMethodDeclaration(fn) || ts.isSetAccessorDeclaration(fn)) &&
-      ts.isObjectLiteralExpression(fn.parent)
-    ) {
+    // A method of an object literal: the member its contract declares, as
+    // declared. (A setter's parameter is not typed by the contract.)
+    if (ts.isMethodDeclaration(fn) && ts.isObjectLiteralExpression(fn.parent)) {
       const literal = this.checker.getContextualType(fn.parent);
       const name = propertyName(fn.name);
       const member =
@@ -2661,12 +2658,9 @@ export class UnknownSweep {
       ) {
         return [];
       }
-      return declarations.flatMap((declaration) => {
-        // A setter is handed what the member is written with.
-        return ts.isSetAccessorDeclaration(fn)
-          ? this.declaredHeld(declaration)
-          : this.slotParameterHeld(declaration, at);
-      });
+      return declarations.flatMap((declaration) =>
+        this.slotParameterHeld(declaration, at),
+      );
     }
     if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return [];
     // Handed to a call: the callee's parameter, as its declaration writes
@@ -2757,13 +2751,6 @@ export class UnknownSweep {
             (each) => each.owner === undefined,
           );
     });
-  }
-
-  /** The positions of `unknown` or `any` a declaration's type writes. */
-  private declaredHeld(declaration: ts.Node): readonly Held[] {
-    return this.held(this.checker.getTypeAtLocation(declaration)).filter(
-      (each) => each.owner === undefined,
-    );
   }
 
   /**

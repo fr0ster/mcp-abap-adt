@@ -72,7 +72,7 @@ against a `?: T`.
     - a callback's parameter to which a contract hands its own `unknown` (a `JSON.parse`
       reviver's value, a predicate over a list the language types `any[]`), written with a
       type or taking the contract's — the parameter of the callee it is handed to, or of the
-      member an object literal's method or setter implements, as that declaration writes it,
+      member an object literal's method implements, as that declaration writes it,
       every overload: a type argument written there (`Listener<unknown>`) is the third
       party's, a type parameter is bound by the caller, a slot written `ToolArgs` is input
       until checked. Once any contract hands it the `unknown`, it passes as a

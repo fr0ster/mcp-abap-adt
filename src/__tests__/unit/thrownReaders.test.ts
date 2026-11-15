@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { messageOf } from '../../lib/answer';
 import { asError, thrownAs } from '../../lib/thrownValue';
 
@@ -32,7 +33,20 @@ const values: [string, unknown][] = [
   ['null', null],
   ['undefined', undefined],
   ['an object', { message: 'not an error' }],
+  ['a Symbol', Symbol('thrown')],
+  ['a boolean', false],
+  ['an Error subclass', new TypeError('typed')],
+  ['an Error from another realm', runInNewContext('new Error("far")')],
+  ['an Error with no message', new Error()],
+  ['an Error whose message was deleted', withoutMessage()],
 ];
+
+/** An Error whose own `message` was deleted: it reads the prototype's. */
+function withoutMessage(): Error {
+  const error = new Error('gone');
+  Reflect.deleteProperty(error, 'message');
+  return error;
+}
 
 describe('thrownAs', () => {
   for (const [name, value] of values) {
@@ -74,6 +88,30 @@ describe('messageOf', () => {
         messageOf(value),
         value instanceof Error ? value.message : String(value),
       );
+    });
+  }
+});
+
+describe('the call sites read as the inline expressions they replaced', () => {
+  for (const [name, value] of values) {
+    it(`a class's member or its fallback, for ${name}`, () => {
+      assert.equal(
+        thrownAs(value, Refusal)?.words ?? 'fallback',
+        value instanceof Refusal ? value.words : 'fallback',
+      );
+      assert.equal(
+        thrownAs(value, Error)?.message ?? 'fallback',
+        value instanceof Error ? value.message : 'fallback',
+      );
+    });
+
+    it(`a class recognised, or the value rethrown, for ${name}`, () => {
+      assert.equal(
+        thrownAs(value, Refusal) !== undefined,
+        value instanceof Refusal,
+      );
+      const kept = thrownAs(value, Error) ?? 'wrapped';
+      assert.equal(kept, value instanceof Error ? value : 'wrapped');
     });
   }
 });

@@ -96,6 +96,17 @@ const SNAPSHOT_LIST_WAIT =
  */
 const SERVICE_BINDING_UNPUBLISH =
   'src/__tests__/integration/coverage/serviceBinding.live.test.ts#unpublish';
+/**
+ * The service binding's wait for its service (owner, 2026-11-16): on the
+ * cloud system a publication is SAP's background job, and the case polls the
+ * service's `$metadata` at a fixed pause until it answers 200 (then, after
+ * the unpublish, non-200), failing at its own time limit; the pause it and
+ * the unpublish call goes with it.
+ */
+const SERVICE_BINDING_METADATA_WAIT = [
+  'src/__tests__/integration/coverage/serviceBinding.live.test.ts#untilMetadata',
+  'src/__tests__/integration/coverage/serviceBinding.live.test.ts#pause',
+];
 /** The pause the retry remainder calls; it goes with it. */
 const REMAINDER_PAUSE =
   'src/__tests__/integration/helpers/testHelpers.ts#delay';
@@ -105,6 +116,7 @@ const ALLOWED_SITES = new Set([
   REMAINDER_PAUSE,
   SNAPSHOT_LIST_WAIT,
   SERVICE_BINDING_UNPUBLISH,
+  ...SERVICE_BINDING_METADATA_WAIT,
 ]);
 
 /** Every key path of a parsed YAML value: `a.b.c`. */

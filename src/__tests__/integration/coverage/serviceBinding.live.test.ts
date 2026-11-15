@@ -9,9 +9,23 @@
  *   projection (read only), and an OData V4 UI binding on it, each name read
  *   free first and recorded for cleanup before its create. The case reads the
  *   binding's metadata and source (`GetServiceBinding`), publishes it
- *   (`UpdateServiceBinding`) and builds its preview URL
- *   (`GetServiceBindingPreviewUrl`). The cleanup unpublishes it (`unpublish`,
- *   asked again on a refusal), deletes both and reads them absent.
+ *   (`UpdateServiceBinding`), waits until the published service answers, and
+ *   builds its preview URL (`GetServiceBindingPreviewUrl`). The cleanup
+ *   unpublishes it (asked again on a refusal), waits until the service no
+ *   longer answers, deletes both and reads them absent.
+ *
+ * **When a publish has completed.** On the cloud system the publish is a
+ * SAP background job: the ADT answer (`SEVERITY OK "… published locally"`,
+ * our `SUCCESS`) comes once SAP's handler has waited up to 120 s for it,
+ * whatever its state, and the binding reads `published` at once. The
+ * measured completion signal is the published service itself: the cloud
+ * gateway answers its `$metadata` 403 "The request has been blocked by
+ * UCON." until SAP's publish job ends, then 200 (measured 2026-11-15: 200
+ * at 95 s and 129 s after the publish answered; an unpublish asked then was
+ * accepted at once). An unpublish is a job too: its `$metadata` turns
+ * non-200 after its answer (within 32 s, measured). On premise the publish
+ * is synchronous: 200 at once, 404 after the unpublish. Tests may wait;
+ * the tools do not.
  */
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -21,6 +35,7 @@ import {
   expectAbsent,
   expectNameFree,
   liveCall,
+  liveConnection,
   livePrepare,
   liveSuite,
   recordCreated,
@@ -39,19 +54,83 @@ const BINDING = `ZMCP_SBB_${SUFFIX}`;
 /** A binding name nobody creates: the validations are of a new binding. */
 const NEW_BINDING = `ZMCP_SBN_${SUFFIX}`;
 
-/** Whether the case left the binding published. */
-const state = { published: false };
+/** Whether the case left the binding published, when its publish answered, and its service's `$metadata` path. */
+const state: { published: boolean; publishedAt: number; metadata?: string } = {
+  published: false,
+  publishedAt: 0,
+};
 
-/** The pause between two unpublish asks, and how long the cleanup asks. */
-const UNPUBLISH_PAUSE_MS = 30_000;
-const UNPUBLISH_LIMIT_MS = 10 * 60_000;
+/** The pause between two attempts. */
+const PAUSE_MS = 30_000;
+/** How long a publish may take to complete before the case fails. */
+const PUBLISH_LIMIT_MS = 20 * 60_000;
+/** How long the cleanup asks for the unpublish, and waits for it to complete. */
+const UNPUBLISH_LIMIT_MS = 15 * 60_000;
+
+const pause = () => new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
+
+/** Seconds since the publish answered. */
+const since = (): number => Math.round((Date.now() - state.publishedAt) / 1000);
+
+/** One stderr line per attempt: seconds since the publish, and how it went. */
+function attempt(what: string, outcome: string): void {
+  process.stderr.write(
+    `[service binding] ${since()} s after the publish: ${what} ${outcome}\n`,
+  );
+}
+
+/** The published service's `$metadata`, read through the suite's connection: SAP's status. */
+async function metadataStatus(path: string): Promise<number | undefined> {
+  try {
+    const answered = await liveConnection().makeAdtRequest({
+      url: path,
+      method: 'GET',
+      timeout: 0,
+      headers: { Accept: 'application/xml' },
+    });
+    return answered.status;
+  } catch (error) {
+    const status = member(member(error, 'response'), 'status');
+    return typeof status === 'number' ? status : undefined;
+  }
+}
+
+/** The path of a URL GetServiceBindingPreviewUrl answers (absolute, or a path over RFC). */
+function pathOf(url: string): string {
+  if (url.startsWith('/')) return url;
+  const parsed = new URL(url);
+  return `${parsed.pathname}${parsed.search}`;
+}
 
 /**
- * The cleanup's unpublish, asked again on a refusal: SAP's unpublish job on
- * the cloud system fails for minutes after a publish (measured 2026-11-15:
- * it failed for at least 90 s, then succeeded minutes later). At the limit
- * the cleanup fails, naming SAP's words and the two objects left over (and
- * the leftovers report names them: their records stay).
+ * Waits, at `PAUSE_MS`, until the service's `$metadata` answers as `done`
+ * says; at `limitMs` it throws, naming the last status.
+ */
+async function untilMetadata(
+  path: string,
+  what: string,
+  done: (status: number | undefined) => boolean,
+  limitMs: number,
+): Promise<void> {
+  const started = Date.now();
+  for (;;) {
+    const status = await metadataStatus(path);
+    attempt(`$metadata (${what})`, String(status));
+    if (done(status)) return;
+    if (Date.now() - started >= limitMs) {
+      throw new Error(
+        `the service of ${BINDING} is not ${what} after ${Math.round((Date.now() - started) / 1000)} s: its $metadata answers ${String(status)}`,
+      );
+    }
+    await pause();
+  }
+}
+
+/**
+ * The cleanup's unpublish, asked again on a refusal; then the wait until the
+ * service no longer answers. At either limit the cleanup fails, naming
+ * SAP's words and the two objects left over (and the leftovers report names
+ * them: their records stay).
  */
 async function unpublish(): Promise<void> {
   const started = Date.now();
@@ -61,17 +140,25 @@ async function unpublish(): Promise<void> {
       desired_publication_state: 'unpublished',
       service_name: SERVICE,
     });
+    attempt('unpublish', answered.isError ? 'refused' : 'unpublished');
     if (!answered.isError) {
       state.published = false;
-      return;
+      break;
     }
-    const waited = Date.now() - started;
-    if (waited >= UNPUBLISH_LIMIT_MS) {
+    if (Date.now() - started >= UNPUBLISH_LIMIT_MS) {
       throw new Error(
-        `the binding ${BINDING} stays published after ${Math.round(waited / 1000)} s of unpublish attempts; ${BINDING} and ${SERVICE} are left over: ${answered.text}`,
+        `the binding ${BINDING} stays published after ${Math.round((Date.now() - started) / 1000)} s of unpublish attempts; ${BINDING} and ${SERVICE} are left over: ${answered.text}`,
       );
     }
-    await new Promise((resolve) => setTimeout(resolve, UNPUBLISH_PAUSE_MS));
+    await pause();
+  }
+  if (state.metadata !== undefined) {
+    await untilMetadata(
+      state.metadata,
+      'unpublished',
+      (status) => status !== 200,
+      UNPUBLISH_LIMIT_MS,
+    );
   }
 }
 
@@ -187,10 +274,29 @@ liveSuite(['onprem', 'cloud'], 'Service bindings', () => {
       service_name: SERVICE,
     });
     state.published = true;
+    state.publishedAt = Date.now();
     assert.ok(
       succeeded('UpdateServiceBinding published', published).text.includes(
         'SUCCESS',
       ),
+    );
+
+    // The publish has completed when the service answers (see the head).
+    const located = await livePrepare('GetServiceBindingPreviewUrl', {
+      service_binding_name: BINDING,
+      entity_set: 'Root',
+    });
+    const metadataUrl = member(
+      payloadOf(succeeded('GetServiceBindingPreviewUrl', located)),
+      'metadata_url',
+    );
+    assert.equal(typeof metadataUrl, 'string');
+    state.metadata = pathOf(String(metadataUrl));
+    await untilMetadata(
+      state.metadata,
+      'published',
+      (status) => status === 200,
+      PUBLISH_LIMIT_MS,
     );
 
     const preview = await liveCall('GetServiceBindingPreviewUrl', {

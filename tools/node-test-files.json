@@ -18,6 +18,7 @@
   "src/__tests__/integration/compact/NarrowedCompactTools.test.ts",
   "src/__tests__/integration/coverage/activate.live.test.ts",
   "src/__tests__/integration/coverage/activateObjectsRefusal.live.test.ts",
+  "src/__tests__/integration/coverage/amdpDebugger.live.test.ts",
   "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
   "src/__tests__/integration/coverage/batch.live.test.ts",
   "src/__tests__/integration/coverage/createLanguage.live.test.ts",

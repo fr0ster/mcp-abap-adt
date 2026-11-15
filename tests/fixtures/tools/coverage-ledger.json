@@ -1,4 +1,18 @@
 {
+  "AmdpDebugCancel": {
+    "unit": "src/__tests__/unit/pins/amdpDebugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts"
+    }
+  },
+  "AmdpDebugSetBreakpoints": {
+    "unit": "src/__tests__/unit/pins/amdpDebugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts"
+    }
+  },
   "BatchBegin": {
     "unit": "src/__tests__/unit/pins/batch.pins.test.ts",
     "live": {

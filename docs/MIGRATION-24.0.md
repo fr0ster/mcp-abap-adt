@@ -893,7 +893,7 @@ message as a success with `activated: false`.
 | success, `activation_not_stated: true`, `objects` | `isError`, `still_inactive: [{ name, type, uri, parent_uri? }]` |
 | success, `nothing_to_activate: true`, objects still inactive | `isError`, `still_inactive` (the inactive list is read once after such an answer) |
 | success, `nothing_to_activate: true`, nothing left inactive | the same |
-| a run whose results carry an error-severity message: success, `activated: false`, the refusal in `message` (`ActivateObjects`, `ActivateObjectLow`) | `isError`, `origin: "refusal"`, `message` naming each refused object, `messages: [{ type, text, objectName }]` |
+| a run whose results carry an error-severity message: success, `activated: false`, the refusal in `message` (`ActivateObjects`, `ActivateObjectLow`) | `isError`, `origin: "refusal"`, `message` counting the refused objects ("refused 1 of 2 object(s)") and naming each, `messages: [{ type, text, objectName?, uri? }]` — `objectName` and `uri` the run's object the message's `href` points into, absent where it points into none ("Activation was cancelled."); with `activationExecuted="false"` the message says none of the objects was activated |
 
 This holds for every tool that activates: the `Activate*` tools, `ActivateObjects`,
 `ActivateObjectLow`, compact `HandlerActivate`, and every create or update with an activate step.

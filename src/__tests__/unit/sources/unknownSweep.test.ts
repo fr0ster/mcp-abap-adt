@@ -941,7 +941,9 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     ]);
   });
 
-  it("an unknown is ours only when text we wrote binds it: a third party's value or default is theirs", () => {
+  it("an unknown is ours only when text we wrote binds it: a third party's value, default or binding without a written type is theirs", () => {
+    // Each `for … of` and destructuring over the external `iterable` is
+    // refused twice: at the name read, and at the binding.
     assert.deepEqual(thirdPartyReads('writtenBinding'), [
       [26, 'refused'],
       [27, 'refused'],
@@ -950,8 +952,12 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
       [32, 'refused'],
       [37, 'refused'],
       [42, 'refused'],
+      [49, 'refused'],
+      [50, 'refused'],
       [50, 'refused'],
       [51, 'refused'],
+      [51, 'refused'],
+      [52, 'refused'],
       [52, 'refused'],
       [82, 'refused'],
     ]);

@@ -892,6 +892,7 @@ export class UnknownSweep {
     for (const expression of expressions) this.widening(expression);
     for (const node of declarations) this.declaration(node);
     for (const node of declarations) this.thirdPartyRead(node);
+    for (const node of declarations) this.unwrittenBinding(node);
     for (const opening of jsxOpenings) this.writtenInExpression(opening);
     for (const expression of expressions) {
       this.writtenInExpression(expression);
@@ -3242,6 +3243,41 @@ export class UnknownSweep {
       : this.unwrittenParameterHeld(holder).length === 0;
   }
 
+  /**
+   * A binding with no written type — what a `for … of` declares, an element
+   * of a destructuring — holding an `unknown` or `any`: the third party's
+   * unless it is ours (`bindingOurs`), judged as a parameter without a type
+   * is — inside a listed function, or every use handing it on. A third
+   * party's member destructured is read at the destructuring.
+   */
+  private unwrittenBinding(node: ts.Node): void {
+    const binding = ts.isBindingElement(node)
+      ? node
+      : ts.isVariableDeclaration(node) &&
+          node.type === undefined &&
+          node.initializer === undefined &&
+          this.forOfSource(node) !== undefined
+        ? node
+        : undefined;
+    if (binding === undefined || !ts.isIdentifier(binding.name)) return;
+    if (ts.isBindingElement(binding) && this.thirdPartyMember(binding)) return;
+    const held = this.held(this.checker.getTypeAtLocation(binding.name)).filter(
+      (each) => each.owner === undefined && this.contractsUnknown([each]),
+    );
+    if (held.length === 0 || this.bindingOurs(binding)) return;
+    if (this.usesPassOn(binding)) return;
+    const listed = this.listedOwner(binding);
+    this.report(
+      binding,
+      'variable',
+      held.map((each) => pathText(each.path) || "''").join(' '),
+      listed,
+      listed === undefined,
+      'third-party',
+      ['binding'],
+    );
+  }
+
   /** The declarations of the member an object destructuring's element reads. */
   private destructuredMember(node: ts.BindingElement): readonly ts.Node[] {
     if (!ts.isObjectBindingPattern(node.parent)) return [];
@@ -3254,6 +3290,11 @@ export class UnknownSweep {
       name,
     );
     return member?.declarations ?? [];
+  }
+
+  /** Whether an object destructuring's element reads a third party's member. */
+  private thirdPartyMember(node: ts.BindingElement): boolean {
+    return this.destructuredMember(node).some((each) => !ownNode(each));
   }
 
   /** Whether an object destructuring's element reads a member of ours. */
@@ -3331,7 +3372,9 @@ export class UnknownSweep {
    * A default tests for `undefined` and may put another value in its place:
    * no parameter with one hands it on whole.
    */
-  private usesPassOn(node: ts.ParameterDeclaration): boolean {
+  private usesPassOn(
+    node: ts.ParameterDeclaration | ts.VariableDeclaration | ts.BindingElement,
+  ): boolean {
     if (node.initializer !== undefined) return false;
     if (!ts.isIdentifier(node.name)) return true;
     const symbol = this.checker.getSymbolAtLocation(node.name);

@@ -28,6 +28,7 @@ import type {
   ToolArgs,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
+import { asError } from '../../../lib/thrownValue';
 import { return_error, return_response } from '../../../lib/utils';
 import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
 import {
@@ -209,7 +210,7 @@ function buildVersionsTool(
           functionGroupName ? String(functionGroupName) : undefined,
         );
       } catch (e) {
-        return return_error(e instanceof Error ? e : new Error(String(e)));
+        return return_error(asError(e));
       }
 
       try {
@@ -227,9 +228,7 @@ function buildVersionsTool(
           ),
         });
       } catch (error) {
-        return return_error(
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        return return_error(asError(error));
       }
     } catch (error) {
       return return_error(error);
@@ -279,9 +278,7 @@ function buildVersionSourceTool(
           data: JSON.stringify({ success: true, content_uri, source }, null, 2),
         });
       } catch (error) {
-        return return_error(
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        return return_error(asError(error));
       }
     } catch (error) {
       return return_error(error);
@@ -355,9 +352,7 @@ function buildVersionDiffTool(
           ),
         });
       } catch (error) {
-        return return_error(
-          error instanceof Error ? error : new Error(String(error)),
-        );
+        return return_error(asError(error));
       }
     } catch (error) {
       return return_error(error);

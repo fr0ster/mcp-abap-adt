@@ -14,6 +14,7 @@ import {
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { asError } from '../../../lib/thrownValue';
 import {
   type AxiosResponse,
   return_error,
@@ -80,7 +81,7 @@ export async function handleGetObjectVersions(
         function_group_name,
       );
     } catch (e) {
-      return return_error(e instanceof Error ? e : new Error(String(e)));
+      return return_error(asError(e));
     }
 
     try {
@@ -98,9 +99,7 @@ export async function handleGetObjectVersions(
         ),
       });
     } catch (error) {
-      return return_error(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      return return_error(asError(error));
     }
   } catch (error) {
     return return_error(error);

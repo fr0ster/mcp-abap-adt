@@ -14,6 +14,7 @@ import {
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { asError } from '../../../lib/thrownValue';
 import {
   type AxiosResponse,
   return_error,
@@ -89,9 +90,7 @@ export async function handleGetObjectVersionSource(
         data: JSON.stringify({ success: true, content_uri, source }, null, 2),
       });
     } catch (error) {
-      return return_error(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      return return_error(asError(error));
     }
   } catch (error) {
     return return_error(error);

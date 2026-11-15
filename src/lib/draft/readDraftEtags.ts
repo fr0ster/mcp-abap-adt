@@ -164,12 +164,20 @@ function readOf(
 }
 
 /** An answer's `ETag`; `null` when it carried none. */
-function etagOf(wire: IAdtWireResponse): string | null {
+export function etagOf(wire: IAdtWireResponse): string | null {
   for (const [key, value] of Object.entries(wire.headers)) {
     if (key.toLowerCase() !== 'etag') continue;
     if (typeof value === 'string') return value;
-    if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
-    return null;
+    // A list with no entry at 0 (empty, or a hole there) carries none, as
+    // `value[0]` is then `undefined`.
+    if (typeof value !== 'object' || value === null || !(0 in value)) {
+      return null;
+    }
+    // Index 0 present: the list's first entry, typed by the header's own
+    // union (`flat`), not by `Array.isArray`'s `any[]`; any other value is its
+    // own first entry, and no text.
+    const [first] = [value].flat();
+    return typeof first === 'string' ? first : null;
   }
   return null;
 }

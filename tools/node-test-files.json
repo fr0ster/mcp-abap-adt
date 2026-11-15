@@ -101,6 +101,7 @@
   "src/__tests__/unit/coverage/takeUpCase.test.ts",
   "src/__tests__/unit/descriptions/toolRetrievalVectors.test.ts",
   "src/__tests__/unit/draft/draftOf.test.ts",
+  "src/__tests__/unit/draft/etagOf.test.ts",
   "src/__tests__/unit/draft/getObjectDraft.test.ts",
   "src/__tests__/unit/embeddable/dataTools.test.ts",
   "src/__tests__/unit/installMatrix.test.ts",

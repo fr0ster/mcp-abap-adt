@@ -2677,8 +2677,13 @@ export class UnknownSweep {
     );
   }
 
-  /** Whether every use of a parameter passes it on whole, or reads its keys. */
+  /**
+   * Whether every use of a parameter passes it on whole, or reads its keys.
+   * A default tests for `undefined` and may put another value in its place:
+   * no parameter with one hands it on whole.
+   */
   private usesPassOn(node: ts.ParameterDeclaration): boolean {
+    if (node.initializer !== undefined) return false;
     if (!ts.isIdentifier(node.name)) return true;
     const symbol = this.checker.getSymbolAtLocation(node.name);
     const uses =

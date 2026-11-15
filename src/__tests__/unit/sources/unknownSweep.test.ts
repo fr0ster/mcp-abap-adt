@@ -887,6 +887,19 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
+  it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
+    // The parse each reviver is handed to passes whole into a sink.
+    assert.deepEqual(thirdPartyReads('callbackDefaults'), [
+      [9, 'refused'],
+      [9, 'sink-contract'],
+      [17, 'refused'],
+      [17, 'sink-contract'],
+      [24, 'refused'],
+      [29, 'refused'],
+      [35, 'sink-contract'],
+    ]);
+  });
+
   it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
     assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
     assert.deepEqual(

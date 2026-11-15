@@ -162,6 +162,41 @@ export function isNotFound(answer: LiveAnswer): boolean {
   );
 }
 
+/**
+ * Whether a delete's refusal says the object is already gone: SAP's deletion
+ * check refusing it (`origin: 'refusal'`, step `delete check`, `200`) with
+ * nothing but `E` messages that each read exactly `<name>: Object does not
+ * exist`, `name` one of `names` (the record's own arguments). SAP's text and
+ * the refusal's shape together; nothing broader — no other step, text or
+ * severity (measured on the cloud system, 2026-11-15: a second delete of a
+ * deleted service binding and service definition).
+ */
+export function isGoneOnDelete(
+  answer: LiveAnswer,
+  names: readonly string[],
+): boolean {
+  if (!answer.isError) return false;
+  const payload = jsonOf(answer);
+  if (
+    member(payload, 'origin') !== 'refusal' ||
+    member(payload, 'step') !== 'delete check' ||
+    member(payload, 'status') !== 200
+  ) {
+    return false;
+  }
+  const messages = member(payload, 'messages');
+  if (!Array.isArray(messages) || messages.length === 0) return false;
+  const gone = new Set(
+    names.map((name) => `${name.toUpperCase()}: Object does not exist`),
+  );
+  return messages.every(
+    (message) =>
+      member(message, 'type') === 'E' &&
+      typeof member(message, 'text') === 'string' &&
+      gone.has(String(member(message, 'text'))),
+  );
+}
+
 function liveAnswerOf(value: unknown): LiveAnswer {
   const answer = toolAnswer(value);
   const content = answer.content.map((item) => ({
@@ -646,7 +681,8 @@ export function recordCreated(deleteTool: string, args: ToolArgs): void {
 /**
  * Deletes only what was recorded, children before parents (reverse creation
  * order). A record goes only once its delete succeeded (or the object is
- * already gone): a failed delete keeps it, and a refused send (the marker)
+ * already gone: a `404`, or SAP's deletion check saying it does not exist,
+ * `isGoneOnDelete`): a failed delete keeps it, and a refused send (the marker)
  * keeps every one not yet deleted. Whatever is kept is named in the
  * leftovers report, and the cleanup fails.
  */
@@ -658,7 +694,14 @@ export async function deleteRecorded(): Promise<void> {
       const record = created[at];
       if (record === undefined) continue;
       const answer = await send(record.tool, record.args);
-      if (answer.isError && !isNotFound(answer)) {
+      const names = Object.values(record.args).filter(
+        (value): value is string => typeof value === 'string',
+      );
+      if (
+        answer.isError &&
+        !isNotFound(answer) &&
+        !isGoneOnDelete(answer, names)
+      ) {
         kept.unshift(record);
         failures.push(
           `${record.tool} ${JSON.stringify(record.args)}: ${answer.text}`,

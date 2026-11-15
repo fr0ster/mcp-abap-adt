@@ -541,6 +541,27 @@
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
+  "GetServiceBinding#metadata": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "GetServiceBinding#source": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "GetServiceBindingPreviewUrl": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
   "GetSqlQuery": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {
@@ -791,6 +812,20 @@
       "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
     }
   },
+  "HandlerServiceBindingListTypes": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "HandlerServiceBindingValidate": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
   "HandlerUnitTestResult": {
     "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
     "live": {
@@ -824,6 +859,13 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "ListServiceBindingTypes": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   },
   "LogoffLeftoverSession": {
@@ -880,6 +922,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "UpdateServiceBinding": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "ValidateServiceBinding": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   }
 }

@@ -16,7 +16,7 @@
  *   pause nowhere: no `setTimeout` or `setInterval`, no call of a `delay`,
  *   `pause` or `sleep`, but at the named sites of the step-13B remainder
  *   below, which wait on asynchronous SAP state and are measured live in
- *   step 19 before they change, and the memory snapshot list's wait.
+ *   step 19 before they change, the memory snapshot list's wait and a service binding's unpublish.
  *
  * The sources are parsed with TypeScript, so comments and strings cannot hide
  * or fake a read or a call; the templates with js-yaml, as the tests read
@@ -89,6 +89,13 @@ const FEED_REMAINDER = [
  */
 const SNAPSHOT_LIST_WAIT =
   'src/__tests__/integration/coverage/debugger.live.test.ts#MemorySnapshotGet reads a snapshot it took, MemorySnapshotDelta compares the two';
+/**
+ * The cleanup's unpublish of a service binding (owner, 2026-11-15): SAP's
+ * unpublish job on the cloud system can fail once after a publish, so the
+ * cleanup asks again at a fixed pause, failing at its own time limit.
+ */
+const SERVICE_BINDING_UNPUBLISH =
+  'src/__tests__/integration/coverage/serviceBinding.live.test.ts#unpublish';
 /** The pause the retry remainder calls; it goes with it. */
 const REMAINDER_PAUSE =
   'src/__tests__/integration/helpers/testHelpers.ts#delay';
@@ -97,6 +104,7 @@ const ALLOWED_SITES = new Set([
   ...FEED_REMAINDER,
   REMAINDER_PAUSE,
   SNAPSHOT_LIST_WAIT,
+  SERVICE_BINDING_UNPUBLISH,
 ]);
 
 /** Every key path of a parsed YAML value: `a.b.c`. */

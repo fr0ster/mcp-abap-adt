@@ -41,9 +41,12 @@ import { parseStructure } from './reading';
 /** A header's value as text: a string, or a list's first string; else empty. */
 function headerValue(value: IAdtWireResponse['headers'][string]): string {
   if (typeof value === 'string') return value.trim();
-  // A list's first entry, typed by the header's own union (`flat`), not by
-  // `Array.isArray`'s `any[]`; any other value is its own first entry, and
-  // no text.
+  // A list with no entry at 0 (empty, or a hole there) names nothing, as
+  // `value[0]` is then `undefined`.
+  if (typeof value === 'object' && value !== null && !(0 in value)) return '';
+  // Index 0 present: the list's first entry, typed by the header's own union
+  // (`flat`), not by `Array.isArray`'s `any[]`; any other value is its own
+  // first entry, and no text.
   const [first] = [value].flat();
   return typeof first === 'string' ? first.trim() : '';
 }

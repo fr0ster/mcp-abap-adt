@@ -47,6 +47,10 @@ describe('analyseLock', () => {
     );
     expect(carriesLockHandle(withHeader(['  ', 'FUGR_HANDLE']))).toBe(false);
     expect(carriesLockHandle(withHeader([]))).toBe(false);
+    // A hole at 0 is no entry, though a later one is text.
+    const holed = new Array<string>(2);
+    holed[1] = 'late-handle';
+    expect(carriesLockHandle(withHeader(holed))).toBe(false);
     expect(carriesLockHandle(withHeader(42))).toBe(false);
     expect(carriesLockHandle(withHeader(null))).toBe(false);
     expect(carriesLockHandle(withHeader({ handle: 'FUGR_HANDLE' }))).toBe(

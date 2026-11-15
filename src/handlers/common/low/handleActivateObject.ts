@@ -708,8 +708,13 @@ function notActivatedRun(outcome: ActivationRunOutcome) {
 /**
  * A run whose results carry an error-severity message: a refusal naming each
  * refused object and SAP's words, with every message of the results as SAP
- * listed them. `undefined` for a run with no such message, and for one that
- * answered no run id (no run was read, so no message is SAP's).
+ * listed them. The count is of objects, not messages: the distinct objects
+ * an error-severity message is about — the run's object its `href` points
+ * into (`uri`), else the `objName` it states.
+ * Where the results state `activationExecuted="false"`, SAP activated none
+ * of the objects, and the words say so. `undefined` for a run with no such
+ * message, and for one that answered no run id (no run was read, so no
+ * message is SAP's).
  */
 function refusedRun(
   outcome: ActivationRunOutcome,
@@ -718,10 +723,24 @@ function refusedRun(
   if (outcome.runId === '') return undefined;
   const refusals = outcome.messages.filter(isRefusal);
   if (refusals.length === 0) return undefined;
+  const refused = new Set(
+    refusals.flatMap((m) => {
+      const object = m.uri ?? m.objectName;
+      return object === undefined ? [] : [object];
+    }),
+  );
+  const verdict =
+    refused.size === 0
+      ? `finished with ${refusals.length} error message(s) about none of the ${objects} object(s) it was given`
+      : `finished and refused ${refused.size} of ${objects} object(s)`;
+  const none =
+    outcome.executed === false
+      ? `; its results say activationExecuted="false": none of the ${objects} object(s) was activated`
+      : '';
   return {
     origin: 'refusal',
     message:
-      `Activation run ${outcome.runId} finished and refused ${refusals.length} of ${objects} object(s): ` +
+      `Activation run ${outcome.runId} ${verdict}${none}: ` +
       refusals
         .map((m) => `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`)
         .join('; '),

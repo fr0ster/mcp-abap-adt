@@ -53,71 +53,116 @@ function areaOf(site: GateSite): string {
   return parts[0] === 'src' ? parts.slice(0, 3).join('/') : (parts[0] ?? '');
 }
 
-/** The warning list as Markdown: a table of the sites, and the counts per area. */
-function warningMarkdown(sites: readonly GateSite[]): string {
-  const warned = sites.filter((site) => site.why !== 'forced');
-  const forced = sites.filter((site) => site.why === 'forced');
-  const areas = new Map<string, number>();
-  for (const site of warned)
-    areas.set(areaOf(site), (areas.get(areaOf(site)) ?? 0) + 1);
+const ORIGINS = ['OURS', 'EXTERNAL', 'LANGUAGE', 'UNRESOLVED'] as const;
+
+/** The unknown sites of each origin, each split by whether a list covers it. */
+function byOrigin(sites: readonly GateSite[]) {
+  return ORIGINS.map((origin) => {
+    const of = sites.filter((site) => site.origin === origin);
+    const covered = of.filter((site) => (site.boundary ?? 'none') !== 'none');
+    return {
+      origin,
+      sites: of,
+      covered: covered.length,
+      open: of.length - covered.length,
+    };
+  });
+}
+
+/** The origin report as Markdown: totals per origin, then each origin's sites. */
+function originMarkdown(sites: readonly GateSite[]): string {
   const cell = (text: string): string => text.split('|').join('\\|');
+  const groups = byOrigin(sites);
   return [
-    `### Written \`unknown\`: ${warned.length} site(s), ${forced.length} forced by a contract`,
+    `### Where \`unknown\` enters: ${sites.length} site(s)`,
     '',
-    '| Site | Written | In | Why |',
+    '| Origin | Sites | Covered by a list | Not covered |',
     '| --- | --- | --- | --- |',
-    ...warned.map(
-      (site) =>
-        `| ${site.where} | \`${cell(site.text)}\` | ${cell(site.owner)} | ${site.why} |`,
+    ...groups.map(
+      (group) =>
+        `| ${group.origin} | ${group.sites.length} | ${group.covered} | ${group.open} |`,
     ),
     '',
-    '| Area | Sites |',
-    '| --- | --- |',
-    ...[...areas]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([area, count]) => `| ${area} | ${count} |`),
-    '',
-    "#### Forced by a third party's contract",
-    '',
-    '| Site | Written | Forced by |',
-    '| --- | --- | --- |',
-    ...forced.map(
-      (site) =>
-        `| ${site.where} | \`${cell(site.text)}\` | ${site.forcedBy ?? ''} |`,
+    ...groups.flatMap((group) =>
+      group.sites.length === 0
+        ? []
+        : [
+            `#### ${group.origin} (${group.sites.length})`,
+            '',
+            '| From | Site | Enters as | Covered by | In | Why |',
+            '| --- | --- | --- | --- | --- | --- |',
+            ...group.sites.map(
+              (site) =>
+                `| ${cell(site.from ?? '')} | ${site.where} | ${site.entry ?? ''} | ${site.boundary ?? 'none'} | ${cell(site.owner)} | ${site.why} |`,
+            ),
+            '',
+          ],
     ),
-    '',
   ].join('\n');
 }
 
-/** The warning list as plain text, grouped by area, with a total. */
-function warningText(sites: readonly GateSite[]): string {
-  const warned = sites.filter((site) => site.why !== 'forced');
-  const byArea = new Map<string, GateSite[]>();
-  for (const site of warned) {
-    const list = byArea.get(areaOf(site)) ?? [];
-    list.push(site);
-    byArea.set(areaOf(site), list);
-  }
+/** The origin report as plain text, origin first, with counts. */
+function originText(sites: readonly GateSite[]): string {
   const lines: string[] = [];
-  for (const [area, list] of [...byArea].sort(([a], [b]) =>
-    a.localeCompare(b),
-  )) {
-    lines.push(`${area} (${list.length})`);
-    for (const site of list) {
+  for (const group of byOrigin(sites)) {
+    lines.push(
+      `${group.origin}: ${group.sites.length} (${group.covered} covered by a list, ${group.open} not)`,
+    );
+    for (const site of group.sites) {
       lines.push(
-        `  ${site.where}  ${site.text}  in ${site.owner}  [${site.why}]`,
+        `  ${site.from ?? ''}  ${site.where}  ${site.entry ?? ''}  [${site.boundary ?? 'none'}]  ${site.text}`,
       );
     }
   }
-  const forced = sites.filter((site) => site.why === 'forced');
-  lines.push(
-    `total: ${warned.length} written unknown, ${forced.length} forced by a contract`,
-  );
-  for (const site of forced) {
-    lines.push(`  forced ${site.where}  ${site.forcedBy ?? ''}`);
-  }
+  lines.push(`total: ${sites.length} site(s) where unknown enters`);
   return lines.join('\n');
 }
+
+/** `[line, origin, from]` of each unknown site, by line. */
+function originsOf(sites: readonly GateSite[]): [number, string, string][] {
+  return sites
+    .filter((site) => site.kind === 'unknown')
+    .map((site): [number, string, string] => [
+      Number(site.where.split(':').pop()),
+      site.origin ?? '',
+      site.from === site.where ? 'here' : (site.from ?? ''),
+    ])
+    .sort(([a], [b]) => a - b);
+}
+
+describe('the origin report: every unknown where it enters', () => {
+  it('OURS: the keyword written, at its own line', () => {
+    assert.deepEqual(originsOf(sitesOf('originOurs')), [
+      [2, 'OURS', 'here'],
+      [6, 'OURS', 'here'],
+    ]);
+  });
+
+  it("EXTERNAL: a package's value, call, callback — named by its manifest and member", () => {
+    assert.deepEqual(originsOf(sitesOf('originExternal')), [
+      [10, 'EXTERNAL', 'external-contracts@1.4.2 raw'],
+      [12, 'EXTERNAL', 'external-contracts@1.4.2 makeGeneric()'],
+      [15, 'EXTERNAL', 'external-contracts@1.4.2 subscribe(listener)'],
+    ]);
+  });
+
+  it('LANGUAGE: a catch binding and a member of the language', () => {
+    assert.deepEqual(originsOf(sitesOf('originLanguage')), [
+      [7, 'LANGUAGE', 'catch binding'],
+      [13, 'LANGUAGE', 'Error.cause'],
+    ]);
+  });
+
+  it('UNRESOLVED: a package with no manifest is said so, not dropped', () => {
+    assert.deepEqual(originsOf(sitesOf('originUnresolved')), [
+      [
+        5,
+        'UNRESOLVED',
+        'src/__tests__/unit/sources/__fixtures__/typeGate/node_modules/no-manifest/index.d.ts loose',
+      ],
+    ]);
+  });
+});
 
 describe('the type gate: any is an error', () => {
   it('the keyword written, and an expression typed any kept, read, inspected or handed into a narrower slot, are errors; handed on whole into an unknown or any slot it passes', () => {
@@ -153,8 +198,18 @@ describe('the type gate: unknown written by us is a warning', () => {
     ]);
   });
 
-  it("a sink contract's own unknown is not warned; the same outside it is", () => {
-    assert.deepEqual(linesOf(sitesOf('sinkContract')), [[15, 'unknown']]);
+  it("a sink contract's own unknown is reported as covered by it; the same outside it is not covered", () => {
+    assert.deepEqual(
+      sitesOf('sinkContract').map((site) => [
+        Number(site.where.split(':').pop()),
+        site.boundary,
+      ]),
+      [
+        [4, 'SINK_CONTRACTS'],
+        [8, 'SINK_CONTRACTS'],
+        [15, 'none'],
+      ],
+    );
   });
 });
 
@@ -195,23 +250,25 @@ describe('production: no any, and the list of written unknown', () => {
     );
   });
 
-  it('lists every written unknown with its class, and writes the list to the job summary', () => {
-    process.stdout.write(`${warningText(warnings)}\n`);
+  it('reports every unknown where it enters, by origin, and writes the report to the job summary', () => {
+    process.stdout.write(`${originText(warnings)}\n`);
     const summary = process.env.GITHUB_STEP_SUMMARY;
     if (summary !== undefined && summary !== '') {
       try {
-        fs.appendFileSync(summary, warningMarkdown(warnings));
+        fs.appendFileSync(summary, originMarkdown(warnings));
       } catch {
         // The summary is a report: a failed write fails nothing.
       }
     }
-    assert.ok(warnings.every((site) => site.why !== undefined));
+    assert.ok(warnings.every((site) => site.origin !== undefined));
   });
 
   it('names no listed, forced or classified site that is gone', () => {
     const keys = productionKeys();
     const forced = new Set(
-      warnings.filter((site) => site.why === 'forced').map((site) => site.key),
+      warnings
+        .filter((site) => site.boundary === 'FORCED_BY_CONTRACT')
+        .map((site) => site.key),
     );
     assert.deepEqual(
       [

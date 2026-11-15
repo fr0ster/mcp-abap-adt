@@ -350,10 +350,24 @@ export interface GateSite {
   /** The function or type the site is in. */
   readonly owner: string;
   /** For `unknown`: why it is still `unknown`. */
-  readonly why: UnknownClass | 'unclassified' | 'forced';
+  readonly why: UnknownClass | 'unclassified';
+  /** For `unknown`: where it comes from. */
+  readonly origin?: UnknownOrigin;
+  /**
+   * For `unknown`: what brought it — `file:line` of the written keyword, a
+   * package's `name@version Member`, the language's member.
+   */
+  readonly from?: string;
+  /** For `unknown`: how it enters — written, a call's answer, a read, a callback's parameter, a catch. */
+  readonly entry?: 'written' | 'call' | 'read' | 'callback' | 'catch';
+  /** For `unknown`: the list that covers it, or `none`. */
+  readonly boundary?: string;
   /** For a forced site: the member that forces it. */
   readonly forcedBy?: string;
 }
+
+/** Where an `unknown` comes from. */
+export type UnknownOrigin = 'OURS' | 'EXTERNAL' | 'LANGUAGE' | 'UNRESOLVED';
 
 function fileKey(name: string): string {
   return path.resolve(name);
@@ -712,23 +726,22 @@ export function gateSites(
           why: 'unclassified',
         });
       } else if (node.kind === ts.SyntaxKind.UnknownKeyword) {
+        // Every `unknown` written is reported, a list covering it or not.
         const key = keyOf(node);
-        // A site a contract forces is reported as such, listed or not.
         const forcedBy = FORCED_BY_CONTRACT.get(key);
-        if (
-          forcedBy !== undefined ||
-          (!listed(node) && !inSinkContract(node))
-        ) {
-          out.push({
-            kind: 'unknown',
-            where: at(node),
-            key,
-            text: oneLine(node.parent),
-            owner: ownerOf(declarationOf(node)),
-            why: forcedBy === undefined ? classOf(node) : 'forced',
-            ...(forcedBy === undefined ? {} : { forcedBy }),
-          });
-        }
+        out.push({
+          kind: 'unknown',
+          where: at(node),
+          key,
+          text: oneLine(node.parent),
+          owner: ownerOf(declarationOf(node)),
+          why: classOf(node),
+          origin: 'OURS',
+          from: at(node),
+          entry: 'written',
+          boundary: boundaryOf(node, forcedBy),
+          ...(forcedBy === undefined ? {} : { forcedBy }),
+        });
       } else if (
         ts.isExpression(node) &&
         valueNode(node) &&
@@ -746,11 +759,414 @@ export function gateSites(
           why: 'unclassified',
         });
       }
+      const entered = entryOf(checker, node);
+      if (entered !== undefined) {
+        out.push({
+          kind: 'unknown',
+          where: at(node),
+          key: keyOf(node),
+          text: oneLine(node),
+          owner: ownerOf(declarationOf(node)),
+          why: classOf(node),
+          origin: entered.origin,
+          from: entered.from,
+          entry: entered.entry,
+          boundary: boundaryOf(node, undefined),
+        });
+      }
       ts.forEachChild(node, visit);
     };
     visit(source);
   }
   return out;
+}
+
+/**
+ * Whether a declaration itself brings the `unknown` its use holds: its
+ * declared type (a call's declared return) holds it, or — no type argument
+ * written at the use — a type parameter of it or of its holder defaults to
+ * one (`IAdtWireResponse<T = unknown>`). One instantiated by type arguments
+ * or values of the caller's brings nothing of its own: the `unknown` is
+ * where the caller wrote it.
+ */
+function declaredUnknown(
+  checker: ts.TypeChecker,
+  declaration: ts.Node,
+  defaultsApply: boolean,
+): boolean {
+  const declared = ts.isFunctionLike(declaration)
+    ? checker.getSignatureFromDeclaration(declaration)?.getReturnType()
+    : checker.getTypeAtLocation(declaration);
+  if (declared !== undefined && holdsUnknown(checker, declared)) return true;
+  if (!defaultsApply) return false;
+  const holders: ts.Node[] = [declaration];
+  const container = declaration.parent;
+  if (
+    container !== undefined &&
+    (ts.isClassLike(container) || ts.isInterfaceDeclaration(container))
+  ) {
+    holders.push(container);
+  }
+  if (
+    ts.isConstructorDeclaration(declaration) &&
+    ts.isClassLike(declaration.parent)
+  ) {
+    holders.push(declaration.parent);
+  }
+  return holders.some((holder) => {
+    const parameters =
+      ts.isClassLike(holder) ||
+      ts.isInterfaceDeclaration(holder) ||
+      ts.isFunctionLike(holder)
+        ? holder.typeParameters
+        : undefined;
+    return (parameters ?? []).some(
+      (parameter) =>
+        parameter.default !== undefined &&
+        holdsUnknown(checker, checker.getTypeAtLocation(parameter.default)),
+    );
+  });
+}
+
+/** Whether a type holds `unknown`: itself, a union's or an intersection's member, a type argument. */
+function holdsUnknown(
+  checker: ts.TypeChecker,
+  type: ts.Type,
+  seen: Set<ts.Type> = new Set(),
+): boolean {
+  if (type.flags & ts.TypeFlags.Unknown) return true;
+  if (seen.has(type)) return false;
+  seen.add(type);
+  if (type.isUnionOrIntersection()) {
+    return type.types.some((part) => holdsUnknown(checker, part, seen));
+  }
+  return (
+    isReference(type) &&
+    checker
+      .getTypeArguments(type)
+      .some((argument) => holdsUnknown(checker, argument, seen))
+  );
+}
+
+function isReference(type: ts.Type): type is ts.TypeReference {
+  return (type.flags & ts.TypeFlags.Object) !== 0 && 'target' in type;
+}
+
+/** The name a declaration writes, when it is a plain one. */
+function writtenName(node: ts.Node): string | undefined {
+  if (
+    (ts.isInterfaceDeclaration(node) ||
+      ts.isClassDeclaration(node) ||
+      ts.isTypeAliasDeclaration(node) ||
+      ts.isModuleDeclaration(node) ||
+      ts.isFunctionDeclaration(node) ||
+      ts.isMethodSignature(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isPropertySignature(node) ||
+      ts.isPropertyDeclaration(node) ||
+      ts.isVariableDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node)) &&
+    node.name !== undefined &&
+    (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
+  ) {
+    return node.name.text;
+  }
+  return undefined;
+}
+
+/** `Holder.member(parameter)` of a declaration in a declaration file. */
+function memberName(declaration: ts.Node): string {
+  const parts: string[] = [];
+  let parameter: string | undefined;
+  if (ts.isParameter(declaration) && ts.isIdentifier(declaration.name)) {
+    parameter = declaration.name.text;
+  }
+  for (let at: ts.Node | undefined = declaration; at; at = at.parent) {
+    if (ts.isSourceFile(at)) break;
+    const name = writtenName(at);
+    if (name !== undefined && name !== 'global') parts.unshift(name);
+    if (
+      ts.isInterfaceDeclaration(at) ||
+      ts.isClassDeclaration(at) ||
+      ts.isTypeAliasDeclaration(at)
+    ) {
+      break;
+    }
+  }
+  const base = parts.join('.') || '(anonymous)';
+  return parameter === undefined ? base : `${base}(${parameter})`;
+}
+
+/** The manifest of the package a declaration file belongs to: `name@version`, else nothing. */
+function packageOf(file: string): string | undefined {
+  const marker = `${path.sep}node_modules${path.sep}`;
+  const normal = path.resolve(file);
+  const at = normal.lastIndexOf(marker);
+  if (at < 0) return undefined;
+  const rest = normal.slice(at + marker.length).split(path.sep);
+  const first = rest[0] ?? '';
+  const name = first.startsWith('@')
+    ? `${first}${path.sep}${rest[1] ?? ''}`
+    : first;
+  const root = normal.slice(0, at + marker.length) + name;
+  try {
+    const manifest: { name?: unknown; version?: unknown } = JSON.parse(
+      fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
+    );
+    return typeof manifest.name === 'string' &&
+      typeof manifest.version === 'string'
+      ? `${manifest.name}@${manifest.version}`
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Where a declaration outside the repository is: the language's, a package's, or unknown. */
+function originOf(
+  declaration: ts.Node | undefined,
+  suffix: string,
+): { origin: UnknownOrigin; from: string } | undefined {
+  if (declaration === undefined) {
+    return { origin: 'UNRESOLVED', from: 'no declaration' };
+  }
+  const source = declaration.getSourceFile();
+  if (ownFile(source.fileName)) return undefined;
+  // Our own packages' built declarations (a sibling's `dist`): ours, reported
+  // where their source writes it.
+  const built = path.resolve(source.fileName);
+  if (
+    built.startsWith(OWN_REPO) &&
+    !built.includes(`${path.sep}node_modules${path.sep}`)
+  ) {
+    return undefined;
+  }
+  const member = `${memberName(declaration)}${suffix}`;
+  const file = path.resolve(source.fileName);
+  if (
+    source.isDeclarationFile &&
+    (path.basename(file).startsWith('lib.') ||
+      file.includes(`${path.sep}typescript${path.sep}lib${path.sep}`))
+  ) {
+    return { origin: 'LANGUAGE', from: member };
+  }
+  const manifest = packageOf(file);
+  if (manifest === undefined) {
+    return { origin: 'UNRESOLVED', from: `${rel(file)} ${member}` };
+  }
+  return { origin: 'EXTERNAL', from: `${manifest} ${member}` };
+}
+
+/**
+ * Where an `unknown` enters our code at a node, if it does: a call's or a
+ * `new`'s answer, a read of a member, a callback's parameter its contract
+ * types, a catch binding — each declared outside the repository. A value
+ * that only flows on within our code enters nowhere.
+ */
+function entryOf(
+  checker: ts.TypeChecker,
+  node: ts.Node,
+):
+  | {
+      origin: UnknownOrigin;
+      from: string;
+      entry: 'call' | 'read' | 'callback' | 'catch';
+    }
+  | undefined {
+  if (
+    ts.isVariableDeclaration(node) &&
+    ts.isCatchClause(node.parent) &&
+    node.type === undefined
+  ) {
+    return { origin: 'LANGUAGE', from: 'catch binding', entry: 'catch' };
+  }
+  if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+    if (!holdsUnknown(checker, checker.getTypeAtLocation(node)))
+      return undefined;
+    const declaration = checker.getResolvedSignature(node)?.getDeclaration();
+    if (
+      declaration !== undefined &&
+      !declaredUnknown(checker, declaration, node.typeArguments === undefined)
+    ) {
+      return undefined;
+    }
+    const found = originOf(declaration, '()');
+    return found === undefined ? undefined : { ...found, entry: 'call' };
+  }
+  if (
+    (ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node)) &&
+    !(
+      (ts.isCallExpression(node.parent) || ts.isNewExpression(node.parent)) &&
+      node.parent.expression === node
+    )
+  ) {
+    if (!holdsUnknown(checker, checker.getTypeAtLocation(node)))
+      return undefined;
+    const name = ts.isPropertyAccessExpression(node)
+      ? node.name
+      : node.argumentExpression;
+    const found0 = checker.getSymbolAtLocation(name);
+    const symbol =
+      found0 !== undefined && found0.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(found0)
+        : found0;
+    const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+    if (declaration === undefined) {
+      // An element of a list, a member of an index signature: it entered
+      // with its holder.
+      return undefined;
+    }
+    if (
+      declaration !== undefined &&
+      !declaredUnknown(checker, declaration, true)
+    ) {
+      return undefined;
+    }
+    const found = originOf(declaration, '');
+    return found === undefined ? undefined : { ...found, entry: 'read' };
+  }
+  if (
+    ts.isIdentifier(node) &&
+    valueNode(node) &&
+    !(
+      (ts.isCallExpression(node.parent) || ts.isNewExpression(node.parent)) &&
+      node.parent.expression === node
+    ) &&
+    !ts.isPropertyAccessExpression(node.parent)
+  ) {
+    // A name a declaration outside the repository gives a value of: read here.
+    const found0 = checker.getSymbolAtLocation(node);
+    const symbol =
+      found0 !== undefined && found0.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(found0)
+        : found0;
+    const declaration = symbol?.valueDeclaration;
+    if (
+      declaration === undefined ||
+      ownFile(declaration.getSourceFile().fileName) ||
+      !holdsUnknown(checker, checker.getTypeAtLocation(node))
+    ) {
+      return undefined;
+    }
+    const found = originOf(declaration, '');
+    return found === undefined ? undefined : { ...found, entry: 'read' };
+  }
+  if (ts.isParameter(node) && node.type === undefined) {
+    if (!holdsUnknown(checker, checker.getTypeAtLocation(node)))
+      return undefined;
+    const fn = node.parent;
+    const at = fn.parameters.indexOf(node);
+    const contract = contractParameter(checker, fn, at);
+    if (contract === null) return undefined;
+    const found = originOf(contract, '');
+    return found === undefined ? undefined : { ...found, entry: 'callback' };
+  }
+  return undefined;
+}
+
+/**
+ * The declaration of the parameter a contract types a callback's parameter
+ * by: the callee's when the callback is handed straight to a call (the
+ * slot that instantiates it), else the contextual signature's; `null` for a
+ * function no contract types.
+ */
+function contractParameter(
+  checker: ts.TypeChecker,
+  fn: ts.SignatureDeclaration,
+  at: number,
+): ts.Node | undefined | null {
+  if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) {
+    if (
+      !ts.isMethodDeclaration(fn) ||
+      !ts.isObjectLiteralExpression(fn.parent)
+    ) {
+      return null;
+    }
+  }
+  const call = fn.parent;
+  if (
+    (ts.isCallExpression(call) || ts.isNewExpression(call)) &&
+    call.expression !== fn
+  ) {
+    const handed: readonly ts.Expression[] = call.arguments ?? [];
+    const index = handed.findIndex((argument) => argument === fn);
+    const parameters =
+      checker.getResolvedSignature(call)?.getParameters() ?? [];
+    const slot = parameters[index]?.valueDeclaration;
+    if (slot !== undefined) return slot;
+  }
+  const contextual = ts.isMethodDeclaration(fn)
+    ? undefined
+    : checker.getContextualType(fn);
+  const signature =
+    contextual === undefined
+      ? undefined
+      : checker.getNonNullableType(contextual).getCallSignatures()[0];
+  if (signature === undefined)
+    return ts.isMethodDeclaration(fn) ? null : undefined;
+  return signature.getParameters()[at]?.valueDeclaration;
+}
+
+/**
+ * The list that covers a site — `FORCED_BY_CONTRACT`, `THROWN_READERS`,
+ * `PARSE_SITES`, `PROGRAM_INPUT_SITES`, `SINK_SITES`, `SINK_SLOTS`,
+ * `SINK_CONTRACTS`, `ToolArgs` (a tool's arguments until checked) — or `none`.
+ */
+function boundaryOf(node: ts.Node, forcedBy: string | undefined): string {
+  if (forcedBy !== undefined) return 'FORCED_BY_CONTRACT';
+  const file = rel(node.getSourceFile().fileName);
+  const owners: string[] = [keyOf(node)];
+  for (let at: ts.Node | undefined = node.parent; at; at = at.parent) {
+    if (!ts.isFunctionLike(at)) continue;
+    const owner = ownerOf(at);
+    if (owner !== '(module)') owners.push(`${file}#${owner}(`);
+  }
+  const lists: [string, readonly string[]][] = [
+    ['THROWN_READERS', [...THROWN_READERS]],
+    ['PARSE_SITES', [...PARSE_SITES]],
+    ['PROGRAM_INPUT_SITES', [...PROGRAM_INPUT_SITES]],
+    ['SINK_SITES', [...SINK_SITES]],
+    ['SINK_SLOTS', [...SINK_SLOTS.values()].map((reader) => `${reader}(`)],
+  ];
+  for (const [name, entries] of lists) {
+    if (
+      owners.some((owner) =>
+        entries.some((entry) =>
+          owner.endsWith('(') ? entry.startsWith(owner) : entry === owner,
+        ),
+      )
+    ) {
+      return name;
+    }
+  }
+  if (inSinkContract(node)) return 'SINK_CONTRACTS';
+  if (toolArgs(node)) return 'ToolArgs';
+  return 'none';
+}
+
+/** Whether a site is a tool's arguments: `ToolArgs` or `ToolArgValue`, by its alias or its written type. */
+function toolArgs(node: ts.Node): boolean {
+  for (let at: ts.Node | undefined = node; at; at = at.parent) {
+    if (
+      ts.isTypeAliasDeclaration(at) &&
+      (at.name.text === 'ToolArgs' || at.name.text === 'ToolArgValue')
+    ) {
+      return true;
+    }
+    const written =
+      ts.isParameter(at) ||
+      ts.isVariableDeclaration(at) ||
+      ts.isPropertyDeclaration(at) ||
+      ts.isPropertySignature(at)
+        ? at.type
+        : undefined;
+    if (written !== undefined) {
+      const text = written.getText();
+      return text.includes('ToolArgs') || text.includes('ToolArgValue');
+    }
+  }
+  return false;
 }
 
 /** Every declaration key of `files`: what a list entry may name. */

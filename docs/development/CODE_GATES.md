@@ -74,7 +74,8 @@ against a `?: T`.
     - a destructuring — of a variable, a parameter, an assignment or a `for … of` head;
       nested, renamed, with a default, by a rest;
     - a name whose every declaration is outside the repository (a third party's value, a
-      global of the language), for what its type holds at the top, in a list or a promise;
+      global of the language), a shorthand property's included, for what its type holds at
+      the top, in a list or a promise;
     - a callback's parameter to which a contract hands its own `unknown` (a `JSON.parse`
       reviver's value, a predicate over a list the language types `any[]`), written with a
       type or not. One written without a type takes its type as the checker gives it, in
@@ -83,11 +84,20 @@ against a `?: T`.
       its `unknown` is **the third party's unless proven ours** for every contract
       signature: the contract's parameter declared in the repository or written
       `ToolArgs`; an annotation of ours whose written type holds it; or nothing but type
-      parameters bound by us — a signature's (bound at our call: a type argument we wrote,
-      a value of ours), or a class's or an interface's whose receiver is ours (`this`, a
-      literal, a `new`, a name or a member the repository declares, a call answering no
-      `unknown` of its own). A type alias's type parameter instantiated outside
-      (`Listener<unknown>`) proves nothing. It passes as a `callback` only when every use
+      parameters bound by text we wrote — a signature's, when the call writes its type
+      arguments or infers it from arguments of ours (at least one; a third party's default
+      is theirs), or a class's or an interface's whose receiver is ours. **Ours is traced to
+      written text**: a name whose written type holds the unknown, or one without a type
+      whose initializer and every assignment are ours; a member the repository declares; a
+      call or a `new` with type arguments written, one of ours whose written return holds
+      it, or one answering only type parameters bound by arguments and a receiver of ours;
+      a literal or a carrier whose parts are ours. A third party's name, factory or default,
+      and a type alias's type parameter instantiated outside (`Listener<unknown>`), prove
+      nothing.
+    - a binding without a written type — what a `for … of` or `for await … of` declares,
+      an element of a destructuring — by the same rule: the third party's unless its source
+      is ours, it reads a member the repository declares, or the destructured parameter is
+      proven ours. It passes as a `callback` only when every use
       of it passes on (below) and it has no default — a default tests for `undefined` and
       may replace the value. A position in a parameter of a function the contract hands
       (`reject(reason?: any)`) is written into by a call, not read.

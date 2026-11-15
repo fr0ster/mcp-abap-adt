@@ -1,4 +1,5 @@
 import type { ShutdownProcess } from '../shutdownSequence.js';
+import { thrownAs } from '../thrownValue';
 import { ParameterRefusal, type ParameterTable } from './authParameters.js';
 import { readConfigFile, type YamlConfig } from './yamlConfig.js';
 
@@ -38,8 +39,9 @@ export function readStartupConfig<T>(
     }
     return read(argv, env, file.yaml);
   } catch (error) {
-    if (!(error instanceof ParameterRefusal)) throw error;
-    edges.stderr(`[MCP] ${error.words}`);
+    const refusal = thrownAs(error, ParameterRefusal);
+    if (refusal === undefined) throw error;
+    edges.stderr(`[MCP] ${refusal.words}`);
     edges.exit(1);
     return undefined;
   }

@@ -26,6 +26,7 @@ import {
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
+import { thrownAs } from '../thrownValue';
 import type { TlsConfig } from './IServerConfig.js';
 import type { YamlConfig } from './yamlConfig.js';
 
@@ -287,7 +288,7 @@ function convert(
       // A row's reader words its refusal as a ParameterRefusal; any other
       // throw gets fixed words — its message never reaches the refusal.
       throw new ParameterRefusal(
-        error instanceof ParameterRefusal ? error.words : `Invalid ${name}`,
+        thrownAs(error, ParameterRefusal)?.words ?? `Invalid ${name}`,
       );
     }
   }
@@ -486,7 +487,7 @@ export function validateYamlParameters(
       convert(p, nameIn(p, 'yaml'), yamlAt(yaml, p.yaml));
     } catch (error) {
       errors.push(
-        error instanceof ParameterRefusal ? error.words : `Invalid ${p.yaml}`,
+        thrownAs(error, ParameterRefusal)?.words ?? `Invalid ${p.yaml}`,
       );
     }
   }
@@ -697,7 +698,7 @@ export const STATE_IDLE_ROW: Parameter = {
       // main's own reader words the refusal (it quotes only the user's value);
       // the row hands those words on as its refusal, as main prints them.
       throw new ParameterRefusal(
-        error instanceof Error ? error.message : `Invalid ${name}`,
+        thrownAs(error, Error)?.message ?? `Invalid ${name}`,
       );
     }
   },

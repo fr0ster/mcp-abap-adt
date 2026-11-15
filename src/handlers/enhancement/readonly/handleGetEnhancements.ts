@@ -56,6 +56,7 @@ import {
   methodFailureOf,
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
+import { thrownAs } from '../../../lib/thrownValue';
 import { logger, return_error } from '../../../lib/utils';
 import {
   child,
@@ -1350,7 +1351,8 @@ async function resolvePaths(
           path: pathFromAnswers(answers, o.name, manualProgramContext, o.type),
         };
       } catch (error) {
-        if (error instanceof Unanswered) next.push(error.read);
+        const unanswered = thrownAs(error, Unanswered);
+        if (unanswered !== undefined) next.push(unanswered.read);
         else resolved[i] = { ok: false, error };
       }
     });

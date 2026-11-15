@@ -42,6 +42,7 @@ import {
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
+  thrownAs,
 } from '@mcp-abap-adt/lib/utils';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { secondCopyLine } from '../secondCopy.js';
@@ -807,7 +808,7 @@ async function launchStdio(
     systemType = effectiveSystemType(config, process.env);
   } catch (error) {
     deps.stderr(
-      `[MCP] ${error instanceof LauncherRefusal ? error.words : 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
+      `[MCP] ${thrownAs(error, LauncherRefusal)?.words ?? 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
     );
     deps.exit(1);
     return;
@@ -847,8 +848,9 @@ async function launchStdio(
       browser = browserOf(mapping);
     }
   } catch (error) {
-    if (!(error instanceof BrowserChoiceError)) throw error;
-    deps.stderr(`[MCP] ${error.words}`);
+    const refusal = thrownAs(error, BrowserChoiceError);
+    if (refusal === undefined) throw error;
+    deps.stderr(`[MCP] ${refusal.words}`);
     deps.exit(1);
     return;
   }

@@ -47,6 +47,7 @@ import {
   rfcConfigOf,
   URL_KEYS,
 } from '@mcp-abap-adt/lib/config';
+import { thrownAs } from '@mcp-abap-adt/lib/utils';
 import * as dotenv from 'dotenv';
 import { getPlatformPaths } from '../config/platformPaths';
 import { countedProvider, ProviderGate } from './countedProvider';
@@ -378,10 +379,11 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     try {
       handler.checkSettings?.(settings, this.context);
     } catch (error) {
-      if (error instanceof SettingsError) {
+      const refused = thrownAs(error, SettingsError);
+      if (refused !== undefined) {
         throw new DestinationConfigError(
           destination,
-          [error.setting],
+          [refused.setting],
           'its authentication cannot use these settings',
         );
       }

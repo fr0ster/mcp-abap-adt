@@ -8,7 +8,7 @@ import {
   isAnswerObject,
 } from '../json';
 import { SystemContextMissingError } from '../systemContextGuard';
-import { child, isElement, isList } from '../thrownValue';
+import { child, isElement, isList, thrownAs } from '../thrownValue';
 import type { Cleanup } from './safeFields';
 import { failed, type StepError, type StepResponse } from './stepResponse';
 
@@ -77,7 +77,7 @@ export function atStep<A extends unknown[], T>(
       if (
         stepOf(thrown) !== undefined ||
         failureOf(thrown) !== undefined ||
-        thrown instanceof SystemContextMissingError
+        thrownAs(thrown, SystemContextMissingError) !== undefined
       ) {
         throw thrown;
       }

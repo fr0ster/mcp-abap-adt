@@ -26,6 +26,7 @@ import type { McpResult } from '../answer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import { requireDebugger } from '../debugger/access';
 import { DebugStateError } from '../debugger/DebugSession';
+import { thrownAs } from '../thrownValue';
 import { type AnswersAsk, batchAnswersAnswer, readAnswers } from './answers';
 import { EnvelopeWatch } from './envelopeWatch';
 import { executeBatch, openBatchOf } from './execute';
@@ -98,8 +99,12 @@ export async function beginDebugBatch(
   try {
     connection = debug.abap.openBatch(options);
   } catch (error) {
-    if (!(error instanceof DebugStateError) || !debug.amdp.atBreak())
+    if (
+      thrownAs(error, DebugStateError) === undefined ||
+      !debug.amdp.atBreak()
+    ) {
       throw error;
+    }
     connection = debug.amdp.openBatch(options);
     debuggee = 'amdp';
   }

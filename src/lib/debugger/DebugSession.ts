@@ -53,6 +53,7 @@ import {
   noteLeftBehind,
   payloadCarriedBy,
 } from '../strategies/step';
+import { thrownAs } from '../thrownValue';
 import {
   type BreakpointNotPlaced,
   mergeDefinitions,
@@ -1024,9 +1025,7 @@ export class DebugSession<O = unknown> {
           if (failures.length === 0) throw error;
           const notClosed = `not closed: ${describeFailures(failures)}`;
           const failed =
-            error instanceof Error
-              ? error
-              : new DebugListenerError(thrown(error));
+            thrownAs(error, Error) ?? new DebugListenerError(thrown(error));
           leaveBehind(failed, { message: 'not closed', failures });
           failed.message = `${failed.message}; ${notClosed}`;
           throw failed;
@@ -1057,9 +1056,7 @@ export class DebugSession<O = unknown> {
             : []),
         ].join('; ');
         const failed =
-          error instanceof Error
-            ? error
-            : new DebugListenerError(thrown(error));
+          thrownAs(error, Error) ?? new DebugListenerError(thrown(error));
         leaveBehind(failed, {
           ...(failures.length ? { message: 'not undone', failures } : {}),
           ...(notes.length ? { notes } : {}),

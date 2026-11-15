@@ -1,1083 +1,160 @@
 /**
- * The `unknown` audit (spec §4), a sweep of every node: a declaration or an
- * expression of production code whose type holds `unknown` (or `any`) at any
- * depth is refused, unless it is one of the listed boundaries. The sweep is
- * `helpers/unknownSweep.ts`, on the type checker; a refusal lists each site
- * with the positions charged to it and the typed values put there.
- *
- * Each fixture under `__fixtures__/unknownProvenance` is one form, refused,
- * or passing under its boundary kind (listed by exact site where the kind
- * needs one).
+ * The type gate (`helpers/unknownSweep.ts`): `any` is an error — the keyword
+ * written, and every expression typed `any` not handed on whole into a slot
+ * declared `unknown` or `any`, outside a listed boundary; `unknown` written by
+ * us is a warning — listed with its class, failing nothing, written to the CI
+ * job's summary — unless it is in a listed boundary, a sink contract, or
+ * forced by a third party's contract (`FORCED_BY_CONTRACT`).
  */
-
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
 import { REPO } from './helpers/failureScan';
 import {
-  type BoundaryKind,
   eachProject,
+  FORCED_BY_CONTRACT,
   fixtureProgram,
-  type ListedSites,
-  ownFile,
+  type GateSite,
+  gateProduction,
+  gateSites,
   PARSE_SITES,
   PROGRAM_INPUT_SITES,
-  productionProjects,
-  productionSinkSlotReads,
+  productionKeys,
   SINK_SITES,
   SINK_SLOTS,
-  type SweepSite,
-  sinkSlotReads,
-  staleEntries,
-  sweepFiles,
-  sweepProduction,
   THROWN_READERS,
+  UNKNOWN_CLASSES,
 } from './helpers/unknownSweep';
 
 const FIXTURES = path.join(
   REPO,
-  'src/__tests__/unit/sources/__fixtures__/unknownProvenance',
+  'src/__tests__/unit/sources/__fixtures__/typeGate',
 );
-const AT = 'src/__tests__/unit/sources/__fixtures__/unknownProvenance';
 
-interface Listing {
-  readonly thrown?: readonly string[];
-  readonly parse?: readonly string[];
-  readonly programInput?: readonly string[];
-  readonly sink?: readonly string[];
-}
-
-function lists(listing: Listing = {}): ListedSites {
-  return {
-    thrown: new Set(listing.thrown ?? []),
-    parse: new Set(listing.parse ?? []),
-    programInput: new Set(listing.programInput ?? []),
-    sink: new Set(listing.sink ?? []),
-  };
-}
-
-function sitesOf(
-  fixture: string,
-  listing: Listing = {},
-  slots: ReadonlyMap<string, string> = SINK_SLOTS,
-): SweepSite[] {
+function sitesOf(fixture: string): GateSite[] {
   const file = path.join(FIXTURES, `${fixture}.ts`);
-  return sweepFiles(
-    fixtureProgram([file]),
-    new Set([file]),
-    lists(listing),
-    slots,
-  );
+  return gateSites(fixtureProgram([file]), new Set([file]));
 }
 
-/** `[boundary, refused, types]` of each site named `name`, of kind `kind`. */
-function judged(
-  sites: readonly SweepSite[],
-  name: string,
-  kind?: string,
-): [BoundaryKind | undefined, boolean, readonly string[]][] {
+/** `[line, kind]` of each site, by line. */
+function linesOf(sites: readonly GateSite[]): [number, GateSite['kind']][] {
   return sites
-    .filter(
-      (site) =>
-        site.name === name && (kind === undefined || site.kind === kind),
-    )
-    .map((site) => [site.boundary, site.refused, site.types]);
-}
-
-/** `file#owner(name)` of a fixture's site. */
-function key(fixture: string, owner: string, name: string): string {
-  return `${AT}/${fixture}.ts#${owner}(${name})`;
-}
-
-describe('the unknown audit refuses a node that holds unknown', () => {
-  it('a typed value held as unknown is refused, with its type', () => {
-    assert.deepEqual(judged(sitesOf('typed'), 'order', 'parameter'), [
-      [undefined, true, ['Order']],
-    ]);
-  });
-
-  it('a value laundered through an unknown parameter is refused where it enters, and the next one too', () => {
-    const sites = sitesOf('laundered').filter((site) => site.name === 'value');
-    assert.deepEqual(
-      sites.map((site) => [
-        site.where.split('/').pop(),
-        site.refused,
-        site.types,
-      ]),
-      [
-        ['laundered.ts:7', true, []],
-        ['laundered.ts:11', true, ['Order']],
-      ],
-    );
-  });
-
-  it('a site unlisted is refused whatever reaches it: no flow is followed', () => {
-    for (const [fixture, name] of [
-      ['boundary', 'value'],
-      ['awaited', 'value'],
-      ['shorthand', 'id'],
-      ['narrowedProperty', 'value'],
-      ['listByKey', 'value'],
-      ['positionFollowed', 'heldReading'],
-      ['unnamedSink', 'value'],
-    ] as const) {
-      const found = sitesOf(fixture).filter((site) => site.name === name);
-      assert.ok(found.length > 0, `${fixture}: ${name}`);
-      assert.ok(
-        found.every((site) => site.refused && site.boundary === undefined),
-        `${fixture}: ${name}`,
-      );
-    }
-    assert.deepEqual(judged(sitesOf('unnamedSink'), 'value'), [
-      [undefined, true, ['number', 'string']],
-    ]);
-  });
-
-  it('a parse result listed by exact site passes, the environment reaching it too', () => {
-    const sites = sitesOf('boundary', {
-      parse: [key('boundary', 'readName', 'value')],
-    });
-    assert.deepEqual(judged(sites, 'value'), [
-      ['parse', false, ['string | undefined']],
-    ]);
-    // The environment is the program's input: no widening refused.
-    assert.deepEqual(
-      sites.filter((site) => site.kind === 'widening'),
-      [],
-    );
-  });
-
-  it('a typed value put into a listed parse site is refused where it lands', () => {
-    const sites = sitesOf('mixed', { parse: [key('mixed', 'label', 'value')] });
-    assert.deepEqual(judged(sites, 'value', 'parameter'), [
-      ['parse', false, ['Order']],
-    ]);
-    assert.deepEqual(
-      sites
-        .filter((site) => site.kind === 'widening')
-        .map((site) => [site.where.split('/').pop(), site.refused, site.types]),
-      [['mixed.ts:11', true, ['Order']]],
-    );
-  });
-
-  it('a caught value is a boundary by its form: a catch binding, a rejection handler', () => {
-    assert.deepEqual(judged(sitesOf('boundary'), 'error'), [
-      ['caught', false, []],
-    ]);
-    assert.deepEqual(judged(sitesOf('callback'), 'reason'), [
-      ['caught', false, []],
-    ]);
-    assert.deepEqual(judged(sitesOf('thrownShorthand'), 'rejection'), [
-      ['caught', false, []],
-    ]);
-  });
-
-  it('a reader of thrown values and a failure slot pass only when listed', () => {
-    const reader = key('thrownReader', 'describeFailure', 'thrown');
-    assert.deepEqual(judged(sitesOf('thrownReader'), 'thrown'), [
-      [undefined, true, ['Error']],
-    ]);
-    assert.deepEqual(
-      judged(sitesOf('thrownReader', { thrown: [reader] }), 'thrown'),
-      [['thrown', false, ['Error']]],
-    );
-    const shorthand = sitesOf('thrownShorthand');
-    assert.deepEqual(judged(shorthand, 'error', 'property'), [
-      [undefined, true, ['Error', 'string']],
-    ]);
-    assert.deepEqual(judged(shorthand, 'reason', 'property'), [
-      [undefined, true, ['string']],
-    ]);
-    assert.deepEqual(judged(shorthand, 'failure', 'property'), [
-      [undefined, true, ['Error']],
-    ]);
-    const listed = sitesOf('thrownShorthand', {
-      thrown: [
-        key('thrownShorthand', 'Settled', 'error'),
-        key('thrownShorthand', 'Rejected', 'reason'),
-        key('thrownShorthand', 'Outcome', 'failure'),
-      ],
-    });
-    assert.deepEqual(
-      listed.filter((site) => site.refused).map((site) => site.key),
-      [],
-    );
-    // A property read of a thrown value held as unknown is the reader's.
-    const property = sitesOf('thrownProperty', {
-      thrown: [
-        key('thrownProperty', 'classOf', 'error'),
-        key('thrownProperty', 'classOf', 'name'),
-      ],
-    });
-    assert.deepEqual(
-      property.filter((site) => site.refused).map((site) => site.key),
-      [],
-    );
-  });
-
-  it('a listed name no site has is stale', () => {
-    const reader = key('thrownReader', 'describeFailure', 'thrown');
-    const sites = sitesOf('thrownReader', { thrown: [reader] });
-    assert.deepEqual(staleEntries(sites, new Set([reader, `${reader}x`])), [
-      `${reader}x`,
-    ]);
-  });
-
-  it("a value of the program's arguments or environment passes in a listed slot", () => {
-    assert.deepEqual(judged(sitesOf('programInput'), 'value'), [
-      [undefined, true, ['string']],
-    ]);
-    const sites = sitesOf('programInput', {
-      programInput: [
-        key('programInput', 'Hit', 'value'),
-        key('programInput', 'Flag', 'flag'),
-      ],
-    });
-    assert.deepEqual(
-      sites.filter((site) => site.refused).map((site) => site.key),
-      [],
-    );
-  });
-
-  it("a tool's arguments before their schema pass, alone or beside typed members", () => {
-    const sites = sitesOf('toolInput');
-    assert.deepEqual(judged(sites, 'args'), [['tool-args', false, []]]);
-    assert.deepEqual(judged(sites, 'selected'), [['tool-args', false, []]]);
-    // A member that holds unknown of its own is a site of its own.
-    assert.deepEqual(judged(sites, 'extra'), [[undefined, true, ['string']]]);
-  });
-
-  it('a named sink contract passes: its members, what implements it, a listed sink site', () => {
-    for (const [fixture, name] of [
-      ['namedSink', 'meta'],
-      ['literalSink', 'meta'],
-      ['answerSerializer', 'payload'],
-    ] as const) {
-      const found = sitesOf(fixture).filter((site) => site.name === name);
-      assert.ok(found.length > 0, fixture);
-      assert.ok(
-        found.every(
-          (site) => site.boundary === 'sink-contract' && !site.refused,
-        ),
-        fixture,
-      );
-    }
-    // A function a sink hands its value to is a site of its own, refused
-    // until listed.
-    const line = key('sinkForward', 'line', 'meta');
-    assert.deepEqual(
-      sitesOf('sinkForward')
-        .filter((site) => site.key === line)
-        .map((site) => site.refused),
-      [true],
-    );
-    assert.deepEqual(
-      sitesOf('sinkForward', { sink: [line] })
-        .filter((site) => site.refused)
-        .map((site) => site.key),
-      [],
-    );
-  });
-
-  it('a sink slot passes, and the same slot unnamed is refused with what is put there', () => {
-    const fixture = `${AT}/sinkSlot.ts`;
-    const slots = new Map([['ContentItem.json', `${fixture}#serialize`]]);
-    assert.deepEqual(judged(sitesOf('sinkSlot', {}, slots), 'json'), [
-      ['sink-slot', false, ['Order']],
-    ]);
-    assert.deepEqual(judged(sitesOf('sinkSlot', {}, new Map()), 'json'), [
-      [undefined, true, ['Order']],
-    ]);
-  });
-
-  it('a sink slot read by any function but its own reader is refused', () => {
-    const file = path.join(FIXTURES, 'sinkSlot.ts');
-    const fixture = `${AT}/sinkSlot.ts`;
-    const found = sinkSlotReads(
-      fixtureProgram([file]),
-      new Set([file]),
-      new Map([['ContentItem.json', `${fixture}#serialize`]]),
-    );
-    assert.deepEqual(
-      found.reads.map((read) => [read.where.split('/').pop(), read.reader]),
-      [
-        ['sinkSlot.ts:29', `${fixture}#readBack`],
-        ['sinkSlot.ts:30', `${fixture}#readBack`],
-        ['sinkSlot.ts:35', `${fixture}#readByKey`],
-        ['sinkSlot.ts:42', `${fixture}#readByAssignment`],
-      ],
-    );
-    assert.deepEqual([...found.declared], ['ContentItem.json']);
-  });
-
-  it('a callback passes where its contract types the position unknown, and is refused where it has a type', () => {
-    assert.deepEqual(judged(sitesOf('callback'), 'value'), [
-      ['callback', false, []],
-    ]);
-    const contract = sitesOf('contractCallback');
-    assert.deepEqual(judged(contract, 'carried'), [['callback', false, []]]);
-    assert.deepEqual(judged(contract, 'widenedReading'), [
-      [undefined, true, ['Order']],
-    ]);
-    const named = sitesOf('namedCallback');
-    assert.deepEqual(judged(named, 'namedValue'), [
-      [undefined, true, ['number']],
-    ]);
-    assert.deepEqual(judged(named, 'revived'), [['callback', false, []]]);
-  });
-
-  it("a runtime object of the language's own is its contract, not a position", () => {
-    assert.deepEqual(sitesOf('languageObject'), []);
-  });
-
-  it('a member written by a quoted key is the member', () => {
-    assert.deepEqual(judged(sitesOf('quotedKey'), "'raw-value'", 'property'), [
-      [undefined, true, ['number']],
-    ]);
-  });
-
-  it('a position is read however deep it lies in a finite type', () => {
-    const [boxed] = sitesOf('deepBox').filter((site) => site.name === 'boxed');
-    assert.deepEqual(
-      [boxed?.position, boxed?.refused],
-      ['.value.value.value.value.value.value.value', true],
-    );
-  });
-
-  it('a container of unknown, an alias of it, an instantiation with it are each refused', () => {
-    const sites = sitesOf('containers');
-    for (const name of [
-      'items',
-      'bag',
-      'pair',
-      'map',
-      'set',
-      'work',
-      'visited',
-      'aliased',
-      'Anything',
-      'held',
-      'into',
-      'slots',
-      'members',
-      'entries',
-      'kept',
-      'spread',
-      'keys',
-      'rows',
-      'heldOrders',
-      'made',
-      'grouped',
-      'resolved',
-      'listed',
-      'table',
-      'spreadInto',
-      'byNumber',
-      'afterSpread',
-      'finished',
-      'inheritedValues',
-      'restItems',
-      'spreadMap',
-      'spreadSet',
-      'listedBags',
-      'pendingLists',
-      'restAfter',
-      'spreadResolved',
-    ]) {
-      const found = sites.filter((site) => site.name === name);
-      assert.ok(found.length > 0, name);
-      assert.ok(
-        found.every((site) => site.refused),
-        name,
-      );
-    }
-    // The typed values that reach them are named.
-    for (const name of [
-      'items',
-      'pair',
-      'map',
-      'set',
-      'work',
-      'visited',
-      'held',
-    ]) {
-      assert.deepEqual(
-        sites
-          .filter((site) => site.name === name)
-          .flatMap((site) => site.types),
-        ['Order'],
-        name,
-      );
-    }
-    // A function type's parameter written unknown, at any depth of an
-    // instantiation.
-    assert.deepEqual(
-      sites
-        .filter((site) => site.name === 'visit')
-        .map((site) => site.position),
-      ['(0)', '(0)[]'],
-    );
-    // An instantiation the call writes unknown into, no argument bringing it.
-    assert.ok(
-      sites.some(
-        (site) =>
-          site.kind === 'expression' &&
-          site.name.startsWith('new Set<unknown>'),
-      ),
-    );
-  });
-
-  it('a container of unknown fed from outside passes only as a listed parse site', () => {
-    const sites = sitesOf('containerBoundary');
-    assert.ok(
-      sites
-        .filter((site) => site.boundary === undefined)
-        .every((site) => site.refused),
-    );
-    const declared = (site: SweepSite) =>
-      !['expression', 'widening', 'any'].includes(site.kind);
-    const listed = sitesOf('containerBoundary', {
-      parse: sites
-        .filter((site) => site.refused && declared(site))
-        .map((site) => site.key),
-    });
-    assert.deepEqual(
-      listed
-        .filter((site) => site.refused && declared(site))
-        .map((site) => site.key),
-      [],
-    );
-    // Listed, a parse site still refuses a typed value put into it: the
-    // `number` after the spread reaches the rest.
-    assert.deepEqual(
-      listed
-        .filter((site) => site.kind === 'widening')
-        .map((site) => [site.where.split('/').pop(), site.types]),
-      [['containerBoundary.ts:54', ['number']]],
-    );
-  });
-
-  it('a library answer of type any lands only where unknown is expected', () => {
-    const lines = sitesOf('untypedAnswer')
-      .filter((site) => site.kind === 'any')
-      .map((site) => Number(site.where.split(':').pop()));
-    for (const refused of [9, 14, 35])
-      assert.ok(lines.includes(refused), `${refused}`);
-    for (const passes of [21, 30, 41])
-      assert.ok(!lines.includes(passes), `${passes}`);
-  });
-
-  it("every package's sources are the repository's own, installed and built files are not", () => {
-    assert.equal(ownFile(path.join(REPO, 'compact-modify/src/x.ts')), true);
-    assert.equal(ownFile(path.join(REPO, 'scripts/x.ts')), true);
-    assert.equal(ownFile(path.join(REPO, 'node_modules/a/index.d.ts')), false);
-    assert.equal(ownFile(path.join(REPO, 'server-runtime/dist/x.d.ts')), false);
-  });
-
-  it('a file is found however its name is spelled', () => {
-    const spelled = `${FIXTURES}${path.sep}deeper${path.sep}..${path.sep}typed.ts`;
-    const sites = sweepFiles(fixtureProgram([spelled]), new Set([spelled]));
-    assert.deepEqual(judged(sites, 'order', 'parameter'), [
-      [undefined, true, ['Order']],
-    ]);
-  });
-});
-
-describe('the forms round 8 found the flow scan missing are refused', () => {
-  it('a named arrow callback, a named function in a typed list or a shorthand member', () => {
-    const sites = sitesOf('namedArrow');
-    assert.deepEqual(judged(sites, 'namedArrow'), [
-      [undefined, true, ['number']],
-    ]);
-    for (const name of ['listed', 'checked', 'member', 'inspected']) {
-      assert.deepEqual(
-        judged(sites, name).map(([boundary, refused]) => [boundary, refused]),
-        [[undefined, true]],
-        name,
-      );
-    }
-  });
-
-  it('a bracket-key write feeds the member', () => {
-    assert.deepEqual(judged(sitesOf('bracketWrite'), 'value', 'property'), [
-      [undefined, true, ['number']],
-    ]);
-    const listed = sitesOf('bracketWrite', {
-      parse: [key('bracketWrite', 'Box', 'value')],
-    });
-    assert.deepEqual(
-      listed
-        .filter((site) => site.kind === 'widening')
-        .map((site) => [site.where.split('/').pop(), site.types]),
-      [['bracketWrite.ts:9', ['number']]],
-    );
-  });
-
-  it('a nested or array assignment pattern reads a sink slot', () => {
-    const file = path.join(FIXTURES, 'nestedDestructuring.ts');
-    const fixture = `${AT}/nestedDestructuring.ts`;
-    const found = sinkSlotReads(
-      fixtureProgram([file]),
-      new Set([file]),
-      new Map([['ContentItem.json', `${fixture}#serialize`]]),
-    );
-    assert.deepEqual(
-      found.reads.map((read) => [read.where.split('/').pop(), read.reader]),
-      [
-        ['nestedDestructuring.ts:18', `${fixture}#readNested`],
-        ['nestedDestructuring.ts:24', `${fixture}#readFromList`],
-      ],
-    );
-  });
-
-  it('a value made by new with no arguments is typed by its class', () => {
-    assert.deepEqual(judged(sitesOf('emptyConstructor'), 'value', 'property'), [
-      [undefined, true, ['number']],
-    ]);
-  });
-
-  it("an object literal's method returns into its contract", () => {
-    assert.deepEqual(
-      judged(sitesOf('literalMethod'), '(anonymous)', 'return'),
-      [[undefined, true, ['number']]],
-    );
-  });
-});
-
-describe('the forms round 9 found the every-node sweep missing are refused', () => {
-  it('a type written inside an expression: satisfies, an assertion, a call, a tagged template, a new, an instantiation expression', () => {
-    assert.deepEqual(
-      sitesOf('expressionTypes')
-        .filter((site) => site.refused)
-        .map((site) => [
-          site.kind,
-          Number(site.where.split(':').pop()),
-          site.position,
-        ]),
-      [
-        // The tagged template's value lands in its instantiated rest.
-        ['widening', 22, "''"],
-        ['expression', 16, 'Record<1>IResultStrategy<0>'],
-        ['expression', 19, 'consume<0>'],
-        ['expression', 22, 'tagged<0>'],
-        ['expression', 25, 'Recorder<0>'],
-        ['expression', 28, 'consume<0>'],
-        ['expression', 31, "''"],
-      ],
-    );
-  });
-
-  it("a third party's member read by a literal key or a destructuring, however nested, or inspected, is refused", () => {
-    assert.deepEqual(
-      sitesOf('readBackForms')
-        .filter((site) => site.kind === 'third-party' && site.refused)
-        .map((site) => Number(site.where.split(':').pop())),
-      [13, 18, 23, 28, 34, 39, 47, 52, 58],
-    );
-  });
-
-  it("a container literal put where unknown is expected is charged to its slot, and a third party's member read is refused", () => {
-    const sites = sitesOf('literalWidening', {
-      parse: [key('literalWidening', 'parse', 'value')],
-    });
-    assert.deepEqual(
-      sites
-        .filter((site) => site.kind === 'widening')
-        .map((site) => [Number(site.where.split(':').pop()), site.types]),
-      [
-        [9, ['number']],
-        [10, ['{ n: number; }']],
-        [11, ['number[]']],
-        [12, ['{ list: { n: number; }[]; }']],
-      ],
-    );
-    assert.deepEqual(
-      sites
-        .filter((site) => site.kind === 'third-party' && site.refused)
-        .map((site) => Number(site.where.split(':').pop())),
-      [18],
-    );
-  });
-});
-
-describe('the forms round 10 found the every-node sweep missing are refused', () => {
-  const readBacks = (fixture: string): number[] =>
-    sitesOf(fixture)
-      .filter((site) => site.kind === 'third-party' && site.refused)
-      .map((site) => Number(site.where.split(':').pop()))
-      .sort((a, b) => a - b);
-
-  it('a read handed to a type parameter of ours instantiated to unknown is refused', () => {
-    assert.deepEqual(readBacks('readBackGeneric'), [21, 25, 29]);
-  });
-
-  it("a reflective read answering a third party's unknown, and a spread copy's member, are refused", () => {
-    assert.deepEqual(readBacks('readBackReflective'), [13, 17, 21, 41]);
-  });
-
-  it('a member written by a computed key is refused where it is read', () => {
-    assert.deepEqual(readBacks('computedKeyWrite'), [10, 19]);
-  });
-});
-
-describe('tool-argument input until it is checked (the owner rule)', () => {
-  it('a value read out of the arguments, a list of them, a nested object and a function handing them on pass', () => {
-    const sites = sitesOf('toolArgValue');
-    assert.deepEqual(judged(sites, 'value', 'parameter'), [
-      ['tool-args', false, []],
-      [undefined, true, []],
-    ]);
-    assert.deepEqual(judged(sites, 'listed', 'parameter'), [
-      ['tool-args', false, []],
-    ]);
-    assert.deepEqual(judged(sites, 'member', 'return'), [
-      ['tool-args', false, []],
-    ]);
-    assert.deepEqual(judged(sites, 'withoutRoute', 'return'), [
-      ['tool-args', false, []],
-    ]);
-  });
-
-  it('a value of no tool-argument type is refused', () => {
-    assert.deepEqual(
-      sitesOf('toolArgValue')
-        .filter((site) => site.refused)
-        .map((site) => site.key),
-      [key('toolArgValue', 'plain', 'value')],
-    );
-  });
-});
-
-describe("a generic's type parameters are bound by the caller (the owner rule)", () => {
-  it('a constraint or a default of unknown is no site; an instantiation through the default is refused where it is written', () => {
-    const sites = sitesOf('boundGenerics');
-    assert.deepEqual(
-      sites.filter((site) => site.kind === 'type-parameter'),
-      [],
-    );
-    assert.deepEqual(
-      sites
-        .filter((site) => site.refused)
-        .map((site) => [site.kind, Number(site.where.split(':').pop())]),
-      [['expression', 19]],
-    );
-  });
-});
-
-describe("an instantiation that builds a listed slot's written type is the slot's", () => {
-  it('a listed slot answers for its initializer; an unlisted one is refused with it', () => {
-    const refused = sitesOf('initialisedSlot').filter((site) => site.refused);
-    assert.deepEqual(
-      refused.map((site) => site.kind),
-      ['property', 'expression'],
-    );
-    const listed = sitesOf('initialisedSlot', {
-      thrown: [key('initialisedSlot', 'Watch', 'thrown')],
-    });
-    assert.deepEqual(
-      listed.filter((site) => site.refused),
-      [],
-    );
-  });
-});
-
-describe("a stand-in for Node's EventEmitter is typed by Node's contract", () => {
-  it("a listener typed by EventEmitter's on passes; one of its own is refused", () => {
-    assert.deepEqual(
-      sitesOf('nodeEmitter')
-        .filter((site) => site.refused)
-        .map((site) => [site.kind, site.key]),
-      [['parameter', key('nodeEmitter', 'on', 'args')]],
-    );
-  });
-});
-
-describe("the type arguments we supply to a third party's generic type are ours", () => {
-  it('an unknown written as its argument is refused where it is written, at any depth', () => {
-    assert.deepEqual(
-      sitesOf('suppliedArguments')
-        .filter((site) => site.refused)
-        .map((site) => [site.kind, site.name, site.position]),
-      [
-        ['alias', 'Answer', 'IAdtResponse<0>'],
-        ['return', 'read', 'Promise<0>IAdtResponse<0>[]'],
-        ['parameter', 'answer', 'IAdtResponse<0>{}'],
-        ['variable', 'pending', 'Array<0>Promise<0>IAdtResponse<0>'],
-      ],
-    );
-  });
-});
-
-/** The line of a fixture's site. */
-function lineOf(site: SweepSite): number {
-  return Number(site.where.split(':').pop());
-}
-
-/** The closed rule's sites of a fixture: `[line, boundary or 'refused']`, by line. */
-function thirdPartyReads(
-  fixture: string,
-  listing: Listing = {},
-): [number, BoundaryKind | 'refused'][] {
-  return sitesOf(fixture, listing)
-    .filter((site) => site.reason === 'third-party')
-    .map((site): [number, BoundaryKind | 'refused'] => [
-      lineOf(site),
-      site.refused ? 'refused' : (site.boundary ?? 'refused'),
+    .map((site): [number, GateSite['kind']] => [
+      Number(site.where.split(':').pop()),
+      site.kind,
     ])
     .sort(([a], [b]) => a - b);
 }
 
-/** The lines `thirdPartyReads` refuses. */
-function refusedReads(fixture: string, listing: Listing = {}): number[] {
-  return thirdPartyReads(fixture, listing)
-    .filter(([, judged]) => judged === 'refused')
-    .map(([line]) => line);
+/** The area a site is in: its package, or `src/<dir>/<dir>`. */
+function areaOf(site: GateSite): string {
+  const parts = site.where.split(':')[0]?.split('/') ?? [];
+  return parts[0] === 'src' ? parts.slice(0, 3).join('/') : (parts[0] ?? '');
 }
 
-describe("the closed rule: a third party's unknown is read only at a boundary (the owner's decision)", () => {
-  const member = { parse: [key('thirdPartyMember', 'parseBody', 'answer')] };
+/** The warning list as Markdown: a table of the sites, and the counts per area. */
+function warningMarkdown(sites: readonly GateSite[]): string {
+  const warned = sites.filter((site) => site.why !== 'forced');
+  const forced = sites.filter((site) => site.why === 'forced');
+  const areas = new Map<string, number>();
+  for (const site of warned)
+    areas.set(areaOf(site), (areas.get(areaOf(site)) ?? 0) + 1);
+  const cell = (text: string): string => text.split('|').join('\\|');
+  return [
+    `### Written \`unknown\`: ${warned.length} site(s), ${forced.length} forced by a contract`,
+    '',
+    '| Site | Written | In | Why |',
+    '| --- | --- | --- | --- |',
+    ...warned.map(
+      (site) =>
+        `| ${site.where} | \`${cell(site.text)}\` | ${cell(site.owner)} | ${site.why} |`,
+    ),
+    '',
+    '| Area | Sites |',
+    '| --- | --- |',
+    ...[...areas]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([area, count]) => `| ${area} | ${count} |`),
+    '',
+    "#### Forced by a third party's contract",
+    '',
+    '| Site | Written | Forced by |',
+    '| --- | --- | --- |',
+    ...forced.map(
+      (site) =>
+        `| ${site.where} | \`${cell(site.text)}\` | ${site.forcedBy ?? ''} |`,
+    ),
+    '',
+  ].join('\n');
+}
 
-  it('a member read by name, by a key, through an optional chain, inspected or discarded is refused', () => {
-    assert.deepEqual(
-      refusedReads('thirdPartyMember', member),
-      [17, 22, 27, 33, 34, 35, 36, 37, 43, 44, 81],
-    );
-  });
+/** The warning list as plain text, grouped by area, with a total. */
+function warningText(sites: readonly GateSite[]): string {
+  const warned = sites.filter((site) => site.why !== 'forced');
+  const byArea = new Map<string, GateSite[]>();
+  for (const site of warned) {
+    const list = byArea.get(areaOf(site)) ?? [];
+    list.push(site);
+    byArea.set(areaOf(site), list);
+  }
+  const lines: string[] = [];
+  for (const [area, list] of [...byArea].sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    lines.push(`${area} (${list.length})`);
+    for (const site of list) {
+      lines.push(
+        `  ${site.where}  ${site.text}  in ${site.owner}  [${site.why}]`,
+      );
+    }
+  }
+  const forced = sites.filter((site) => site.why === 'forced');
+  lines.push(
+    `total: ${warned.length} written unknown, ${forced.length} forced by a contract`,
+  );
+  for (const site of forced) {
+    lines.push(`  forced ${site.where}  ${site.forcedBy ?? ''}`);
+  }
+  return lines.join('\n');
+}
 
-  it('a member read whole into a sink, as tool arguments or inside a listed function passes; for its keys alone it reads nothing', () => {
-    assert.deepEqual(
-      thirdPartyReads('thirdPartyMember', member).filter(
-        ([, judged]) => judged !== 'refused',
-      ),
-      [
-        [45, 'sink-contract'],
-        [45, 'sink-contract'],
-        [57, 'tool-args'],
-        [69, 'parse'],
-      ],
-    );
-    const keysAlone = [48, 49, 50];
-    assert.deepEqual(
-      sitesOf('thirdPartyMember', member).filter((site) =>
-        keysAlone.includes(lineOf(site)),
-      ),
-      [],
-    );
-  });
-
-  it('a whole third-party value held reads nothing; an unknown we wrote is charged where written, not read off the third party', () => {
-    const sites = sitesOf('thirdPartyMember', member);
-    assert.deepEqual(
-      sites.filter((site) => lineOf(site) >= 60 && lineOf(site) <= 64),
-      [],
-    );
-    assert.deepEqual(
-      sites
-        .filter((site) => lineOf(site) >= 75 && lineOf(site) <= 77)
-        .map((site) => [lineOf(site), site.kind, site.reason]),
-      [
-        [75, 'parameter', 'holds'],
-        [76, 'expression', 'holds'],
-      ],
-    );
-  });
-
-  it("a call answering a third party's unknown, or instantiated with one, is refused unless it passes on", () => {
-    const listing = { parse: [key('thirdPartyCall', 'parseText', 'text')] };
-    assert.deepEqual(thirdPartyReads('thirdPartyCall', listing), [
-      [8, 'refused'],
-      [13, 'refused'],
-      [17, 'refused'],
-      [23, 'sink-contract'],
-      [27, 'sink-contract'],
-      [32, 'parse'],
+describe('the type gate: any is an error', () => {
+  it('the keyword written, and an expression typed any kept, read, inspected or handed into a narrower slot, are errors; handed on whole into an unknown or any slot it passes', () => {
+    assert.deepEqual(linesOf(sitesOf('anyErrors')), [
+      [5, 'unknown'],
+      [9, 'any-keyword'],
+      [15, 'any'],
+      [16, 'any'],
+      [21, 'any'],
+      [26, 'any'],
+      [32, 'any'],
+      [37, 'any'],
+      [43, 'unknown'],
+      [48, 'unknown'],
+      [60, 'unknown'],
+      [61, 'any'],
     ]);
-    // Keys alone read nothing, an `any` included; an argument of ours that
-    // brought the `unknown` in is charged where it is.
-    assert.deepEqual(
-      sitesOf('thirdPartyCall', listing)
-        .filter((site) => [22, 38].includes(lineOf(site)))
-        .map((site) => site.kind),
-      [],
-    );
   });
+});
 
-  it('a destructuring of a variable, a parameter, an assignment, nested, renamed, by a rest or in a callback is refused', () => {
-    assert.deepEqual(
-      refusedReads('thirdPartyDestructuring'),
-      [8, 13, 19, 24, 30, 35, 40],
-    );
-    assert.deepEqual(
-      sitesOf('thirdPartyDestructuring').filter((site) => lineOf(site) === 45),
-      [],
-    );
-  });
-
-  it('a callback parameter a contract hands its own unknown is refused unless every use passes it on, or it is inside a listed function', () => {
-    const listing = { parse: [key('thirdPartyCallback', 'listed', 'raw')] };
-    // The parse each reviver is handed to passes whole into a sink.
-    assert.deepEqual(thirdPartyReads('thirdPartyCallback', listing), [
-      [11, 'refused'],
-      [11, 'sink-contract'],
-      [18, 'parse'],
-      [22, 'refused'],
-      [28, 'sink-contract'],
-    ]);
-    const sites = sitesOf('thirdPartyCallback', listing);
-    assert.deepEqual(
-      sites
-        .filter((site) => site.name === 'value' && lineOf(site) === 28)
-        .map((site) => [site.boundary, site.refused]),
-      [['callback', false]],
-    );
-    // Instantiated with a type of ours: ours.
-    assert.deepEqual(judged(sites, 'reading'), [['callback', false, []]]);
-  });
-
-  it('a discarded read is a read: a member, a call answering one, awaited or not, a callback parameter used only discarded are refused', () => {
-    // The parse the reviver is handed to passes whole into a sink.
-    assert.deepEqual(thirdPartyReads('discardedReads'), [
-      [8, 'refused'],
-      [9, 'refused'],
-      [10, 'refused'],
-      [15, 'refused'],
-      [16, 'refused'],
-      [17, 'refused'],
-      [23, 'refused'],
-      [23, 'sink-contract'],
+describe('the type gate: unknown written by us is a warning', () => {
+  it('lists the keyword in every type position', () => {
+    assert.deepEqual(linesOf(sitesOf('unknownPositions')), [
+      [4, 'unknown'],
+      [7, 'unknown'],
+      [10, 'unknown'],
+      [14, 'unknown'],
+      [18, 'unknown'],
+      [20, 'unknown'],
+      [22, 'unknown'],
+      [26, 'unknown'],
+      [30, 'unknown'],
     ]);
   });
 
-  it('the left operand of ||, && and ??, a condition and ! inspect what they test and are refused; a right operand or a branch handed on whole passes', () => {
-    // The parse the reviver is handed to passes whole into a sink; a branch
-    // of each kind passes on its own.
-    assert.deepEqual(thirdPartyReads('inspectingOperators'), [
-      [10, 'refused'],
-      [11, 'refused'],
-      [12, 'refused'],
-      [13, 'refused'],
-      [14, 'refused'],
-      [15, 'refused'],
-      [21, 'refused'],
-      [27, 'refused'],
-      [27, 'sink-contract'],
-      [38, 'sink-contract'],
-      [39, 'sink-contract'],
-      [40, 'sink-contract'],
-      [41, 'sink-contract'],
-      [41, 'sink-contract'],
-    ]);
-  });
-
-  it("a callback parameter written without a type takes the contract's unknown and is judged as one written with it", () => {
-    // The parse each reviver is handed to passes whole into a sink.
-    assert.deepEqual(thirdPartyReads('contextualCallback'), [
-      [9, 'refused'],
-      [9, 'sink-contract'],
-      [16, 'refused'],
-      [16, 'sink-contract'],
-      [21, 'sink-contract'],
-    ]);
-    // A function the contract hands is called, its parameter written into;
-    // a contract instantiated with a type of ours is ours.
-    assert.deepEqual(
-      sitesOf('contextualCallback').filter(
-        (site) => lineOf(site) >= 23 && site.refused,
-      ),
-      [],
-    );
-  });
-
-  it("a contract declared outside the repository types a callback's parameter written without a type: a generic it instantiated, a method of a literal, any overload", () => {
-    assert.deepEqual(thirdPartyReads('externalContracts'), [
-      [16, 'refused'],
-      [24, 'refused'],
-      [32, 'refused'],
-    ]);
-    // A type argument of ours (a value of ours instantiates the generic).
-    assert.deepEqual(
-      sitesOf('externalContracts').filter((site) => lineOf(site) >= 37),
-      [],
-    );
-  });
-
-  it("a callback's parameter written without a type, in a list, a tuple, a rest or from a receiver the third party instantiated, is the third party's unless proven ours", () => {
-    assert.deepEqual(thirdPartyReads('externalShapes'), [
-      [22, 'refused'],
-      [23, 'refused'],
-      [24, 'refused'],
-      [29, 'refused'],
-      [30, 'refused'],
-    ]);
-    // A receiver of ours, a value of ours, a type argument we wrote: ours.
-    assert.deepEqual(
-      sitesOf('externalShapes').filter(
-        (site) => lineOf(site) >= 32 && site.reason === 'third-party',
-      ),
-      [],
-    );
-  });
-
-  it("a name read whose declaration is outside the repository is the third party's, judged where it is read", () => {
-    // `raw`, `many` (indexed) and `anything`, each where it is read.
-    assert.deepEqual(thirdPartyReads('externalNames'), [
-      [9, 'refused'],
-      [10, 'refused'],
-      [10, 'refused'],
-      [10, 'refused'],
-      [15, 'sink-contract'],
-    ]);
-  });
-
-  it("a third party's unknown whose parent is a position the pass-on list does not name is refused", () => {
-    assert.deepEqual(thirdPartyReads('unknownParents'), [
-      [8, 'refused'],
-      [9, 'refused'],
-      [10, 'refused'],
-      [15, 'refused'],
-      [19, 'refused'],
-      [24, 'sink-contract'],
-      [24, 'sink-contract'],
-    ]);
-  });
-
-  it("an unknown is ours only when text we wrote binds it: a third party's value, default or binding without a written type is theirs", () => {
-    // Each `for … of` and destructuring over the external `iterable` is
-    // refused twice: at the name read, and at the binding.
-    assert.deepEqual(thirdPartyReads('writtenBinding'), [
-      [26, 'refused'],
-      [27, 'refused'],
-      [28, 'refused'],
-      [29, 'refused'],
-      [32, 'refused'],
-      [37, 'refused'],
-      [42, 'refused'],
-      [49, 'refused'],
-      [50, 'refused'],
-      [50, 'refused'],
-      [51, 'refused'],
-      [51, 'refused'],
-      [52, 'refused'],
-      [52, 'refused'],
-      [82, 'refused'],
-    ]);
-    // Ours: a member the repository declares, destructured.
-    assert.deepEqual(
-      sitesOf('writtenBinding').filter(
-        (site) => lineOf(site) >= 85 && site.reason === 'third-party',
-      ),
-      [],
-    );
-    // Ours: a type argument written here, an annotation of ours, a value
-    // inferred from one, a binding over a list of ours.
-    assert.deepEqual(
-      sitesOf('writtenBinding').filter(
-        (site) =>
-          lineOf(site) >= 56 &&
-          lineOf(site) <= 77 &&
-          site.reason === 'third-party',
-      ),
-      [],
-    );
-  });
-
-  it('a member, an accessor, a return or a re-export of ours is ours only when its written type binds the unknown, else traced to what it holds', () => {
-    // A literal's member, an accessor, an interface member `typeof` their
-    // value, a generic wrapper, a namespace re-export; an own factory with
-    // no written return, called and kept; a member traced to a factory
-    // whose type's base holds the unknown; a member written `typeof` their
-    // value, read off `this`.
-    assert.deepEqual(thirdPartyReads('writtenMembers'), [
-      [47, 'refused'],
-      [48, 'refused'],
-      [49, 'refused'],
-      [50, 'refused'],
-      [53, 'refused'],
-      [60, 'refused'],
-      [62, 'refused'],
-      [87, 'refused'],
-      [122, 'refused'],
-    ]);
-    // Ours: bound by text we wrote — a member, a return, a wrapper of ours,
-    // a third party's generic instantiated by us, `unknown` included, and a
-    // value of ours re-exported through a namespace of ours.
-    assert.deepEqual(
-      sitesOf('writtenMembers').filter(
-        (site) =>
-          ((lineOf(site) >= 65 && lineOf(site) <= 83) ||
-            (lineOf(site) >= 90 && lineOf(site) <= 116) ||
-            lineOf(site) >= 125) &&
-          site.reason === 'third-party',
-      ),
-      [],
-    );
-  });
-
-  it("this is ours only for what our class's own text binds; a chain of bases is walked whole", () => {
-    // An inherited default, a base of ours inheriting it, an unknown five
-    // bases down (called, kept, a member), a function rebinding `this`, a
-    // base whose own base takes a default, a default nested five deep.
-    assert.deepEqual(thirdPartyReads('thisAndChains'), [
-      [16, 'refused'],
-      [23, 'refused'],
-      [29, 'refused'],
-      [31, 'refused'],
-      [33, 'refused'],
-      [41, 'refused'],
-      [64, 'refused'],
-      [70, 'refused'],
-    ]);
-    // Type arguments we wrote, `unknown` included, and a base of ours so
-    // written.
-    assert.deepEqual(
-      sitesOf('thisAndChains').filter(
-        (site) =>
-          lineOf(site) >= 47 &&
-          lineOf(site) <= 59 &&
-          site.reason === 'third-party',
-      ),
-      [],
-    );
-  });
-
-  it('a default tests for undefined and may replace the value: a parameter or a binding with one is refused', () => {
-    // The parse each reviver is handed to passes whole into a sink.
-    assert.deepEqual(thirdPartyReads('callbackDefaults'), [
-      [9, 'refused'],
-      [9, 'sink-contract'],
-      [17, 'refused'],
-      [17, 'sink-contract'],
-      [24, 'refused'],
-      [29, 'refused'],
-      [35, 'sink-contract'],
-    ]);
-  });
-
-  it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
-    assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
-    assert.deepEqual(
-      sitesOf('thirdPartyLaundering').filter((site) => lineOf(site) === 24),
-      [],
-    );
-  });
-
-  it("a settled promise's reason is a caught value: handed whole to a thrown-value reader it passes, inspected it is refused", () => {
-    const listing = { thrown: [key('settledReason', 'describe', 'thrown')] };
-    assert.deepEqual(thirdPartyReads('settledReason', listing), [
-      [12, 'caught'],
-      [21, 'refused'],
-    ]);
-  });
-
-  it('the forms round 11 found writing into a third party are each refused where they read', () => {
-    assert.deepEqual(
-      refusedReads('round11'),
-      [11, 12, 18, 23, 27, 37, 43, 49, 55],
-    );
-    assert.deepEqual(
-      sitesOf('round11').filter((site) => lineOf(site) >= 59),
-      [],
-    );
+  it("a sink contract's own unknown is not warned; the same outside it is", () => {
+    assert.deepEqual(linesOf(sitesOf('sinkContract')), [[15, 'unknown']]);
   });
 });
 
@@ -1105,47 +182,53 @@ describe('the sweep reads only programs the compiler accepts', () => {
   });
 });
 
-describe('production code holds as unknown only what comes from outside the type system', () => {
-  const sites = sweepProduction();
+describe('production: no any, and the list of written unknown', () => {
+  const sites = gateProduction();
+  const warnings = sites.filter((site) => site.kind === 'unknown');
 
-  it('refuses no site', () => {
+  it('has no any', () => {
     assert.deepEqual(
       sites
-        .filter((entry) => entry.refused)
-        .map(
-          (entry) =>
-            `${entry.where} ${entry.kind} ${entry.key} at '${entry.position}' ${entry.reason}: ${entry.types.join(' | ')}`,
-        ),
+        .filter((site) => site.kind !== 'unknown')
+        .map((site) => `${site.where} ${site.kind} ${site.text}`),
       [],
     );
   });
 
-  it("reads the root's TypeScript scripts too", () => {
-    assert.ok(
-      productionProjects().some(
-        (project) =>
-          project.dir === 'scripts' &&
-          project.tsconfig === 'tsconfig.test.json',
-      ),
-    );
-  });
-
-  it('names no listed site that is gone', () => {
-    for (const listed of [
-      THROWN_READERS,
-      PARSE_SITES,
-      PROGRAM_INPUT_SITES,
-      SINK_SITES,
-    ]) {
-      assert.deepEqual(staleEntries(sites, listed), []);
+  it('lists every written unknown with its class, and writes the list to the job summary', () => {
+    process.stdout.write(`${warningText(warnings)}\n`);
+    const summary = process.env.GITHUB_STEP_SUMMARY;
+    if (summary !== undefined && summary !== '') {
+      try {
+        fs.appendFileSync(summary, warningMarkdown(warnings));
+      } catch {
+        // The summary is a report: a failed write fails nothing.
+      }
     }
+    assert.ok(warnings.every((site) => site.why !== undefined));
   });
 
-  it('reads every sink slot only in its own reader, and names no slot that is gone', () => {
-    const found = productionSinkSlotReads();
-    assert.deepEqual(found.reads, []);
+  it('names no listed, forced or classified site that is gone', () => {
+    const keys = productionKeys();
+    const forced = new Set(
+      warnings.filter((site) => site.why === 'forced').map((site) => site.key),
+    );
     assert.deepEqual(
-      [...SINK_SLOTS.keys()].filter((slot) => !found.declared.has(slot)),
+      [
+        ...[
+          ...THROWN_READERS,
+          ...PARSE_SITES,
+          ...PROGRAM_INPUT_SITES,
+          ...SINK_SITES,
+        ].filter((entry) => !keys.has(entry)),
+        ...[...SINK_SLOTS.values()].filter(
+          (reader) => ![...keys].some((key) => key.startsWith(`${reader}(`)),
+        ),
+        ...[...FORCED_BY_CONTRACT.keys()].filter((key) => !forced.has(key)),
+        ...[...UNKNOWN_CLASSES.keys()].filter(
+          (owner) => ![...keys].some((key) => key.startsWith(`${owner}(`)),
+        ),
+      ],
       [],
     );
   });

@@ -75,6 +75,7 @@ import {
 } from '../../../lib/strategies/serviceBindingFacts';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { wireValueOf } from '../../../lib/wireValue';
 
 /** The resource `getSystemInformation` reads. */
 const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
@@ -93,11 +94,73 @@ function pathOf(serviceUrl: string): string {
   return query === -1 ? serviceUrl : serviceUrl.slice(0, query);
 }
 
+/** SAP's words on a page: the text of an HTML error page without its markup and styles, else the text as it is. */
+export function pageText(body: string, ceiling = 300): string {
+  let out = '';
+  let at = 0;
+  const lower = body.toLowerCase();
+  while (at < body.length && out.length < ceiling * 4) {
+    if (lower.startsWith('<style', at) || lower.startsWith('<script', at)) {
+      const closing = lower.startsWith('<style', at) ? '</style>' : '</script>';
+      const end = lower.indexOf(closing, at);
+      at = end === -1 ? body.length : end + closing.length;
+      out += ' ';
+      continue;
+    }
+    const ch = body[at] ?? '';
+    if (ch === '<') {
+      const end = body.indexOf('>', at);
+      at = end === -1 ? body.length : end + 1;
+      out += ' ';
+      continue;
+    }
+    out += ch;
+    at += 1;
+  }
+  let words = '';
+  let gap = false;
+  for (const ch of out) {
+    const blank = ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t';
+    if (blank) {
+      gap = words !== '';
+      continue;
+    }
+    if (gap) words += ' ';
+    gap = false;
+    words += ch;
+  }
+  return words.slice(0, ceiling);
+}
+
+/** What the published service's `$metadata` answered: the service's live state. */
+export type LiveState =
+  | { live: true }
+  | {
+      live: false;
+      live_status?: number;
+      live_text?: string;
+      live_failure?: FailureEntry;
+    };
+
+/** The live state of a `$metadata` answer SAP gave with `status` and `body`. */
+export function liveStateOf(
+  status: number | undefined,
+  body: string,
+): LiveState {
+  if (status === 200) return { live: true };
+  const text = pageText(body);
+  return {
+    live: false,
+    ...(status !== undefined && { live_status: status }),
+    ...(text !== '' && { live_text: text }),
+  };
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.',
+    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. For a published binding it also reads the $metadata of the service once and answers live: true when the service answers 200, or live: false with the status (live_status) and the words (live_text) SAP answered — on ABAP Cloud a publication is a background job of SAP, and the service answers 403, blocked by UCON, until that job ends. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.',
   inputSchema: z.object({
     service_binding_name: z.string().describe('Service binding name.'),
     entity_set: z
@@ -213,7 +276,72 @@ export async function handleGetServiceBindingPreviewUrl(
     exposed: ReturnType<typeof exposedEntitiesOf>;
     associations: string[];
     category: ReturnType<typeof categoryServiceUrlsOf>;
+    live?: LiveState;
   }
+
+  /** The service's URL: the system's own answer when it gives one, else composed. */
+  const serviceUrlFor = (
+    facts: Found['facts'],
+    category: Found['category'],
+  ): string => {
+    const composedUrl =
+      facts.protocol === 'odatav2'
+        ? `${baseUrl}/sap/opu/odata/sap/${facts.service ?? bindingName}/`
+        : // The second position is the SERVICE, not the service definition.
+          // Two systems were needed to see it: on a SAP-delivered binding the
+          // service and the definition are both `ZUI_TRAVEL`, so the wrong
+          // reading answered `200`; on our own, where the service is the
+          // binding's name and the definition is not, the same rule answered
+          // `404`. A URL Eclipse produced for it carries the service.
+          `${baseUrl}/sap/opu/odata4/sap/${bindingName.toLowerCase()}` +
+          `/srvd/sap/${(facts.service ?? bindingName).toLowerCase()}` +
+          `/${facts.version ?? '0001'}/`;
+    // The system's own answer wins when there is one.
+    return category.serviceUrl === undefined
+      ? composedUrl
+      : category.serviceUrl.startsWith('http')
+        ? category.serviceUrl
+        : `${baseUrl}${category.serviceUrl}`;
+  };
+
+  /**
+   * The service's live state: one GET of its `$metadata`, no retry. On ABAP
+   * Cloud a publication is SAP's background job, and the gateway answers 403
+   * "The request has been blocked by UCON." until it ends, then 200
+   * (measured); on premise an unpublished service answers 404. A credential
+   * refusal ends the call as every other read's does; any other failure is
+   * the state, with SAP's status and words.
+   */
+  const liveOfService = async (serviceUrl: string): Promise<LiveState> => {
+    const url = `${pathOf(serviceUrl)}$metadata`;
+    try {
+      const answered = await connection.makeAdtRequest({
+        url,
+        method: 'GET',
+        timeout: 0,
+        headers: { Accept: 'application/xml' },
+      });
+      const body = wireValueOf(answered.data);
+      return liveStateOf(
+        answered.status,
+        body.kind === 'text' ? body.text : '',
+      );
+    } catch (thrown) {
+      const step = 'read service $metadata';
+      const failure = requestThrownEntry(thrown, { method: 'GET', url }, step);
+      if (isCredentialPayload(failure)) throw thrown;
+      const status = failure.status;
+      const rawBody = failure.raw_body;
+      const state = liveStateOf(
+        typeof status === 'number' ? status : undefined,
+        typeof rawBody === 'string' ? rawBody : '',
+      );
+      // No status means no answer from SAP: the probe's own failure, as it is.
+      return state.live || typeof status === 'number'
+        ? state
+        : { ...state, live_failure: failure };
+    }
+  };
 
   return answer(
     { tool: 'GetServiceBindingPreviewUrl', detail: 'terse' },
@@ -301,39 +429,25 @@ export async function handleGetServiceBindingPreviewUrl(
             }
           }
 
+          const live = facts.published
+            ? await liveOfService(serviceUrlFor(facts, category))
+            : undefined;
           return succeededWith<Found>({
             facts,
             exposed,
             associations,
             category,
+            ...(live !== undefined && { live }),
           });
         },
       ),
-    ({ facts, exposed, associations, category }: Found) => {
+    ({ facts, exposed, associations, category, live }: Found) => {
       const entitySet = args.entity_set ?? exposed[0]?.entitySet;
       const navigation = args.navigation ?? associations[0];
       const target =
         args.target_entity_set ?? exposed[1]?.entitySet ?? entitySet;
 
-      const composedUrl =
-        facts.protocol === 'odatav2'
-          ? `${baseUrl}/sap/opu/odata/sap/${facts.service ?? bindingName}/`
-          : // The second position is the SERVICE, not the service definition.
-            // Two systems were needed to see it: on a SAP-delivered binding the
-            // service and the definition are both `ZUI_TRAVEL`, so the wrong
-            // reading answered `200`; on our own, where the service is the
-            // binding's name and the definition is not, the same rule answered
-            // `404`. A URL Eclipse produced for it carries the service.
-            `${baseUrl}/sap/opu/odata4/sap/${bindingName.toLowerCase()}` +
-            `/srvd/sap/${(facts.service ?? bindingName).toLowerCase()}` +
-            `/${facts.version ?? '0001'}/`;
-      // The system's own answer wins when there is one.
-      const serviceUrl =
-        category.serviceUrl === undefined
-          ? composedUrl
-          : category.serviceUrl.startsWith('http')
-            ? category.serviceUrl
-            : `${baseUrl}${category.serviceUrl}`;
+      const serviceUrl = serviceUrlFor(facts, category);
 
       // A Fiori preview belongs to the UI variant. A Web API binding has no
       // FEAP page at all, so its entity set and navigation are not "missing" —
@@ -427,6 +541,8 @@ export async function handleGetServiceBindingPreviewUrl(
         success: true,
         service_binding_name: bindingName,
         published: facts.published,
+        // The service's live state, read only for a published binding.
+        ...(live ?? { live: false }),
         protocol: facts.protocol,
         service: facts.service,
         service_definition: facts.serviceDefinition,

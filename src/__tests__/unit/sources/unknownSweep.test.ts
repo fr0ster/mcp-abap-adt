@@ -887,8 +887,11 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
-  it("a contract declared outside the repository types a callback's parameter written without a type: a generic it instantiated", () => {
-    assert.deepEqual(thirdPartyReads('externalContracts'), [[16, 'refused']]);
+  it("a contract declared outside the repository types a callback's parameter written without a type: a generic it instantiated, a method of a literal", () => {
+    assert.deepEqual(thirdPartyReads('externalContracts'), [
+      [16, 'refused'],
+      [24, 'refused'],
+    ]);
     // A type argument of ours (a value of ours instantiates the generic).
     assert.deepEqual(
       sitesOf('externalContracts').filter((site) => lineOf(site) >= 40),

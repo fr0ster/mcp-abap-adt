@@ -2637,6 +2637,35 @@ export class UnknownSweep {
     if (node.type !== undefined) return [];
     const fn = node.parent;
     const at = fn.parameters.indexOf(node);
+    // A method or a setter of an object literal: the member its contract
+    // declares, as declared.
+    if (
+      (ts.isMethodDeclaration(fn) || ts.isSetAccessorDeclaration(fn)) &&
+      ts.isObjectLiteralExpression(fn.parent)
+    ) {
+      const literal = this.checker.getContextualType(fn.parent);
+      const name = propertyName(fn.name);
+      const member =
+        literal === undefined || name === undefined
+          ? undefined
+          : this.checker.getPropertyOfType(
+              this.checker.getNonNullableType(literal),
+              name,
+            );
+      const declarations = member?.declarations ?? [];
+      if (
+        declarations.length === 0 ||
+        declarations.some((declaration) => ownNode(declaration))
+      ) {
+        return [];
+      }
+      return declarations.flatMap((declaration) => {
+        // A setter is handed what the member is written with.
+        return ts.isSetAccessorDeclaration(fn)
+          ? this.declaredHeld(declaration)
+          : this.slotParameterHeld(declaration, at);
+      });
+    }
     if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return [];
     // Handed to a call: the callee's parameter, as its declaration writes
     // it — a type argument written there is the third party's

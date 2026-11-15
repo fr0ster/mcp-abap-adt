@@ -67,11 +67,11 @@ export const TOOL_DEFINITION = {
 /**
  * Interface for enhancement by name response
  */
-export interface EnhancementByNameResponse {
+export type EnhancementByNameResponse = {
   enhancement_spot: string;
   enhancement_name: string;
   source_code: string;
-}
+};
 
 /**
  * Parses enhancement source XML to extract the source code

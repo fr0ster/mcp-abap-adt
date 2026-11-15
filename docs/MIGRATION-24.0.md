@@ -393,6 +393,12 @@ What it typed in the exported surface, read from the built declarations:
   follows the connection it points at. **What you do:** call the session members with `?.()`;
   the answer is the one the method gave, read at the call.
 
+## Embedders: an answer serializer's payload and a tool result's content are typed
+
+`IAnswerSerializer<A>.json` is generic in the payload: `json<P>(payload: P, isError?: boolean): A`. A serializer of your own writes its `json` with the type parameter instead of `payload: unknown`; the value is handed on whole to the text, as before.
+
+`ToolContentItem` types its members: `json?: AnswerValue` (a JSON value, its members possibly absent) and `text?: string`. A handler that answers `{ type: 'json', json }` hands a value whose type is a JSON value: an object type written as a type alias (an interface has no index signature, so it does not fit), a list, a string, a number, a boolean or `null`. `EnhancementSpotResponse`, `EnhancementSpotMetadata`, `EnhancementByNameResponse` and `CachedObject` are type aliases now, with the same members.
+
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 
 **Removed: `isCloudConnection`.** It reported an on-premise system with JWT authentication as

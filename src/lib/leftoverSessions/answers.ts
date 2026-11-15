@@ -16,7 +16,7 @@ export interface LeftoverAnswer {
 
 /** A value as a leftover-session answer's JSON text. */
 const answers: IAnswerSerializer<LeftoverAnswer> = {
-  json(payload: unknown, isError = false): LeftoverAnswer {
+  json<P>(payload: P, isError = false): LeftoverAnswer {
     return {
       isError,
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],

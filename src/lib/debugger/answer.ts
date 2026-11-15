@@ -8,7 +8,7 @@ import { terseSettings, terseStop } from './readings';
 
 /** A debugger answer's text block: a string as it is, any other value as JSON. */
 const textBlocks: IAnswerSerializer<{ type: 'text'; text: string }> = {
-  json(value: unknown) {
+  json<P>(value: P) {
     return {
       type: 'text',
       text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),

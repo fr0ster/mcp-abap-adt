@@ -18,7 +18,7 @@ export interface BackgroundAnswer {
 
 /** A value as a background-run answer's JSON text. */
 const answers: IAnswerSerializer<BackgroundAnswer> = {
-  json(payload: unknown): BackgroundAnswer {
+  json<P>(payload: P): BackgroundAnswer {
     return {
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     };

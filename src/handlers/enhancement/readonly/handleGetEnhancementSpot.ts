@@ -27,13 +27,13 @@ export const TOOL_DEFINITION = {
 /**
  * Interface for enhancement spot response
  */
-export interface EnhancementSpotResponse {
+export type EnhancementSpotResponse = {
   enhancement_spot: string;
   metadata: EnhancementSpotMetadata;
-}
+};
 
 /** What the spot's document names: each member only when the document has it. */
-export interface EnhancementSpotMetadata {
+export type EnhancementSpotMetadata = {
   name?: string;
   description?: string;
   type?: string;
@@ -51,7 +51,7 @@ export interface EnhancementSpotMetadata {
     type: string | undefined;
     title: string | undefined;
   }>;
-}
+};
 
 /**
  * Parses enhancement spot XML to extract metadata and function (implementation) descriptions.

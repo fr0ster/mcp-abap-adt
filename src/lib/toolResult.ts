@@ -1,11 +1,13 @@
+import type { AnswerValue } from './json';
+
 /**
  * Shape a handler returns. `content` items may carry a custom `json` type that
  * the MCP SDK does not know about.
  */
 export interface ToolContentItem {
   type?: string;
-  json?: unknown;
-  text?: unknown;
+  json?: AnswerValue;
+  text?: string;
 }
 
 export interface ToolResultLike {

@@ -1532,7 +1532,7 @@ function enhancementOptionsOf(args: GetEnhancementsArgs): EnhancementOptions {
 
 /** An enhancements answer: the payload as compact JSON text. */
 const answerText: IAnswerSerializer<McpResult> = {
-  json(payload: unknown): McpResult {
+  json<P>(payload: P): McpResult {
     return {
       isError: false,
       content: [{ type: 'text', text: JSON.stringify(payload) }],

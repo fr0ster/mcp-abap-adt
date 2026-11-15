@@ -399,6 +399,10 @@ What it typed in the exported surface, read from the built declarations:
 
 `ToolContentItem` types its members: `json?: AnswerValue` (a JSON value, its members possibly absent) and `text?: string`. A handler that answers `{ type: 'json', json }` hands a value whose type is a JSON value: an object type written as a type alias (an interface has no index signature, so it does not fit), a list, a string, a number, a boolean or `null`. `EnhancementSpotResponse`, `EnhancementSpotMetadata`, `EnhancementByNameResponse` and `CachedObject` are type aliases now, with the same members.
 
+## Embedders: the debugger sessions' origin defaults to `HandlerContext`
+
+`DebugSession<O>`, `AmdpSession<O>`, `DebugSessionPorts<O>` and `AmdpSessionPorts<O>` default their origin `O` to `HandlerContext` instead of `unknown`. Code that binds another origin (a string, a context of its own) states it: `new AmdpSession<string>(ports)`, `DebugSession<string>`. Written without the argument, they are what the server's own sessions are.
+
 ## Embedders: `isCloudConnection` is removed from `@mcp-abap-adt/lib/utils`
 
 **Removed: `isCloudConnection`.** It reported an on-premise system with JWT authentication as

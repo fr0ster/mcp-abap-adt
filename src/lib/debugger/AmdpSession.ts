@@ -32,6 +32,7 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
+import type { HandlerContext } from '../handlers/interfaces';
 import { currentRequestSignal } from '../requestSignal';
 import { spentBy } from '../sessionLoss';
 import {
@@ -77,7 +78,7 @@ const AMDP_LABEL: BreakpointLabel = 'CLAS';
 export type AmdpDebuggerT = AmdpDebugger<
   ResultValuesOf<typeof amdpDebuggerDocuments>
 >;
-export interface AmdpSessionPorts<O = unknown> {
+export interface AmdpSessionPorts<O = HandlerContext> {
   /** A connection of its own, `stateful` unless `session` says otherwise. */
   openConnection(
     origin: O,
@@ -169,7 +170,7 @@ type Wire = Partial<Pick<IAdtWireResponse, 'headers' | 'data'>>;
 const wireOf = (a: IAdtResponse<IAdtWireResponse>): Wire =>
   (a.ok ? a.getResult().value : undefined) ?? {};
 
-export class AmdpSession<O = unknown> {
+export class AmdpSession<O = HandlerContext> {
   private readonly serial = new Serial();
   private origin?: O;
   private open?: Open | undefined;

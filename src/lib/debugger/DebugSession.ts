@@ -46,6 +46,7 @@ import {
   isCredentialPayload,
   unlessCredentialFailure,
 } from '../answer';
+import type { HandlerContext } from '../handlers/interfaces';
 import { spentBy } from '../sessionLoss';
 import {
   carryingFailure,
@@ -113,7 +114,7 @@ export type RunOutcome =
  * requests), stateless for the program's run.
  */
 export type DebugSessionKind = 'stateful' | 'stateless';
-export interface DebugSessionPorts<O = unknown> {
+export interface DebugSessionPorts<O = HandlerContext> {
   /** A connection of its own, `stateful` unless `session` says otherwise. */
   openConnection(
     origin: O,
@@ -521,7 +522,7 @@ const readChildVariablesOf = (
 const writeVariableOf = (d: Debugger, name: string, value: string) =>
   d.setVariableValue(name.toUpperCase(), value);
 
-export class DebugSession<O = unknown> {
+export class DebugSession<O = HandlerContext> {
   protected readonly serial = new Serial();
   protected origin?: O;
   protected mode: IDebuggerListenerConflict = 'refuse';

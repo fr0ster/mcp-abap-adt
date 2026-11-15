@@ -65,7 +65,7 @@ function world() {
     },
   };
   let opened = 0;
-  const session = new AmdpSession({
+  const session = new AmdpSession<string>({
     openConnection: async () => ({ n: opened++ }) as any,
     closeConnection: async (c) => {
       closed.push(c);

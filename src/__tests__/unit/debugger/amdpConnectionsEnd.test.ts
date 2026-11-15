@@ -56,7 +56,7 @@ function world() {
     },
     getDataPreview: async () => okResponse(''),
   };
-  const session = new AmdpSession({
+  const session = new AmdpSession<string>({
     openConnection: async () => {
       const c = { n: opened.length };
       opened.push(c);

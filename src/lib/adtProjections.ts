@@ -130,7 +130,7 @@ export type ServedCodeName<R, P> = {
 
 /** Compiles only when `Listed` names every member of `All`. */
 type Complete<Listed, All> = [Exclude<All, Listed>] extends [never]
-  ? unknown
+  ? Record<never, never>
   : { readonly missingFromTheList: Exclude<All, Listed> };
 
 /** One argument's values on each variant. */
@@ -188,7 +188,7 @@ type CodesIn<T> = {
 }[keyof T];
 
 /** The `main` the code entries of `E` (a union of `codes` objects) state for `C`. */
-type MainStated<E, C extends string> = E extends unknown
+type MainStated<E, C extends string> = E extends E
   ? C extends keyof E
     ? E[C] extends { readonly main: infer M extends string }
       ? M
@@ -229,7 +229,7 @@ export type CodesOfMainType<P extends AdtUtilityCode, M extends string> = {
 /** Whether `T` is exactly one member. */
 type IsOne<T, All = T> = [T] extends [never]
   ? false
-  : T extends unknown
+  : T extends T
     ? [All] extends [T]
       ? true
       : false

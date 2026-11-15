@@ -218,14 +218,16 @@ type PerformedOn<
   A extends AdtApiName,
   Op extends AdtOperation,
   T,
-> = [V] extends [AdtPerformingVariantsIn<IAdtTypeTables, A, Op>] ? T : unknown;
+> = [V] extends [AdtPerformingVariantsIn<IAdtTypeTables, A, Op>]
+  ? T
+  : Record<never, never>;
 
 /** `T` where every variant of `V` is one whose table serves API `A`; nothing otherwise. */
 type ServedOn<V extends AdtVariant, A extends AdtApiName, T> = [V] extends [
   AdtServingVariantsIn<IAdtTypeTables, A>,
 ]
   ? T
-  : unknown;
+  : Record<never, never>;
 
 /** What the server calls on `getClass()`'s answer. */
 export type ClassApi<

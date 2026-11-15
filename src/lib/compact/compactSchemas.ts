@@ -99,7 +99,7 @@ type TakenIn<T> = T extends {
 
 /** Compiles only when `T` names every property of `P`. */
 type EveryPropertyTaken<P, T> = [Exclude<P, TakenIn<T>>] extends [never]
-  ? unknown
+  ? Record<never, never>
   : { readonly untaken: Exclude<P, TakenIn<T>> };
 
 /**

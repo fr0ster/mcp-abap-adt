@@ -158,7 +158,7 @@ export function parseCheckRunResponse(response: {
     return {
       success: false,
       status: 'parse_error',
-      message: `Failed to parse check run response: ${error}`,
+      message: `Failed to parse check run response: ${String(error)}`,
       errors: [],
       warnings: [],
       info: [],

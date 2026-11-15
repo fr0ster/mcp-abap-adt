@@ -21,9 +21,21 @@
  *   lists it, `DebugDeleteWatchpoint` deletes it, and the list is empty;
  * - `DebugTerminate` ends the run where it stands.
  *
- * `MemorySnapshotGet` reads the latest of the user's own memory snapshots
- * (`MemorySnapshotList`), and `MemorySnapshotDelta` compares it with
- * itself: none is created, since no tool deletes a snapshot.
+ * **The memory snapshots.** At the stop the case takes two memory snapshots
+ * of its own (`DebugCreateMemorySnapshot`); each answer names the snapshot's
+ * file. After the run ends, `MemorySnapshotGet` reads the first and
+ * `MemorySnapshotDelta` compares the two — exactly those, found in
+ * `MemorySnapshotList` (detail `full`) by their file names. Nothing deletes
+ * them: no tool can, and SAP removes snapshots over time.
+ *
+ * **Why the case waits.** SAP lists a new snapshot only later (measured on
+ * premise: the list was unchanged within a run, after the stop and the
+ * terminate as well, and two longer by the next run; adt-clients documents
+ * seconds on premise and minutes on the cloud). The create answers the
+ * snapshot's file, not its id, and only the list gives the id. So the case
+ * reads `MemorySnapshotList` every `LIST_PAUSE_MS` until both of its own
+ * file names are listed, and fails, naming them and the time waited, once
+ * `LIST_LIMIT_MS` has passed.
  */
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -86,6 +98,15 @@ const line = (name: string) => ({
   object_name: PROBE,
   line: LINE[name],
 });
+
+/** The pause between two reads of the snapshot list. */
+const LIST_PAUSE_MS = 10_000;
+
+/** How long the case waits for its snapshots to be listed before it fails. */
+const LIST_LIMIT_MS = 15 * 60_000;
+
+/** The files of the snapshots the case took, in order. */
+const snapshotFiles: string[] = [];
 
 /** The listener's state handle once it started. */
 const session: { handle?: string } = {};
@@ -305,35 +326,22 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
     assert.equal(left.text.toUpperCase().includes('LV_COUNTER'), false);
   });
 
-  it('MemorySnapshotGet reads a snapshot of the user, MemorySnapshotDelta compares two', async () => {
-    // The user's own snapshots, listed (earlier runs' `DebugCreateMemorySnapshot`
-    // made them): none is created here, since no tool deletes one.
-    const list = succeeded(
-      'MemorySnapshotList',
-      await livePrepare('MemorySnapshotList', {}),
-    );
-    const listed = payloadOf(list);
-    const ids = Array.isArray(listed)
-      ? listed.map((each) => member(each, 'id'))
-      : [];
-    // The latest one, compared with itself: an old snapshot may no longer
-    // load (measured on premise: `MEMORY_INSPECTOR` 013, "invalid data", for
-    // the oldest), and two snapshots of different sessions do not compare
-    // (measured on the cloud: `ExceptionMemoryAnalysisIncompatibleDeltaSnapshots`
-    // for the latest two).
-    const latest = ids.at(-1);
-    if (typeof latest !== 'string') {
-      throw new Error('the user holds no memory snapshot: the reads need one');
+  it('DebugCreateMemorySnapshot takes two snapshots at the stop', async () => {
+    for (const at of [1, 2]) {
+      const made = succeeded(
+        `DebugCreateMemorySnapshot ${at}`,
+        await livePrepare('DebugCreateMemorySnapshot', {
+          state_handle: handle(),
+        }),
+      );
+      // `<instance>,<file>`: the file the snapshot is kept in.
+      const data = String(member(member(payloadOf(made), 'action'), 'data'));
+      const file = data.slice(data.indexOf(',') + 1);
+      if (file === '' || data.indexOf(',') < 0) {
+        throw new Error(`the snapshot names no file: ${made.text}`);
+      }
+      snapshotFiles.push(file);
     }
-    const read = await liveCall('MemorySnapshotGet', { snapshot_id: latest });
-    succeeded('MemorySnapshotGet', read);
-    process.stderr.write(`DBG snap get ${read.text.slice(0, 900)}\n`);
-    const delta = await liveCall('MemorySnapshotDelta', {
-      from_id: latest,
-      to_id: latest,
-    });
-    succeeded('MemorySnapshotDelta', delta);
-    process.stderr.write(`DBG snap delta ${delta.text.slice(0, 900)}\n`);
   });
 
   it('DebugTerminate ends the run where it stands', async () => {
@@ -341,5 +349,51 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
     succeeded('DebugTerminate', ended);
     assert.equal(member(payloadOf(ended), 'state'), 'ended');
     assert.equal(member(payloadOf(ended), 'reason'), 'terminated');
+  });
+
+  it('MemorySnapshotGet reads a snapshot it took, MemorySnapshotDelta compares the two', async () => {
+    const [first, second] = snapshotFiles;
+    if (first === undefined || second === undefined) {
+      throw new Error('the case took no two snapshots');
+    }
+    // Until both files are listed (the header: why the case waits).
+    const idOf = new Map<string, string>();
+    const started = Date.now();
+    for (;;) {
+      const list = succeeded(
+        'MemorySnapshotList',
+        await livePrepare('MemorySnapshotList', { detail: 'full' }),
+      );
+      const rows = payloadOf(list);
+      for (const row of Array.isArray(rows) ? rows : []) {
+        const fileName = String(member(row, 'fileName'));
+        for (const file of [first, second]) {
+          if (fileName.endsWith(`/${file}`)) {
+            idOf.set(file, String(member(row, 'id')));
+          }
+        }
+      }
+      if (idOf.size === 2) break;
+      const waited = Date.now() - started;
+      if (waited >= LIST_LIMIT_MS) {
+        throw new Error(
+          `the snapshots ${first} and ${second} were not listed after ${Math.round(waited / 1000)} s`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, LIST_PAUSE_MS));
+    }
+    const from = idOf.get(first);
+    const to = idOf.get(second);
+    if (from === undefined || to === undefined) throw new Error('unreachable');
+
+    const read = await liveCall('MemorySnapshotGet', { snapshot_id: from });
+    succeeded('MemorySnapshotGet', read);
+    assert.equal(typeof member(payloadOf(read), 'overview'), 'object');
+    const delta = await liveCall('MemorySnapshotDelta', {
+      from_id: from,
+      to_id: to,
+    });
+    succeeded('MemorySnapshotDelta', delta);
+    assert.equal(typeof member(payloadOf(delta), 'overview'), 'object');
   });
 });

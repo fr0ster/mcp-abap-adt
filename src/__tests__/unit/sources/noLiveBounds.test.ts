@@ -16,7 +16,7 @@
  *   pause nowhere: no `setTimeout` or `setInterval`, no call of a `delay`,
  *   `pause` or `sleep`, but at the named sites of the step-13B remainder
  *   below, which wait on asynchronous SAP state and are measured live in
- *   step 19 before they change.
+ *   step 19 before they change, and the memory snapshot list's wait.
  *
  * The sources are parsed with TypeScript, so comments and strings cannot hide
  * or fake a read or a call; the templates with js-yaml, as the tests read
@@ -82,6 +82,13 @@ const FEED_REMAINDER = [
   'src/__tests__/integration/readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts#runs the shared program under the profiler and gets the id of its trace (on-prem)',
   'src/__tests__/integration/readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts#should create dump by division by zero and read/analyze created dump',
 ];
+/**
+ * The wait for a memory snapshot to be listed (owner, 2026-11-15): SAP lists
+ * a new snapshot only later and the create names its file, not its id, so
+ * the case reads the list at a fixed pause, failing at its own limit.
+ */
+const SNAPSHOT_LIST_WAIT =
+  'src/__tests__/integration/coverage/debugger.live.test.ts#MemorySnapshotGet reads a snapshot it took, MemorySnapshotDelta compares the two';
 /** The pause the retry remainder calls; it goes with it. */
 const REMAINDER_PAUSE =
   'src/__tests__/integration/helpers/testHelpers.ts#delay';
@@ -89,6 +96,7 @@ const ALLOWED_SITES = new Set([
   ...RETRY_REMAINDER,
   ...FEED_REMAINDER,
   REMAINDER_PAUSE,
+  SNAPSHOT_LIST_WAIT,
 ]);
 
 /** Every key path of a parsed YAML value: `a.b.c`. */

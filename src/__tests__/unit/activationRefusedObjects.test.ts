@@ -211,6 +211,55 @@ describe("a message's object named by objName is the run's object of that name",
   });
 });
 
+describe('a name sent as two types names neither, unless the message states its type', () => {
+  const DOMAIN = {
+    name: 'ZSHARED',
+    type: 'DOMA/DD',
+    uri: '/sap/bc/adt/ddic/domains/zshared',
+  };
+  const ELEMENT = {
+    name: 'ZSHARED',
+    type: 'DTEL/DE',
+    uri: '/sap/bc/adt/ddic/dataelements/zshared',
+  };
+  const NAMED =
+    `${HEAD}<msg type="E" objName="ZSHARED"><shortText><txt>A refusal</txt></shortText></msg>` +
+    '</chkl:messages>';
+
+  it.each([
+    ['domain first', [DOMAIN, ELEMENT]],
+    ['data element first', [ELEMENT, DOMAIN]],
+  ] as const)(
+    '%s: the message keeps its own name and no uri',
+    (_order, sent) => {
+      expect(namedRunObject('ZSHARED', undefined, sent)).toBeUndefined();
+      expect(activationMessagesOf(kept(NAMED), sent)).toEqual([
+        { type: 'E', text: 'A refusal', objectName: 'ZSHARED' },
+      ]);
+    },
+  );
+
+  it.each([
+    ['domain first', [DOMAIN, ELEMENT]],
+    ['data element first', [ELEMENT, DOMAIN]],
+  ] as const)(
+    '%s: the type the message states picks the one',
+    (_order, sent) => {
+      expect(namedRunObject('ZSHARED', 'DTEL/DE', sent)?.uri).toBe(ELEMENT.uri);
+      expect(namedRunObject('zshared', 'doma/dd', sent)?.uri).toBe(DOMAIN.uri);
+    },
+  );
+
+  it('a name sent once is its object, with no type stated', () => {
+    expect(namedRunObject('ZSHARED', undefined, [DOMAIN])?.uri).toBe(
+      DOMAIN.uri,
+    );
+    expect(activationMessagesOf(kept(NAMED), [DOMAIN])).toEqual([
+      { type: 'E', text: 'A refusal', objectName: 'ZSHARED', uri: DOMAIN.uri },
+    ]);
+  });
+});
+
 describe('the measured results of a run with one broken class', () => {
   it('cloud: each error message names the broken class and its uri', () => {
     expect(activationMessagesOf(kept(CLOUD), REFERENCES)).toEqual(READ_BROKEN);

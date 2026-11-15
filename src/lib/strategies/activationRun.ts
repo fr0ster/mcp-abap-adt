@@ -138,9 +138,12 @@ export function runObjectOf(
 
 /**
  * The object of the run a message names by its `objName` (or
- * `adtcore:name`): the reference of that name, compared with ASCII letters in
- * upper case, and of the message's type where it states one
- * (`adtcore:type`). `undefined` for no name, or one of no reference.
+ * `adtcore:name`): the one reference of that name, compared with ASCII
+ * letters in upper case, and of the message's type where it states one
+ * (`adtcore:type`). `undefined` for no name, for one of no reference, and
+ * for one that several references match (one name sent as two types, the
+ * message stating none): which of them it is about is not known, so none is
+ * chosen.
  */
 export function namedRunObject(
   name: string | undefined,
@@ -150,11 +153,13 @@ export function namedRunObject(
   if (name === undefined || name === '') return undefined;
   const wanted = asciiUpper(name);
   const wantedType = type === undefined ? undefined : asciiUpper(type);
-  return references.find(
+  const matching = references.filter(
     (reference) =>
       asciiUpper(reference.name) === wanted &&
       (wantedType === undefined || asciiUpper(reference.type) === wantedType),
   );
+  const [only, other] = matching;
+  return other === undefined ? only : undefined;
 }
 
 /** How each read of a run judges SAP's answer: adt-strategies' message-failure reading. */

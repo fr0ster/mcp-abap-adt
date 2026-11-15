@@ -52,19 +52,31 @@ against a `?: T`.
     declaration so written — through parentheses, a conditional's branch, the right operand of
     `??` or `||`, an `await`. Returned into `Promise<unknown>`, handed to a type parameter or
     into any narrower slot, it is laundered, and an error.
-  - **`unknown` written by us is a warning**: the keyword in a type position — an annotation, a
-    parameter, a return, a field, an alias, an interface, a type argument, a constraint, a
-    default, an `as` target — is listed by `file:line`, failing nothing, with why it is still
-    `unknown` (`UNKNOWN_CLASSES`, by `file#function`): an `entry point` (a value from outside
-    the type system as the language or a contract hands it: a thrown value, a tool's
-    arguments), a `generic carry` (handed on whole to a function of the caller's type), a
-    `missing own type` (one a type of ours could name), else `unclassified`. A site inside a
-    listed boundary or a sink contract is not warned. Reading or inspecting an `unknown` is the
-    compiler's to refuse.
-  - **Forced by a contract** (`FORCED_BY_CONTRACT`, by `file#owner(name)`, each with the third
-    party's member that forces it: `ILogger`'s meta, `IAbapRequestOptions.params`,
-    `IAdtWireResponse.data`, `JSON.stringify`'s replacer value): reported in a table of its own,
-    in a listed boundary or not — the worklist of typing those contracts.
+  - **Every `unknown` is reported where it enters, and fails nothing.** A site is the keyword
+    written in a type position (an annotation, a parameter, a return, a field, an alias, an
+    interface, a type argument, a constraint, a default, an `as` target), a call's or a `new`'s
+    answer or a member read whose declaration brings the `unknown` (its declared type holds it,
+    or a type parameter of it or its holder defaults to one with no type argument written), a
+    callback's parameter its contract types, or a catch binding — once, where it enters; a
+    value that only flows on within our code, or an `unknown` the caller's own type argument
+    or value instantiated, is not reported again. Each site has its origin:
+    - `OURS` — the keyword written here (its own `file:line`); our packages' built
+      declarations count as the source that writes them;
+    - `EXTERNAL` — declared in a package: its manifest's `name@version` and the member that
+      brings it (`@mcp-abap-adt/interfaces-utils@1.1.1 ILogger.info(meta)`), found through the
+      declaration of the symbol whose type brings it, our aliases of their types included;
+    - `LANGUAGE` — the language's own (`lib.*.d.ts`): a catch binding, `Error.cause`, a
+      callback a language method types;
+    - `UNRESOLVED` — a declaration the report cannot place (a package with no manifest), said
+      so with its path, never dropped.
+    Each site names the list that covers it — `FORCED_BY_CONTRACT` (a site a third party's
+    contract forces, with the member: `ILogger`'s meta, `IAbapRequestOptions.params`,
+    `IAdtWireResponse.data`, `JSON.stringify`'s replacer value), `THROWN_READERS`,
+    `PARSE_SITES`, `PROGRAM_INPUT_SITES`, `SINK_SITES`, `SINK_SLOTS`, `SINK_CONTRACTS`,
+    `ToolArgs` — or `none`; a site inside a list is reported, not hidden. Its class
+    (`UNKNOWN_CLASSES`, by `file#function`: `entry point`, `generic carry`, `missing own type`)
+    says why it is still `unknown`, else `unclassified`. Reading or inspecting an `unknown` is
+    the compiler's to refuse.
 - **The boundaries**, each site by `file#owner(name)`; a site inside a function a list names is
   in it:
   - `THROWN_READERS` — the readers of thrown values and failure slots: a caught value is
@@ -79,11 +91,13 @@ against a `?: T`.
     value of any type by design (`ILogger`, `RegisteredToolCallback`): the contract's
     declaration, a class implementing it, a declaration whose written type names it;
     `SINK_SLOTS` — none today, a tool result's content being typed.
-- **Where the list shows.** `npm run sweep:unknown` runs the gate alone (no SAP system) and prints
-  the written `unknown` grouped by area, each with its function and class, a total, and the
-  forced sites. In CI the gate appends the same to the job's summary (`GITHUB_STEP_SUMMARY`) as
-  Markdown tables — the sites (file:line, the written type, the function, the class), the count
-  per area, and the forced sites with the member that forces each; a failed write fails nothing.
+- **Where the report shows.** `npm run sweep:unknown` runs the gate alone (no SAP system) and
+  prints the report origin first — `OURS`, `EXTERNAL`, `LANGUAGE`, `UNRESOLVED`, each with its
+  count split into covered by a list and not — then each origin's sites (what brought it, the
+  site, how it enters, the list covering it, the text). In CI the gate appends the same to the
+  job's summary (`GITHUB_STEP_SUMMARY`) as Markdown tables: the totals per origin, then a table
+  per origin; a failed write fails nothing. The `EXTERNAL` table is the worklist of typing the
+  third parties' contracts.
 - **The lists name exact sites and stay short:** an entry, a forced site or a class no
   production site has is stale and refused. A finding is fixed in the code — typed by its
   contract, its wire or parse answer, or made generic — never by widening a list.
@@ -124,7 +138,7 @@ deliberately wrong value to prove a check at a boundary, or prove a refusal of t
   text }`; "holds no any" the same for the test infrastructure.
 - `noRegexOverInput.test.ts` lists each site as `file:line` and its first line.
 - `unknownSweep.test.ts` "has no any" lists each error as `file:line kind text` — `any-keyword`
-  for the keyword written, `any` for an expression typed `any`; the written `unknown` is the
-  warning list it prints (`npm run sweep:unknown`).
+  for the keyword written, `any` for an expression typed `any`; the `unknown` is the origin
+  report it prints (`npm run sweep:unknown`).
 - A fixture per refusal lives under `src/__tests__/unit/sources/__fixtures__/`; a new rule comes
   with a fixture its scan refuses and a clean one it accepts.

@@ -94,7 +94,12 @@ against a `?: T`.
       ours (a written type bringing in an unknown of its own — `typeof` a third party's
       value, its alias — is theirs); a call or a `new` with type arguments written, or
       whose signature's type parameters, and a generic receiver's, are bound by arguments
-      and a receiver of ours; a literal or a carrier whose parts are ours. **A type
+      and a receiver of ours; `this` when every base its class extends or implements is
+      bound by text we wrote (a class of ours so bound, type arguments we write on a base
+      whose own bases bring in no unknown, or a base bringing in none — never a function
+      that rebinds it); a literal or a carrier whose parts are ours. A type is walked
+      whole for an unknown — its type arguments and bases to any depth, with a set of the
+      types already walked; no depth bound answers that it holds none. **A type
       argument we write is ours, `unknown` included** (the owner's decision: the generic is
       foreign, an instantiation we write is ours — `receiver: Generic<unknown>`,
       `new Holder<unknown>()`); one written in a third party's text — its declared value,

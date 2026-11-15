@@ -28,6 +28,7 @@ import {
   failurePayload,
   isCredentialPayload,
   type McpResult,
+  messageOf,
 } from '../../../lib/answer';
 import {
   type PhaseResult,
@@ -443,9 +444,7 @@ async function includesListOf(
       ],
     };
   } catch (error) {
-    logger?.error(
-      `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    logger?.error(`Error getting includes list: ${messageOf(error)}`);
     // A carried method error as it is, a chain failure as it came, a throw
     // of our own `client_threw` — never the bare message.
     return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
@@ -814,9 +813,7 @@ async function treeFromAnswers(
       ],
     };
   } catch (error) {
-    logger?.error(
-      `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    logger?.error(`Error getting includes list: ${messageOf(error)}`);
     return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
   }
 }
@@ -963,9 +960,7 @@ export async function handleGetIncludesList(
         () => includesListOf(context, args),
       );
     } catch (error) {
-      logger?.error(
-        `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      logger?.error(`Error getting includes list: ${messageOf(error)}`);
       return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
     }
   }
@@ -1026,9 +1021,7 @@ export async function handleGetIncludesList(
       },
     );
   } catch (error) {
-    logger?.error(
-      `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    logger?.error(`Error getting includes list: ${messageOf(error)}`);
     return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
   }
 }

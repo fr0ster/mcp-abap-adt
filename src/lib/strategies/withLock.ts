@@ -7,6 +7,7 @@ import {
   failureEntry,
   isCredentialFailure,
   isCredentialPayload,
+  messageOf,
   thrownEntry,
 } from '../answer';
 import { spentBy } from '../sessionLoss';
@@ -77,7 +78,7 @@ async function runRelease<H, U>(
   } catch (error) {
     // No origin. `connection` and `refusal` are both claims about the server,
     // and neither is true of an argument-validation defect in this process.
-    const message = error instanceof Error ? error.message : String(error);
+    const message = messageOf(error);
     return {
       kind: 'threw',
       thrown: error,

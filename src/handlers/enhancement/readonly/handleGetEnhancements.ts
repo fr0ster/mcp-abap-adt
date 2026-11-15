@@ -24,6 +24,7 @@ import {
   isCredentialFailure,
   isCredentialPayload,
   type McpResult,
+  messageOf,
   thrownEntry,
 } from '../../../lib/answer';
 import type { IAnswerSerializer } from '../../../lib/answerSerializer';
@@ -667,7 +668,7 @@ async function getEnhancementsForSingleObject(
       methodFailureOf(thrown) !== undefined
     )
       throw thrown;
-    const message = thrown instanceof Error ? thrown.message : String(thrown);
+    const message = messageOf(thrown);
     throw new EnhancementInputError(
       `Failed to retrieve enhancements for ${objectName}: ${message}`,
     );
@@ -1486,7 +1487,7 @@ function responseFromAnswers(
       methodFailureOf(thrown) !== undefined
     )
       throw thrown;
-    const message = thrown instanceof Error ? thrown.message : String(thrown);
+    const message = messageOf(thrown);
     throw new EnhancementInputError(
       `Failed to retrieve enhancements for ${objectName}: ${message}`,
     );

@@ -12,6 +12,7 @@
  * `activationExecuted="false"`. Each handler case runs over a recording
  * connection — real adt-clients code, no SAP.
  */
+import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import {
@@ -135,6 +136,26 @@ describe("a message's object is the run's object its href points into", () => {
     ['a uri of no run object', '/sap/bc/adt/oo/classes/zobj_other'],
   ] as const)('%s points into none', (_case, href) => {
     expect(runObjectOf(href, REFERENCES)).toBeUndefined();
+  });
+
+  it('a namespaced uri matches its href whatever the case of its escapes and letters', () => {
+    // buildObjectUri('/NS/ZBROKEN', 'CLAS/OC') sends the slashes as %2F; an
+    // href may spell the escape %2f, and the letters in either case.
+    const sent = {
+      name: '/NS/ZBROKEN',
+      uri: buildObjectUri('/NS/ZBROKEN', 'CLAS/OC'),
+    };
+    expect(sent.uri).toBe('/sap/bc/adt/oo/classes/%2Fns%2Fzbroken');
+    for (const href of [
+      '/sap/bc/adt/oo/classes/%2fns%2fzbroken/source/main#start=7,4',
+      '/sap/bc/adt/oo/classes/%2FNS%2FZBROKEN/source/main#start=7,4',
+      '/sap/bc/adt/oo/classes/%2Fns%2Fzbroken',
+    ]) {
+      expect(runObjectOf(href, [sent])?.name).toBe('/NS/ZBROKEN');
+    }
+    expect(
+      runObjectOf('/sap/bc/adt/oo/classes/%2fns%2fzbroken2', [sent]),
+    ).toBeUndefined();
   });
 
   it('a reference with an empty uri is no object of any href', () => {

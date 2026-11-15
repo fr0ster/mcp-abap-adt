@@ -96,25 +96,38 @@ export interface RunReference {
 }
 
 /**
+ * An ADT path as an href and a sent uri are compared: its ASCII letters in
+ * lower case. Object paths are case-insensitive (the measured hrefs are lower
+ * case), and so the hex digits of a `%XX` escape compare in either case —
+ * `%2F` and `%2f` alike. Nothing is decoded.
+ */
+function comparablePath(path: string): string {
+  return asciiLower(path);
+}
+
+/**
  * The object of the run a message's `href` points into: the reference whose
  * uri is the href itself, or its prefix followed by `/` or `#` (a source part,
  * a position) — the longest such uri, so a part addressed under its owner
- * goes to the part. `undefined` for an empty href, or one inside none of
- * them. Plain string comparison.
+ * goes to the part. Both compared as `comparablePath` reads them. `undefined`
+ * for an empty href, or one inside none of them. Plain string comparison.
  */
 export function runObjectOf(
   href: string | undefined,
   references: readonly RunReference[],
 ): RunReference | undefined {
   if (href === undefined) return undefined;
+  const seen = comparablePath(href);
   let found: RunReference | undefined;
+  let foundLength = 0;
   for (const reference of references) {
-    const { uri } = reference;
-    if (uri === '' || !href.startsWith(uri)) continue;
-    const next = href.charAt(uri.length);
+    const uri = comparablePath(reference.uri);
+    if (uri === '' || !seen.startsWith(uri)) continue;
+    const next = seen.charAt(uri.length);
     if (next !== '' && next !== '/' && next !== '#') continue;
-    if (found === undefined || uri.length > found.uri.length) {
+    if (found === undefined || uri.length > foundLength) {
       found = reference;
+      foundLength = uri.length;
     }
   }
   return found;

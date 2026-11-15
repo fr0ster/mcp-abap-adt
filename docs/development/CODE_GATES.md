@@ -70,8 +70,13 @@ against a `?: T`.
     - a destructuring — of a variable, a parameter, an assignment or a `for … of` head;
       nested, renamed, with a default, by a rest;
     - a callback's parameter to which a contract hands its own `unknown` (a `JSON.parse`
-      reviver's value, a predicate over a list the language types `any[]`): it passes as a
-      `callback` only when every use of it passes on (below).
+      reviver's value, a predicate over a list the language types `any[]`), written with a
+      type or taking the contract's (the type its declaration writes; a type parameter is
+      bound by the caller, a slot written `ToolArgs` is input until checked): it passes as a
+      `callback` only when every use of it passes on (below) and it has no default — a
+      default tests for `undefined` and may replace the value. A position in a parameter of
+      a function the contract hands (`reject(reason?: any)`) is written into by a call, not
+      read.
 
     It passes only inside a listed function (`PARSE_SITES`, `THROWN_READERS`, `SINK_SITES`,
     matched by `file#function(`, closures inside it included); landing whole where `unknown`

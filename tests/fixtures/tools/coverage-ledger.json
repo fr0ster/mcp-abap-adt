@@ -97,11 +97,137 @@
       "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
     }
   },
+  "GetBehaviorDefinitionVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetBehaviorDefinitionVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetBehaviorDefinitionVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetClassVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetClassVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetClassVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetDdlVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetDdlVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetDdlVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
   "GetFunctionModule#source": {
     "unit": "src/__tests__/unit/pins/searchSource.pins.test.ts",
     "live": {
       "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "GetFunctionModuleVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetFunctionModuleVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetFunctionModuleVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetInterfaceVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetInterfaceVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetInterfaceVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMetadataExtensionVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMetadataExtensionVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMetadataExtensionVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
   "GetObjectDraft#BEHAVIOR_DEFINITION": {
@@ -241,11 +367,81 @@
       "onprem": "src/__tests__/integration/coverage/outline.live.test.ts"
     }
   },
+  "GetProgramVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetProgramVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetProgramVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
   "GetSqlQuery": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {
       "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetStructureVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetStructureVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetStructureVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableTypeVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
   "GetUnitTestResult": {

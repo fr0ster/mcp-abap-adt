@@ -55,6 +55,10 @@ against a `?: T`.
     declaration or inside an expression, at any depth of the written type. The language's own structure (`Record`, `Readonly`, `Array`,
     `Promise`, `Map`) is walked; a member of a runtime object of the language (`Error.cause`)
     is not a position.
+  - **Only programs the compiler accepts:** each production project's configuration must
+    parse and its program have no diagnostic before emit, or the sweep fails, naming the
+    project and its first diagnostics — an import left unresolved (a sibling's `dist` not
+    built) would type what it names as the error type, read as `any`.
   - **Bound by the caller:** a type parameter's constraint and default are not sites; each
     instantiation is judged where it is written, a default that falls back to `unknown`
     included.

@@ -1,7 +1,12 @@
 # Dependency directories
 node_modules/
-# A third party's contracts for the closed rule's fixtures, outside by path.
+# A third party's contracts for the closed rule's fixtures, outside by path:
+# the directory is let in only down to its one declaration file (named after
+# `*.d.ts` below); anything else under it stays ignored.
 !src/__tests__/unit/sources/__fixtures__/unknownProvenance/node_modules/
+src/__tests__/unit/sources/__fixtures__/unknownProvenance/node_modules/*
+!src/__tests__/unit/sources/__fixtures__/unknownProvenance/node_modules/external-contracts/
+src/__tests__/unit/sources/__fixtures__/unknownProvenance/node_modules/external-contracts/*
 
 # Build output
 dist/

@@ -900,11 +900,10 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     );
   });
 
-  it("a callback's parameter written without a type, in a list, a tuple, a rest, a spread or from a receiver the third party instantiated, is the third party's unless proven ours", () => {
+  it("a callback's parameter written without a type, in a list, a tuple, a rest or from a receiver the third party instantiated, is the third party's unless proven ours", () => {
     assert.deepEqual(thirdPartyReads('externalShapes'), [
-      [20, 'refused'],
-      [21, 'refused'],
       [22, 'refused'],
+      [23, 'refused'],
       [24, 'refused'],
       [29, 'refused'],
       [30, 'refused'],

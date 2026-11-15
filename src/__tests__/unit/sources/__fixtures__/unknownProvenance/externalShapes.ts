@@ -1,6 +1,6 @@
 // The closed rule, a callback's parameter written without a type, in every
 // position a third party's contract types it (`node_modules/
-// external-contracts`): in a list, a tuple, a rest, a spread, and from a
+// external-contracts`): in a list, a tuple, a rest, and from a
 // receiver the third party instantiated — called, or assigned later. Its
 // `unknown` is the third party's unless proven ours: refused by default.
 import {
@@ -15,13 +15,13 @@ import {
 
 type ToolArgs = Readonly<Record<string, unknown>>;
 
-// Refused: a list, a tuple, a rest, a spread.
+// Refused: a list, a tuple, a rest. (A list spread into the call types no
+// callback inside it: written without a type, its parameter is refused by the
+// compiler, TS7006.)
 export function positions(): void {
   listenAll([(value) => String(typeof value === 'string')]);
   listenPair([(value) => String(typeof value === 'string')]);
   restListeners((value) => String(typeof value === 'string'));
-  restListeners(...[(value: unknown) => String(value)]);
-  restListeners(...[(value) => String(typeof value === 'string')]);
 }
 
 // Refused: a receiver the third party instantiated, called or assigned.

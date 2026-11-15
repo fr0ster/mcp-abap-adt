@@ -27,6 +27,20 @@
       "cloud": "src/__tests__/integration/coverage/batch.live.test.ts"
     }
   },
+  "CreateMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "CreateMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
   "DebugCreateWatchpoint": {
     "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
     "live": {
@@ -81,6 +95,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DeleteMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "DeleteMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
     }
   },
   "DiscardBackgroundRun": {
@@ -207,6 +235,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "GetMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
     }
   },
   "GetMetadataExtensionVersionDiff": {
@@ -657,6 +699,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "UpdateMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "UpdateMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
     }
   }
 }

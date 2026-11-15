@@ -868,6 +868,25 @@ describe("the closed rule: a third party's unknown is read only at a boundary (t
     ]);
   });
 
+  it("a callback parameter written without a type takes the contract's unknown and is judged as one written with it", () => {
+    // The parse each reviver is handed to passes whole into a sink.
+    assert.deepEqual(thirdPartyReads('contextualCallback'), [
+      [9, 'refused'],
+      [9, 'sink-contract'],
+      [16, 'refused'],
+      [16, 'sink-contract'],
+      [21, 'sink-contract'],
+    ]);
+    // A function the contract hands is called, its parameter written into;
+    // a contract instantiated with a type of ours is ours.
+    assert.deepEqual(
+      sitesOf('contextualCallback').filter(
+        (site) => lineOf(site) >= 23 && site.refused,
+      ),
+      [],
+    );
+  });
+
   it("a member read sees every declaration it has: a typed member of ours beside a third party's unknown still reads theirs", () => {
     assert.deepEqual(refusedReads('thirdPartyLaundering'), [9, 13, 18]);
     assert.deepEqual(

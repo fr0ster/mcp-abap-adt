@@ -1270,7 +1270,32 @@ export class UnknownSweep {
       return;
     }
     const held = this.ownHeld(node);
-    if (held.length === 0) return;
+    if (held.length === 0) {
+      if (!ts.isParameter(node)) return;
+      const contract = this.contractParameterHeld(node);
+      if (contract.length === 0) return;
+      // Written without a type, it takes the contract's: judged exactly as
+      // one written with it.
+      const decided = this.boundaryOf(node, contract);
+      if (
+        decided.kind !== 'callback' ||
+        !this.contractsUnknown(contract) ||
+        this.usesPassOn(node)
+      ) {
+        return;
+      }
+      const listed = this.listedOwner(node);
+      this.report(
+        node,
+        kind,
+        contract.map((each) => pathText(each.path) || "''").join(' '),
+        listed,
+        listed === undefined,
+        'third-party',
+        ['callback'],
+      );
+      return;
+    }
     const decided = this.boundaryOf(node, held);
     if (
       decided.kind === 'callback' &&
@@ -2589,11 +2614,66 @@ export class UnknownSweep {
    * Whether a callback's parameter holds the contract's own `unknown`: at
    * the top, or inside the language's structure — not inside a type of the
    * repository the contract was instantiated with (`Reading<unknown>`: bound
-   * by the caller, where it is written).
+   * by the caller, where it is written), nor in a parameter of a function
+   * the contract hands (`reject(reason?: any)`): a call writes into it, and
+   * no write is tracked.
    */
   private contractsUnknown(held: readonly Held[]): boolean {
     return held.some((each) =>
-      each.path.every((step) => step.kind !== 'member'),
+      each.path.every(
+        (step) => step.kind !== 'member' && step.kind !== 'parameter',
+      ),
+    );
+  }
+
+  /**
+   * The positions of `unknown` or `any` a callback's parameter written
+   * without a type takes from its contract, when the contract is declared
+   * outside the repository (one of ours is charged where it is written).
+   */
+  private contractParameterHeld(
+    node: ts.ParameterDeclaration,
+  ): readonly Held[] {
+    if (node.type !== undefined) return [];
+    const fn = node.parent;
+    if (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) return [];
+    // An optional callback's contract is `… | undefined`: its signatures
+    // are the function's.
+    const contextual = this.checker.getContextualType(fn);
+    const signatures =
+      contextual === undefined
+        ? []
+        : this.checker.getNonNullableType(contextual).getCallSignatures();
+    const at = fn.parameters.indexOf(node);
+    const declarations = signatures.map((signature) => {
+      const parameters = signature.getParameters();
+      const last = parameters.at(-1)?.valueDeclaration;
+      const rest =
+        last !== undefined &&
+        ts.isParameter(last) &&
+        last.dotDotDotToken !== undefined;
+      return (parameters[at] ?? (rest ? parameters.at(-1) : undefined))
+        ?.valueDeclaration;
+    });
+    // Every contract it may take is a third party's, and none writes the
+    // slot `ToolArgs` (input until checked, as when written here).
+    const contracts: ts.Node[] = [];
+    for (const declaration of declarations) {
+      if (
+        declaration === undefined ||
+        ownNode(declaration) ||
+        this.toolArgs(declaration)
+      ) {
+        return [];
+      }
+      contracts.push(declaration);
+    }
+    // The contract's declared type: a type parameter it is instantiated
+    // with is bound by the caller, where it is written.
+    return contracts.flatMap((declaration) =>
+      this.held(this.checker.getTypeAtLocation(declaration)).filter(
+        (each) => each.owner === undefined,
+      ),
     );
   }
 

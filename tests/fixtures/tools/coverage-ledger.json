@@ -492,6 +492,13 @@
       "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
     }
   },
+  "GetObjectNodeFromCache": {
+    "unit": "src/__tests__/unit/pins/objectsByType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/objectsByType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/objectsByType.live.test.ts"
+    }
+  },
   "GetObjectOutline#CLAS/OC": {
     "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
     "live": {
@@ -524,6 +531,13 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetObjectsByType": {
+    "unit": "src/__tests__/unit/pins/objectsByType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/objectsByType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/objectsByType.live.test.ts"
     }
   },
   "GetPackage": {

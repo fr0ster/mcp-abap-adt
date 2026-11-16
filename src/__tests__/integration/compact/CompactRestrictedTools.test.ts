@@ -43,6 +43,7 @@ import {
   succeeded,
 } from '../helpers/restrictedCalls';
 import { skipRunningTest } from '../helpers/runningTest';
+import { lineOfText } from '../helpers/sourceLine';
 
 const onprem = (): boolean => configuredSystemKind() === 'onprem';
 const denied = (...entries: string[]) => ({
@@ -55,8 +56,12 @@ const denied = (...entries: string[]) => ({
 const RUN_CLASS = 'ZMCP_SHR_PROF_CLS';
 /** The shared run program, on premise. */
 const RUN_PROGRAM = 'ZMCP_SHR_PROF_PROG';
-/** The line of the shared run class that writes its output. */
-const OUTPUT_LINE = 12;
+/**
+ * The text of the shared run class's line that writes its output: the
+ * breakpoint's line is read from the class as the system holds it
+ * (`lineOfText`), since the class is laid out differently per system.
+ */
+const OUTPUT_TEXT = 'out->write( lv_x ).';
 
 liveSuite(
   ['onprem', 'cloud'],
@@ -217,6 +222,15 @@ liveSuite(
         });
 
         it('a breakpoint, a listen, a catch, the stack read alone and in a debugger batch, a step and a continue, the end', async () => {
+          const read = succeeded(
+            'GetClass the shared run class',
+            await livePrepare('GetClass', { class_name: RUN_CLASS }),
+          );
+          const source = answerField(read, 'source');
+          if (typeof source !== 'string') {
+            throw new Error(`GetClass ${RUN_CLASS} answered no source`);
+          }
+          const outputLine = lineOfText(source, OUTPUT_TEXT, RUN_CLASS);
           const placed = succeeded(
             'HandlerDebugBreakpoints setBreakpoints',
             await livePrepare('HandlerDebugBreakpoints', {
@@ -226,7 +240,7 @@ liveSuite(
                 {
                   object_type: 'CLAS',
                   object_name: RUN_CLASS,
-                  line: OUTPUT_LINE,
+                  line: outputLine,
                 },
               ],
             }),

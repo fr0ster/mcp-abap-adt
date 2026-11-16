@@ -130,7 +130,11 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       description: 'MCP test class in transport (GitHub #11)',
     });
 
-    assert.equal(createResponse.isError, false);
+    assert.equal(
+      createResponse.isError,
+      false,
+      JSON.stringify(createResponse.content),
+    );
     // CreateClass's terse projection is `terseWrite`: on success it answers
     // the literal text "SUCCESS", not a JSON object — `success` no longer
     // exists to read (CHANGELOG Unreleased: "Terse writes answer the
@@ -167,7 +171,11 @@ ENDCLASS.`;
       activate: true,
     });
 
-    assert.equal(updateResponse.isError, false);
+    assert.equal(
+      updateResponse.isError,
+      false,
+      JSON.stringify(updateResponse.content),
+    );
     // UpdateClass's terse projection is `terseWrite` too — same literal
     // "SUCCESS" text, no `success` field (projections.ts `terseWrite`).
     assert.equal(updateResponse.content[0]?.text, 'SUCCESS');
@@ -180,7 +188,11 @@ ENDCLASS.`;
       class_name: className,
     });
 
-    assert.equal(getResponse.isError, false);
+    assert.equal(
+      getResponse.isError,
+      false,
+      JSON.stringify(getResponse.content),
+    );
     const getData = handlerAnswer(
       getResponse,
       z.looseObject({ source: z.unknown(), success: z.unknown() }),
@@ -200,7 +212,11 @@ ENDCLASS.`;
       part: 'metadata',
     });
 
-    assert.equal(readResponse.isError, false);
+    assert.equal(
+      readResponse.isError,
+      false,
+      JSON.stringify(readResponse.content),
+    );
     const readData = handlerAnswer(
       readResponse,
       z.looseObject({ metadata: z.unknown(), success: z.unknown() }),
@@ -217,7 +233,11 @@ ENDCLASS.`;
       transport_request: transportRequest,
     });
 
-    assert.equal(deleteResponse.isError, false);
+    assert.equal(
+      deleteResponse.isError,
+      false,
+      JSON.stringify(deleteResponse.content),
+    );
     logger?.success('Step 5: DeleteClass succeeded');
     className = ''; // Prevent double-delete in afterAll
   });

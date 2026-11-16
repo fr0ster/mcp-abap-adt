@@ -94,7 +94,7 @@ describe('GetSqlQuery Handler Integration', () => {
         },
       );
 
-      assert.equal(result.isError, false);
+      assert.equal(result.isError, false, JSON.stringify(result.content));
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 

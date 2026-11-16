@@ -1346,7 +1346,7 @@ include_cloud_read:
         include_name: ""
 
 # Table type (TableType) — on premise and on ABAP cloud. On cloud the suite
-# works in shared_dependencies.package.
+# works in environment.default_package (the build package).
 # Read by high/table_type/TableTypeHighHandlers.test.ts. Object name and
 # definition. onprem, cloud.
 create_table_type:

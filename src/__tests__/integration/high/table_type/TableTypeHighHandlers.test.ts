@@ -4,8 +4,9 @@
  * **Where it runs: on premise and on ABAP cloud** (`create_table_type` /
  * `builder_table_type`, `available_in: ["onprem", "cloud"]`). On premise the
  * run creates a local package of its own ($ZMCP_T<run>, no transport) and
- * deletes it last; on ABAP cloud it works in `shared_dependencies.package`
- * with the configured transport. Without an integration configuration the
+ * deletes it last; on ABAP cloud it works in the build package
+ * (`environment.default_package`, ZADT_BLD_PKG03, checked before anything is
+ * created) with the configured transport. Without an integration configuration the
  * case skips and says so (LambdaTester: "No configuration found").
  *
  * Lifecycle, one run, every object of its own:
@@ -84,8 +85,8 @@ import {
   readTableTypeDefinition,
   type StoredTableTypeDefinition,
 } from '../../../../lib/strategies/tableTypeStored';
+import { ownPackage } from '../../coverage/ownObjects';
 import {
-  getSharedDependenciesConfig,
   getSystemType,
   resolveTransportRequest,
 } from '../../helpers/configHelpers';
@@ -386,11 +387,10 @@ describe('TableType High-Level Handlers Integration', () => {
       };
 
       if (getSystemType() === 'cloud') {
-        packageName = getSharedDependenciesConfig()?.package ?? '';
+        // The build package, checked before anything is created; the
+        // shared package holds read-only fixtures.
+        packageName = ownPackage();
         transportRequest = resolveTransportRequest(ctx.testCase);
-        if (!packageName) {
-          throw new Error('shared_dependencies.package is required on cloud');
-        }
       } else {
         await must(`CreatePackage ${OWN_PACKAGE}`, () =>
           handleCreatePackage(

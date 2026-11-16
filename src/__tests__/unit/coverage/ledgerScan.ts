@@ -879,6 +879,8 @@ export type Check =
   | 'extra-row'
   | 'missing-system'
   | 'extra-system'
+  | 'reason-empty'
+  | 'reason-not-served'
   | 'unit-not-discovered'
   | 'unit-no-pin'
   | 'live-not-integration'
@@ -905,7 +907,21 @@ export interface Finding {
 /** One ledger row as the file states it. */
 export interface LedgerRow {
   readonly unit: string;
+  /** The live file per system kind. */
   readonly live: Partial<Record<SystemKind, string>>;
+  /**
+   * The kinds stated `{ reason: "<text>" }` in place of a file: served, not
+   * live there, for the reason given (as written; checked non-empty after
+   * trimming). A reason is no live coverage: it names no file.
+   */
+  readonly reasons: Partial<Record<SystemKind, string>>;
+}
+
+/** A kind a row covers by a reason instead of a live file. */
+export interface ReasonRow {
+  readonly key: CoverageKey;
+  readonly kind: SystemKind;
+  readonly reason: string;
 }
 
 /** What the checks read: the served tools and the files, given. */
@@ -943,15 +959,41 @@ function ledgerRows(ledger: unknown): Map<CoverageKey, LedgerRow> | string {
       return `${key}: a row is { unit: <file>, live: { onprem?: <file>, cloud?: <file> } }`;
     }
     const files: Partial<Record<SystemKind, string>> = {};
+    const reasons: Partial<Record<SystemKind, string>> = {};
     for (const [system, file] of Object.entries(live)) {
-      if (!isSystemKind(system) || typeof file !== 'string') {
-        return `${key}: live names onprem and cloud only, each a file`;
+      if (!isSystemKind(system)) {
+        return `${key}: live names onprem and cloud only, each a file or { reason }`;
       }
-      files[system] = file;
+      if (typeof file === 'string') {
+        files[system] = file;
+        continue;
+      }
+      const reason: unknown =
+        typeof file === 'object' && file !== null && !Array.isArray(file)
+          ? Reflect.get(file, 'reason')
+          : undefined;
+      if (typeof reason !== 'string' || Object.keys(file).length !== 1) {
+        return `${key}: live names onprem and cloud only, each a file or { reason }`;
+      }
+      reasons[system] = reason;
     }
-    rows.set(key, { unit, live: files });
+    rows.set(key, { unit, live: files, reasons });
   }
   return rows;
+}
+
+/** Every kind the ledger covers by a reason, in key then kind order; `[]` when it is not a ledger. */
+export function reasonRows(ledger: unknown): ReasonRow[] {
+  const rows = ledgerRows(ledger);
+  if (typeof rows === 'string') return [];
+  return [...rows.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .flatMap(([key, row]) =>
+      (['onprem', 'cloud'] as const).flatMap((kind) => {
+        const reason = row.reasons[kind];
+        return reason === undefined ? [] : [{ key, kind, reason }];
+      }),
+    );
 }
 
 /** The served list against the fixture's `listedBy`, projected to onprem and cloud. */
@@ -1058,8 +1100,18 @@ export function checkLedger(input: CheckInput): Finding[] {
       continue;
     }
     for (const kind of kinds) {
-      if (row.live[kind] === undefined) {
+      if (row.live[kind] === undefined && row.reasons[kind] === undefined) {
         findings.push({ check: 'missing-system', detail: `${key}: ${kind}` });
+      }
+    }
+    for (const [system, reason] of Object.entries(row.reasons)) {
+      if (!isSystemKind(system) || !kinds.has(system)) {
+        findings.push({
+          check: 'reason-not-served',
+          detail: `${key}: ${system}`,
+        });
+      } else if (reason.trim() === '') {
+        findings.push({ check: 'reason-empty', detail: `${key}: ${system}` });
       }
     }
     for (const system of Object.keys(row.live)) {

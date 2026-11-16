@@ -34,6 +34,7 @@ import {
   checkRunReport,
   type RunScope,
   readLedger,
+  readReasonLines,
   runScriptOf,
 } from './helpers/runReport';
 
@@ -102,6 +103,12 @@ function check(
     script === 'full'
       ? { kind: 'full' }
       : { kind: 'family', files: readFilesRan() };
+  const reasons = readReasonLines(globalConfig.rootDir);
+  if (reasons.length > 0) {
+    console.log(
+      `[globalTeardown] covered by a reason, not live:\n${reasons.join('\n')}`,
+    );
+  }
   const problems = checkRunReport({
     ledger: readLedger(globalConfig.rootDir),
     outcomes: readOutcomes(),

@@ -35,6 +35,7 @@ import {
   checkRunReport,
   type LiveFiles,
   liveFilesOf,
+  reasonLinesOf,
 } from '../../integration/helpers/runReport';
 import { environment } from '../runner/toolRuns';
 
@@ -147,6 +148,40 @@ const outcomesOf = (entries: readonly OutcomeEntry[]): string[] =>
   entries.map((o) => `${o.key} ${o.outcome}`).sort();
 
 describe('the run report', () => {
+  it('a kind covered by a reason requires no live key and counts as none', () => {
+    const ledger = liveFilesOf({
+      GetThing: {
+        unit: 'unit.test.ts',
+        live: { onprem: 'thing.test.ts', cloud: { reason: 'no thing there' } },
+      },
+    });
+    assertEquals(
+      [...ledger.entries()],
+      [['GetThing', { onprem: 'thing.test.ts' }]],
+    );
+    assertEquals(
+      checkRunReport({
+        ledger,
+        outcomes: [],
+        system: 'cloud',
+        scope: { kind: 'full' },
+      }),
+      [],
+    );
+    assertEquals(
+      reasonLinesOf({
+        GetThing: {
+          unit: 'unit.test.ts',
+          live: {
+            onprem: 'thing.test.ts',
+            cloud: { reason: 'no thing there' },
+          },
+        },
+      }),
+      ['GetThing on cloud: not live — no thing there'],
+    );
+  });
+
   it("every key gets its test's completed outcome, read from node:test", () => {
     assertEquals(
       outcomesOf(outcomes),

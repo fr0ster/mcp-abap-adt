@@ -50,6 +50,7 @@ import {
   checkDebt,
   checkLedger,
   type Finding,
+  reasonRows,
   repoReader,
 } from './ledgerScan';
 
@@ -206,7 +207,22 @@ describe('the coverage ledger guard', () => {
   });
 
   it('each row names exactly the systems its key requires', () => {
-    assertEquals(of(findings, 'missing-system', 'extra-system'), []);
+    assertEquals(
+      of(
+        findings,
+        'missing-system',
+        'extra-system',
+        'reason-empty',
+        'reason-not-served',
+      ),
+      [],
+    );
+  });
+
+  it('the kinds covered by a reason instead of a live case are exactly these', () => {
+    // Adding one is a deliberate change: it is a key served on a system
+    // where no live case runs, for the reason stated.
+    assertEquals(reasonRows(readJson(LEDGER)), []);
   });
 
   it('each unit reference is a pinCases row of that key', () => {
@@ -412,6 +428,8 @@ function checkNamed(name: string): Check {
     'extra-row',
     'missing-system',
     'extra-system',
+    'reason-empty',
+    'reason-not-served',
     'unit-not-discovered',
     'unit-no-pin',
     'live-not-integration',

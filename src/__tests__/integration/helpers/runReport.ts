@@ -75,6 +75,51 @@ export function readLedger(root: string): LiveFiles {
   return liveFilesOf(JSON.parse(fs.readFileSync(file, 'utf8')));
 }
 
+/**
+ * The kinds the ledger covers by a reason instead of a live file, one line
+ * each — `<key> on <kind>: not live — <reason>` — for the run's log. A
+ * reason is no live coverage: `liveFilesOf` reads it as no file, so a run
+ * requires nothing of it.
+ */
+export function reasonLinesOf(ledger: unknown): string[] {
+  if (typeof ledger !== 'object' || ledger === null) return [];
+  const lines: string[] = [];
+  for (const [key, row] of Object.entries(ledger).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )) {
+    const live: unknown =
+      typeof row === 'object' && row !== null
+        ? Reflect.get(row, 'live')
+        : undefined;
+    for (const system of ['onprem', 'cloud'] as const) {
+      const stated: unknown =
+        typeof live === 'object' && live !== null
+          ? Reflect.get(live, system)
+          : undefined;
+      const reason: unknown =
+        typeof stated === 'object' && stated !== null
+          ? Reflect.get(stated, 'reason')
+          : undefined;
+      if (typeof reason === 'string') {
+        lines.push(`${key} on ${system}: not live — ${reason}`);
+      }
+    }
+  }
+  return lines;
+}
+
+/** The repository ledger's reason lines (`reasonLinesOf`). */
+export function readReasonLines(root: string): string[] {
+  const file = path.join(
+    root,
+    'tests',
+    'fixtures',
+    'tools',
+    'coverage-ledger.json',
+  );
+  return reasonLinesOf(JSON.parse(fs.readFileSync(file, 'utf8')));
+}
+
 /** Which keys a run requires: all the ledger names for its system, or those of the files that ran. */
 export type RunScope =
   | { readonly kind: 'full' }

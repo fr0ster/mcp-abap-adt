@@ -88,6 +88,7 @@ import {
   readSessionTrace,
   SESSION_TRACE_PREAMBLE,
 } from '../helpers/sessionTrace';
+import { lineOfText } from '../helpers/sourceLine';
 import {
   launchStdioScript,
   testConnectionLogOn,
@@ -321,16 +322,7 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       );
     }
     const source = String(payloadOf(read)?.source ?? textOf(read));
-    const lines = source.split('\n');
-    const index = lines.findIndex(
-      (text) => text.trim().toLowerCase() === STOP_TEXT,
-    );
-    if (index < 0) {
-      throw new Error(
-        `the shared class ${className} has no line "${STOP_TEXT}"`,
-      );
-    }
-    const stopLine = index + 1;
+    const stopLine = lineOfText(source, STOP_TEXT, className);
 
     const started = await served.call('DebugStartListener', {
       breakpoints: [

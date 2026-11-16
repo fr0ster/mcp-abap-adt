@@ -114,6 +114,7 @@ import { assertEquals, isUpperHex } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { primeSystemContext } from '../helpers/primeSystemContext';
 import { skipRunningTest } from '../helpers/runningTest';
+import { lineOfText } from '../helpers/sourceLine';
 import { createHandlerContext } from '../helpers/testHelpers';
 
 const testLogger = createTestLogger('refusal-follow-ups');
@@ -547,18 +548,11 @@ async function secondStopListenerOn(kind: Kind, testCase: any): Promise<void> {
       );
     }
     const source = String(read.json?.source ?? read.text);
-    const index = source
-      .split('\n')
-      .findIndex((text) => text.trim().toLowerCase() === STOP_TEXT);
-    if (index < 0) {
-      throw new Error(
-        `the shared class ${className} has no line "${STOP_TEXT}"`,
-      );
-    }
+    const stopLine = lineOfText(source, STOP_TEXT, className);
 
     const started = await local(handleDebugStartListener, ctx, {
       breakpoints: [
-        { object_type: 'CLAS', object_name: className, line: index + 1 },
+        { object_type: 'CLAS', object_name: className, line: stopLine },
       ],
     });
     if (typeof started.json?.state_handle === 'string')

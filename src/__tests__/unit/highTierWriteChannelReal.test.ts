@@ -72,6 +72,7 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -119,6 +120,24 @@ const TRANSPORT_CREATED_XML =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">' +
   '<tm:request tm:number="SIDK900123" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project="">' +
   '<tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
+
+/**
+ * SAP's read of the created request: its own `tm:request` element, with the
+ * one task SAP created beside it, out of the corpus listing (the element a
+ * read of `/sap/bc/adt/cts/transportrequests/{number}` answers under its
+ * `tm:root`).
+ */
+const REQUEST_WITH_TASK_XML = (() => {
+  const listing = corpusBody(
+    'read-transport-list-structure--01-cts-transportrequests',
+  );
+  const start = listing.indexOf('<tm:request ');
+  const endTag = '</tm:request>';
+  const end = listing.indexOf(endTag, start);
+  if (start < 0 || end < 0)
+    throw new Error('the corpus listing holds no request');
+  return `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="TRLK900438" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core">${listing.slice(start, end + endTag.length)}</tm:root>`;
+})();
 
 const cases: ChannelCase[] = [
   {
@@ -385,13 +404,31 @@ const cases: ChannelCase[] = [
   {
     // `parseCreatedTransport` throws on a document with no `tm:root` — a
     // real create answer is required, not the connection's 200/empty
-    // default.
+    // default. The request is then read back for the task SAP created with
+    // it, and that task is typed: SAP's read of a request with one task,
+    // then the type change's empty `200`.
     name: 'CreateTransport',
     method: 'POST',
     urlContains: '/sap/bc/adt/cts/transportrequests',
-    seedAnswers: [{ data: TRANSPORT_CREATED_XML }],
+    seedAnswers: [
+      { data: TRANSPORT_CREATED_XML },
+      { data: REQUEST_WITH_TASK_XML },
+      { status: 200, data: '' },
+    ],
     run: (marker, connection) =>
       handleCreateTransport(ctx(connection) as any, { description: marker }),
+    extraChecks: (_marker, requests) => {
+      expect(requests.map((r) => `${r.method} ${r.url.split('?')[0]}`)).toEqual(
+        [
+          'POST /sap/bc/adt/cts/transportrequests',
+          'GET /sap/bc/adt/cts/transportrequests/SIDK900123',
+          'PUT /sap/bc/adt/cts/transportrequests/TRLK900439',
+        ],
+      );
+      expect(String(requests[2]?.data ?? '')).toContain(
+        'tm:useraction="changetasktype"',
+      );
+    },
   },
   {
     // `checkCdsTestDoubles` runs first; its default (200/empty) reading has

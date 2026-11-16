@@ -21,16 +21,16 @@ so it writes no runtime session file. A
 write binary keeps every readonly tool: writing needs reading (a `Get<Type>` both groups serve is
 listed once, from the high group, see the dedup below).
 
-Batch mode is in every binary, on every transport: the full binaries, `-ro` ones included, serve
-`BatchBegin`, `BatchEnd` and `BatchAnswers`; the compact ones serve it as one tool, `HandlerBatch`
-(`action: 'begin' | 'end' | 'answers'`). Every other tool's description ends with one sentence
-saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or
+Batch mode is the compact binaries', on every transport, `-ro` ones included: one tool,
+`HandlerBatch` (`action: 'begin' | 'end' | 'answers'`). The full binaries serve none. In a compact
+binary every other tool's description ends with one sentence saying how a call of it behaves in
+batch mode: recordable, recordable for the arguments it names, or
 run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-on premise, stdio / Streamable HTTP / SSE: core 269 / 269 / 267 (with the 3 batch tools and the
-debugger batch's 2); core-ro 74 / 75 / 73 (each with the 3 batch tools and the 3 background-run tools); compact 39 / 38 / 37 (28 of the 29 +
+on premise, stdio / Streamable HTTP / SSE: core 267 / 267 / 265 (with the debugger batch's 3);
+core-ro 71 / 72 / 70 (each with the 3 background-run tools); compact 39 / 38 / 37 (28 of the 29 +
 4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 21 / 21 / 20
 (16 of the 17 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
 premise only), core-ro 73, compact 39, compact-ro 21. Each count is without the data tools:

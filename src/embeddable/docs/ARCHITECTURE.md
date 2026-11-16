@@ -449,7 +449,7 @@ their answers are kept is the host's: a strategy.
 ### Batch mode: the owner
 
 Batch mode records each single-request tool call instead of sending it, and sends the recorded calls
-together at `BatchEnd` (batch-mode spec). Its state is one instance's, held by an owner the host
+together at the batch end (batch-mode spec). Its state is one instance's, held by an owner the host
 creates.
 
 - **The owner** (`InstanceBatch`, `src/lib/batch/InstanceBatch.ts`, exported from

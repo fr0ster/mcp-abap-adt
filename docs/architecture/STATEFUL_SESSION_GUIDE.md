@@ -89,7 +89,7 @@ reach into the connection's session.
 - **Batch mode sends LOCK and UNLOCK in envelopes of their own**: a recorded call's
   `LOCK` or `UNLOCK` is marked stateful in the batch (the recorder forwards the
   member's `setSessionType` to adt-clients' `AdtBatchConnection`, touching no
-  connection); at `BatchEnd`, `execute()` sends each run of LOCK / UNLOCK parts as a
+  connection); at the batch's end, `execute()` sends each run of LOCK / UNLOCK parts as a
   stateful envelope and every other run stateless, on the instance's connection in
   force then — reached through the batch's late-bound target
   (`src/lib/batch/lateBound.ts`), which forwards the session type to it — and sets

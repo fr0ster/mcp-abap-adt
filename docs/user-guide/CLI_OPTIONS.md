@@ -47,7 +47,7 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 |-----|-------------|------|-------|---------|
 | `--conf=<path>` (alias `--config`) | — | — | path | The YAML config file of this binary; a missing file gets the binary's template and the start ends |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type, **required** (no default, never guessed): the tools offered, the connector and how the system's answers are read. stdio: a destination without it does not start; http/sse: the binary does not start (exit `1`, nothing listens). Inspection-only stdio needs it too and lists that system type's tools |
-| `--batch-keep-raw-parts` | `MCP_BATCH_KEEP_RAW_PARTS` | `batch.keepRawParts` | `true`, `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. Default `false`; any other value is refused at startup |
+| `--batch-keep-raw-parts` | `MCP_BATCH_KEEP_RAW_PARTS` | `batch.keepRawParts` | `true`, `false` | Batch mode: each answer of a batch (`HandlerBatch` `answers`, `DebugBatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. Default `false`; any other value is refused at startup |
 | `--enable-data-tools` | `MCP_ENABLE_DATA_TOOLS` | `enable-data-tools` | `true`, `false` | Serves the data tools: `GetSqlQuery` and `GetTableContents` (compact: `HandlerGetData`). Default `false`: without it no binary lists them. A value other than empty, `true` or `false` is refused at startup; an empty value (or YAML null) counts as not given and the next form decides, as for every row. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to turn this on is the customer's decision. On HTTP and SSE a start parameter, never a header; see [README, The data tools](../../README.md#the-data-tools-off-unless-enabled) |
 | `--deny-actions=<entries>` | `MCP_DENY_ACTIONS` | `restrictions.deny-actions` | `Tool`, `Prefix*`, `Tool.value`, `Tool.CODE`, `Tool.prefix*`, comma-separated | Tools and values not registered at start; see [Access restrictions](ACCESS_RESTRICTIONS.md) |
 | `--allowed-packages=<entries>` | `MCP_ALLOWED_PACKAGES` | `restrictions.allowed-packages` | `ZFOO`, `Z*`, `ZFOO/**`, comma-separated | A call naming a package runs only when it matches; a `/**` entry reads the package tree |
@@ -594,7 +594,7 @@ mcp-abap-adt-http --state-idle-minutes=60 --system-type=<onprem|cloud>
 
 **stdio (`mcp-abap-adt` and its compact and `-ro` variants) has no idle bound.** The stdio
 server's life and its state are governed only by the LLM client that started it: held state ends
-by its stop tool (`DebugStop`, `BatchEnd`, …), the client closing stdin (the server then shuts down
+by its stop tool (`DebugStop`, `DebugBatchEnd`, `HandlerBatch` `end`, …), the client closing stdin (the server then shuts down
 and logs off), the backend's answer, or the process's shutdown — never on the server's clock.
 `--state-idle-minutes` and the YAML key `state-idle-minutes` were removed from the stdio binaries
 in 20.1.1: each stops the start, naming the form used, so a configuration that states a bound is

@@ -56,7 +56,7 @@ mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 - **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Each binary's command-line options with their environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
-- **[BATCH_MODE.md](BATCH_MODE.md)** - Batch mode (every binary): independent calls recorded, sent together at `BatchEnd`, answered by number; which calls are recorded
+- **[BATCH_MODE.md](BATCH_MODE.md)** - Batch mode (the compact binaries, `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
 - **[TOOL_SEARCH.md](TOOL_SEARCH.md)** - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - **[DEBUGGER.md](DEBUGGER.md)** - The debugger (the write binaries; no `-ro` one): debug sessions, the SAP ids, transports, what ends a session
 

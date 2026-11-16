@@ -235,25 +235,27 @@ See [MIGRATION-24.0](docs/MIGRATION-24.0.md#callers-of-the-long-tools-background
 ### Batch mode
 
 Calls none of whose requests depends on another's answer can be recorded and sent together, in
-one ADT batch envelope, instead of one request each: `BatchBegin` switches the server into batch
-mode, every such call is then recorded, answers nothing and takes the next number (from 1, in the
-order made), `BatchEnd` sends them all and leaves batch mode whatever happens, and
-`BatchAnswers` reads each call's answer by its number — the answer the tool gives outside batch
-mode for what SAP answered. The compact binaries serve the same as one tool, `HandlerBatch`
-(`action: 'begin' | 'end' | 'answers'`). Every binary serves it, the `-ro` ones included, on every
-transport.
+one ADT batch envelope, instead of one request each. Batch mode is the compact binaries' (the
+`-ro` ones included, on every transport), one tool, `HandlerBatch`: `action: 'begin'` switches
+the server into batch mode, every such call is then recorded, answers nothing and takes the next
+number (from 1, in the order made), `action: 'end'` sends them all and leaves batch mode whatever
+happens, and `action: 'answers'` reads each call's answer by its number — the answer the tool
+gives outside batch mode for what SAP answered. The full binaries serve no batch mode; their
+debugger batch reads its answers with `DebugBatchAnswers`.
 
 A tool that builds a request from an earlier answer is refused in batch mode — a high-level
 create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
-the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
+the handles read with `HandlerBatch` `action: 'answers'`), write (`HandlerUpdate` with `lock_handle`, one request;
 the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`), unlock
 (`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`; with `with_long_polling: true` the status read is one request SAP holds until the run ends, without it a read answered at once, as often as you choose); a unit-test run is one request with the synchronous runner (`HandlerUnitTestRun` with `runner: 'sync'`, answering the finished result) or, with the asynchronous runner (`runner: 'async'`, the default), its start (`HandlerUnitTestRun`, answering `run_id`; by `tests`, or by a run `target` — an object of any run type or a package — which takes this runner), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
-`batch_other_kind`: record it in the next batch. Every tool's description ends with
-one sentence saying how it behaves in batch mode: recordable, recordable for the arguments it
-names, or run outside batch mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers as the
+`batch_other_kind`: record it in the next batch. A transport create (`HandlerTransportCreate`,
+`HandlerCreate` `object_type: 'TRANSPORT'`) types the new request's task from the create's answer
+and is not recorded. Every tool's description in a compact binary ends with one sentence saying
+how it behaves in batch mode: recordable, recordable for the arguments it names, or run outside
+batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action: 'begin'` answers as the
 `state_handle` argument (or in the `x-mcp-state-handle` request header) on every call of the batch. See
 [Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
 
@@ -303,7 +305,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC library at run time, the prebuilt RFC module and where to build one
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
-- **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - Record independent calls, send them together in batch envelopes at `BatchEnd`, read their answers by number; which calls are recorded
+- **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - The compact binaries' `HandlerBatch`: record independent calls, send them together in batch envelopes at the batch's end, read their answers by number; which calls are recorded
 - **[Tool Search](docs/user-guide/TOOL_SEARCH.md)** - The three texts each listed tool carries — `description` for the model, `keywords` for BM25, `semantic` for vector search — and where a client reads them
 - **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves

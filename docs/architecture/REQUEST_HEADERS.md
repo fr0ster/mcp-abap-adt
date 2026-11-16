@@ -514,7 +514,7 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
   is read, the parts SAP answered `406` / `415` go in one envelope of their own — only those
   parts, each recorded again by the same member call with the corrected pair, which is kept. One
   round: what that envelope answers is the call's answer.
-- **`BatchEnd`** is unchanged: a call recorded in batch mode is made once, and its part's `406` /
+- **The batch end** (`HandlerBatch` `action: 'end'`) is unchanged: a call recorded in batch mode is made once, and its part's `406` /
   `415` is that call's answer.
 - A member without a header pair (a search, a source or metadata read) is sent as it is; its
   `406` is its answer.

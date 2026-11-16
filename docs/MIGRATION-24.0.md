@@ -3,7 +3,8 @@
 24.0.0 lets the compiler check what it can ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)):
 a tool's arguments are a zod schema — their type and the one check of a call — and an entry carries
 its call, typed by that schema. A client over MCP sees the tools as in 23.1.0, except the data tools, off unless enabled
-("Callers of `GetSqlQuery`, `GetTableContents` and `HandlerGetData`", below), the two
+("Callers of `GetSqlQuery`, `GetTableContents` and `HandlerGetData`", below), batch mode,
+which only the compact binaries serve now ("Callers of batch mode in the full binaries", below), the two
 arguments that become required (below) and the arguments some tools now declare because their
 handlers read them. An embedder that defines, registers or calls tools in TypeScript changes its
 code. Go through the section that fits how you use the server; the [CHANGELOG](../CHANGELOG.md) has
@@ -37,6 +38,54 @@ with the RFC SDK's error as fields (`IAdtError.rfc`, interfaces-adt 27.2), and e
 on that connection fails `ADT_NOT_CONNECTED` with nothing sent; 0.3.x went on, silently, on a new
 ABAP session without the old one's locks. An embedder that kept using a connection after such an
 error creates a new connection instead (connection's MIGRATION-22.0).
+
+## Callers of batch mode in the full binaries: `HandlerBatch` in a compact binary
+
+The full binaries (`mcp-abap-adt`, `-http`, `-sse` and their `-ro` binaries) serve no batch mode:
+`BatchBegin`, `BatchEnd` and `BatchAnswers` are gone from every one of them, and their tools'
+descriptions carry no batch sentence. Batch mode is the compact binaries'
+(`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` and their `-ro` binaries): one tool,
+`HandlerBatch`, whose actions mean what the three tools meant — `action: 'begin'` for
+`BatchBegin`, `action: 'end'` for `BatchEnd`, `action: 'answers'` with `number` or `numbers` for
+`BatchAnswers`. The calls recorded are the compact tools'; `tools/batch-handlers.json` lists them
+(and [BATCH_MODE.md](user-guide/BATCH_MODE.md)).
+
+**Migrating:** a client of a full binary that used `BatchBegin` / `BatchEnd` / `BatchAnswers`
+connects to a compact binary and uses its `HandlerBatch`, recording the compact tools (a read is
+`HandlerGet`, a lock `HandlerLock`, and so on).
+
+## Callers of the debugger batch in the full binaries: its answers are read with `DebugBatchAnswers`
+
+The full binaries' debugger batch (`DebugBatchBegin`, `DebugBatchEnd`) read its answers with
+`BatchAnswers`, which is gone. `DebugBatchAnswers` reads them: `number` or `numbers`, the same
+answers, on no connection. Compact `HandlerDebugBatch` `action: 'answers'` is unchanged.
+
+**Migrating:** after `DebugBatchEnd`, call `DebugBatchAnswers` where you called `BatchAnswers`.
+
+## Callers of batch mode: the transport creates are not recorded
+
+`HandlerTransportCreate` and `HandlerCreate` with `object_type: 'TRANSPORT'` create a request,
+read it back and type the task SAP created with it from the create's answer (`task_type`,
+default `S`); one batch envelope cannot hold a request built from another's answer, so neither is
+recorded: in batch mode each is refused `batch_not_recordable`, takes no number and sends nothing.
+`CreateTransport` and `CreateTransportTask` of the full binaries are not recorded either (the full
+binaries serve no batch mode).
+
+**Migrating:** create a transport request outside a batch, then record the calls that use it.
+
+## Embedders: `BatchHandlersGroup` is removed
+
+`BatchHandlersGroup` and `batchToolEntries` (`@mcp-abap-adt/lib/handlers`) and the handlers
+`handleBatchBegin`, `handleBatchEnd` and `handleBatchAnswers` are removed. `DebugBatchHandlersGroup`
+serves `DebugBatchAnswers` beside `DebugBatchBegin` and `DebugBatchEnd`. An instance with a batch
+owner appends the batch sentence to its tools' descriptions only when a registered group carries
+an entry marked `communicationBatch` (`HandlerEntry.communicationBatch`, set by `HandlerBatch`'s
+entry); a registry's own tool follows the same rule.
+
+**Migrating:** an embedder that registered `BatchHandlersGroup` registers the compact sets'
+`HandlerBatch` group (`compactToolSetOf`, `compactReadOnlyToolSetOf`) for batch mode, or drops
+batch mode; one that read the debugger batch's answers with `BatchAnswers` registers
+`DebugBatchHandlersGroup`, which carries `DebugBatchAnswers`.
 
 ## RFC destinations: the address is stated
 

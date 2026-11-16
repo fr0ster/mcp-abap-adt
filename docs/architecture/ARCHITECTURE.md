@@ -291,7 +291,7 @@ its one stateful site is the debugger's own session (`src/lib/debugger/ports.ts`
 and the listed long tools and background runs set their own fresh connections
 stateless. Batch mode only forwards: a recorded call's `LOCK` / `UNLOCK` asks the
 batch connection (adt-clients' `AdtBatchConnection`, through the per-call recorder,
-`src/lib/batch/recorder.ts`) to mark that request stateful, and at `BatchEnd`
+`src/lib/batch/recorder.ts`) to mark that request stateful, and at the batch's end
 `execute()` sends the LOCK / UNLOCK runs as stateful envelopes on the instance's
 connection in force, reached through the late-bound target
 (`src/lib/batch/lateBound.ts`), restoring its session type afterwards. Every site is
@@ -424,7 +424,6 @@ Handlers are organized into groups by access level:
 | `HighLevelHandlersGroup` | Full CRUD (Create, Update, Delete, Get) | ~121 |
 | `SearchHandlersGroup` | Repository search, where-used | ~4 |
 | `SystemHandlersGroup` | System info, discovery | ~30 |
-| `BatchHandlersGroup` | Batch mode: `BatchBegin`, `BatchEnd`, `BatchAnswers` (every full set, `-ro` included; the compact sets serve `HandlerBatch`) | 3 |
 
 Counts drift as tools are added; see [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) for the authoritative, up-to-date list.
 
@@ -474,10 +473,11 @@ where the host gave one, the instance's batch owner (`batch`, an `InstanceBatch`
 
 **Batch mode.** While a batch is open, `BaseMcpServer`'s dispatch records each call the eligibility table
 (`tools/batch-handlers.json`) admits — its handler runs on a per-call recorder over adt-clients'
-`AdtBatchConnection`, numbered in the order made — and refuses every other call. `BatchEnd` takes the
+`AdtBatchConnection`, numbered in the order made — and refuses every other call. Batch mode is the
+compact sets' (`HandlerBatch`, `CompactBatchHandlersGroup`); the full sets serve none. Its end takes the
 instance's connection in its turn, holds it for the whole `execute()`, and every recorded handler then
 builds its answer from what SAP answered; batch mode ends whatever fails. Where the instance has a
-batch owner, every tool's description, as registered, ends with one sentence (`src/lib/batch/sentence.ts`)
+batch owner and its set serves `HandlerBatch` (an entry marked `communicationBatch`), every tool's description, as registered, ends with one sentence (`src/lib/batch/sentence.ts`)
 saying how a call of it behaves in batch mode: "Recordable: …", "When <arguments>, recordable: …"
 (the arguments in words, from the table's `when` and `connection`) or "Runs outside batch mode.". See [Batch Mode](../user-guide/BATCH_MODE.md).
 

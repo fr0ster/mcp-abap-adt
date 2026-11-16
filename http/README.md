@@ -127,9 +127,9 @@ force for its next sends; what SAP answers to that credential reaches the caller
 hold ends at the `UNLOCK`, or with the instance (`SessionClose` of a long session, the idle bound,
 the server's stop), whose logoff releases the lock.
 
-**Batch mode.** `BatchBegin` (compact: `HandlerBatch` with `action: 'begin'`) holds state and
+**Batch mode** (the compact binaries'). `HandlerBatch` with `action: 'begin'` holds state and
 answers the instance's `state_handle`: send it as the `state_handle` argument (or in
-`x-mcp-state-handle`) on every call of the batch, `BatchEnd` and `BatchAnswers` included. A call
+`x-mcp-state-handle`) on every call of the batch, its `end` and `answers` included. A call
 without it reaches an instance where no batch is open. See
 [Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md#over-streamable-http).
 

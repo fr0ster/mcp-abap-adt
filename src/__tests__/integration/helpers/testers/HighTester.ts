@@ -11,7 +11,7 @@ import type {
   HandlerEntry,
   ToolArgs,
 } from '../../../../lib/handlers/interfaces';
-import { getCleanupAfter, getSystemType } from '../configHelpers';
+import { getCleanupAfter } from '../configHelpers';
 import type { LoggerWithExtras } from '../loggerHelpers';
 import { skipRunningTest } from '../runningTest';
 import type { CaseParams } from '../testConfigSchema';
@@ -225,11 +225,7 @@ export class HighTester extends LambdaTester {
     }
 
     if (!this.context.hasConfig) {
-      skipRunningTest(`No configuration found`);
-      return;
-    }
-
-    if (this.skipsOnThisSystem()) {
+      skipRunningTest(this.configSkip ?? 'No configuration found');
       return;
     }
 

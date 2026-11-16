@@ -15,19 +15,16 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import { handleGetFunctionInclude } from '../../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import { handleListFunctionGroupIncludes } from '../../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../../handlers/function_include/readonly/handleListFunctionModules';
-import {
-  getEnabledTestCase,
-  isTestAvailableForSystem,
-  statedKindWords,
-} from '../../helpers/configHelpers';
+import { getTestCase, testCaseKey } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -69,6 +66,16 @@ const groupParamsOf = (testCase: TestCase, section: string) =>
   readCaseParams(testCase.params, FunctionGroupListParams, section);
 
 const testLogger = createTestLogger('function-include-readonly');
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'GetFunctionInclude',
+  'ListFunctionGroupIncludes',
+  'ListFunctionModules',
+]);
 
 describe('FunctionInclude ReadOnly Handlers Integration', () => {
   let connection: IAbapConnection | null = null;
@@ -137,16 +144,14 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase(
+    const testCase = getTestCase(
       'read_function_include_readonly',
       'read_top_include',
     );
     if (!testCase) {
-      skipRunningTest('No test case configuration');
-      return;
-    }
-    if (!isTestAvailableForSystem(testCase.available_in)) {
-      skipRunningTest(`not available on ${statedKindWords()}`);
+      skipRunningTest(
+        `the test config has no ${testCaseKey('read_function_include_readonly', 'read_top_include')}`,
+      );
       return;
     }
 
@@ -217,16 +222,14 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase(
+    const testCase = getTestCase(
       'list_function_group_includes_readonly',
       'list_includes',
     );
     if (!testCase) {
-      skipRunningTest('No test case configuration');
-      return;
-    }
-    if (!isTestAvailableForSystem(testCase.available_in)) {
-      skipRunningTest(`not available on ${statedKindWords()}`);
+      skipRunningTest(
+        `the test config has no ${testCaseKey('list_function_group_includes_readonly', 'list_includes')}`,
+      );
       return;
     }
 
@@ -300,16 +303,14 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase(
+    const testCase = getTestCase(
       'list_function_modules_readonly',
       'list_modules',
     );
     if (!testCase) {
-      skipRunningTest('No test case configuration');
-      return;
-    }
-    if (!isTestAvailableForSystem(testCase.available_in)) {
-      skipRunningTest(`not available on ${statedKindWords()}`);
+      skipRunningTest(
+        `the test config has no ${testCaseKey('list_function_modules_readonly', 'list_modules')}`,
+      );
       return;
     }
 

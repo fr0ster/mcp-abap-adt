@@ -31,7 +31,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { getTestDestination } from '../helpers/authHelpers';
 import {
   configuredSystemKind,
-  getEnabledTestCase,
+  getTestCase,
   sharedDependencyKind,
 } from '../helpers/configHelpers';
 import {
@@ -55,7 +55,7 @@ const FEED_TOP = 50;
 
 /** A shared class the runtime case names in the test config. */
 function sharedClass(field: 'dump_class_name' | 'profiled_class_name'): string {
-  const params = getEnabledTestCase(
+  const params = getTestCase(
     'runtime_readonly_handlers',
     'test_runtime_readonly',
   )?.params;

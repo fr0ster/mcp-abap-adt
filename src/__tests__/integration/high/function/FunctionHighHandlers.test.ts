@@ -16,7 +16,7 @@
  * Run: npm test -- --testPathPattern=integration/function/
  */
 
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
@@ -28,15 +28,15 @@ import { handleDeleteFunctionModule } from '../../../../handlers/function_module
 import {
   getCleanupAfter,
   getCleanupAfterRun,
-  getEnabledTestCase,
-  isTestAvailableForSystem,
+  getTestCase,
   loadTestEnv,
   resolvePackageName,
   resolveTransportRequest,
-  statedKindWords,
+  testCaseKey,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -73,6 +73,19 @@ const paramsOf = (testCase: TestCase) =>
 // loadTestEnv will be called in beforeAll
 
 const testLogger = createTestLogger('function-high');
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateFunctionGroup',
+  'CreateFunctionModule',
+  'DeleteFunctionGroup',
+  'DeleteFunctionModule',
+  'UpdateFunctionGroup',
+  'UpdateFunctionModule',
+]);
 
 describe('Function High-Level Handlers Integration', () => {
   let connection: IAbapConnection | null = null;
@@ -120,20 +133,11 @@ describe('Function High-Level Handlers Integration', () => {
     }
 
     // Get test case configuration (single config for both FUGR and FM)
-    const testCase = getEnabledTestCase(
-      'create_function',
-      'full_workflow_high',
-    );
+    const testCase = getTestCase('create_function', 'full_workflow_high');
 
     if (!testCase) {
-      skipRunningTest('No test case configuration');
-      return;
-    }
-
-    // Check available_in from test case config
-    if (!isTestAvailableForSystem(testCase.available_in)) {
       skipRunningTest(
-        `not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
+        `the test config has no ${testCaseKey('create_function', 'full_workflow_high')}`,
       );
       return;
     }

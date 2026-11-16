@@ -52,13 +52,15 @@ describe('Transported Object CRUD (GitHub #11)', () => {
   let packageName: string;
   let className: string;
   let testEnabled = false;
+  /** Why the case skips: the config key it lacks, or no system kind stated. */
+  let skipReason = 'the test config was not read';
 
   before(async () => {
     await loadTestEnv();
 
     const systemType = configuredSystemKind();
     if (systemType === undefined) {
-      logger?.warn(`No system kind stated, the case skips: ${NO_KIND_STATED}`);
+      skipReason = NO_KIND_STATED;
       return;
     }
     logger?.info(`System type: ${systemType}`);
@@ -66,20 +68,17 @@ describe('Transported Object CRUD (GitHub #11)', () => {
     const config = loadTestConfig();
     const section = config?.create_transported_object;
 
-    if (!section || section.enabled === false) {
-      logger?.warn('create_transported_object is disabled in config');
-      return;
-    }
-
-    if (!section.transport_request) {
-      logger?.warn(
-        'No transport_request in create_transported_object — skipping',
-      );
+    // Its data, not a switch: `enabled` is not read. A dedicated unreleased
+    // request and a transportable package recorded to it.
+    if (!section?.transport_request) {
+      skipReason =
+        'the test config has no create_transported_object.transport_request';
       return;
     }
 
     if (!section.package_name) {
-      logger?.warn('No package_name in create_transported_object — skipping');
+      skipReason =
+        'the test config has no create_transported_object.package_name';
       return;
     }
 
@@ -115,7 +114,7 @@ describe('Transported Object CRUD (GitHub #11)', () => {
 
   it('should CRUD a class in a transportable package', async () => {
     if (!testEnabled) {
-      skipRunningTest('test not enabled or missing config');
+      skipRunningTest(skipReason);
       return;
     }
 

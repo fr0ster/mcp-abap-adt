@@ -26,7 +26,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
@@ -39,14 +39,14 @@ import {
   assertNotSharedDependency,
   getCleanupAfter,
   getCleanupAfterRun,
-  getEnabledTestCase,
-  isTestAvailableForSystem,
+  getTestCase,
   resolvePackageName,
   resolveTransportRequest,
-  statedKindWords,
+  testCaseKey,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -70,6 +70,19 @@ const FunctionIncludeParams = z.looseObject({
 });
 
 const testLogger = createTestLogger('function-include-high');
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateFunctionGroup',
+  'CreateFunctionInclude',
+  'DeleteFunctionGroup',
+  'DeleteFunctionInclude',
+  'GetFunctionInclude',
+  'UpdateFunctionInclude',
+]);
 
 describe('FunctionInclude High-Level Handlers Integration', () => {
   let connection: IAbapConnection | null = null;
@@ -110,17 +123,10 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase(
-      'function_include_high',
-      'full_workflow_high',
-    );
+    const testCase = getTestCase('function_include_high', 'full_workflow_high');
     if (!testCase) {
-      skipRunningTest('No test case configuration');
-      return;
-    }
-    if (!isTestAvailableForSystem(testCase.available_in)) {
       skipRunningTest(
-        `not available on ${statedKindWords()} (available_in: ${testCase.available_in?.join(', ')})`,
+        `the test config has no ${testCaseKey('function_include_high', 'full_workflow_high')}`,
       );
       return;
     }

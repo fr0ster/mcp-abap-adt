@@ -15,7 +15,7 @@
  * Run: npm test -- --testPathPatterns=integration/behaviorDefinitionAndImplementation.*High
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
@@ -26,7 +26,7 @@ import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteC
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
 import { handleValidateObject } from '../../../../handlers/common/low/handleValidateObject';
-import { getEnabledTestCase } from '../../helpers/configHelpers';
+import { getTestCase } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
   activateAndConfirm,
@@ -35,6 +35,7 @@ import {
   deleteView,
   type ViewFixture,
 } from '../../helpers/rapFixtures';
+import { servedSuite } from '../../helpers/servedHere';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { readCaseParams, stated } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -64,6 +65,22 @@ const BdefParams = z.looseObject({
 
 const testLogger = createTestLogger('bdef-bimpl-high');
 
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'ActivateObjectLow',
+  'CreateBehaviorDefinition',
+  'CreateBehaviorImplementation',
+  'DeleteBehaviorDefinition',
+  'DeleteClass',
+  'UpdateBehaviorDefinition',
+  'UpdateBehaviorImplementation',
+  'UpdateClass',
+  'ValidateObjectLow',
+]);
+
 describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integration', () => {
   let tester: LambdaTester;
 
@@ -89,7 +106,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         const leftBehind: string[] = [];
 
         // Load BIMPL config to get class name
-        const bimplTestCase = getEnabledTestCase(
+        const bimplTestCase = getTestCase(
           'create_behavior_implementation',
           'builder_behavior_implementation',
         );
@@ -329,7 +346,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
       testLogger?.info?.(`   + BDEF updated (not activated)`);
 
       // ── Step 3: Load BIMPL config
-      const bimplTestCase = getEnabledTestCase(
+      const bimplTestCase = getTestCase(
         'create_behavior_implementation',
         'builder_behavior_implementation',
       );

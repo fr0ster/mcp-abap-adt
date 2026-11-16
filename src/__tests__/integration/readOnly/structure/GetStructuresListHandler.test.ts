@@ -18,17 +18,14 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import { handleGetStructuresList } from '../../../../handlers/structure/readonly/handleGetStructuresList';
-import {
-  getEnabledTestCase,
-  isTestAvailableForSystem,
-  statedKindWords,
-} from '../../helpers/configHelpers';
+import { getTestCase, testCaseKey } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -70,6 +67,12 @@ interface StructureNode {
   cyclic?: boolean;
   error?: string;
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['GetStructuresList']);
 
 describe('GetStructuresList ReadOnly Handler Integration', () => {
   let connection: IAbapConnection | null = null;
@@ -138,16 +141,14 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase(
+    const testCase = getTestCase(
       'get_structures_list_readonly',
       'list_embedded_structures',
     );
     if (!testCase) {
-      skipRunningTest('No test case configuration');
-      return;
-    }
-    if (!isTestAvailableForSystem(testCase.available_in)) {
-      skipRunningTest(`not available on ${statedKindWords()}`);
+      skipRunningTest(
+        `the test config has no ${testCaseKey('get_structures_list_readonly', 'list_embedded_structures')}`,
+      );
       return;
     }
 

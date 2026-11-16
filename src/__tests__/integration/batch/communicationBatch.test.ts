@@ -10,9 +10,10 @@
  * config names (`environment.connection_type`, `--connection-type`).
  *
  * Where it runs: the system the config names, when the case
- * `batch.test_cases.communication` is enabled — one case per kind of
- * destination: on premise over HTTP, on premise over RFC (a config with
- * `connection_type: rfc`, e.g. through `MCP_TEST_CONFIG`) and ABAP Cloud.
+ * `batch.test_cases.communication` is in the test config (its data; its
+ * `enabled` is not read) — one case per kind of destination: on premise
+ * over HTTP, on premise over RFC (a config with `connection_type: rfc`,
+ * e.g. through `MCP_TEST_CONFIG`) and ABAP Cloud.
  * The case of the configured kind runs; the other two skip, saying why.
  * Without a configuration, or with the case disabled, all three skip.
  *
@@ -61,7 +62,7 @@ import { getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js
 import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   assertNotSharedDependency,
-  getEnabledTestCase,
+  getTestCase,
   loadTestConfig,
   resolvePackageName,
   resolveTransportRequest,
@@ -685,10 +686,10 @@ describe('the communication batch through the served compact tools, on the syste
         );
         return;
       }
-      const testCase = getEnabledTestCase('batch', 'communication');
+      const testCase = getTestCase('batch', 'communication');
       if (!testCase) {
         skipRunningTest(
-          `${KIND_WORDS[kind]}: batch.test_cases.communication is not enabled in the test config`,
+          `${KIND_WORDS[kind]}: the test config has no batch.test_cases[name=communication]`,
         );
         return;
       }

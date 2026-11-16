@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { before, describe, it } from 'node:test';
+import { before, it } from 'node:test';
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 
 /**
@@ -31,14 +31,14 @@ import { credentialFromSapConfig } from '../../../../lib/credentialSources';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
-  getEnabledTestCase,
   getSapConfigFromEnv,
   getSystemType,
-  isTestAvailableForSystem,
+  getTestCase,
   loadTestEnv,
   preCheckTestParameters,
   resolvePackageName,
   resolveTransportRequest,
+  testCaseKey,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { trackConnection } from '../../helpers/openConnections';
@@ -49,6 +49,7 @@ import {
   guardedTestConnection,
 } from '../../helpers/refusalGuard';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams, type TestCase } from '../../helpers/testConfigSchema';
 import { DEBUG_TESTS, debugLog } from '../../helpers/testHelpers';
 
@@ -73,6 +74,12 @@ const paramsOf = (testCase: TestCase) =>
 
 const testLogger = createTestLogger('class-crud-direct');
 
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['DeleteClass']);
+
 describe('Class AdtClient Direct (Reference Implementation)', () => {
   let hasConfig = false;
   let isCloud = false;
@@ -89,14 +96,11 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
+    const testCase = getTestCase('create_class_direct', 'crud_direct');
     if (!testCase) {
-      skipRunningTest('Test case not enabled');
-      return;
-    }
-
-    if (!isTestAvailableForSystem(testCase.available_in)) {
-      skipRunningTest('not available on current system type');
+      skipRunningTest(
+        `the test config has no ${testCaseKey('create_class_direct', 'crud_direct')}`,
+      );
       return;
     }
 

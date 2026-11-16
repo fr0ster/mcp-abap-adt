@@ -338,9 +338,42 @@ export function loadTestConfig(): TestConfig {
   return parseTestConfig({}, 'no test config');
 }
 
+/** The config key of a test case, as a skip names it when the case is absent. */
+export function testCaseKey(
+  handlerName: string,
+  testCaseName?: string,
+): string {
+  return testCaseName === undefined
+    ? `${handlerName}.test_cases`
+    : `${handlerName}.test_cases[name=${testCaseName}]`;
+}
+
 /**
- * Get enabled test case for a handler
- * @param handlerName - Handler name (e.g., 'create_class_low', 'lock_class_low')
+ * A handler's test case from the test config — the named one, or the first —
+ * for its data (`params`). Its `enabled` and `available_in` are not read:
+ * where a case runs is decided in code by what the system serves
+ * (`servedHere.ts`). `null` when the config holds no such entry; the caller
+ * skips naming `testCaseKey(...)`.
+ */
+export function getTestCase(
+  handlerName: string,
+  testCaseName?: string,
+): TestCase | null {
+  const handlerTests = handlerTestCases(loadTestConfig(), handlerName);
+  const found =
+    testCaseName === undefined
+      ? handlerTests[0]
+      : handlerTests.find((tc) => tc.name === testCaseName);
+  return found ?? null;
+}
+
+/**
+ * An owner-set switch: a test case that runs only with `enabled: true`.
+ * Only the batch cases whose `enabled` has a purpose of its own read it —
+ * `refusal_follow_ups` (logons with a wrong password), `debugger` (it would
+ * clash with the owner's IDE debugger) and `amdp_http_handle`; every other
+ * case is read with `getTestCase`.
+ * @param handlerName - Handler name (e.g., 'batch')
  * @param testCaseName - Optional: specific test case name
  */
 export function getEnabledTestCase(

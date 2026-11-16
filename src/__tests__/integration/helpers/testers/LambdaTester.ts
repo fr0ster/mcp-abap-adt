@@ -13,13 +13,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
-  getEnabledTestCase,
-  getSystemType,
+  getTestCase,
   loadTestConfig,
   loadTestEnv,
   resolvePackageName,
   resolveTestSystemContext,
   resolveTransportRequest,
+  testCaseKey,
 } from '../configHelpers';
 import {
   type ConfiguredSystemKind,
@@ -127,6 +127,8 @@ export class LambdaTester {
   protected testSkipped = false;
   /** Why the tester does not run at all: no system kind stated. */
   protected kindSkip: string | undefined;
+  /** Why the tester has no case to run: the config key it lacks, or why it could not start. */
+  protected configSkip: string | undefined;
   protected hardModeMcp: HardModeClient | null = null;
 
   /**
@@ -190,12 +192,11 @@ export class LambdaTester {
       }
       hasConfig = true;
 
-      testCase = getEnabledTestCase(this.handlerName, this.testCaseName);
+      testCase = getTestCase(this.handlerName, this.testCaseName);
 
       if (!testCase) {
-        throw new Error(
-          `Test case "${this.testCaseName}" not found or disabled for handler "${this.handlerName}"`,
-        );
+        this.configSkip = `the test config has no ${testCaseKey(this.handlerName, this.testCaseName)}`;
+        throw new Error(this.configSkip);
       }
 
       // Resolve parameters from group if paramsGroupName is provided
@@ -358,6 +359,7 @@ export class LambdaTester {
       // If initialization failed, create minimal context
       const errorLogger = createTestLogger(this.logPrefix);
       errorLogger?.warn(`⚠️ Failed to initialize tester: ${thrownWords(error)}`);
+      this.configSkip ??= `the tester could not start: ${thrownWords(error)}`;
 
       this.context = {
         hasConfig: false,
@@ -547,42 +549,6 @@ export class LambdaTester {
    * Note: Jest's afterEach hook will run cleanup even if test fails, so we don't need try-finally here.
    * The cleanup is handled by afterEach() which is called by Jest regardless of test outcome.
    */
-  /**
-   * Does this test case's declared scope exclude the system we are pointed at?
-   *
-   * A test case may name the systems it applies to (`available_in` in
-   * `tests/test-config.yaml`) — programs, for one, do not exist on ABAP
-   * Cloud, so both program cases declare `["onprem"]`.
-   *
-   * The check lives on the base class because it belongs to every tester,
-   * and because keeping a copy per tester is what let it go missing:
-   * `LowTester` overrides `run()` wholesale and carried no copy, so
-   * `create_program_low` ran its workflow against a cloud system while
-   * `create_program` was correctly skipped. SAP answered the lock with
-   * `ExceptionResourceNotFound` — "ZMCP_BLD_PROG_L1 does not exist"
-   * (T100KEY `SEDI_ADT`/005) — a real answer to a request that should
-   * never have been sent.
-   *
-   * Logs the skip itself, so a caller only has to decide whether to return.
-   */
-  protected skipsOnThisSystem(): boolean {
-    const availableIn = this.context?.testCase?.available_in;
-    if (!availableIn || availableIn.length === 0) {
-      return false;
-    }
-    const systemType = getSystemType();
-    if (availableIn.includes(systemType)) {
-      return false;
-    }
-    skipRunningTest(
-      `not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
-    );
-    // Nothing was created, so the cleanup deletes nothing: a delete here
-    // could only reach an object of that name made by someone else.
-    this.testSkipped = true;
-    return true;
-  }
-
   async run(testFunc: TLambda): Promise<void> {
     if (!this.context) {
       throw new Error('Tester not initialized. Call beforeAll() first.');
@@ -594,11 +560,7 @@ export class LambdaTester {
     }
 
     if (!this.context.hasConfig) {
-      skipRunningTest(`No configuration found`);
-      return;
-    }
-
-    if (this.skipsOnThisSystem()) {
+      skipRunningTest(this.configSkip ?? 'No configuration found');
       return;
     }
 

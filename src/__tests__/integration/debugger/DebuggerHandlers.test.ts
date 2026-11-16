@@ -34,7 +34,7 @@
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import { after, afterEach, before, describe, it } from 'node:test';
+import { after, afterEach, before, it } from 'node:test';
 import {
   AbapDebugger,
   AdtExecutor,
@@ -117,7 +117,6 @@ import {
   getSharedDependenciesConfig,
   getStatedDatabaseSystem,
   getSystemType,
-  isTestAvailableForSystem,
   loadTestConfig,
   testAuthBrokerPath,
 } from '../helpers/configHelpers';
@@ -125,6 +124,7 @@ import { logOffLeft, ownedNow } from '../helpers/debuggerCleanup';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { endTestConnection } from '../helpers/openConnections';
 import { guardedTestConnection } from '../helpers/refusalGuard';
+import { servedSuite } from '../helpers/servedHere';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../helpers/testers/types';
 import { createHandlerContext } from '../helpers/testHelpers';
@@ -271,6 +271,36 @@ function listenCounter(): {
     },
   };
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'AmdpDebugGetTable',
+  'AmdpDebugStart',
+  'AmdpDebugStep',
+  'AmdpDebugStop',
+  'AmdpDebugWait',
+  'CreateClass',
+  'DebugCreateMemorySnapshot',
+  'DebugGetMemorySizes',
+  'DebugGetStack',
+  'DebugGetVariables',
+  'DebugSetBreakpoints',
+  'DebugSetSettings',
+  'DebugStartListener',
+  'DebugStep',
+  'DebugStepToLine',
+  'DebugStop',
+  'DebugTakeOverListener',
+  'DebugWait',
+  'DeleteClass',
+  'GetClass',
+  'GetDdl',
+  'MemorySnapshotList',
+  'UpdateClass',
+]);
 
 describe('Debugger handlers (integration)', () => {
   let tester: LambdaTester;
@@ -728,10 +758,6 @@ describe('Debugger handlers (integration)', () => {
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         if (!context.hasConfig) return;
-        // The case's systems decide before anything is created: each test
-        // skips on a system its available_in leaves out, so the probe would
-        // be written for nothing (and on a system that cannot take it, fail).
-        if (!isTestAvailableForSystem(context.testCase?.available_in)) return;
         connection = context.connection as unknown as IAbapConnection;
         const p = context.params ?? {};
         probe = String(p.probe_class ?? '').toUpperCase();

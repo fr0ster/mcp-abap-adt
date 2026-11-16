@@ -1466,24 +1466,6 @@ create_table:
 # Table (Table - Low-Level)
 # Create View (Low-Level Handler)
 
-# Transported Object CRUD (GitHub #11)
-# Tests full lifecycle of an object in a transportable package:
-# create class → read → update → delete, all recorded to a dedicated transport.
-# Reproduces the issue where editing objects in unreleased transports
-# fails on legacy/onprem systems.
-# IMPORTANT: transport_request and package_name must be set to a REAL
-# unreleased transport and a transportable package (not $TMP).
-# Read by high/transport/TransportedObjectCrud.test.ts (transport_request,
-# package_name, class_name): data, no switch. The suite has no system gate: it
-# runs on the configured system whatever its kind once both are set, and
-# skips naming the key without them.
-create_transported_object:
-  # cloud: needed (to run there) — an unreleased request of the cloud system.
-  transport_request: "TRLK900201"                # ← CHANGE: dedicated unreleased transport
-  # cloud: needed (to run there) — a transportable package recorded to it.
-  package_name: "ZMC_REQUEST_TEST"                # ← CHANGE: transportable package recorded to that transport
-  class_name: "ZMCP_BLD_TRCLS"
-
 # Service Definition (Service Definition - High-Level)
 # Read by high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts. Object
 # name and sources. onprem, cloud.

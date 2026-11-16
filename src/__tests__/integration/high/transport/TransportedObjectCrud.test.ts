@@ -6,53 +6,65 @@ import * as z from 'zod';
  * transports fails on legacy systems (and possibly on-prem).
  *
  * Scenario:
- *   1. Create a class in a transportable package (recorded to transport)
- *   2. Read the class (GetClass part source, then part metadata)
- *   3. Update the class source code
- *   4. Delete the class
+ *   0. CreateTransport: a workbench request of the test's own
+ *   1. Create a class of the run's own name in the transportable package,
+ *      recorded on that request
+ *   2. Update the class source code (activated)
+ *   3. Read the class source (GetClass)
+ *   4. Read the class metadata (GetClass part metadata)
+ *   5. Delete the class
+ *   6. GetClass again: the class is gone
  *
- * Prerequisites in test-config.yaml section `create_transported_object`:
- *   - transport_request: an existing unreleased transport
- *   - package_name: a transportable package (not $TMP)
- *   - class_name: test class name (default ZMCP_BLD_TRCLS)
+ * The request is never released and never deleted: it stays in the system
+ * (the deleted class's entry stays on it, so every run takes a fresh class
+ * name). The configured `environment.default_transport` is not used.
  *
- * Run: npm test -- --testPathPattern=TransportedObjectCrud
+ * The package is `environment.default_package`, which must be the system's
+ * transportable development package (on premise ZAC_TEST_PKG, on the cloud
+ * ZADT_BLD_PKG03), checked before anything is created; on another system
+ * kind the case skips and says why.
  */
 
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
+import { handleCreateTransport } from '../../../../handlers/transport/high/handleCreateTransport';
 import {
   configuredSystemKind,
-  loadTestConfig,
   loadTestEnv,
+  resolvePackageName,
 } from '../../helpers/configHelpers';
 import { NO_KIND_STATED } from '../../helpers/configuredSystemKind';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
-import {
-  createTestConnectionAndSession,
-  type SessionInfo,
-} from '../../helpers/sessionHelpers';
-import {
-  createHandlerContext,
-  handlerAnswer,
-  parseHandlerResponse,
-} from '../../helpers/testHelpers';
+import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
+import { createHandlerContext, handlerAnswer } from '../../helpers/testHelpers';
+
+/** The transportable development package of each system kind it runs on. */
+const TRANSPORTABLE: Readonly<Record<'onprem' | 'cloud', string>> = {
+  onprem: 'ZAC_TEST_PKG',
+  cloud: 'ZADT_BLD_PKG03',
+};
+
+/** The run's own class: a deleted class's entry stays on its request. */
+const CLASS_NAME = `ZMCP_BLD_TR${randomBytes(2).toString('hex').toUpperCase()}`;
 
 describe('Transported Object CRUD (GitHub #11)', () => {
   const logger = createTestLogger('transport-crud');
 
-  let connection: any;
-  let session: SessionInfo;
-  let transportRequest: string;
-  let packageName: string;
-  let className: string;
-  let testEnabled = false;
-  /** Why the case skips: the config key it lacks, or no system kind stated. */
+  let connection:
+    | Awaited<ReturnType<typeof createTestConnectionAndSession>>['connection']
+    | undefined;
+  /** The request the test created; never released, never deleted. */
+  let transportRequest = '';
+  let packageName = '';
+  /** The class while it may exist; emptied once deleted. */
+  let className = '';
+  /** Why the case skips: no system kind stated, or one it does not run on. */
   let skipReason = 'the test config was not read';
 
   before(async () => {
@@ -63,41 +75,25 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       skipReason = NO_KIND_STATED;
       return;
     }
+    if (systemType !== 'onprem' && systemType !== 'cloud') {
+      skipReason = `no transportable package is known for a ${systemType} system`;
+      return;
+    }
     logger?.info(`System type: ${systemType}`);
 
-    const config = loadTestConfig();
-    const section = config?.create_transported_object;
-
-    // Its data, not a switch: `enabled` is not read. A dedicated unreleased
-    // request and a transportable package recorded to it.
-    if (!section?.transport_request) {
-      skipReason =
-        'the test config has no create_transported_object.transport_request';
-      return;
+    // The package guard, before anything is created.
+    const accepted = TRANSPORTABLE[systemType];
+    if (resolvePackageName().trim().toUpperCase() !== accepted) {
+      throw new Error(`the package is not ${accepted}: nothing is created`);
     }
-
-    if (!section.package_name) {
-      skipReason =
-        'the test config has no create_transported_object.package_name';
-      return;
-    }
-
-    transportRequest = String(section.transport_request).trim();
-    packageName = String(section.package_name).trim();
-    className = String(section.class_name || 'ZMCP_BLD_TRCLS').trim();
-
-    logger?.info(
-      `Transport: ${transportRequest}, Package: ${packageName}, Class: ${className}`,
-    );
+    packageName = accepted;
 
     const result = await createTestConnectionAndSession();
     connection = result.connection;
-    session = result.session;
-    testEnabled = true;
   });
 
   after(async () => {
-    if (testEnabled && className && connection) {
+    if (className && connection) {
       logger?.info(`Cleanup: deleting class ${className}`);
       try {
         const ctx = createHandlerContext({ connection, logger });
@@ -106,19 +102,42 @@ describe('Transported Object CRUD (GitHub #11)', () => {
           transport_request: transportRequest,
         });
         logger?.success(`Cleanup: class ${className} deleted`);
-      } catch (e: any) {
-        logger?.warn(`Cleanup class delete failed: ${e.message}`);
+      } catch (e) {
+        logger?.warn(
+          `Cleanup class delete failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
   });
 
   it('should CRUD a class in a transportable package', async () => {
-    if (!testEnabled) {
+    if (connection === undefined) {
       skipRunningTest(skipReason);
       return;
     }
 
-    // Step 1: Create class in transportable package
+    // Step 0: a request of the test's own (never the configured one)
+    logger?.info("Step 0: Creating a workbench request of the test's own");
+    const requestResponse = await handleCreateTransport(
+      createHandlerContext({ connection, logger }),
+      {
+        transport_type: 'workbench',
+        description: 'MCP test: transported object CRUD (GitHub #11)',
+      },
+    );
+    assert.equal(
+      requestResponse.isError,
+      false,
+      JSON.stringify(requestResponse.content),
+    );
+    transportRequest = handlerAnswer(
+      requestResponse,
+      z.looseObject({ transport_number: z.string().min(1) }),
+    ).transport_number;
+    logger?.success(`Step 0: request ${transportRequest} created`);
+
+    // Step 1: Create class in transportable package, recorded on the request
+    className = CLASS_NAME;
     logger?.info(
       `Step 1: Creating class ${className} in ${packageName}, TR ${transportRequest}`,
     );
@@ -239,6 +258,18 @@ ENDCLASS.`;
       JSON.stringify(deleteResponse.content),
     );
     logger?.success('Step 5: DeleteClass succeeded');
-    className = ''; // Prevent double-delete in afterAll
+    className = ''; // Prevent double-delete in after
+
+    // Step 6: read back absent
+    const goneResponse = await handleGetClass(
+      createHandlerContext({ connection, logger }),
+      { class_name: CLASS_NAME },
+    );
+    assert.equal(
+      goneResponse.isError,
+      true,
+      `${CLASS_NAME} still reads after DeleteClass`,
+    );
+    logger?.success(`Step 6: ${CLASS_NAME} reads absent`);
   });
 });

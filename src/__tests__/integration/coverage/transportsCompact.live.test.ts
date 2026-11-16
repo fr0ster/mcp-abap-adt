@@ -8,8 +8,11 @@
  * (read only), none where none is configured: a move between requests of
  * different targets is refused (measured, `TransportObjectToolsCrud.test.ts`).
  *
- * - **Both systems:** HandlerTransportCreate creates a request, and
- *   HandlerTransportSortAndCompress sorts and compresses its task. On
+ * - **Both systems:** HandlerTransportCreate creates a request,
+ *   ListTransports lists the session user's modifiable requests (an empty
+ *   list is a valid answer: the system's saved search decides what it
+ *   holds), and HandlerTransportSortAndCompress sorts and compresses the
+ *   new request's task. On
  *   premise the task holds an own interface's entry (the package has a
  *   transport layer, so SAP records it there), still held once after. The
  *   cloud trial has only ZLOCAL packages and SAP records no local object on
@@ -247,6 +250,25 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
       target_system: target,
     });
     own.push(await ownRequest(plan, created));
+  });
+
+  it("ListTransports lists the session user's modifiable requests", async () => {
+    const answered = await liveCall('ListTransports', {});
+    const listed = payloadOf(succeeded('ListTransports', answered));
+    assert.equal(member(listed, 'success'), true);
+    const transports = member(listed, 'transports');
+    if (!Array.isArray(transports)) throw new Error('no transports list');
+    assert.equal(member(listed, 'count'), transports.length);
+    for (const transport of transports) {
+      const number = member(transport, 'number');
+      assert.equal(typeof number, 'string');
+      // Modifiable only (the default): D or L, or a status SAP left unstated.
+      const status = member(transport, 'status');
+      assert.ok(
+        status === undefined || ['', 'D', 'L'].includes(String(status)),
+        `${String(number)} has status ${String(status)}`,
+      );
+    }
   });
 
   it('HandlerTransportSortAndCompress sorts and compresses the task of the test own', async () => {

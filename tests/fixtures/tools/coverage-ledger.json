@@ -960,6 +960,13 @@
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   },
+  "ListTransports": {
+    "unit": "src/__tests__/unit/pins/listTransports.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
   "LogoffLeftoverSession": {
     "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
     "live": {

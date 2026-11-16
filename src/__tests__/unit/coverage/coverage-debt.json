@@ -452,7 +452,6 @@
   "ListATCResults",
   "ListFunctionGroupIncludes",
   "ListFunctionModules",
-  "ListTransports",
   "MemorySnapshotList",
   "MoveTransportObjects",
   "ReadTransportActionLog",

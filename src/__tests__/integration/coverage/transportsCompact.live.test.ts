@@ -297,6 +297,42 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
   });
 });
 
+liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
+  after(async () => {
+    await cleanUp([]);
+  });
+
+  it('HandlerCreate TRANSPORT gives the task SAP creates with the request the type task_type asks (R)', async () => {
+    transportablePackage();
+    const plan = await prepareRequestCreate();
+    const target = await configuredTarget();
+    const created = await liveCall('HandlerCreate', {
+      object_type: 'TRANSPORT',
+      ...createArgs(plan.description, target),
+      task_type: 'R',
+    });
+    await reconcileRequestCreate(plan, created);
+    const answered = payloadOf(created);
+    assert.equal(member(answered, 'task_type'), 'R');
+    const request = member(answered, 'transport_number');
+    if (typeof request !== 'string') throw new Error('no request number');
+    const task = member(answered, 'task_number');
+    if (typeof task !== 'string') throw new Error('no task number');
+    recordCreatedRequest(task);
+    // Read back: the request's one task, of type R as SAP keeps it.
+    const read = succeeded(
+      `GetTransport ${request}`,
+      await livePrepare('GetTransport', { transport_number: request }),
+    );
+    const tasks = member(payloadOf(read), 'tasks');
+    const listed = Array.isArray(tasks) ? tasks : [];
+    assert.deepEqual(
+      listed.map((entry) => [member(entry, 'number'), member(entry, 'type')]),
+      [[task, 'R']],
+    );
+  });
+});
+
 liveSuite(
   ['onprem'],
   `Compact transport move (cloud: ${CLOUD_MOVE_REASON})`,

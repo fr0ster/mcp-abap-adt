@@ -54,7 +54,6 @@ import {
  * every tool it calls, and skips naming the first it does not serve.
  */
 const describe = servedSuite([
-  'ActivateClassLow',
   'CreateClass',
   'DeleteClass',
   'DeleteLocalDefinitions',

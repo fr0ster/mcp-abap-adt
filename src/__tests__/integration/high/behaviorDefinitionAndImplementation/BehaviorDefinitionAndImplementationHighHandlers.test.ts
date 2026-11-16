@@ -70,7 +70,6 @@ const testLogger = createTestLogger('bdef-bimpl-high');
  * every tool it calls, and skips naming the first it does not serve.
  */
 const describe = servedSuite([
-  'ActivateObjectLow',
   'CreateBehaviorDefinition',
   'CreateBehaviorImplementation',
   'DeleteBehaviorDefinition',
@@ -78,7 +77,6 @@ const describe = servedSuite([
   'UpdateBehaviorDefinition',
   'UpdateBehaviorImplementation',
   'UpdateClass',
-  'ValidateObjectLow',
 ]);
 
 describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integration', () => {

@@ -51,11 +51,7 @@ async function activateAsUpdate(
  * This file's `describe`: the suite runs where the configured system serves
  * every tool it calls, and skips naming the first it does not serve.
  */
-const describe = servedSuite([
-  'ActivateServiceBindingLow',
-  'CreateServiceBinding',
-  'DeleteServiceBinding',
-]);
+const describe = servedSuite(['CreateServiceBinding', 'DeleteServiceBinding']);
 
 describe('ServiceBinding High-Level Handlers Integration', () => {
   let tester: HighTester;

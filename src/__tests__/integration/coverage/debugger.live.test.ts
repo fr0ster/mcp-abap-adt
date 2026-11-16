@@ -19,6 +19,13 @@
  *   value set;
  * - `DebugCreateWatchpoint` watches the counter, `DebugListWatchpoints`
  *   lists it, `DebugDeleteWatchpoint` deletes it, and the list is empty;
+ * - the debugger batch, in the full set and in the compact one, each at the
+ *   stop: `DebugBatchBegin` (`HandlerDebugBatch` `begin`); a step over, the
+ *   stack and the counter recorded — each answers nothing; one
+ *   `DebugBatchEnd` (`end`) sends them, summarised `recorded`, `sent`,
+ *   `received` three each; `DebugBatchAnswers` (`answers`) reads them by
+ *   `number` and by `numbers`: the step answered, the stack on the next
+ *   line, the counter as that line left it;
  * - `DebugTerminate` ends the run where it stands.
  *
  * **The memory snapshots.** At the stop the case takes two memory snapshots
@@ -49,6 +56,7 @@ import {
   livePrepare,
   liveSuite,
   recordCreated,
+  type ToolArgs,
 } from '../helpers/live';
 import {
   member,
@@ -108,8 +116,8 @@ const LIST_LIMIT_MS = 15 * 60_000;
 /** The files of the snapshots the case took, in order. */
 const snapshotFiles: string[] = [];
 
-/** The listener's state handle once it started. */
-const session: { handle?: string } = {};
+/** The listener's state handle once it started; whether a debugger batch is open. */
+const session: { handle?: string; batchOpen?: boolean } = {};
 
 function handle(): string {
   if (session.handle === undefined) throw new Error('no listener started');
@@ -167,8 +175,91 @@ async function stackNow(): Promise<{ positions: number[]; cursor: unknown }> {
   };
 }
 
+/** One answer a debugger batch kept: its number, and the tool's answer. */
+interface BatchEntry {
+  readonly number: unknown;
+  readonly isError: boolean;
+  readonly text: string;
+  readonly payload: unknown;
+}
+
+/** The entries `DebugBatchAnswers` / `HandlerDebugBatch` `answers` answered. */
+function entriesOf(answer: LiveAnswer): BatchEntry[] {
+  const rows = payloadOf(answer);
+  if (!Array.isArray(rows)) throw new Error(`no batch answers: ${answer.text}`);
+  return rows.map((row) => {
+    const content = member(row, 'content');
+    const first: unknown = Array.isArray(content) ? content[0] : undefined;
+    const text = String(member(first, 'text') ?? '');
+    let payload: unknown;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = undefined;
+    }
+    return {
+      number: member(row, 'number'),
+      isError: member(row, 'isError') === true,
+      text,
+      payload,
+    };
+  });
+}
+
+/** A call recorded into the open debugger batch: it answers nothing. */
+async function recorded(tool: string, args: ToolArgs): Promise<void> {
+  const answer = await livePrepare(tool, args);
+  if (answer.isError || answer.content.length > 0) {
+    throw new Error(`${tool} was not recorded: ${answer.text}`);
+  }
+}
+
+/** The step's, the stack's and the counter's answers a batch kept, checked. */
+function checkBatchAnswers(
+  entries: readonly BatchEntry[],
+  stepFrom: number,
+  counter: string,
+): void {
+  const failed = entries.filter((entry) => entry.isError);
+  if (failed.length > 0) {
+    throw new Error(
+      failed.map((entry) => `#${entry.number}: ${entry.text}`).join('\n'),
+    );
+  }
+  assert.deepEqual(
+    entries.map((entry) => entry.number),
+    [1, 2, 3],
+  );
+  const [step, stack, variables] = entries;
+  // 1: the step answered, the run not ended by it.
+  assert.notEqual(member(step?.payload, 'state'), 'ended');
+  // 2: the stack read after the step: the next line.
+  assert.equal(
+    member(member(member(stack?.payload, 'at'), 'address'), 'line'),
+    stepFrom + 1,
+  );
+  // 3: the counter as the line stepped over left it: the full set answers
+  // the variables, the compact set its `value` beside the identity in force.
+  const read = variables?.payload;
+  const rows = Array.isArray(read) ? read : member(read, 'value');
+  if (!Array.isArray(rows)) {
+    throw new Error(`no variables: ${variables?.text}`);
+  }
+  const found = rows.find(
+    (row) => String(member(row, 'name')).toUpperCase() === 'LV_COUNTER',
+  );
+  assert.equal(String(member(found, 'value')).trim(), counter);
+}
+
+/** The debugger batch's end summary for three recorded calls. */
+const THREE = { recorded: 3, sent: 3, received: 3 };
+
 liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
   after(async () => {
+    if (session.batchOpen === true) {
+      await livePrepare('DebugBatchEnd', {});
+      session.batchOpen = false;
+    }
     if (session.handle !== undefined) {
       await livePrepare('DebugStop', { state_handle: session.handle });
     }
@@ -342,6 +433,80 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
       }
       snapshotFiles.push(file);
     }
+  });
+
+  it('DebugBatchBegin, a step, the stack and the counter recorded, DebugBatchEnd, DebugBatchAnswers by number and by numbers', async () => {
+    const begun = await liveCall('DebugBatchBegin', {});
+    succeeded('DebugBatchBegin', begun);
+    session.batchOpen = true;
+    assert.equal(member(payloadOf(begun), 'debug_batch'), 'on');
+    await recorded('DebugStep', { state_handle: handle(), action: 'over' });
+    await recorded('DebugGetStack', { state_handle: handle() });
+    await recorded('DebugGetVariables', {
+      state_handle: handle(),
+      names: ['LV_COUNTER'],
+    });
+    const ended = await liveCall('DebugBatchEnd', {});
+    session.batchOpen = false;
+    succeeded('DebugBatchEnd', ended);
+    assert.deepEqual(payloadOf(ended), THREE);
+
+    const one = await liveCall('DebugBatchAnswers', { number: 2 });
+    succeeded('DebugBatchAnswers number', one);
+    const [stack] = entriesOf(one);
+    assert.equal(stack?.number, 2);
+    assert.equal(
+      member(member(member(stack?.payload, 'at'), 'address'), 'line'),
+      LINE.mark + 1,
+    );
+    const all = await liveCall('DebugBatchAnswers', { numbers: [1, 2, 3] });
+    succeeded('DebugBatchAnswers numbers', all);
+    // The stop was at the first marker, the counter set to 41 there: the
+    // step ran its line, `lv_counter = 1`.
+    checkBatchAnswers(entriesOf(all), LINE.mark, '1');
+  });
+
+  it('HandlerDebugBatch begin, a step, the stack and the counter recorded, end, answers by number and by numbers', async () => {
+    const begun = await liveCall('HandlerDebugBatch', { action: 'begin' });
+    succeeded('HandlerDebugBatch begin', begun);
+    session.batchOpen = true;
+    assert.equal(member(payloadOf(begun), 'debug_batch'), 'on');
+    await recorded('HandlerDebugStep', {
+      state_handle: handle(),
+      kind: 'abap',
+      operation: 'stepOver',
+    });
+    await recorded('HandlerDebugMaintain', {
+      state_handle: handle(),
+      kind: 'abap',
+      operation: 'getStack',
+    });
+    await recorded('HandlerDebugMaintain', {
+      state_handle: handle(),
+      kind: 'abap',
+      operation: 'getVariables',
+      names: ['LV_COUNTER'],
+    });
+    const ended = await liveCall('HandlerDebugBatch', { action: 'end' });
+    session.batchOpen = false;
+    succeeded('HandlerDebugBatch end', ended);
+    assert.deepEqual(payloadOf(ended), THREE);
+
+    const one = await liveCall('HandlerDebugBatch', {
+      action: 'answers',
+      number: 3,
+    });
+    succeeded('HandlerDebugBatch answers number', one);
+    const [variables] = entriesOf(one);
+    assert.equal(variables?.number, 3);
+    const all = await liveCall('HandlerDebugBatch', {
+      action: 'answers',
+      numbers: [1, 2, 3],
+    });
+    succeeded('HandlerDebugBatch answers numbers', all);
+    // The full set's batch left the run on the line after the first marker:
+    // the step ran `lv_counter = lv_counter + 1`.
+    checkBatchAnswers(entriesOf(all), LINE.mark + 1, '2');
   });
 
   it('DebugTerminate ends the run where it stands', async () => {

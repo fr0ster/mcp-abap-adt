@@ -110,6 +110,27 @@
       "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
     }
   },
+  "DebugBatchAnswers": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugBatchBegin": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugBatchEnd": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
   "DebugCreateWatchpoint": {
     "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
     "live": {
@@ -678,6 +699,27 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerDebugBatch#answers": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "HandlerDebugBatch#begin": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "HandlerDebugBatch#end": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
     }
   },
   "HandlerDumpList": {

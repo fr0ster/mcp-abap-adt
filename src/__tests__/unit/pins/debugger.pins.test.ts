@@ -20,6 +20,7 @@
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { envelopeResponse } from '../../helpers/batchEnvelope';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
 type Answer = Partial<IAdtWireResponse> | undefined;
@@ -99,6 +100,93 @@ function expectPlaced(answer: { content: Array<{ text: string }> }): void {
   ).toEqual([PLACED]);
 }
 
+/**
+ * The debugger batch at the stop: begun, one stack read recorded (it sends
+ * nothing), and its end — one envelope on the stop's connection, answered
+ * with the stack as one part.
+ */
+const BATCH_BEGUN = {
+  full: [START, { tool: 'DebugBatchBegin', args: {} }],
+  compact: [START, { tool: 'HandlerDebugBatch', args: { action: 'begin' } }],
+};
+
+/** The stack read the batch records, as each set calls it. */
+const STACK_READ = {
+  full: {
+    tool: 'DebugGetStack',
+    args: {},
+    bind: { state_handle: { from: 0, field: 'state_handle' } },
+  },
+  compact: {
+    tool: 'HandlerDebugMaintain',
+    args: { kind: 'abap', operation: 'getStack' },
+    bind: { state_handle: { from: 0, field: 'state_handle' } },
+  },
+};
+
+/** The batch's steps before its end. */
+const BATCH_RECORDED = {
+  full: [...BATCH_BEGUN.full, STACK_READ.full],
+  compact: [...BATCH_BEGUN.compact, STACK_READ.compact],
+};
+
+/** The batch's steps through its end, before its answers are read. */
+const BATCH_ENDED = {
+  full: [...BATCH_RECORDED.full, { tool: 'DebugBatchEnd', args: {} }],
+  compact: [
+    ...BATCH_RECORDED.compact,
+    { tool: 'HandlerDebugBatch', args: { action: 'end' } },
+  ],
+};
+
+/** SAP's answer to the envelope: the stack, its one part. */
+const ENVELOPE: Answer = envelopeResponse([
+  {
+    status: 200,
+    statusText: 'OK',
+    headers: XML,
+    body: corpusBody('debugger-conversation--06-stack'),
+  },
+]);
+
+/** DebugBatchBegin / `begin` sends nothing: the batch is on. */
+function expectBatchOn(answer: { content: Array<{ text: string }> }): void {
+  const begun: unknown = JSON.parse(answer.content[0]?.text ?? 'null');
+  expect(
+    typeof begun === 'object' && begun !== null
+      ? Reflect.get(begun, 'debug_batch')
+      : begun,
+  ).toBe('on');
+}
+
+/** The batch end's summary: one call recorded, sent and answered. */
+function expectOneSent(answer: { content: Array<{ text: string }> }): void {
+  expect(JSON.parse(answer.content[0]?.text ?? 'null')).toEqual({
+    recorded: 1,
+    sent: 1,
+    received: 1,
+  });
+}
+
+/** The answers read send nothing: the stack read, number 1, answered. */
+function expectStackAnswered(answer: {
+  content: Array<{ text: string }>;
+}): void {
+  const entries: unknown = JSON.parse(answer.content[0]?.text ?? 'null');
+  expect(
+    Array.isArray(entries)
+      ? entries.map((entry: unknown) =>
+          typeof entry === 'object' && entry !== null
+            ? [
+                Reflect.get(entry, 'number'),
+                Reflect.get(entry, 'isError') === true,
+              ]
+            : entry,
+        )
+      : entries,
+  ).toEqual([[1, false]]);
+}
+
 /** A watchpoint document, as SAP answers its create and its list. */
 const WATCHPOINTS: Answer = {
   status: 200,
@@ -151,6 +239,118 @@ function statedAs(variant: 'onprem' | 'cloud'): void {
 describe('onprem', () => {
   statedAs('onprem');
   pinCases([
+    {
+      tool: 'DebugBatchBegin',
+      variant: 'onprem',
+      stand: 'server',
+      before: [START],
+      answers: atStop('onprem'),
+      args: {},
+      expected: 'none',
+      ran: expectBatchOn,
+    },
+    {
+      tool: 'DebugBatchEnd',
+      variant: 'onprem',
+      stand: 'server',
+      before: BATCH_RECORDED.full,
+      answers: atStop('onprem', [ENVELOPE]),
+      args: {},
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/debugger/batch',
+          headers: {
+            accept: 'multipart/mixed',
+            'content-type':
+              'multipart/mixed; boundary=batch_ee05eec6-c315-4480-ad6f-0eb5aec810ce',
+            'sap-adt-saplb': 'fetch',
+            'x-sap-adt-sessiontype': 'stateful',
+            'sap-adt-connection-id': '053b871d-b4ad-4b9e-a029-19aaa40c82a1',
+            'sap-adt-request-id': '78487ce2db89420caaf1e42fab652118',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'x-csrf-token': 'csrf-placeholder',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-4; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'content-length': '294',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: '--batch_ee05eec6-c315-4480-ad6f-0eb5aec810ce\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true HTTP/1.1\r\nAccept: application/xml\r\nX-sap-adt-sessiontype: stateful\r\n\r\n\r\n\r\n--batch_ee05eec6-c315-4480-ad6f-0eb5aec810ce--\r\n',
+        },
+      ],
+      ran: expectOneSent,
+    },
+    {
+      tool: 'DebugBatchAnswers',
+      variant: 'onprem',
+      stand: 'server',
+      before: BATCH_ENDED.full,
+      answers: atStop('onprem', [ENVELOPE]),
+      args: { numbers: [1] },
+      expected: 'none',
+      ran: expectStackAnswered,
+    },
+    {
+      tool: 'HandlerDebugBatch',
+      variant: 'onprem',
+      stand: 'server',
+      before: [START],
+      answers: atStop('onprem'),
+      args: { action: 'begin' },
+      expected: 'none',
+      ran: expectBatchOn,
+    },
+    {
+      tool: 'HandlerDebugBatch',
+      variant: 'onprem',
+      stand: 'server',
+      before: BATCH_RECORDED.compact,
+      answers: atStop('onprem', [ENVELOPE]),
+      args: { action: 'end' },
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/debugger/batch',
+          headers: {
+            accept: 'multipart/mixed',
+            'content-type':
+              'multipart/mixed; boundary=batch_478a5b2b-7f10-4df1-ad61-2b321d77cb88',
+            'sap-adt-saplb': 'fetch',
+            'x-sap-adt-sessiontype': 'stateful',
+            'sap-adt-connection-id': '998c55b5-dbe3-4189-a7ed-25254a0a2dd6',
+            'sap-adt-request-id': 'ab83b764c4c04511a36d8aeb9da8020a',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'x-csrf-token': 'csrf-placeholder',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-4; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'content-length': '294',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: '--batch_478a5b2b-7f10-4df1-ad61-2b321d77cb88\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true HTTP/1.1\r\nAccept: application/xml\r\nX-sap-adt-sessiontype: stateful\r\n\r\n\r\n\r\n--batch_478a5b2b-7f10-4df1-ad61-2b321d77cb88--\r\n',
+        },
+      ],
+      ran: expectOneSent,
+    },
+    {
+      tool: 'HandlerDebugBatch',
+      variant: 'onprem',
+      stand: 'server',
+      before: BATCH_ENDED.compact,
+      answers: atStop('onprem', [ENVELOPE]),
+      args: { action: 'answers', number: 1 },
+      expected: 'none',
+      ran: expectStackAnswered,
+    },
     {
       tool: 'DebugListBreakpoints',
       variant: 'onprem',
@@ -563,6 +763,120 @@ describe('onprem', () => {
 describe('cloud', () => {
   statedAs('cloud');
   pinCases([
+    {
+      tool: 'DebugBatchBegin',
+      variant: 'cloud',
+      stand: 'server',
+      before: [START],
+      answers: atStop('cloud'),
+      args: {},
+      expected: 'none',
+      ran: expectBatchOn,
+    },
+    {
+      tool: 'DebugBatchEnd',
+      variant: 'cloud',
+      stand: 'server',
+      before: BATCH_RECORDED.full,
+      answers: atStop('cloud', [ENVELOPE]),
+      args: {},
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/debugger/batch',
+          headers: {
+            accept: 'multipart/mixed',
+            'content-type':
+              'multipart/mixed; boundary=batch_e7ae4fd7-3116-45db-a35c-75b98d43835f',
+            'sap-adt-saplb': 'fetch',
+            'x-sap-security-session': 'use',
+            'x-sap-adt-sessiontype': 'stateful',
+            'sap-adt-connection-id': '6d9e89bc-58e7-4714-a5d7-3ec7da51ecf6',
+            'sap-adt-request-id': 'b59a8dfd5396417caeedf1abaf566640',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'x-csrf-token': 'csrf-placeholder',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-4; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'content-length': '294',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: '--batch_e7ae4fd7-3116-45db-a35c-75b98d43835f\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true HTTP/1.1\r\nAccept: application/xml\r\nX-sap-adt-sessiontype: stateful\r\n\r\n\r\n\r\n--batch_e7ae4fd7-3116-45db-a35c-75b98d43835f--\r\n',
+        },
+      ],
+      ran: expectOneSent,
+    },
+    {
+      tool: 'DebugBatchAnswers',
+      variant: 'cloud',
+      stand: 'server',
+      before: BATCH_ENDED.full,
+      answers: atStop('cloud', [ENVELOPE]),
+      args: { numbers: [1] },
+      expected: 'none',
+      ran: expectStackAnswered,
+    },
+    {
+      tool: 'HandlerDebugBatch',
+      variant: 'cloud',
+      stand: 'server',
+      before: [START],
+      answers: atStop('cloud'),
+      args: { action: 'begin' },
+      expected: 'none',
+      ran: expectBatchOn,
+    },
+    {
+      tool: 'HandlerDebugBatch',
+      variant: 'cloud',
+      stand: 'server',
+      before: BATCH_RECORDED.compact,
+      answers: atStop('cloud', [ENVELOPE]),
+      args: { action: 'end' },
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/debugger/batch',
+          headers: {
+            accept: 'multipart/mixed',
+            'content-type':
+              'multipart/mixed; boundary=batch_0a054732-2427-46cf-a9a9-60880b3af1f5',
+            'sap-adt-saplb': 'fetch',
+            'x-sap-security-session': 'use',
+            'x-sap-adt-sessiontype': 'stateful',
+            'sap-adt-connection-id': '20f32ff5-56f9-4fe5-a698-e8244c84368d',
+            'sap-adt-request-id': '4e2433754c454dd0af594fb054c18ba5',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'x-csrf-token': 'csrf-placeholder',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-4; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'content-length': '294',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: '--batch_0a054732-2427-46cf-a9a9-60880b3af1f5\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true HTTP/1.1\r\nAccept: application/xml\r\nX-sap-adt-sessiontype: stateful\r\n\r\n\r\n\r\n--batch_0a054732-2427-46cf-a9a9-60880b3af1f5--\r\n',
+        },
+      ],
+      ran: expectOneSent,
+    },
+    {
+      tool: 'HandlerDebugBatch',
+      variant: 'cloud',
+      stand: 'server',
+      before: BATCH_ENDED.compact,
+      answers: atStop('cloud', [ENVELOPE]),
+      args: { action: 'answers', number: 1 },
+      expected: 'none',
+      ran: expectStackAnswered,
+    },
     {
       tool: 'DebugListBreakpoints',
       variant: 'cloud',

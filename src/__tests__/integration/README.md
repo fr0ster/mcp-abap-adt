@@ -23,7 +23,6 @@ against an ADT stand-in in `src/__tests__/unit/lowToCompact.test.ts` and
 ## Testers
 
 - `HighTester` runs a high tool's workflow and its cleanup.
-- `ReadOnlyTester` runs a read.
 - `LambdaTester` runs workflow functions (lambdas) that receive the tester's context — see
   [`helpers/testers/README.md`](helpers/testers/README.md).
 
@@ -76,6 +75,29 @@ configuration it lacks) calls `skipRunningTest(reason)` (`helpers/runningTest.ts
 reports it skipped with the reason, never a pass. No live test carries a bound, a delay or a poll limit: each step
 goes on the answer of the one before it, and a wait that does not end is ended with Ctrl-C
 (below).
+
+## Where a suite runs
+
+Where a suite runs is decided in code, by what the configured system serves; the test config
+gives data only.
+
+- A `liveSuite` names the system kinds it runs on (`liveSuite(['onprem', 'cloud'], …)`).
+- A suite of the testers is wrapped in `servedSuite(tools)` (`helpers/servedHere.ts`): it runs
+  where the configured system serves every tool it calls — the tool's `available_in` and the
+  system's ADT type table, the rule the server lists tools by — and is skipped elsewhere, naming
+  the first tool not served and why (`notServedReason`). Inside a running case,
+  `skipUnlessServed(tool)` does the same for one tool.
+- A tester reads its case with `getTestCase(section, case)` (`helpers/configHelpers.ts`) for its
+  `params` only. A case's `enabled` and `available_in` in the test config are not read: what the
+  system serves is tested on it, what it does not serve is not. A case the config does not hold
+  skips naming its key (`<section>.test_cases[name=<case>]`).
+- The owner's switches are the exception: hard mode (`integration_hard_mode.enabled`), and the
+  `batch` cases `refusal_follow_ups`, `debugger` and `amdp_http_handle`, each run only with
+  `enabled: true` (`getEnabledTestCase`).
+
+`tests/test-config.yaml.template` says, per section, which file reads it and on which systems;
+`src/__tests__/unit/testConfigSections.test.ts` checks that it holds every section a tester reads
+and no section nothing reads.
 
 ## Notes
 

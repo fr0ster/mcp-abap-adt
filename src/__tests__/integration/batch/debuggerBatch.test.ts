@@ -20,7 +20,7 @@
  *    loop and a run of the class; `DebugWait` until it is stopped there;
  *    `DebugBatchBegin`; `DebugStep` over, `DebugGetStack`,
  *    `DebugGetVariables` — each answers nothing; one `DebugBatchEnd`; then
- *    `BatchAnswers` 1–3, each checked on its own: the step answered, the
+ *    `DebugBatchAnswers` 1–3, each checked on its own: the step answered, the
  *    stack on the next line, the variable as the loop's first pass left it.
  * 2. **The AMDP debugger batch** — on premise only, over either transport,
  *    on a system that runs AMDP debugging (HANA). ABAP Cloud skips. Hard
@@ -36,7 +36,7 @@
  *    the class (`stop_existing` false), `AmdpDebugWait` until `ON_BREAK`,
  *    `DebugBatchBegin` at the AMDP break, `AmdpDebugGetTable` of the table
  *    variable and `AmdpDebugStep` over — each answers nothing; one
- *    `DebugBatchEnd`; then `BatchAnswers` 1–2: the rows, the step. It passes
+ *    `DebugBatchEnd`; then `DebugBatchAnswers` 1–2: the rows, the step. It passes
  *    when both answers are ok and the debuggee moves on to its next event
  *    (`AmdpDebugWait`: the step took effect).
  *
@@ -414,7 +414,7 @@ async function debuggerBatchOn(kind: Kind, testCase: any): Promise<void> {
       received: calls.length,
     });
     const entries = (payloadOf(
-      await served.call('BatchAnswers', { numbers: [1, 2, 3] }),
+      await served.call('DebugBatchAnswers', { numbers: [1, 2, 3] }),
     ) ?? []) as Entry[];
     for (const entry of entries) {
       say(kind, `answer #${entry.number}`, {
@@ -681,7 +681,7 @@ async function amdpBatchOn(kind: Kind, testCase: any): Promise<void> {
       received: calls.length,
     });
     const entries = (payloadOf(
-      await served.call('BatchAnswers', { numbers: [1, 2] }),
+      await served.call('DebugBatchAnswers', { numbers: [1, 2] }),
     ) ?? []) as Entry[];
     for (const entry of entries) {
       say(kind, `amdp answer #${entry.number}`, {

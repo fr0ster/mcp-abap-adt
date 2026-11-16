@@ -24,6 +24,7 @@ import type {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
+import { TOOL_DEFINITION as DebugBatchAnswers_Tool } from '../../../handlers/debugger/debug/handleDebugBatchAnswers';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import {
   BATCH_MODE_ON_WORDS,
@@ -39,13 +40,16 @@ import {
   CompactDebugBatchHandlersGroup,
   CompactDebugHandlersGroup,
 } from '../../../lib/compact/debug/group';
+import { HANDLER_DEBUG_BATCH_DESCRIPTION } from '../../../lib/compact/debug/handleHandlerDebugBatch';
 import {
   AmdpSession,
   DebuggerInstance,
   DebugSession,
 } from '../../../lib/debugger/index';
-import { BatchHandlersGroup } from '../../../lib/handlers/groups/BatchHandlersGroup';
-import { DebugBatchHandlersGroup } from '../../../lib/handlers/groups/DebugBatchHandlersGroup';
+import {
+  DebugBatchHandlersGroup,
+  debugBatchToolEntries,
+} from '../../../lib/handlers/groups/DebugBatchHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import type { IHandlerGroup } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -212,7 +216,6 @@ async function stand(set: SetKind): Promise<Stand> {
       ? [
           new DebugHandlersGroup(placeholder),
           new DebugBatchHandlersGroup(placeholder),
-          new BatchHandlersGroup(placeholder),
         ]
       : [
           new CompactDebugHandlersGroup(placeholder),
@@ -279,7 +282,7 @@ const answersOf = async (s: Stand, set: SetKind, numbers: number[]) =>
   jsonOf(
     set === 'compact'
       ? await s.call('HandlerDebugBatch', { action: 'answers', numbers })
-      : await s.call('BatchAnswers', { numbers }),
+      : await s.call('DebugBatchAnswers', { numbers }),
   ) as Array<Record<string, any>>;
 
 /** step, stack and variables, as each set calls them. */
@@ -409,7 +412,7 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     });
     expect(s.owner.mode()).toBe('off');
     const read = await s.call(
-      set === 'compact' ? 'HandlerDebugBatch' : 'BatchAnswers',
+      set === 'compact' ? 'HandlerDebugBatch' : 'DebugBatchAnswers',
       set === 'compact'
         ? { action: 'answers', numbers: [1, 2, 3] }
         : { numbers: [1, 2, 3] },
@@ -508,53 +511,51 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     expect(s.owner.mode()).toBe('debugger');
   });
 
-  it('begin of either batch refused while the other is open', async () => {
-    await s.attach();
-    const communication =
-      set === 'full'
-        ? { begin: ['BatchBegin', {}], end: ['BatchEnd', {}] }
-        : {
-            begin: ['HandlerBatch', { action: 'begin' }],
-            end: ['HandlerBatch', { action: 'end' }],
-          };
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const other = await s.call(
-      communication.begin[0] as string,
-      communication.begin[1] as Record<string, unknown>,
-    );
-    expect(other.isError).toBe(true);
-    expect(jsonOf(other)).toEqual({
-      error: 'batch_mode_other',
-      message: BATCH_MODE_OTHER_WORDS,
+  // Batch mode is the compact sets': the full set serves no communication
+  // batch to meet the debugger batch.
+  if (set === 'compact') {
+    it('begin of either batch refused while the other is open', async () => {
+      await s.attach();
+      const communication = {
+        begin: ['HandlerBatch', { action: 'begin' }],
+        end: ['HandlerBatch', { action: 'end' }],
+      };
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const other = await s.call(
+        communication.begin[0] as string,
+        communication.begin[1] as Record<string, unknown>,
+      );
+      expect(other.isError).toBe(true);
+      expect(jsonOf(other)).toEqual({
+        error: 'batch_mode_other',
+        message: BATCH_MODE_OTHER_WORDS,
+      });
+      expect(s.owner.mode()).toBe('debugger');
+      await settled(s.call(NAMES.end[set], endArgs(set)));
+      await s.call(
+        communication.begin[0] as string,
+        communication.begin[1] as Record<string, unknown>,
+      );
+      expect(s.owner.mode()).toBe('communication');
+      const debug = await s.call(NAMES.begin[set], beginArgs(set));
+      expect(debug.isError).toBe(true);
+      expect(jsonOf(debug)).toEqual({
+        error: 'batch_mode_other',
+        message: BATCH_MODE_OTHER_WORDS,
+      });
+      expect(s.owner.mode()).toBe('communication');
     });
-    expect(s.owner.mode()).toBe('debugger');
-    await settled(s.call(NAMES.end[set], endArgs(set)));
-    await s.call(
-      communication.begin[0] as string,
-      communication.begin[1] as Record<string, unknown>,
-    );
-    expect(s.owner.mode()).toBe('communication');
-    const debug = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(debug.isError).toBe(true);
-    expect(jsonOf(debug)).toEqual({
-      error: 'batch_mode_other',
-      message: BATCH_MODE_OTHER_WORDS,
-    });
-    expect(s.owner.mode()).toBe('communication');
-  });
 
-  it('begin while the communication batch is open is refused batch_mode_other, with no stop too', async () => {
-    await s.call(
-      set === 'full' ? 'BatchBegin' : 'HandlerBatch',
-      set === 'full' ? {} : { action: 'begin' },
-    );
-    const debug = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(jsonOf(debug)).toEqual({
-      error: 'batch_mode_other',
-      message: BATCH_MODE_OTHER_WORDS,
+    it('begin while the communication batch is open is refused batch_mode_other, with no stop too', async () => {
+      await s.call('HandlerBatch', { action: 'begin' });
+      const debug = await s.call(NAMES.begin[set], beginArgs(set));
+      expect(jsonOf(debug)).toEqual({
+        error: 'batch_mode_other',
+        message: BATCH_MODE_OTHER_WORDS,
+      });
+      expect(s.owner.mode()).toBe('communication');
     });
-    expect(s.owner.mode()).toBe('communication');
-  });
+  }
 
   it('breakpoint and listener tools refused while open', async () => {
     await s.attach();
@@ -824,16 +825,45 @@ describe('which sets serve the debugger batch tools', () => {
       );
       expect(full.has('DebugBatchBegin')).toBe(true);
       expect(full.has('DebugBatchEnd')).toBe(true);
+      // The full set's reader of the debugger batch's answers.
+      expect(full.has('DebugBatchAnswers')).toBe(true);
       expect(full.has('HandlerDebugBatch')).toBe(false);
       expect(compact.has('HandlerDebugBatch')).toBe(true);
       expect(compact.has('DebugBatchBegin')).toBe(false);
       expect(compact.has('DebugBatchEnd')).toBe(false);
+      expect(compact.has('DebugBatchAnswers')).toBe(false);
       for (const ro of [fullRo, compactRo]) {
         expect(ro.has('DebugBatchBegin')).toBe(false);
         expect(ro.has('DebugBatchEnd')).toBe(false);
+        expect(ro.has('DebugBatchAnswers')).toBe(false);
         expect(ro.has('HandlerDebugBatch')).toBe(false);
       }
     }
+  });
+});
+
+describe("DebugBatchAnswers, the full set's reader of the debugger batch", () => {
+  const entry = debugBatchToolEntries().find(
+    (e) => e.toolDefinition.name === 'DebugBatchAnswers',
+  );
+
+  it('works on no connection and takes number or numbers, each at least 1', () => {
+    expect(entry?.connectionless).toBe(true);
+    const schema = DebugBatchAnswers_Tool.inputSchema;
+    expect(schema.safeParse({ number: 1 }).success).toBe(true);
+    expect(schema.safeParse({ numbers: [1, 2] }).success).toBe(true);
+    expect(schema.safeParse({ number: 0 }).success).toBe(false);
+    expect(schema.safeParse({ numbers: [] }).success).toBe(false);
+  });
+
+  it("means what HandlerDebugBatch's answers action means, in the same words", () => {
+    const words = DebugBatchAnswers_Tool.description.replace(
+      '[read-only] [debug] ',
+      '',
+    );
+    expect(HANDLER_DEBUG_BATCH_DESCRIPTION).toContain(
+      `action 'answers' (with number or numbers): ${words}`,
+    );
   });
 });
 
@@ -847,7 +877,7 @@ describe('the end of the debugger batch', () => {
     for (const action of ['begin', 'answers', undefined]) {
       expect(endsBatch('HandlerDebugBatch', { action })).toBe(undefined);
     }
-    expect(endsBatch('BatchEnd', {})).toBe('communication');
+    expect(endsBatch('HandlerBatch', { action: 'end' })).toBe('communication');
   });
 
   it("HandlerDebugBatch action 'end' with a number is refused and the batch stays open", async () => {

@@ -36,7 +36,6 @@ import {
   DebuggerInstance,
   DebugSession,
 } from '../../../lib/debugger/index';
-import { BatchHandlersGroup } from '../../../lib/handlers/groups/BatchHandlersGroup';
 import { DebugBatchHandlersGroup } from '../../../lib/handlers/groups/DebugBatchHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import type { IHandlerGroup } from '../../../lib/handlers/interfaces';
@@ -212,7 +211,6 @@ async function stand(set: SetKind): Promise<Stand> {
       ? [
           new DebugHandlersGroup(placeholder),
           new DebugBatchHandlersGroup(placeholder),
-          new BatchHandlersGroup(placeholder),
         ]
       : [
           new CompactDebugHandlersGroup(placeholder),
@@ -314,7 +312,7 @@ const answersOf = async (s: Stand, set: SetKind, numbers: number[]) =>
   jsonOf(
     set === 'compact'
       ? await s.call('HandlerDebugBatch', { action: 'answers', numbers })
-      : await s.call('BatchAnswers', { numbers }),
+      : await s.call('DebugBatchAnswers', { numbers }),
   ) as Array<Record<string, any>>;
 
 /** The data preview, step over and continue, as each set calls them. */
@@ -574,7 +572,7 @@ describe('a complete stop ends the debugger batch answers with the debug state (
     expect(stopped.isError).toBe(true);
     expect(s.owner.holdsState()).toBe(true);
     expect(s.holds()).toBe(true);
-    const answers = jsonOf(await s.call('BatchAnswers', { numbers: [1] }));
+    const answers = jsonOf(await s.call('DebugBatchAnswers', { numbers: [1] }));
     expect(answers[0]?.number).toBe(1);
   });
 });

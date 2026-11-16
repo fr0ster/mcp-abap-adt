@@ -7,11 +7,9 @@ import type { BatchKind } from './InstanceBatch';
  * refused otherwise.
  */
 export const BATCH_TOOLS: readonly string[] = [
-  'BatchBegin',
-  'BatchEnd',
-  'BatchAnswers',
   'DebugBatchBegin',
   'DebugBatchEnd',
+  'DebugBatchAnswers',
   'HandlerBatch',
   'HandlerDebugBatch',
 ];
@@ -70,12 +68,11 @@ function endAction(args: ToolArgs): boolean {
 
 /**
  * Which batch a call of `tool` with `args` ends: the communication batch
- * (`BatchEnd`, `HandlerBatch` with `action: 'end'`), the debugger batch
+ * (`HandlerBatch` with `action: 'end'`), the debugger batch
  * (`DebugBatchEnd`, `HandlerDebugBatch` with `action: 'end'`), or none. Its
  * failure before `execute()` ends that batch (`endBeforeExecute`).
  */
 export function endsBatch(tool: string, args: ToolArgs): BatchKind | undefined {
-  if (tool === 'BatchEnd') return 'communication';
   if (tool === 'DebugBatchEnd') return 'debugger';
   if (tool === 'HandlerBatch' && endAction(args)) return 'communication';
   if (tool === 'HandlerDebugBatch' && endAction(args)) return 'debugger';

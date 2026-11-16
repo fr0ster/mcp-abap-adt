@@ -17,7 +17,7 @@
  * every later call sends it in `x-mcp-state-handle`: `AmdpDebugWait` until
  * `ON_BREAK`, `DebugBatchBegin` (the handle it answers is the same),
  * `AmdpDebugGetTable` and `AmdpDebugStep` over — each answers nothing —,
- * `DebugBatchEnd`, `BatchAnswers` 1–2, the debuggee's next event,
+ * `DebugBatchEnd`, `DebugBatchAnswers` 1–2, the debuggee's next event,
  * `AmdpDebugStop`. Then the state has ended, the debugger batch's kept
  * answers with it: a call over the handle answers `state is not available`,
  * as for an unknown handle. Then `SIGTERM` to the server's process (a graceful
@@ -255,7 +255,7 @@ async function sourceRead(
 }
 
 describe('the AMDP debugger batch over Streamable HTTP, behind one state handle', () => {
-  it('AmdpDebugStart, the break, DebugBatchBegin, the recorded AMDP calls, DebugBatchEnd and BatchAnswers over one x-mcp-state-handle; AmdpDebugStop, the state ended, a graceful shutdown; every session logged off', async () => {
+  it('AmdpDebugStart, the break, DebugBatchBegin, the recorded AMDP calls, DebugBatchEnd and DebugBatchAnswers over one x-mcp-state-handle; AmdpDebugStop, the state ended, a graceful shutdown; every session logged off', async () => {
     const where = whereItRuns();
     if ('reason' in where) {
       skipRunningTest(`${where.reason}`);
@@ -366,7 +366,7 @@ describe('the AMDP debugger batch over Streamable HTTP, behind one state handle'
         received: 2,
       });
       const entries = (payloadOf(
-        await call(held, 'BatchAnswers', { numbers: [1, 2] }),
+        await call(held, 'DebugBatchAnswers', { numbers: [1, 2] }),
       ) ?? []) as Entry[];
       assertEquals(
         entries.map((e) => e.number),

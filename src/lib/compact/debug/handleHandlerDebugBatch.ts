@@ -3,10 +3,11 @@ import * as z from 'zod';
  * `HandlerDebugBatch`: the debugger batch in the compact set, one tool for
  * the three actions — `begin`, `end`, `answers` — each as the full set's
  * tool of the same meaning (`DebugBatchBegin`, `DebugBatchEnd`,
- * `BatchAnswers`). `number` / `numbers` go with `answers` alone; given with
+ * `DebugBatchAnswers`). `number` / `numbers` go with `answers` alone; given with
  * another action, the call is refused before anything runs.
  */
 
+import { TOOL_DEFINITION as DebugBatchAnswers_Tool } from '../../../handlers/debugger/debug/handleDebugBatchAnswers';
 import { TOOL_DEFINITION as DebugBatchBegin_Tool } from '../../../handlers/debugger/debug/handleDebugBatchBegin';
 import { TOOL_DEFINITION as DebugBatchEnd_Tool } from '../../../handlers/debugger/debug/handleDebugBatchEnd';
 import { asksNumbers } from '../../batch/batchTools';
@@ -27,9 +28,6 @@ const withoutTag = (text: string, tag: string): string =>
 const untagged = (description: string): string =>
   withoutTag(withoutTag(description, READ_ONLY_TAG), DEBUG_TAG);
 
-const ANSWERS_WORDS =
-  "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.";
-
 /** `HandlerDebugBatch`'s actions. */
 export const DEBUG_BATCH_ACTIONS = ['begin', 'end', 'answers'] as const;
 type DebugBatchAction = (typeof DEBUG_BATCH_ACTIONS)[number];
@@ -38,7 +36,10 @@ type DebugBatchAction = (typeof DEBUG_BATCH_ACTIONS)[number];
 const ACTION_SENTENCES: ReadonlyArray<readonly [DebugBatchAction, string]> = [
   ['begin', `action 'begin': ${untagged(DebugBatchBegin_Tool.description)}`],
   ['end', `action 'end': ${untagged(DebugBatchEnd_Tool.description)}`],
-  ['answers', `action 'answers' (with number or numbers): ${ANSWERS_WORDS}`],
+  [
+    'answers',
+    `action 'answers' (with number or numbers): ${untagged(DebugBatchAnswers_Tool.description)}`,
+  ],
 ];
 
 /** Each action's words in `action`'s description. */

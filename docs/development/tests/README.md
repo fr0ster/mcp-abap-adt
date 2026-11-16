@@ -30,11 +30,12 @@ Guide for debugging integration tests:
 - Common issues and solutions
 - Example debug output
 
-### [test-config.yaml.template](test-config.yaml.template)
-Template for test configuration:
+### [test-config.yaml.template](../../../tests/test-config.yaml.template)
+Template for test configuration (`tests/test-config.yaml.template`):
 - Copy to `tests/test-config.yaml` before running tests
 - Update transport requests and system-specific values
-- Enable/disable test cases as needed
+- It gives data only: where a case runs is decided in code by what the system serves
+  (`src/__tests__/integration/README.md`, "Where a suite runs")
 
 ## Quick Start
 

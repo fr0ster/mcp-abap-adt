@@ -15,7 +15,7 @@ doc/tests/
 ├── README.md                      # Documentation index
 ├── TESTING_GUIDE.md              # Complete testing guide
 ├── TEST_INFRASTRUCTURE.md        # Technical overview
-└── test-config.yaml.template     # Template reference copy
+└── test-config.yaml.template     # A pointer to tests/test-config.yaml.template (no copy)
 ```
 
 ## 🎯 Key Points

@@ -5,9 +5,8 @@
  * the one before it, and a wait that does not end is ended by the person
  * with the runner's interrupt.
  *
- * - **The templates** (`tests/test-config.yaml.template` and its copy under
- *   `docs/development/tests/`) name none of the time keys: under
- *   `test_settings` no `timeout`, `timeouts`, `operation_delays`,
+ * - **The template** (`tests/test-config.yaml.template`) names none of the
+ *   time keys: under `test_settings` no `timeout`, `timeouts`, `operation_delays`,
  *   `retry_on_failure` or `max_retries`, and in no case `operation_delays`,
  *   `poll_interval_ms`, `poll_timeout_ms`, `trace_read_retries` or
  *   `trace_read_retry_delay_ms`.
@@ -19,7 +18,7 @@
  *   step 19 before they change, the memory snapshot list's wait and a service binding's unpublish.
  *
  * The sources are parsed with TypeScript, so comments and strings cannot hide
- * or fake a read or a call; the templates with js-yaml, as the tests read
+ * or fake a read or a call; the template with js-yaml, as the tests read
  * them.
  */
 import assert from 'node:assert/strict';
@@ -32,10 +31,7 @@ import { repositoryRoot } from '../../helpers/repoRoot';
 
 const REPO = repositoryRoot(__dirname);
 
-const TEMPLATES = [
-  'tests/test-config.yaml.template',
-  'docs/development/tests/test-config.yaml.template',
-];
+const TEMPLATES = ['tests/test-config.yaml.template'];
 const LIVE_ROOTS = ['src/__tests__/integration', 'src/__tests__/admin'];
 
 /** Refused under `test_settings`. */

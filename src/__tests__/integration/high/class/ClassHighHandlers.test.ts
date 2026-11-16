@@ -17,13 +17,14 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -42,6 +43,17 @@ const ClassParams = z.looseObject({
   superclass: z.string().optional(),
   update_source_code: z.string().optional(),
 });
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateClass',
+  'DeleteClass',
+  'GetClass',
+  'UpdateClass',
+]);
 
 describe('Class High-Level Handlers Integration', () => {
   let tester: LambdaTester;

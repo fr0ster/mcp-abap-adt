@@ -36,7 +36,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, describe, it } from 'node:test';
+import { after, afterEach, before, it } from 'node:test';
 import { patchTableTypeDocument } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import { handleHandlerActivate } from '../../../../../compact-modify/src/handlers/handleHandlerActivate';
@@ -91,6 +91,7 @@ import {
 } from '../../helpers/configHelpers';
 import { assertEquals, assertMatches } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -204,6 +205,36 @@ const REFUSED_TABLE_TYPE = `${NAME_PREFIX}R`;
 const FREE_NAME = `${NAME_PREFIX}Z`;
 
 const logger = createTestLogger('ttyp-high');
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'ActivateObjects',
+  'CheckTableType',
+  'CreatePackage',
+  'CreateTableType',
+  'DeletePackage',
+  'DeleteTableType',
+  'GetObjectVersionSource',
+  'GetObjectVersions',
+  'GetTableType',
+  'GetTypeInfo',
+  'HandlerActivate',
+  'HandlerCheckRun',
+  'HandlerCreate',
+  'HandlerDelete',
+  'HandlerDeletionCheck',
+  'HandlerGet',
+  'HandlerLock',
+  'HandlerUnlock',
+  'HandlerUpdate',
+  'HandlerValidate',
+  'HandlerWhereUsed',
+  'SearchObject',
+  'UpdateTableType',
+]);
 
 describe('TableType High-Level Handlers Integration', () => {
   let tester: LambdaTester;

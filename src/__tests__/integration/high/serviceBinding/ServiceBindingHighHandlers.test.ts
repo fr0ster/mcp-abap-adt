@@ -9,7 +9,7 @@
  * Run: npm test -- --testPathPattern=integration/high/serviceBinding
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import {
   TOOL_DEFINITION as CreateServiceBindingTool,
@@ -24,7 +24,7 @@ import {
   defineTool,
   type HandlerContext,
 } from '../../../../lib/handlers/interfaces';
-
+import { servedSuite } from '../../helpers/servedHere';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
 
@@ -46,6 +46,16 @@ async function activateAsUpdate(
     name: args.service_binding_name,
   });
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'ActivateServiceBindingLow',
+  'CreateServiceBinding',
+  'DeleteServiceBinding',
+]);
 
 describe('ServiceBinding High-Level Handlers Integration', () => {
   let tester: HighTester;

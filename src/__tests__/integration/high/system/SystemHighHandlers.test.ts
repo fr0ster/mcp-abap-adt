@@ -14,10 +14,11 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import * as z from 'zod';
 import { handleGetPackageTree } from '../../../../handlers/system/high/handleGetPackageTree';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -27,6 +28,12 @@ import { createHandlerContext } from '../../helpers/testHelpers';
 const SystemParams = z.looseObject({
   test_package: z.string().optional(),
 });
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['GetPackageTree']);
 
 describe('System High-Level Handlers Integration', () => {
   let tester: LambdaTester;

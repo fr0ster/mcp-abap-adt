@@ -5,7 +5,7 @@
  * Run: npm test -- --testPathPatterns=integration/high/unitTest/ClassUnitTestHighHandlers
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
@@ -15,6 +15,7 @@ import { handleDeleteUnitTest } from '../../../../handlers/unit_test/high/handle
 import { handleRunUnitTest } from '../../../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateUnitTest } from '../../../../handlers/unit_test/high/handleUpdateUnitTest';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -27,6 +28,20 @@ const ClassUnitTestParams = z.looseObject({
   test_class_source: z.string().optional(),
   expected_test_methods: z.array(z.string()).optional(),
 });
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateClass',
+  'CreateUnitTest',
+  'DeleteClass',
+  'DeleteUnitTest',
+  'RunUnitTest',
+  'UpdateClass',
+  'UpdateUnitTest',
+]);
 
 describe('Unit Test High-Level Handlers (class)', () => {
   let tester: LambdaTester;

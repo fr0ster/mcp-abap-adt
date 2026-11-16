@@ -15,13 +15,14 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/high/handleCreateMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/high/handleUpdateMetadataExtension';
 import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -37,6 +38,16 @@ const MetadataExtensionParams = z.looseObject({
   source_code: z.string().optional(),
   update_source_code: z.string().optional(),
 });
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateMetadataExtension',
+  'DeleteMetadataExtension',
+  'UpdateMetadataExtension',
+]);
 
 describe('MetadataExtension High-Level Handlers Integration', () => {
   let tester: LambdaTester;

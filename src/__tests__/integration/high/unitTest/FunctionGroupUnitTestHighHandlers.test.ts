@@ -7,7 +7,7 @@
  * Run: npm test -- --testPathPatterns=integration/high/unitTest/FunctionGroupUnitTestHighHandlers
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
@@ -18,6 +18,7 @@ import { handleRunFunctionGroupUnitTest } from '../../../../handlers/unit_test/h
 import { handleRunFunctionModuleUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { handleUpdateFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleUpdateFunctionGroupUnitTest';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -31,6 +32,21 @@ const FunctionGroupUnitTestParams = z.looseObject({
   test_class_source: z.string().optional(),
   expected_test_methods: z.array(z.string()).optional(),
 });
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateFunctionGroup',
+  'CreateFunctionGroupUnitTest',
+  'CreateFunctionModule',
+  'DeleteFunctionGroup',
+  'RunFunctionGroupUnitTest',
+  'RunFunctionModuleUnitTest',
+  'UpdateFunctionGroupUnitTest',
+  'UpdateFunctionModule',
+]);
 
 describe('Unit Test High-Level Handlers (function group)', () => {
   let tester: LambdaTester;

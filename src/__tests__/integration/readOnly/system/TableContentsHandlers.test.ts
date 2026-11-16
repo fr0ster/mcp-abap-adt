@@ -12,13 +12,14 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import {
   TOOL_DEFINITION as GetTableContents,
   handleGetTableContents,
 } from '../../../../handlers/table/readonly/handleGetTableContents';
 
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
@@ -30,6 +31,12 @@ function extractResultData(result: any): any {
   }
   throw new Error('No response payload found');
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['GetTableContents']);
 
 describe('GetTableContents Handler Integration', () => {
   let tester: LambdaTester;

@@ -10,7 +10,7 @@ import { stated } from '../../helpers/testConfigSchema';
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetFunctionModule } from '../../../../handlers/function_module/high/handleGetFunctionModule';
 import {
@@ -20,6 +20,7 @@ import {
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -37,6 +38,12 @@ import {
 } from '../../helpers/testHelpers';
 
 const testLogger = createTestLogger('get-function-module');
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['GetFunctionModule']);
 
 describe('GetFunctionModule Handler Integration (read-only)', () => {
   let connection: IAbapConnection | null = null;

@@ -14,7 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/interface
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import {
   TOOL_DEFINITION as CreateInterfaceTool,
   handleCreateInterface,
@@ -29,7 +29,18 @@ import {
 } from '../../../../handlers/interface/high/handleUpdateInterface';
 
 import { defineTool } from '../../../../lib/handlers/interfaces';
+import { servedSuite } from '../../helpers/servedHere';
 import { HighTester } from '../../helpers/testers/HighTester';
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateInterface',
+  'DeleteInterface',
+  'UpdateInterface',
+]);
 
 describe('Interface High-Level Handlers Integration', () => {
   let tester: HighTester;

@@ -10,12 +10,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import * as z from 'zod';
 import { handleRuntimeGetGatewayErrorLog } from '../../../../handlers/system/readonly/handleRuntimeGetGatewayErrorLog';
 import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListSystemMessages } from '../../../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite, skipUnlessServed } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -51,6 +52,12 @@ function expectSuccess(result: any, label: string): void {
     throw new Error(`${label} returned error: ${errorText.slice(0, 500)}`);
   }
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['RuntimeListFeeds', 'RuntimeListSystemMessages']);
 
 describe('Runtime Feed Handlers Integration', () => {
   let tester: LambdaTester;
@@ -264,11 +271,7 @@ describe('Runtime Feed Handlers Integration', () => {
 
   it('should list gateway errors via RuntimeGetGatewayErrorLog (on-prem)', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      if (context.isCloudSystem) {
-        throw new Error(
-          'SKIP: gateway error log is not available on cloud systems',
-        );
-      }
+      if (skipUnlessServed('RuntimeGetGatewayErrorLog')) return;
 
       const maxResults =
         readCaseParams(

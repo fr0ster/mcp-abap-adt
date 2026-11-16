@@ -9,7 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCheckBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckClass } from '../../../../handlers/class/high/handleCheckClass';
@@ -30,6 +30,7 @@ import { handleCheckTable } from '../../../../handlers/table/high/handleCheckTab
 import { getSharedDependenciesConfig } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams, stated } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -121,6 +122,29 @@ function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
   );
   assertEquals(errors, []);
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CheckBehaviorDefinition',
+  'CheckClass',
+  'CheckDataElement',
+  'CheckDdl',
+  'CheckDomain',
+  'CheckFunctionGroup',
+  'CheckFunctionModule',
+  'CheckInterface',
+  'CheckMetadataExtension',
+  'CheckPackage',
+  'CheckProgram',
+  'CheckStructure',
+  'CheckTable',
+  'CreateClass',
+  'DeleteClass',
+  'UpdateClass',
+]);
 
 describe('Check High-Level Handlers Integration', () => {
   // CheckClass

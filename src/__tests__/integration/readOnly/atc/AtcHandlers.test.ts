@@ -13,7 +13,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import { handleGetATCFindings } from '../../../../handlers/atc/high/handleGetATCFindings';
 import { handleGetATCResult } from '../../../../handlers/atc/high/handleGetATCResult';
 import { handleGetATCRunStatus } from '../../../../handlers/atc/high/handleGetATCRunStatus';
@@ -22,6 +22,7 @@ import { handleRunATC } from '../../../../handlers/atc/high/handleRunATC';
 import { pollUntilFinished } from '../../helpers/atcRun';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -34,6 +35,18 @@ function payload(result: any): any {
   if (!text) throw new Error('No response payload found');
   return JSON.parse(text);
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'GetATCFindings',
+  'GetATCResult',
+  'GetATCRunStatus',
+  'ListATCResults',
+  'RunATC',
+]);
 
 describe('ATC Handlers Integration', () => {
   let tester: LambdaTester;

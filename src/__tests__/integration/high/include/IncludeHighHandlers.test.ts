@@ -34,7 +34,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, describe, it } from 'node:test';
+import { after, afterEach, before, it } from 'node:test';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -71,6 +71,7 @@ import { systemsDescribe } from '../../helpers/live';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { withRootDescription } from '../../helpers/rootDescription';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -603,6 +604,16 @@ function objectTypesOf(
  * elsewhere the case skips (LambdaTester: "not available on onprem",
  * "No configuration found"). Nothing is written.
  */
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'GetInclude',
+  'HandlerDeletionCheck',
+  'HandlerGet',
+]);
+
 describe('Include on ABAP cloud: listed read-only, read', () => {
   let tester: LambdaTester;
   let handlerContext: HandlerContext | undefined;

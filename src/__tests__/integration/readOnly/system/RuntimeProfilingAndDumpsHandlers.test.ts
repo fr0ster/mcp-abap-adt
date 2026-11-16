@@ -8,7 +8,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
@@ -24,6 +24,7 @@ import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite, skipUnlessServed } from '../../helpers/servedHere';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -119,6 +120,19 @@ function toPositiveInt(value: unknown, fallback: number): number {
   }
   return Math.trunc(parsed);
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'RuntimeAnalyzeProfilerTrace',
+  'RuntimeGetDumpById',
+  'RuntimeGetProfilerTraceData',
+  'RuntimeListFeeds',
+  'RuntimeListProfilerTraceFiles',
+  'RuntimeRunClass',
+]);
 
 describe('Runtime Profiling and Dumps Handlers Integration', () => {
   let tester: LambdaTester;
@@ -242,11 +256,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
 
   it('runs the shared program under the profiler and gets the id of its trace (on-prem)', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      if (context.isCloudSystem) {
-        throw new Error(
-          'SKIP: programs are not available on cloud systems (expected on-prem only)',
-        );
-      }
+      if (skipUnlessServed('RuntimeRunProgram')) return;
       const programName = String(
         readCaseParams(
           context.params,

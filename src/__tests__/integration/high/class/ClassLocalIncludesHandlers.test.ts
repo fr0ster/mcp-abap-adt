@@ -18,7 +18,7 @@ import * as z from 'zod';
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleDeleteLocalDefinitions } from '../../../../handlers/class/high/handleDeleteLocalDefinitions';
@@ -39,6 +39,7 @@ import {
   statedKindWords,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -47,6 +48,28 @@ import {
   handlerAnswer,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'ActivateClassLow',
+  'CreateClass',
+  'DeleteClass',
+  'DeleteLocalDefinitions',
+  'DeleteLocalMacros',
+  'DeleteLocalTestClass',
+  'DeleteLocalTypes',
+  'GetLocalDefinitions',
+  'GetLocalMacros',
+  'GetLocalTestClass',
+  'GetLocalTypes',
+  'UpdateLocalDefinitions',
+  'UpdateLocalMacros',
+  'UpdateLocalTestClass',
+  'UpdateLocalTypes',
+]);
 
 describe('Class Local Includes High-Level Handlers Integration', () => {
   let tester: LambdaTester;

@@ -11,11 +11,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import { handleSearchSource } from '../../../../handlers/system/readonly/handleSearchSource';
 import { getSharedDependenciesConfig } from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
@@ -96,6 +97,12 @@ function matchesMask(name: string, mask: string): boolean {
   };
   return from(0, 0);
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['SearchSource']);
 
 describe('SearchSource Handler Integration', () => {
   let tester: LambdaTester;

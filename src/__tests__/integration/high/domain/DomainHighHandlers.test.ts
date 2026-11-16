@@ -14,7 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/domain
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import {
   TOOL_DEFINITION as CreateDomainTool,
   handleCreateDomain,
@@ -29,7 +29,14 @@ import {
 } from '../../../../handlers/domain/high/handleUpdateDomain';
 
 import { defineTool } from '../../../../lib/handlers/interfaces';
+import { servedSuite } from '../../helpers/servedHere';
 import { HighTester } from '../../helpers/testers/HighTester';
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['CreateDomain', 'DeleteDomain', 'UpdateDomain']);
 
 describe('Domain High-Level Handlers Integration', () => {
   let tester: HighTester;

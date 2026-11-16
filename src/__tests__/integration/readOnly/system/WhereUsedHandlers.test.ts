@@ -14,11 +14,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import * as z from 'zod';
 import { handleGetWhereUsed } from '../../../../handlers/system/readonly/handleGetWhereUsed';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -41,6 +42,12 @@ function extractResultData(result: any): any {
   }
   throw new Error('No response payload found');
 }
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['GetWhereUsed']);
 
 describe('WhereUsed Handler Integration', () => {
   let tester: LambdaTester;

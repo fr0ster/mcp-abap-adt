@@ -15,7 +15,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import {
   TOOL_DEFINITION as CreatePackage,
@@ -24,6 +24,7 @@ import {
 import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -42,6 +43,12 @@ const PackageParams = z.looseObject({
   software_component: z.string().optional(),
   transport_layer: z.string().optional(),
 });
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['CreatePackage', 'DeletePackage']);
 
 describe('Package High-Level Handlers Integration', () => {
   let tester: LambdaTester;

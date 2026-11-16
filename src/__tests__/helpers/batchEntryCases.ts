@@ -917,6 +917,8 @@ const WRITES: BatchEntryCase[] = [
   {
     tool: 'CreateTransportTask',
     args: { transport_number: TRANSPORT, target_user: 'USER_A' },
+    // The created task's number, so a request built from it is seen.
+    body: TRANSPORT_DOCUMENT,
   },
   {
     tool: 'RemoveTransportObject',

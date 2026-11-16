@@ -728,7 +728,7 @@ export const BATCH_KEEP_RAW_PARTS_ROW: Parameter = {
   kind: 'flag',
   default: false,
   section: 'BATCH MODE',
-  help: "Each answer of a batch (BatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
+  help: "Each answer of a batch (HandlerBatch answers, DebugBatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
 };
 
 export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';

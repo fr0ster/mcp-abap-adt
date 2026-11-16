@@ -21,7 +21,7 @@ import {
   registryOf,
   type ToolSet,
 } from '../../../lib/toolSet';
-import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
+import { SAMPLE_CALLS } from '../../helpers/batchEntryCases';
 import { inProcessServer } from '../../helpers/pinServer';
 
 afterEach(() => {
@@ -90,7 +90,7 @@ describe('nothing configured', () => {
     try {
       const listed = new Set(await server.listed());
       let called = 0;
-      for (const sample of BATCH_ENTRY_CASES) {
+      for (const sample of SAMPLE_CALLS) {
         if (!listed.has(sample.tool)) continue;
         // The connection is unreachable: each call fails on its connection,
         // after the point where a strategy would have been asked.

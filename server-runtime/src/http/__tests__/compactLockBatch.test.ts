@@ -3,21 +3,19 @@
  * in one batch, written in the next, unlocked in the third — each batch
  * reached by the instance's `state_handle`. The locks recorded in the lock
  * batch are held for the instance once their parts are answered at
- * `BatchEnd`, so the write batch and the unlock batch are recorded under them;
+ * `HandlerBatch` end, so the write batch and the unlock batch are recorded under them;
  * every envelope goes on the instance's one SAP session. Real HTTP to the ADT
  * stand-in; each envelope part answered as SAP would — a LOCK with a handle of
  * its own object.
  */
 
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
-import {
-  BatchHandlersGroup,
-  type HandlerContext,
-} from '@mcp-abap-adt/lib/handlers';
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   envelopeResponse,
   innerRequests,
 } from '../../../../src/__tests__/helpers/batchEnvelope';
+import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import {
   basicHeaders,
   type HttpStand,
@@ -56,7 +54,7 @@ beforeEach(async () => {
     server: { batch: { keepRawParts: false } },
     groups: [
       new CompactModifyHandlersGroup(placeholder),
-      new BatchHandlersGroup(placeholder),
+      new CompactBatchHandlersGroup(placeholder),
     ],
   });
   s.standIn.respond(
@@ -111,8 +109,8 @@ async function batch(
   calls: Array<[string, Record<string, unknown>]>,
 ): Promise<{ stateHandle: string; answers: Array<Record<string, unknown>> }> {
   const begun = await s.call(
-    'BatchBegin',
-    {},
+    'HandlerBatch',
+    { action: 'begin' },
     stateHandle === undefined ? undefined : withHeader(stateHandle),
   );
   expect(begun.isError).toBe(false);
@@ -126,7 +124,11 @@ async function batch(
       recorded: false,
     });
   }
-  const ended = await s.call('BatchEnd', {}, withHeader(handle));
+  const ended = await s.call(
+    'HandlerBatch',
+    { action: 'end' },
+    withHeader(handle),
+  );
   expect(JSON.parse(ended.text)).toMatchObject({
     recorded: calls.length,
     sent: calls.length,
@@ -135,8 +137,8 @@ async function batch(
   const answers: Array<Record<string, unknown>> = [];
   for (let n = 1; n <= calls.length; n += 1) {
     const read = await s.call(
-      'BatchAnswers',
-      { number: n },
+      'HandlerBatch',
+      { action: 'answers', number: n },
       withHeader(handle),
     );
     expect(read.isError).toBe(false);
@@ -145,7 +147,7 @@ async function batch(
   return { stateHandle: handle, answers };
 }
 
-/** A batch answer's tool answer, parsed: `BatchAnswers` names it beside its number. */
+/** A batch answer's tool answer, parsed: `HandlerBatch` answers names it beside its number. */
 const answerOf = (entry: Record<string, unknown>): Record<string, unknown> => {
   const text = JSON.stringify(entry);
   const at = text.indexOf('lock_handle');

@@ -2,7 +2,7 @@
 
 Generated from the tool definitions the server builds (not from docs).
 
-The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
+The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 - Level: High-Level
 - Total tools: 188
@@ -2677,7 +2677,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Create a new ABAP transport request in SAP system for development objects.
+**Description:** Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number, task_number and task_type.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -2686,6 +2686,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
 - `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
+- `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - The type given to the request's task: S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.
 - `transport_type` (string, optional (default: workbench), one of: `workbench`, `customizing`) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
 
 ---
@@ -2998,4 +2999,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-11-15*
+*Last updated: 2026-11-16*

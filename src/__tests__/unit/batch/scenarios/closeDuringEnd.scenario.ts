@@ -1,7 +1,7 @@
 /**
  * Plain-node scenario (`plainNode.ts`): the instance close begins while
- * `BatchEnd` executes. Two reads are recorded — one stateless batch, one
- * envelope — and `BatchEnd` starts; the envelope is held at the instance's
+ * the batch end (`HandlerBatch` end) executes. Two reads are recorded — one stateless batch, one
+ * envelope — and the batch end starts; the envelope is held at the instance's
  * connection, the close begins (the batch dropped), then the envelope is
  * answered. Reports the envelopes that reached the connection (their part
  * counts), the owner's state afterwards, and every unhandled rejection the
@@ -15,7 +15,7 @@ import * as z from 'zod';
 import { EmbeddableMcpServer } from '../../../../embeddable/EmbeddableMcpServer';
 import { InstanceBatch } from '../../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../../lib/batch/lateBound';
-import { BatchHandlersGroup } from '../../../../lib/handlers/groups/BatchHandlersGroup';
+import { CompactBatchHandlersGroup } from '../../../../lib/compact/batch/group';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -85,7 +85,7 @@ const tool = (name: string, property: string, handler: Handler) =>
 const group = {
   getName: () => 'close-during-end',
   getHandlers: () => [
-    tool('GetProgram', 'program_name', async (context, _args) => {
+    tool('HandlerProfileList', 'program_name', async (context, _args) => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/programs/programs/prog_a/source/main',
         method: 'GET',
@@ -93,7 +93,7 @@ const group = {
       });
       return { isError: false, content: [{ type: 'text', text: 'a' }] };
     }),
-    tool('GetInterface', 'interface_name', async (context, _args) => {
+    tool('HandlerUnitTestStatus', 'interface_name', async (context, _args) => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/oo/interfaces/if_a/source/main',
         method: 'GET',
@@ -117,7 +117,7 @@ const ledger = new HandlerLedger();
     connection: connection as never,
     handlersRegistry: new CompositeHandlersRegistry([
       ledger.watch(group),
-      new BatchHandlersGroup({ connection: undefined as never }),
+      new CompactBatchHandlersGroup({ connection: undefined as never }),
     ]),
     systemType: 'onprem',
     logger: { info() {}, debug() {}, warn() {}, error() {} } as never,
@@ -128,19 +128,19 @@ const ledger = new HandlerLedger();
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
 
   await client.callTool({
-    name: 'GetProgram',
+    name: 'HandlerProfileList',
     arguments: { program_name: 'PROG_A' },
   });
   await client.callTool({
-    name: 'GetInterface',
+    name: 'HandlerUnitTestStatus',
     arguments: { interface_name: 'IF_A' },
   });
   const recorded = [...(owner.opened()?.recorded ?? [])];
 
-  // BatchEnd's answer never reaches a closed client: its rejection is read.
+  // The batch end's answer never reaches a closed client: its rejection is read.
   let endSettled = false;
   void client
-    .callTool({ name: 'BatchEnd', arguments: {} })
+    .callTool({ name: 'HandlerBatch', arguments: { action: 'end' } })
     .then(
       () => undefined,
       () => undefined,

@@ -84,8 +84,9 @@ describe('closing the in-process server leaves an injected connection to its own
     const connection = { ...recordingConnection(), disconnect };
     const server = await inProcessServer('onprem', { injected: connection });
     await server.call('GetPackage', { package_name: 'ZANY' });
-    await server.call('BatchBegin', {});
-    await server.call('CreateClass', {
+    await server.call('HandlerBatch', { action: 'begin' });
+    await server.call('HandlerCreate', {
+      object_type: 'CLASS',
       class_name: 'ZANY_CLASS',
       package_name: 'ZANY',
       description: 'recorded, never sent',

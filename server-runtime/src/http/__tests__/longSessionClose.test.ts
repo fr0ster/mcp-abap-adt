@@ -13,11 +13,9 @@
 
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
-import {
-  BatchHandlersGroup,
-  type HandlerContext,
-} from '@mcp-abap-adt/lib/handlers';
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
+import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import { CompactLongSessionHandlersGroup } from '../../../../src/lib/compact/longSession/group';
 import { LongSessionHandlersGroup } from '../../../../src/lib/handlers/groups/LongSessionHandlersGroup';
 import { isClosing } from '../../../../src/lib/instanceClose';
@@ -54,7 +52,7 @@ beforeEach(async () => {
     server: { batch: { keepRawParts: false } },
     groups: [
       new CompactModifyHandlersGroup(placeholder),
-      new BatchHandlersGroup(placeholder),
+      new CompactBatchHandlersGroup(placeholder),
       new LongSessionHandlersGroup(placeholder),
       new CompactLongSessionHandlersGroup(placeholder),
     ],
@@ -180,7 +178,10 @@ it('close without a handle, or with an unknown one, answers state is not availab
 it('close runs at once while a batch is open: the batch and its recorded call are dropped with nothing sent', async () => {
   const handle = await openSession();
   await s.call('ProbeAdt', { id: 'one', state_handle: handle });
-  const begun = await s.call('BatchBegin', { state_handle: handle });
+  const begun = await s.call('HandlerBatch', {
+    action: 'begin',
+    state_handle: handle,
+  });
   expect(begun.isError).toBe(false);
   expect(handleOf(begun.text)).toBe(handle);
   const recorded = await s.call('HandlerLock', {
@@ -201,7 +202,8 @@ it('close runs at once while a batch is open: the batch and its recorded call ar
   expect(s.standIn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
     false,
   );
-  const answers = await s.call('BatchAnswers', {
+  const answers = await s.call('HandlerBatch', {
+    action: 'answers',
     number: 1,
     state_handle: handle,
   });
@@ -312,7 +314,7 @@ it('close ends any held state: a lock taken without SessionOpen, closed by its h
 });
 
 it('a close whose batch was the only thing held: the state empties, and the pool runs no disposal on the closed instance', async () => {
-  const begun = await s.call('BatchBegin', {});
+  const begun = await s.call('HandlerBatch', { action: 'begin' });
   expect(begun.isError).toBe(false);
   const handle = handleOf(begun.text);
   expect(poolSize()).toBe(1);

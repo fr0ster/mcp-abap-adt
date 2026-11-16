@@ -11,6 +11,7 @@ import { afterEach, describe, it, mock } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { IAccessChecks } from '../../../lib/access/accessChecks';
 import {
@@ -24,8 +25,8 @@ import { listedAccessChecks } from '../../../lib/access/listedAccessChecks';
 import { packageTreeAccessChecks } from '../../../lib/access/packageTreeAccessChecks';
 import { withoutDenied } from '../../../lib/access/withoutDenied';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
+import { CompactBatchHandlersGroup } from '../../../lib/compact/batch/group';
 import { noopLogger } from '../../../lib/handlerLogger';
-import { BatchHandlersGroup } from '../../../lib/handlers/groups/BatchHandlersGroup';
 import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { HighLevelHandlersGroup } from '../../../lib/handlers/groups/HighLevelHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
@@ -272,21 +273,23 @@ describe('path 1: a server instance', () => {
       batch,
       accessChecks: allowedPackages('Z*'),
       handlersRegistry: new CompositeHandlersRegistry([
-        new HighLevelHandlersGroup(context),
-        new BatchHandlersGroup(context),
+        new CompactModifyHandlersGroup(context),
+        new CompactBatchHandlersGroup(context),
       ]),
     });
     const client = await clientOf(server);
-    const begun = await client.call('BatchBegin', {});
+    const begun = await client.call('HandlerBatch', { action: 'begin' });
     assert.equal(begun.isError, false);
     const numbered = mock.method(batch, 'nextNumber');
-    const answer = await client.call('CreateClass', {
+    const answer = await client.call('HandlerCreate', {
+      object_type: 'CLASS',
       class_name: 'ZC',
       package_name: 'YFOO',
     });
     assert.equal(answer.body.error, 'package_not_allowed');
     assert.equal(numbered.mock.callCount(), 0);
-    await client.call('CreateClass', {
+    await client.call('HandlerCreate', {
+      object_type: 'CLASS',
       class_name: 'ZC',
       package_name: 'ZFOO',
       description: 'D',

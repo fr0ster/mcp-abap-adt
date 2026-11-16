@@ -17,8 +17,8 @@
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
- * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
- * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), background runs of the long reads, batch mode; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, the debugger batch; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
+ * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), background runs of the long reads; on stdio the leftover-session list and logoff; on Streamable HTTP `SessionOpen`, `SessionClose` |
  * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`, `HandlerDebugBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
  * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, background runs of the long reads, `HandlerBatch`; on stdio the leftover-session list and logoff; on Streamable HTTP `HandlerSession` |
  *
@@ -75,7 +75,6 @@ import {
   type ToolSetKind,
 } from './config/binaries';
 import { BackgroundRunHandlersGroup } from './handlers/groups/BackgroundRunHandlersGroup.js';
-import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
 import { DataHandlersGroup } from './handlers/groups/DataHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
 import {
@@ -297,8 +296,6 @@ const COMPACT_DATA_LINE = dataToolsLine('HandlerGetData');
 
 const READONLY_LINE =
   'readonly: Get*, List*, ReadTransport* (read operations), with search and system';
-const BATCH_LINE =
-  'batch mode: BatchBegin, BatchEnd, BatchAnswers — independent calls recorded, sent together in envelopes, answered by number';
 const COMPACT_BATCH_LINE =
   "batch mode: HandlerBatch (action 'begin', 'end', 'answers') — independent calls recorded, sent together in envelopes, answered by number";
 const LONG_SESSION_LINE =
@@ -334,7 +331,6 @@ export const fullToolSet: ToolSet = {
           'the leftover SAP sessions of an ended process: list, log off',
         ),
         'background runs of the long reads, RuntimeRunClass and RuntimeRunProgram: read, list, cancel or discard',
-        BATCH_LINE,
         DATA_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
@@ -359,8 +355,8 @@ export const fullToolSet: ToolSet = {
         servesLeftoverSessions(transport) ||
         !(group instanceof LeftoverSessionHandlersGroup),
     ),
-    // Batch mode, on every transport; the debugger batch beside the debugger.
-    new BatchHandlersGroup(context),
+    // The debugger batch beside the debugger; batch mode is the compact
+    // sets' (HandlerBatch).
     new DebugBatchHandlersGroup(context),
     // The long session, on Streamable HTTP alone.
     ...(servesLongSession(transport)
@@ -391,7 +387,6 @@ export const fullReadOnlyToolSet: ToolSet = {
           'the leftover SAP sessions of an ended process: list',
         ),
         'background runs of the long reads: read, list, cancel',
-        BATCH_LINE,
         DATA_LINE,
         ...longSessionLine(transport, LONG_SESSION_LINE),
       ],
@@ -415,7 +410,6 @@ export const fullReadOnlyToolSet: ToolSet = {
     ...(servesLeftoverSessions(transport)
       ? [new LeftoverSessionListHandlersGroup(context)]
       : []),
-    new BatchHandlersGroup(context),
     ...(servesLongSession(transport)
       ? [new LongSessionHandlersGroup(context)]
       : []),

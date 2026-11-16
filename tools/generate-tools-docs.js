@@ -25,7 +25,8 @@ const OUTPUT_PATHS = {
 };
 // `low` left in 19.0.0: the low set is not served by the full binaries,
 // and the low handler files that remain serve compact and high only.
-const LEVELS = ['readonly', 'high', 'debug', 'session', 'batch'];
+// `batch` left in 24.0.0: batch mode is the compact sets' (`HandlerBatch`).
+const LEVELS = ['readonly', 'high', 'debug', 'session'];
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
@@ -149,7 +150,6 @@ const GROUP_LEVELS = {
   DebugBatchHandlersGroup: 'debug',
   LeftoverSessionHandlersGroup: 'session',
   LeftoverSessionListHandlersGroup: 'session',
-  BatchHandlersGroup: 'batch',
 };
 
 /** Every built handler module, `dist/handlers/<object>/<level>/<file>.js`. */
@@ -386,7 +386,6 @@ function levelTitle(level) {
   if (level === 'low') return 'Low-Level';
   if (level === 'debug') return 'Debug';
   if (level === 'session') return 'Session';
-  if (level === 'batch') return 'Batch';
   return level;
 }
 
@@ -505,7 +504,6 @@ function generateMarkdown(tools, surface) {
     high: tools.filter((t) => t.level === 'high').length,
     debug: tools.filter((t) => t.level === 'debug').length,
     session: tools.filter((t) => t.level === 'session').length,
-    batch: tools.filter((t) => t.level === 'batch').length,
   };
 
   let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
@@ -515,8 +513,7 @@ function generateMarkdown(tools, surface) {
   md += `- Read-only tools: ${summary.readonly}\n`;
   md += `- High-level tools: ${summary.high}\n`;
   md += `- Debug tools: ${summary.debug}\n`;
-  md += `- Session tools: ${summary.session}\n`;
-  md += `- Batch tools: ${summary.batch}\n\n`;
+  md += `- Session tools: ${summary.session}\n\n`;
 
   md += `## Handler Sets\n\n`;
   md += `The binary fixes its tool set (19.0.0); there is no \`--exposition\`.\n\n`;
@@ -525,7 +522,7 @@ function generateMarkdown(tools, surface) {
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
   md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
   md += `- every Streamable HTTP binary (\`-http\`, \`-http-ro\`) -> [${HTTP_HEADING}](#${anchorFromHeading(HTTP_HEADING)}): the optional \`state_handle\` argument on every tool, and the long session (${surface.sessionTools.map((tool) => `\`${tool.name}\``).join(', ')}). No stdio or SSE binary serves these\n`;
-  md += `- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, \`HandlerBatch\`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it\n`;
+  md += `- batch mode (record independent calls, send them together, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)) is the compact binaries' alone, one tool, \`HandlerBatch\`; the binaries on this page serve none, and their tools' descriptions carry no batch sentence. The debugger batch of the full binaries is in the [Debug Group](#debug-group): \`DebugBatchBegin\`, \`DebugBatchEnd\`, and \`DebugBatchAnswers\`, which reads its answers\n`;
   md += `- compact -> [the compact package](../../compact/README.md): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;
@@ -724,11 +721,11 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
 
 /** What the read-only page lists, said on the page. */
 const READ_ONLY_PAGE_INTRO =
-  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
+  "Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
 
 /** What the high-level page says beside its tools. */
 const HIGH_PAGE_INTRO =
-  "The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).";
+  'The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.';
 
 function main() {
   console.log('🔍 Reading the built tool sets...');

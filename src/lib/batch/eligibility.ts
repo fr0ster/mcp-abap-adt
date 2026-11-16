@@ -3,7 +3,7 @@
  * `tools/batch-handlers.json`, read once, and nothing else.
  *
  * The one criterion (the owner, 2026-10-16): none of a recorded call's
- * requests needs another's answer — answers arrive only at `BatchEnd`, so a
+ * requests needs another's answer — answers arrive only at the batch end, so a
  * handler that reads a first answer to build or decide a second request (a
  * create then its activation, a fallback after a `404`, a poll) cannot be
  * recorded; several requests sent together can. Long reads are judged the
@@ -37,7 +37,8 @@ export type WhenRule = {
 /** One row of `tools/batch-handlers.json`. */
 export interface BatchEntry {
   tool: string;
-  set: 'full' | 'compact';
+  /** Batch mode is the compact sets' (`HandlerBatch`): every entry is theirs. */
+  set: 'compact';
   /** `path#function`, from the repository root. */
   handler: string;
   /** The requests the call sends, in words. */
@@ -113,7 +114,7 @@ function batchEntryOf(value: JsonValue, at: number): BatchEntry {
   const sends = jsonAt(value, 'sends');
   if (
     typeof tool !== 'string' ||
-    (set !== 'full' && set !== 'compact') ||
+    set !== 'compact' ||
     typeof handler !== 'string' ||
     typeof sends !== 'string'
   ) {

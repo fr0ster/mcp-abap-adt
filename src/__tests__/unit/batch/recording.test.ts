@@ -14,6 +14,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import {
   BATCH_NO_BACKGROUND_WORDS,
@@ -30,8 +31,6 @@ import { createRecorder, untilSent } from '../../../lib/batch/recorder';
 import { callTransportRequest } from '../../../lib/callTransport';
 import { createAdtClient } from '../../../lib/clients';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
-import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
-import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -92,19 +91,12 @@ function groupOf(entries: HandlerEntry[]): IHandlerGroup {
 }
 
 /** The shipped entry of `name`, its handler reading its own group's context. */
-const VERSION_FROM =
-  '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
-const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';
-
 function shipped(name: string): IHandlerGroup {
   const placeholder = {
     connection: null,
     logger: undefined,
   } as unknown as HandlerContext;
-  for (const group of [
-    new ReadOnlyHandlersGroup(placeholder),
-    new SearchHandlersGroup(placeholder),
-  ]) {
+  for (const group of [new CompactReadOnlyHandlersGroup(placeholder)]) {
     const entry = group
       .getHandlers()
       .find((e) => e.toolDefinition.name === name);
@@ -227,8 +219,12 @@ afterEach(() => {
 
 describe('recording in batch mode', () => {
   it('an eligible call in batch mode answers { content: [] } before execute runs', async () => {
-    const s = await stand([groupOf([tool('GetProgram', oneGet('/program'))])]);
-    const answer = await s.call('GetProgram', { name: 'Z' });
+    const s = await stand([
+      groupOf([tool('HandlerServiceBindingListTypes', oneGet('/program'))]),
+    ]);
+    const answer = await s.call('HandlerServiceBindingListTypes', {
+      name: 'Z',
+    });
     expect(answer).toEqual({ content: [] });
     expect(s.execute).not.toHaveBeenCalled();
     expect(s.recorded).toEqual(['/program']);
@@ -238,11 +234,14 @@ describe('recording in batch mode', () => {
 
   it("the instance's connection receives no makeAdtRequest while recording", async () => {
     const s = await stand([
-      groupOf([tool('GetProgram', oneGet('/program'))]),
-      shipped('GetClass'),
+      groupOf([tool('HandlerServiceBindingListTypes', oneGet('/program'))]),
+      shipped('HandlerGet'),
     ]);
-    await s.call('GetProgram', { name: 'Z' });
-    await s.call('GetClass', { class_name: 'ZCL_PLACEHOLDER' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
+    await s.call('HandlerGet', {
+      object_type: 'CLASS',
+      class_name: 'ZCL_PLACEHOLDER',
+    });
     expect(s.instance.connection.makeAdtRequest).not.toHaveBeenCalled();
     expect(s.recorded).toHaveLength(2);
     await s.close();
@@ -252,13 +251,13 @@ describe('recording in batch mode', () => {
     const delayed = () => new Promise<void>((r) => setTimeout(r, 30));
     const s = await stand([
       groupOf([
-        tool('GetProgram', oneGet('/first', delayed)),
-        tool('GetClass', oneGet('/second')),
+        tool('HandlerServiceBindingListTypes', oneGet('/first', delayed)),
+        tool('HandlerProfileList', oneGet('/second')),
       ]),
     ]);
     const answers = await Promise.all([
-      s.call('GetProgram', { name: 'Z' }),
-      s.call('GetClass', { name: 'Z' }),
+      s.call('HandlerServiceBindingListTypes', { name: 'Z' }),
+      s.call('HandlerProfileList', { name: 'Z' }),
     ]);
     expect(answers).toEqual([{ content: [] }, { content: [] }]);
     expect(s.recorded).toEqual(['/first', '/second']);
@@ -266,21 +265,23 @@ describe('recording in batch mode', () => {
     await s.close();
   });
 
-  it('a call sending two independent parts (GetObjectVersionDiff) takes one number for both', async () => {
+  it('a call sending independent parts (HandlerGet part draft) takes one number for all', async () => {
     const s = await stand([
-      shipped('GetObjectVersionDiff'),
-      groupOf([tool('GetProgram', oneGet('/program'))]),
+      shipped('HandlerGet'),
+      groupOf([tool('HandlerServiceBindingListTypes', oneGet('/program'))]),
     ]);
     expect(
-      await s.call('GetObjectVersionDiff', {
-        object_type: 'class',
-        content_uri_from: VERSION_FROM,
-        content_uri_to: VERSION_TO,
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+        part: 'draft',
       }),
     ).toEqual({ content: [] });
-    expect(s.recorded).toEqual([VERSION_FROM, VERSION_TO]);
+    // The three versions of the one part, sent together.
+    expect(s.recorded).toHaveLength(3);
+    expect(s.recorded.every((url) => url.includes('prog_a'))).toBe(true);
     expect(recordedCalls(s)).toEqual([1]);
-    await s.call('GetProgram', { name: 'Z' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     expect(recordedCalls(s)).toEqual([1, 2]);
     await s.close();
   });
@@ -304,11 +305,14 @@ describe('recording in batch mode', () => {
       return { content: [{ type: 'text', text: 'both' }] };
     };
     const s = await stand([
-      groupOf([tool('GetProgram', twoParts), tool('GetClass', oneGet('/b'))]),
+      groupOf([
+        tool('HandlerServiceBindingListTypes', twoParts),
+        tool('HandlerProfileList', oneGet('/b')),
+      ]),
     ]);
     await Promise.all([
-      s.call('GetProgram', { name: 'Z' }),
-      s.call('GetClass', { name: 'Z' }),
+      s.call('HandlerServiceBindingListTypes', { name: 'Z' }),
+      s.call('HandlerProfileList', { name: 'Z' }),
     ]);
     expect(s.recorded).toEqual(['/a-1', '/a-2', '/b']);
     expect(recordedCalls(s)).toEqual([1, 2]);
@@ -321,7 +325,7 @@ describe('recording in batch mode', () => {
     const s = await stand([
       groupOf([
         tool(
-          'GetClass',
+          'HandlerProfileList',
           async (context, args) => {
             received = args;
             return oneGet('/class')(context, args);
@@ -333,10 +337,13 @@ describe('recording in batch mode', () => {
         ),
       ]),
     ]);
-    await s.call('GetClass', { class_name: 'ZCL_PLACEHOLDER', unknown: 1 });
+    await s.call('HandlerProfileList', {
+      class_name: 'ZCL_PLACEHOLDER',
+      unknown: 1,
+    });
     expect(asked).toHaveBeenCalledTimes(1);
     const [name, args, kind] = asked.mock.calls[0] ?? [];
-    expect(name).toBe('GetClass');
+    expect(name).toBe('HandlerProfileList');
     expect(args).toEqual({ class_name: 'ZCL_PLACEHOLDER', version: 'active' });
     expect(kind).toBe('http');
     // The same object the handler received.
@@ -349,7 +356,7 @@ describe('recording in batch mode', () => {
     const s = await stand([
       groupOf([
         tool('UpdateDomain', update as Handler),
-        tool('GetProgram', oneGet('/program')),
+        tool('HandlerServiceBindingListTypes', oneGet('/program')),
       ]),
     ]);
     const refused = refusalOf(await s.call('UpdateDomain', { name: 'Z' }));
@@ -359,7 +366,7 @@ describe('recording in batch mode', () => {
     });
     expect(update).not.toHaveBeenCalled();
     expect(s.recorded).toEqual([]);
-    await s.call('GetProgram', { name: 'Z' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     expect(recordedCalls(s)).toEqual([1]);
     await s.close();
   });
@@ -367,20 +374,20 @@ describe('recording in batch mode', () => {
   it('a handler that refuses its arguments before sending answers at once and takes no number', async () => {
     const s = await stand([
       groupOf([
-        tool('GetClass', async () => ({
+        tool('HandlerProfileList', async () => ({
           isError: true,
           content: [{ type: 'text', text: 'class_name is required' }],
         })),
-        tool('GetProgram', oneGet('/program')),
+        tool('HandlerServiceBindingListTypes', oneGet('/program')),
       ]),
     ]);
-    const answer = await s.call('GetClass', { name: '' });
+    const answer = await s.call('HandlerProfileList', { name: '' });
     expect(answer).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'class_name is required' }],
     });
     expect(recordedCalls(s)).toEqual([]);
-    await s.call('GetProgram', { name: 'Z' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     expect(recordedCalls(s)).toEqual([1]);
     await s.close();
   });
@@ -436,9 +443,9 @@ describe('recording in batch mode', () => {
   it('a long read with independent requests is recorded: runLongCall and openFreshConnection not called', async () => {
     const run = jest.spyOn(longCall, 'runLongCall');
     const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
-    const s = await stand([shipped('SearchObject')]);
-    const answer = await s.call('SearchObject', {
-      object_name: 'ZPLACEHOLDER*',
+    const s = await stand([shipped('HandlerSearch')]);
+    const answer = await s.call('HandlerSearch', {
+      query: 'ZPLACEHOLDER*',
     });
     expect(answer).toEqual({ content: [] });
     expect(run).not.toHaveBeenCalled();
@@ -454,14 +461,14 @@ describe('recording in batch mode', () => {
     // A server that lists `background`: a strategy and the tool reading its runs.
     const s = await stand(
       [
-        shipped('SearchObject'),
+        shipped('HandlerSearch'),
         new BackgroundRunHandlersGroup(noConnectionContext()),
       ],
       { backgroundRuns: true },
     );
     const refused = refusalOf(
-      await s.call('SearchObject', {
-        object_name: 'ZPLACEHOLDER*',
+      await s.call('HandlerSearch', {
+        query: 'ZPLACEHOLDER*',
         background: true,
       }),
     );
@@ -478,13 +485,13 @@ describe('recording in batch mode', () => {
     let seen: AbortSignal | undefined;
     const s = await stand([
       groupOf([
-        tool('GetProgram', async (context, args) => {
+        tool('HandlerServiceBindingListTypes', async (context, args) => {
           seen = currentRequestSignal();
           return oneGet('/program')(context, args);
         }),
       ]),
     ]);
-    await s.call('GetProgram', { name: 'Z' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     await s.server.idle();
     expect(seen).toBe(s.owner.signal());
     expect(seen?.aborted).toBe(false);
@@ -497,7 +504,7 @@ describe('recording in batch mode', () => {
     const s = await stand([
       groupOf([
         tool(
-          'GetProgram',
+          'HandlerServiceBindingListTypes',
           async (context, args) => {
             seen = callTransportRequest();
             return oneGet('/program')(context, args);
@@ -509,7 +516,7 @@ describe('recording in batch mode', () => {
         ),
       ]),
     ]);
-    const answered = await s.call('GetProgram', {
+    const answered = await s.call('HandlerServiceBindingListTypes', {
       name: 'Z',
       transport_request: 'SIDK900001',
     });
@@ -523,33 +530,33 @@ describe('recording in batch mode', () => {
     let settled = false;
     const s = await stand([
       groupOf([
-        tool('GetProgram', async (context, args) => {
+        tool('HandlerServiceBindingListTypes', async (context, args) => {
           const answer = await oneGet('/program')(context, args);
           settled = true;
           return answer;
         }),
       ]),
     ]);
-    await s.call('GetProgram', { name: 'Z' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     const idle = await Promise.race([
       s.server.idle().then(() => 'idle'),
       new Promise((r) => setTimeout(() => r('held'), 1000)),
     ]);
     expect(idle).toBe('idle');
-    expect(settled).toBe(false); // its part waits for BatchEnd
+    expect(settled).toBe(false); // its part waits for HandlerBatch end
     await s.close();
   });
 
   it("a recording call reaches the instance's connection through the target in its turn; the target is cleared when the call returns", async () => {
     const s = await stand([
       groupOf([
-        tool('GetProgram', async (context, args) => {
+        tool('HandlerServiceBindingListTypes', async (context, args) => {
           await context.connection.getBaseUrl();
           return oneGet('/program')(context, args);
         }),
       ]),
     ]);
-    await s.call('GetProgram', { name: 'Z' });
+    await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     expect(s.instance.connection.getBaseUrl).toHaveBeenCalledTimes(1);
     await expect(s.target.getBaseUrl()).rejects.toThrow(
       LATE_BOUND_UNPOINTED_WORDS,
@@ -596,7 +603,7 @@ describe('recording in batch mode', () => {
     const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
     // The batch opens while the call is past its entry: during its system
     // lookup, which it makes in a turn of its own (it holds none).
-    const s = await stand([shipped('SearchObject')], {
+    const s = await stand([shipped('HandlerSearch')], {
       open: false,
       onLookup: (stand) => {
         if (stand.owner.mode() === 'off') {
@@ -609,10 +616,10 @@ describe('recording in batch mode', () => {
       },
     });
     expect(
-      refusalOf(await s.call('SearchObject', { object_name: 'ZPLACEHOLDER*' })),
+      refusalOf(await s.call('HandlerSearch', { query: 'ZPLACEHOLDER*' })),
     ).toEqual({
       error: 'batch_not_recordable',
-      message: batchNotServedWords('SearchObject'),
+      message: batchNotServedWords('HandlerSearch'),
     });
     expect(s.owner.mode()).toBe('communication');
     expect(run).not.toHaveBeenCalled();
@@ -623,10 +630,15 @@ describe('recording in batch mode', () => {
   });
 
   it('with no batch open nothing changes: the call goes to the instance connection', async () => {
-    const s = await stand([groupOf([tool('GetProgram', oneGet('/program'))])], {
-      open: false,
+    const s = await stand(
+      [groupOf([tool('HandlerServiceBindingListTypes', oneGet('/program'))])],
+      {
+        open: false,
+      },
+    );
+    const answer = await s.call('HandlerServiceBindingListTypes', {
+      name: 'Z',
     });
-    const answer = await s.call('GetProgram', { name: 'Z' });
     expect(answer).toEqual({ content: [{ type: 'text', text: '/program' }] });
     expect(s.instance.sent.map((r) => r.url)).toEqual(['/program']);
     expect(s.recorded).toEqual([]);

@@ -36,7 +36,7 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
-import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
+import { SAMPLE_CALLS } from '../../helpers/batchEntryCases';
 import {
   type CountedRequest,
   countingConnection,
@@ -521,7 +521,7 @@ function callsOf(tool: string, entry: HandlerEntry): Sample[] {
     args: requiredOf(entry.toolDefinition.inputSchema),
   };
   return [
-    ...BATCH_ENTRY_CASES.filter((c) => c.tool === tool).map(
+    ...SAMPLE_CALLS.filter((c) => c.tool === tool).map(
       (c): Sample => ({ args: c.args, body: c.body }),
     ),
     own,

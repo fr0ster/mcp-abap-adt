@@ -36,11 +36,14 @@ afterEach(() => {
 });
 
 it('a recorded read runs on the kind the server states, not SAP_SYSTEM_TYPE', async () => {
-  const stand = await batchStand({ tools: ['GetProgram'], part: sap });
+  const stand = await batchStand({ tools: ['HandlerGet'], part: sap });
   try {
     stand.begin();
     const recorded = await withinTurns(
-      stand.call('GetProgram', { program_name: 'PROG_A' }),
+      stand.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
     );
     expect(recorded.isError).toBeFalsy();
     const { summary } = await withinTurns(stand.end());

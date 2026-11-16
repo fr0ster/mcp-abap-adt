@@ -165,8 +165,10 @@ describe('the coverage ledger guard', () => {
   });
 
   it('the served list is the listed-schema fixture', () => {
-    // 24.0.0: GetObjectDraft, one more.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 314);
+    // 24.0.0: GetObjectDraft, one more; BatchBegin, BatchEnd and
+    // BatchAnswers left the full sets, three fewer; DebugBatchAnswers, one
+    // more.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 312);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 

@@ -278,10 +278,10 @@ describe('tool descriptions are purely functional', () => {
   });
 
   it('reads identifiers, first sentences and read tools with plain code', () => {
-    expect(identifiersOf('names GetClass_x, (BatchEnd)-done')).toEqual([
+    expect(identifiersOf('names GetClass_x, (DebugBatchEnd)-done')).toEqual([
       'names',
       'GetClass_x',
-      'BatchEnd',
+      'DebugBatchEnd',
       'done',
     ]);
     expect(firstSentence('Reads X (e.g. Y). Then Z.')).toBe(
@@ -310,8 +310,7 @@ describe('tool descriptions are purely functional', () => {
       'GetUnitTestStatus',
       'DiscardBackgroundRun',
       'ListLeftoverSessions',
-      'BatchBegin',
-      'BatchAnswers',
+      'DebugBatchAnswers',
       'HandlerBatch',
       'HandlerDumpList',
       'HandlerProfileList',

@@ -220,7 +220,7 @@ export const BATCH_MODE_OFF_WORDS =
 
 /** A long read given `background: true` in batch mode: refused before anything is recorded. */
 export const BATCH_NO_BACKGROUND_WORDS =
-  'in batch mode a read takes no background: it is recorded, and the batch is sent at BatchEnd';
+  'in batch mode a read takes no background: it is recorded, and the batch is sent at its end';
 
 /**
  * A request of a recorded call after its batch ended: a handler resumed when
@@ -229,12 +229,12 @@ export const BATCH_NO_BACKGROUND_WORDS =
 export const BATCH_ENDED_WORDS =
   'the batch has ended; this call can send nothing more';
 
-/** `BatchEnd`'s error: the envelope's answer did not split into parts. */
+/** The batch end's error: the envelope's answer did not split into parts. */
 export const BATCH_UNSPLIT_WORDS =
   "the envelope's answer could not be split into the calls' parts";
 
 /**
- * `BatchEnd`'s error: fewer parts came than requests were sent, so no part
+ * the batch end's error: fewer parts came than requests were sent, so no part
  * can be matched to its call.
  */
 export function batchPartsMismatchWords(
@@ -245,7 +245,7 @@ export function batchPartsMismatchWords(
 }
 
 /**
- * `BatchEnd`'s error (`batch_parts_mismatch`): more parts came than requests
+ * the batch end's error (`batch_parts_mismatch`): more parts came than requests
  * were sent. adt-clients settles one part per request and drops the rest
  * unread, so how many more is not known here.
  */

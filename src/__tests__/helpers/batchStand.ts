@@ -1,9 +1,9 @@
 /**
- * A server instance with batch mode, for the BatchEnd / BatchAnswers / no-retry
+ * A server instance with batch mode, for the batch end / answers / no-retry
  * tests: a `BaseMcpServer` whose connection is built from a source (so a test
  * can end a connection's session, or make the source fail), the shipped handlers of
- * the tools a test names, and the real batch tools (`BatchHandlersGroup`,
- * and the compact `HandlerBatch`).
+ * the tools a test names, and the real batch tool (the compact `HandlerBatch`:
+ * batch mode is the compact sets').
  * `begin()` opens the batch directly, so a test can count `execute()`.
  *
  * Each built connection is a fake (`envelopeConnection`): an envelope is
@@ -40,7 +40,6 @@ import { communicationBatch } from '../../lib/batch/tools';
 import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import {
-  BatchHandlersGroup,
   DataHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -193,16 +192,16 @@ export interface Stand {
   batch(): AdtBatchConnection;
   /** Every `execute()` of every batch opened here. */
   executes: jest.Mock;
-  /** Opens a communication batch, as BatchBegin does, counting its `execute()`. */
+  /** Opens a communication batch, as HandlerBatch begin does, counting its `execute()`. */
   begin(): void;
   /** SAP ended the session of the connection built last: the next call replaces it. */
   loseSession(): void;
   /** The source's next `resolve` fails with `error`. */
   failResolve(error: unknown): void;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
-  /** BatchEnd's answer, parsed. */
+  /** HandlerBatch end's answer, parsed. */
   end(): Promise<{ answer: Answer; summary: Record<string, unknown> }>;
-  /** BatchAnswers' entries for `numbers`, parsed. */
+  /** HandlerBatch answers' entries for `numbers`, parsed. */
   answers(numbers: number[]): Promise<AnswerEntry[]>;
   close(): Promise<void>;
 }
@@ -259,7 +258,6 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
         options.ledger === undefined ? g : options.ledger.watch(g),
       ),
       ...(options.groups ?? []),
-      new BatchHandlersGroup({ connection: undefined as never }),
       new CompactBatchHandlersGroup({ connection: undefined as never }),
     ],
     owner,
@@ -285,7 +283,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     },
     executes,
     begin: () => {
-      // As BatchBegin opens it: the envelope watch included.
+      // As HandlerBatch begin opens it: the envelope watch included.
       const open = communicationBatch();
       const batch = open.connection;
       const execute = batch.execute.bind(batch);
@@ -306,12 +304,12 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     },
     call,
     end: async () => {
-      const answer = await call('BatchEnd');
+      const answer = await call('HandlerBatch', { action: 'end' });
       const text = answer.content?.[0]?.text ?? '{}';
       return { answer, summary: JSON.parse(text) };
     },
     answers: async (numbers) => {
-      const answer = await call('BatchAnswers', { numbers });
+      const answer = await call('HandlerBatch', { action: 'answers', numbers });
       return JSON.parse(answer.content?.[0]?.text ?? '[]');
     },
     close: async () => {

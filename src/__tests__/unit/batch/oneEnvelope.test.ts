@@ -9,11 +9,18 @@ import * as z from 'zod';
  *
  * The batch connection is adt-clients' own `AdtBatchConnection`; every built
  * connection is a fake that answers envelopes part by part (`batchStand`).
- * The full set ends with `BatchEnd`, the compact set with `HandlerBatch`.
+ * Batch mode is the compact sets': a batch ends with `HandlerBatch`.
  */
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock below.
+  siblingRecordOf: jest.fn(() => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  })),
   // A view over a connection keeps its kind: the kind is mocked above.
   withSystemKindOf: jest.fn((view: object) => view),
 }));
@@ -57,7 +64,7 @@ function sap(inner: InnerRequest): PartAnswer {
   };
 }
 
-const TOOLS = ['GetProgram', 'GetClass', 'HandlerLock', 'HandlerUnlock'];
+const TOOLS = ['HandlerGet', 'HandlerLock', 'HandlerUnlock'];
 
 const lock = (name: string) => ({ object_type: 'CLASS', object_name: name });
 const unlock = (name: string) => ({
@@ -91,12 +98,6 @@ function refusedOtherKind(
 /** The two sets: how each begins, ends and reads a batch. */
 const SETS = [
   {
-    set: 'full',
-    begin: (s: Stand) => s.call('BatchBegin'),
-    end: async (s: Stand) => payloadOf(await s.call('BatchEnd')),
-    answers: (s: Stand, numbers: number[]) => s.answers(numbers),
-  },
-  {
     set: 'compact',
     begin: (s: Stand) => s.call('HandlerBatch', { action: 'begin' }),
     end: async (s: Stand) =>
@@ -122,8 +123,11 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
     });
     expect(s.owner.kind()).toBe('lock');
     refusedOtherKind(
-      await s.call('GetProgram', { program_name: 'PROG_A' }),
-      'GetProgram',
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+      'HandlerGet',
       'stateless',
       'LOCK',
     );
@@ -167,7 +171,12 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
       part: sap,
     });
     await set.begin(s);
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+    ).toEqual({
       content: [],
     });
     expect(s.owner.kind()).toBe('stateless');
@@ -184,7 +193,12 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
       'stateless',
     );
     // A stateless read: one number.
-    expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'CLASS',
+        class_name: 'CLAS_A',
+      }),
+    ).toEqual({
       content: [],
     });
     expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
@@ -215,8 +229,11 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
       'UNLOCK',
     );
     refusedOtherKind(
-      await s.call('GetClass', { class_name: 'CLAS_A' }),
-      'GetClass',
+      await s.call('HandlerGet', {
+        object_type: 'CLASS',
+        class_name: 'CLAS_A',
+      }),
+      'HandlerGet',
       'stateless',
       'UNLOCK',
     );
@@ -247,7 +264,12 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
     expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
     expect(s.owner.kind()).toBeUndefined();
     await set.begin(s);
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+    ).toEqual({
       content: [],
     });
     expect(s.owner.kind()).toBe('stateless');
@@ -269,7 +291,7 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
 type Step = 'lock' | 'read' | 'stateful';
 
 /**
- * `GetProgram` served by a member of the test's own: it records its parts
+ * `HandlerProfileList` served by a member of the test's own: it records its parts
  * in `steps` order, synchronously, before awaiting any answer — a `lock`
  * asks for stateful and records a LOCK, a `read` records a GET, and
  * `stateful` asks for stateful and records a LOCK without ever restoring.
@@ -280,8 +302,8 @@ function memberOf(steps: Step[]): IHandlerGroup {
     getHandlers: () => [
       {
         toolDefinition: {
-          name: 'GetProgram',
-          description: 'GetProgram',
+          name: 'HandlerProfileList',
+          description: 'HandlerProfileList',
           inputSchema: z.object({ program_name: z.string().optional() }),
         },
         call: async (context: HandlerContext, _args: unknown) => {
@@ -320,22 +342,32 @@ describe('a call with a part of another kind', () => {
   it('first part refused: the call answers batch_other_kind, its later part of the batch kind is not recorded, no number', async () => {
     const s = await batchStand({
       heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: ['GetClass'],
+      tools: ['HandlerGet'],
       part: sap,
       groups: [memberOf(['lock', 'read'])],
     });
     s.begin();
-    expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'CLASS',
+        class_name: 'CLAS_A',
+      }),
+    ).toEqual({
       content: [],
     });
     refusedOtherKind(
-      await s.call('GetProgram', { program_name: 'PROG_A' }),
-      'GetProgram',
+      await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
+      'HandlerProfileList',
       'LOCK',
       'stateless',
     );
     // No number for it: the next call is 2.
-    expect(await s.call('GetClass', { class_name: 'CLAS_B' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'CLASS',
+        class_name: 'CLAS_B',
+      }),
+    ).toEqual({
       content: [],
     });
     expect((await s.end()).summary).toEqual({
@@ -353,14 +385,16 @@ describe('a call with a part of another kind', () => {
   it('a later part refused: the call answers batch_other_kind naming its number, the earlier part is sent, its number answers the refusal', async () => {
     const s = await batchStand({
       heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: ['GetClass'],
+      tools: ['HandlerGet'],
       part: sap,
       groups: [memberOf(['read', 'lock', 'read'])],
     });
     s.begin();
-    const answer = await s.call('GetProgram', { program_name: 'PROG_A' });
+    const answer = await s.call('HandlerProfileList', {
+      program_name: 'PROG_A',
+    });
     const words =
-      'GetProgram is a LOCK request; this batch holds stateless requests — record it in the next batch. An earlier part of this call was recorded, under number 1, and will be sent at the batch end; its answer under that number is this refusal';
+      'HandlerProfileList is a LOCK request; this batch holds stateless requests — record it in the next batch. An earlier part of this call was recorded, under number 1, and will be sent at the batch end; its answer under that number is this refusal';
     expect(answer.isError).toBe(true);
     expect(payloadOf(answer)).toEqual({
       error: 'batch_other_kind',
@@ -390,21 +424,31 @@ describe('a call with a part of another kind', () => {
   it("a refused part's stateful switch is undone: the next call's read goes stateless into the batch's one envelope", async () => {
     const s = await batchStand({
       heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: ['GetClass'],
+      tools: ['HandlerGet'],
       part: sap,
       groups: [memberOf(['stateful'])],
     });
     s.begin();
-    expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'CLASS',
+        class_name: 'CLAS_A',
+      }),
+    ).toEqual({
       content: [],
     });
     refusedOtherKind(
-      await s.call('GetProgram', { program_name: 'PROG_A' }),
-      'GetProgram',
+      await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
+      'HandlerProfileList',
       'LOCK',
       'stateless',
     );
-    expect(await s.call('GetClass', { class_name: 'CLAS_B' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'CLASS',
+        class_name: 'CLAS_B',
+      }),
+    ).toEqual({
       content: [],
     });
     expect((await s.end()).summary).toEqual({

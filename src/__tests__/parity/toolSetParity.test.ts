@@ -913,30 +913,30 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
             }
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
-      // core: the debugger, high, background runs, the three batch tools
-      // and the two debugger batch tools, always; on http SessionOpen and
-      // SessionClose. Started without --enable-data-tools: the data tools
-      // (GetSqlQuery, GetTableContents) are off, two fewer than with it.
-      // 24.0.0: GetObjectDraft, one more.
-      expect(full.tools).toHaveLength(onStdio ? 269 : onHttp ? 269 : 267);
+      // core: the debugger, high, background runs and the two debugger
+      // batch tools, always; on http SessionOpen and SessionClose. Started
+      // without --enable-data-tools: the data tools (GetSqlQuery,
+      // GetTableContents) are off, two fewer than with it.
+      // 24.0.0: GetObjectDraft, one more; batch mode is the compact sets'
+      // (BatchBegin, BatchEnd, BatchAnswers left), three fewer; the debugger
+      // batch reads its answers with DebugBatchAnswers, one more.
+      expect(full.tools).toHaveLength(onStdio ? 267 : onHttp ? 267 : 265);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
           'DebugStop',
           'CreateClass',
           'GetBackgroundRun',
-          'BatchBegin',
-          'BatchEnd',
-          'BatchAnswers',
           'DebugBatchBegin',
           'DebugBatchEnd',
+          'DebugBatchAnswers',
         ]),
       );
-      // core-ro: the readonly tools with system and search, the three batch
-      // tools, the three background-run tools of the long reads (and, on
-      // stdio, the leftover-session list; on http SessionOpen and
-      // SessionClose); no write, run, debugger, logoff or resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 74 : onHttp ? 75 : 73);
+      // core-ro: the readonly tools with system and search, the three
+      // background-run tools of the long reads (and, on stdio, the
+      // leftover-session list; on http SessionOpen and SessionClose); no
+      // write, run, debugger, logoff, resume or batch mode.
+      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 72 : 70);
       for (const name of [
         'GetBackgroundRun',
         'ListBackgroundRuns',
@@ -952,9 +952,6 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'GetATCRunStatus',
           'GetATCFindings',
           'SearchObject',
-          'BatchBegin',
-          'BatchEnd',
-          'BatchAnswers',
         ]),
       );
       // The ABAP Unit run tools start runs whose tests can change data:
@@ -972,6 +969,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         'ResumeLeftoverSession',
         'DebugBatchBegin',
         'DebugBatchEnd',
+        'DebugBatchAnswers',
         'RuntimeRunClass',
         'RuntimeRunProgram',
         'RuntimeCreateProfilerTraceParameters',
@@ -1008,10 +1006,16 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(compactRo.tools).toContain('HandlerGet');
       expect(compactRo.tools).toContain('HandlerDeletionCheck');
       expect(compactRo.tools).toContain('HandlerBatch');
+      // Batch mode is the compact sets': no full binary serves a batch tool.
       for (const tools of [full.tools, fullRo.tools]) {
         expect(tools).not.toContain('HandlerBatch');
       }
-      for (const tools of [compact.tools, compactRo.tools]) {
+      for (const tools of [
+        full.tools,
+        fullRo.tools,
+        compact.tools,
+        compactRo.tools,
+      ]) {
         expect(tools.filter((n) => n.startsWith('Batch'))).toEqual([]);
       }
       for (const name of [

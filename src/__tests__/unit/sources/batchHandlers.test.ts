@@ -27,7 +27,7 @@ import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { LONG_TOOLS } from '../../../lib/longTools';
-import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
+import { BATCH_ENTRY_CASES, SAMPLE_CALLS } from '../../helpers/batchEntryCases';
 
 const REPO = path.resolve(__dirname, '../../../..');
 
@@ -176,7 +176,7 @@ describe('tools/batch-handlers.json', () => {
         entries.filter((e) => e.tool === tool),
       ),
     );
-    expect(entries.length).toBeGreaterThan(50);
+    expect(entries.length).toBeGreaterThan(40);
   });
 
   it('ships with the package, so eligible() finds it in dist too', () => {
@@ -216,7 +216,7 @@ describe('tools/batch-handlers.json', () => {
         tool: entry.tool,
         extra: [],
       });
-      expect(['full', 'compact']).toContain(entry.set);
+      expect(entry.set).toBe('compact');
       if (entry.connection !== undefined) expect(entry.connection).toBe('http');
       for (const rule of entry.when ?? []) {
         expect(typeof rule.argument).toBe('string');
@@ -288,10 +288,10 @@ describe('tools/batch-handlers.json', () => {
     }
   });
 
-  it('lists every long read whose requests do not chain (spec §4.4)', () => {
+  it("lists every compact long read whose requests do not chain (spec §4.4): batch mode is the compact sets'", () => {
     const tools = new Set(entries.map((e) => e.tool));
     for (const [tool, kind] of Object.entries(LONG_BY_REQUESTS)) {
-      if (kind === 'chained') continue;
+      if (kind === 'chained' || !served.compact.has(tool)) continue;
       expect({ tool, listed: tools.has(tool) }).toEqual({ tool, listed: true });
     }
   });
@@ -326,10 +326,14 @@ describe('tools/batch-handlers.json', () => {
     expect(missing).toEqual([]);
   });
 
-  it('every case is of a listed tool', () => {
+  it("every sample call of a compact tool is in the batch proof; the others are the full set's", () => {
     const tools = new Set(entries.map((e) => e.tool));
+    const unlisted = SAMPLE_CALLS.filter((c) => !tools.has(c.tool));
     expect(
-      BATCH_ENTRY_CASES.filter((c) => !tools.has(c.tool)).map((c) => c.tool),
+      unlisted.filter((c) => served.compact.has(c.tool)).map((c) => c.tool),
+    ).toEqual([]);
+    expect(
+      unlisted.filter((c) => !served.full.has(c.tool)).map((c) => c.tool),
     ).toEqual([]);
   });
 });

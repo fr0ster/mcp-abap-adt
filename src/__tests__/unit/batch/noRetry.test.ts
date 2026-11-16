@@ -11,6 +11,13 @@
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock below.
+  siblingRecordOf: jest.fn(() => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  })),
   // A view over a connection keeps its kind: the kind is mocked above.
   withSystemKindOf: jest.fn((view: object) => view),
 }));
@@ -75,11 +82,14 @@ describe('no retry in batch mode', () => {
   it("406 (supported Accept named) and 415 parts are the calls' answers; each request sent once; no follow-up envelope", async () => {
     const s = await batchStand({
       heldLocks: holding('LOCK_HANDLE_PLACEHOLDER'),
-      tools: ['GetProgram', 'HandlerUpdate'],
+      tools: ['HandlerGet', 'HandlerUpdate'],
       part: picky,
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     await s.call('HandlerUpdate', WRITE);
     const { summary } = await s.end();
     expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
@@ -97,7 +107,7 @@ describe('no retry in batch mode', () => {
   it('an envelope answered 406 is not sent again', async () => {
     const s = await batchStand({
       heldLocks: holding('LOCK_HANDLE_PLACEHOLDER'),
-      tools: ['GetProgram'],
+      tools: ['HandlerGet'],
       part: picky,
       // SAP refuses the envelope itself 406, naming another Accept.
       envelope: async () => {
@@ -107,9 +117,12 @@ describe('no retry in batch mode', () => {
       },
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     const { answer, summary } = await s.end();
-    // BatchEnd's error, as it came; its one number answers the same.
+    // the batch end's error, as it came; its one number answers the same.
     expect(answer.isError).toBe(true);
     expect(summary).toMatchObject({ status: 406, step: 'execute' });
     const [entry] = await s.answers([1]);

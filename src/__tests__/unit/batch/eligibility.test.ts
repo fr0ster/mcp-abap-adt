@@ -16,12 +16,32 @@ const LOCK = 'LOCK_HANDLE_PLACEHOLDER';
 
 describe('eligible', () => {
   it('a listed tool with no when is eligible', () => {
-    expect(eligible('SearchObject', { object_name: 'Z*' }, 'http')).toEqual({
+    expect(eligible('HandlerSearch', { query: 'Z*' }, 'http')).toEqual({
       ok: true,
     });
-    expect(eligible('GetClass', { class_name: 'CLAS_A' }, 'rfc')).toEqual({
+    expect(eligible('HandlerProfileList', {}, 'rfc')).toEqual({
       ok: true,
     });
+  });
+
+  it("a full-set tool is not listed: batch mode is the compact sets'", () => {
+    for (const tool of [
+      'SearchObject',
+      'GetClass',
+      'ActivateClass',
+      'RuntimeRunClass',
+      'CreateFunctionGroup',
+      'CreatePackage',
+      'RuntimeListFeeds',
+      'GetWhereUsed',
+      'GetObjectVersions',
+      'GetFunctionModule',
+    ]) {
+      expect({ tool, eligible: eligible(tool, {}, 'http') }).toEqual({
+        tool,
+        eligible: { ok: false, reason: 'not-listed' },
+      });
+    }
   });
 
   it('HandlerUpdate needs lock_handle; every type then sends its one write', () => {
@@ -285,9 +305,6 @@ describe('eligible', () => {
 
   it('the writes and runs are eligible only under the arguments whose requests do not chain', () => {
     const no = { ok: false, reason: 'arguments' };
-    expect(eligible('ActivateClass', { class_name: 'C' }, 'rfc')).toEqual({
-      ok: true,
-    });
     expect(
       eligible(
         'HandlerActivate',
@@ -311,12 +328,6 @@ describe('eligible', () => {
       });
       expect(eligible('HandlerGet', { part }, 'http')).toEqual(no);
     }
-    expect(eligible('RuntimeRunClass', { class_name: 'C' }, 'http')).toEqual({
-      ok: true,
-    });
-    expect(
-      eligible('RuntimeRunClass', { class_name: 'C', profile: true }, 'http'),
-    ).toEqual(no);
     expect(
       eligible(
         'HandlerProfileRun',
@@ -334,53 +345,11 @@ describe('eligible', () => {
     expect(eligible('HandlerProfileSchedule', {}, 'http')).toEqual({
       ok: true,
     });
+    // A package create over RFC opens an ABAP session of its own.
     expect(
       eligible(
-        'CreateFunctionGroup',
-        { function_group_name: 'F', package_name: 'P' },
-        'http',
-      ),
-    ).toEqual(no);
-    expect(
-      eligible(
-        'CreateServiceDefinition',
-        {
-          service_definition_name: 'S',
-          package_name: 'P',
-          activate: false,
-          source_code: 'x',
-        },
-        'http',
-      ),
-    ).toEqual(no);
-    expect(eligible('RuntimeListFeeds', {}, 'http')).toEqual({ ok: true });
-    expect(
-      eligible('RuntimeListFeeds', { feed_type: 'dumps' }, 'http'),
-    ).toEqual(no);
-    expect(
-      eligible(
-        'GetWhereUsed',
-        { object_name: 'C', object_type: 'class' },
-        'http',
-      ),
-    ).toEqual({ ok: true });
-    for (const filter of [
-      { enable_all_types: true },
-      { enable_only_types: ['CLAS/OC'] },
-      { disable_types: ['PROG/P'] },
-    ]) {
-      expect(
-        eligible(
-          'GetWhereUsed',
-          { object_name: 'C', object_type: 'class', ...filter },
-          'http',
-        ),
-      ).toEqual(no);
-    }
-    expect(
-      eligible(
-        'CreatePackage',
-        { package_name: 'P', super_package: 'S' },
+        'HandlerCreate',
+        { object_type: 'PACKAGE', package_name: 'P', super_package: 'S' },
         'rfc',
       ),
     ).toEqual({ ok: false, reason: 'connection' });
@@ -416,37 +385,19 @@ describe('eligible', () => {
         { object_name: 'FM_A', object_adt_type: 'FUGR/FF', parentName: 'G' },
         'http',
       ),
-      'GetWhereUsed FUGR/FF': eligible(
-        'GetWhereUsed',
-        { object_name: 'G|M', object_type: 'FUGR/FF' },
+      'HandlerWhereUsed FUNCTION_MODULE': eligible(
+        'HandlerWhereUsed',
+        { object_name: 'G|M', object_type: 'FUNCTION_MODULE' },
         'http',
       ),
-      'GetWhereUsed function': eligible(
-        'GetWhereUsed',
-        { object_name: 'G|M', object_type: 'function' },
+      'HandlerCheckRun FUNCTION_MODULE': eligible(
+        'HandlerCheckRun',
+        { object_name: 'G|M', object_type: 'FUNCTION_MODULE' },
         'http',
       ),
-      'GetObjectVersions function_module': eligible(
-        'GetObjectVersions',
-        {
-          object_type: 'function_module',
-          object_name: 'M',
-          function_group_name: 'G',
-        },
-        'http',
-      ),
-      'GetFunctionModule source': eligible(
-        'GetFunctionModule',
-        { function_module_name: 'M', function_group_name: 'G' },
-        'http',
-      ),
-      'GetFunctionModule metadata': eligible(
-        'GetFunctionModule',
-        {
-          function_module_name: 'M',
-          function_group_name: 'G',
-          part: 'metadata',
-        },
+      'HandlerDeletionCheck FUNCTION_MODULE': eligible(
+        'HandlerDeletionCheck',
+        { object_name: 'G|M', object_type: 'FUNCTION_MODULE' },
         'http',
       ),
     }).toEqual({
@@ -455,11 +406,9 @@ describe('eligible', () => {
       'objects function_module': no,
       'objects without a module': { ok: true },
       'object_adt_type FUGR/FF': no,
-      'GetWhereUsed FUGR/FF': no,
-      'GetWhereUsed function': no,
-      'GetObjectVersions function_module': no,
-      'GetFunctionModule source': no,
-      'GetFunctionModule metadata': { ok: true },
+      'HandlerWhereUsed FUNCTION_MODULE': no,
+      'HandlerCheckRun FUNCTION_MODULE': no,
+      'HandlerDeletionCheck FUNCTION_MODULE': no,
     });
   });
 

@@ -331,35 +331,6 @@
     ],
     "semantic": "Wait until the AMDP method being debugged stops at an SQLScript breakpoint."
   },
-  "BatchAnswers": {
-    "keywords": [
-      "batch answers",
-      "batch results",
-      "answer by number",
-      "batch"
-    ],
-    "semantic": "Read the answers of the calls of the last batch by their number."
-  },
-  "BatchBegin": {
-    "keywords": [
-      "batch mode",
-      "start batch",
-      "record calls",
-      "several calls together",
-      "batch"
-    ],
-    "semantic": "Start batch mode: record several independent calls to send them together."
-  },
-  "BatchEnd": {
-    "keywords": [
-      "end batch",
-      "send batch",
-      "execute batch",
-      "batch mode",
-      "batch"
-    ],
-    "semantic": "Send the recorded calls together in one request and end batch mode."
-  },
   "CheckBehaviorDefinition": {
     "keywords": [
       "syntax check",
@@ -973,6 +944,16 @@
       "class"
     ],
     "semantic": "Write ABAP Unit tests for a class: its local test classes."
+  },
+  "DebugBatchAnswers": {
+    "keywords": [
+      "debugger batch answers",
+      "debugger batch results",
+      "answer by number",
+      "batch",
+      "debugger"
+    ],
+    "semantic": "Read the answers of the calls of the last debugger batch by their number."
   },
   "DebugBatchBegin": {
     "keywords": [

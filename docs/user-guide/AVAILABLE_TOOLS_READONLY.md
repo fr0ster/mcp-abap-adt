@@ -2,10 +2,10 @@
 
 Generated from the tool definitions the server builds (not from docs).
 
-Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recordable, recordable for the arguments it names, or run outside batch mode; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
+Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 76
+- Total tools: 73
 
 ## Navigation
 
@@ -20,10 +20,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetBackgroundRun](#getbackgroundrun-read-only-background-run)
     - [ListBackgroundRuns](#listbackgroundruns-read-only-background-run)
     - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
-  - [Batch](#read-only-batch)
-    - [BatchBegin](#batchbegin-read-only-batch)
-    - [BatchEnd](#batchend-read-only-batch)
-    - [BatchAnswers](#batchanswers-read-only-batch)
   - [Behavior Definition](#read-only-behavior-definition)
     - [GetBehaviorDefinition](#getbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
@@ -227,43 +223,6 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `run_handle` (string, required) - The run_handle a background run answered at its start.
-
----
-
-<a id="read-only-batch"></a>
-### Read-Only / Batch
-
-<a id="batchbegin-read-only-batch"></a>
-#### BatchBegin (Read-Only / Batch)
-**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
-
-**Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
-
-**Parameters:**
-- None
-
----
-
-<a id="batchend-read-only-batch"></a>
-#### BatchEnd (Read-Only / Batch)
-**Description:** [read-only] Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
-
-**Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
-
-**Parameters:**
-- None
-
----
-
-<a id="batchanswers-read-only-batch"></a>
-#### BatchAnswers (Read-Only / Batch)
-**Description:** [read-only] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
-
-**Source:** `src/handlers/batch/batch/handleBatchAnswers.ts`
-
-**Parameters:**
-- `number` (integer, optional) - One batch number to read (an integer of at least 1); give this or numbers, not both.
-- `numbers` (array, optional) - Several batch numbers to read, answered in the order given; give this or number, not both.
 
 ---
 
@@ -1290,4 +1249,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-15*
+*Last updated: 2026-11-16*

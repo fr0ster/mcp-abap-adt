@@ -1,5 +1,7 @@
 /**
- * The sample calls that prove `tools/batch-handlers.json`, entry by entry:
+ * The sample calls that prove `tools/batch-handlers.json`, entry by entry
+ * (`BATCH_ENTRY_CASES`: the compact sets' tools, the only ones the table
+ * lists), and the full set's beside them (`SAMPLE_CALLS`):
  * `oneRequestPerEntry.test.ts` runs each against a counting connection and
  * requires exactly one request; `batchHandlers.test.ts` requires every entry
  * to be admitted by at least one case, and every value an entry's `equals`
@@ -10,6 +12,7 @@
  * end the call before it shows what it sends next).
  */
 
+import { batchEntries } from '../../lib/batch/eligibility';
 import { corpusBody } from './adtCorpus';
 
 export interface BatchEntryCase {
@@ -1093,7 +1096,11 @@ const TOGETHER: BatchEntryCase[] = [
   })),
 ];
 
-export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
+/**
+ * Every sample call: the full set's tools beside the compact ones. The
+ * version and access suites run each through its served handler.
+ */
+export const SAMPLE_CALLS: readonly BatchEntryCase[] = [
   ...FULL,
   ...COMPACT,
   ...CREATE_CASES,
@@ -1101,3 +1108,11 @@ export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
   ...WRITES,
   ...TOGETHER,
 ];
+
+/** The tools the table lists: batch mode is the compact sets'. */
+const LISTED = new Set(batchEntries().map((entry) => entry.tool));
+
+/** The batch proof: the sample calls of the tools the table lists. */
+export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = SAMPLE_CALLS.filter(
+  (sample) => LISTED.has(sample.tool),
+);

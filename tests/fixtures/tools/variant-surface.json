@@ -27,9 +27,6 @@
         "AmdpDebugStep",
         "AmdpDebugStop",
         "AmdpDebugWait",
-        "BatchAnswers",
-        "BatchBegin",
-        "BatchEnd",
         "CheckBehaviorDefinition",
         "CheckClass",
         "CheckDataElement",
@@ -71,6 +68,7 @@
         "CreateTransport",
         "CreateTransportTask",
         "CreateUnitTest",
+        "DebugBatchAnswers",
         "DebugBatchBegin",
         "DebugBatchEnd",
         "DebugCreateMemorySnapshot",
@@ -383,9 +381,6 @@
     },
     "core-ro": {
       "tools": [
-        "BatchAnswers",
-        "BatchBegin",
-        "BatchEnd",
         "DescribeByList",
         "DiscardBackgroundRun",
         "GetATCFindings",
@@ -1305,9 +1300,6 @@
         "AmdpDebugStep",
         "AmdpDebugStop",
         "AmdpDebugWait",
-        "BatchAnswers",
-        "BatchBegin",
-        "BatchEnd",
         "CheckBehaviorDefinition",
         "CheckClass",
         "CheckDataElement",
@@ -1346,6 +1338,7 @@
         "CreateTransport",
         "CreateTransportTask",
         "CreateUnitTest",
+        "DebugBatchAnswers",
         "DebugBatchBegin",
         "DebugBatchEnd",
         "DebugCreateMemorySnapshot",
@@ -1648,9 +1641,6 @@
     },
     "core-ro": {
       "tools": [
-        "BatchAnswers",
-        "BatchBegin",
-        "BatchEnd",
         "DescribeByList",
         "DiscardBackgroundRun",
         "GetATCFindings",
@@ -2518,9 +2508,6 @@
   "legacy": {
     "core": {
       "tools": [
-        "BatchAnswers",
-        "BatchBegin",
-        "BatchEnd",
         "DiscardBackgroundRun",
         "GetBackgroundRun",
         "ListBackgroundRuns",
@@ -2534,9 +2521,6 @@
     },
     "core-ro": {
       "tools": [
-        "BatchAnswers",
-        "BatchBegin",
-        "BatchEnd",
         "DiscardBackgroundRun",
         "GetBackgroundRun",
         "ListBackgroundRuns",

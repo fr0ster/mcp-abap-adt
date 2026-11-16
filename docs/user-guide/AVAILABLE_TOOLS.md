@@ -4,12 +4,11 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 291
+- Total tools: 289
 - Read-only tools: 66
 - High-level tools: 188
-- Debug tools: 32
+- Debug tools: 33
 - Session tools: 2
-- Batch tools: 3
 
 ## Handler Sets
 
@@ -20,7 +19,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list, and in the full binaries logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
 - every Streamable HTTP binary (`-http`, `-http-ro`) -> [Streamable HTTP Binaries](#streamable-http-binaries): the optional `state_handle` argument on every tool, and the long session (`SessionOpen`, `SessionClose`). No stdio or SSE binary serves these
-- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the handlers' own, without it
+- batch mode (record independent calls, send them together, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)) is the compact binaries' alone, one tool, `HandlerBatch`; the binaries on this page serve none, and their tools' descriptions carry no batch sentence. The debugger batch of the full binaries is in the [Debug Group](#debug-group): `DebugBatchBegin`, `DebugBatchEnd`, and `DebugBatchAnswers`, which reads its answers
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation
@@ -344,6 +343,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [AmdpDebugStep](#amdpdebugstep-debug-debugger)
     - [AmdpDebugStop](#amdpdebugstop-debug-debugger)
     - [AmdpDebugWait](#amdpdebugwait-debug-debugger)
+    - [DebugBatchAnswers](#debugbatchanswers-debug-debugger)
     - [DebugBatchBegin](#debugbatchbegin-debug-debugger)
     - [DebugBatchEnd](#debugbatchend-debug-debugger)
     - [DebugCreateMemorySnapshot](#debugcreatememorysnapshot-debug-debugger)
@@ -373,11 +373,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Leftover Session](#session-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-session-leftover-session)
     - [LogoffLeftoverSession](#logoffleftoversession-session-leftover-session)
-- [Batch Group](#batch-group)
-  - [Batch](#batch-batch)
-    - [BatchAnswers](#batchanswers-batch-batch)
-    - [BatchBegin](#batchbegin-batch-batch)
-    - [BatchEnd](#batchend-batch-batch)
 - [Streamable HTTP Binaries](#streamable-http-binaries)
   - [SessionOpen](#sessionopen-streamable-http)
   - [SessionClose](#sessionclose-streamable-http)
@@ -3837,7 +3832,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Create a new ABAP transport request in SAP system for development objects.
+**Description:** Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number, task_number and task_type.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
@@ -3846,6 +3841,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
 - `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
+- `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - The type given to the request's task: S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.
 - `transport_type` (string, optional (default: workbench), one of: `workbench`, `customizing`) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
 
 ---
@@ -4250,6 +4246,18 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
+<a id="debugbatchanswers-debug-debugger"></a>
+#### DebugBatchAnswers (Debug / Debugger)
+**Description:** [read-only] [debug] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
+
+**Source:** `src/handlers/debugger/debug/handleDebugBatchAnswers.ts`
+
+**Parameters:**
+- `number` (integer, optional) - One batch number to read (an integer of at least 1); give this or numbers, not both.
+- `numbers` (array, optional) - Several batch numbers to read, answered in the order given; give this or number, not both.
+
+---
+
 <a id="debugbatchbegin-debug-debugger"></a>
 #### DebugBatchBegin (Debug / Debugger)
 **Description:** [read-only] [debug] Starts the debugger batch on the stopped ABAP debuggee, else at the AMDP break. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable at the ABAP debuggee, and of step over, continue or the data preview of a table variable at the AMDP break, is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
@@ -4614,46 +4622,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-<a id="batch-group"></a>
-## Batch Group
-
-<a id="batch-batch"></a>
-### Batch / Batch
-
-<a id="batchanswers-batch-batch"></a>
-#### BatchAnswers (Batch / Batch)
-**Description:** [read-only] Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.
-
-**Source:** `src/handlers/batch/batch/handleBatchAnswers.ts`
-
-**Parameters:**
-- `number` (integer, optional) - One batch number to read (an integer of at least 1); give this or numbers, not both.
-- `numbers` (array, optional) - Several batch numbers to read, answered in the order given; give this or number, not both.
-
----
-
-<a id="batchbegin-batch-batch"></a>
-#### BatchBegin (Batch / Batch)
-**Description:** [read-only] Starts batch mode on this server. In batch mode each call of a tool marked recordable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle: over Streamable HTTP send it as the state_handle argument of every call of the batch (or in the x-mcp-state-handle header).
-
-**Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
-
-**Parameters:**
-- None
-
----
-
-<a id="batchend-batch-batch"></a>
-#### BatchEnd (Batch / Batch)
-**Description:** [read-only] Sends the recorded calls in one envelope with the credentials in force and ends batch mode. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.
-
-**Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
-
-**Parameters:**
-- None
-
----
-
 <a id="streamable-http-binaries"></a>
 ## Streamable HTTP Binaries
 
@@ -4680,4 +4648,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-15*
+*Last updated: 2026-11-16*

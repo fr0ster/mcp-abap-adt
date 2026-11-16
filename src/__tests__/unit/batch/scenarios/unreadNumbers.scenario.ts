@@ -21,7 +21,7 @@ import {
   InstanceBatch,
   type RecordedCall,
 } from '../../../../lib/batch/InstanceBatch';
-import { BatchHandlersGroup } from '../../../../lib/handlers/groups/BatchHandlersGroup';
+import { CompactBatchHandlersGroup } from '../../../../lib/compact/batch/group';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -78,7 +78,7 @@ const tool = (name: string, property: string, handler: Handler) =>
 const group = {
   getName: () => 'unread-numbers',
   getHandlers: () => [
-    tool('GetProgram', 'program_name', async (context, _args) => {
+    tool('HandlerProfileList', 'program_name', async (context, _args) => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/programs/programs/prog_a/source/main',
         method: 'GET',
@@ -86,7 +86,7 @@ const group = {
       });
       return { isError: false, content: [{ type: 'text', text: 'a' }] };
     }),
-    tool('GetInterface', 'interface_name', async (context, _args) => {
+    tool('HandlerUnitTestStatus', 'interface_name', async (context, _args) => {
       const first = context.connection.makeAdtRequest({
         url: '/sap/bc/adt/oo/interfaces/if_a/source/main',
         method: 'GET',
@@ -118,7 +118,7 @@ const ledger = new HandlerLedger();
     connection: connection as never,
     handlersRegistry: new CompositeHandlersRegistry([
       ledger.watch(group),
-      new BatchHandlersGroup({ connection: undefined as never }),
+      new CompactBatchHandlersGroup({ connection: undefined as never }),
     ]),
     systemType: 'onprem',
     logger: { info() {}, debug() {}, warn() {}, error() {} } as never,
@@ -130,20 +130,22 @@ const ledger = new HandlerLedger();
   const call = (name: string, args: Record<string, unknown> = {}) =>
     client.callTool({ name, arguments: args });
 
-  await call('BatchBegin');
-  await call('GetProgram', { program_name: 'PROG_A' });
-  await call('GetInterface', { interface_name: 'IF_A' });
+  await call('HandlerBatch', { action: 'begin' });
+  await call('HandlerProfileList', { program_name: 'PROG_A' });
+  await call('HandlerUnitTestStatus', { interface_name: 'IF_A' });
   const recorded: RecordedCall[] = [...(owner.opened()?.recorded ?? [])];
-  const summary = textOf(await call('BatchEnd'));
-  const read = textOf(await call('BatchAnswers', { number: 1 }));
+  const summary = textOf(await call('HandlerBatch', { action: 'end' }));
+  const read = textOf(
+    await call('HandlerBatch', { action: 'answers', number: 1 }),
+  );
 
   // Number 2 is never read: its handler waits at its first request.
   await turns();
-  const settledBefore = ledger.endedOf('GetInterface');
+  const settledBefore = ledger.endedOf('HandlerUnitTestStatus');
 
   if (how === 'replace') {
-    await call('BatchBegin');
-    await call('BatchEnd');
+    await call('HandlerBatch', { action: 'begin' });
+    await call('HandlerBatch', { action: 'end' });
   } else {
     await closeInstance(server);
   }

@@ -25,9 +25,6 @@
     "AmdpDebugStep": "state_handle*, action*, detail",
     "AmdpDebugStop": "state_handle*, detail",
     "AmdpDebugWait": "state_handle*, hold_seconds, detail",
-    "BatchAnswers": "number, numbers, state_handle",
-    "BatchBegin": "state_handle",
-    "BatchEnd": "state_handle",
     "CheckBehaviorDefinition": "name*, version, state_handle",
     "CheckClass": "class_name*, version, source_code, state_handle",
     "CheckDataElement": "data_element_name*, version, state_handle",
@@ -69,6 +66,7 @@
     "CreateTransport": "transport_type, description*, target_system, owner, task_type, detail, state_handle",
     "CreateTransportTask": "transport_number*, target_user*, task_type, detail, state_handle",
     "CreateUnitTest": "class_name*, test_class_source*, transport_request, detail, state_handle",
+    "DebugBatchAnswers": "number, numbers, state_handle",
     "DebugBatchBegin": "state_handle",
     "DebugBatchEnd": "state_handle",
     "DebugCreateMemorySnapshot": "state_handle*, detail",
@@ -273,9 +271,6 @@
     "ValidateServiceBinding": "service_binding_name*, description, service_definition_name*, package_name*, service_binding_version, detail, state_handle"
   },
   "mcp-abap-adt-http-ro": {
-    "BatchAnswers": "number, numbers, state_handle",
-    "BatchBegin": "state_handle",
-    "BatchEnd": "state_handle",
     "DescribeByList": "background, objects*, state_handle",
     "DiscardBackgroundRun": "run_handle*, state_handle",
     "GetAdtTypes": "validate_type, detail, state_handle",

@@ -5,13 +5,11 @@
  * connection's batch is untouched.
  */
 
-import {
-  BatchHandlersGroup,
-  type HandlerContext,
-  HighLevelHandlersGroup,
-} from '@mcp-abap-adt/lib/handlers';
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
 import { InstanceBatch } from '../../../../src/lib/batch/InstanceBatch';
+import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import { type SseStand, sseStand, turns, until } from './shutdown/harness';
 
 jest.setTimeout(30_000);
@@ -35,8 +33,8 @@ beforeEach(async () => {
   s = await sseStand({
     server: { batch: { keepRawParts: false } },
     groups: [
-      new HighLevelHandlersGroup(placeholder),
-      new BatchHandlersGroup(placeholder),
+      new CompactReadOnlyHandlersGroup(placeholder),
+      new CompactBatchHandlersGroup(placeholder),
     ],
   });
 });
@@ -53,18 +51,26 @@ it("an SSE close drops the connection's batch with nothing sent; another connect
   const closing = await s.open();
   const other = await s.open();
 
-  await closing.call('BatchBegin', {}, 1);
+  await closing.call('HandlerBatch', { action: 'begin' }, 1);
   expect((await closing.answer(1)).isError).toBe(false);
-  await other.call('BatchBegin', {}, 1);
+  await other.call('HandlerBatch', { action: 'begin' }, 1);
   expect((await other.answer(1)).isError).toBe(false);
   // One owner per connection's instance.
   expect(owners).toHaveLength(2);
   const [closingOwner, otherOwner] = owners as [InstanceBatch, InstanceBatch];
   expect(closingOwner).not.toBe(otherOwner);
 
-  await closing.call('GetProgram', { program_name: 'PROG_A' }, 2);
+  await closing.call(
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_A' },
+    2,
+  );
   expect(await closing.answer(2)).toEqual({ text: '', isError: false });
-  await other.call('GetProgram', { program_name: 'PROG_B' }, 2);
+  await other.call(
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_B' },
+    2,
+  );
   expect(await other.answer(2)).toEqual({ text: '', isError: false });
   expect(closingOwner.opened()?.recorded).toHaveLength(1);
   const signal = closingOwner.signal();

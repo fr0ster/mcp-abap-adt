@@ -1106,14 +1106,22 @@ describe('RuntimeListFeeds', () => {
 // Batch mode
 // ---------------------------------------------------------------------------
 
+// Batch mode is the compact sets': their where-used and feed reads of one
+// request are recorded; the full set's tools are not listed at all.
 describe('batch mode records the one-request calls only', () => {
   it.each<[string, Record<string, unknown>, boolean]>([
-    ['GetWhereUsed', table('ZT_A'), true],
+    ['HandlerWhereUsed', { object_type: 'TABLE', object_name: 'ZT_A' }, true],
+    [
+      'HandlerWhereUsed',
+      { object_type: 'FUNCTION_MODULE', object_name: 'G|M' },
+      false,
+    ],
+    ['HandlerDumpList', {}, true],
+    ['HandlerDumpList', { feed_type: 'system_messages' }, true],
+    ['GetWhereUsed', table('ZT_A'), false],
     ['GetWhereUsed', { objects: THREE }, false],
-    ['GetWhereUsed', { objects: [table('ZT_A')] }, false],
-    ['RuntimeListFeeds', {}, true],
-    ['RuntimeListFeeds', { feed_type: 'variants' }, true],
-    ['RuntimeListFeeds', { feed_types: ['descriptors'] }, false],
+    ['RuntimeListFeeds', {}, false],
+    ['RuntimeListFeeds', { feed_type: 'variants' }, false],
   ])('%s %j: recorded %s', (tool, args, recorded) => {
     expect(eligible(tool, args, 'http').ok).toBe(recorded);
   });

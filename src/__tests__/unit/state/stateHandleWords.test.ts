@@ -24,7 +24,6 @@ const TOOLS = [
   'HandlerDelete',
   'HandlerUnlock',
   'HandlerBatch',
-  'BatchBegin',
   'DebugBatchBegin',
   'HandlerDebugBatch',
 ];

@@ -515,7 +515,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"adapter_threw\",\n  \"tool\": \"CreateTransport\",\n  \"detail\": \"terse\",\n  \"message\": \"Invalid transport response XML structure - no tm:root found\"\n}"
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"CreateTransport\",\n  \"detail\": \"terse\",\n  \"message\": \"Invalid transport response XML structure - no tm:root found\"\n}"
   },
   "onprem HandlerCreate TABLE": {
     "requests": [
@@ -4608,7 +4608,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"adapter_threw\",\n  \"tool\": \"CreateTransport\",\n  \"detail\": \"terse\",\n  \"message\": \"Invalid transport response XML structure - no tm:root found\"\n}"
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"CreateTransport\",\n  \"detail\": \"terse\",\n  \"message\": \"Invalid transport response XML structure - no tm:root found\"\n}"
   },
   "cloud HandlerCreate TABLE": {
     "requests": [

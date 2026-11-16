@@ -197,7 +197,8 @@ export function isGoneOnDelete(
   );
 }
 
-function liveAnswerOf(value: unknown): LiveAnswer {
+/** A tool's answer, read as a live answer (its text joined). */
+export function liveAnswerOf(value: unknown): LiveAnswer {
   const answer = toolAnswer(value);
   const content = answer.content.map((item) => ({
     type: 'text' as const,

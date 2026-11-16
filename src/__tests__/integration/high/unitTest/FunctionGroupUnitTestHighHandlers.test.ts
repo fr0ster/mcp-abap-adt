@@ -13,6 +13,7 @@ import { handleCreateFunctionGroup } from '../../../../handlers/function/high/ha
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionModule } from '../../../../handlers/function/high/handleUpdateFunctionModule';
 import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
+import { handleGetFunctionGroup } from '../../../../handlers/function_group/high/handleGetFunctionGroup';
 import { handleCreateFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest';
 import { handleRunFunctionGroupUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
 import { handleRunFunctionModuleUnitTest } from '../../../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
@@ -75,6 +76,11 @@ describe('Unit Test High-Level Handlers (function group)', () => {
             transport_request: context.transportRequest,
           },
           handleDeleteFunctionGroup,
+          {
+            tool: 'GetFunctionGroup',
+            args: { function_group_name: groupName },
+            handler: handleGetFunctionGroup,
+          },
         );
       },
     );

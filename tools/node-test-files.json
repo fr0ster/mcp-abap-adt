@@ -153,6 +153,7 @@
   "src/__tests__/unit/thrownReaders.test.ts",
   "src/__tests__/unit/toolSet/dataTools.test.ts",
   "src/__tests__/unit/toolSet/fixtureBytes.test.ts",
+  "src/__tests__/unit/unitTestCleanup.test.ts",
   "src/__tests__/unit/wireValue.test.ts",
   "src/__tests__/unit/xml/node.test.ts"
 ]

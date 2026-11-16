@@ -12,6 +12,7 @@ import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
+import { handleGetProgram } from '../../../../handlers/program/high/handleGetProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
 import { handleCreateProgramUnitTest } from '../../../../handlers/unit_test/high/handleCreateProgramUnitTest';
 import { handleRunProgramUnitTest } from '../../../../handlers/unit_test/high/handleRunProgramUnitTest';
@@ -63,6 +64,11 @@ systemsDescribe(['onprem'], 'Unit Test High-Level Handlers (report)', () => {
             transport_request: context.transportRequest,
           },
           handleDeleteProgram,
+          {
+            tool: 'GetProgram',
+            args: { program_name: programName },
+            handler: handleGetProgram,
+          },
         );
         // No tool deletes a report include; the suite removes the one it made,
         // directly — on a connection of its own in hard mode, where the

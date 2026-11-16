@@ -108,6 +108,13 @@ export function testerSystemKind(
     : { kind, isCloudSystem: kind === 'cloud' };
 }
 
+/**
+ * A cleanup that is part of the test: deleting what the test created was
+ * refused, or the object still reads after its delete. The tester passes it
+ * on, so the test fails; any other cleanup error is only logged.
+ */
+export class CleanupFailure extends Error {}
+
 export class LambdaTester {
   // Configuration
   protected readonly handlerName: string;
@@ -450,6 +457,8 @@ export class LambdaTester {
       await this.cleanupAfterLambda(this.context);
       this.context.logger?.success?.('✅ Cleanup completed successfully');
     } catch (error) {
+      // A delete that must succeed and read back absent fails the test.
+      if (error instanceof CleanupFailure) throw error;
       // Log cleanup errors but don't throw - cleanup should not fail the test suite
       this.context.logger?.error?.(
         `⚠️ Cleanup error: ${thrownWords(error)}. Object left in SAP system.`,
@@ -549,6 +558,7 @@ export class LambdaTester {
     try {
       await this.cleanupAfter();
     } catch (error) {
+      if (error instanceof CleanupFailure) throw error;
       // Cleanup errors are already handled in cleanupAfter(), but log here for visibility
       this.context.logger?.warn?.(
         `⚠️ Cleanup process error: ${thrownWords(error)}`,

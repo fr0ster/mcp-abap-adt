@@ -6,13 +6,18 @@ import * as z from 'zod';
  */
 
 import assert from 'node:assert/strict';
-import type { LambdaTester } from '../../helpers/testers/LambdaTester';
+import { isNotFound, type LiveAnswer, liveAnswerOf } from '../../helpers/live';
+import {
+  CleanupFailure,
+  type LambdaTester,
+} from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
   createHandlerContext,
   extractErrorMessage,
   handlerAnswer,
 } from '../../helpers/testHelpers';
+import { thrownWords } from '../../helpers/thrownValue';
 
 type Response = {
   isError: boolean;
@@ -43,24 +48,43 @@ export function stepsFor(tester: LambdaTester, context: LambdaTesterContext) {
     return response;
   }
 
-  /** A cleanup call: a refusal is logged, never thrown. */
+  /**
+   * The cleanup is part of the test: deleting what the test created must
+   * succeed, and the object must then read "not found" (`isNotFound`). A
+   * refused delete, an object that still reads, or a call that throws is a
+   * `CleanupFailure`, which the tester passes on: the test fails.
+   */
   async function cleanup(
     tool: string,
     args: Record<string, unknown>,
     handler: Handler,
+    read: { tool: string; args: Record<string, unknown>; handler: Handler },
   ): Promise<void> {
-    try {
-      const response = (await tester.invokeToolOrHandler(tool, args, () =>
-        handler(handlerContext(), args),
-      )) as Response;
-      if (response.isError) {
-        context.logger?.warn?.(
-          `cleanup ${tool} (ignored): ${extractErrorMessage(response)}`,
+    const call = async (
+      name: string,
+      callArgs: Record<string, unknown>,
+      callHandler: Handler,
+    ): Promise<LiveAnswer> => {
+      try {
+        return liveAnswerOf(
+          await tester.invokeToolOrHandler(name, callArgs, () =>
+            callHandler(handlerContext(), callArgs),
+          ),
+        );
+      } catch (error) {
+        throw new CleanupFailure(
+          `cleanup ${name} threw: ${thrownWords(error)}`,
         );
       }
-    } catch (error: any) {
-      context.logger?.warn?.(
-        `cleanup ${tool} (ignored): ${error?.message ?? String(error)}`,
+    };
+    const deleted = await call(tool, args, handler);
+    if (deleted.isError) {
+      throw new CleanupFailure(`cleanup ${tool} was refused: ${deleted.text}`);
+    }
+    const readBack = await call(read.tool, read.args, read.handler);
+    if (!isNotFound(readBack)) {
+      throw new CleanupFailure(
+        `cleanup ${tool}: ${read.tool} still reads the object it deleted: ${readBack.text}`,
       );
     }
   }

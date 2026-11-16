@@ -9,6 +9,7 @@ import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
+import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { handleCreateUnitTest } from '../../../../handlers/unit_test/high/handleCreateUnitTest';
 import { handleDeleteUnitTest } from '../../../../handlers/unit_test/high/handleDeleteUnitTest';
@@ -70,6 +71,11 @@ describe('Unit Test High-Level Handlers (class)', () => {
             transport_request: context.transportRequest,
           },
           handleDeleteClass,
+          {
+            tool: 'GetClass',
+            args: { class_name: className },
+            handler: handleGetClass,
+          },
         );
       },
     );

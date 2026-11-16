@@ -8,6 +8,7 @@
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';
 import * as z from 'zod';
+import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleCreateCdsUnitTest } from '../../../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleDeleteCdsUnitTest } from '../../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleRunCdsUnitTest } from '../../../../handlers/unit_test/high/handleRunCdsUnitTest';
@@ -66,6 +67,11 @@ describe('Unit Test High-Level Handlers (CDS view)', () => {
             transport_request: context.transportRequest,
           },
           handleDeleteCdsUnitTest,
+          {
+            tool: 'GetClass',
+            args: { class_name: className },
+            handler: handleGetClass,
+          },
         );
       },
     );

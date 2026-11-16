@@ -104,26 +104,18 @@ describe('the package guard', () => {
     });
   });
 
-  it('a package created under an allowed parent is checked by its parent', () => {
+  it('a package still to be created is checked by the configured parent it is created under', () => {
+    const absent = { exists: false } as const;
     assert.equal(
       guardedChildPackage(
         'onprem',
         'child',
         'ZMCP_SHARED',
+        absent,
         'parent',
         'ZAC_TEST_PKG',
       ),
       'ZMCP_SHARED',
-    );
-    assert.equal(
-      guardedChildPackage(
-        'cloud',
-        'child',
-        'ZADT_BLD_PKG03',
-        'parent',
-        undefined,
-      ),
-      'ZADT_BLD_PKG03',
     );
     assert.throws(
       () =>
@@ -131,6 +123,7 @@ describe('the package guard', () => {
           'onprem',
           'child',
           'ZMCP_SHARED',
+          absent,
           'parent',
           'ZOTHER',
         ),
@@ -140,10 +133,76 @@ describe('the package guard', () => {
       },
     );
     assert.throws(
-      () => guardedChildPackage('onprem', 'child', 'ZMCP_SHARED', 'parent', ''),
+      () =>
+        guardedChildPackage(
+          'onprem',
+          'child',
+          'ZMCP_SHARED',
+          absent,
+          'parent',
+          '',
+        ),
       {
         message:
           'the package guard: child names ZMCP_SHARED, which is none of $TMP, ZAC_TEST_PKG on onprem: nothing is created',
+      },
+    );
+  });
+
+  it('an allowed package is allowed whatever SAP reads of it', () => {
+    assert.equal(
+      guardedChildPackage(
+        'cloud',
+        'child',
+        'ZADT_BLD_PKG03',
+        { exists: true, superPackage: 'ZANYTHING' },
+        'parent',
+        undefined,
+      ),
+      'ZADT_BLD_PKG03',
+    );
+  });
+
+  it('an existing package is checked by the super package SAP reads, never by the configured parent', () => {
+    assert.equal(
+      guardedChildPackage(
+        'cloud',
+        'child',
+        'ZMCP_SHR_PKG',
+        { exists: true, superPackage: 'ZADT_BLD_PKG03' },
+        'parent',
+        '',
+      ),
+      'ZMCP_SHR_PKG',
+    );
+    assert.throws(
+      () =>
+        guardedChildPackage(
+          'cloud',
+          'child',
+          'ZFOREIGN',
+          { exists: true, superPackage: 'ZELSEWHERE' },
+          'parent',
+          'ZADT_BLD_PKG03',
+        ),
+      {
+        message:
+          'the package guard: the super package SAP reads for child (ZFOREIGN) names ZELSEWHERE, which is none of ZADT_BLD_PKG03 on cloud: nothing is created',
+      },
+    );
+    assert.throws(
+      () =>
+        guardedChildPackage(
+          'cloud',
+          'child',
+          'ZFOREIGN',
+          { exists: true, superPackage: undefined },
+          'parent',
+          'ZADT_BLD_PKG03',
+        ),
+      {
+        message:
+          'the package guard: child names ZFOREIGN, which is none of ZADT_BLD_PKG03 on cloud: nothing is created',
       },
     );
   });

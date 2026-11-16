@@ -74,6 +74,7 @@ import { handleDebugTakeOverListener } from '../../../handlers/debugger/debug/ha
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import type { HandlerContext } from '../../../handlers/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
@@ -124,9 +125,10 @@ import {
 import { logOffLeft, ownedNow } from '../helpers/debuggerCleanup';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { endTestConnection } from '../helpers/openConnections';
-import { guardedChildPackage, guardedPackage } from '../helpers/packageGuard';
+import { guardedPackage } from '../helpers/packageGuard';
 import { guardedTestConnection } from '../helpers/refusalGuard';
 import { servedSuite } from '../helpers/servedHere';
+import { checkedSharedPackage } from '../helpers/sharedObjects';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../helpers/testers/types';
 import { createHandlerContext } from '../helpers/testHelpers';
@@ -771,7 +773,7 @@ describe('Debugger handlers (integration)', () => {
         // records no changes, so the probe needs no transport. $TMP is
         // refused on ABAP Cloud (403 ExceptionResourceNoAccess, measured).
         // The package guard, before anything is created: the case's package
-        // itself, the shared one by itself or by its parent.
+        // itself; the shared one by itself or by the super package SAP reads.
         const shared = getSharedDependenciesConfig();
         pkg =
           p.package !== undefined && p.package !== null
@@ -780,13 +782,16 @@ describe('Debugger handlers (integration)', () => {
                 'debugger_handlers.test_cases[name=debugger_chain].params.package',
                 String(p.package),
               )
-            : guardedChildPackage(
-                configuredSystemKind(),
-                'shared_dependencies.package',
-                shared?.package ?? '',
-                'shared_dependencies.super_package',
-                shared?.super_package,
-              );
+            : shared?.package
+              ? await checkedSharedPackage(
+                  createAdtClient(connection, logger),
+                  shared,
+                )
+              : guardedPackage(
+                  configuredSystemKind(),
+                  'shared_dependencies.package',
+                  '',
+                );
         transport = p.transport ? String(p.transport) : undefined;
         repeats = Number(p.timing_repeats) > 0 ? Number(p.timing_repeats) : 5;
         secondUserEnv = String(p.second_user_env ?? '');

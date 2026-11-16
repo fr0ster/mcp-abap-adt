@@ -56,18 +56,41 @@ export function guardedPackage(
 }
 
 /**
+ * What SAP says of a package the config names: it exists with this super
+ * package (`undefined` when its document names none), or it does not exist.
+ */
+export type PackageOnSystem =
+  | { exists: true; superPackage: string | undefined }
+  | { exists: false };
+
+/**
  * A package the config names together with the parent it is created under
  * (`shared_dependencies.package` under `shared_dependencies.super_package`):
- * allowed itself, or checked by its parent.
+ * allowed itself; else, when it exists, by its actual super package as SAP
+ * reads it — never by the configured one; else, when it is still to be
+ * created, by the configured parent it will be created under.
  */
 export function guardedChildPackage(
   kind: ConfiguredSystemKind | undefined,
   key: string,
   packageName: string,
+  onSystem: PackageOnSystem,
   parentKey: string,
   parent: string | undefined,
 ): string {
   if (packageRefusal(kind, key, packageName) === undefined) return packageName;
+  if (onSystem.exists) {
+    const actual = onSystem.superPackage;
+    if (actual === undefined || actual.trim() === '') {
+      return guardedPackage(kind, key, packageName);
+    }
+    guardedPackage(
+      kind,
+      `the super package SAP reads for ${key} (${packageName})`,
+      actual,
+    );
+    return packageName;
+  }
   if (parent === undefined || parent.trim() === '') {
     return guardedPackage(kind, key, packageName);
   }

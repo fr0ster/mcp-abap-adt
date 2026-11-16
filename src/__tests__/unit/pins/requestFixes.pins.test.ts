@@ -7,7 +7,8 @@
  *   one (measured), is refused before anything is sent;
  * - `CheckTable` with `ddl_code` checks that source (#9);
  * - `CreateTransport` `customizing` is a Customizing Request (`W`),
- *   `workbench` a Workbench Request (`K`);
+ *   `workbench` a Workbench Request (`K`); with `task_type` `X` the request
+ *   is read back for its task and the task is left as SAP created it;
  * - `RuntimeGetProfilerTraceData` `statements` sends the drill-down
  *   threshold as given (`0.1`, not `0`).
  *
@@ -48,6 +49,11 @@ const REQUEST_CREATED = [
   {
     status: 200,
     data: '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="PINK900001"/>',
+  },
+  // The request read back, for the task SAP created with it.
+  {
+    status: 200,
+    data: '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request tm:number="PINK900001"><tm:task tm:number="PINK900002" tm:type="X"/></tm:request></tm:root>',
   },
 ];
 
@@ -152,7 +158,11 @@ const CASES: readonly PinCase[] = [
     tool: 'CreateTransport',
     variant: 'onprem',
     stand: 'recording',
-    args: { description: 'Pin request', transport_type: 'customizing' },
+    args: {
+      description: 'Pin request',
+      transport_type: 'customizing',
+      task_type: 'X',
+    },
     answers: REQUEST_CREATED,
     expected: [
       {
@@ -164,13 +174,25 @@ const CASES: readonly PinCase[] = [
         },
         body: '<?xml version="1.0" encoding="ASCII"?>\n<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">\n  <tm:request tm:desc="Pin request" tm:type="W" tm:target="LOCAL" tm:cts_project="">\n    <tm:task tm:owner="PIN_RESPONSIBLE"/>\n  </tm:request>\n</tm:root>',
       },
+      {
+        method: 'GET',
+        url: '/sap/bc/adt/cts/transportrequests/PINK900001',
+        headers: {
+          Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+        },
+        body: undefined,
+      },
     ],
   },
   {
     tool: 'CreateTransport',
     variant: 'onprem',
     stand: 'recording',
-    args: { description: 'Pin request', transport_type: 'workbench' },
+    args: {
+      description: 'Pin request',
+      transport_type: 'workbench',
+      task_type: 'X',
+    },
     answers: REQUEST_CREATED,
     expected: [
       {
@@ -181,6 +203,14 @@ const CASES: readonly PinCase[] = [
           'Content-Type': 'text/plain',
         },
         body: '<?xml version="1.0" encoding="ASCII"?>\n<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">\n  <tm:request tm:desc="Pin request" tm:type="K" tm:target="LOCAL" tm:cts_project="">\n    <tm:task tm:owner="PIN_RESPONSIBLE"/>\n  </tm:request>\n</tm:root>',
+      },
+      {
+        method: 'GET',
+        url: '/sap/bc/adt/cts/transportrequests/PINK900001',
+        headers: {
+          Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+        },
+        body: undefined,
       },
     ],
   },

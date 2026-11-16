@@ -3,12 +3,12 @@
  * target whose every member forwards to the connection it is pointed at now.
  *
  * The instance's connection object may be replaced between recording and
- * `BatchEnd` (a session SAP ended) and the replaced one
+ * the batch end (a session SAP ended) and the replaced one
  * ends with its logoff, so the batch never holds a connection of its own.
  * The owner points the target: during a recording call's turn at the
  * connection that call took (what `connect()` / `getBaseUrl()` /
  * `getSessionId()` of the batch connection reach while recording), at
- * `BatchEnd` at the connection `BatchEnd` took — and clears it after. A
+ * the batch end at the connection the batch end took — and clears it after. A
  * dropped batch seals it (`seal()`): it points at nothing from then on, so
  * an `execute()` running at the drop sends no further envelope.
  *

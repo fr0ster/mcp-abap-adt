@@ -2,7 +2,7 @@
  * What the connection under a batch's `AdtBatchConnection` did with its
  * envelopes: the errors it threw, and how many envelopes it answered.
  *
- * `BatchEnd` reads it when `execute()` rejects (spec §5.3): a rejection the
+ * the batch end reads it when `execute()` rejects (spec §5.3): a rejection the
  * connection threw is `execute()`'s error, as it came (SAP's outer answer, a
  * transport failure, a credential refusal); a rejection that came after the
  * connection answered is adt-clients' own reading of that answer — it could

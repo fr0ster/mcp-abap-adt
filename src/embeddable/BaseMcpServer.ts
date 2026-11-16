@@ -1669,7 +1669,7 @@ export abstract class BaseMcpServer extends McpServer {
             }
             let inUse: IAbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
-            // The batch a `BatchEnd` (or `DebugBatchEnd`) call ends: the one
+            // The batch an end call (`HandlerBatch` end, `DebugBatchEnd`) ends: the one
             // of its kind open when it came.
             const endingKind = endsBatch(entry.toolDefinition.name, args);
             const ending =
@@ -1930,7 +1930,7 @@ export abstract class BaseMcpServer extends McpServer {
               // A failed tool returns an isError result — it does not throw.
               // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
               if (isErrorResult(result)) {
-                // `BatchEnd` answering its own error: every number of its
+                // the batch end answering its own error: every number of its
                 // batch answers the same (spec §5.3).
                 if (this.batch !== undefined && ending !== undefined) {
                   endWithFailure(
@@ -1953,7 +1953,7 @@ export abstract class BaseMcpServer extends McpServer {
               // structured result. return_error extracts the ADT response body,
               // which the SDK's own error.message would discard.
               const failed = this.refusalAnswer(error);
-              // `BatchEnd` failing before `execute()` — taking the connection,
+              // the batch end failing before `execute()` — taking the connection,
               // the system lookup — ends batch mode with no map: every number
               // answers this failure, as the call answers it; nothing is
               // sent. Failing after (its own error thrown: a credential
@@ -2100,7 +2100,7 @@ export abstract class BaseMcpServer extends McpServer {
    * the call's scopes but under the batch's signal, and the call waits until
    * it has recorded everything it sends before an answer, or settled. It
    * answers nothing (`{ content: [] }`) once it recorded; the handler goes on
-   * and builds its answer when `BatchEnd` settles its parts — the answer of
+   * and builds its answer when the batch end settles its parts — the answer of
    * its number. A handler that settled without recording answers its own
    * answer, with no number — or, when its request was of another session
    * kind than the batch holds, the refusal `batch_other_kind` (every batch

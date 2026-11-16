@@ -1,9 +1,9 @@
 /**
- * `BatchAnswers`: the map of the last ended batch, read by number (spec §6).
+ * the answers read: the map of the last ended batch, read by number (spec §6).
  * A number's handler, waiting at its first request, is resumed with its
  * parts when the number is first read and builds its answer; the numbers
  * asked in one call are processed in parallel, and the answer is kept. A
- * number of a batch whose `BatchEnd` failed answers that error. Nothing is
+ * number of a batch whose the batch end failed answers that error. Nothing is
  * sent to SAP; served while a batch is open, so the previous phase's
  * answers stay readable while the next phase is recorded.
  */
@@ -13,7 +13,7 @@ import type { BatchAnswer, InstanceBatch } from './InstanceBatch';
 /** A number the last executed batch has no answer for (or no batch ran here). */
 export type NoAnswer = { number: number; error: 'no_answer'; message: string };
 
-/** One entry of `BatchAnswers`' answer: the number's answer, or that it has none. */
+/** One entry of the answers' answer: the number's answer, or that it has none. */
 export type AnswerEntry = BatchAnswer | NoAnswer;
 
 export const NO_ANSWER_WORDS = 'no answer with that number';
@@ -27,7 +27,7 @@ export const ANSWERS_NUMBER_WORDS =
   'a batch answer number is an integer of at least 1';
 
 /**
- * What `BatchAnswers` was asked, as its schema parses it: exactly one of
+ * What the answers read was asked, as its schema parses it: exactly one of
  * `number` and `numbers`, each an integer of at least 1.
  */
 export type AnswersAsk = {
@@ -74,7 +74,7 @@ export function readAnswers(
   );
 }
 
-/** `BatchAnswers`' answer: its entries, as JSON. */
+/** The answers' answer: its entries, as JSON. */
 export function batchAnswersAnswer(entries: AnswerEntry[]): McpResult {
   return {
     isError: false,

@@ -11,7 +11,7 @@
  * and under the state's idle bound on every transport, the one clock that
  * touches it. Nothing of the batch's own runs on a clock.
  *
- * The owner sends nothing: what is recorded is sent by `BatchEnd` /
+ * The owner sends nothing: what is recorded is sent by the batch end /
  * `DebugBatchEnd`, which split the envelope's answer into the map (`end`) or
  * failed (`fail`). A number's answer is built when it is first read
  * (`answer`): its handler, waiting at its first request, is resumed with its
@@ -53,7 +53,7 @@ export type BatchAnswer = {
   raw?: RawPart[] | undefined;
 };
 
-/** `BatchEnd`'s own error, as it answered it: what every number of its batch answers. */
+/** The batch end's own error, as it answered it: what every number of its batch answers. */
 export type BatchFailure = {
   content: CallToolResult['content'];
   isError?: boolean;
@@ -83,7 +83,7 @@ export interface RecordedCall {
 
 /**
  * What a begin hands the owner: the batch connection, the late-bound target
- * it wraps (pointed by the dispatch and `BatchEnd`), the watch of the
+ * it wraps (pointed by the dispatch and the batch end), the watch of the
  * connection its envelopes go out on, and the record of its calls, in
  * number order. A debugger batch wraps the stop's connection itself
  * (`DebugSession.openBatch`), and has no target.
@@ -93,13 +93,13 @@ export interface OpenBatch {
   target?: LateBoundConnection;
   /**
    * What the connection under `connection` did with the envelopes. Absent,
-   * every rejection of `execute()` is `BatchEnd`'s error as it came.
+   * every rejection of `execute()` is the batch end's error as it came.
    */
   envelopes?: EnvelopeWatch;
   recorded: RecordedCall[];
   /**
-   * The instance's SAP session `BatchEnd` sent the envelope on
-   * (`HeldLocks.session()`), set by `BatchEnd`: a lock read by number is
+   * The instance's SAP session the batch end sent the envelope on
+   * (`HeldLocks.session()`), set by the batch end: a lock read by number is
    * held only while that session is the live one.
    */
   lockSession?: number;
@@ -252,7 +252,7 @@ export class InstanceBatch implements StatePart {
   }
 
   /**
-   * `BatchEnd` failed (spec §5.3) — before `execute()`, in it, or splitting
+   * the batch end failed (spec §5.3) — before `execute()`, in it, or splitting
    * its answer: mode off, no map; every number the batch recorded answers
    * `failure`, the kept map replaced by none. No handler is resumed: the
    * batch's signal is aborted, so every one ends its wait. With `ending`

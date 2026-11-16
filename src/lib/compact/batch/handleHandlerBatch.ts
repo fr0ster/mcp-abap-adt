@@ -1,8 +1,7 @@
 import * as z from 'zod';
 /**
- * `HandlerBatch`: batch mode in the compact sets, one tool for the three
- * actions — `begin`, `end`, `answers` — each as the full set's tool of the
- * same meaning (`BatchBegin`, `BatchEnd`, `BatchAnswers`). `number` /
+ * `HandlerBatch`: batch mode, served by the compact sets alone; one tool
+ * for the three actions — `begin`, `end`, `answers`. `number` /
  * `numbers` go with `answers` alone; given with another action, the call is
  * refused before anything runs.
  *

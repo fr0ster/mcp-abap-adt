@@ -3,9 +3,9 @@
  * in batch mode, over the open batch's `AdtBatchConnection`.
  *
  * Every member forwards to the batch connection, so a request is recorded,
- * never sent: its part settles when `BatchEnd` executes the batch, and the
+ * never sent: its part settles when the batch end executes the batch, and the
  * promise the handler awaits settles with that part only once the call's
- * number is read (`release()`, spec §6) — `BatchEnd` resumes no handler.
+ * number is read (`release()`, spec §6) — the batch end resumes no handler.
  * Once the batch has ended (or was dropped), a request is not recorded: it
  * is refused `batch_ended`, and that refusal is what the resumed handler
  * meets.
@@ -31,7 +31,7 @@
  *
  * Every request the recorder hands back is raced against the batch's signal
  * (taken when the recorder is created): a drop (`drop()`, `dispose()`, the
- * instance close), a failed `BatchEnd` and the replacement of the batch's
+ * instance close), a failed the batch end and the replacement of the batch's
  * map abort it, and the handler's wait for a part it will never be given
  * ends with `RequestAbortedError` — adt-clients has no discard, its part
  * promise stays pending and is let go with the batch connection. Nothing is

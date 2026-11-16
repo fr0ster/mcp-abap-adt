@@ -178,7 +178,7 @@ export async function pair<A, B>(
  *
  * `pair` waits for the first answer before it sends the second request, even
  * when the second needs nothing of it — a read of a source and its metadata.
- * In batch mode no answer exists before `BatchEnd`, so such a read could not
+ * In batch mode no answer exists before the batch end, so such a read could not
  * be recorded whole. `both` sends the two requests at once and then reads the
  * answers in order, with `pair`'s answer exactly: the first failing answer,
  * untouched (the first's before the second's), else both values with any

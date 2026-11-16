@@ -17,7 +17,7 @@
  *   after its envelope answered, the parts SAP answered `406`/`415` are
  *   recorded again in one envelope of their own, each by this same call with
  *   the corrected pair (`correctPhaseParts`, `src/lib/batch/phases.ts`).
- * - Inside a call recorded in batch mode (`BatchBegin` … `BatchEnd`) the call
+ * - Inside a call recorded in batch mode (the batch begin … the batch end) the call
  *   is made once: a `406`/`415` part is that call's answer.
  */
 

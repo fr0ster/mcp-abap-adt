@@ -1,6 +1,6 @@
 /**
- * What the batch tools do, shared by the full sets' `BatchBegin`,
- * `BatchEnd`, `BatchAnswers` and the compact sets' `HandlerBatch`: each
+ * What the batch tools do, shared by the compact sets' `HandlerBatch`, the
+ * debugger batch's tools and `DebugBatchAnswers`: each
  * reaches the instance's owner through its call's context (`batch`), and
  * without one answers `batch_mode_unavailable`.
  *
@@ -54,7 +54,7 @@ export function communicationBatch(logger?: ILogger): OpenBatch {
   return { connection, target, envelopes, recorded: [] };
 }
 
-/** `BatchBegin`: a communication batch opened; answers `{ batch: 'on', state_handle }`. */
+/** The batch begin: a communication batch opened; answers `{ batch: 'on', state_handle }`. */
 export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   owner.begin('communication', communicationBatch(context.logger));
@@ -66,7 +66,7 @@ export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   };
 }
 
-/** `BatchEnd`: the open communication batch executed on the call's connection. */
+/** The batch end: the open communication batch executed on the call's connection. */
 export async function endBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   const open = openBatchOf(owner, 'communication');
@@ -128,7 +128,7 @@ export async function endDebugBatch(
   return executeBatch(owner, open);
 }
 
-/** `BatchAnswers`: the last batch's numbers, each answered when read. */
+/** The answers read: the last batch's numbers, each answered when read. */
 export async function answersOf(
   context: HandlerContext,
   ask: AnswersAsk,

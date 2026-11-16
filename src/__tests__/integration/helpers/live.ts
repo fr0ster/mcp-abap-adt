@@ -348,7 +348,7 @@ function hardRunner(
 }
 
 /** Whether a test config exists for this run (not the template). */
-function hasTestConfig(): boolean {
+export function hasTestConfig(): boolean {
   return (
     testConfigPathFromEnv() !== undefined ||
     fs.existsSync(

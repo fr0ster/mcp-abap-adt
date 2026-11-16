@@ -895,6 +895,29 @@
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   },
+  "HandlerTransportCreate": {
+    "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
+  "HandlerTransportMoveObjects": {
+    "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": {
+        "reason": "the cloud trial has only ZLOCAL packages; SAP records no local object on a request (TRINT_APPEND_TO_COMM_ARRAYS: 'Local object is edited without a request')"
+      }
+    }
+  },
+  "HandlerTransportSortAndCompress": {
+    "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
   "HandlerUnitTestResult": {
     "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
     "live": {

@@ -222,7 +222,14 @@ describe('the coverage ledger guard', () => {
   it('the kinds covered by a reason instead of a live case are exactly these', () => {
     // Adding one is a deliberate change: it is a key served on a system
     // where no live case runs, for the reason stated.
-    assertEquals(reasonRows(readJson(LEDGER)), []);
+    assertEquals(reasonRows(readJson(LEDGER)), [
+      {
+        key: 'HandlerTransportMoveObjects',
+        kind: 'cloud',
+        reason:
+          "the cloud trial has only ZLOCAL packages; SAP records no local object on a request (TRINT_APPEND_TO_COMM_ARRAYS: 'Local object is edited without a request')",
+      },
+    ]);
   });
 
   it('each unit reference is a pinCases row of that key', () => {

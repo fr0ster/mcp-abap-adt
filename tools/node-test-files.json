@@ -35,6 +35,7 @@
   "src/__tests__/integration/coverage/reads.live.test.ts",
   "src/__tests__/integration/coverage/searchSource.live.test.ts",
   "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+  "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
   "src/__tests__/integration/coverage/unitTests.live.test.ts",
   "src/__tests__/integration/coverage/versions.live.test.ts",
   "src/__tests__/integration/debugger/DebuggerHandlers.test.ts",

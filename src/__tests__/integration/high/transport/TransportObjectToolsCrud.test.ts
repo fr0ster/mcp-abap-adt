@@ -138,7 +138,11 @@ import { handleReadTransportActionLog } from '../../../../handlers/transport/rea
 import { handleReadTransportObjects } from '../../../../handlers/transport/readonly/handleReadTransportObjects';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
-import { loadTestConfig, loadTestEnv } from '../../helpers/configHelpers';
+import {
+  configuredSystemKind,
+  loadTestConfig,
+  loadTestEnv,
+} from '../../helpers/configHelpers';
 import { systemsDescribe } from '../../helpers/live';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
@@ -146,6 +150,7 @@ import {
   sapIsConfigured,
   systemUserName,
 } from '../../helpers/objectLocks';
+import { guardedPackage } from '../../helpers/packageGuard';
 import { skipRunningTest } from '../../helpers/runningTest';
 import {
   createTestConnectionAndSession,
@@ -334,6 +339,13 @@ systemsDescribe(['onprem'], SUITE, () => {
       logger?.warn(`No system to run against: ${skipReason}`);
       return;
     }
+
+    // The package guard, before anything is created.
+    guardedPackage(
+      configuredSystemKind(),
+      'environment.default_package',
+      packageName,
+    );
 
     const result = await createTestConnectionAndSession();
     connection = result.connection;

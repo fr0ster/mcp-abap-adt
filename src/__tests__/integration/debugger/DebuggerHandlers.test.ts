@@ -114,6 +114,7 @@ import {
   type FixtureRead,
 } from '../helpers/amdpFixture';
 import {
+  configuredSystemKind,
   getSharedDependenciesConfig,
   getStatedDatabaseSystem,
   getSystemType,
@@ -123,6 +124,7 @@ import {
 import { logOffLeft, ownedNow } from '../helpers/debuggerCleanup';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { endTestConnection } from '../helpers/openConnections';
+import { guardedChildPackage, guardedPackage } from '../helpers/packageGuard';
 import { guardedTestConnection } from '../helpers/refusalGuard';
 import { servedSuite } from '../helpers/servedHere';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
@@ -768,7 +770,23 @@ describe('Debugger handlers (integration)', () => {
         // creates on every system and which, as the template configures it,
         // records no changes, so the probe needs no transport. $TMP is
         // refused on ABAP Cloud (403 ExceptionResourceNoAccess, measured).
-        pkg = String(p.package ?? getSharedDependenciesConfig()?.package ?? '');
+        // The package guard, before anything is created: the case's package
+        // itself, the shared one by itself or by its parent.
+        const shared = getSharedDependenciesConfig();
+        pkg =
+          p.package !== undefined && p.package !== null
+            ? guardedPackage(
+                configuredSystemKind(),
+                'debugger_handlers.test_cases[name=debugger_chain].params.package',
+                String(p.package),
+              )
+            : guardedChildPackage(
+                configuredSystemKind(),
+                'shared_dependencies.package',
+                shared?.package ?? '',
+                'shared_dependencies.super_package',
+                shared?.super_package,
+              );
         transport = p.transport ? String(p.transport) : undefined;
         repeats = Number(p.timing_repeats) > 0 ? Number(p.timing_repeats) : 5;
         secondUserEnv = String(p.second_user_env ?? '');

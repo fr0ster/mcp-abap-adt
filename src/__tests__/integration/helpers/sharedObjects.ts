@@ -32,13 +32,16 @@ import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
+  configuredSystemKind,
   getSharedDependenciesConfig,
   getSystemType,
   loadTestConfig,
   resolveSharedDependency,
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
+import { guardedChildPackage, guardedPackage } from './packageGuard';
 import { createTestConnectionAndSession } from './sessionHelpers';
+import type { SharedDependencies } from './testConfigSchema';
 import { thrownWords } from './thrownValue';
 
 const logger = createTestLogger('shared-objects');
@@ -71,12 +74,34 @@ function resolveTransportRequest(override?: string): string | undefined {
   return config?.environment?.default_transport || undefined;
 }
 
-function resolvePackageName(override?: string): string {
-  if (override) return override;
+/**
+ * The package a shared object is created in — the shared package, else the
+ * default one — checked by the package guard first (`packageGuard.ts`).
+ */
+function resolvePackageName(): string {
   const sharedConfig = getSharedDependenciesConfig();
-  if (sharedConfig?.package) return sharedConfig.package;
+  if (sharedConfig?.package) return guardedSharedPackage(sharedConfig);
   const config = loadTestConfig();
-  return config?.environment?.default_package || 'ZLOCAL';
+  return guardedPackage(
+    configuredSystemKind(),
+    'environment.default_package',
+    config?.environment?.default_package || 'ZLOCAL',
+  );
+}
+
+/**
+ * The shared package (`shared_dependencies.package`): allowed itself, or
+ * checked by the parent it is created under
+ * (`shared_dependencies.super_package`).
+ */
+function guardedSharedPackage(sharedConfig: SharedDependencies): string {
+  return guardedChildPackage(
+    configuredSystemKind(),
+    'shared_dependencies.package',
+    sharedConfig.package ?? '',
+    'shared_dependencies.super_package',
+    sharedConfig.super_package,
+  );
 }
 
 /**
@@ -92,7 +117,7 @@ export async function ensureSharedPackage(
   const sharedConfig = getSharedDependenciesConfig();
   if (!sharedConfig?.package) return;
 
-  const packageName = sharedConfig.package;
+  const packageName = guardedSharedPackage(sharedConfig);
 
   // Check if package exists. A package has no source, only its own document
   // (IAdtMetadataReadable, not IAdtReadable) — see IAdtCapabilities.ts.

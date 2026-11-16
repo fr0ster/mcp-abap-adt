@@ -22,9 +22,11 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * also how a task is made for somebody else.
  *
  * **The task is typed before it is handed back, and that is measured too.**
- * A task CTS creates itself — with the request, or when an object is first
- * locked on a request — gets its type there. A task created by hand, through
- * `newtask`, stays `Unclassified`, and on premise, 2026-09-25, `addobject`
+ * A task CTS creates when an object is first recorded on a request gets its
+ * type there. The task created with the request does not: SAP's
+ * `CL_CTS_ADT_RES_OBJ_RECORD` inserts it with `wi_trfunction = 'X'`,
+ * Unclassified (read on both systems, 2026-11-16), and `CreateTransport`
+ * types it. A task created by hand, through `newtask`, stays `Unclassified`, and on premise, 2026-09-25, `addobject`
  * onto one was refused — `400 SCTS_ADT_MSG 009` / TK127, *"Changes to
  * objects are only allowed in correction/repair"* — and the same call
  * answered 200 once the task had been given type `S` by `changetasktype`.

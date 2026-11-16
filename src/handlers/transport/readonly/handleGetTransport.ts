@@ -67,7 +67,7 @@ type TransportRow = AnswerObject;
 /**
  * Parse transport request XML response
  */
-function parseTransportXml(
+export function parseTransportXml(
   xmlData: string,
   includeObjects: boolean = true,
   includeTasks: boolean = true,

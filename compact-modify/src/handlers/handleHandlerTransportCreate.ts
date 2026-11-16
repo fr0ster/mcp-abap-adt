@@ -7,7 +7,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerTransportCreate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Transport create. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner. Response: JSON.',
+    'Creates a transport request and gives its task the type task_type. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner, task_type(S|R|X, default S). Response: JSON with transport_number, task_number and task_type.',
   inputSchema: compactTransportCreateSchema,
 } as const;
 

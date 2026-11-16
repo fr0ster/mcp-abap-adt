@@ -1483,6 +1483,13 @@ export const compactTransportCreateSchema = z.object({
   description: z.string().describe('Transport description.'),
   target_system: z.string().optional().describe('Target system id.'),
   owner: z.string().optional().describe('Transport owner user.'),
+  task_type: z
+    .enum(['S', 'R', 'X'])
+    .default('S')
+    .optional()
+    .describe(
+      "Type given to the request's task: S Development/Correction (default), R Repair, X Unclassified.",
+    ),
 });
 
 export const compactTransportSortAndCompressSchema = z.object({

@@ -11,7 +11,10 @@
  *   message) and the inactive list read after it still naming the group
  *   (`activation-group-alone-s4-2025` 04 and 05).
  *
- * `analyseActivation` (adt-strategies 0.22.0) reads both as a failure before
+ * - a checklist with no `activationExecuted` and only a `W` message, the
+ *   inactive list empty (#360): a success, decided by that list.
+ *
+ * `analyseActivation` (adt-strategies 0.22.0) reads the first two as a failure before
  * any projection runs; the answer renders its `stillInactive` as
  * `still_inactive`, field by field.
  */
@@ -37,6 +40,17 @@ const IOC_751 = corpusBody(
 );
 const SILENT = corpusBody('activation-group-alone-s4-2025--04-activation');
 const LISTED = corpusBody('activation-group-alone-s4-2025--05-inactiveobjects');
+/** SAP's empty inactive list. */
+const NONE_INACTIVE = corpusBody(
+  'activation-reactivate-active-s4-2025--04-inactiveobjects',
+);
+/**
+ * A checklist stating no `activationExecuted`, its one message a warning
+ * (fr0ster/mcp-abap-adt#360): the corpus's checklist shape, the attribute
+ * left out and its message a `W`.
+ */
+const WARNED =
+  '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" generationExecuted="true"/><msg objDescr="Class ZCL_AI_ACT_PROBE" type="W" line="1" href="/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#start=3,0" forceSupported="true"><shortText><txt>The method is not used.</txt></shortText></msg></chkl:messages>';
 
 /** What the connection answers: by the request, not by its order. */
 type Route = (options: IAbapRequestOptions) => string | undefined;
@@ -165,6 +179,20 @@ describe('ActivateObjects, one object', () => {
         parent_uri: '/sap/bc/adt/functions/groups/zact751p9325',
       },
     ]);
+    expect(requests).toContain('GET /sap/bc/adt/activation/inactiveobjects');
+  });
+});
+
+describe('ActivateObjects, a warned checklist (#360)', () => {
+  it('no activationExecuted, a W message and an empty inactive list is a success, decided by the inactive list', async () => {
+    const { connection, requests } = answering(
+      activationAnswer(WARNED, NONE_INACTIVE),
+    );
+    const result = await handleActivateObjects(contextOver(connection), {
+      objects: [{ name: 'ZCL_AI_ACT_PROBE', type: 'CLAS/OC' }],
+    });
+    expect(isError(result)).toBe(false);
+    expect(payloadOf(result)).not.toHaveProperty('still_inactive');
     expect(requests).toContain('GET /sap/bc/adt/activation/inactiveobjects');
   });
 });

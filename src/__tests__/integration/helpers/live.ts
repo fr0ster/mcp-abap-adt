@@ -385,6 +385,30 @@ async function liveRunner(system: SystemKind): Promise<LiveRunner> {
 }
 
 /**
+ * Where a suite on `systems` runs: the configured kind when it is one of
+ * them, else the reason it skips — no test config, no kind stated, or
+ * another system configured.
+ */
+function placeOf(
+  systems: readonly SystemKind[],
+): { kind: SystemKind } | { skipped: string } {
+  if (!hasTestConfig()) {
+    return {
+      skipped: 'no test config (tests/test-config.yaml or MCP_TEST_CONFIG)',
+    };
+  }
+  const stated = configuredSystemKind();
+  if (stated === undefined) return { skipped: NO_KIND_STATED };
+  const kind = stated === 'onprem' || stated === 'cloud' ? stated : undefined;
+  if (kind === undefined || !systems.includes(kind)) {
+    return {
+      skipped: `the configured system is ${stated}; this suite runs on ${systems.join(', ')}`,
+    };
+  }
+  return { kind };
+}
+
+/**
  * A suite of live cases on `systems`. Without a config, or on a system it
  * does not name, it skips and logs the reason.
  */
@@ -393,23 +417,13 @@ export function liveSuite(
   title: string,
   body: () => void,
 ): void {
-  const reason = !hasTestConfig()
-    ? 'no test config (tests/test-config.yaml or MCP_TEST_CONFIG)'
-    : undefined;
-  const stated = reason === undefined ? configuredSystemKind() : undefined;
-  const kind = stated === 'onprem' || stated === 'cloud' ? stated : undefined;
-  const skipped =
-    reason ??
-    (stated === undefined
-      ? NO_KIND_STATED
-      : kind === undefined || !systems.includes(kind)
-        ? `the configured system is ${stated}; this suite runs on ${systems.join(', ')}`
-        : undefined);
-  if (skipped !== undefined || kind === undefined) {
-    console.log(`[liveSuite] ${title}: skipped — ${skipped}`);
-    describe(title, { skip: skipped ?? true }, body);
+  const place = placeOf(systems);
+  if ('skipped' in place) {
+    console.log(`[liveSuite] ${title}: skipped — ${place.skipped}`);
+    describe(title, { skip: place.skipped }, body);
     return;
   }
+  const { kind } = place;
   liveDescribe(
     title,
     () => liveRunner(kind),
@@ -419,6 +433,28 @@ export function liveSuite(
     },
     body,
   );
+}
+
+/**
+ * A suite of the older testers (`HighTester`, `LambdaTester`, a direct
+ * handler call) on `systems`, stated in code as `liveSuite` states it: on a
+ * system it does not name, or without a config, it skips with the reason, so
+ * a test config's `available_in` alone never decides whether a case that
+ * calls a tool the system does not serve is sent. On a system it names it is
+ * a plain `describe`: its cases run as they did.
+ */
+export function systemsDescribe(
+  systems: readonly SystemKind[],
+  title: string,
+  body: () => void,
+): void {
+  const place = placeOf(systems);
+  if ('skipped' in place) {
+    console.log(`[liveSuite] ${title}: skipped — ${place.skipped}`);
+    describe(title, { skip: place.skipped }, body);
+    return;
+  }
+  describe(title, body);
 }
 
 /** The words a case skips with once the run was interrupted. */

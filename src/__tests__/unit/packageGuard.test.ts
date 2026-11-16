@@ -19,6 +19,7 @@ import {
   guardedChildPackage,
   guardedPackage,
   PackageGuardRefusal,
+  packageOnSystemOf,
   packageRefusal,
 } from '../integration/helpers/packageGuard';
 import { LambdaTester } from '../integration/helpers/testers/LambdaTester';
@@ -54,6 +55,14 @@ process.env.MCP_TEST_CONFIG = file;
 
 after(() => {
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** SAP's wire answer of a status, nothing else in it. */
+const wire = (status: number) => ({
+  status,
+  statusText: '',
+  headers: {},
+  data: '',
 });
 
 describe('the package guard', () => {
@@ -204,6 +213,89 @@ describe('the package guard', () => {
         message:
           'the package guard: child names ZFOREIGN, which is none of ZADT_BLD_PKG03 on cloud: nothing is created',
       },
+    );
+  });
+
+  it('a package read only a confirmed not-found counts as absent; it is then checked by its configured parent', () => {
+    const absent404 = packageOnSystemOf('child', 'ZMCP_SHR_PKG', {
+      ok: false,
+      error: {
+        origin: 'refusal',
+        message: 'not found',
+        response: wire(404),
+      },
+    });
+    assert.deepEqual(absent404, { exists: false });
+    assert.deepEqual(
+      packageOnSystemOf('child', 'ZMCP_SHR_PKG', {
+        ok: false,
+        error: {
+          origin: 'refusal',
+          message: 'gone',
+          code: 'ADT_OBJECT_NOT_FOUND',
+        },
+      }),
+      { exists: false },
+    );
+    assert.equal(
+      guardedChildPackage(
+        'cloud',
+        'child',
+        'ZMCP_SHR_PKG',
+        absent404,
+        'parent',
+        'ZADT_BLD_PKG03',
+      ),
+      'ZMCP_SHR_PKG',
+    );
+  });
+
+  it('an existing package whose read fails otherwise is refused, though its configured parent is allowed', () => {
+    const refusedRead = () =>
+      guardedChildPackage(
+        'cloud',
+        'shared_dependencies.package',
+        'ZFOREIGN',
+        packageOnSystemOf('shared_dependencies.package', 'ZFOREIGN', {
+          ok: false,
+          error: {
+            origin: 'refusal',
+            message: 'no authority',
+            response: wire(403),
+          },
+        }),
+        'shared_dependencies.super_package',
+        'ZADT_BLD_PKG03',
+      );
+    assert.throws(refusedRead, (error: unknown) => {
+      assert.ok(error instanceof PackageGuardRefusal);
+      assert.equal(
+        error.message,
+        'the package guard: shared_dependencies.package names ZFOREIGN, which SAP did not read (status 403: no authority): its super package is unknown, nothing is created in it',
+      );
+      return true;
+    });
+    assert.throws(
+      () =>
+        packageOnSystemOf('k', 'ZFOREIGN', {
+          ok: false,
+          error: { origin: 'connection', message: 'socket hang up' },
+        }),
+      {
+        message:
+          'the package guard: k names ZFOREIGN, which SAP did not read (origin connection: socket hang up): its super package is unknown, nothing is created in it',
+      },
+    );
+  });
+
+  it('a package read answers the super package its document names', () => {
+    assert.deepEqual(
+      packageOnSystemOf('k', 'ZMCP_SHR_PKG', {
+        ok: true,
+        document:
+          '<pak:package xmlns:pak="http://www.sap.com/adt/packages" adtcore:name="ZMCP_SHR_PKG" xmlns:adtcore="http://www.sap.com/adt/core"><pak:superPackage adtcore:name="ZADT_BLD_PKG03"/></pak:package>',
+      }),
+      { exists: true, superPackage: 'ZADT_BLD_PKG03' },
     );
   });
 

@@ -10,6 +10,8 @@
  * Pure on purpose: the system kind is the caller's, so the unit tests need
  * no config.
  */
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { packageSummary } from '../../../lib/strategies/packageSummary';
 import type { ConfiguredSystemKind } from './configuredSystemKind';
 
 /** The packages a run may create in, per system kind. */
@@ -96,4 +98,37 @@ export function guardedChildPackage(
   }
   guardedPackage(kind, parentKey, parent);
   return packageName;
+}
+
+/**
+ * What a metadata read of a package says of it: its document, it exists with
+ * the super package the document names; a confirmed "not found" — SAP's
+ * `404`, or the `ADT_OBJECT_NOT_FOUND` refusal (the rule `isNotFound` reads
+ * off an answer) — it does not exist. Any other failure leaves its super
+ * package unknown: refused, naming the key and SAP's answer.
+ */
+export function packageOnSystemOf(
+  key: string,
+  packageName: string,
+  read: { ok: true; document: string } | { ok: false; error: IAdtError },
+): PackageOnSystem {
+  if (read.ok) {
+    return {
+      exists: true,
+      superPackage: packageSummary(read.document).super_package,
+    };
+  }
+  const { error } = read;
+  const status = error.response?.status;
+  if (
+    status === 404 ||
+    (error.origin === 'refusal' && error.code === 'ADT_OBJECT_NOT_FOUND')
+  ) {
+    return { exists: false };
+  }
+  const answered =
+    typeof status === 'number' ? `status ${status}` : `origin ${error.origin}`;
+  throw new PackageGuardRefusal(
+    `the package guard: ${key} names ${packageName}, which SAP did not read (${answered}: ${error.message}): its super package is unknown, nothing is created in it`,
+  );
 }

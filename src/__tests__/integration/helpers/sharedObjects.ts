@@ -30,7 +30,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { IServerAdtClient } from '../../../lib/adtClientContract';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
-import { packageSummary } from '../../../lib/strategies/packageSummary';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
   configuredSystemKind,
@@ -45,6 +44,7 @@ import {
   guardedPackage,
   PackageGuardRefusal,
   type PackageOnSystem,
+  packageOnSystemOf,
   packageRefusal,
 } from './packageGuard';
 import { createTestConnectionAndSession } from './sessionHelpers';
@@ -108,11 +108,13 @@ async function packageOnSystem(
       { packageName },
       { version: 'active', analyse: analyseException },
     );
-  if (!read.ok) return { exists: false };
-  return {
-    exists: true,
-    superPackage: packageSummary(read.getResult().value).super_package,
-  };
+  return packageOnSystemOf(
+    'shared_dependencies.package',
+    packageName,
+    read.ok
+      ? { ok: true, document: read.getResult().value }
+      : { ok: false, error: read.getError() },
+  );
 }
 
 /** The shared package once the guard accepted it, for the rest of the process. */

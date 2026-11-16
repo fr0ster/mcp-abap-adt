@@ -1466,6 +1466,23 @@ create_table:
 # Table (Table - Low-Level)
 # Create View (Low-Level Handler)
 
+# Transported Object CRUD (GitHub #11)
+# Read by high/transport/TransportedObjectCrud.test.ts (target_system): data,
+# no switch. The test creates a workbench request of its own through
+# CreateTransport with this target and records a class of
+# environment.default_package on it; the configured default_transport is not
+# used.
+create_transported_object:
+  # onprem: needed (to run there; absent, the case skips naming this key) —
+  # the transport target of the package's requests: read it from an existing
+  # request of environment.default_package (GetTransport, target_system) and
+  # give it without the enclosing slashes, since CreateTransport sends
+  # /<target_system>/. Without a target the request is created with target
+  # LOCAL and SAP refuses to record the package's class on it (CTS_WBO_API 048).
+  # cloud: not needed — absent, the request is created with target LOCAL, which
+  # the cloud package accepts (measured).
+  target_system: "TARGET"                        # ← CHANGE: the package's transport target, no slashes
+
 # Service Definition (Service Definition - High-Level)
 # Read by high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts. Object
 # name and sources. onprem, cloud.

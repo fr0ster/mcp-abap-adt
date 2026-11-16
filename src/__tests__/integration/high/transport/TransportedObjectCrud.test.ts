@@ -15,6 +15,12 @@ import * as z from 'zod';
  *   5. Delete the class
  *   6. GetClass again: the class is gone
  *
+ * The request's transport target is `create_transported_object.target_system`:
+ * on premise it is required (CreateTransport without one creates the request
+ * with target LOCAL, and SAP refuses to record the package's class on it —
+ * 403 CTS_WBO_API 048, measured), and the case skips naming the key without
+ * it; on the cloud it is optional (LOCAL is accepted there, measured).
+ *
  * The request is never released and never deleted: it stays in the system
  * (the deleted class's entry stays on it, so every run takes a fresh class
  * name). The configured `environment.default_transport` is not used.
@@ -35,6 +41,7 @@ import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateC
 import { handleCreateTransport } from '../../../../handlers/transport/high/handleCreateTransport';
 import {
   configuredSystemKind,
+  loadTestConfig,
   loadTestEnv,
   resolvePackageName,
 } from '../../helpers/configHelpers';
@@ -62,6 +69,8 @@ describe('Transported Object CRUD (GitHub #11)', () => {
   /** The request the test created; never released, never deleted. */
   let transportRequest = '';
   let packageName = '';
+  /** The request's transport target; `undefined` sends none. */
+  let targetSystem: string | undefined;
   /** The class while it may exist; emptied once deleted. */
   let className = '';
   /** Why the case skips: no system kind stated, or one it does not run on. */
@@ -80,6 +89,15 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       return;
     }
     logger?.info(`System type: ${systemType}`);
+
+    const target =
+      loadTestConfig().create_transported_object?.target_system?.trim() ?? '';
+    if (systemType === 'onprem' && target === '') {
+      skipReason =
+        'create_transported_object.target_system is not set: on premise the request needs the transport target of the package';
+      return;
+    }
+    targetSystem = target === '' ? undefined : target;
 
     // The package guard, before anything is created.
     const accepted = TRANSPORTABLE[systemType];
@@ -123,6 +141,7 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       {
         transport_type: 'workbench',
         description: 'MCP test: transported object CRUD (GitHub #11)',
+        target_system: targetSystem,
       },
     );
     assert.equal(

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { stated } from '../../helpers/testConfigSchema';
 /**
@@ -139,6 +139,7 @@ import { handleReadTransportObjects } from '../../../../handlers/transport/reado
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../../lib/clients';
 import { loadTestConfig, loadTestEnv } from '../../helpers/configHelpers';
+import { systemsDescribe } from '../../helpers/live';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
   lockHolderOf,
@@ -203,7 +204,10 @@ function expectOk(
   assert.equal(response.isError, false);
 }
 
-describe('Transport object tools end to end (GitHub #221, PR227)', () => {
+/** It creates a PROGRAM: ABAP Cloud has none, so the suite runs on premise. */
+const SUITE = 'Transport object tools end to end (GitHub #221, PR227)';
+
+systemsDescribe(['onprem'], SUITE, () => {
   const logger = createTestLogger('transport-object-tools');
 
   let connection: any;

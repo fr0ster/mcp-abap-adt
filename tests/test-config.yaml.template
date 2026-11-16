@@ -1730,9 +1730,10 @@ search_source_readonly:
         # Substring used as exclusion — present in at least one matching line so the test
         # can assert the line was dropped.
         known_exclude: "ev_output"
-        # Glob that matches only one of the seeded programs/classes — used to verify
-        # object_filter narrows the scan.
-        narrow_object_filter: "Z_MCP_BLD_SHR_FM*"
+        # Glob over the scanned package's objects that matches only one of the
+        # seeded ones — used to verify object_filter narrows the scan. A function
+        # module is not a package object: name its group (the shared group).
+        narrow_object_filter: "ZMCP_BLD_SHR_FGR*"
 
 # WhereUsed Read-Only Handler
 # Read by readOnly/system/WhereUsedHandlers.test.ts. A class and a table to

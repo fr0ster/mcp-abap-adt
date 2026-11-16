@@ -5,9 +5,12 @@
  *
  * The tests scan the case's `scan_package`, else the package configured under
  * `shared_dependencies.package`, and rely on the shared FM `Z_MCP_BLD_SHR_FM`
- * seeded by `shared:setup` to contain known marker substrings.
+ * seeded by `shared:setup` to contain known marker substrings. Every case
+ * that scans that package first requires the search to have read something
+ * there (`expectScanned`), so a package holding no source fails naming the
+ * config keys rather than passing with no hit to check.
  *
- * Run: npm test -- --testPathPattern=integration/readOnly/system/SearchSource
+ * Run: npm run test:integration -- src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts
  */
 
 import assert from 'node:assert/strict';
@@ -54,6 +57,30 @@ function scanPackageOf(given: unknown): string {
     );
   }
   return pkg;
+}
+
+/** The case and its params, as a refusal names them. */
+const CASE_PARAMS =
+  'search_source_readonly.test_cases[name=test_search_source].params';
+
+/** What chooses the scanned package. */
+const PACKAGE_RULE = `${CASE_PARAMS}.scan_package, else shared_dependencies.package, must name a package holding the seeded objects`;
+
+/** What chooses the object filter. */
+const FILTER_RULE = `${CASE_PARAMS}.narrow_object_filter must be a glob over the package's objects — a function group, not its modules (the shared group, e.g. ZMCP_BLD_SHR_FGR*)`;
+
+/**
+ * The search read something in `where`, or the case fails naming the config
+ * keys that choose what is scanned: a package holding no source the search
+ * reads answers no hit whatever the query, which a bare `results.length > 0`
+ * would not say.
+ */
+function expectScanned(
+  data: SearchSourceResult,
+  where: string,
+  rule = PACKAGE_RULE,
+): void {
+  assert.ok(data.scanned.objects > 0, `nothing scanned in ${where}: ${rule}`);
 }
 
 function parseResult(result: any): SearchSourceResult {
@@ -152,6 +179,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       assert.ok(data.results.length > 0);
       for (const hit of data.results) {
         assert.ok(hit.snippet.toLowerCase().includes(query.toLowerCase()));
@@ -183,6 +211,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       for (const hit of data.results) {
         const lower = hit.snippet.toLowerCase();
         assert.ok(lower.includes(q.toLowerCase()));
@@ -215,6 +244,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       for (const hit of data.results) {
         assert.ok(!hit.snippet.toLowerCase().includes(excl.toLowerCase()));
       }
@@ -244,6 +274,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       for (const hit of data.results) {
         assert.notEqual(hit.snippet[0], '*');
         const trimmed = hit.snippet.replace(/^\s+/, '');
@@ -274,6 +305,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       const byObject = new Map<string, number>();
       for (const hit of data.results) {
         const key = `${hit.devclass}/${hit.object_type}/${hit.object_name}`;
@@ -306,20 +338,20 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       assertEquals(data.results, []);
       assert.ok(!Object.keys(data).includes('no_hits'));
       assert.ok(!Object.keys(data).includes('failures'));
-      assert.ok(data.scanned.objects > 0);
       assert.equal(data.scanned.objects_with_hits, 0);
     });
   });
 
-  it('object_filter narrows the scan — only matching object names appear in results', async () => {
+  it('object_filter narrows the scan — only hits of matching objects (a group for its modules) appear in results', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
       const { connection, params } = context;
       const pkg = scanPackageOf(params?.scan_package);
       const q = String(params?.known_query ?? 'Echo:');
-      const glob = String(params?.narrow_object_filter ?? 'Z_MCP_BLD_SHR_FM*');
+      const glob = String(params?.narrow_object_filter ?? 'ZMCP_BLD_SHR_FGR*');
       const matcher = new RegExp(
         `^${glob.replace(/\*/g, '.*').replace(/\?/g, '.')}$`,
         'i',
@@ -342,8 +374,12 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, `${pkg} filtered by ${glob}`, FILTER_RULE);
+      // The filter selects the package's objects: a hit in a function group
+      // (a module or an include) is filtered by its group.
       for (const hit of data.results) {
-        assert.equal(matcher.test(hit.object_name), true);
+        const scannedObject = hit.function_group_name ?? hit.object_name;
+        assert.equal(matcher.test(scannedObject), true, scannedObject);
       }
     });
   });
@@ -372,6 +408,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, mask);
       assert.ok(data.results.length > 0);
     });
   });
@@ -400,6 +437,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, mask);
       assert.ok(data.results.length > 0);
       for (const hit of data.results) {
         assert.ok(matchesMask(hit.devclass, mask), hit.devclass);
@@ -458,6 +496,7 @@ describe('SearchSource Handler Integration', () => {
 
       assert.equal(result.isError, false);
       const data = parseResult(result);
+      expectScanned(data, pkg);
       assert.ok(data.results.length > 0);
       const devclasses = new Set(data.results.map((h) => h.devclass));
       assert.equal(devclasses.has(pkg), true);

@@ -302,10 +302,12 @@ liveSuite(['onprem', 'cloud'], 'Service bindings', () => {
     });
     const first = payloadOf(succeeded('GetServiceBindingPreviewUrl', located));
     // Right after the answer: live at once on premise; on the cloud system
-    // the gateway still blocks the service (measured: 95 s and 129 s more).
+    // the gateway usually still blocks the service (measured: 95 s and 129 s
+    // more) — unless SAP's publication job has already finished, when the
+    // service is live and the pending shape is not there to assert.
     if (onPremise()) {
       assert.equal(member(first, 'live'), true);
-    } else {
+    } else if (member(first, 'live') !== true) {
       assert.equal(member(first, 'live'), false);
       assert.equal(member(first, 'live_status'), 403);
       assert.ok(String(member(first, 'live_text')).includes('UCON'));

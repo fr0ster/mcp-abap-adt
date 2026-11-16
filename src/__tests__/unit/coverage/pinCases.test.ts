@@ -179,10 +179,10 @@ describe('pinCases', () => {
 
   it('the fakes are installed before the server is built', async () => {
     const begin: PinCase = {
-      tool: 'BatchBegin',
+      tool: 'HandlerBatch',
       variant: 'onprem',
       stand: 'server',
-      args: {},
+      args: { action: 'begin' },
       expected: 'none',
       ran: () => {},
     };
@@ -197,9 +197,9 @@ describe('pinCases', () => {
     for (const _ of [1, 2]) {
       const stand: AdtStandIn = await adtStandIn();
       const server = await pinServer('onprem', stand);
-      const restore = installPinFakes('BatchBegin onprem');
+      const restore = installPinFakes('HandlerBatch#begin onprem');
       try {
-        const answer = await server.call('BatchBegin', {});
+        const answer = await server.call('HandlerBatch', { action: 'begin' });
         handles.push(answer.content[0]?.text ?? '');
       } finally {
         restore();

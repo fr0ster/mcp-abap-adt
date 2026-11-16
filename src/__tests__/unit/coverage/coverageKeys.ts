@@ -253,8 +253,6 @@ export function requiredKeys(
  * `expected: 'none'`, asserting the tool ran.
  */
 export const SENDS_NOTHING: ReadonlySet<CoverageKey> = new Set([
-  'BatchBegin',
-  'BatchAnswers',
   'GetBackgroundRun',
   'ListBackgroundRuns',
   'DiscardBackgroundRun',

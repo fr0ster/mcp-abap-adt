@@ -117,6 +117,9 @@ environment:
   # On ABAP Cloud this is the build package SearchSource's live known-hit case searches with its
   # subpackages: shared_dependencies.package must be a descendant of it, or that case fails
   # naming the prerequisite.
+  # The live harness creates only where its package guard allows (src/__tests__/integration/
+  # helpers/packageGuard.ts): on premise "$TMP" or ZAC_TEST_PKG, on the cloud ZADT_BLD_PKG03;
+  # a case's package_name is held to the same, any other fails the case naming the key.
   # cloud: needed — the cloud build package (a package of the cloud system).
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   # cloud: needed — a request of the cloud system when default_package records
@@ -154,6 +157,8 @@ shared_dependencies:
   # package): SearchSource's live known-hit case searches the build package's tree for it, and
   # fails naming the prerequisite when it is not there.
   # cloud: needed — a package of the cloud system under default_package.
+  # The package guard accepts this package when it is an allowed one itself, else by its
+  # super_package, which must then be an allowed one.
   package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
   super_package: ""                          # super package (optional, leave "" if none)
   # cloud: needed — the cloud system's software component.

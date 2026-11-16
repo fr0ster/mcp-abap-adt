@@ -306,9 +306,13 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     transportablePackage();
     const plan = await prepareRequestCreate();
     const target = await configuredTarget();
-    const created = await liveCall('HandlerCreate', {
+    // An empty target_system is LOCAL, as an absent one. HandlerCreate's
+    // members are no ledger keys: the call is made, its key not recorded.
+    const created = await livePrepare('HandlerCreate', {
       object_type: 'TRANSPORT',
-      ...createArgs(plan.description, target),
+      description: plan.description,
+      transport_type: 'workbench',
+      target_system: target,
       task_type: 'R',
     });
     await reconcileRequestCreate(plan, created);

@@ -16,10 +16,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, it } from 'node:test';
 import { handleHandlerGet } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { handleGetMainPrograms } from '../../../../handlers/include/readonly/handleGetMainPrograms';
-
+import { systemsDescribe } from '../../helpers/live';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -47,7 +47,7 @@ function mainProgramsOf(answer: unknown): unknown[] {
   return Array.isArray(listed) ? listed : [];
 }
 
-describe("An include's main programs", () => {
+systemsDescribe(['onprem'], "An include's main programs", () => {
   let tester: LambdaTester;
 
   before(async () => {

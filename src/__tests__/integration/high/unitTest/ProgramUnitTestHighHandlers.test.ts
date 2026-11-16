@@ -1,4 +1,4 @@
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import { includeDocuments } from '@mcp-abap-adt/adt-clients';
 
 /**
@@ -19,6 +19,7 @@ import { handleUpdateProgramUnitTest } from '../../../../handlers/unit_test/high
 import { programTestInclude } from '../../../../handlers/unit_test/shared/writeTests';
 import { DEFAULT_ADT_HEADERS } from '../../../../lib/adtHeaders/defaultPairs';
 import { createOnPremAdtClient } from '../../../../lib/clients';
+import { systemsDescribe } from '../../helpers/live';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { readCaseParams } from '../../helpers/testConfigSchema';
@@ -34,7 +35,7 @@ const ProgramUnitTestParams = z.looseObject({
   expected_test_methods: z.array(z.string()).optional(),
 });
 
-describe('Unit Test High-Level Handlers (report)', () => {
+systemsDescribe(['onprem'], 'Unit Test High-Level Handlers (report)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('program-unit-test-high');
 

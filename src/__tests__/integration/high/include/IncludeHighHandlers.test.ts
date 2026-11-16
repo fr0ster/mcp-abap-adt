@@ -67,6 +67,7 @@ import { CompactHandlersGroup } from '../../../../lib/compact/group';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { getSystemType } from '../../helpers/configHelpers';
+import { systemsDescribe } from '../../helpers/live';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { withRootDescription } from '../../helpers/rootDescription';
@@ -144,7 +145,7 @@ const FREE_NAME = `${NAME_PREFIX}Z`;
 
 const logger = createTestLogger('incl-high');
 
-describe('Include High-Level Handlers Integration', () => {
+systemsDescribe(['onprem'], 'Include High-Level Handlers Integration', () => {
   let tester: LambdaTester;
   /** Set once the case runs here: only then is absence read back. */
   let ran = false;

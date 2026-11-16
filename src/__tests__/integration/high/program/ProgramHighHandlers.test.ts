@@ -14,7 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/program
  */
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
 import {
   TOOL_DEFINITION as CreateProgramTool,
   handleCreateProgram,
@@ -29,9 +29,10 @@ import {
 } from '../../../../handlers/program/high/handleUpdateProgram';
 
 import { defineTool } from '../../../../lib/handlers/interfaces';
+import { systemsDescribe } from '../../helpers/live';
 import { HighTester } from '../../helpers/testers/HighTester';
 
-describe('Program High-Level Handlers Integration', () => {
+systemsDescribe(['onprem'], 'Program High-Level Handlers Integration', () => {
   let tester: HighTester;
 
   before(async () => {

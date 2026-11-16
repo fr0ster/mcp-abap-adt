@@ -33,6 +33,10 @@ type Closable = {
 export async function endTestConnection(connection: unknown): Promise<void> {
   const closable = connection as Closable | null | undefined;
   if (!closable || typeof closable.disconnect !== 'function') return;
+  // Ended here, it is no longer the file's to close: `disconnect()` is called
+  // once per connection (a second call rejects, connection 16.0.0), so the
+  // per-file close (`closeTrackedConnections`) must not call it again.
+  open.delete(closable);
   // After a credential refusal nothing is sent, a logoff included.
   if (markerExists()) return;
   await closable.disconnect();

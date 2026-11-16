@@ -22,6 +22,7 @@ export function compactBatchEntries(): HandlerEntry[] {
     {
       ...defineTool(HandlerBatch_Tool, handleHandlerBatch),
       connectionless: batchActionIsConnectionless,
+      communicationBatch: true as const,
     },
   ];
 }

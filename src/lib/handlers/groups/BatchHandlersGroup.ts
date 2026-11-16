@@ -33,6 +33,7 @@ export function batchToolEntries(): HandlerEntry[] {
     {
       ...defineTool(BatchBegin_Tool, handleBatchBegin),
       connectionless: true as const,
+      communicationBatch: true as const,
     },
     defineTool(BatchEnd_Tool, handleBatchEnd),
     {

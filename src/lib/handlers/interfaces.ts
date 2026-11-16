@@ -97,6 +97,12 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
    * connection, so the refusal sends nothing, no logon included (#4).
    */
   readonly heldLockOf?: (args: ToolArgs) => string | undefined;
+  /**
+   * The tool begins and ends the communication batch (`HandlerBatch`): a set
+   * that serves it has batch mode, and only there does every other tool's
+   * description carry its batch sentence.
+   */
+  readonly communicationBatch?: true;
 }
 
 /**

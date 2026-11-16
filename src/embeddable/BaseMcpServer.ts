@@ -395,6 +395,12 @@ export abstract class BaseMcpServer extends McpServer {
    * answer `batch_mode_unavailable`.
    */
   protected readonly batch: InstanceBatch | undefined;
+  /**
+   * Whether the groups registered last serve the communication batch
+   * (an entry marked `communicationBatch`): a set without it has no batch
+   * mode, and no description names one.
+   */
+  private servesCommunicationBatch = false;
 
   /** The locks this instance holds between requests (`heldLocks` option, else its own). */
   protected readonly heldLocks: HeldLocks;
@@ -1569,9 +1575,17 @@ export abstract class BaseMcpServer extends McpServer {
       const groups = this.withBackgroundRunTools(
         handlersRegistry.getHandlerGroups(),
       );
-      // Where the instance has a batch owner, every tool's description but
-      // a batch tool's ends with its batch sentence (spec §3).
-      const sentenced = this.batch !== undefined;
+      // Where the instance has a batch owner and its set serves the
+      // communication batch, every tool's description but a batch tool's
+      // ends with its batch sentence (spec §3); a set without batch mode
+      // describes none.
+      this.servesCommunicationBatch = groups.some((group) =>
+        group
+          .getHandlers()
+          .some((entry: HandlerEntry) => entry.communicationBatch === true),
+      );
+      const sentenced =
+        this.batch !== undefined && this.servesCommunicationBatch;
       // A listed long tool offers `background` only where its run can be
       // read: this instance holds a strategy and serves the tool that reads
       // its runs. Elsewhere it is listed without the parameter and answers
@@ -2876,12 +2890,14 @@ export abstract class BaseMcpServer extends McpServer {
         : registerArgs;
     };
     // A registry's own tool runs outside batch mode: where the instance has
-    // a batch owner, its description says so (spec §3) — the same rule as a
-    // handler group's tools the eligibility table does not list.
+    // a batch owner and serves the communication batch, its description says
+    // so (spec §3) — the same rule as a handler group's tools the
+    // eligibility table does not list.
     const described = (
       registerArgs: readonly RegistrationArg[],
     ): readonly RegistrationArg[] => {
-      if (this.batch === undefined) return registerArgs;
+      if (this.batch === undefined || !this.servesCommunicationBatch)
+        return registerArgs;
       const name = registerArgs[0];
       if (typeof name !== 'string' || runsBesideBatch(name))
         return registerArgs;

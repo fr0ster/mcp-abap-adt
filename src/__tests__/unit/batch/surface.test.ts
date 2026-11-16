@@ -278,7 +278,7 @@ describe('the batch tools on the surface', () => {
     }
   });
 
-  it("a registry's own tool gets the outside-batch sentence where the instance has a batch owner", async () => {
+  it("a registry's own tool gets no sentence where the instance serves no communication batch, batch owner or not", async () => {
     const own = (): IHandlersRegistry =>
       ({
         registerAllTools: (server: {
@@ -298,7 +298,7 @@ describe('the batch tools on the surface', () => {
     });
     const listed = (await withOwner.client.listTools()).tools;
     expect(listed.find((t) => t.name === 'OwnTool')?.description).toBe(
-      `Does its own thing. ${OUTSIDE_WORDS}`,
+      'Does its own thing.',
     );
     const withoutOwner = await served(own());
     expect(

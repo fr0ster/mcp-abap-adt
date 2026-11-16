@@ -700,7 +700,6 @@
         "equals": [
           "DOMAIN",
           "DATA_ELEMENT",
-          "TRANSPORT",
           "TABLE",
           "STRUCTURE",
           "DDL",
@@ -1368,24 +1367,6 @@
         ]
       }
     ]
-  },
-  {
-    "tool": "CreateTransport",
-    "set": "full",
-    "handler": "src/handlers/transport/high/handleCreateTransport.ts#handleCreateTransport",
-    "sends": "POST /sap/bc/adt/cts/transportrequests"
-  },
-  {
-    "tool": "HandlerTransportCreate",
-    "set": "compact",
-    "handler": "compact-modify/src/handlers/handleHandlerTransportCreate.ts#handleHandlerTransportCreate",
-    "sends": "POST /sap/bc/adt/cts/transportrequests"
-  },
-  {
-    "tool": "CreateTransportTask",
-    "set": "full",
-    "handler": "src/handlers/transport/high/handleCreateTransportTask.ts#handleCreateTransportTask",
-    "sends": "POST /sap/bc/adt/cts/transportrequests/{number}/tasks"
   },
   {
     "tool": "RemoveTransportObject",

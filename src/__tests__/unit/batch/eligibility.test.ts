@@ -78,6 +78,10 @@ describe('eligible', () => {
         reason: 'arguments',
       });
     }
+    // A transport request's task is typed from the create's answer.
+    expect(
+      eligible('HandlerCreate', { object_type: 'TRANSPORT' }, 'http'),
+    ).toEqual({ ok: false, reason: 'arguments' });
     // A package over RFC is created in an ABAP session of its own.
     const pkg = { object_type: 'PACKAGE' };
     expect(eligible('HandlerCreate', pkg, 'http')).toEqual({ ok: true });
@@ -225,6 +229,19 @@ describe('eligible', () => {
       expect(
         eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
       ).toEqual({ ok: true });
+    }
+  });
+
+  it("the transport creates are not listed: each types its task from the create's answer", () => {
+    for (const tool of [
+      'CreateTransport',
+      'HandlerTransportCreate',
+      'CreateTransportTask',
+    ]) {
+      expect({ tool, eligible: eligible(tool, {}, 'http') }).toEqual({
+        tool,
+        eligible: { ok: false, reason: 'not-listed' },
+      });
     }
   });
 

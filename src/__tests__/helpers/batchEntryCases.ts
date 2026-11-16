@@ -579,11 +579,10 @@ const DELETE_CASES: BatchEntryCase[] = [
   })),
 ];
 
-/** `HandlerCreate`: the create request alone, per type but PACKAGE. */
+/** `HandlerCreate`: the create request alone, per type but PACKAGE and TRANSPORT. */
 const CREATES: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A', package_name: 'PKG_A' }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A', package_name: 'PKG_A' }],
-  ['TRANSPORT', { description: 'text' }],
   ['TABLE', { table_name: 'TAB_A', package_name: 'PKG_A' }],
   ['STRUCTURE', { structure_name: 'STRU_A', package_name: 'PKG_A' }],
   ['DDL', { ddl_name: 'DDL_A', package_name: 'PKG_A' }],
@@ -632,7 +631,6 @@ const CREATE_CASES: BatchEntryCase[] = [
   ...CREATES.map(([object_type, fields]) => ({
     tool: 'HandlerCreate',
     args: { object_type, ...fields },
-    ...(object_type === 'TRANSPORT' ? { body: TRANSPORT_DOCUMENT } : {}),
   })),
   {
     tool: 'HandlerCreate',
@@ -908,17 +906,6 @@ const WRITES: BatchEntryCase[] = [
       description: 'text',
       activate: false,
     },
-  },
-  ...['CreateTransport', 'HandlerTransportCreate'].map((tool) => ({
-    tool,
-    args: { description: 'text' },
-    body: TRANSPORT_DOCUMENT,
-  })),
-  {
-    tool: 'CreateTransportTask',
-    args: { transport_number: TRANSPORT, target_user: 'USER_A' },
-    // The created task's number, so a request built from it is seen.
-    body: TRANSPORT_DOCUMENT,
   },
   {
     tool: 'RemoveTransportObject',

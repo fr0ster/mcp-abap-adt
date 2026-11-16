@@ -309,6 +309,11 @@ describe('the MCP tool surface', () => {
           'feed_types',
         ],
         'high/CreateTransportTask': ['task_type'],
+        // 24.0.0 (the owner, 2026-11-16): the request's own task is created
+        // Unclassified (CL_CTS_ADT_RES_OBJ_RECORD), and the create types it,
+        // `S` by default; `task_type` asks for `R` or leaves it `X`.
+        'high/CreateTransport': ['task_type'],
+        'compact/HandlerTransportCreate': ['task_type'],
         // 20.1.0 (#286): the unit-test start tools take `runner` (async |
         // sync, default async — without it a run is what it was); the
         // synchronous run of a function module addresses it under its group,

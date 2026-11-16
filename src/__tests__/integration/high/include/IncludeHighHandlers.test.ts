@@ -71,7 +71,6 @@ import { systemsDescribe } from '../../helpers/live';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { withRootDescription } from '../../helpers/rootDescription';
-import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
 import { McpSession } from '../../helpers/testers/hardMode';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -601,20 +600,13 @@ function objectTypesOf(
  * (`GetInclude` both parts, `HandlerGet INCLUDE`, `HandlerDeletionCheck
  * INCLUDE`) run on the delivered include the configuration names
  * (`include_name`). An empty `include_name` skips the reads and says so;
- * elsewhere the case skips (LambdaTester: "not available on onprem",
- * "No configuration found"). Nothing is written.
+ * it states what ABAP Cloud lists, so it runs on cloud only (stated in
+ * code); without its config case it skips naming the key. Nothing is
+ * written.
  */
-/**
- * This file's `describe`: the suite runs where the configured system serves
- * every tool it calls, and skips naming the first it does not serve.
- */
-const describe = servedSuite([
-  'GetInclude',
-  'HandlerDeletionCheck',
-  'HandlerGet',
-]);
+const CLOUD_SUITE = 'Include on ABAP cloud: listed read-only, read';
 
-describe('Include on ABAP cloud: listed read-only, read', () => {
+systemsDescribe(['cloud'], CLOUD_SUITE, () => {
   let tester: LambdaTester;
   let handlerContext: HandlerContext | undefined;
   const record = (label: string, answer: Answer) =>

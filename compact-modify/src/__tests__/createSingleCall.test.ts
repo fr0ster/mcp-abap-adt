@@ -360,6 +360,47 @@ describe('HandlerCreate is one POST', () => {
     expect(full.sent).toEqual(answered.sent);
   });
 
+  it('TRANSPORT task_type R: the task is typed R, as the full set’s CreateTransport types it', async () => {
+    const fields = { description: 'A request', task_type: 'R' };
+    const answered = await run(
+      'answered',
+      create('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    const full = await run(
+      'answered',
+      fullCreate('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    expect(answered.answer?.isError).not.toBe(true);
+    expect(answered.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      'POST /sap/bc/adt/cts/transportrequests',
+      'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
+      'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
+    ]);
+    expect(String(answered.sent[2]?.data)).toContain(
+      '<tm:task tm:number="XXXK900002" tm:type="R"/>',
+    );
+    expect(full.sent).toEqual(answered.sent);
+  });
+
+  it('TRANSPORT task_type X: the task stays as SAP created it, no type change sent', async () => {
+    const fields = { description: 'A request', task_type: 'X' };
+    const answered = await run(
+      'answered',
+      create('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    const full = await run(
+      'answered',
+      fullCreate('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    expect(answered.answer?.isError).not.toBe(true);
+    expect(answered.sent.map((sent) => sent.method)).not.toContain('PUT');
+    expect(full.sent).toEqual(answered.sent);
+  });
+
   it.each(TYPES.filter(([type]) => type !== 'TRANSPORT'))(
     '%s: exactly one request, the create’s POST',
     async (objectType, fields) => {
@@ -546,7 +587,7 @@ const CARRIES: Record<string, string[]> = {
   ],
   DOMAIN: ['domain_name', 'master_language'],
   DATA_ELEMENT: ['data_element_name', 'master_language'],
-  TRANSPORT: ['transport_type', 'target_system', 'owner'],
+  TRANSPORT: ['transport_type', 'target_system', 'owner', 'task_type'],
   TABLE: ['table_name', 'master_language'],
   STRUCTURE: ['structure_name', 'master_language'],
   DDL: ['ddl_name', 'master_language'],
@@ -606,6 +647,8 @@ const ACCEPTED_NOT_SENT: Record<string, string[]> = {
 const SAMPLE: Record<string, unknown> = {
   transport_request: 'XXXK900001',
   transport_type: 'workbench',
+  // Sent with the task's type change after the create, not in its POST.
+  task_type: 'R',
   binding_variant: 'ODATA_V4_UI',
   package_type: 'development',
   implementation_type: 'Managed',
@@ -752,7 +795,10 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
     async (objectType, name) => {
       const answered = await run(
         'answered',
-        create(objectType, { ...fieldsOf(objectType), [name]: 'X' }),
+        create(objectType, {
+          ...fieldsOf(objectType),
+          [name]: 'NOT_A_LISTED_VALUE',
+        }),
       );
       expect(answered.sent).toEqual([]);
       expect(answered.answer?.isError).toBe(true);

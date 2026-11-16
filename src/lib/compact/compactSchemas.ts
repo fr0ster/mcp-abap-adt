@@ -214,6 +214,12 @@ const CREATE_PROPERTIES = {
     .string()
     .optional()
     .describe('Owner of the transport request (TRANSPORT create).'),
+  task_type: z
+    .enum(['S', 'R', 'X'])
+    .optional()
+    .describe(
+      "The type given to the request's task (TRANSPORT create): S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.",
+    ),
   superclass: z.string().optional().describe('Superclass name (CLASS create).'),
   final: z
     .boolean()
@@ -310,7 +316,7 @@ export const COMPACT_CREATE_TAKES = takesOf<
     ],
     DOMAIN: ['domain_name', 'master_language'],
     DATA_ELEMENT: ['data_element_name', 'master_language'],
-    TRANSPORT: ['transport_type', 'target_system', 'owner'],
+    TRANSPORT: ['transport_type', 'target_system', 'owner', 'task_type'],
     TABLE: ['table_name', 'master_language'],
     STRUCTURE: ['structure_name', 'master_language'],
     TABLE_TYPE: ['table_type_name', 'master_language'],

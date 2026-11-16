@@ -396,7 +396,7 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it("the served BatchBegin opens the batch; HandlerBatch's end and answers execute and read it as BatchEnd and BatchAnswers do", async () => {
+  it('the served HandlerBatch begin opens the batch; its end and answers execute and read it', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     const begun = await s.call('HandlerBatch', { action: 'begin' });
     expect(payloadOf(begun)).toEqual({

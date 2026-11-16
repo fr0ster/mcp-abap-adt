@@ -1,7 +1,7 @@
 /**
  * Every entry of `tools/batch-handlers.json` sends requests none of which
  * needs another's answer (the owner, 2026-10-16): a recorded call's answers
- * come only at `BatchEnd`, so a request built from an earlier answer — a
+ * come only at the batch's end, so a request built from an earlier answer — a
  * create then its activation, a fallback after a `404`, a poll — could never
  * be sent. Real adt-clients code runs; nothing of it is doubled.
  *

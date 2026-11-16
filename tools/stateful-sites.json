@@ -31,7 +31,7 @@
     "function": "LateBoundConnection.setSessionType",
     "site": "setSessionType(type)",
     "count": 1,
-    "window": "none of its own: forwards the batch connection's envelope session type to the connection the target points at now (BatchEnd's)",
+    "window": "none of its own: forwards the batch connection's envelope session type to the connection the target points at now (the batch end's)",
     "stateless": "execute()'s finally restores the previous session type through this member",
     "whose": "server"
   },

@@ -1,9 +1,13 @@
 /**
- * Compact `HandlerCreate` is one ADT request: the `POST` of the type's
- * adt-clients `create()`, for every type — no validate, lock, write, unlock,
- * check or activate, no service-group read, no read-back (spec §4.6, the
- * owner's rule: compact is one request per tool call, the consumer chains).
- * There is no flag and no mode.
+ * Compact `HandlerCreate` is one operation, the create: no validate, lock,
+ * write, unlock, check or activate, no service-group read, no read-back
+ * (spec §4.6, the owner's rule: a compact tool does one operation, the
+ * consumer chains). There is no flag and no mode. For every type but
+ * TRANSPORT the create is the `POST` of the type's adt-clients `create()`.
+ * A TRANSPORT create also types the task SAP creates with the request,
+ * Unclassified (`CL_CTS_ADT_RES_OBJ_RECORD` inserts it with
+ * `wi_trfunction = 'X'`): the `POST`, the read of the new request for its
+ * task, and the `changetasktype` `PUT` on that task, and nothing else.
  *
  * Real adt-clients code runs over a recording connection; nothing of it is
  * doubled. Pinned per type:
@@ -155,9 +159,12 @@ async function run(
   return { sent, answer };
 }
 
-/** What SAP answers a created transport request: its number. */
+/**
+ * What SAP answers a created transport request: its number — and, read
+ * back, the request with the one task SAP created with it.
+ */
 const TRANSPORT_DOCUMENT =
-  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"/>';
+  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"><tm:request tm:number="XXXK900001"><tm:task tm:number="XXXK900002" tm:type="X"/></tm:request></tm:root>';
 
 /** The answer body per type, where an empty one is not an answer of a create. */
 const BODY: Record<string, string> = { TRANSPORT: TRANSPORT_DOCUMENT };
@@ -320,7 +327,40 @@ describe('HandlerCreate is one POST', () => {
     );
   });
 
-  it.each(TYPES)(
+  it('TRANSPORT: the create’s POST, the read of the new request, the type change of its task, and nothing else', async () => {
+    const fields = new Map(TYPES).get('TRANSPORT') ?? {};
+    const held = await run('pending', create('TRANSPORT', fields));
+    const answered = await run(
+      'answered',
+      create('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    const notFound = await run('not-found', create('TRANSPORT', fields));
+    const full = await run(
+      'answered',
+      fullCreate('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    expect(held.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      'POST /sap/bc/adt/cts/transportrequests',
+    ]);
+    expect(answered.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      'POST /sap/bc/adt/cts/transportrequests',
+      'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
+      'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
+    ]);
+    expect(String(answered.sent[2]?.data)).toContain(
+      'tm:useraction="changetasktype"',
+    );
+    expect(answered.answer?.isError).not.toBe(true);
+    // A refused create is the answer: nothing follows it.
+    expect(notFound.sent).toEqual(held.sent);
+    expect(notFound.answer?.isError).toBe(true);
+    // The same requests as the full set's CreateTransport.
+    expect(full.sent).toEqual(answered.sent);
+  });
+
+  it.each(TYPES.filter(([type]) => type !== 'TRANSPORT'))(
     '%s: exactly one request, the create’s POST',
     async (objectType, fields) => {
       const held = await run('pending', create(objectType, fields));

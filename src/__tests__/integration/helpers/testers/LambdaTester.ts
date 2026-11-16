@@ -27,6 +27,7 @@ import {
   NO_KIND_STATED,
 } from '../configuredSystemKind';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
+import { PackageGuardRefusal } from '../packageGuard';
 import { primeSystemContext } from '../primeSystemContext';
 import { skipRunningTest } from '../runningTest';
 import {
@@ -152,6 +153,16 @@ export class LambdaTester {
 
     // Initialize context synchronously (will be populated in async init)
     this.context = undefined;
+  }
+
+  /**
+   * The package the case creates in (`context.packageName`), checked by the
+   * package guard: the case's `package_name`, else the default package. A
+   * suite whose `package_name` names what it reads, not where it creates,
+   * overrides this.
+   */
+  protected creationPackage(testCase: TestCase): string {
+    return resolvePackageName(testCase);
   }
 
   /**
@@ -281,7 +292,7 @@ export class LambdaTester {
         }
 
         const testCaseWithParams = { ...testCase, params: testParams };
-        packageName = resolvePackageName(testCaseWithParams);
+        packageName = this.creationPackage(testCaseWithParams);
         transportRequest = resolveTransportRequest(testCaseWithParams);
         const defaultPackage = config.environment?.default_package;
         this.context = {
@@ -329,7 +340,7 @@ export class LambdaTester {
       // Resolve package name and transport request
       // Create testCase object with resolved params for resolve functions
       const testCaseWithParams = { ...testCase, params: testParams };
-      packageName = resolvePackageName(testCaseWithParams);
+      packageName = this.creationPackage(testCaseWithParams);
       transportRequest = resolveTransportRequest(testCaseWithParams);
 
       // Get default package from config
@@ -356,6 +367,8 @@ export class LambdaTester {
       this.testCase = testCase;
       this.testParams = testParams;
     } catch (error) {
+      // The package guard's refusal fails the case: it is never a skip.
+      if (error instanceof PackageGuardRefusal) throw error;
       // If initialization failed, create minimal context
       const errorLogger = createTestLogger(this.logPrefix);
       errorLogger?.warn(`⚠️ Failed to initialize tester: ${thrownWords(error)}`);

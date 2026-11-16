@@ -38,6 +38,12 @@ export function packageRefusal(
   return `the package guard: ${key} names ${packageName}, which is none of ${accepted.join(', ')} on ${kind}: nothing is created`;
 }
 
+/**
+ * The guard's refusal: a failure of the case, never a skip — a tester that
+ * turns its start-up errors into a skip passes this one on.
+ */
+export class PackageGuardRefusal extends Error {}
+
 /** `packageName` when it may be created in; otherwise the refusal is thrown. */
 export function guardedPackage(
   kind: ConfiguredSystemKind | undefined,
@@ -45,7 +51,7 @@ export function guardedPackage(
   packageName: string,
 ): string {
   const refusal = packageRefusal(kind, key, packageName);
-  if (refusal !== undefined) throw new Error(refusal);
+  if (refusal !== undefined) throw new PackageGuardRefusal(refusal);
   return packageName;
 }
 

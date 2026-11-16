@@ -18,13 +18,33 @@ import { resolvePackageName } from '../integration/helpers/configHelpers';
 import {
   guardedChildPackage,
   guardedPackage,
+  PackageGuardRefusal,
   packageRefusal,
 } from '../integration/helpers/packageGuard';
+import { LambdaTester } from '../integration/helpers/testers/LambdaTester';
+
+/** A tester whose package is the default one, as a suite that reads its package_name. */
+class PackageReading extends LambdaTester {
+  protected override creationPackage(): string {
+    return resolvePackageName();
+  }
+  get packageName(): string | undefined {
+    return this.context?.packageName;
+  }
+}
 
 const CONFIG = `
 environment:
   system_type: cloud
   default_package: ZADT_BLD_PKG03
+  integration_hard_mode:
+    enabled: true
+create_class:
+  test_cases:
+    - name: local_case
+      params:
+        class_name: ZCL_GUARD_CASE
+        package_name: $TMP
 `;
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'package-guard-'));
@@ -130,6 +150,28 @@ describe('the package guard', () => {
 
   it('resolvePackageName answers the allowed default package', () => {
     assert.equal(resolvePackageName(), 'ZADT_BLD_PKG03');
+  });
+
+  it("a tester whose case's package the guard refuses fails to start: no skip", async () => {
+    const tester = new LambdaTester('create_class', 'local_case', 'guard-test');
+    await assert.rejects(tester.init(), (error: unknown) => {
+      assert.ok(error instanceof PackageGuardRefusal);
+      assert.equal(
+        error.message,
+        'the package guard: test_cases[name=local_case].params.package_name names $TMP, which is none of ZADT_BLD_PKG03 on cloud: nothing is created',
+      );
+      return true;
+    });
+  });
+
+  it("a tester reading its case's package_name takes the guarded default package", async () => {
+    const tester = new PackageReading(
+      'create_class',
+      'local_case',
+      'guard-test',
+    );
+    await tester.init();
+    assert.equal(tester.packageName, 'ZADT_BLD_PKG03');
   });
 
   it("resolvePackageName refuses a case's package the system does not allow, naming its key", () => {

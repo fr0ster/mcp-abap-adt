@@ -35,6 +35,7 @@ import {
   testDestinationName,
 } from './configuredSystemKind';
 import { createTestLogger } from './loggerHelpers';
+import { guardedPackage } from './packageGuard';
 import { testConfigPathFromEnv } from './testConfigPath';
 import {
   type CaseParams,
@@ -647,16 +648,22 @@ export function resolveTestSystemContext(): {
 }
 
 /**
- * Resolve package name (from test case or default)
+ * Resolve package name (from test case or default), checked by the package
+ * guard (`packageGuard.ts`) before anything is created in it: a package the
+ * configured system kind does not allow fails the case, naming the config
+ * key and the package.
  */
 export function resolvePackageName(testCase?: TestCase | null): string {
   let packageName: string;
+  let key: string;
 
   if (testCase?.params?.package_name) {
     packageName = String(testCase.params.package_name).trim();
+    key = `test_cases[name=${testCase.name}].params.package_name`;
   } else {
     const config = loadTestConfig();
     packageName = (config.environment?.default_package || 'ZOK_LOCAL').trim();
+    key = 'environment.default_package';
   }
 
   // Validate for placeholders
@@ -668,7 +675,7 @@ export function resolvePackageName(testCase?: TestCase | null): string {
     );
   }
 
-  return packageName;
+  return guardedPackage(configuredSystemKind(), key, packageName);
 }
 
 /**

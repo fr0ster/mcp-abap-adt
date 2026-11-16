@@ -122,6 +122,7 @@
   "src/__tests__/unit/installMatrix.test.ts",
   "src/__tests__/unit/launchers/accessRestrictionsAtStart.test.ts",
   "src/__tests__/unit/launchers/dataToolsAtStart.test.ts",
+  "src/__tests__/unit/packageGuard.test.ts",
   "src/__tests__/unit/runner/build.test.ts",
   "src/__tests__/unit/runner/interrupt.test.ts",
   "src/__tests__/unit/runner/jestWorkers.test.ts",

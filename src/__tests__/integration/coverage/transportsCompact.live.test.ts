@@ -323,7 +323,8 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     const task = member(answered, 'task_number');
     if (typeof task !== 'string') throw new Error('no task number');
     recordCreatedRequest(task);
-    // Read back: the request's one task, of type R as SAP keeps it.
+    // Read back: the request's one task, of type R — GetTransport names it
+    // Repair (measured on premise).
     const read = succeeded(
       `GetTransport ${request}`,
       await livePrepare('GetTransport', { transport_number: request }),
@@ -332,7 +333,7 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     const listed = Array.isArray(tasks) ? tasks : [];
     assert.deepEqual(
       listed.map((entry) => [member(entry, 'number'), member(entry, 'type')]),
-      [[task, 'R']],
+      [[task, 'Repair']],
     );
   });
 });

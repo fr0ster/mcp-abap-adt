@@ -14,11 +14,7 @@ import {
   resolveTransportRequest,
 } from '../helpers/configHelpers';
 import type { LiveAnswer } from '../helpers/live';
-
-const ACCEPTED: Readonly<Record<'onprem' | 'cloud', readonly string[]>> = {
-  onprem: ['$TMP', 'ZAC_TEST_PKG'],
-  cloud: ['ZADT_BLD_PKG03'],
-};
+import { CREATION_PACKAGES } from '../helpers/packageGuard';
 
 /** Whether the configured system is the on-premise one. */
 export const onPremise = (): boolean => configuredSystemKind() === 'onprem';
@@ -28,7 +24,7 @@ export const onPremise = (): boolean => configuredSystemKind() === 'onprem';
  * on the cloud — each checked against the accepted ones first.
  */
 export function ownPackage(): string {
-  const accepted = ACCEPTED[onPremise() ? 'onprem' : 'cloud'];
+  const accepted = CREATION_PACKAGES[onPremise() ? 'onprem' : 'cloud'];
   const chosen = onPremise() ? '$TMP' : resolvePackageName();
   if (!accepted.includes(chosen)) {
     throw new Error(

@@ -40,6 +40,7 @@ import {
   liveSuite,
   recordCreated,
 } from '../helpers/live';
+import { CREATION_PACKAGES } from '../helpers/packageGuard';
 
 const SUFFIX = randomBytes(3).toString('hex').toUpperCase();
 const GOOD_A = `ZMCP_AOR_${SUFFIX}_A`;
@@ -94,13 +95,11 @@ liveSuite(
      * configured package must be exactly one of them, read before anything
      * is created; otherwise the case refuses, naming only the accepted ones.
      */
-    const ACCEPTED: Readonly<Record<'onprem' | 'cloud', readonly string[]>> = {
-      onprem: ['$TMP', 'ZAC_TEST_PKG'],
-      cloud: ['ZADT_BLD_PKG03'],
-    };
     const packageName = (): string => {
       const accepted =
-        ACCEPTED[configuredSystemKind() === 'onprem' ? 'onprem' : 'cloud'];
+        CREATION_PACKAGES[
+          configuredSystemKind() === 'onprem' ? 'onprem' : 'cloud'
+        ];
       const configured = resolvePackageName();
       if (!accepted.includes(configured)) {
         throw new Error(

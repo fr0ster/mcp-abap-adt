@@ -27,7 +27,10 @@ import { handleCheckPackage } from '../../../../handlers/package/high/handleChec
 import { handleCheckProgram } from '../../../../handlers/program/high/handleCheckProgram';
 import { handleCheckStructure } from '../../../../handlers/structure/high/handleCheckStructure';
 import { handleCheckTable } from '../../../../handlers/table/high/handleCheckTable';
-import { getSharedDependenciesConfig } from '../../helpers/configHelpers';
+import {
+  getSharedDependenciesConfig,
+  resolvePackageName,
+} from '../../helpers/configHelpers';
 import { assertEquals } from '../../helpers/liveAssert';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
@@ -787,12 +790,22 @@ describe('Check High-Level Handlers Integration', () => {
     });
   });
 
+  /**
+   * CheckPackage's `package_name` names the package checked, not one created
+   * in: the tester's package is the default one, checked by the package guard.
+   */
+  class PackageReadTester extends LambdaTester {
+    protected override creationPackage(): string {
+      return resolvePackageName();
+    }
+  }
+
   // CheckPackage
   describe('CheckPackage', () => {
     let tester: LambdaTester;
 
     before(async () => {
-      tester = new LambdaTester(
+      tester = new PackageReadTester(
         'check_package_high',
         'check_existing',
         'check-package-high',

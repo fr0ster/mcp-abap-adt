@@ -19,8 +19,8 @@ let cached: IAdtSystemContext | undefined;
  * The system context the configuration states — `SAP_MASTER_SYSTEM`,
  * `SAP_RESPONSIBLE`, `SAP_LANGUAGE` — merged into the process context, or
  * `undefined` when it states none. It fills only what the process context
- * lacks: a value an embedder stated (`setSystemContext`, `systemContext`) survives every request that sets a
- * context up. Sends nothing.
+ * lacks. An embedder's `systemContext` is the instance's, entered per call,
+ * never this one. Sends nothing.
  *
  * The environment read here is the process's own: no destination's `.env`
  * joins it (24.0.0). A destination's master language is its `SAP_LANGUAGE`
@@ -50,8 +50,8 @@ export function getSystemContext(): IAdtSystemContext {
 /**
  * The system context as the current request states it — what a call reads
  * (a create's responsible). A responsible is only one stated
- * (`x-sap-responsible`, `SAP_RESPONSIBLE`, `setSystemContext`, a scope's
- * `responsible`) or the connection's parameters (made by a host's rules,
+ * (`x-sap-responsible`, `SAP_RESPONSIBLE`, an instance's `systemContext`, a
+ * scope's `responsible`) or the connection's parameters (made by a host's rules,
  * `withKnownSystemContext`); no login stands in for it here.
  *
  * Outside a request scope (stdio) the process values apply. Inside one:

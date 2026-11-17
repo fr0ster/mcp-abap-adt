@@ -115,7 +115,9 @@ A value a start states is read as stated, or the start is refused naming it.
   `SAP_SYSTEM_TYPE` answers only when the option is absent. An embedder that set both to the same
   value changes nothing; one that relied on `SAP_SYSTEM_TYPE` for the connection while stating
   another `systemType` now gets the stated kind. `sessionIdentity` takes the kind as its fourth
-  argument; without it, `SAP_SYSTEM_TYPE` answers as before.
+  argument; without it, `SAP_SYSTEM_TYPE` answers as before. A connection your `freshConnection`
+  factory returns runs on that kind too (the long calls, background runs, the debugger,
+  `force_new_connection`).
 
 ## RFC destinations: the address is stated
 

@@ -35,7 +35,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isLatched } from './activeTools';
 import { ClosedInstanceRefusal } from './auth/failures';
 import { ServerRefusal } from './auth/serverRefusal';
-import { createAbapConnection, siblingRecordOf } from './connectionFactory';
+import {
+  createAbapConnection,
+  siblingRecordOf,
+  withSystemKindOf,
+} from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
 import type { HandlerContext } from './handlers/interfaces';
 import {
@@ -126,7 +130,9 @@ export async function openFreshConnection(
   if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
   // Once handed over it is the server's, treated exactly like a
   // connection the server built.
-  const given = await factory();
+  // It runs on the kind of the connection it is fresh for (the server
+  // declared its systemType on it), never on what SAP_SYSTEM_TYPE says now.
+  const given = withSystemKindOf(await factory(), connection);
   own(given, { role: 'fresh' });
   await bornOrEnded(given, born, logger);
   return connectedOrClosed(given, logger);

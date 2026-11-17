@@ -964,7 +964,9 @@ entry's own call, a compact tool's target, `HandlerExporter`: a value of the clo
 stated by the server, the group's context or the exporter, none recorded on the connection the
 host injected — such a tool is refused `system_type_required` before anything is taken: no
 connection, no fresh session, no run, nothing sent. State the kind (`systemType`), or inject a
-connection built for one. An embedder calling an entry of such a tool directly gets the variant's
+connection built for one (or declared one, `declareSystemKind`): a server without `systemType`
+lists and checks its tools for the kind recorded on that connection, which `SAP_SYSTEM_TYPE` does
+not override, and a group or exporter stating no kind keeps it. An embedder calling an entry of such a tool directly gets the variant's
 schema's words (`Invalid option: expected one of …`) where a handler answered its own.
 
 `HandlerGet` part `virtual_folders` now sends

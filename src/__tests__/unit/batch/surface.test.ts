@@ -100,7 +100,6 @@ class SurfaceServer extends BaseMcpServer {
       this.setConnectionContext({
         kind: 'built',
         source: options.source,
-        sessionId: 'dest-a',
       });
     }
   }

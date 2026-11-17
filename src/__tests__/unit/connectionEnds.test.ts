@@ -200,7 +200,6 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     let i = 0;
     server.use({
       kind: 'built',
-      sessionId: 's',
       source: {
         resolve: async () => ({
           settings: SETTINGS,
@@ -337,7 +336,6 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     server.use({
       kind: 'injected',
       connection: injected as unknown as AbapConnection,
-      sessionId: 'i',
     });
     await server.connection();
     await server.terminalClose();

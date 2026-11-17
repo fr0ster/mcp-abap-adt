@@ -79,7 +79,6 @@ class StandServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'built',
       source: { resolve: async () => this.source },
-      sessionId: 'header-pairs-stand',
     });
     this.registerHandlers(
       new CompositeHandlersRegistry([

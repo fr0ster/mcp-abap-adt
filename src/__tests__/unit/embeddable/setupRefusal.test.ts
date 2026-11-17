@@ -26,7 +26,7 @@ class TestServer extends BaseMcpServer {
     super({ name: 'test-server', version: '1.0.0', logger: silent });
   }
   fromSource(source: ConnectionSource) {
-    this.setConnectionContext({ kind: 'built', source, sessionId: 'dest' });
+    this.setConnectionContext({ kind: 'built', source });
   }
   connection() {
     return this.getConnection(new AbortController().signal);

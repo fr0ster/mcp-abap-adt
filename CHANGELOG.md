@@ -51,6 +51,13 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 - **`EmbeddableMcpServer`** takes `data` in `exposition`, not in the default `['readonly', 'high']`; **`HandlerExporter`** takes `includeData`, read as `=== true` (its other `include…` options stay on unless `false`). `HandlerSet` and `registryForExposition` / `expositionGroups` take `data`. **Migrating:** `exposition: [..., 'data']` or `includeData: true` to serve them.
 - **The tool sets take what is served.** `ToolSet.groups(context, transport, served)`, `registryOf(toolSet, transport, served)` and `streamableHttpSurface(toolSet, served)` take a required `ServedTools` (`{ dataTools: boolean }`, `@mcp-abap-adt/lib/tool-set`); `CompactHalves` gains `data` and `compactReadOnlyToolSetOf` takes `{ readOnly, data }` (`CompactReadOnlyHalf`). `IServerConfig` gains `enableDataTools`; `@mcp-abap-adt/lib/config` exports `ENABLE_DATA_TOOLS_ROW` and its three names. **Migrating:** pass `{ dataTools: config.enableDataTools === true }` where you build a set's registry, and the compact sets' `data` builder.
 
+### Removed — breaking for an embedder: options read by nothing
+
+- **`EmbeddableMcpServer`'s `exposition: ['compact']`** built nothing (the default registry has no compact branch): `compact` leaves the type. **Migrating:** the compact binaries or `HandlerExporter` serve the compact tools.
+- **`IAdtSystemContext.client`** was read by nothing, and the `systemContext` option's doc named `isLegacy`, which the type never had. **Migrating:** drop `client`; the connection's client is the connection's setting.
+- **`ConnectionContext.sessionId` (required) and `metadata`** were read by nothing; `EmbeddableMcpServer`, `StdioServer` and `headerContext` stop setting them. **Migrating:** drop both from a connection context.
+- **`RouteRegistrationOptions.addJsonMiddleware`** was ignored by `StreamableHttpServer` and `SseServer`. **Migrating:** drop it (`RouteRegistrationOptions` holds no option today).
+
 ### Changed — breaking for a start: nothing stated is ignored
 
 - **A flag's value follows `=`; `--flag false` is refused** (every binary, every flag): a flag followed by a separate `false` turned the flag on and left the word unread — `--auth-debug false` turned on auth debugging, `--unsafe false` session writes, `--http-enable-dns-protection false` the protection. A flag is `--flag` (true) or `--flag=true|false`; `--flag false` and `--flag true` in two words stop the start, naming `--flag=false` (`--flag=true`). The help shows `--flag[=true|false]`. **Migrating:** write `--flag=false`, or leave the flag out (MIGRATION-24.0, "Starts: nothing stated is ignored").

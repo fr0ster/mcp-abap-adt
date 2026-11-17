@@ -90,7 +90,6 @@ class StandServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'built',
       source: { resolve: async () => this.source },
-      sessionId: 'availability-stand',
     });
     this.registerHandlers(
       new CompositeHandlersRegistry([

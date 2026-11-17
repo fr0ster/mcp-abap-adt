@@ -162,14 +162,7 @@ export interface EmbeddableMcpServerOptions {
    * serve them is the customer's decision.
    * @default ['readonly', 'high']
    */
-  exposition?: (
-    | 'readonly'
-    | 'high'
-    | 'compact'
-    | 'system'
-    | 'search'
-    | 'data'
-  )[];
+  exposition?: ('readonly' | 'high' | 'system' | 'search' | 'data')[];
 
   /**
    * Server version
@@ -178,7 +171,7 @@ export interface EmbeddableMcpServerOptions {
   version?: string;
 
   /**
-   * System context (masterSystem, responsible, client, isLegacy).
+   * System context (masterSystem, responsible, masterLanguage).
    * Set this to avoid HTTP calls that resolve system info at runtime.
    * If not provided, handlers will use whatever is available from env vars.
    */
@@ -331,7 +324,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       kind: 'injected',
       connection: options.connection,
       ...(options.system !== undefined && { system: options.system }),
-      sessionId: 'embedded',
     });
 
     // The latest injection of this connection decides.

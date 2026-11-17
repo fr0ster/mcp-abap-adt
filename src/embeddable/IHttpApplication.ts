@@ -42,13 +42,7 @@ export interface IHttpApplication {
 }
 
 /**
- * Options for route registration on external app
+ * Options for route registration on external app: none today
+ * (`addJsonMiddleware`, read by neither server, is removed in 24.0.0).
  */
-export interface RouteRegistrationOptions {
-  /**
-   * Whether to add express.json() middleware for the routes
-   * Set to false if the external app already has JSON parsing middleware
-   * @default true for standalone, false for external app
-   */
-  addJsonMiddleware?: boolean;
-}
+export type RouteRegistrationOptions = Record<string, never>;

@@ -74,7 +74,6 @@ class LeftoverServer extends BaseMcpServer {
           credential: resolved.credential,
         }),
       },
-      sessionId: 'live-leftover-sessions',
       destination,
     });
   }

@@ -258,7 +258,6 @@ class LiveRunServer extends BaseMcpServer {
       // An RFC connection answers no URL: the host states the system a run
       // is kept for, here the destination, which names one system.
       system: destination,
-      sessionId: 'live-background-runs',
       destination,
     });
   }

@@ -134,7 +134,6 @@ function builtServer() {
   const credential = provider();
   server.use({
     kind: 'built',
-    sessionId: 's',
     source: { resolve: async () => ({ settings: SETTINGS, credential }) },
   });
   return { server, built: own_ };
@@ -197,7 +196,6 @@ it('an injected connection is the consumer’s: never disconnected', async () =>
   server.use({
     kind: 'injected',
     connection: injected.connection,
-    sessionId: 'i',
   });
   expect(await server.connection()).toBe(injected.connection);
   await server.dispose();

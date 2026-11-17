@@ -178,7 +178,7 @@ class StandServer extends BaseMcpServer {
       ...(heldLocks !== undefined ? { heldLocks } : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry(groups));
-    this.setConnectionContext({ kind: 'built', source, sessionId: 'dest-a' });
+    this.setConnectionContext({ kind: 'built', source });
   }
 }
 

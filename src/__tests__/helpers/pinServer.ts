@@ -160,13 +160,11 @@ class PinMcpServer extends BaseMcpServer {
             // An injected RFC connection answers no URL: its background runs
             // are kept under this key (one system per run).
             system: PIN_SYSTEM,
-            sessionId: 'pin-server',
             destination: PIN_DESTINATION,
           }
         : {
             kind: 'built',
             source: { resolve: async () => source },
-            sessionId: 'pin-server',
             destination: PIN_DESTINATION,
           },
     );

@@ -56,7 +56,6 @@ class Server extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'built',
       source: { resolve: async () => source },
-      sessionId: 'rfc',
       ...(destination !== undefined ? { destination } : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry([probeGroup()]));

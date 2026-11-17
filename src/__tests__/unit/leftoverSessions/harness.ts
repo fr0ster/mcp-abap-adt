@@ -75,7 +75,6 @@ class StandServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'built',
       source: { resolve: async () => source },
-      sessionId: 'leftover-stand',
       destination: DESTINATION,
     });
   }

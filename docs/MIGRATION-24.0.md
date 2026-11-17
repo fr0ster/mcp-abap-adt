@@ -89,6 +89,16 @@ entry); a registry's own tool follows the same rule.
 batch mode; one that read the debugger batch's answers with `BatchAnswers` registers
 `DebugBatchHandlersGroup`, which carries `DebugBatchAnswers`.
 
+## Embedders: options read by nothing are removed
+
+- `EmbeddableMcpServer`'s `exposition: ['compact']` built nothing: use the compact binaries, or
+  `HandlerExporter` for the compact tools.
+- `IAdtSystemContext.client` is gone (the connection's client is its setting); the doc's
+  `isLegacy` was never in the type.
+- `ConnectionContext.sessionId` and `metadata` are gone: remove them from the contexts you pass
+  to `setConnectionContext`.
+- `RouteRegistrationOptions.addJsonMiddleware` is gone: neither server read it.
+
 ## Starts: nothing stated is ignored
 
 A value a start states is read as stated, or the start is refused naming it.

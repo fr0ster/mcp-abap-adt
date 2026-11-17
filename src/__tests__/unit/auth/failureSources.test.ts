@@ -74,7 +74,6 @@ class TestServer extends BaseMcpServer {
           credential: await destinations.getProvider(),
         }),
       },
-      sessionId: 'dest',
     });
     this.registerHandlers(new CompositeHandlersRegistry([group as never]));
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

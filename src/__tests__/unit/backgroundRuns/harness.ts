@@ -71,7 +71,6 @@ export class StandServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'built',
       source: { resolve: async () => source },
-      sessionId: 'background-stand',
     });
   }
   register(registry: CompositeHandlersRegistry): void {

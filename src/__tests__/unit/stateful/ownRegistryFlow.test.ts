@@ -139,7 +139,6 @@ class OwnRegistryServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'injected',
       connection,
-      sessionId: 'own-registry-flow',
     });
     this.registerHandlers(
       ownRegistry(

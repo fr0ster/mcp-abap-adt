@@ -4,7 +4,6 @@ import { getRequestContext } from './requestContext';
 export interface IAdtSystemContext {
   masterSystem?: string | undefined;
   responsible?: string | undefined;
-  client?: string;
   /** Original language for created objects, from SAP_LANGUAGE: a create given none states this one (#348); unset, a create states none and SAP takes its logon language. */
   masterLanguage?: string | undefined;
 }

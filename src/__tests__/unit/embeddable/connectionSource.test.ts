@@ -110,7 +110,7 @@ describe("'built': the source resolves, the connection is built from its answer"
     }));
     const source: ConnectionSource = { resolve };
     const server = new TestServer();
-    server.use({ kind: 'built', source, sessionId: 's' });
+    server.use({ kind: 'built', source });
 
     const signal = new AbortController().signal;
     const connection = await server.connection(signal);
@@ -132,7 +132,7 @@ describe("'injected': the connection is used as given", () => {
     const connect = jest.fn(async () => {});
     const injected = { connect } as unknown as AbapConnection;
     const server = new TestServer();
-    server.use({ kind: 'injected', connection: injected, sessionId: 's' });
+    server.use({ kind: 'injected', connection: injected });
 
     const signal = new AbortController().signal;
     expect(await server.connection(signal)).toBe(injected);

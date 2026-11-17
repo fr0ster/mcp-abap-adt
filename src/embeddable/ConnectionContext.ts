@@ -58,8 +58,6 @@ export type Source =
  * identifies it.
  */
 export type ConnectionContext = Source & {
-  /** Session ID for this connection context. */
-  sessionId: string;
   /**
    * The destination the instance serves for its life (stdio's): who calls,
    * for its leftover sessions — a runtime file is the caller's when it names
@@ -68,6 +66,4 @@ export type ConnectionContext = Source & {
    * not available.
    */
   destination?: string;
-  /** Optional metadata for additional context information. */
-  metadata?: Record<string, string>;
 };

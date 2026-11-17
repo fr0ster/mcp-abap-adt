@@ -85,7 +85,6 @@ class Server extends BaseMcpServer {
     });
     this.setConnectionContext({
       kind: 'built',
-      sessionId: 's',
       source: { resolve: async () => ({ settings: SETTINGS, credential }) },
     });
   }

@@ -15,10 +15,7 @@ import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { openFreshConnection } from '../../../lib/packageSessions';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type AdtStandIn,
@@ -26,6 +23,7 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { setUpLiveRun } from '../../integration/globalSetup';

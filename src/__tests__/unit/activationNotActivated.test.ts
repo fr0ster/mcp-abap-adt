@@ -18,6 +18,7 @@
  * any projection runs; the answer renders its `stillInactive` as
  * `still_inactive`, field by field.
  */
+
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -27,12 +28,10 @@ import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleActivateClass } from '../../handlers/class/low/handleActivateClass';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { LOCK_SUCCESS_XML } from '../helpers/recordingConnection';
 
 const IOC_751 = corpusBody(

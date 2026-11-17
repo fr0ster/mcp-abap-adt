@@ -32,10 +32,7 @@ import {
   READ_VERSION_FIELD_UNDEFAULTED,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { SAMPLE_CALLS } from '../../helpers/batchEntryCases';
 import {
   type CountedRequest,
@@ -48,6 +45,7 @@ import {
   listedJson,
 } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires.
 process.env.SAP_SYSTEM_TYPE = 'onprem';

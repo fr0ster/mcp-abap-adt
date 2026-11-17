@@ -8,8 +8,9 @@ export interface IAdtSystemContext {
   masterLanguage?: string | undefined;
 }
 
-// The process-wide context: the configuration (`systemContextFromConfiguration`)
-// or what an embedder states (`setSystemContext`). Per-request values — headers,
+// The process-wide context: the configuration (`systemContextFromConfiguration`).
+// An embedder states its own on the server's options (`systemContext`, per
+// instance). Per-request values — headers,
 // a destination's own .env, a cloud system's answer — live in the request scope
 // (requestContext.ts), never here, so they cannot leak between requests.
 let cached: IAdtSystemContext | undefined;
@@ -86,17 +87,6 @@ export function getCreateSystemContext(): IAdtSystemContext {
   if (ctx.responsible?.trim()) return ctx;
   const login = getRequestContext()?.login;
   return login?.trim() ? { ...ctx, responsible: login } : ctx;
-}
-
-/**
- * Set system context explicitly (safe, no HTTP requests).
- * Use this when system info is known upfront (e.g., from BTP destination metadata).
- */
-export function setSystemContext(context: Partial<IAdtSystemContext>): void {
-  cached = {
-    ...cached,
-    ...context,
-  };
 }
 
 export function resetSystemContextCache() {

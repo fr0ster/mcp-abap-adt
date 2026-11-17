@@ -32,6 +32,7 @@
  * asserted the same way on every family, not only the one pair that happens
  * to share a shape.
  */
+
 import {
   analyseActivation,
   analyseException,
@@ -90,10 +91,7 @@ import { listedTool } from '../../lib/listedTool';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { sessionContext } from '../../lib/utils';
 import { corpusBody } from '../helpers/adtCorpus';
 import {
@@ -108,6 +106,7 @@ import {
   moduleMetadataDocument,
   readsModuleIn,
 } from '../helpers/functionModuleMetadata';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires: the ADT

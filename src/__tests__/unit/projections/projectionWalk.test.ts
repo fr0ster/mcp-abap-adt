@@ -14,6 +14,7 @@
  * The compact tools' arguments are read from their own descriptions on that
  * variant (`MEMBER(arg*, …)`): what the description promises is what is sent.
  */
+
 import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
@@ -99,12 +100,10 @@ import {
   WHERE_USED_NAMES,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { holding } from '../../helpers/heldLocks';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { PROJECTED_ARGUMENTS } from '../../helpers/projectedArguments';
 import {
   type RecordedRequest,

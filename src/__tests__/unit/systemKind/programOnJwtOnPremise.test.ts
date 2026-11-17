@@ -14,10 +14,7 @@
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { listedTool, statedEnvironment } from '../../../lib/listedTool';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { sessionContext } from '../../../lib/utils';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { jsonFind, listedJson } from '../../helpers/listedJson';
@@ -27,6 +24,7 @@ import {
   runPinCase,
   servedEntries,
 } from '../../helpers/pinCases';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import type { SystemKind } from '../../helpers/servedTools';
 
 const JWT_SETTINGS: SapConfig = {

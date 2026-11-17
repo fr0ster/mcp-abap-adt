@@ -21,10 +21,7 @@ import type {
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,
@@ -35,6 +32,7 @@ import {
 import { type Mode, runCase, servedTools } from '../../helpers/batchHarness';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

@@ -10,6 +10,7 @@
  * request — real adt-clients code, no SAP: the discovery of S/4HANA 2025,
  * of SAP_BASIS 7.40 and the 751 partial one (`tests/fixtures/adt/`).
  */
+
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -18,12 +19,10 @@ import type {
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 
 const RUN_ID = 'RUN0001';
 const ACTIVATED =

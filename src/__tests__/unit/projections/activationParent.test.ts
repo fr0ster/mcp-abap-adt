@@ -8,6 +8,7 @@
  * the tool's own handler runs over a recording connection declared the
  * variant — real adt-clients code, no SAP.
  */
+
 import { z } from 'zod';
 import {
   TOOL_DEFINITION as HANDLER_ACTIVATE,
@@ -32,16 +33,14 @@ import type {
   HandlerContext,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import {
   type JsonSchema,
   jsonFind,
   listedJson,
 } from '../../helpers/listedJson';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];

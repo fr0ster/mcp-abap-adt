@@ -49,13 +49,11 @@ import {
   READ_VERSION_FIELD,
   READ_VERSIONS,
 } from '../../../lib/handlers/readVersion';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordingConnection,
   recordingConnection,

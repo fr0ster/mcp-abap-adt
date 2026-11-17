@@ -7,10 +7,7 @@
  */
 
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import {
   declaredRequired,
   type JsonSchema,
@@ -18,6 +15,7 @@ import {
   listedJson,
 } from '../helpers/listedJson';
 import { recordCase, servedEntries } from '../helpers/pinCases';
+import { setSystemContext } from '../helpers/processSystemContext';
 import type { SystemKind } from '../helpers/servedTools';
 
 beforeEach(() => {

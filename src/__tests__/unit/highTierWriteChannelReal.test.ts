@@ -68,11 +68,9 @@ import { handleCreateTransport } from '../../handlers/transport/high/handleCreat
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,

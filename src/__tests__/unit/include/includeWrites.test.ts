@@ -25,12 +25,10 @@ import {
   handleActivateInclude,
 } from '../../../handlers/include/low/handleActivateInclude';
 import { defineTool } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordingConnection,
   recordingConnection,

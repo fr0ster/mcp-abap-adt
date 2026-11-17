@@ -104,7 +104,12 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
   `EmbeddableMcpServerBaseOptions` instead.
 - `systemContext` is per instance: two `EmbeddableMcpServer`s keep their own, and
   `getSystemContext()` no longer returns an instance's option. Code that read it there passes the
-  values itself (`setSystemContext` still sets the process context).
+  values itself.
+- **`setSystemContext` is removed** (`@mcp-abap-adt/lib/utils` and the system context module): it
+  set one context for the whole process. State `systemContext` on the server's options
+  (`EmbeddableMcpServer`, `BaseMcpServer`); a process without a server states `SAP_RESPONSIBLE`,
+  `SAP_MASTER_SYSTEM` and `SAP_LANGUAGE` in its configuration. `getSystemContext()` stays: it reads
+  the process configuration.
 - A `HandlerExporter.createRegistry()` registry on a server with `backgroundRuns` lists the run tools
   (`RuntimeRunClass`, `RuntimeRunProgram`) with `background`, as the server's own run tools are.
 - A connection `createAbapConnection` built for one kind, called through an exporter that states the

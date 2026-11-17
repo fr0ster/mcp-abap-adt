@@ -16,12 +16,10 @@
  * row yet — their family tasks (C3–C16) add the row with its live case.
  */
 
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { type PinCase, pinKey, runPinCase } from '../../helpers/pinCases';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 /** A request is created for its owner: the responsible stated here. */
 beforeEach(() => {

@@ -14,16 +14,14 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '../../../lib/connectionFactory';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type AdtStandIn,
   adtStandIn,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { stateSystemKind } from '../../helpers/systemKind';
 import {

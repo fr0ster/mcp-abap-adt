@@ -21,6 +21,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
 import { longToolInTheCall } from '../../../src/lib/backgroundRuns/tools';
 import { createAdtClient } from '../../../src/lib/clients';
@@ -40,7 +41,6 @@ import {
 import {
   getStatedSystemContext,
   resetSystemContextCache,
-  setSystemContext,
 } from '../../../src/lib/systemContext';
 import { readSystemInformation } from '../../../src/lib/systemInformation';
 import type { ToolResultLike } from '../../../src/lib/toolResult';

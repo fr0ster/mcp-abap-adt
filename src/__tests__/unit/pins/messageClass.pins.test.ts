@@ -4,12 +4,11 @@
  * on a real connection to the ADT stand-in, which answers a lock with a
  * handle (real adt-clients code throughout).
  */
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 /** A change is made for its responsible person: the one stated here. */
 beforeEach(() => {

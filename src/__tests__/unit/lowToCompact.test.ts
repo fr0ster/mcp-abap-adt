@@ -42,10 +42,7 @@ import type {
   HandlerContext,
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { holdingLockOf } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
 import {
@@ -58,6 +55,7 @@ import {
   TABLE_END,
   TABLE_START,
 } from '../helpers/lowToCompact';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { REQUEST_ID } from '../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires: the ADT

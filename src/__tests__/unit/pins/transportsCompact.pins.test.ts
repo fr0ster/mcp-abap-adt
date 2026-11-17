@@ -7,11 +7,10 @@
  * their one request on a task. SAP's answers: the created request's number,
  * and the empty `200` both actions answer (measured on premise).
  */
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { type McpResult, pinCases } from '../../helpers/pinCases';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 /** The answer's JSON, as the tool gave it. */
 const answered = (result: McpResult): Record<string, unknown> => {

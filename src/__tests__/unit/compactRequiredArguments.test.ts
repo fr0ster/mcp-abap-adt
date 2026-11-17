@@ -26,13 +26,11 @@ import {
 } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import type { ProjectionVariant } from '../../lib/adtProjections';
 import { defineTool, type HandlerContext } from '../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { holding } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 jest.setTimeout(60_000);

@@ -69,16 +69,14 @@ import { handleCreateTransport } from '../../handlers/transport/high/handleCreat
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import {
   fakeClientOf,
   okResponse,
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { setSystemContext } from '../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

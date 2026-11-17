@@ -10,6 +10,7 @@
  * Each case runs the tool's own handler over a recording connection
  * declared the variant — real adt-clients code, no SAP.
  */
+
 import {
   ADT_SEARCH_TYPES_CLOUD,
   ADT_SEARCH_TYPES_ONPREM,
@@ -33,11 +34,9 @@ import {
   TYPE_NAMES,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,

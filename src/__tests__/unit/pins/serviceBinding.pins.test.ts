@@ -4,12 +4,11 @@
  * types, a binding's metadata and source reads, its publication and its
  * preview URL.
  */
+
 import assert from 'node:assert/strict';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { type McpResult, pinCases } from '../../helpers/pinCases';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 /** SAP's transport check of a new binding: admissible (`RESULT` S). */
 const ADMISSIBLE = {

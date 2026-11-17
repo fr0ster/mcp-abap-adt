@@ -977,7 +977,7 @@ function debugLog(message: string): void {
 // A named re-export can be added here the day something actually needs one.
 export type { IAdtSystemContext } from './systemContext.js';
 // Re-export safe system context accessors for consumers (no HTTP, no connection mutation)
-export { getSystemContext, setSystemContext } from './systemContext.js';
+export { getSystemContext } from './systemContext.js';
 
 /** What the summary says of a value it holds: that it is there. */
 const PRESENT = 'set';

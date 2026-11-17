@@ -14,6 +14,7 @@
  * the run start (`202`, the run id in `Location`), the run's status, its
  * results.
  */
+
 import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleHandlerActivate } from '../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
@@ -26,12 +27,10 @@ import {
   runStatusOf,
 } from '../../lib/strategies/activationRun';
 import type { AdtReading } from '../../lib/strategies/reading';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /** A run document kept as text: the reading a set that keeps it answers. */

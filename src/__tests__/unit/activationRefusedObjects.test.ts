@@ -12,6 +12,7 @@
  * `activationExecuted="false"`. Each handler case runs over a recording
  * connection — real adt-clients code, no SAP.
  */
+
 import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
@@ -23,13 +24,11 @@ import {
   runObjectOf,
 } from '../../lib/strategies/activationRun';
 import type { AdtReading } from '../../lib/strategies/reading';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { MEASURED_RUNS } from '../helpers/activationRunsByType';
 import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /** A results document kept as text. */

@@ -12,6 +12,7 @@
  * npm test -- <this file>`) and reviewed in its diff; every later change
  * must leave it equal.
  */
+
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -26,10 +27,7 @@ import type {
   HandlerEntry,
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { holdingLockOf } from '../../helpers/heldLocks';
 import { listedJson } from '../../helpers/listedJson';
@@ -39,6 +37,7 @@ import {
   parityRequests,
   silentLogger,
 } from '../../helpers/lowToCompact';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
 const FIXTURE = path.join(

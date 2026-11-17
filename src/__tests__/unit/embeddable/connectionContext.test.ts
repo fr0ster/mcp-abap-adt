@@ -9,6 +9,7 @@
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
@@ -45,7 +46,6 @@ import {
   getStatedSystemContext,
   getSystemContext,
   resetSystemContextCache,
-  setSystemContext,
 } from '../../../lib/systemContext';
 import { readSystemInformation } from '../../../lib/systemInformation';
 import { presented } from '../../helpers/presented';

@@ -47,12 +47,10 @@ import {
   type HandlerContext,
   type ToolArgs,
 } from '../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { corpusBody } from '../helpers/adtCorpus';
 import { moduleInGroup } from '../helpers/functionModuleMetadata';
+import { setSystemContext } from '../helpers/processSystemContext';
 import {
   LOCK_SUCCESS_XML,
   type RecordedRequest,

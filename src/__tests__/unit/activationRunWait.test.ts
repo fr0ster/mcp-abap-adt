@@ -10,18 +10,17 @@
  * connection — real adt-clients code, no SAP: the run start (`202`, the run
  * id in `Location`), the run's status reads, its results.
  */
+
 import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 import {
   RUNS_DISCOVERY,
   recordingConnection,

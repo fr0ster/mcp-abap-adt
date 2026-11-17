@@ -10,12 +10,10 @@ import type {
   HandlerContext,
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { holdingLockOf } from '../helpers/heldLocks';
 import { silentLogger } from '../helpers/lowToCompact';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 import { toolAnswer } from '../helpers/toolAnswer';
 

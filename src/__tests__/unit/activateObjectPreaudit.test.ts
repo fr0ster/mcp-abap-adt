@@ -4,12 +4,10 @@ import {
   TOOL_DEFINITION,
 } from '../../handlers/common/low/handleActivateObject';
 import { SINGLE_ACTIVATION } from '../../lib/adtProjections';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { jsonAt, listedJson } from '../helpers/listedJson';
+import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 /**

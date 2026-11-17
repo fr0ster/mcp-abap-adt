@@ -24,13 +24,11 @@
 
 import { eligible } from '../../../lib/batch/eligibility';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
 import { runCase, servedTools } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

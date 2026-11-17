@@ -56,6 +56,7 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 - **`EmbeddableMcpServer`'s `exposition: ['compact']`** built nothing (the default registry has no compact branch): `compact` leaves the type. **Migrating:** the compact binaries or `HandlerExporter` serve the compact tools.
 - **`IAdtSystemContext.client`** was read by nothing, and the `systemContext` option's doc named `isLegacy`, which the type never had. **Migrating:** drop `client`; the connection's client is the connection's setting.
 - **`ConnectionContext.sessionId` (required) and `metadata`** were read by nothing; `EmbeddableMcpServer`, `StdioServer` and `headerContext` stop setting them. **Migrating:** drop both from a connection context.
+- **`setSystemContext`** (`@mcp-abap-adt/lib/utils`): the module-global setter of one system context for the whole process; the system context is per instance. **Migrating:** state `systemContext` on the server's options; without a server, the configuration (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_LANGUAGE`).
 - **`RouteRegistrationOptions.addJsonMiddleware`** was ignored by `StreamableHttpServer` and `SseServer`. **Migrating:** drop it (`RouteRegistrationOptions` holds no option today).
 
 ### Changed — breaking for a start: nothing stated is ignored

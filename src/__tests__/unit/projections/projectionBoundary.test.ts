@@ -10,6 +10,7 @@
  * Each case runs the tool's own handler over a recording connection declared
  * the variant — real adt-clients code, no SAP.
  */
+
 import {
   TOOL_DEFINITION as HandlerActivate,
   handleHandlerActivate,
@@ -92,13 +93,11 @@ import {
 } from '../../../lib/debugger/objectUri';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { defineTool } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { moduleInGroup } from '../../helpers/functionModuleMetadata';
 import { holding } from '../../helpers/heldLocks';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 jest.setTimeout(60_000);

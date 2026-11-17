@@ -10,13 +10,11 @@ import { failureOf } from '../../../lib/auth/failures';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import * as sequenceModule from '../../../lib/strategies/sequence';
 import { both, pair } from '../../../lib/strategies/sequence';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import type { BatchEntryCase } from '../../helpers/batchEntryCases';
 import { runCase, servedTools } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

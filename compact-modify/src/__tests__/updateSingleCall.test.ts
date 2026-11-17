@@ -21,6 +21,7 @@
  * - HandlerLock and HandlerUnlock take SERVICE_DEFINITION and SERVICE_BINDING,
  *   one request each.
  */
+
 import {
   compactLockSchema,
   compactUnlockSchema,
@@ -35,11 +36,9 @@ import {
   jsonAt,
   listedJson,
 } from '../../../src/__tests__/helpers/listedJson';
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../src/lib/systemContext';
+import { resetSystemContextCache } from '../../../src/lib/systemContext';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
 import {
   TOOL_DEFINITION as HandlerLock,

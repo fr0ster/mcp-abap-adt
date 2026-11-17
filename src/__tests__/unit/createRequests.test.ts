@@ -21,10 +21,7 @@
 
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
 import { corpusBody } from '../helpers/adtCorpus';
 import { jsonFind, listedJson } from '../helpers/listedJson';
 import {
@@ -32,6 +29,7 @@ import {
   recordCase,
   servedEntries,
 } from '../helpers/pinCases';
+import { setSystemContext } from '../helpers/processSystemContext';
 import type { SystemKind } from '../helpers/servedTools';
 
 type Args = Readonly<Record<string, unknown>>;

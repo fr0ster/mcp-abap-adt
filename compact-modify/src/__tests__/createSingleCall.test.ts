@@ -20,6 +20,7 @@
  * - UNIT_TEST and CDS_UNIT_TEST, whose create is a chain, are refused before
  *   any request, pointing to the full set.
  */
+
 import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -47,11 +48,9 @@ import {
   jsonFind,
   listedJson,
 } from '../../../src/__tests__/helpers/listedJson';
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../src/lib/systemContext';
+import { resetSystemContextCache } from '../../../src/lib/systemContext';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
 import {
   handleHandlerCreate,

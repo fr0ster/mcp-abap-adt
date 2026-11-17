@@ -16,16 +16,14 @@ import { AxiosError } from 'axios';
 import { handleCreateFunctionGroup } from '../../../handlers/function/high/handleCreateFunctionGroup';
 import { dumpSummaryOf } from '../../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { failureText } from '../../../lib/debugger/readings';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import {
   isAlreadyExistsError,
   parseValidationResponse,
   return_error,
 } from '../../../lib/utils';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires.

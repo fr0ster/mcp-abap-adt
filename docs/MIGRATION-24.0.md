@@ -958,6 +958,15 @@ used to check — a required name not blank (`class_name is required`), "exactly
 listing says so). A refused call answers the SDK's validation error (`MCP error -32602: Input
 validation error: …`) in place of the handler's answer.
 
+A tool stated per variant is read on the variant of the call, on every path — the listing, the
+entry's own call, a compact tool's target, `HandlerExporter`: a value of the cloud table only
+(`SIA1`) is taken on cloud and refused on premise, and the other way round. With no kind — none
+stated by the server, the group's context or the exporter, none recorded on the connection the
+host injected — such a tool is refused `system_type_required` before anything is taken: no
+connection, no fresh session, no run, nothing sent. State the kind (`systemType`), or inject a
+connection built for one. An embedder calling an entry of such a tool directly gets the variant's
+schema's words (`Invalid option: expected one of …`) where a handler answered its own.
+
 `HandlerGet` part `virtual_folders` now sends
 `with_versions` and `ignore_short_descriptions` as `false` where it sent none (`GetVirtualFolders`'
 schema defaults).

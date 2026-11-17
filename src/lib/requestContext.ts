@@ -44,20 +44,20 @@ export interface RequestContext {
    * `SAP_DEBUG_TERMINAL_ID` of the request's destination. Same presence rule
    * as `responsible`; when none is stated the debugger generates one.
    */
-  debugTerminalId?: string;
+  debugTerminalId?: string | undefined;
   /**
    * The debugger's IDE id, as stated: `x-sap-debug-ide-id`, or
    * `SAP_DEBUG_IDE_ID` of the request's destination. Same presence rule as
    * `debugTerminalId`.
    */
-  debugIdeId?: string;
+  debugIdeId?: string | undefined;
   /**
    * The debugger's breakpoint conflict (`replace` or `refuse-if-held`), as
    * stated: `x-sap-debug-breakpoint-conflict`, or
    * `SAP_DEBUG_BREAKPOINT_CONFLICT` of the request's destination. Same
    * presence rule as `debugTerminalId`.
    */
-  debugBreakpointConflict?: string;
+  debugBreakpointConflict?: string | undefined;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -81,16 +81,18 @@ function headerValue(
 }
 
 /**
- * The request scope an HTTP/SSE request states in its headers:
- * `x-sap-language` as `masterLanguage` (the key always present, as #110
- * established), and `x-sap-responsible` / `x-sap-master-system` as
- * `responsible` / `masterSystem` — each of these present only when its header
- * carries a value, so a request that states none leaves the destination's
- * `.env`, the process configuration, the login and the cloud lookup to fill
- * it. `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
- * `x-sap-debug-breakpoint-conflict` enter the same way as `debugTerminalId` /
- * `debugIdeId` / `debugBreakpointConflict`. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
- * basic connection, which the server enters itself.
+ * The request scope an HTTP/SSE request states in its headers, every key
+ * present (24.0.0): `x-sap-language` as `masterLanguage` (#110),
+ * `x-sap-responsible` / `x-sap-master-system` as `responsible` /
+ * `masterSystem`, and `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
+ * `x-sap-debug-breakpoint-conflict` as `debugTerminalId` / `debugIdeId` /
+ * `debugBreakpointConflict` — `undefined` when the header carries no value.
+ * So a request that states none is answered by none of the process's
+ * `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` or `SAP_DEBUG_*`: http/sse take
+ * request values from headers only. The login and the connection's
+ * parameters (the rules, the cloud lookup) still fill the responsible.
+ * `x-sap-login` is not read here: it is a login only on an `x-sap-*` basic
+ * connection, which the server enters itself.
  */
 export function requestContextFromHeaders(
   headers: Record<string, string | string[] | undefined>,
@@ -105,11 +107,11 @@ export function requestContextFromHeaders(
   );
   return {
     masterLanguage: headerValue(headers, 'x-sap-language'),
-    ...(responsible ? { responsible } : {}),
-    ...(masterSystem ? { masterSystem } : {}),
-    ...(debugTerminalId ? { debugTerminalId } : {}),
-    ...(debugIdeId ? { debugIdeId } : {}),
-    ...(debugBreakpointConflict ? { debugBreakpointConflict } : {}),
+    responsible,
+    masterSystem,
+    debugTerminalId,
+    debugIdeId,
+    debugBreakpointConflict,
   };
 }
 

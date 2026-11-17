@@ -417,13 +417,15 @@ inherited one changes nothing, and stdio starts with no bound. See [Held State](
 
 ### The debugger's ids
 
-`SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (where the debugger is served): first found, the
-destination's `.env`, then the process environment; else random per instance. See
+`SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (stdio, where the debugger is served): first found, the
+destination's `.env`, then the process environment; else random per instance. Streamable HTTP and
+SSE take them from the `x-sap-debug-*` headers only (24.0.0). See
 [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one).
 
 `SAP_DEBUG_BREAKPOINT_CONFLICT` (`replace`, the default, or `refuse-if-held`): whether a take-over
 of the debugger, and every later change of its breakpoints, first asks if another debugger
-listens for the same SAP user, and refuses if so. Same order. See
+listens for the same SAP user, and refuses if so. The header (or the destination's `.env`), then an
+embedder's `breakpointConflict` option, then — on stdio only — the environment. See
 [Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key).
 
 ## `mcp-abap-adt-http` (Streamable HTTP)
@@ -449,9 +451,8 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 
 Per request, the system context comes from the headers `x-sap-responsible`,
 `x-sap-master-system`, `x-sap-language`, and the debugger's `x-sap-debug-terminal-id` /
-`x-sap-debug-ide-id` / `x-sap-debug-breakpoint-conflict`; then `SAP_RESPONSIBLE`,
-`SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID`,
-`SAP_DEBUG_BREAKPOINT_CONFLICT` of the environment. Held state is reached again with its `state_handle`, on
+`x-sap-debug-ide-id` / `x-sap-debug-breakpoint-conflict` — from the headers only: the process's
+`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_DEBUG_*` are not read (24.0.0). Held state is reached again with its `state_handle`, on
 the instance that holds it.
 
 **What `mcp-abap-adt-http` refuses** (each stops the start, naming the form you used):

@@ -135,6 +135,13 @@ A value a start states is read as stated, or the start is refused naming it.
 - **One destination source on stdio.** `--env` with `--env-path` (or `MCP_ENV_PATH`), and `--mcp`
   with an env file, are refused at startup. Keep the one you meant: before, `--env-path` silently
   won over `--env`, and `--mcp` was served while the env file's credentials were ignored.
+- **Streamable HTTP and SSE read `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_DEBUG_*` from
+  headers only.** A process value no longer answers a request without the header: send
+  `x-sap-responsible`, `x-sap-master-system`, `x-sap-debug-terminal-id`, `x-sap-debug-ide-id`,
+  `x-sap-debug-breakpoint-conflict`. An embedder entering `requestContextFromHeaders` gets every
+  key stated (absent as `undefined`). stdio is unchanged.
+- **A stated `breakpointConflict` is no longer overridden by `SAP_DEBUG_BREAKPOINT_CONFLICT`**:
+  the option wins over the environment; a header or a destination's `.env` wins over both.
 
 ## RFC destinations: the address is stated
 

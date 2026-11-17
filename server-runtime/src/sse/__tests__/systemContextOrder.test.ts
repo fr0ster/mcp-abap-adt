@@ -220,16 +220,17 @@ describe('SseServer: responsible and master system per session', () => {
     };
   }
 
-  it('the opening headers win over the process environment', async () => {
+  it('the opening headers only: the process environment answers neither (D26 D2)', async () => {
     await expect(
       ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
-      masterSystem: 'PROCESS_SYS',
+      masterSystem: null,
     });
+    // No responsible header: the basic connection's login stands in.
     await expect(ask(BASIC)).resolves.toEqual({
-      responsible: 'PROCESS_USER',
-      masterSystem: 'PROCESS_SYS',
+      responsible: 'HEADER_LOGIN',
+      masterSystem: null,
     });
   });
 
@@ -238,7 +239,7 @@ describe('SseServer: responsible and master system per session', () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     await expect(ask(BASIC)).resolves.toEqual({
       responsible: 'HEADER_LOGIN',
-      masterSystem: 'PROCESS_SYS',
+      masterSystem: null,
     });
   });
 
@@ -312,7 +313,7 @@ describe('SseServer: responsible and master system per session', () => {
       ask({ ...BASIC, 'x-sap-responsible': 'FIRST' }, 60),
       ask({ ...BASIC, 'x-sap-master-system': 'HDR' }, 0),
     ]);
-    expect(a).toEqual({ responsible: 'FIRST', masterSystem: 'PROCESS_SYS' });
-    expect(b).toEqual({ responsible: 'PROCESS_USER', masterSystem: 'HDR' });
+    expect(a).toEqual({ responsible: 'FIRST', masterSystem: null });
+    expect(b).toEqual({ responsible: 'HEADER_LOGIN', masterSystem: 'HDR' });
   });
 });

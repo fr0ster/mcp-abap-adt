@@ -241,7 +241,7 @@ user exists only inside the system. For each request the server takes each from 
 | | *Only on an on-premise system that gives no information (no `systeminformation`, an answer without the user, an error):* | |
 | 3 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
 | 4 | `SAP_RESPONSIBLE` in the destination's own `.env` (stdio) | `SAP_MASTER_SYSTEM` in the destination's own `.env` (stdio) |
-| 5 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
+| 5 | `SAP_RESPONSIBLE` in the process environment (stdio; Streamable HTTP and SSE read no process value) | `SAP_MASTER_SYSTEM` in the process environment (stdio) |
 | 6 | the login: the destination's own `SAP_USERNAME` (stdio) | — left out of the request |
 | 7 | the login: `x-sap-login` of an `x-sap-url` basic connection (HTTP, SSE) | |
 | 8 | the login: the process `SAP_USERNAME` | |

@@ -29,7 +29,7 @@ describe('debugger ids', () => {
     });
     expect(statedDebuggerIds({})).toEqual({});
   });
-  it('a header wins over the environment, only for its own id', () => {
+  it('a request from headers takes each id from its header only: the environment answers neither (D26 D2)', () => {
     runWithRequestContext(
       requestContextFromHeaders({ 'x-sap-debug-ide-id': 'FROMHEADER' }),
       () => {
@@ -38,7 +38,7 @@ describe('debugger ids', () => {
             SAP_DEBUG_IDE_ID: 'FROMENV',
             SAP_DEBUG_TERMINAL_ID: 'T',
           }),
-        ).toEqual({ ideId: 'FROMHEADER', terminalId: 'T' });
+        ).toEqual({ ideId: 'FROMHEADER' });
       },
     );
   });
@@ -70,7 +70,7 @@ describe('the terminal id and the breakpoint conflict, as stated', () => {
     );
   });
 
-  it('the conflict: replace by default; the embedder, under the environment, under the request scope', () => {
+  it('the conflict: replace by default; the environment under the embedder, under the request scope (D26 D6)', () => {
     expect(resolveBreakpointConflict(undefined, {})).toBe('replace');
     expect(resolveBreakpointConflict('refuse-if-held', {})).toBe(
       'refuse-if-held',
@@ -79,7 +79,12 @@ describe('the terminal id and the breakpoint conflict, as stated', () => {
       resolveBreakpointConflict('refuse-if-held', {
         SAP_DEBUG_BREAKPOINT_CONFLICT: 'replace',
       }),
-    ).toBe('replace');
+    ).toBe('refuse-if-held');
+    expect(
+      resolveBreakpointConflict(undefined, {
+        SAP_DEBUG_BREAKPOINT_CONFLICT: 'refuse-if-held',
+      }),
+    ).toBe('refuse-if-held');
     runWithRequestContext(
       requestContextFromHeaders({
         'x-sap-debug-breakpoint-conflict': 'refuse-if-held',

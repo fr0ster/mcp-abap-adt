@@ -85,8 +85,9 @@ routed by its sessionId alone, and its own x-sap-* headers are not read):
     x-sap-debug-breakpoint-conflict  replace (default) or refuse-if-held: whether a take-over
                                    of the debugger, and every later change of its breakpoints,
                                    first asks if another debugger listens for the same SAP user
-    Then SAP_RESPONSIBLE, SAP_MASTER_SYSTEM, SAP_DEBUG_TERMINAL_ID, SAP_DEBUG_IDE_ID,
-    SAP_DEBUG_BREAKPOINT_CONFLICT of the environment; with x-sap-login, the login is the responsible when none is stated.
+    From the headers only: SAP_RESPONSIBLE, SAP_MASTER_SYSTEM and SAP_DEBUG_* of the
+    process environment are not read. With x-sap-login, the login is the responsible
+    when none is stated.
 
   Held state (a debug session) lives in the connection's instance until the
   connection closes; MCP_STATE_IDLE_MINUTES / --state-idle-minutes bound it.

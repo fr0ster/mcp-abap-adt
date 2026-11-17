@@ -77,11 +77,11 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-login` | Yes* (for basic) | Username for basic authentication; on-premise also the responsible of created objects when none is stated (only on this `x-sap-url` connection, not on a destination request) | `your_username` |
 | `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
 | `x-sap-master-system` | No | Master system of created objects; wins over the environment | `<system id>` |
-| `x-sap-responsible` | No | Responsible person of created objects; wins over the environment and the login | `<user>` |
+| `x-sap-responsible` | No | Responsible person of created objects; wins over the login. The process's `SAP_RESPONSIBLE` is not read | `<user>` |
 | `x-sap-language` | No | Master language of created objects | `EN` |
-| `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the environment (`SAP_DEBUG_TERMINAL_ID`). Random per instance when none is stated | `<terminal id>` |
+| `x-sap-debug-terminal-id` | No | The debugger's terminal id; the process's `SAP_DEBUG_TERMINAL_ID` is not read. Random per instance when none is stated | `<terminal id>` |
 | `x-sap-debug-ide-id` | No | The debugger's IDE id; same order. The system keys its listener conflict by it: a shared IDE id means shared catches and no conflict ([Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one)) | `<IDE id>` |
-| `x-sap-debug-breakpoint-conflict` | No | `replace` or `refuse-if-held` ([Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)); wins over the destination's `.env` and the environment | `refuse-if-held` |
+| `x-sap-debug-breakpoint-conflict` | No | `replace` or `refuse-if-held` ([Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)); wins over an embedder's `breakpointConflict` option; the process's `SAP_DEBUG_BREAKPOINT_CONFLICT` is not read | `refuse-if-held` |
 | `x-mcp-state-handle` | No (Streamable HTTP) | The `state_handle` of the instance that holds state (a long session, a lock, a batch, a debug session), for a client that sets headers: the alternative to the `state_handle` argument every tool declares on the Streamable HTTP binaries, which is how a model sends it. When both are sent, the header wins. A bearer secret | `<state_handle>` |
 
 \* A request (SSE: the opening `GET`) must carry `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password`; without them it is answered `400`. `x-mcp-destination` is answered `400`.
@@ -354,7 +354,7 @@ When creating ABAP objects, SAP ADT takes `responsible` and `masterSystem` attri
 | 2 | `systeminformation` on the connected connection | the system's user | the system id |
 | 3 | Request headers (HTTP/SSE) — on-premise `404` only | `x-sap-responsible` | `x-sap-master-system` |
 | 4 | The destination's own `.env` (`--env` / `--env-path` file, or `sessions/<destination>.env`) — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
-| 5 | The process environment — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
+| 5 | The process environment (stdio; Streamable HTTP and SSE read none, 24.0.0) — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
 | 6 | The login: the destination's own `.env` — on-premise `404` only | `SAP_USERNAME` | — |
 | 7 | The login: an `x-sap-url` connection's header — on-premise `404` only | `x-sap-login` | — |
 | 8 | The login: the process environment — on-premise `404` only | `SAP_USERNAME` | — |

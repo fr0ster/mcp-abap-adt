@@ -65,7 +65,10 @@ export {
 } from '../../handlers/service_binding/high/handleValidateServiceBinding.js';
 export { handleGetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition.js';
 export { handleGetStructure } from '../../handlers/structure/high/handleGetStructure.js';
-export { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree.js';
+export {
+  handleGetPackageTree,
+  packageTreeArgumentsRefusal,
+} from '../../handlers/system/high/handleGetPackageTree.js';
 // The metadata readers and the preview-URL tool: `part` on the compact read
 // routes to these, and a package that carries only read routes must be able to
 // import them without reaching a write handler.
@@ -77,7 +80,10 @@ export { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirt
 export { handleGetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure.js';
 export { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl.js';
 export { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery.js';
-export { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed.js';
+export {
+  handleGetWhereUsed,
+  whereUsedArgumentsRefusal,
+} from '../../handlers/system/readonly/handleGetWhereUsed.js';
 export { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.js';
 export { handleRuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById.js';
 export { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData.js';

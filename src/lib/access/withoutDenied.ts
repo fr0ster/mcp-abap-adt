@@ -13,6 +13,7 @@ import {
   type IHandlerGroup,
   invalidArgumentsWords,
   type SapEnvironment,
+  type ToolArgs,
   type ToolDefinition,
   type VariantToolDefinition,
 } from '../handlers/interfaces.js';
@@ -140,9 +141,27 @@ function narrowed(
     ...(entry.toolDefinition.variants !== undefined ? { variants } : {}),
   };
   const original = entry.call;
+  const refuses = entry.refusesArguments;
   return {
     ...entry,
     toolDefinition,
+    // Before the call takes a connection: the narrowed schema first, then
+    // the original refusal of what it parsed.
+    ...(refuses !== undefined
+      ? {
+          refusesArguments: (args: ToolArgs) => {
+            const parsed = own.inputSchema.safeParse(args);
+            return parsed.success
+              ? refuses(parsed.data)
+              : new Error(
+                  invalidArgumentsWords(
+                    entry.toolDefinition.name,
+                    parsed.error.issues,
+                  ),
+                );
+          },
+        }
+      : {}),
     // The narrowed schema is the one check of the call's arguments: a
     // property it dropped (`sql_query`) never reaches the original call.
     call: async (context, args) => {

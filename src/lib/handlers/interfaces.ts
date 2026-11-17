@@ -98,6 +98,15 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
    */
   readonly heldLockOf?: (args: ToolArgs) => string | undefined;
   /**
+   * The refusal of the call's arguments its call would answer, read before
+   * the call takes a connection (`undefined`: none). Set where the listed
+   * schema cannot express a rule its call checks — `HandlerSystem`'s
+   * per-action arguments, each its target's — so a refused call opens no
+   * connection, logs on nowhere, starts no run and sends nothing. Every
+   * registration path reads it first.
+   */
+  readonly refusesArguments?: (args: ToolArgs) => Error | undefined;
+  /**
    * The tool begins and ends the communication batch (`HandlerBatch`): a set
    * that serves it has batch mode, and only there does every other tool's
    * description carry its batch sentence.
@@ -127,6 +136,27 @@ export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
       }
       return handler(context, parsed.data);
     },
+  };
+}
+
+/**
+ * The refusal the call of `defineTool(toolDefinition, …)` answers for
+ * `args`, without the call: its schema's issues, else `own`'s refusal of
+ * the parsed arguments (a rule its handler checks itself), else none.
+ */
+export function argumentsRefusalOf<S extends z.ZodObject>(
+  toolDefinition: ToolDefinition<S>,
+  own?: (args: z.output<S>) => string | undefined,
+): (args: ToolArgs) => Error | undefined {
+  return (args) => {
+    const parsed = toolDefinition.inputSchema.safeParse(args);
+    if (!parsed.success) {
+      return new Error(
+        invalidArgumentsWords(toolDefinition.name, parsed.error.issues),
+      );
+    }
+    const words = own?.(parsed.data);
+    return words === undefined ? undefined : new Error(words);
   };
 }
 

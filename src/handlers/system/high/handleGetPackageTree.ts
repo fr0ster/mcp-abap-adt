@@ -344,6 +344,22 @@ function treeOf(
 }
 
 /**
+ * The refusal of a package-tree call's arguments, before anything is read
+ * (`undefined`: none): exactly one of `package_name` and `package_names`.
+ */
+export function packageTreeArgumentsRefusal(
+  args: GetPackageTreeArgs,
+): string | undefined {
+  const single = typeof args.package_name === 'string' && args.package_name;
+  const list = Array.isArray(args.package_names) ? args.package_names : [];
+  if (single && list.length > 0) {
+    return 'Give exactly one of package_name or package_names';
+  }
+  if (!single && list.length === 0) return 'package_name is required';
+  return undefined;
+}
+
+/**
  * Main handler for GetPackageTree MCP tool
  */
 export async function handleGetPackageTree(
@@ -352,17 +368,10 @@ export async function handleGetPackageTree(
 ) {
   const { logger } = context;
   try {
+    const refusal = packageTreeArgumentsRefusal(args);
+    if (refusal !== undefined) return return_error(new Error(refusal));
     const single = typeof args?.package_name === 'string' && args.package_name;
     const list = Array.isArray(args?.package_names) ? args.package_names : [];
-    if (single && list.length > 0) {
-      return return_error(
-        new Error('Give exactly one of package_name or package_names'),
-      );
-    }
-    // Validate required parameters
-    if (!single && list.length === 0) {
-      return return_error(new Error('package_name is required'));
-    }
     const packageNames = (single ? [single] : list).map((name) =>
       name.toUpperCase(),
     );

@@ -979,7 +979,8 @@ tool. Six reads are new to compact: `search_source`, `package_tree`, `transports
   action itself or of another action — is refused before dispatch, in `HandlerSystem`'s name
   (`Input validation error: Invalid arguments for tool HandlerSystem: …`), so the listing keeps
   each argument's type. A missing required argument is refused in the target tool's words, with
-  nothing sent.
+  nothing sent: before the call takes a connection, with `background` true or false and with or
+  without a fresh-connection factory, so no session of its own is opened and no run started.
 - **A long tool.** Without `background` a call answers a `run_handle` at once, read with
   `HandlerBackgroundRunGet` and cancelled with `HandlerBackgroundRunDiscard`; `background: false`
   answers in the call. A server without a background-run strategy lists it without `background`

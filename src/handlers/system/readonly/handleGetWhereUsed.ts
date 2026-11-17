@@ -633,6 +633,31 @@ const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
   'ended' in outcome ? outcome.ended : outcome.answers[0];
 
 /**
+ * The refusal of a where-used call's arguments, before anything is read
+ * (`undefined`: none): one object needs its name and its type; a list
+ * stands alone and holds at least one object.
+ */
+export function whereUsedArgumentsRefusal(
+  args: WhereUsedArgs,
+): string | undefined {
+  const listed = args.objects;
+  if (listed === undefined) {
+    if (!args.object_name) return 'Object name is required';
+    if (!args.object_type) return 'Object type is required';
+    return undefined;
+  }
+  if (
+    args.object_name !== undefined ||
+    args.object_type !== undefined ||
+    !Array.isArray(listed) ||
+    listed.length === 0
+  ) {
+    return 'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })';
+  }
+  return undefined;
+}
+
+/**
  * Where-used lists of one object or several, read in ADT batch envelopes
  * where a call sends more than one request; the sequential reads where the
  * destination has no communication batch. One object without a type filter
@@ -642,6 +667,8 @@ export async function handleGetWhereUsed(
   context: HandlerContext,
   args: WhereUsedArgs,
 ) {
+  const refusal = whereUsedArgumentsRefusal(args);
+  if (refusal !== undefined) return return_error(refusal);
   const listed = args?.objects;
   if (listed === undefined) {
     const refused = await refusedModule(context, [args]);
@@ -653,16 +680,6 @@ export async function handleGetWhereUsed(
       context,
       async () => onlyAnswer(await whereUsedInEnvelopes(context, [args], args)),
       () => whereUsedOf(context, args),
-    );
-  }
-  if (
-    args.object_name !== undefined ||
-    args.object_type !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0
-  ) {
-    return return_error(
-      'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })',
     );
   }
   const objects = listed.map((o) => ({

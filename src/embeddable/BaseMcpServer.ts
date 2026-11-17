@@ -1750,6 +1750,17 @@ export abstract class BaseMcpServer extends McpServer {
             if (longTool && !longRead && statesBackground(args)) {
               return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
             }
+            // Arguments its call would refuse (`HandlerSystem`'s action's
+            // target's) are refused here, before the call takes a
+            // connection: no fresh one opened, no run started, nothing sent.
+            const refusedArguments = entry.refusesArguments?.(
+              isBackgroundTool(entry.toolDefinition.name) || longTool
+                ? withoutBackground(args)
+                : args,
+            );
+            if (refusedArguments !== undefined) {
+              return this.refusalAnswer(refusedArguments);
+            }
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —

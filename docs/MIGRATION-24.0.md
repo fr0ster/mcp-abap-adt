@@ -127,6 +127,17 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
 
 A value a start states is read as stated, or the start is refused naming it.
 
+- **One kind per server.** An embedder's server (`EmbeddableMcpServer`, `BaseMcpServer`,
+  `StreamableHttpServer`, `SseServer`) fixes its system kind once, at construction: its
+  `systemType`, else `SAP_SYSTEM_TYPE` as it is then — set the variable before constructing, not
+  per request; a later change is not read. That one kind lists the tools and checks and runs every
+  call. Without a kind the server still constructs, and every call that takes a connection answers
+  `system_type_required` before anything is taken. A connection whose recorded kind (built by
+  `createAbapConnection` for the other kind) or declared kind (`declareSystemKind`) differs is
+  refused `system_type_conflict` before it is used: inject a connection of the server's kind. A
+  handler group or `HandlerExporter` states its own kind the same way (`systemType`); stating
+  none, a tool stated per variant is refused `system_type_required`.
+
 - **A flag's value follows `=`.** `--auth-debug false`, `--unsafe false`,
   `--http-enable-dns-protection false` (and every other flag followed by a separate `true` or
   `false`) turned the flag **on** and left the word unread. It is refused now, naming the form
@@ -958,16 +969,13 @@ used to check — a required name not blank (`class_name is required`), "exactly
 listing says so). A refused call answers the SDK's validation error (`MCP error -32602: Input
 validation error: …`) in place of the handler's answer.
 
-A tool stated per variant is read on the variant of the call, on every path — the listing, the
+A tool stated per variant is read on the one kind of the server, the group or the exporter (see
+"Starts: nothing stated is ignored", one kind per server), on every path — the listing, the
 entry's own call, a compact tool's target, `HandlerExporter`: a value of the cloud table only
-(`SIA1`) is taken on cloud and refused on premise, and the other way round. With no kind — none
-stated by the server, the group's context or the exporter, none recorded on the connection the
-host injected — such a tool is refused `system_type_required` before anything is taken: no
-connection, no fresh session, no run, nothing sent. State the kind (`systemType`), or inject a
-connection built for one (or declared one, `declareSystemKind`): a server without `systemType`
-lists and checks its tools for the kind recorded on that connection, which `SAP_SYSTEM_TYPE` does
-not override, and a group or exporter stating no kind keeps it. An embedder calling an entry of such a tool directly gets the variant's
-schema's words (`Invalid option: expected one of …`) where a handler answered its own.
+(`SIA1`) is taken on cloud and refused on premise, and the other way round. With no kind, such a
+tool is refused `system_type_required` before anything is taken: no connection, no fresh session,
+no run, nothing sent. State the kind (`systemType`), and inject a connection of that kind. An embedder calling an entry of such a tool directly gets the
+variant's schema's words (`Invalid option: expected one of …`) where a handler answered its own.
 
 `HandlerGet` part `virtual_folders` now sends
 `with_versions` and `ignore_short_descriptions` as `false` where it sent none (`GetVirtualFolders`'

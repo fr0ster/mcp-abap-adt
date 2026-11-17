@@ -338,9 +338,9 @@ new EmbeddableMcpServer({
 });
 ```
 
-Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
+Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe, not required, and not read: a server's kind is fixed when it is constructed.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`. Without both, every tool is listed, and every call that would reach the system is refused `system_type_required`: an embedder states one. That order picks the tools and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL.
+**One kind per server, fixed at construction:** `options.systemType`, else `process.env.SAP_SYSTEM_TYPE` as it is when the server is constructed — a later change is not read. That one kind lists the tools, checks every call's arguments and runs it, and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL. Without one the server still constructs, every tool is listed, and every call that takes a connection is refused `system_type_required` before anything is sent: an embedder states one. A connection built for another kind (`createAbapConnection`) or declared for another (`declareSystemKind`) is refused `system_type_conflict` before it is used.
 
 ### System Context for On-Premise Systems
 

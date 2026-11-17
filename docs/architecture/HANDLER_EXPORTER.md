@@ -221,7 +221,10 @@ Its `call` is wrapped. The wrapper, before the handler runs:
   `systemType` stated, the connection has none, and a call that would reach a
   system is refused `system_type_required` before anything is sent.
   `SAP_SYSTEM_TYPE` is not read for it. A connection `createAbapConnection` built
-  for the other kind is refused `system_type_conflict` (24.0.0), naming both kinds;
+  for the other kind, or declared for it (`declareSystemKind`), is refused
+  `system_type_conflict` (24.0.0), naming both kinds; with no `systemType` stated, a tool stated
+  per variant is refused `system_type_required`, and the others run on the connection's
+  recorded or declared kind;
 - runs it in the call-transport scope with its call's own
   `transport_request` (the failure renderer's transport hint);
 - with a `systemContextResolver` (none by default since 19.0.0), fills the

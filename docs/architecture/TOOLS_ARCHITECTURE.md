@@ -99,8 +99,9 @@ export const TOOL_DEFINITION = {
 At registration, `BaseMcpServer.registerHandlers()` reads the stated system type and skips tools that don't match:
 
 ```typescript
-// The kind is stated, never guessed: the server's `systemType` option, else SAP_SYSTEM_TYPE.
-const currentEnv = statedEnvironment(this.systemType ?? process.env.SAP_SYSTEM_TYPE);
+// The kind is stated, never guessed, and fixed once at construction: the
+// server's `systemType` option, else SAP_SYSTEM_TYPE as it was then.
+const currentEnv = statedEnvironment(this.systemType);
 
 // For each tool:
 const availableIn = entry.toolDefinition.available_in;

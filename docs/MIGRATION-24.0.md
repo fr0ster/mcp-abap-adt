@@ -92,7 +92,12 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
 ## Embedders: options read by nothing are removed
 
 - `EmbeddableMcpServer`'s `exposition: ['compact']` built nothing: use the compact binaries, or
-  `HandlerExporter` for the compact tools.
+  register the compact handler groups — `CompactReadOnlyHandlersGroup`
+  (`@mcp-abap-adt/compact-readonly-entries`) and `CompactModifyHandlersGroup`
+  (`@mcp-abap-adt/compact-modify`) — on an `EmbeddableMcpServer` (its `handlersRegistry`) or a
+  plain `McpServer`. `HandlerExporter` serves the full tools only: its `createRegistry()` carries
+  no compact tool (`HandlerSystem` and the rest answer as unknown tools)
+  ([Handler Exporter](architecture/HANDLER_EXPORTER.md)).
 - `IAdtSystemContext.client` is gone (the connection's client is its setting); the doc's
   `isLegacy` was never in the type.
 - `ConnectionContext.sessionId` and `metadata` are gone: remove them from the contexts you pass

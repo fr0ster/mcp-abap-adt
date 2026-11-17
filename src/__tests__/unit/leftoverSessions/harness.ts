@@ -157,7 +157,7 @@ export async function leftoverStand(
     /** The instance's `systemType` option; none by default (`SAP_SYSTEM_TYPE` answers). */
     systemType?: 'onprem' | 'cloud';
     /** The instance's logger; a silent one by default. */
-    logger?: typeof silent;
+    logger?: ConstructorParameters<typeof BaseMcpServer>[0]['logger'];
   } = {},
 ): Promise<LeftoverStand> {
   const standIn = await adtStandIn();

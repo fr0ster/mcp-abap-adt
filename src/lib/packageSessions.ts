@@ -37,7 +37,9 @@ import { ClosedInstanceRefusal } from './auth/failures';
 import { ServerRefusal } from './auth/serverRefusal';
 import {
   createAbapConnection,
+  kindConflictOf,
   siblingRecordOf,
+  systemKindOf,
   withSystemKindOf,
 } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
@@ -132,7 +134,13 @@ export async function openFreshConnection(
   // connection the server built.
   // It runs on the kind of the connection it is fresh for (the server
   // declared its systemType on it), never on what SAP_SYSTEM_TYPE says now.
-  const given = withSystemKindOf(await factory(), connection);
+  const returned = await factory();
+  // The one kind: a connection the host's factory built or declared for
+  // another kind than the one it is fresh for is refused before its
+  // connect — nothing sent.
+  const conflict = kindConflictOf(returned, systemKindOf(connection));
+  if (conflict !== undefined) throw conflict;
+  const given = withSystemKindOf(returned, connection);
   own(given, { role: 'fresh' });
   await bornOrEnded(given, born, logger);
   return connectedOrClosed(given, logger);

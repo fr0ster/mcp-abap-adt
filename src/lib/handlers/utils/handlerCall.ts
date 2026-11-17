@@ -1,16 +1,8 @@
 import type { HandlerContext } from '../../../handlers/interfaces.js';
-import {
-  ServerRefusal,
-  systemTypeConflictWords,
-} from '../../auth/serverRefusal.js';
 import { runWithCallTransport } from '../../callTransport.js';
-import { siblingRecordOf } from '../../connectionFactory.js';
+import { kindConflictOf } from '../../connectionFactory.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
-import {
-  declaredSystemKindOf,
-  statedSystemKind,
-  stateSystemKind,
-} from '../../systemKind.js';
+import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
 import type { ToolArgs } from '../interfaces.js';
 
 /**
@@ -50,21 +42,11 @@ export function inStatedScope<T>(
     // One kind: the one stated. A connection built for another (the
     // factory's record) or declared for another (`declareSystemKind`) is
     // refused, never run on either.
-    const stated = statedSystemKind(scope.systemType);
-    const declared = declaredSystemKindOf(connection);
-    for (const other of [
-      siblingRecordOf(connection)?.kind,
-      declared === 'none' ? undefined : declared,
-    ]) {
-      if (other !== undefined && stated !== undefined && other !== stated) {
-        return Promise.reject(
-          new ServerRefusal(
-            'system_type_conflict',
-            systemTypeConflictWords(other, stated),
-          ),
-        );
-      }
-    }
+    const conflict = kindConflictOf(
+      connection,
+      statedSystemKind(scope.systemType),
+    );
+    if (conflict !== undefined) return Promise.reject(conflict);
     stateSystemKind(connection, scope.systemType);
   }
   return runWithCallTransport(args, () =>

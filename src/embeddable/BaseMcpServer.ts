@@ -40,7 +40,6 @@ import {
   batchNotRecordableWords,
   batchNotServedWords,
   ServerRefusal,
-  systemTypeConflictWords,
 } from '../lib/auth/serverRefusal.js';
 import { answerBackgroundStarted } from '../lib/backgroundRuns/answers.js';
 import type {
@@ -86,7 +85,7 @@ import { runWithCallTransport } from '../lib/callTransport.js';
 import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
-  siblingRecordOf,
+  kindConflictOf,
   systemKindOf,
   withSystemKindOf,
 } from '../lib/connectionFactory.js';
@@ -185,7 +184,6 @@ import {
 } from '../lib/systemContext.js';
 import {
   type AbapSystemKind,
-  declaredSystemKindOf,
   declareSystemKind,
   statedSystemKind,
 } from '../lib/systemKind.js';
@@ -851,6 +849,12 @@ export abstract class BaseMcpServer extends McpServer {
         'Connection context not set. Call setConnectionContext() first.',
       );
     }
+    // The one kind first: every call, a registry's own callback and the
+    // debugger's sends alike take their connection here — no kind, or a
+    // host's connection of another kind, is refused before anything is
+    // resolved, built or used.
+    const refused = this.kindRefusal();
+    if (refused !== undefined) throw refused;
     if (context.kind === 'injected') {
       // The host's connection, as given: its parameters are made before the
       // first tool on it runs (`systemBeforeTool`).
@@ -1422,18 +1426,9 @@ export abstract class BaseMcpServer extends McpServer {
     const kind = statedSystemKind(this.systemType);
     if (kind === undefined) return new ServerRefusal('system_type_required');
     const context = this.connectionContext;
-    if (context?.kind !== 'injected') return undefined;
-    const recorded = siblingRecordOf(context.connection)?.kind;
-    const declared = declaredSystemKindOf(context.connection);
-    for (const other of [recorded, declared]) {
-      if (other !== undefined && other !== 'none' && other !== kind) {
-        return new ServerRefusal(
-          'system_type_conflict',
-          systemTypeConflictWords(other, kind),
-        );
-      }
-    }
-    return undefined;
+    return context?.kind === 'injected'
+      ? kindConflictOf(context.connection, kind)
+      : undefined;
   }
 
   /**
@@ -1805,12 +1800,6 @@ export abstract class BaseMcpServer extends McpServer {
             if (longTool && !longRead && statesBackground(args)) {
               return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
             }
-            // One kind per instance: none, or a connection recorded or
-            // declared for another, refuses the call before anything is
-            // taken — no connection, no flow, no run, nothing sent.
-            const kindRefused = this.kindRefusal();
-            if (kindRefused !== undefined)
-              return this.refusalAnswer(kindRefused);
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —

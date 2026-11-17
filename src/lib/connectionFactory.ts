@@ -22,7 +22,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import { ServerRefusal } from './auth/serverRefusal';
+import { ServerRefusal, systemTypeConflictWords } from './auth/serverRefusal';
 import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
@@ -338,6 +338,35 @@ export function systemKindOf(
   // A plain registration stated none: no kind, the environment not read.
   if (stated === 'none') return undefined;
   return stated ?? statedSystemKind(env.SAP_SYSTEM_TYPE);
+}
+
+/**
+ * The one check of the one kind (the owner, 2026-11-17), wherever a
+ * connection is handed to work — the main one (`getConnection`), a fresh
+ * one (`openFreshConnection`), a plain registration's or an exporter's
+ * (`inStatedScope`): its recorded kind (the factory's record) or its
+ * declared kind (`declareSystemKind`), when it is another than `kind`, is
+ * `system_type_conflict`, before it is connected or used; `undefined`
+ * when it agrees, or no kind is in force.
+ */
+export function kindConflictOf(
+  connection: object,
+  kind: AbapSystemKind | undefined,
+): ServerRefusal | undefined {
+  if (kind === undefined) return undefined;
+  const declared = declaredSystemKindOf(connection);
+  for (const other of [
+    records.get(connection)?.kind,
+    declared === 'none' ? undefined : declared,
+  ]) {
+    if (other !== undefined && other !== kind) {
+      return new ServerRefusal(
+        'system_type_conflict',
+        systemTypeConflictWords(other, kind),
+      );
+    }
+  }
+  return undefined;
 }
 
 /**

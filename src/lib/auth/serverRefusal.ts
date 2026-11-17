@@ -292,14 +292,15 @@ export function batchOtherKindWords(
 }
 
 /**
- * `system_type_conflict`'s words: a connection built for one kind, handed to
- * a handler stated for another (`HandlerExporter`'s `systemType`).
+ * `system_type_conflict`'s words: a connection (or a call's context) of one
+ * kind, handed to a server, a registration or an exporter whose one kind is
+ * another — `none` where it was listed for no kind.
  */
 export function systemTypeConflictWords(
   built: 'onprem' | 'cloud',
-  stated: 'onprem' | 'cloud',
+  stated: 'onprem' | 'cloud' | 'none',
 ): string {
-  return `the system types contradict: the connection was built for ${built} and the exporter states ${stated} — state the kind the connection was built for; nothing was sent to the system`;
+  return `the system types contradict: the connection was built for ${built} and the server, registration or exporter states ${stated} — one kind: state the kind the connection was built for, or hand it a connection of its kind; nothing was sent to the system`;
 }
 
 /** The refusals whose words are given at construction. */

@@ -9,7 +9,10 @@ import {
 } from '../../access/checkedArguments.js';
 import { refusalOf } from '../../access/listedAccessChecks.js';
 import { lazyPackageReader } from '../../access/packageReader.js';
-import { ServerRefusal } from '../../auth/serverRefusal.js';
+import {
+  ServerRefusal,
+  systemTypeConflictWords,
+} from '../../auth/serverRefusal.js';
 import {
   BACKGROUND_INVALID_WORDS,
   isBackgroundRunTool,
@@ -25,7 +28,7 @@ import {
 } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
-import { stateSystemKind } from '../../systemKind.js';
+import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
@@ -213,7 +216,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // package reader when it reads first, else here.
           let asked: Promise<HandlerContext> | undefined;
           const contextOnce = () => {
-            asked ??= callContext();
+            asked ??= callContext().then((given) => this.listedKindOf(given));
             return asked;
           };
           // The access checks (spec §3.2), before the call's context: a
@@ -285,5 +288,26 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         }
       },
     );
+  }
+
+  /**
+   * `given` (a call's context) on the one kind this group was listed for
+   * (its own context's `systemType`): a context stating another kind — or
+   * any kind, where the group was listed for none — is refused
+   * `system_type_conflict`; its kind never replaces the listed one.
+   */
+  private listedKindOf(given: HandlerContext): HandlerContext {
+    const listed = statedSystemKind(this.context.systemType);
+    const stated = statedSystemKind(given.systemType);
+    if (stated !== undefined && stated !== listed) {
+      throw new ServerRefusal(
+        'system_type_conflict',
+        systemTypeConflictWords(stated, listed ?? 'none'),
+      );
+    }
+    const { systemType: _given, ...rest } = given;
+    return this.context.systemType === undefined
+      ? rest
+      : { ...rest, systemType: this.context.systemType };
   }
 }

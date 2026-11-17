@@ -69,7 +69,7 @@ it('built for onprem, the exporter states cloud: refused naming both, the handle
     serverRefusal: 'system_type_conflict',
   });
   await expect(call('cloud')).rejects.toThrow(
-    'the connection was built for onprem and the exporter states cloud',
+    'the connection was built for onprem and the server, registration or exporter states cloud',
   );
   expect(ran).toBe(0);
 });

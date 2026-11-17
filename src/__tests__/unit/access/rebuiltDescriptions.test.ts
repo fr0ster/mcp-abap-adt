@@ -1,8 +1,10 @@
 /**
- * The eight fixed-enum compact tools whose definitions the deny list
+ * The nine fixed-enum compact tools whose definitions the deny list
  * rebuilds from a member set (`HandlerBatch`, `HandlerDebugBatch`,
  * `HandlerSession`, `HandlerDebugSession`, `HandlerDebugStep`,
- * `HandlerDebugBreakpoints`, `HandlerDebugMaintain`, `HandlerGetData`):
+ * `HandlerDebugBreakpoints`, `HandlerDebugMaintain`, `HandlerGetData`,
+ * `HandlerSystem` — its on-premise statement; `listed-schemas.json` holds
+ * both variants'):
  * with every value present, each tool's description, every property's
  * description and every enum stay as the base wrote them. The expectation is
  * `tests/fixtures/tools/rebuilt-descriptions.json`, written from the base
@@ -15,6 +17,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { TOOL_DEFINITION as getData } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGetData';
+import { TOOL_DEFINITION as system } from '../../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { TOOL_DEFINITION as batch } from '../../../lib/compact/batch/handleHandlerBatch';
 import { TOOL_DEFINITION as debugBatch } from '../../../lib/compact/debug/handleHandlerDebugBatch';
 import { TOOL_DEFINITION as debugBreakpoints } from '../../../lib/compact/debug/handleHandlerDebugBreakpoints';
@@ -44,6 +47,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
   debugBreakpoints,
   debugMaintain,
   getData,
+  system,
 ];
 
 /** Every description and enum under `node`, by its dotted path. */

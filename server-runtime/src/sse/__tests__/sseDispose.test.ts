@@ -27,9 +27,10 @@ function deferred<T>() {
 const tick = () => new Promise((r) => setImmediate(r));
 
 function make(opts: object = {}) {
+  // An external app takes no listener options (D26 E7).
+  const listener = 'app' in opts ? {} : { host: '127.0.0.1', port: 0 };
   return new SseServer(new CompositeHandlersRegistry([]), {
-    host: '127.0.0.1',
-    port: 0,
+    ...listener,
     ...opts,
   });
 }

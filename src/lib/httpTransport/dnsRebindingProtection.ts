@@ -148,3 +148,38 @@ export function withDnsRebindingProtection(
     return handler(req, res, next);
   };
 }
+
+/** Listener options given beside an embedder's own `app`, refused at construction. */
+export class ListenerOptionsRefusal extends Error {
+  readonly words: string;
+
+  constructor(words: string) {
+    super(words);
+    this.name = 'ListenerOptionsRefusal';
+    this.words = words;
+  }
+}
+
+/**
+ * `host`, `port` and `tls` configure the server's own listener: beside an
+ * embedder's `app` (routes registered on it) they are read by nothing, so
+ * they are refused naming the ones given.
+ */
+export function refuseListenerOptionsBesideApp(options: {
+  readonly app?: object | undefined;
+  readonly host?: string | undefined;
+  readonly port?: number | undefined;
+  readonly tls?: object | undefined;
+}): void {
+  if (options.app === undefined) return;
+  const given = [
+    ...(options.host !== undefined ? ['host'] : []),
+    ...(options.port !== undefined ? ['port'] : []),
+    ...(options.tls !== undefined ? ['tls'] : []),
+  ];
+  if (given.length > 0) {
+    throw new ListenerOptionsRefusal(
+      `${given.join(', ')} beside app: they configure the server's own listener, and routes registered on your app use your app's — drop them`,
+    );
+  }
+}

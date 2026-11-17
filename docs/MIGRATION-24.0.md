@@ -150,6 +150,8 @@ A value a start states is read as stated, or the start is refused naming it.
   `x-sap-responsible`, `x-sap-master-system`, `x-sap-debug-terminal-id`, `x-sap-debug-ide-id`,
   `x-sap-debug-breakpoint-conflict`. An embedder entering `requestContextFromHeaders` gets every
   key stated (absent as `undefined`). stdio is unchanged.
+- **`host`, `port` and `tls` beside `app` are refused** by `StreamableHttpServer` and `SseServer`:
+  they were read by nothing there; drop them.
 - **A stated `breakpointConflict` is no longer overridden by `SAP_DEBUG_BREAKPOINT_CONFLICT`**:
   the option wins over the environment; a header or a destination's `.env` wins over both.
 

@@ -28,6 +28,7 @@ import {
   headerContext,
   refuseDestinationHeader,
   refuseIncompleteDnsRebinding,
+  refuseListenerOptionsBesideApp,
   requestFailureAnswer,
   withDnsRebindingProtection,
 } from '@mcp-abap-adt/lib/http-transport';
@@ -74,12 +75,12 @@ export interface SseServerOptions {
    */
   batch?: { keepRawParts: boolean };
   /**
-   * Host to bind to (only used when no external app is provided)
+   * Host to bind to (refused beside an external app)
    * @default "127.0.0.1"
    */
   host?: string | undefined;
   /**
-   * Port to listen on (only used when no external app is provided)
+   * Port to listen on (refused beside an external app)
    * @default 3001
    */
   port?: number | undefined;
@@ -222,6 +223,8 @@ export class SseServer {
     this.tls = opts?.tls;
     // Incomplete DNS-rebinding settings check nothing: refused here.
     refuseIncompleteDnsRebinding(opts ?? {});
+    // The listener's own options beside an embedder's app: read by nothing.
+    refuseListenerOptionsBesideApp(opts ?? {});
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;

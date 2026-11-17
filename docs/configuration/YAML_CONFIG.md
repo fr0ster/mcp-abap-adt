@@ -216,6 +216,11 @@ flag value, a `state-idle-minutes` under 30, over 35791 or not a whole number) i
 startup**, naming the key, instead of being ignored — and so is a key of another binary, or
 `transport`. A file that is not YAML is refused naming its line and column, never quoting it.
 
+**A key no parameter of the binary reads is refused** (24.0.0), at any depth, by its dotted path,
+with the known key it may mean: `system_type` → `Config file key "system_type" is not a parameter
+of this binary; did you mean "system-type"?`; `http.json_response` the same. Before 24.0.0 such a
+key was read by nothing, and the value it meant to set stayed at its default.
+
 ### Configuration only (no secrets)
 
 `.env` files and environment variables hold secrets and the session; YAML holds configuration

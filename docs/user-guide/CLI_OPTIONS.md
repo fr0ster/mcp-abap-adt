@@ -69,6 +69,12 @@ ignored.
 (`--auth-debug false: a flag's value follows "=" — write --auth-debug=false`); before 24.0.0
 the bare flag turned the option on and the `false` was left unread.
 
+**Every argument is read.** An argument no parameter of the binary reads (`--unsfe`), a
+positional word (`stray`, a value with no option before it) and a parameter given twice
+(`--port=3000 --port=4000`, or `--port` beside `--http-port`) stop the start, naming them — with
+the option a misspelling may mean (`--sytem-type is not an argument of mcp-abap-adt; did you mean
+--system-type?`). Before 24.0.0 they were left unread, and the first of two values won.
+
 ### `--transport` is gone
 
 `--transport`, `MCP_TRANSPORT` and the YAML key `transport`, with any value, stop every binary with

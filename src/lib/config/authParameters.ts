@@ -426,6 +426,134 @@ export function readParameters(
   return out;
 }
 
+/** The edit distance of two names, by plain code (two rows of the table). */
+function editDistance(a: string, b: string): number {
+  let previous: number[] = [];
+  for (let j = 0; j <= b.length; j += 1) previous.push(j);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current: number[] = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current.push(
+        Math.min(
+          (previous[j] ?? 0) + 1,
+          (current[j - 1] ?? 0) + 1,
+          (previous[j - 1] ?? 0) + cost,
+        ),
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length] ?? 0;
+}
+
+/**
+ * The known name `name` may mean: the same once `_` reads `-` and case is
+ * folded, else the closest within two edits. Plain string comparison.
+ */
+function closestName(
+  name: string,
+  known: readonly string[],
+): string | undefined {
+  const folded = (text: string) => text.toLowerCase().split('_').join('-');
+  const same = known.find((each) => folded(each) === folded(name));
+  if (same !== undefined) return same;
+  let best: string | undefined;
+  let bestDistance = 3;
+  for (const each of known) {
+    const distance = editDistance(folded(name), folded(each));
+    if (distance < bestDistance) {
+      best = each;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/** Whether a CLI name is a removed parameter's of the table. */
+function isRemovedCli(table: ParameterTable, name: string): boolean {
+  return table.removed.some(
+    (removed) =>
+      (removed.cli?.includes(name) ?? false) ||
+      (removed.cliPrefixes?.some((prefix) => name.startsWith(prefix)) ?? false),
+  );
+}
+
+/**
+ * Every argument of a start must be read: each is a row's CLI name (or its
+ * `=` form) or a removed parameter's (whose own words refuse it later); a
+ * row's two-word value (`--port 3000`) is its value. Anything else — an
+ * unknown name, a positional, a single-dash word other than `-h` / `-v`,
+ * which are answered before — is refused naming it, and a row stated twice
+ * (in any of its names) is refused naming both forms. Called with a binary's
+ * whole table, before its rows are read.
+ */
+export function refuseUnreadArguments(
+  table: ParameterTable,
+  argv: readonly string[],
+): void {
+  // `--conf` is read for every table (`readConfigFile`), listed or not.
+  const rows = table.rows.includes(CONF_ROW)
+    ? table.rows
+    : [CONF_ROW, ...table.rows];
+  const seen = new Map<Parameter, string>();
+  const known = rows.flatMap(cliNames);
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index] ?? '';
+    if (!arg.startsWith('-')) {
+      throw new ParameterRefusal(
+        `"${arg}" is not an argument of ${table.program}: every argument is --name or --name=<value>`,
+      );
+    }
+    if (
+      arg === '-h' ||
+      arg === '-v' ||
+      arg === '--help' ||
+      arg === '--version'
+    ) {
+      continue;
+    }
+    const name = argName(arg);
+    const row = rows.find((each) => cliNames(each).includes(name));
+    const twoWord = arg.length === name.length;
+    const next = argv[index + 1];
+    const takesNext = twoWord && next !== undefined && !next.startsWith('-');
+    if (row === undefined) {
+      if (name.startsWith('--') && isRemovedCli(table, name)) {
+        if (takesNext) index += 1;
+        continue;
+      }
+      const near = name.startsWith('--') ? closestName(name, known) : undefined;
+      throw new ParameterRefusal(
+        `${name} is not an argument of ${table.program}${near === undefined ? '' : `; did you mean ${near}?`}`,
+      );
+    }
+    const word = next?.trim().toLowerCase();
+    if (
+      row.kind === 'flag' &&
+      twoWord &&
+      next !== undefined &&
+      (word === 'true' || word === 'false')
+    ) {
+      throw new ParameterRefusal(
+        `${name} ${next}: a flag's value follows "=" — write ${name}=${word}`,
+      );
+    }
+    let form = arg;
+    if (row.kind !== 'flag' && takesNext) {
+      form = `${arg} ${next}`;
+      index += 1;
+    }
+    const earlier = seen.get(row);
+    if (earlier !== undefined) {
+      throw new ParameterRefusal(
+        `${row.cli} is given twice (${earlier}, ${form}): state it once`,
+      );
+    }
+    seen.set(row, form);
+  }
+}
+
 /**
  * The form a parameter was read from, named as a refusal names it: `--env`,
  * `MCP_ENV_PATH`, `env-path (config file)`. Undefined when it is set nowhere.
@@ -478,6 +606,55 @@ export function findSecretYamlKeys(value: JsonValue, prefix = ''): string[] {
   return found;
 }
 
+/**
+ * Every key of a config file that is no row's: at each level a key must be a
+ * row's YAML key or the section of one (`http` of `http.port`); a top-level
+ * key of a removed parameter is refused in its own words, not here. Each is
+ * named by its dotted path, with the known key of its level it may mean.
+ */
+function unknownYamlKeys(table: ParameterTable, yaml: YamlConfig): string[] {
+  const paths = table.rows.flatMap((p) =>
+    p.yaml === undefined ? [] : [p.yaml.split('.')],
+  );
+  const removed = new Set(table.removed.flatMap((each) => each.yaml ?? []));
+  const found: string[] = [];
+  const walk = (value: JsonValue, prefix: readonly string[]) => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return;
+    }
+    const under = paths.filter((segments) =>
+      prefix.every((segment, i) => segments[i] === segment),
+    );
+    const known = [
+      ...new Set(
+        under.flatMap((segments) => {
+          const next = segments[prefix.length];
+          return next === undefined ? [] : [next];
+        }),
+      ),
+    ];
+    for (const [key, inner] of Object.entries(value)) {
+      if (prefix.length === 0 && removed.has(key)) continue;
+      const path = [...prefix, key];
+      if (!known.includes(key)) {
+        const near = closestName(key, known);
+        found.push(
+          `Config file key "${path.join('.')}" is not a parameter of this binary${near === undefined ? '' : `; did you mean "${[...prefix, near].join('.')}"?`}`,
+        );
+        continue;
+      }
+      const leaf = under.some(
+        (segments) =>
+          segments.length === path.length &&
+          segments.every((segment, i) => segment === path[i]),
+      );
+      if (!leaf) walk(inner, path);
+    }
+  };
+  walk(yaml, []);
+  return found;
+}
+
 /** Every refusal of a YAML file against the table: removed keys, secrets, values. */
 export function validateYamlParameters(
   table: ParameterTable,
@@ -492,6 +669,7 @@ export function validateYamlParameters(
         `Config file key "${key}" looks like a secret or a session value. YAML is configuration only: put secrets and the session in .env or the environment`,
     ),
   );
+  errors.push(...unknownYamlKeys(table, yaml));
   for (const p of table.rows) {
     if (p.yaml === undefined) continue;
     try {
@@ -586,7 +764,8 @@ ${options.description}
   CLI wins over the environment, which wins over the YAML file. A flag is --flag (true)
   or --flag=true|false; --flag false, in two words, is refused. An invalid value is
   refused at startup, and so is a parameter of another binary, naming the binary that
-  serves it. Secrets and the session live in .env or the environment, never in YAML:
+  serves it, an argument or a YAML key no row of this binary reads, and a parameter
+  given twice. Secrets and the session live in .env or the environment, never in YAML:
   the server refuses a YAML key that looks like one.
 
 ${parametersHelp(table)}

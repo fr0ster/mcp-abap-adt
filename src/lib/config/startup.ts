@@ -1,6 +1,10 @@
 import type { ShutdownProcess } from '../shutdownSequence.js';
 import { thrownAs } from '../thrownValue';
-import { ParameterRefusal, type ParameterTable } from './authParameters.js';
+import {
+  ParameterRefusal,
+  type ParameterTable,
+  refuseUnreadArguments,
+} from './authParameters.js';
 import { readConfigFile, type YamlConfig } from './yamlConfig.js';
 
 /** The process's edges a binary's start reports through. */
@@ -11,7 +15,8 @@ export interface StartupEdges {
 }
 
 /**
- * A binary's configuration, read by its own table: `--conf` first (a missing
+ * A binary's configuration, read by its own table: every argument checked
+ * against it (an unknown, positional or repeated one refused), `--conf` first (a missing
  * file gets the table's template, and the start ends `0`), then every row. A
  * refusal — a removed parameter, an invalid value, a refused config file —
  * is reported in its words and ends the start `1`; undefined is returned
@@ -29,6 +34,8 @@ export function readStartupConfig<T>(
   ) => T,
 ): T | undefined {
   try {
+    // Every argument is read, or the start ends naming the one that is not.
+    refuseUnreadArguments(table, argv);
     const file = readConfigFile(table, argv);
     if (file.template) {
       edges.stderr(

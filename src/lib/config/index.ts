@@ -52,6 +52,7 @@ export {
   type RemovedParameter,
   readParameters,
   refuseRemovedParameters,
+  refuseUnreadArguments,
   SHUTDOWN_TIMEOUT_ROW,
   SSE_ELSEWHERE,
   SSE_OPTIONS_REMOVED,

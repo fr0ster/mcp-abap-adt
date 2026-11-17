@@ -54,6 +54,7 @@ A major ([#346](https://github.com/fr0ster/mcp-abap-adt/pull/346)): what the com
 ### Changed — breaking for a start: nothing stated is ignored
 
 - **A flag's value follows `=`; `--flag false` is refused** (every binary, every flag): a flag followed by a separate `false` turned the flag on and left the word unread — `--auth-debug false` turned on auth debugging, `--unsafe false` session writes, `--http-enable-dns-protection false` the protection. A flag is `--flag` (true) or `--flag=true|false`; `--flag false` and `--flag true` in two words stop the start, naming `--flag=false` (`--flag=true`). The help shows `--flag[=true|false]`. **Migrating:** write `--flag=false`, or leave the flag out (MIGRATION-24.0, "Starts: nothing stated is ignored").
+- **An unknown argument, a positional, a parameter given twice and an unknown YAML key are refused** (every binary): each was read by nothing — `--port=3000 --port=4000` listened on 3000, YAML `system_type` (for `system-type`) or `http.json_response` left the value at its default. The start ends naming the argument or the dotted key, and the parameter a close misspelling may mean (`refuseUnreadArguments`, exported from `@mcp-abap-adt/lib/config`; `readStartupConfig` calls it). **Migrating:** correct the name, drop the extra value.
 
 ### Changed — breaking for an RFC destination
 

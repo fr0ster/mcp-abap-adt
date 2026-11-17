@@ -2009,75 +2009,135 @@ export const SYSTEM_ACTION_TOOLS = {
   atc_result: 'GetATCResult',
 } as const satisfies Readonly<Record<SystemAction, string>>;
 
-/** The `detail` the detail-taking actions pass on, without the full tool's default. */
-const SYSTEM_DETAIL = z
-  .enum(['terse', 'full', 'raw'])
-  .optional()
-  .describe(
-    `search_object, transports, atc_findings, atc_result: ${DETAIL_SHAPE.detail.description ?? ''}`,
-  );
+/** What a property's words say, per action that takes it. */
+type SaidPerAction = { readonly [A in SystemAction]?: string };
+
+/**
+ * The words of `said` for the actions of `actions` that take the property,
+ * each prefixed by the actions that say the same: `a, b: words`. A narrowed
+ * definition names only the actions left.
+ */
+function said(actions: readonly SystemAction[], words: SaidPerAction): string {
+  const groups: Array<{
+    readonly names: SystemAction[];
+    readonly text: string;
+  }> = [];
+  for (const action of actions) {
+    const text = words[action];
+    if (text === undefined) continue;
+    const same = groups.find((group) => group.text === text);
+    if (same === undefined) groups.push({ names: [action], text });
+    else same.names.push(action);
+  }
+  return groups
+    .map((group) => `${group.names.join(', ')}: ${group.text}`)
+    .join(' ');
+}
+
+/** The words of `detail`: the full tool's own, for each action that takes it. */
+const DETAIL_WORDS = DETAIL_SHAPE.detail.description ?? '';
+
+/** Each action as `action` lists it. */
+const ACTION_WORDS: Readonly<Record<SystemAction, string>> = {
+  search_source: 'search_source (source text in packages)',
+  search_object: 'search_object (objects by name or mask)',
+  where_used: 'where_used (the objects that use an object)',
+  package_tree: 'package_tree (a package tree)',
+  transports: 'transports (transport requests)',
+  atc_findings: 'atc_findings (the findings of an ATC run)',
+  atc_results: 'atc_results (the stored ATC results)',
+  atc_result: 'atc_result (one stored ATC result)',
+};
 
 /**
  * Every property an action of `HandlerSystem` takes on `variant`, each typed
  * as its full tool types it, optional, with no default (the full tool's own
- * parse applies its defaults), its words naming the action(s) that take it.
+ * parse applies its defaults), its words naming those of `actions` that take
+ * it.
  */
-function systemProperties(variant: ProjectionVariant) {
+function systemProperties(
+  variant: ProjectionVariant,
+  actions: readonly SystemAction[],
+) {
   return {
     background: COMPACT_LONG_BACKGROUND_FIELD,
-    action: listedValues(SYSTEM_ACTIONS).describe(
-      'The read: search_source (source text in packages), search_object (objects by name or mask), where_used (the objects that use an object), package_tree (a package tree), transports (transport requests), atc_findings (the findings of an ATC run), atc_results (the stored ATC results), atc_result (one stored ATC result).',
+    action: listedValues(actions).describe(
+      `The read: ${actions.map((action) => ACTION_WORDS[action]).join(', ')}.`,
     ),
     query: z
       .string()
       .min(1)
       .optional()
       .describe(
-        'search_source: primary substring to match (case-insensitive, ABAP CS).',
+        said(actions, {
+          search_source:
+            'primary substring to match (case-insensitive, ABAP CS).',
+        }),
       ),
     query2: z
       .string()
       .optional()
       .describe(
-        'search_source: a second substring; when set, both query and query2 must appear on the same line.',
+        said(actions, {
+          search_source:
+            'a second substring; when set, both query and query2 must appear on the same line.',
+        }),
       ),
     exclude: z
       .array(z.string())
       .max(3)
       .optional()
       .describe(
-        'search_source: up to 3 substrings; a line containing any of them is dropped.',
+        said(actions, {
+          search_source:
+            'up to 3 substrings; a line containing any of them is dropped.',
+        }),
       ),
     packages: z
       .array(z.string().min(1))
       .min(1)
       .optional()
       .describe(
-        'search_source: packages to scan, each an exact package name or a mask (`*` zero or more characters, `?` one character; `+`, `_`, `%` and `#` are characters of the name).',
+        said(actions, {
+          search_source:
+            'packages to scan, each an exact package name or a mask (`*` zero or more characters, `?` one character; `+`, `_`, `%` and `#` are characters of the name).',
+        }),
       ),
     include_subpackages: z
       .boolean()
       .optional()
       .describe(
-        'search_source: recurse into subpackages (default true); package_tree: expand subpackages recursively (default true).',
+        said(actions, {
+          search_source: 'recurse into subpackages (default true).',
+          package_tree: 'expand subpackages recursively (default true).',
+        }),
       ),
     object_filter: z
       .string()
       .optional()
       .describe(
-        'search_source: glob applied to object names within each package (e.g. "Z*").',
+        said(actions, {
+          search_source:
+            'glob applied to object names within each package (e.g. "Z*").',
+        }),
       ),
     object_types: z
       .array(z.enum(SCAN_OBJECT_TYPES))
       .optional()
       .describe(
-        'search_source: object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD (default all of them).',
+        said(actions, {
+          search_source:
+            'object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD (default all of them).',
+        }),
       ),
     exclude_comments: z
       .boolean()
       .optional()
       .describe(
-        "search_source: skip col-1 '*' and full-line '\"' comment lines (default false).",
+        said(actions, {
+          search_source:
+            "skip col-1 '*' and full-line '\"' comment lines (default false).",
+        }),
       ),
     max_hits_per_object: z
       .number()
@@ -2085,7 +2145,10 @@ function systemProperties(variant: ProjectionVariant) {
       .min(1)
       .optional()
       .describe(
-        'search_source: the most hits answered per object; absent, every hit.',
+        said(actions, {
+          search_source:
+            'the most hits answered per object; absent, every hit.',
+        }),
       ),
     max_hits: z
       .number()
@@ -2093,39 +2156,67 @@ function systemProperties(variant: ProjectionVariant) {
       .min(1)
       .optional()
       .describe(
-        'search_source: the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.',
+        said(actions, {
+          search_source:
+            'the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.',
+        }),
       ),
     answer: z
       .enum(ANSWER_LEVELS)
       .optional()
       .describe(
-        'search_source: what each hit is answered as: snippets (the default), lines or objects.',
+        said(actions, {
+          search_source:
+            'what each hit is answered as: snippets (the default), lines or objects.',
+        }),
       ),
     version: z
       .enum(['active', 'inactive', 'workingArea'])
       .optional()
       .describe(
-        'search_source: the version every source is read at (default active).',
+        said(actions, {
+          search_source:
+            'the version every source is read at (default active).',
+        }),
       ),
     object_name: z
       .string()
       .optional()
       .describe(
-        "search_object: object name or mask (e.g. 'MARA*'); where_used: name of the object (with object_type), a function module as 'GROUP|FM_NAME'.",
+        said(actions, {
+          search_object: "object name or mask (e.g. 'MARA*').",
+          where_used:
+            "name of the object (with object_type), a function module as 'GROUP|FM_NAME'.",
+        }),
       ),
     object_type: z
       .string()
       .optional()
       .describe(
-        `search_object: ${SEARCH_TYPE_DESCRIPTION} where_used: ${whereUsedTypeDescription(variant)}`,
+        said(actions, {
+          search_object: SEARCH_TYPE_DESCRIPTION,
+          where_used: whereUsedTypeDescription(variant),
+        }),
       ),
     maxResults: z
       .number()
       .optional()
       .describe(
-        'search_object: maximum number of results to return (default 100).',
+        said(actions, {
+          search_object: 'maximum number of results to return (default 100).',
+        }),
       ),
-    detail: SYSTEM_DETAIL,
+    detail: z
+      .enum(['terse', 'full', 'raw'])
+      .optional()
+      .describe(
+        said(actions, {
+          search_object: DETAIL_WORDS,
+          transports: DETAIL_WORDS,
+          atc_findings: DETAIL_WORDS,
+          atc_result: DETAIL_WORDS,
+        }),
+      ),
     objects: z
       .array(
         z.object({
@@ -2141,95 +2232,141 @@ function systemProperties(variant: ProjectionVariant) {
       )
       .optional()
       .describe(
-        'where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.',
+        said(actions, {
+          where_used:
+            'several objects, read together (give this or object_name and object_type); the type filters apply to every object.',
+        }),
       ),
     enable_all_types: z
       .boolean()
       .optional()
       .describe(
-        'where_used: true selects every object type of the where-used scope (default false, the SAP default scope).',
+        said(actions, {
+          where_used:
+            'true selects every object type of the where-used scope (default false, the SAP default scope).',
+        }),
       ),
     enable_only_types: z
       .array(z.string())
       .optional()
       .describe(
-        "where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').",
+        said(actions, {
+          where_used:
+            "the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').",
+        }),
       ),
     disable_types: z
       .array(z.string())
       .optional()
       .describe(
-        "where_used: ADT object types removed from the scope (e.g. ['CLAS/OC']).",
+        said(actions, {
+          where_used:
+            "ADT object types removed from the scope (e.g. ['CLAS/OC']).",
+        }),
       ),
     package_name: z
       .string()
       .optional()
-      .describe('package_tree: package name (give this or package_names).'),
+      .describe(
+        said(actions, {
+          package_tree: 'package name (give this or package_names).',
+        }),
+      ),
     package_names: z
       .array(z.string())
       .optional()
       .describe(
-        'package_tree: several package names, read together (give this or package_name).',
+        said(actions, {
+          package_tree:
+            'several package names, read together (give this or package_name).',
+        }),
       ),
     max_depth: z
       .number()
       .int()
       .optional()
-      .describe('package_tree: maximum depth of the walk (default 5).'),
+      .describe(
+        said(actions, {
+          package_tree: 'maximum depth of the walk (default 5).',
+        }),
+      ),
     include_descriptions: z
       .boolean()
       .optional()
       .describe(
-        "package_tree: each object's description in the answer (default false).",
+        said(actions, {
+          package_tree:
+            "each object's description in the answer (default false).",
+        }),
       ),
     debug: z
       .boolean()
       .optional()
       .describe(
-        'package_tree: diagnostic metadata in the answer (counts, types, hierarchy; default false).',
+        said(actions, {
+          package_tree:
+            'diagnostic metadata in the answer (counts, types, hierarchy; default false).',
+        }),
       ),
     user: z
       .string()
       .optional()
       .describe(
-        "transports: the SAP user id whose requests are listed (default the session's user).",
+        said(actions, {
+          transports:
+            "the SAP user id whose requests are listed (default the session's user).",
+        }),
       ),
     modifiable_only: z
       .boolean()
       .optional()
       .describe(
-        'transports: only modifiable (unreleased) requests (default true).',
+        said(actions, {
+          transports: 'only modifiable (unreleased) requests (default true).',
+        }),
       ),
     worklist_id: z
       .string()
       .optional()
-      .describe('atc_findings: worklist identifier an ATC run answered.'),
+      .describe(
+        said(actions, {
+          atc_findings: 'worklist identifier an ATC run answered.',
+        }),
+      ),
     created_by: z
       .string()
       .optional()
       .describe(
-        'atc_results: whose results: a user name, or * for every user.',
+        said(actions, {
+          atc_results: 'whose results: a user name, or * for every user.',
+        }),
       ),
     central_only: z
       .boolean()
       .optional()
-      .describe('atc_results: true lists central results only.'),
+      .describe(
+        said(actions, { atc_results: 'true lists central results only.' }),
+      ),
     age_min: z
       .number()
       .int()
       .min(0)
       .optional()
-      .describe('atc_results: youngest age to list, in days.'),
+      .describe(
+        said(actions, { atc_results: 'youngest age to list, in days.' }),
+      ),
     age_max: z
       .number()
       .int()
       .min(0)
       .optional()
-      .describe('atc_results: oldest age to list, in days.'),
+      .describe(said(actions, { atc_results: 'oldest age to list, in days.' })),
     display_id: z
       .string()
       .optional()
-      .describe('atc_result: display ID of a stored ATC result.'),
+      .describe(
+        said(actions, { atc_result: 'display ID of a stored ATC result.' }),
+      ),
   } as const;
 }
 
@@ -2281,31 +2418,87 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
   },
 });
 
-/** `HandlerSystem`'s input on `variant`: one flat object, `action` required. */
-export function compactSystemSchemaFor(variant: ProjectionVariant) {
-  return z.object(systemProperties(variant));
+/**
+ * `HandlerSystem`'s input on `variant` with `actions`: one flat object,
+ * `action` required, the properties no action of `actions` takes left out.
+ */
+export function compactSystemSchemaFor(
+  variant: ProjectionVariant,
+  actions: readonly SystemAction[] = SYSTEM_ACTIONS,
+) {
+  const properties = systemProperties(variant, actions);
+  return z.object({
+    ...offered(properties, COMPACT_SYSTEM_TAKES, actions),
+    action: properties.action,
+  });
 }
 
-/** `HandlerSystem`'s description: what each action reads, its arguments and its answer. */
-export const HANDLER_SYSTEM_DESCRIPTION = withLongToolAdvice(
-  '[read-only] Reads the ABAP repository and its transports and ATC results, one read per action: ' +
-    'search_source(query*, packages*, query2, exclude, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version) the source lines of the objects in packages that contain query; ' +
-    'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask; ' +
-    'where_used(object_name* and object_type*, or objects*; enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package; ' +
-    'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree; ' +
-    "transports(user, modifiable_only, detail) the transport requests of user, by default the session's user; " +
-    'atc_findings(worklist_id*, detail) the findings of the ATC run whose worklist is worklist_id; ' +
-    'atc_results(created_by*, central_only, age_min, age_max) the stored ATC results, newest first; ' +
-    'atc_result(display_id*, detail) the stored ATC result display_id with its findings. ' +
-    'Each argument is described with the actions that take it. Response: JSON, per action: search_source the hits (package, object type, object name, include, line, snippet) with the scanned and truncated counters; search_object the objects found; where_used the references with their total (one entry per object for objects); package_tree the tree (one entry per package for package_names); transports the requests; atc_findings and atc_result the findings with the counts per priority; atc_results one entry per result.',
-);
+/** What each action reads, with the arguments it takes (`*` required). */
+const ACTION_SENTENCES: Readonly<Record<SystemAction, string>> = {
+  search_source:
+    'search_source(query*, packages*, query2, exclude, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version) the source lines of the objects in packages that contain query',
+  search_object:
+    'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask',
+  where_used:
+    'where_used(object_name* and object_type*, or objects*; enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
+  package_tree:
+    'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree',
+  transports:
+    "transports(user, modifiable_only, detail) the transport requests of user, by default the session's user",
+  atc_findings:
+    'atc_findings(worklist_id*, detail) the findings of the ATC run whose worklist is worklist_id',
+  atc_results:
+    'atc_results(created_by*, central_only, age_min, age_max) the stored ATC results, newest first',
+  atc_result:
+    'atc_result(display_id*, detail) the stored ATC result display_id with its findings',
+};
 
-/** `HandlerSystem`'s description and schema, per variant. */
+/** What each action answers. */
+const ACTION_ANSWERS: Readonly<Record<SystemAction, string>> = {
+  search_source:
+    'search_source the hits (package, object type, object name, include, line, snippet) with the scanned and truncated counters',
+  search_object: 'search_object the objects found',
+  where_used:
+    'where_used the references with their total (one entry per object for objects)',
+  package_tree:
+    'package_tree the tree (one entry per package for package_names)',
+  transports: 'transports the requests',
+  atc_findings: 'atc_findings the findings with the counts per priority',
+  atc_results: 'atc_results one entry per result',
+  atc_result: 'atc_result the findings with the counts per priority',
+};
+
+/**
+ * `HandlerSystem`'s description with `actions`: what each reads, its
+ * arguments and its answer, naming only those actions.
+ */
+export function handlerSystemDescription(
+  actions: readonly SystemAction[] = SYSTEM_ACTIONS,
+): string {
+  return withLongToolAdvice(
+    `[read-only] Reads across the ABAP system, one read per action: ${actions.map((action) => ACTION_SENTENCES[action]).join('; ')}. Each argument is described with the actions that take it. Response: JSON, per action: ${actions.map((action) => ACTION_ANSWERS[action]).join('; ')}.`,
+  );
+}
+
+/** `HandlerSystem`'s description with every action. */
+export const HANDLER_SYSTEM_DESCRIPTION = handlerSystemDescription();
+
+/** `HandlerSystem`'s description and schema on `variant` with `actions`. */
+export function handlerSystemDefinitionFor(
+  variant: ProjectionVariant,
+  actions: readonly SystemAction[],
+) {
+  return {
+    description: handlerSystemDescription(actions),
+    inputSchema: compactSystemSchemaFor(variant, actions),
+  };
+}
+
+/** `HandlerSystem`'s description and schema, per variant, every action. */
 export function handlerSystemDefinition() {
-  return byVariant((variant) => ({
-    description: HANDLER_SYSTEM_DESCRIPTION,
-    inputSchema: compactSystemSchemaFor(variant),
-  }));
+  return byVariant((variant) =>
+    handlerSystemDefinitionFor(variant, SYSTEM_ACTIONS),
+  );
 }
 
 /** The properties of `HandlerGetData` beside its `sql_query`. */

@@ -138,7 +138,7 @@ describe('the description', () => {
   it('starts with what it reads, marked read-only', () => {
     expect(
       TOOL_DEFINITION.description.startsWith(
-        '[read-only] Reads the ABAP repository and its transports and ATC results, one read per action: ',
+        '[read-only] Reads across the ABAP system, one read per action: ',
       ),
     ).toBe(true);
   });

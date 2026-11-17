@@ -107,6 +107,8 @@ export {
   handlerGetDataWithoutSqlDefinition,
   handlerGetDataWithSqlDefinition,
   handlerSystemDefinition,
+  handlerSystemDefinitionFor,
+  handlerSystemDescription,
   SYSTEM_ACTION_TOOLS,
   SYSTEM_ACTIONS,
   type SystemAction,

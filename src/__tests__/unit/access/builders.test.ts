@@ -55,7 +55,8 @@ function dispatchOf(tool: string): string {
   if (
     tool === 'HandlerBatch' ||
     tool === 'HandlerDebugBatch' ||
-    tool === 'HandlerSession'
+    tool === 'HandlerSession' ||
+    tool === 'HandlerSystem'
   ) {
     return 'action';
   }
@@ -220,6 +221,51 @@ describe('the narrowed cases the plan names', () => {
       undefined,
     );
     assert.deepEqual(enumOf(definition, 'action'), ['begin', 'answers']);
+  });
+
+  it('HandlerSystem with where_used removed lists the other seven actions and no argument where_used alone takes', () => {
+    const system = narrowing('HandlerSystem');
+    for (const variant of VARIANTS) {
+      const left = system
+        .values(variant)
+        .filter((action) => action !== 'where_used');
+      const definition = system.definition(variant, left, undefined);
+      assert.deepEqual(enumOf(definition, 'action'), left);
+      const properties = Object.keys(
+        listedJson(definition.inputSchema).properties ?? {},
+      );
+      for (const gone of [
+        'objects',
+        'enable_all_types',
+        'enable_only_types',
+        'disable_types',
+      ]) {
+        assert.equal(properties.includes(gone), false, gone);
+      }
+      // search_object takes these too: they stay, in its words alone.
+      assert.ok(properties.includes('object_name'));
+      assert.ok(properties.includes('object_type'));
+      assert.equal(
+        definition.inputSchema.safeParse({
+          action: 'where_used',
+          object_name: 'ZCL_A',
+          object_type: 'class',
+        }).success,
+        false,
+      );
+    }
+  });
+
+  it('HandlerSystem with only atc_result left takes display_id and detail beside background', () => {
+    const definition = narrowing('HandlerSystem').definition(
+      'onprem',
+      ['atc_result'],
+      undefined,
+    );
+    assert.deepEqual(
+      Object.keys(listedJson(definition.inputSchema).properties ?? {}).sort(),
+      ['action', 'background', 'detail', 'display_id'],
+    );
   });
 
   it('HandlerActivate without CLAS/OC: the code arguments take the codes left, as written only', () => {

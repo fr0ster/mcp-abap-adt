@@ -164,6 +164,42 @@ describe('withoutDenied', () => {
     assert.equal(namesOf(everyCode).includes('HandlerActivate'), false);
   });
 
+  it('HandlerSystem.where_used: where_used refused before anything is sent, the other actions run', async () => {
+    const entry = entryOf(compact('HandlerSystem.where_used'), 'HandlerSystem');
+    assert.equal(
+      enumOf(entry.toolDefinition, 'action').includes('where_used'),
+      false,
+    );
+    await refuses(entry, {
+      action: 'where_used',
+      object_name: 'ZCL_A',
+      object_type: 'class',
+    });
+    const connection = parityConnection();
+    declareSystemKind(connection, 'onprem');
+    await entry.call(
+      { connection, logger: silentLogger },
+      { action: 'search_object', object_name: 'Z*', background: false },
+    );
+    assert.equal(connection.requests.length, 1);
+  });
+
+  it('HandlerSystem with every action denied is left out', () => {
+    assert.equal(
+      namesOf(
+        compact(
+          'HandlerSystem.search_source',
+          'HandlerSystem.search_object',
+          'HandlerSystem.where_used',
+          'HandlerSystem.package_tree',
+          'HandlerSystem.transports',
+          'HandlerSystem.atc_*',
+        ),
+      ).includes('HandlerSystem'),
+      false,
+    );
+  });
+
   it('HandlerProfileRun with every value denied is left out', () => {
     assert.equal(
       namesOf(
@@ -239,9 +275,16 @@ describe('withoutDenied', () => {
           'DebugStepX',
           'GetPackage.CLASS',
           'DeleteClass',
+          'HandlerSystem.where_used',
+          'HandlerWhereUsed.CLASS',
         ),
       ),
-      ['HandlerCreate.NOPE', 'DebugStepX', 'GetPackage.CLASS'],
+      [
+        'HandlerCreate.NOPE',
+        'DebugStepX',
+        'GetPackage.CLASS',
+        'HandlerWhereUsed.CLASS',
+      ],
     );
   });
 

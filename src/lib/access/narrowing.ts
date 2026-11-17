@@ -1,7 +1,8 @@
 /**
  * The compact tools a deny list narrows value by value (spec §3.1): the
  * eleven whose `object_type` / `target_type` is projected per variant, the
- * seven with a fixed `action` / `operation`, and `HandlerGetData` (`sql`).
+ * eight with a fixed `action` / `operation` (`HandlerSystem` among them), and
+ * `HandlerGetData` (`sql`).
  * Each states its values per variant, its ADT codes where a code argument
  * takes them (HandlerActivate, HandlerGet), and its definition for the
  * values and codes left — built by the same builders the tool's own
@@ -54,6 +55,8 @@ import {
   compactUpdateSchemaFor,
   compactValidateSchemaFor,
   handlerGetDataDefinition,
+  handlerSystemDefinitionFor,
+  SYSTEM_ACTIONS,
 } from '../compact/compactSchemas';
 import {
   DEBUG_BATCH_ACTIONS,
@@ -293,6 +296,14 @@ const NARROWING_LIST: readonly Narrowing[] = [
   fixed('HandlerDebugMaintain', MAINTAIN_OPERATIONS, (values) =>
     handlerDebugMaintainDefinition(keptOf(MAINTAIN_OPERATIONS, values)),
   ),
+  // HandlerSystem's actions are the same on both variants; its words of
+  // where_used's object_type are the variant's, so its definition takes it.
+  {
+    tool: 'HandlerSystem',
+    values: () => SYSTEM_ACTIONS,
+    definition: (variant, values) =>
+      handlerSystemDefinitionFor(variant, keptOf(SYSTEM_ACTIONS, values)),
+  },
   fixed('HandlerGetData', ['sql'], (values) =>
     handlerGetDataDefinition(values.includes('sql')),
   ),

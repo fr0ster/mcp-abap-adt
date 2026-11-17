@@ -18,7 +18,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
-import { systemKindOf } from '../../connectionFactory.js';
+import { kindOfCall } from '../../connectionFactory.js';
 import {
   listedTool,
   type SearchMeta,
@@ -241,7 +241,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // anything sent: the kind the context states, else the one
           // recorded on its connection; neither is `system_type_required`.
           if (variantRules !== undefined) {
-            const kind = kindOfCall(context);
+            const kind = kindOfContext(context);
             if (kind === undefined) {
               return return_error(new ServerRefusal('system_type_required'));
             }
@@ -304,7 +304,6 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
  * `declareSystemKind`) — the environment is not read; `undefined` when
  * neither names one.
  */
-function kindOfCall(context: HandlerContext): AbapSystemKind | undefined {
-  stateSystemKind(context.connection, context.systemType);
-  return systemKindOf(context.connection);
+function kindOfContext(context: HandlerContext): AbapSystemKind | undefined {
+  return kindOfCall(context.connection, context.systemType, {});
 }

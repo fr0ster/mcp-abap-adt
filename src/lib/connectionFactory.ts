@@ -335,6 +335,23 @@ export function systemKindOf(
 }
 
 /**
+ * The kind a call on `connection` is checked and dispatched on — the one
+ * resolver of both: `systemKindOf`'s order (the factory's record, the kind
+ * `stated` by the server, the context or the exporter, the kind declared
+ * for the connection, then `environment`'s `SAP_SYSTEM_TYPE`). The
+ * environment is the process's where an embedder that states no kind may
+ * fall back to it (a server instance), none where it may not (a plain
+ * registration, `HandlerExporter`). Reads; never records a kind.
+ */
+export function kindOfCall(
+  connection: object,
+  stated: string | undefined,
+  environment: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): AbapSystemKind | undefined {
+  return systemKindOf(connection, environment, stated);
+}
+
+/**
  * Gives `view` — a connection built over `outer` (a batch connection, a
  * forwarding or recording view) — the system kind `outer` has
  * (`systemKindOf`). An `outer` with no kind gives the view none, and nothing

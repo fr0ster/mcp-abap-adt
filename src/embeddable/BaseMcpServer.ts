@@ -85,6 +85,7 @@ import { runWithCallTransport } from '../lib/callTransport.js';
 import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
+  kindOfCall,
   systemKindOf,
   withSystemKindOf,
 } from '../lib/connectionFactory.js';
@@ -1389,18 +1390,36 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * The system type the tools are listed for: the instance's `systemType`;
+   * else the kind recorded on the connection the host injected (the
+   * factory's record, `declareSystemKind`) — the kind its calls are
+   * dispatched on, which the environment does not override; else
+   * `SAP_SYSTEM_TYPE`.
+   */
+  private listedSystemType(): string | undefined {
+    if (this.systemType !== undefined) return this.systemType;
+    const context = this.connectionContext;
+    const recorded =
+      context?.kind === 'injected'
+        ? kindOfCall(context.connection, undefined, {})
+        : undefined;
+    return recorded ?? process.env.SAP_SYSTEM_TYPE;
+  }
+
+  /**
    * The kind a call runs on, known before its connection is taken: the
    * kind this instance states, else the one recorded on the connection the
    * host injected (the factory's record, `declareSystemKind`); `undefined`
    * when neither names one — the kind is never guessed.
    */
   private kindBeforeConnection(): AbapSystemKind | undefined {
-    const stated = statedSystemKind(this.statedSystemType());
-    if (stated !== undefined) return stated;
     const context = this.connectionContext;
-    return context?.kind === 'injected'
-      ? systemKindOf(context.connection)
-      : undefined;
+    // A connection the instance builds is built for the kind it states.
+    if (context?.kind !== 'injected') {
+      return statedSystemKind(this.statedSystemType());
+    }
+    // The host's: as it is dispatched (`declareSystemKind`, `systemKindOf`).
+    return kindOfCall(context.connection, this.systemType, process.env);
   }
 
   /**
@@ -1689,7 +1708,7 @@ export abstract class BaseMcpServer extends McpServer {
           // states none) nothing is filtered — every tool of the set is
           // listed as it is, and a call that would reach a system is refused
           // `system_type_required` before anything is sent.
-          const environment = statedEnvironment(this.statedSystemType());
+          const environment = statedEnvironment(this.listedSystemType());
           const name = entry.toolDefinition.name;
           if (this.backgroundRuns === undefined && isBackgroundRunTool(name)) {
             continue;

@@ -43,14 +43,20 @@ export function declareSystemKind(
 /**
  * Records what a handler group registered on a plain McpServer states for
  * `connection` (its context's `systemType`): the kind, or — stating none —
- * that it has none. Either way the environment is not read for it: an
- * embedded library takes no configuration from the environment.
+ * that it has none, unless a kind is already declared for it, which a
+ * statement of none never erases. Either way the environment is not read
+ * for it: an embedded library takes no configuration from the environment.
  */
 export function stateSystemKind(
   connection: object,
   stated: string | undefined,
 ): void {
-  declaredKinds.set(connection, statedSystemKind(stated) ?? 'none');
+  const kind = statedSystemKind(stated);
+  if (kind !== undefined) {
+    declaredKinds.set(connection, kind);
+  } else if (declaredKinds.get(connection) === undefined) {
+    declaredKinds.set(connection, 'none');
+  }
 }
 
 /**

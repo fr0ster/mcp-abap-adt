@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type * as z from 'zod';
 import type { HandlerContext } from '../../handlers/interfaces.js';
-import { systemKindOf } from '../connectionFactory.js';
+import { kindOfCall } from '../connectionFactory.js';
 import type { AbapSystemKind } from '../systemKind.js';
 import type { ToolResultLike } from '../toolResult';
 
@@ -129,7 +129,7 @@ export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
         toolDefinition,
         toolDefinition.variants === undefined
           ? undefined
-          : systemKindOf(context.connection),
+          : kindOfCall(context.connection, undefined, process.env),
       ).safeParse(args);
       if (!parsed.success) {
         throw new Error(

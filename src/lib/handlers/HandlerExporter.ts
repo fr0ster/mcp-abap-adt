@@ -16,7 +16,7 @@ import {
   longToolInTheCall,
   withoutBackgroundParameter,
 } from '../backgroundRuns/tools.js';
-import { systemKindOf } from '../connectionFactory.js';
+import { kindOfCall } from '../connectionFactory.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -26,7 +26,7 @@ import {
 } from '../requestSystemResolution.js';
 import type { LineMatchStrategy } from '../search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../search-source/readFailure.js';
-import { type AbapSystemKind, stateSystemKind } from '../systemKind.js';
+import type { AbapSystemKind } from '../systemKind.js';
 import { readOnlyToolNames } from '../toolSet.js';
 import { return_error } from '../utils.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
@@ -410,8 +410,7 @@ export class HandlerExporter {
         // read); none is `system_type_required`, before anything else.
         let kind: AbapSystemKind | undefined;
         if (entry.toolDefinition.variants !== undefined) {
-          stateSystemKind(context.connection, this.systemType);
-          kind = systemKindOf(context.connection);
+          kind = kindOfCall(context.connection, this.systemType, {});
           if (kind === undefined) {
             return Promise.reject(new ServerRefusal('system_type_required'));
           }

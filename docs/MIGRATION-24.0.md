@@ -940,15 +940,25 @@ action), `HandlerGetData`, and the creates and updates `HandlerCreate` and
 `HandlerUpdate` delegate. An argument the target requires that the compact call left out (an
 object's name, `run_id`), or a value outside a list the target declares (`package_type`), is
 refused in the target schema's words, naming the target, where 23.x ran the
-target's handler and refused in its words. For the listed long tools — `HandlerGet` and
-`HandlerGetData` as `HandlerSystem` — that refusal comes before the call takes a connection: with
-`background` true or false, with or without a fresh-connection factory, no session of its own
-is opened and no run started (a call that a refusal used to answer with a `run_handle`, or with
-`fresh_connection_unavailable`, is answered the refusal now). The full long reads do the same with
-the rules their handlers check: `GetWhereUsed`, `GetPackageContents`, `GetPackageTree`,
-`GetObjectsList`, `GetStructuresList`, `GetIncludesList` and `GetObjectInfo` refuse a missing or
-contradictory argument (`Object name is required`, `package_name is required`, `Give exactly
-one of …`) before any connection, in the words they answered before. `HandlerGet` part `virtual_folders` now sends
+target's handler and refused in its words. The compact tool's own listed schema holds those
+rules — `HandlerSystem` checks each action with its target's schema, `HandlerGet` each member and
+part with its route's target's —, so the refusal comes from the listed schema, before dispatch:
+the SDK's parse on a server or a plain registration, `HandlerExporter`'s before the call. Nothing
+is acquired before it: no connection, no session of its own, no run (`background` true or false,
+with or without a fresh-connection factory), no resolver, nothing sent. Refusals read
+`Invalid arguments for tool HandlerGet: GetClass: class_name is required at class_name`.
+
+The same holds for every listed long tool and the reads `HandlerGet` routes to: a rule a handler
+used to check — a required name not blank (`class_name is required`), "exactly one of" two forms
+(`Give exactly one of package_name or package_names`), a type of the variant's list
+(`GetObjectInfo` / `GetObjectsList` `parent_type`, `GetWhereUsed` `object_type`, `SearchObject`
+`object_type`), `top` of `HandlerDumpList` within one page, the dumps filters of
+`RuntimeListFeeds` — is the tool's schema's now, in the words the handler answered. A blank value
+(`""`, spaces) is refused as a missing one. `DescribeByList`'s `objects[].name` is required (its
+listing says so). A refused call answers the SDK's validation error (`MCP error -32602: Input
+validation error: …`) in place of the handler's answer.
+
+`HandlerGet` part `virtual_folders` now sends
 `with_versions` and `ignore_short_descriptions` as `false` where it sent none (`GetVirtualFolders`'
 schema defaults).
 
@@ -998,8 +1008,11 @@ tool. Six reads are new to compact: `search_source`, `package_tree`, `transports
   action itself or of another action — is refused before dispatch, in `HandlerSystem`'s name
   (`Input validation error: Invalid arguments for tool HandlerSystem: …`), so the listing keeps
   each argument's type. A missing required argument is refused in the target tool's words, with
-  nothing sent: before the call takes a connection, with `background` true or false and with or
-  without a fresh-connection factory, so no session of its own is opened and no run started.
+  nothing sent: `HandlerSystem`'s listed schema checks each action with its target's, so the
+  refusal comes before dispatch (`Invalid arguments for tool HandlerSystem: SearchObject:
+  object_name is required at object_name`), with `background` true or false and with or without
+  a fresh-connection factory — no session of its own is opened and no run started. A blank value
+  is refused as a missing one.
 - **A long tool.** Without `background` a call answers a `run_handle` at once, read with
   `HandlerBackgroundRunGet` and cancelled with `HandlerBackgroundRunDiscard`; `background: false`
   answers in the call. A server without a background-run strategy lists it without `background`

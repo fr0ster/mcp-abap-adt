@@ -212,6 +212,10 @@ Each entry is `{ toolDefinition, call(context, args), connectionless? }`
 (`HandlerEntry`); its `toolDefinition.inputSchema` is the tool's zod schema.
 Its `call` is wrapped. The wrapper, before the handler runs:
 
+- parses `args` with the tool's schema first — on the kind the exporter states (else the one
+  the connection was built for), whose schema holds that variant's type lists (24.0.0): a
+  refused call is rejected with the schema's words before any scope, resolver, access check
+  or request;
 - states the exporter's `systemType` on the call's connection — the
   connection of the `context` it is called with. The handler runs on that kind; with no
   `systemType` stated, the connection has none, and a call that would reach a

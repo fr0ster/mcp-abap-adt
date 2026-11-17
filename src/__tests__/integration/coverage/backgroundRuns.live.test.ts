@@ -13,7 +13,9 @@
  *   the run is listed and read `cancelled` once, and the answer that comes
  *   late changes nothing;
  * - the read-only sets (`core-ro`, `compact-ro`) list the three run tools
- *   and run the first case.
+ *   and run the first case;
+ * - in `compact-ro`, a `HandlerSystem` `search_source` run discarded with
+ *   `HandlerBackgroundRunDiscard` while it runs is cancelled the same way.
  *
  * **Where the calls go.** The suite is a `liveSuite`; each of its three
  * sets is served by an in-process server of its own, the suite's runner for
@@ -30,7 +32,10 @@
  * until the test lets it through, after the discard: the run is running for
  * the server, whatever SAP's speed, and no timer decides anything. What
  * the hold does not show is SAP ending a read still under way: the read
- * has ended at SAP when the logoff arrives.
+ * has ended at SAP when the logoff arrives. The `search_source` run is held
+ * the same way, and is one request too: a package no system holds, searched
+ * without its subpackages, is one node-structure read SAP answers empty —
+ * the case asserts the run sent exactly that one before its discard.
  *
  * **What is asserted of the logoff.** The connection answers no logoff
  * outcome of its own (`disconnect()` resolves once the logoff is written,
@@ -44,6 +49,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
 import type {
   IAbapConnection,
@@ -187,6 +193,8 @@ interface OwnConnection {
   readonly connection: GuardedConnection;
   /** Settles at its first request. */
   readonly entered: Promise<void>;
+  /** How many requests it was asked to send. */
+  requests(): number;
   /** How many times the server asked its logoff. */
   logoffs(): number;
 }
@@ -202,11 +210,13 @@ function observed(
 ): OwnConnection {
   const first = deferred();
   let logoffs = 0;
+  let requests = 0;
   const connection: GuardedConnection = {
     connect: () => inner.connect(),
     makeAdtRequest: async <T = unknown, D = unknown>(
       options: IAbapRequestOptions,
     ) => {
+      requests += 1;
       first.resolve();
       const answered = await inner.makeAdtRequest<T, D>(options);
       if (hold !== undefined) await hold;
@@ -229,7 +239,12 @@ function observed(
     endCriticalSection: () => inner.endCriticalSection(),
   };
   declareSystemKind(connection, systemKindOf(inner));
-  return { connection, entered: first.promise, logoffs: () => logoffs };
+  return {
+    connection,
+    entered: first.promise,
+    logoffs: () => logoffs,
+    requests: () => requests,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -505,6 +520,9 @@ function sharedTable(): string {
   return name;
 }
 
+/** A package name no system holds: its search is one node-structure read. */
+const MISSING_PACKAGE = `ZMCP_NX_${randomBytes(3).toString('hex').toUpperCase()}`;
+
 /** The query every case reads: the rows of the shared table. */
 function query(): string {
   return `SELECT * FROM ${sharedTable()}`;
@@ -761,6 +779,67 @@ liveSuite(['onprem', 'cloud'], 'Background runs of a long read', () => {
       expectNotAvailable(
         await livePrepare('HandlerBackgroundRunGet', { run_handle: handle }),
       );
+    });
+
+    it('a HandlerSystem search_source run discarded while it runs is cancelled, its session logged off', async () => {
+      const held = current().holdNext();
+      const handle = startedHandle(
+        'HandlerSystem',
+        await livePrepare('HandlerSystem', {
+          action: 'search_source',
+          packages: [MISSING_PACKAGE],
+          include_subpackages: false,
+          query: 'FUNCTION',
+        }),
+      );
+      const own = current().own.at(-1);
+      if (own === undefined) throw new Error('the run opened no connection');
+      // Its one request was sent; its answer is held, so the run is running.
+      await own.entered;
+      assert.equal(own.requests(), 1);
+      assert.equal(own.logoffs(), 0);
+
+      const discarded = await liveCall('HandlerBackgroundRunDiscard', {
+        run_handle: handle,
+      });
+      assertEquals(
+        itemOf(succeeded('HandlerBackgroundRunDiscard', discarded), 0),
+        { run_handle: handle, state: 'cancelled' },
+      );
+      // The run's own session: logged off once, by the server, its goodbye
+      // settled; the connection is no longer connected.
+      assert.equal(own.logoffs(), 1);
+      await own.connection.flushGoodbye();
+      assert.equal(own.connection.isConnected(), false);
+
+      const listed = await livePrepare('HandlerBackgroundRunList', {});
+      const runs = member(
+        itemOf(succeeded('HandlerBackgroundRunList', listed), 0),
+        'runs',
+      );
+      assertEquals(
+        Array.isArray(runs)
+          ? runs
+              .filter((run) => member(run, 'run_handle') === handle)
+              .map((run) => member(run, 'state'))
+          : runs,
+        ['cancelled'],
+      );
+
+      // The answer SAP gave reaches the run now, after the cancel.
+      held.release();
+
+      const cancelled = await livePrepare('HandlerBackgroundRunGet', {
+        run_handle: handle,
+      });
+      assert.equal(member(itemOf(cancelled, 0), 'state'), 'cancelled');
+      assert.equal(cancelled.content[1]?.text, BACKGROUND_READ_CANCELLED_WORDS);
+      expectNotAvailable(
+        await livePrepare('HandlerBackgroundRunGet', { run_handle: handle }),
+      );
+      // One end kept, the cancel's; the late answer kept nothing.
+      assert.equal(current().runs.finishCount(handle), 1);
+      assert.equal(own.logoffs(), 1);
     });
   });
 });

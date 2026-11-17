@@ -18,6 +18,7 @@ import {
   handleGetTableContents,
 } from '../../../../handlers/table/readonly/handleGetTableContents';
 
+import { schemaWords } from '../../../helpers/schemaWords';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -109,29 +110,13 @@ describe('GetTableContents Handler Integration', () => {
     });
   });
 
-  it('should handle missing table_name parameter', async () => {
-    await tester.run(async (context: LambdaTesterContext) => {
-      const { connection } = context;
-
-      logger?.info('Testing error handling: missing table_name');
-
-      const result = await tester.invokeToolOrHandler(
-        'GetTableContents',
-        { table_name: '' },
-        async () => {
-          const handlerContext = createHandlerContext({ connection, logger });
-          return handleGetTableContents(
-            handlerContext,
-            GetTableContents.inputSchema.parse({ table_name: '' }),
-          );
-        },
-      );
-
-      assert.equal(result.isError, true);
-      assert.ok(result.content !== undefined);
-      assert.ok(result.content.length > 0);
-
-      logger?.info('Error handling validated: missing table_name');
-    });
+  it('refuses a blank table_name in its schema, before any request', () => {
+    // The rule lives in the tool's schema (24.0.0): the listed schema
+    // refuses the call before dispatch, so the handler is not reached.
+    assert.ok(
+      schemaWords(GetTableContents, { table_name: '' }).includes(
+        'Table name is required',
+      ),
+    );
   });
 });

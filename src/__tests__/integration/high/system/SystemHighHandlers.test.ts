@@ -16,7 +16,11 @@
 import assert from 'node:assert/strict';
 import { after, before, it } from 'node:test';
 import * as z from 'zod';
-import { handleGetPackageTree } from '../../../../handlers/system/high/handleGetPackageTree';
+import {
+  TOOL_DEFINITION as GetPackageTree,
+  handleGetPackageTree,
+} from '../../../../handlers/system/high/handleGetPackageTree';
+import { schemaWords } from '../../../helpers/schemaWords';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { servedSuite } from '../../helpers/servedHere';
 import { readCaseParams } from '../../helpers/testConfigSchema';
@@ -257,40 +261,14 @@ describe('System High-Level Handlers Integration', () => {
       });
     });
 
-    it('should handle missing package_name error', async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection } = context;
-
-        logger?.info('🔍 Testing error handling: missing package_name');
-
-        const result = await tester.invokeToolOrHandler(
-          'GetPackageTree',
-          {
-            package_name: '',
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger,
-            });
-            return handleGetPackageTree(handlerContext, {
-              package_name: '',
-            });
-          },
-        );
-
-        assert.equal(result.isError, true);
-        assert.ok(result.content !== undefined);
-        assert.ok(result.content.length > 0);
-
-        const textContent = result.content.find(
-          (c: any) => c.type === 'text',
-        ) as any;
-        assert.ok(textContent !== undefined);
-        assert.ok(textContent?.text.includes('package_name is required'));
-
-        logger?.info('✅ Error handling validated: missing package_name');
-      });
+    it('refuses a blank package_name in its schema, before any request', () => {
+      // The rule lives in the tool's schema (24.0.0): the listed schema
+      // refuses the call before dispatch, so the handler is not reached.
+      assert.ok(
+        schemaWords(GetPackageTree, { package_name: '' }).includes(
+          'package_name is required',
+        ),
+      );
     });
 
     it('should handle invalid package name error', async () => {

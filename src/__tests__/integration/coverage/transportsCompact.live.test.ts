@@ -22,6 +22,11 @@
  *   move between two tasks of one request, TR 717), both tasks read again.
  *   The cloud side is a reason row of the ledger (`CLOUD_MOVE_REASON`).
  *
+ * - **`HandlerSystem` `transports`, both systems, read only:** the session
+ *   user's modifiable requests, through the server's dispatch
+ *   (`throughServer`), with `background: false` in the call and without
+ *   `background` as a run read once with `HandlerBackgroundRunGet`.
+ *
  * No request is ever released. Each suite's cleanup (`deleteRecordedRequests`)
  * deletes its interface (read absent), takes its entries off the test's
  * requests, and deletes the tasks and requests, each read absent; the
@@ -29,7 +34,7 @@
  */
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { after, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import {
   configuredSystemKind,
   resolvePackageName,
@@ -48,8 +53,10 @@ import {
   reconcileRequestCreate,
   recordCreated,
   recordCreatedRequest,
+  throughServer,
 } from '../helpers/live';
 import { member, payloadOf, succeeded } from './ownObjects';
+import { finishedRun, startedRun } from './systemRuns';
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 /** The interface the sort case's task holds (on premise). */
@@ -398,3 +405,42 @@ liveSuite(
     });
   },
 );
+
+/** A listing of the session user's modifiable requests: its count, each number, each status D, L or unstated. */
+function expectModifiableListing(answer: LiveAnswer): void {
+  const listed = payloadOf(succeeded('HandlerSystem transports', answer));
+  assert.equal(member(listed, 'success'), true);
+  const transports = member(listed, 'transports');
+  if (!Array.isArray(transports)) throw new Error('no transports list');
+  assert.equal(member(listed, 'count'), transports.length);
+  for (const transport of transports) {
+    const number = member(transport, 'number');
+    assert.equal(typeof number, 'string');
+    const status = member(transport, 'status');
+    assert.ok(
+      status === undefined || ['', 'D', 'L'].includes(String(status)),
+      `${String(number)} has status ${String(status)}`,
+    );
+  }
+}
+
+liveSuite(['onprem', 'cloud'], 'HandlerSystem transports', () => {
+  describe('through the server', () => {
+    throughServer();
+
+    it('background false lists the modifiable requests in the call', async () => {
+      const answer = await liveCall('HandlerSystem', {
+        action: 'transports',
+        background: false,
+      });
+      expectModifiableListing(answer);
+    });
+
+    it('without background it starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
+      const started = await liveCall('HandlerSystem', {
+        action: 'transports',
+      });
+      expectModifiableListing(await finishedRun(startedRun(started)));
+    });
+  });
+});

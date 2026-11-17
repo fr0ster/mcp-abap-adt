@@ -7,13 +7,27 @@
  * - `GetObjectStructure`: the shared class (`shared_dependencies`);
  * - `GetPackage`: the shared package the configuration names;
  * - `GetBehaviorImplementation`: the shared behavior implementation's
- *   metadata and source.
+ *   metadata and source;
+ * - `HandlerSystem` `search_object`: the shared class by its name;
+ *   `where_used`: the shared domain, used by the shared data element — each
+ *   through the server's dispatch (`throughServer`), with `background: false`
+ *   in the call and without `background` as a run read once with
+ *   `HandlerBackgroundRunGet`.
  */
 import assert from 'node:assert/strict';
-import { it } from 'node:test';
-import { getSharedDependenciesConfig } from '../helpers/configHelpers';
-import { liveCall, liveSuite } from '../helpers/live';
+import { describe, it } from 'node:test';
+import {
+  configuredSystemKind,
+  getSharedDependenciesConfig,
+} from '../helpers/configHelpers';
+import {
+  type LiveAnswer,
+  liveCall,
+  liveSuite,
+  throughServer,
+} from '../helpers/live';
 import { member, payloadOf, succeeded } from './ownObjects';
+import { finishedRun, startedRun } from './systemRuns';
 
 /** The shared package the configuration names. */
 function sharedPackage(): string {
@@ -22,6 +36,71 @@ function sharedPackage(): string {
     throw new Error('the test config names no shared package');
   }
   return named.toUpperCase();
+}
+
+/**
+ * The name of the first entry of the shared section `section` that exists on
+ * the configured system (its `available_in`, when stated, names it).
+ */
+function sharedName(section: string): string {
+  const kind = configuredSystemKind();
+  const entries = member(getSharedDependenciesConfig(), section);
+  const found = Array.isArray(entries)
+    ? entries.find((entry) => {
+        const availableIn = member(entry, 'available_in');
+        return (
+          typeof member(entry, 'name') === 'string' &&
+          (!Array.isArray(availableIn) || availableIn.includes(kind))
+        );
+      })
+    : undefined;
+  const name = member(found, 'name');
+  if (typeof name !== 'string' || name === '') {
+    throw new Error(`the test config names no shared ${section} here`);
+  }
+  return name.toUpperCase();
+}
+
+/** The shared domain: what the shared data element is typed with. */
+function sharedDomain(): string {
+  return sharedName('domains');
+}
+
+/** The shared data element typed with the shared domain. */
+function sharedDataElement(): string {
+  const entries = member(getSharedDependenciesConfig(), 'data_elements');
+  const found = Array.isArray(entries)
+    ? entries.find(
+        (entry) =>
+          String(member(entry, 'type_name')).toUpperCase() === sharedDomain(),
+      )
+    : undefined;
+  const name = member(found, 'name');
+  if (typeof name !== 'string' || name === '') {
+    throw new Error(
+      `the test config names no shared data element of ${sharedDomain()}`,
+    );
+  }
+  return name.toUpperCase();
+}
+
+/** The quick search's answer names the shared class, as a class. */
+function expectSharedClassFound(answer: LiveAnswer): void {
+  const text = succeeded('HandlerSystem search_object', answer).text;
+  assert.ok(
+    text
+      .split('\n')
+      .some(
+        (line) => line.includes('ZCL_MCP_SHARED_CLS') && line.includes('CLAS'),
+      ),
+    text,
+  );
+}
+
+/** The where-used answer of the shared domain names the shared data element. */
+function expectDomainUsed(answer: LiveAnswer): void {
+  const text = succeeded('HandlerSystem where_used', answer).text;
+  assert.ok(text.toUpperCase().includes(sharedDataElement()), text);
 }
 
 liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
@@ -76,5 +155,46 @@ liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
         .text.toLowerCase()
         .includes('zbp_mcp_shr_i_root'),
     );
+  });
+  describe('HandlerSystem through the server', () => {
+    throughServer();
+
+    it('search_object with background false finds the shared class in the call', async () => {
+      const answer = await liveCall('HandlerSystem', {
+        action: 'search_object',
+        object_name: 'ZCL_MCP_SHARED_CLS',
+        object_type: 'CLAS',
+        background: false,
+      });
+      expectSharedClassFound(answer);
+    });
+
+    it('search_object without background starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
+      const started = await liveCall('HandlerSystem', {
+        action: 'search_object',
+        object_name: 'ZCL_MCP_SHARED_CLS',
+        object_type: 'CLAS',
+      });
+      expectSharedClassFound(await finishedRun(startedRun(started)));
+    });
+
+    it('where_used with background false names the shared data element as a user of the shared domain', async () => {
+      const answer = await liveCall('HandlerSystem', {
+        action: 'where_used',
+        object_name: sharedDomain(),
+        object_type: 'DOMA/DD',
+        background: false,
+      });
+      expectDomainUsed(answer);
+    });
+
+    it('where_used without background starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
+      const started = await liveCall('HandlerSystem', {
+        action: 'where_used',
+        object_name: sharedDomain(),
+        object_type: 'DOMA/DD',
+      });
+      expectDomainUsed(await finishedRun(startedRun(started)));
+    });
   });
 });

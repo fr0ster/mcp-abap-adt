@@ -916,6 +916,34 @@
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   },
+  "HandlerSystem#search_object": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "HandlerSystem#search_source": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "HandlerSystem#transports": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
+  "HandlerSystem#where_used": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
   "HandlerTransportCreate": {
     "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
     "live": {

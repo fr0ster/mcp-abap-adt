@@ -1,5 +1,6 @@
 /**
- * `SearchSource`, live (plan D23b, Step 7): what the search answers on the
+ * `SearchSource`, live (plan D23b, Step 7), and `HandlerSystem`'s
+ * `search_source` (D25), which calls its entry: what the search answers on the
  * systems, read-only. No package is counted (DO26): what the cases claim is
  * that a search answers no object that holds nothing of what was searched.
  *
@@ -29,13 +30,18 @@
  *   what a SAP `404` on a source read is through adt-clients (`origin`, the
  *   response's status, `adtType`), and the function modules named `VIEW*`
  *   (D23a Step 2): what the quick search lists and what reading one answers.
+ * - **`HandlerSystem` `search_source`, on both systems, through the server's
+ *   dispatch (`throughServer`):** the shared module searched by its own name
+ *   in the shared package answers its hit, with `background: false` in the
+ *   call and without `background` as a run read once with
+ *   `HandlerBackgroundRunGet`.
  *
  * Nothing is created, changed or deleted.
  */
 
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { after, before, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
@@ -51,6 +57,7 @@ import {
   liveCall,
   livePrepare,
   liveSuite,
+  throughServer,
 } from '../helpers/live';
 import { assertEquals } from '../helpers/liveAssert';
 import { endTestConnection, trackConnection } from '../helpers/openConnections';
@@ -59,6 +66,7 @@ import {
   type GuardedConnection,
   guardedTestConnection,
 } from '../helpers/refusalGuard';
+import { finishedRun, startedRun } from './systemRuns';
 
 // ---------------------------------------------------------------------------
 // What the config names
@@ -658,6 +666,45 @@ liveSuite(['onprem', 'cloud'], 'SearchSource finds a known hit', () => {
     const payload = payloadOf('SearchSource', answer);
     assert.equal(listOf(payload, 'results').length, 1);
     assert.equal(member(member(payload, 'truncated'), 'by_max_hits'), true);
+  });
+});
+
+liveSuite(['onprem', 'cloud'], 'HandlerSystem search_source', () => {
+  /** The shared module's hits in the shared package: hits only, the module's among them, each real. */
+  async function expectModuleHits(answer: LiveAnswer): Promise<void> {
+    const payload = payloadOf('HandlerSystem search_source', answer);
+    expectHitsOnly(payload);
+    const results = listOf(payload, 'results');
+    expectHitsWithin(results, [sharedPackage()]);
+    moduleHit(results);
+    await expectHitsReal(results, sharedModule());
+  }
+
+  describe('through the server', () => {
+    throughServer();
+
+    it('background false answers the hits in the call', async () => {
+      const answer = await liveCall('HandlerSystem', {
+        action: 'search_source',
+        packages: [sharedPackage()],
+        include_subpackages: false,
+        object_types: ['FUGR'],
+        query: sharedModule(),
+        background: false,
+      });
+      await expectModuleHits(answer);
+    });
+
+    it('without background it starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
+      const started = await liveCall('HandlerSystem', {
+        action: 'search_source',
+        packages: [sharedPackage()],
+        include_subpackages: false,
+        object_types: ['FUGR'],
+        query: sharedModule(),
+      });
+      await expectModuleHits(await finishedRun(startedRun(started)));
+    });
   });
 });
 

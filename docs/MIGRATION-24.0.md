@@ -107,6 +107,9 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
   values itself (`setSystemContext` still sets the process context).
 - A `HandlerExporter.createRegistry()` registry on a server with `backgroundRuns` lists the run tools
   (`RuntimeRunClass`, `RuntimeRunProgram`) with `background`, as the server's own run tools are.
+- A connection `createAbapConnection` built for one kind, called through an exporter that states the
+  other, is refused `system_type_conflict` (it ran on the recorded kind). State the same kind, or
+  none.
 
 ## Starts: nothing stated is ignored
 

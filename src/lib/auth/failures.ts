@@ -46,6 +46,7 @@ export type FailureCode =
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
+  | 'system_type_conflict'
   | 'variant_not_served'
   | 'instance_closed'
   | 'batch_mode_unavailable'

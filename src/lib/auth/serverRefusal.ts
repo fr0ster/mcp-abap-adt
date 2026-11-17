@@ -27,6 +27,7 @@ export type ServerRefusalCode =
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
+  | 'system_type_conflict'
   | 'variant_not_served'
   | 'instance_closed'
   | 'batch_mode_unavailable'
@@ -290,8 +291,20 @@ export function batchOtherKindWords(
     : `${words}. An earlier part of this call was recorded, under number ${recorded}, and will be sent at the batch end; its answer under that number is this refusal`;
 }
 
+/**
+ * `system_type_conflict`'s words: a connection built for one kind, handed to
+ * a handler stated for another (`HandlerExporter`'s `systemType`).
+ */
+export function systemTypeConflictWords(
+  built: 'onprem' | 'cloud',
+  stated: 'onprem' | 'cloud',
+): string {
+  return `the system types contradict: the connection was built for ${built} and the exporter states ${stated} — state the kind the connection was built for; nothing was sent to the system`;
+}
+
 /** The refusals whose words are given at construction. */
 type WordedCode =
+  | 'system_type_conflict'
   | 'destination_refused'
   | 'background_run_limit'
   | 'batch_not_recordable'
@@ -398,6 +411,7 @@ export class ServerRefusal extends Error {
         ? noConnectionText(words ?? '')
         : (code === 'background_runs_unavailable' && words !== undefined) ||
             code === 'destination_refused' ||
+            code === 'system_type_conflict' ||
             code === 'background_run_limit' ||
             code === 'batch_not_recordable' ||
             code === 'batch_other_kind' ||

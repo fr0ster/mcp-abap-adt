@@ -1,7 +1,12 @@
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import {
+  ServerRefusal,
+  systemTypeConflictWords,
+} from '../../auth/serverRefusal.js';
 import { runWithCallTransport } from '../../callTransport.js';
+import { siblingRecordOf } from '../../connectionFactory.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
-import { stateSystemKind } from '../../systemKind.js';
+import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
 import type { ToolArgs } from '../interfaces.js';
 
 /**
@@ -35,7 +40,21 @@ export function inStatedScope<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const { connection } = scope;
-  if (connection) stateSystemKind(connection, scope.systemType);
+  if (connection) {
+    // A connection the factory built keeps the kind it was built for: a
+    // handler stated for another kind is refused, never run on either.
+    const built = siblingRecordOf(connection)?.kind;
+    const stated = statedSystemKind(scope.systemType);
+    if (built !== undefined && stated !== undefined && built !== stated) {
+      return Promise.reject(
+        new ServerRefusal(
+          'system_type_conflict',
+          systemTypeConflictWords(built, stated),
+        ),
+      );
+    }
+    stateSystemKind(connection, scope.systemType);
+  }
   return runWithCallTransport(args, () =>
     withResolvedSystemContext(
       connection,

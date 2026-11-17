@@ -71,8 +71,11 @@ export type ConnectionProvider = () =>
  */
 export interface HandlerExporterOptions {
   /**
-   * Logger instance for handler context
-   * @default defaultLogger
+   * The logger of the handlers' context: the handlers `getHandlerEntries()`
+   * hands out run with it, over the embedder's context logger, and a plain
+   * registration (`registerOnServer`) uses it. On `createRegistry()` the
+   * hosting server's logger applies. Absent: the embedder's context logger
+   * (no logging on the exporter's own paths).
    */
   logger?: Logger | undefined;
 
@@ -214,6 +217,8 @@ export interface HandlerExporterOptions {
  */
 export class HandlerExporter {
   private readonly logger: Logger;
+  /** The `logger` option as given: a handed-out handler's logger when stated. */
+  private readonly statedLogger: Logger | undefined;
   private readonly handlerGroups: BaseHandlerGroup[];
   private readonly systemContextResolver: SystemContextResolver | null;
   private readonly systemContextRules: SystemContextRules | null;
@@ -226,6 +231,7 @@ export class HandlerExporter {
 
   constructor(options?: HandlerExporterOptions) {
     this.logger = options?.logger ?? noopLogger;
+    this.statedLogger = options?.logger;
     this.sapAnswerStrategy = options?.sapAnswerStrategy;
     this.lineMatchStrategy = options?.lineMatchStrategy;
     this.systemType = options?.systemType;
@@ -384,9 +390,11 @@ export class HandlerExporter {
   }
 
   /**
-   * `context` with this exporter's `SearchSource` strategies: the field of
+   * `context` with this exporter's `SearchSource` strategies — the field of
    * each is the option when given and absent when not, whatever the
-   * embedder's context held — a context is no way to pass a strategy.
+   * embedder's context held: a context is no way to pass a strategy — and
+   * with the exporter's `logger` when one was given (the embedder's
+   * context logger otherwise).
    */
   private withStrategies(context: HandlerContext): HandlerContext {
     const {
@@ -394,7 +402,11 @@ export class HandlerExporter {
       lineMatchStrategy: _lines,
       ...rest
     } = context;
-    return { ...rest, ...this.strategies() };
+    return {
+      ...rest,
+      ...(this.statedLogger !== undefined && { logger: this.statedLogger }),
+      ...this.strategies(),
+    };
   }
 
   /** This exporter's `SearchSource` strategies: a field per option given. */

@@ -18,6 +18,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
+import { systemKindOf } from '../../connectionFactory.js';
 import {
   listedTool,
   type SearchMeta,
@@ -25,14 +26,16 @@ import {
 } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
-import { stateSystemKind } from '../../systemKind.js';
+import { type AbapSystemKind, stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
-import type {
-  HandlerEntry,
-  IHandlerGroup,
-  SapEnvironment,
-  ToolArgs,
+import {
+  argumentsRefusalOf,
+  type HandlerEntry,
+  type IHandlerGroup,
+  type SapEnvironment,
+  type ToolArgs,
+  type ToolDefinition,
 } from '../interfaces.js';
 import { type CallContext, inStatedScope } from '../utils/handlerCall.js';
 
@@ -142,6 +145,9 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             checks: access.checks,
             checked: checkedArgumentsOf(entry.toolDefinition, access.readOnly),
           },
+      entry.toolDefinition.variants === undefined
+        ? undefined
+        : entry.toolDefinition,
     );
   }
 
@@ -151,6 +157,8 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
    * `search`: the tool's search `_meta` (`listedTool`), when it has one.
    * `callContext`: the context each call runs in, asked for when it comes;
    * the group's own by default.
+   * `variantRules`: the definition of a tool stated per variant, whose
+   * arguments are read on the kind of the call before its handler runs.
    */
   protected registerToolOnServer(
     server: McpServer,
@@ -164,6 +172,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       readonly checks: IAccessChecks;
       readonly checked: CheckedArguments | undefined;
     },
+    variantRules?: ToolDefinition,
   ): void {
     server.registerTool(
       toolName,
@@ -227,6 +236,18 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // for this call (its provider's connection). Its rejection is
           // this call's answer (the catch below); the handler does not run.
           const context = await contextOnce();
+          // A tool stated per variant (a type list) is read on the kind of
+          // the call before the handler, its long read's own connection or
+          // anything sent: the kind the context states, else the one
+          // recorded on its connection; neither is `system_type_required`.
+          if (variantRules !== undefined) {
+            const kind = kindOfCall(context);
+            if (kind === undefined) {
+              return return_error(new ServerRefusal('system_type_required'));
+            }
+            const refused = argumentsRefusalOf(variantRules, args, kind);
+            if (refused !== undefined) return return_error(refused);
+          }
           // The kind the context states on its connection (none stated,
           // none: SAP_SYSTEM_TYPE is not read), the call-transport scope,
           // and the connection's parameters when the context carries a
@@ -275,4 +296,15 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       },
     );
   }
+}
+
+/**
+ * The kind a call on a plain registration runs on: the kind its context
+ * states, else the one recorded on its connection (the factory's record,
+ * `declareSystemKind`) — the environment is not read; `undefined` when
+ * neither names one.
+ */
+function kindOfCall(context: HandlerContext): AbapSystemKind | undefined {
+  stateSystemKind(context.connection, context.systemType);
+  return systemKindOf(context.connection);
 }

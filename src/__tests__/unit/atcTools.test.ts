@@ -550,13 +550,14 @@ describe('RunATC: the object kinds of each variant', () => {
   });
 
   it.each(['program', 'program_include'])(
-    'cloud refuses %s naming its kinds, before any call',
+    'cloud refuses %s by its listed cloud schema, naming its kinds, before any call',
     async (type) => {
       const { answered, calls } = await runOn('cloud', type);
       expect(answered.isError).toBe(true);
-      expect(answered.content[0]?.text).toContain(
-        `objects[].type "${type}" is not one of: ${CLOUD.join(', ')}; nothing was sent`,
-      );
+      const text = answered.content[0]?.text ?? '';
+      expect(text).toContain('Invalid arguments for tool RunATC: ');
+      for (const kind of CLOUD) expect(text).toContain(`"${kind}"`);
+      expect(text).toContain('at objects.0.type');
       expect(calls).toEqual([]);
     },
   );

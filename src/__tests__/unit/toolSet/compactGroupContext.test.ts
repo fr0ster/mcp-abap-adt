@@ -79,8 +79,11 @@ describe('compact groups read the context of the current request', () => {
           .call(probe, { object_type: 'CLASS' })
           .catch(() => undefined);
       } else if (read !== undefined) {
-        // `object_type` left out: the router refuses before SAP, through its log.
-        await read.call(probe, {});
+        // A read its schema takes: the router logs its route through the
+        // context it was given, before SAP (what SAP answers is not read).
+        await read
+          .call(probe, { object_type: 'CLASS', class_name: 'ZCL_PROBE' })
+          .catch(() => undefined);
       } else {
         throw new Error(`${name} serves neither HandlerCreate nor HandlerGet`);
       }

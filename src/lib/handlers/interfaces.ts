@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type * as z from 'zod';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import { systemKindOf } from '../connectionFactory.js';
 import type { AbapSystemKind } from '../systemKind.js';
 import type { ToolResultLike } from '../toolResult';
 
@@ -108,12 +109,11 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
 /**
  * Pairs a tool definition with its handler, checked by the compiler: the
  * handler takes the output of the definition's schema. The entry's call
- * parses a call's arguments with that schema and hands the handler the
- * result; arguments that do not parse are refused, naming each issue, and
- * the handler does not run. The call answers what the handler answers.
- * A variant's own rules (its type lists) are its listed schema's, read
- * before dispatch: by the SDK on a server or a plain registration, by
- * `HandlerExporter` before the call (`argumentsRefusalOf`).
+ * parses a call's arguments with the schema of the variant its connection
+ * runs on (`schemaOn`; the definition's own where it states none per
+ * variant) and hands the handler the result; arguments that do not parse
+ * are refused, naming each issue, and the handler does not run. The call
+ * answers what the handler answers.
  */
 export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
   toolDefinition: ToolDefinition<S>,
@@ -122,7 +122,15 @@ export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
   return {
     toolDefinition,
     call: async (context, args) => {
-      const parsed = toolDefinition.inputSchema.safeParse(args);
+      // A tool stated per variant is read on the variant of its call's
+      // connection — its type lists too; none recorded, on its own schema
+      // (the handler then refuses `system_type_required`).
+      const parsed = schemaOn(
+        toolDefinition,
+        toolDefinition.variants === undefined
+          ? undefined
+          : systemKindOf(context.connection),
+      ).safeParse(args);
       if (!parsed.success) {
         throw new Error(
           invalidArgumentsWords(toolDefinition.name, parsed.error.issues),

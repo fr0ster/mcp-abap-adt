@@ -164,14 +164,15 @@ describe('HandlerActivate and the type it was given', () => {
       entry.call(context, { object_name: 'ZCL_X', object_type: 'TRANSPORT' }),
     ).rejects.toThrow('Invalid arguments for tool HandlerActivate');
     await outside;
-    // A member the declared variant does not activate by name reaches the
-    // handler, which names the field that settles it and what the variant's
-    // projection offers.
+    // A member the cloud variant does not list is refused by the cloud
+    // schema, the call's own variant's, naming what it lists.
     declareSystemKind(connection, 'cloud');
     try {
       const unnamed = expect(
         entry.call(context, { object_name: 'ZCL_X', object_type: 'PROGRAM' }),
-      ).rejects.toThrow(/object_adt_type.*Known without it: CLASS, INTERFACE/);
+      ).rejects.toThrow(
+        /Invalid arguments for tool HandlerActivate: .*"CLASS"\|"INTERFACE".* at object_type/,
+      );
       await unnamed;
     } finally {
       declareSystemKind(connection, 'onprem');

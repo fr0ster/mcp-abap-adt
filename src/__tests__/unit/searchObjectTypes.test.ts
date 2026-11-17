@@ -22,7 +22,6 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
-import { toolAnswer } from '../helpers/toolAnswer';
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -172,12 +171,16 @@ describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
     expect(sentObjectType(connection.requests)).toBe('STRU');
     const refusedConnection = recordingConnection();
     declareSystemKind(refusedConnection, variant);
+    // The target's schema on this variant refuses it, before its handler.
     const refused = await handleHandlerSystem(
       { connection: refusedConnection },
       { action: 'search_object', object_name: 'Z*', object_type: 'NOPE' },
+    ).then(
+      () => '',
+      (error: Error) => error.message,
     );
     expect(refusedConnection.requests).toEqual([]);
-    expect(textOf(toolAnswer(refused))).toContain(refusal('NOPE'));
+    expect(refused).toContain(refusal('NOPE'));
   });
 
   it('DescribeByList searches an object whose type is no search name without one', async () => {

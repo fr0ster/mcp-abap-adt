@@ -1345,7 +1345,7 @@
   },
   "onprem HandlerGet PACKAGE part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "onprem HandlerGet PACKAGE part=metadata": {
     "requests": [
@@ -1361,7 +1361,7 @@
   },
   "onprem HandlerGet PACKAGE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "onprem HandlerGet PACKAGE part=contents": {
     "requests": [
@@ -1379,15 +1379,15 @@
   },
   "onprem HandlerGet PACKAGE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "onprem HandlerGet PACKAGE part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "onprem HandlerGet DOMAIN part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DOMAIN part=metadata": {
     "requests": [
@@ -1403,15 +1403,15 @@
   },
   "onprem HandlerGet DOMAIN part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DOMAIN part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DOMAIN part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DOMAIN part=draft": {
     "requests": [
@@ -1441,7 +1441,7 @@
   },
   "onprem HandlerGet DATA_ELEMENT part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DATA_ELEMENT part=metadata": {
     "requests": [
@@ -1457,15 +1457,15 @@
   },
   "onprem HandlerGet DATA_ELEMENT part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DATA_ELEMENT part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DATA_ELEMENT part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet DATA_ELEMENT part=draft": {
     "requests": [
@@ -1519,15 +1519,15 @@
   },
   "onprem HandlerGet TABLE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TABLE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet TABLE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TABLE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet TABLE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=TABLE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet TABLE part=draft": {
     "requests": [
@@ -1581,15 +1581,15 @@
   },
   "onprem HandlerGet STRUCTURE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet STRUCTURE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet STRUCTURE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet STRUCTURE part=draft": {
     "requests": [
@@ -1619,7 +1619,7 @@
   },
   "onprem HandlerGet TABLE_TYPE part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet TABLE_TYPE part=metadata": {
     "requests": [
@@ -1635,15 +1635,15 @@
   },
   "onprem HandlerGet TABLE_TYPE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet TABLE_TYPE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet TABLE_TYPE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet TABLE_TYPE part=draft": {
     "requests": [
@@ -1697,15 +1697,15 @@
   },
   "onprem HandlerGet DDL part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DDL. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=DDL. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet DDL part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DDL. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=DDL. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet DDL part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DDL. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=DDL. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet DDL part=draft": {
     "requests": [
@@ -1759,15 +1759,15 @@
   },
   "onprem HandlerGet SERVICE_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet SERVICE_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet SERVICE_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet SERVICE_DEFINITION part=draft": {
     "requests": [
@@ -1852,15 +1852,15 @@
   },
   "onprem HandlerGet SERVICE_BINDING part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls. at part"
   },
   "onprem HandlerGet SERVICE_BINDING part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls. at part"
   },
   "onprem HandlerGet SERVICE_BINDING part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls. at part"
   },
   "onprem HandlerGet CLASS part=source": {
     "requests": [
@@ -1888,15 +1888,15 @@
   },
   "onprem HandlerGet CLASS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=CLASS. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=CLASS. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet CLASS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=CLASS. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=CLASS. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet CLASS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=CLASS. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=CLASS. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet CLASS part=draft": {
     "requests": [
@@ -2001,23 +2001,23 @@
   },
   "onprem HandlerGet LOCAL_TEST_CLASS part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TEST_CLASS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TEST_CLASS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TEST_CLASS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TEST_CLASS part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TYPES part=source": {
     "requests": [
@@ -2033,23 +2033,23 @@
   },
   "onprem HandlerGet LOCAL_TYPES part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TYPES part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TYPES part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TYPES part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_TYPES part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=source": {
     "requests": [
@@ -2065,23 +2065,23 @@
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_DEFINITIONS part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_MACROS part=source": {
     "requests": [
@@ -2097,23 +2097,23 @@
   },
   "onprem HandlerGet LOCAL_MACROS part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_MACROS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_MACROS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_MACROS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "onprem HandlerGet LOCAL_MACROS part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "onprem HandlerGet PROGRAM part=source": {
     "requests": [
@@ -2141,15 +2141,15 @@
   },
   "onprem HandlerGet PROGRAM part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=PROGRAM. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=PROGRAM. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet PROGRAM part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=PROGRAM. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=PROGRAM. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet PROGRAM part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=PROGRAM. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=PROGRAM. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet PROGRAM part=draft": {
     "requests": [
@@ -2203,11 +2203,11 @@
   },
   "onprem HandlerGet INCLUDE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INCLUDE. It offers: source, metadata, main_programs, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=INCLUDE. It offers: source, metadata, main_programs, draft. at part"
   },
   "onprem HandlerGet INCLUDE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INCLUDE. It offers: source, metadata, main_programs, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=INCLUDE. It offers: source, metadata, main_programs, draft. at part"
   },
   "onprem HandlerGet INCLUDE part=main_programs": {
     "requests": [
@@ -2273,15 +2273,15 @@
   },
   "onprem HandlerGet INTERFACE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=INTERFACE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet INTERFACE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=INTERFACE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet INTERFACE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet INTERFACE part=draft": {
     "requests": [
@@ -2311,7 +2311,7 @@
   },
   "onprem HandlerGet FUNCTION_GROUP part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_GROUP part=metadata": {
     "requests": [
@@ -2327,15 +2327,15 @@
   },
   "onprem HandlerGet FUNCTION_GROUP part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_GROUP part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_GROUP part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_GROUP part=draft": {
     "requests": [
@@ -2396,15 +2396,15 @@
   },
   "onprem HandlerGet FUNCTION_MODULE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_MODULE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_MODULE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet FUNCTION_MODULE part=draft": {
     "requests": [
@@ -2458,15 +2458,15 @@
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet BEHAVIOR_DEFINITION part=draft": {
     "requests": [
@@ -2520,15 +2520,15 @@
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet BEHAVIOR_IMPLEMENTATION part=draft": {
     "requests": [
@@ -2645,15 +2645,15 @@
   },
   "onprem HandlerGet METADATA_EXTENSION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet METADATA_EXTENSION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet METADATA_EXTENSION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft. at part"
   },
   "onprem HandlerGet METADATA_EXTENSION part=draft": {
     "requests": [
@@ -2695,23 +2695,23 @@
   },
   "onprem HandlerGet UNIT_TEST part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet UNIT_TEST part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet UNIT_TEST part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet UNIT_TEST part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet UNIT_TEST part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet CDS_UNIT_TEST part=source": {
     "requests": [
@@ -2727,23 +2727,23 @@
   },
   "onprem HandlerGet CDS_UNIT_TEST part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet CDS_UNIT_TEST part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet CDS_UNIT_TEST part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet CDS_UNIT_TEST part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet CDS_UNIT_TEST part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "onprem HandlerGet TRANSPORT part=source": {
     "requests": [
@@ -2759,23 +2759,23 @@
   },
   "onprem HandlerGet TRANSPORT part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "onprem HandlerGet TRANSPORT part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "onprem HandlerGet TRANSPORT part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "onprem HandlerGet TRANSPORT part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "onprem HandlerGet TRANSPORT part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "onprem HandlerLock CLASS": {
     "requests": [
@@ -5200,7 +5200,7 @@
   },
   "cloud HandlerGet PACKAGE part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "cloud HandlerGet PACKAGE part=metadata": {
     "requests": [
@@ -5216,7 +5216,7 @@
   },
   "cloud HandlerGet PACKAGE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "cloud HandlerGet PACKAGE part=contents": {
     "requests": [
@@ -5234,15 +5234,15 @@
   },
   "cloud HandlerGet PACKAGE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet PACKAGE part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=PACKAGE. It offers: metadata, contents."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=PACKAGE. It offers: metadata, contents. at part"
   },
   "cloud HandlerGet DOMAIN part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet DOMAIN part=metadata": {
     "requests": [
@@ -5258,15 +5258,15 @@
   },
   "cloud HandlerGet DOMAIN part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet DOMAIN part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=DOMAIN. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet DOMAIN part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DOMAIN. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet DOMAIN part=draft": {
     "requests": [
@@ -5296,7 +5296,7 @@
   },
   "cloud HandlerGet DATA_ELEMENT part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet DATA_ELEMENT part=metadata": {
     "requests": [
@@ -5312,15 +5312,15 @@
   },
   "cloud HandlerGet DATA_ELEMENT part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet DATA_ELEMENT part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=DATA_ELEMENT. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet DATA_ELEMENT part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DATA_ELEMENT. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet DATA_ELEMENT part=draft": {
     "requests": [
@@ -5374,15 +5374,15 @@
   },
   "cloud HandlerGet TABLE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TABLE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet TABLE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TABLE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet TABLE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet TABLE part=draft": {
     "requests": [
@@ -5436,15 +5436,15 @@
   },
   "cloud HandlerGet STRUCTURE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=STRUCTURE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet STRUCTURE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=STRUCTURE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet STRUCTURE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=STRUCTURE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet STRUCTURE part=draft": {
     "requests": [
@@ -5474,7 +5474,7 @@
   },
   "cloud HandlerGet TABLE_TYPE part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet TABLE_TYPE part=metadata": {
     "requests": [
@@ -5490,15 +5490,15 @@
   },
   "cloud HandlerGet TABLE_TYPE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet TABLE_TYPE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TABLE_TYPE. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet TABLE_TYPE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TABLE_TYPE. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet TABLE_TYPE part=draft": {
     "requests": [
@@ -5552,15 +5552,15 @@
   },
   "cloud HandlerGet DDL part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=DDL. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=DDL. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet DDL part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=DDL. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=DDL. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet DDL part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=DDL. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet DDL part=draft": {
     "requests": [
@@ -5614,15 +5614,15 @@
   },
   "cloud HandlerGet SERVICE_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet SERVICE_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet SERVICE_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet SERVICE_DEFINITION part=draft": {
     "requests": [
@@ -5707,15 +5707,15 @@
   },
   "cloud HandlerGet SERVICE_BINDING part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls. at part"
   },
   "cloud HandlerGet SERVICE_BINDING part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet SERVICE_BINDING part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=SERVICE_BINDING. It offers: source, metadata, urls. at part"
   },
   "cloud HandlerGet CLASS part=source": {
     "requests": [
@@ -5743,15 +5743,15 @@
   },
   "cloud HandlerGet CLASS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=CLASS. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=CLASS. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet CLASS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=CLASS. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=CLASS. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet CLASS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=CLASS. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet CLASS part=draft": {
     "requests": [
@@ -5856,23 +5856,23 @@
   },
   "cloud HandlerGet LOCAL_TEST_CLASS part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TEST_CLASS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TEST_CLASS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TEST_CLASS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet LOCAL_TEST_CLASS part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_TEST_CLASS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_TEST_CLASS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TYPES part=source": {
     "requests": [
@@ -5888,23 +5888,23 @@
   },
   "cloud HandlerGet LOCAL_TYPES part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TYPES part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TYPES part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_TYPES part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet LOCAL_TYPES part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_TYPES. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_TYPES. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=source": {
     "requests": [
@@ -5920,23 +5920,23 @@
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet LOCAL_DEFINITIONS part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_DEFINITIONS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_DEFINITIONS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_MACROS part=source": {
     "requests": [
@@ -5952,23 +5952,23 @@
   },
   "cloud HandlerGet LOCAL_MACROS part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_MACROS part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_MACROS part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "cloud HandlerGet LOCAL_MACROS part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet LOCAL_MACROS part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=LOCAL_MACROS. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=LOCAL_MACROS. It offers: source. at part"
   },
   "cloud HandlerGet PROGRAM part=source": {
     "requests": [
@@ -5996,19 +5996,19 @@
   },
   "cloud HandlerGet PROGRAM part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=PROGRAM. It offers: source, metadata. at part"
   },
   "cloud HandlerGet PROGRAM part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=PROGRAM. It offers: source, metadata. at part"
   },
   "cloud HandlerGet PROGRAM part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet PROGRAM part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=PROGRAM. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=PROGRAM. It offers: source, metadata. at part"
   },
   "cloud HandlerGet INCLUDE part=source": {
     "requests": [
@@ -6036,19 +6036,19 @@
   },
   "cloud HandlerGet INCLUDE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INCLUDE. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=INCLUDE. It offers: source, metadata. at part"
   },
   "cloud HandlerGet INCLUDE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INCLUDE. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=INCLUDE. It offers: source, metadata. at part"
   },
   "cloud HandlerGet INCLUDE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=INCLUDE. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet INCLUDE part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=INCLUDE. It offers: source, metadata."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=INCLUDE. It offers: source, metadata. at part"
   },
   "cloud HandlerGet INTERFACE part=source": {
     "requests": [
@@ -6076,15 +6076,15 @@
   },
   "cloud HandlerGet INTERFACE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=INTERFACE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet INTERFACE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=INTERFACE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet INTERFACE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=INTERFACE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet INTERFACE part=draft": {
     "requests": [
@@ -6114,7 +6114,7 @@
   },
   "cloud HandlerGet FUNCTION_GROUP part=source": {
     "requests": [],
-    "ended": "error answer: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=source is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet FUNCTION_GROUP part=metadata": {
     "requests": [
@@ -6130,15 +6130,15 @@
   },
   "cloud HandlerGet FUNCTION_GROUP part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet FUNCTION_GROUP part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft. at part"
   },
   "cloud HandlerGet FUNCTION_GROUP part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_GROUP. It offers: metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet FUNCTION_GROUP part=draft": {
     "requests": [
@@ -6199,15 +6199,15 @@
   },
   "cloud HandlerGet FUNCTION_MODULE part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet FUNCTION_MODULE part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet FUNCTION_MODULE part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=FUNCTION_MODULE. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet FUNCTION_MODULE part=draft": {
     "requests": [
@@ -6261,15 +6261,15 @@
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_DEFINITION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet BEHAVIOR_DEFINITION part=draft": {
     "requests": [
@@ -6323,15 +6323,15 @@
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=BEHAVIOR_IMPLEMENTATION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet BEHAVIOR_IMPLEMENTATION part=draft": {
     "requests": [
@@ -6448,15 +6448,15 @@
   },
   "cloud HandlerGet METADATA_EXTENSION part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet METADATA_EXTENSION part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft. at part"
   },
   "cloud HandlerGet METADATA_EXTENSION part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=METADATA_EXTENSION. It offers: source, metadata, draft."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet METADATA_EXTENSION part=draft": {
     "requests": [
@@ -6498,23 +6498,23 @@
   },
   "cloud HandlerGet UNIT_TEST part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet UNIT_TEST part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet UNIT_TEST part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet UNIT_TEST part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet UNIT_TEST part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet CDS_UNIT_TEST part=source": {
     "requests": [
@@ -6530,23 +6530,23 @@
   },
   "cloud HandlerGet CDS_UNIT_TEST part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet CDS_UNIT_TEST part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet CDS_UNIT_TEST part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet CDS_UNIT_TEST part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet CDS_UNIT_TEST part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=CDS_UNIT_TEST. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=CDS_UNIT_TEST. It offers: source. at part"
   },
   "cloud HandlerGet TRANSPORT part=source": {
     "requests": [
@@ -6562,23 +6562,23 @@
   },
   "cloud HandlerGet TRANSPORT part=metadata": {
     "requests": [],
-    "ended": "error answer: part=metadata is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "cloud HandlerGet TRANSPORT part=urls": {
     "requests": [],
-    "ended": "error answer: part=urls is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "cloud HandlerGet TRANSPORT part=contents": {
     "requests": [],
-    "ended": "error answer: part=contents is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "cloud HandlerGet TRANSPORT part=main_programs": {
     "requests": [],
-    "ended": "error answer: part=main_programs is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
   },
   "cloud HandlerGet TRANSPORT part=draft": {
     "requests": [],
-    "ended": "error answer: part=draft is not available for object_type=TRANSPORT. It offers: source."
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source. at part"
   },
   "cloud HandlerLock CLASS": {
     "requests": [

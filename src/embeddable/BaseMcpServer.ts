@@ -98,12 +98,13 @@ import {
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
-import type {
-  HandlerEntry,
-  IHandlerGroup,
-  IHandlersRegistry,
-  SapEnvironment,
-  ToolArgs,
+import {
+  argumentsRefusalOf,
+  type HandlerEntry,
+  type IHandlerGroup,
+  type IHandlersRegistry,
+  type SapEnvironment,
+  type ToolArgs,
 } from '../lib/handlers/interfaces.js';
 import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
@@ -1388,6 +1389,21 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * The kind a call runs on, known before its connection is taken: the
+   * kind this instance states, else the one recorded on the connection the
+   * host injected (the factory's record, `declareSystemKind`); `undefined`
+   * when neither names one — the kind is never guessed.
+   */
+  private kindBeforeConnection(): AbapSystemKind | undefined {
+    const stated = statedSystemKind(this.statedSystemType());
+    if (stated !== undefined) return stated;
+    const context = this.connectionContext;
+    return context?.kind === 'injected'
+      ? systemKindOf(context.connection)
+      : undefined;
+  }
+
+  /**
    * The kind of a connection this instance builds ({@link statedSystemType});
    * refused `system_type_required` when none is stated, before anything is
    * built or sent.
@@ -1755,6 +1771,25 @@ export abstract class BaseMcpServer extends McpServer {
               longTool && isLongRead(entry.toolDefinition.name, args);
             if (longTool && !longRead && statesBackground(args)) {
               return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
+            }
+            // A tool stated per variant (a type list) is read on the kind
+            // of the call, before anything is taken: none stated or
+            // recorded is `system_type_required` — no connection, no flow,
+            // no run, nothing sent; a value off that variant's list is
+            // refused in its schema's words.
+            if (entry.toolDefinition.variants !== undefined) {
+              const kind = this.kindBeforeConnection();
+              if (kind === undefined) {
+                return this.refusalAnswer(
+                  new ServerRefusal('system_type_required'),
+                );
+              }
+              const refused = argumentsRefusalOf(
+                entry.toolDefinition,
+                args,
+                kind,
+              );
+              if (refused !== undefined) return this.refusalAnswer(refused);
             }
             try {
               // A run tool's `background` is the wrapper's: read, refused

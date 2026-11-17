@@ -2471,8 +2471,10 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
  */
 export function compactSystemSchemaFor(
   variant: ProjectionVariant,
-  actions: readonly SystemAction[] = SYSTEM_ACTIONS,
-  rules: ProjectionVariant | undefined = variant,
+  actions: readonly SystemAction[],
+  // Stated by every caller, `undefined` included: a default here would
+  // turn the no-variant schema into the on-premise one.
+  rules: ProjectionVariant | undefined,
 ) {
   const properties = systemProperties(variant, actions);
   const { background, ...taken } = offered(
@@ -2577,7 +2579,7 @@ export function handlerSystemDefinitionFor(
 ) {
   return {
     description: handlerSystemDescription(actions),
-    inputSchema: compactSystemSchemaFor(variant, actions),
+    inputSchema: compactSystemSchemaFor(variant, actions, variant),
   };
 }
 

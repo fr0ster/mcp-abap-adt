@@ -216,19 +216,16 @@ Each entry is `{ toolDefinition, call(context, args), connectionless? }`
 (`HandlerEntry`); its `toolDefinition.inputSchema` is the tool's zod schema.
 Its `call` is wrapped. The wrapper, before the handler runs:
 
-- parses `args` with the tool's schema first — on the kind the exporter states (else the one
-  the connection was built for), whose schema holds that variant's type lists (24.0.0): a
-  refused call is rejected with the schema's words before any scope, resolver, access check
-  or request;
+- parses `args` with the tool's schema first — on the kind the exporter states, whose schema
+  holds that variant's type lists (24.0.0): a refused call is rejected with the schema's words
+  before any scope, resolver, access check or request;
 - states the exporter's `systemType` on the call's connection — the
-  connection of the `context` it is called with. The handler runs on that kind; with no
-  `systemType` stated, the connection has none, and a call that would reach a
-  system is refused `system_type_required` before anything is sent.
-  `SAP_SYSTEM_TYPE` is not read for it. A connection `createAbapConnection` built
-  for the other kind, or declared for it (`declareSystemKind`), is refused
-  `system_type_conflict` (24.0.0), naming both kinds; with no `systemType` stated, a tool stated
-  per variant is refused `system_type_required`, and the others run on the connection's
-  recorded or declared kind;
+  connection of the `context` it is called with — and the handler runs on that kind. A
+  connection `createAbapConnection` built for the other kind, or declared for it
+  (`declareSystemKind`), is refused `system_type_conflict` (24.0.0), naming both kinds. With
+  no `systemType` stated, a tool stated per variant is refused `system_type_required` before
+  anything is sent, and the others run on the connection's recorded or declared kind.
+  `SAP_SYSTEM_TYPE` is not read for it;
 - runs it in the call-transport scope with its call's own
   `transport_request` (the failure renderer's transport hint);
 - with a `systemContextResolver` (none by default since 19.0.0), fills the

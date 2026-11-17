@@ -105,6 +105,8 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
 - `systemContext` is per instance: two `EmbeddableMcpServer`s keep their own, and
   `getSystemContext()` no longer returns an instance's option. Code that read it there passes the
   values itself (`setSystemContext` still sets the process context).
+- A `HandlerExporter.createRegistry()` registry on a server with `backgroundRuns` lists the run tools
+  (`RuntimeRunClass`, `RuntimeRunProgram`) with `background`, as the server's own run tools are.
 
 ## Starts: nothing stated is ignored
 

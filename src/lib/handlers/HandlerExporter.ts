@@ -58,6 +58,27 @@ class ExportedRuntimeRunHandlersGroup extends RuntimeRunHandlersGroup {
 }
 
 /**
+ * The registry `createRegistry()` hands out. A server (`BaseMcpServer`)
+ * reads its groups and runs the run tools as it runs its own: `background`
+ * kept, served with the server's background runs and refused in words
+ * without them. A plain registration (`registerAllTools` on an
+ * `McpServer`) keeps no runs: it registers the run tools without
+ * `background`, as `getHandlerEntries()` hands them out.
+ */
+class ExportedRegistry extends CompositeHandlersRegistry {
+  constructor(
+    private readonly servedGroups: BaseHandlerGroup[],
+    plainGroups: BaseHandlerGroup[],
+  ) {
+    super(plainGroups);
+  }
+
+  override getHandlerGroups(): BaseHandlerGroup[] {
+    return [...this.servedGroups];
+  }
+}
+
+/**
  * The connection one call of a tool registered with
  * `HandlerExporter.registerOnServer` runs on: called for each call, sync or
  * async. What it returns is the call's; its lifetime is the embedder's.
@@ -220,6 +241,12 @@ export class HandlerExporter {
   /** The `logger` option as given: a handed-out handler's logger when stated. */
   private readonly statedLogger: Logger | undefined;
   private readonly handlerGroups: BaseHandlerGroup[];
+  /**
+   * The groups `createRegistry()` hands a server: the same, but the run
+   * tools keep `background` — the hosting server lists it when it has
+   * background runs, and strips it when it has none.
+   */
+  private readonly registryGroups: BaseHandlerGroup[];
   private readonly systemContextResolver: SystemContextResolver | null;
   private readonly systemContextRules: SystemContextRules | null;
   private readonly systemType: string | undefined;
@@ -301,9 +328,18 @@ export class HandlerExporter {
     if (options?.includeData === true) {
       this.handlerGroups.push(new DataHandlersGroup(dummyContext));
     }
+    const registryGroups = this.handlerGroups.map((group) =>
+      group instanceof ExportedRuntimeRunHandlersGroup
+        ? new RuntimeRunHandlersGroup(dummyContext)
+        : group,
+    );
     // The denied actions, applied once: every path starts from these groups.
     this.handlerGroups = withoutDenied(
       this.handlerGroups,
+      options?.deniedActions ?? [],
+    );
+    this.registryGroups = withoutDenied(
+      registryGroups,
       options?.deniedActions ?? [],
     );
   }
@@ -502,7 +538,7 @@ export class HandlerExporter {
    * `lineMatchStrategy`), and this exporter's do not apply.
    */
   createRegistry(): IHandlersRegistry {
-    return new CompositeHandlersRegistry(this.handlerGroups);
+    return new ExportedRegistry(this.registryGroups, this.handlerGroups);
   }
 }
 

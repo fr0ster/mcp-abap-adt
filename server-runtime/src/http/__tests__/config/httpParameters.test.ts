@@ -136,8 +136,8 @@ describe("http's help", () => {
     'MCP_SHUTDOWN_TIMEOUT',
     'x-sap-debug-terminal-id',
     'x-sap-debug-ide-id',
-    'SAP_DEBUG_TERMINAL_ID',
-    'SAP_DEBUG_IDE_ID',
+    // Named as the environment that is not read (D26 D2: headers only).
+    'SAP_DEBUG_* of the',
   ])('lists %s', (name) => {
     expect(help).toContain(name);
   });

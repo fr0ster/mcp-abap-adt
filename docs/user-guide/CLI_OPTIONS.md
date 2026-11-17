@@ -437,7 +437,7 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 | `--http-json-response` | `MCP_HTTP_ENABLE_JSON_RESPONSE` | `http.json-response` | flag | Answer with JSON responses rather than SSE streams |
 | `--http-allowed-hosts=<list>` | `MCP_HTTP_ALLOWED_HOSTS` | `http.allowed-hosts` | list | Host header values accepted with DNS-rebinding protection (exact, with the port) |
 | `--http-allowed-origins=<list>` | `MCP_HTTP_ALLOWED_ORIGINS` | `http.allowed-origins` | list | Origin header values accepted with DNS-rebinding protection (exact, with the scheme) |
-| `--http-enable-dns-protection` | `MCP_HTTP_ENABLE_DNS_PROTECTION` | `http.enable-dns-protection` | flag | Enable DNS-rebinding protection |
+| `--http-enable-dns-protection` | `MCP_HTTP_ENABLE_DNS_PROTECTION` | `http.enable-dns-protection` | flag | Enable DNS-rebinding protection, with `--http-allowed-hosts` and/or `--http-allowed-origins`: either without the other is refused at startup (it would check nothing) |
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `http.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `http.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
 | `--tls-ca=<path>` | `MCP_TLS_CA` | `http.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
@@ -507,7 +507,7 @@ answered `400`; a `GET` or `POST` with `x-mcp-destination` is answered `400`.
 | `--post-path=<path>` | — | — | path | The path of a connection's `POST` messages (default `/messages`) |
 | `--sse-allowed-hosts=<list>` | `MCP_SSE_ALLOWED_HOSTS` | `sse.allowed-hosts` | list | Host header values accepted with DNS-rebinding protection (exact, with the port) |
 | `--sse-allowed-origins=<list>` | `MCP_SSE_ALLOWED_ORIGINS` | `sse.allowed-origins` | list | Origin header values accepted with DNS-rebinding protection (exact, with the scheme) |
-| `--sse-enable-dns-protection` | `MCP_SSE_ENABLE_DNS_PROTECTION` | `sse.enable-dns-protection` | flag | Enable DNS-rebinding protection |
+| `--sse-enable-dns-protection` | `MCP_SSE_ENABLE_DNS_PROTECTION` | `sse.enable-dns-protection` | flag | Enable DNS-rebinding protection, with `--sse-allowed-hosts` and/or `--sse-allowed-origins`: either without the other is refused at startup (it would check nothing) |
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `sse.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `sse.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
 | `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |

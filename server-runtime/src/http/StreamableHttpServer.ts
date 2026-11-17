@@ -24,6 +24,7 @@ import {
   getProtocol,
   headerContext,
   refuseDestinationHeader,
+  refuseIncompleteDnsRebinding,
   requestFailureAnswer,
   withDnsRebindingProtection,
 } from '@mcp-abap-adt/lib/http-transport';
@@ -115,7 +116,11 @@ export interface StreamableHttpServerOptions {
   allowedHosts?: string[] | undefined;
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
   allowedOrigins?: string[] | undefined;
-  /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
+  /**
+   * Enable DNS-rebinding protection: with allowedHosts and/or allowedOrigins.
+   * Either without the other is refused at construction
+   * (`DnsRebindingSettingsRefusal`): it would check nothing.
+   */
   enableDnsRebindingProtection?: boolean | undefined;
   /**
    * Where background runs and their answers are kept, handed to every
@@ -265,6 +270,8 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.path = opts?.path ?? '/mcp/stream/http';
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
+    // Incomplete DNS-rebinding settings check nothing: refused here.
+    refuseIncompleteDnsRebinding(opts ?? {});
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;

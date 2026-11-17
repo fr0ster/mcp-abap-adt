@@ -19,6 +19,7 @@ import {
   listValue,
   numberValue,
   type Parameter,
+  ParameterRefusal,
   type ParameterTable,
   parameterSource,
   readAccessRestrictions,
@@ -33,6 +34,7 @@ import {
   wordValue,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { incompleteDnsRebindingWords } from '@mcp-abap-adt/lib/http-transport';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 
@@ -103,7 +105,7 @@ export const SSE_ROWS: readonly Parameter[] = [
     yaml: 'sse.enable-dns-protection',
     kind: 'flag',
     section: SSE,
-    help: 'Enable DNS-rebinding protection (with --sse-allowed-hosts and/or --sse-allowed-origins)',
+    help: 'Enable DNS-rebinding protection, with --sse-allowed-hosts and/or --sse-allowed-origins: either without the other is refused at startup (it would check nothing)',
   },
 ];
 
@@ -174,6 +176,28 @@ export function readSseConfig(
 ): SseConfig {
   const table = sseParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
+  // Incomplete DNS-rebinding settings check nothing: refused, naming the
+  // forms used.
+  const formOf = (key: string, cli: string) =>
+    parameterSource(table, key, argv, env, yaml) ?? cli;
+  const incomplete = incompleteDnsRebindingWords(
+    {
+      enableDnsRebindingProtection: flagValue(
+        values.enableDnsRebindingProtection,
+      ),
+      allowedHosts: listValue(values.allowedHosts),
+      allowedOrigins: listValue(values.allowedOrigins),
+    },
+    {
+      enable: formOf(
+        'enableDnsRebindingProtection',
+        '--sse-enable-dns-protection',
+      ),
+      hosts: formOf('allowedHosts', '--sse-allowed-hosts'),
+      origins: formOf('allowedOrigins', '--sse-allowed-origins'),
+    },
+  );
+  if (incomplete !== undefined) throw new ParameterRefusal(incomplete);
   return {
     configFile: textValue(values.configFile),
     systemType: wordValue(values.systemType, SYSTEM_TYPES),

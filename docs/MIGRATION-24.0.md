@@ -104,6 +104,12 @@ A value a start states is read as stated, or the start is refused naming it.
   drop the extra value.
 - **`--http-json-response=false` gives SSE streams** (and its variable and YAML key). Before, a
   stated `false` answered JSON like an absent flag; leave the flag out to keep JSON.
+- **DNS-rebinding protection and its lists go together.** `--http-allowed-hosts` /
+  `--http-allowed-origins` without `--http-enable-dns-protection` (SSE: the `--sse-` forms)
+  checked nothing, and the enable flag without a list let every request through; an embedder's
+  `allowedHosts` / `allowedOrigins` / `enableDnsRebindingProtection` on `StreamableHttpServer` and
+  `SseServer` alike. Each is refused now, at start or construction: state the flag and at least
+  one list, or neither.
 
 ## RFC destinations: the address is stated
 

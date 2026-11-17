@@ -118,14 +118,17 @@ describe.each(LAUNCHERS)('$name: a flag and its value', (launcher) => {
     (flag) => {
       const row = launcher.table.rows.find((each) => each.cli === flag);
       const key = row?.key ?? '';
+      // The DNS-rebinding flag is read only beside a list (F1).
+      const besides = flag.endsWith('-enable-dns-protection')
+        ? [`${flag.slice(0, -'enable-dns-protection'.length)}allowed-hosts=h:1`]
+        : [];
+      const on = (args: readonly string[]) =>
+        startWith(launcher, [...args, ...besides]).config;
       const off = startWith(launcher, [`${flag}=false`]).config;
       expect(off).toBeDefined();
       expect(off).toHaveProperty(key, false);
-      expect(startWith(launcher, [`${flag}=true`]).config).toHaveProperty(
-        key,
-        true,
-      );
-      expect(startWith(launcher, [flag]).config).toHaveProperty(key, true);
+      expect(on([`${flag}=true`])).toHaveProperty(key, true);
+      expect(on([flag])).toHaveProperty(key, true);
     },
   );
 });

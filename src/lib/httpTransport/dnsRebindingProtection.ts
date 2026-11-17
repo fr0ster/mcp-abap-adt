@@ -31,7 +31,78 @@ function reject(message: string): RebindingRefusal {
   };
 }
 
-/** Returns a 403 descriptor if the request must be rejected, else null. */
+/** The DNS-rebinding settings as a start or an embedder states them. */
+export interface DnsRebindingSettings {
+  readonly enableDnsRebindingProtection?: boolean | undefined;
+  readonly allowedHosts?: readonly string[] | undefined;
+  readonly allowedOrigins?: readonly string[] | undefined;
+}
+
+/** How a refusal names each setting: the form the user used. */
+export interface DnsRebindingNames {
+  readonly enable: string;
+  readonly hosts: string;
+  readonly origins: string;
+}
+
+/** The option names of the server classes, as an embedder states them. */
+export const DNS_REBINDING_OPTION_NAMES: DnsRebindingNames = {
+  enable: 'enableDnsRebindingProtection',
+  hosts: 'allowedHosts',
+  origins: 'allowedOrigins',
+};
+
+/** An incomplete combination of DNS-rebinding settings, refused at construction. */
+export class DnsRebindingSettingsRefusal extends Error {
+  readonly words: string;
+
+  constructor(words: string) {
+    super(words);
+    this.name = 'DnsRebindingSettingsRefusal';
+    this.words = words;
+  }
+}
+
+/**
+ * Why `settings` are incomplete, in words naming them by `names`, or
+ * undefined: allowed hosts or origins without the protection enabled are
+ * checked by nothing, and the protection enabled without a list has nothing
+ * to check against. Both together, or neither, are complete.
+ */
+export function incompleteDnsRebindingWords(
+  settings: DnsRebindingSettings,
+  names: DnsRebindingNames,
+): string | undefined {
+  const lists = [
+    ...((settings.allowedHosts?.length ?? 0) > 0 ? [names.hosts] : []),
+    ...((settings.allowedOrigins?.length ?? 0) > 0 ? [names.origins] : []),
+  ];
+  const enabled = settings.enableDnsRebindingProtection === true;
+  if (!enabled && lists.length > 0) {
+    return `${lists.join(' and ')} without ${names.enable}: DNS-rebinding protection checks the hosts and origins only when it is enabled — add ${names.enable}, or drop them`;
+  }
+  if (enabled && lists.length === 0) {
+    return `${names.enable} without ${names.hosts} or ${names.origins}: DNS-rebinding protection has nothing to check against — state the hosts or origins to accept`;
+  }
+  return undefined;
+}
+
+/** Throws {@link DnsRebindingSettingsRefusal} for incomplete settings of a server class. */
+export function refuseIncompleteDnsRebinding(
+  settings: DnsRebindingSettings,
+): void {
+  const words = incompleteDnsRebindingWords(
+    settings,
+    DNS_REBINDING_OPTION_NAMES,
+  );
+  if (words !== undefined) throw new DnsRebindingSettingsRefusal(words);
+}
+
+/**
+ * Returns a 403 descriptor if the request must be rejected, else null.
+ * Enabled with no list it fails closed: incomplete settings are refused at
+ * construction, and nothing here lets every request through for them.
+ */
 export function checkDnsRebinding(
   headers: { host?: string | undefined; origin?: string | undefined },
   opts: DnsRebindingOptions,
@@ -39,6 +110,9 @@ export function checkDnsRebinding(
   if (opts.enable !== true) return null;
   const hosts = opts.allowedHosts ?? [];
   const origins = opts.allowedOrigins ?? [];
+  if (hosts.length === 0 && origins.length === 0) {
+    return reject('DNS-rebinding protection is enabled with nothing to accept');
+  }
   if (hosts.length > 0) {
     const host = headers.host;
     if (!host || !hosts.includes(host)) {

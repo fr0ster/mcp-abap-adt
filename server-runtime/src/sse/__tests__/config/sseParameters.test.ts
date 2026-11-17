@@ -200,6 +200,7 @@ describe('every SSE option of today is read under its name', () => {
           sse: {
             port: 3007,
             'allowed-hosts': ['localhost:3007'],
+            'enable-dns-protection': true,
             tls: { cert: '/c', key: '/k' },
           },
         },

@@ -60,8 +60,12 @@ await connection.disconnect();
 (`createRegistry().registerAllTools(mcpServer)`, see
 [the handlers README](../../src/lib/handlers/README.md#which-variant-a-plain-registration-lists)),
 through the same code: the tools, descriptions, schemas and search members of the variant
-`systemType` states. With no `systemType`, every definition is listed as it is, and every call
-that would reach a system is refused `system_type_required` before anything is sent.
+`systemType` states. With no `systemType` stated, every definition is listed as it is; a tool stated per variant is refused
+`system_type_required` before anything is sent, and a tool listed alike on every variant runs on the
+connection's recorded kind (the factory's record) or declared kind (`declareSystemKind`), whatever
+`SAP_SYSTEM_TYPE` says. The kind a registration was listed for is the one kind of its calls: a
+provided context (`registerHandlersOnCall`, `registerOnServer`) stating another kind — or any kind,
+where the registration was listed for none — is refused `system_type_conflict`, never run on its kind.
 `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call.
 
 The exporter keeps no background-run store and no debugger, so on its own paths

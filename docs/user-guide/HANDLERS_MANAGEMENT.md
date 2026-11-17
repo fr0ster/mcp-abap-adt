@@ -374,9 +374,12 @@ example from `HandlerExporter` in `@mcp-abap-adt/lib/handlers`) lists the varian
 (`systemType` of their `HandlerContext`, `HandlerExporter`'s `systemType` option), by the same rule
 as a server instance: the variant's tool set, its descriptions and schemas, and search `_meta`
 naming only the members it offers; its calls run on that variant. `SAP_SYSTEM_TYPE` is not read
-there, for the listing or for a call. With no `systemType` stated, every definition is listed as it
-is, and every call that would reach a system is refused `system_type_required` before anything is
-sent, whatever `SAP_SYSTEM_TYPE` says. The binaries and `EmbeddableMcpServer` read `SAP_SYSTEM_TYPE` once, at
+there, for the listing or for a call. With no `systemType` stated, every definition is listed as it is; a tool stated per variant is refused
+`system_type_required` before anything is sent, and a tool listed alike on every variant runs on the
+connection's recorded kind (the factory's record) or declared kind (`declareSystemKind`), whatever
+`SAP_SYSTEM_TYPE` says. The kind a registration was listed for is the one kind of its calls: a
+provided context (`registerHandlersOnCall`, `registerOnServer`) stating another kind — or any kind,
+where the registration was listed for none — is refused `system_type_conflict`, never run on its kind. The binaries and `EmbeddableMcpServer` read `SAP_SYSTEM_TYPE` once, at
 construction, when no `systemType` option is given: one kind for the server's life. A connection
 recorded or declared for another kind than the one stated is refused `system_type_conflict`. Groups that state different variants are refused when they are
 registered, before anything is registered — a variant stated beside none as well; the error names

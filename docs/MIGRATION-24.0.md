@@ -136,7 +136,10 @@ A value a start states is read as stated, or the start is refused naming it.
   `createAbapConnection` for the other kind) or declared kind (`declareSystemKind`) differs is
   refused `system_type_conflict` before it is used: inject a connection of the server's kind. A
   handler group or `HandlerExporter` states its own kind the same way (`systemType`); stating
-  none, a tool stated per variant is refused `system_type_required`.
+  none, a tool stated per variant is refused `system_type_required`. The check covers every
+  connection handed to work: a `freshConnection` factory must return a connection of the server's
+  kind, and a context a group's provider hands it (`registerHandlersOnCall`) may not state another
+  kind than the group was listed for.
 
 - **A flag's value follows `=`.** `--auth-debug false`, `--unsafe false`,
   `--http-enable-dns-protection false` (and every other flag followed by a separate `true` or

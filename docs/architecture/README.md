@@ -128,17 +128,22 @@ background-run store and no debugger, so it hands out neither (no background-run
 
 `getHandlerEntries()` and `getToolNames()` give the same handlers without a server. Each handler
 `getHandlerEntries()` hands out runs on the system kind the exporter states (`systemType`), stated on
-the call's connection before it runs; with none stated, a call that would reach a system is refused
-`system_type_required` before anything is sent. `SAP_SYSTEM_TYPE` is not read for it.
+the call's connection before it runs; a connection recorded or declared for another kind is refused
+`system_type_conflict`. With none stated, a tool stated per variant is refused `system_type_required`
+before anything is sent, and the others run on the connection's recorded or declared kind.
+`SAP_SYSTEM_TYPE` is not read for it.
 
 Registered on a plain SDK `McpServer` (`registerOnServer`, or a registry's
 `registerAllTools(mcpServer)`), the tools are listed on the variant the exporter states
 (`systemType`), as a server instance lists them: that variant's tool set, descriptions, schemas
 and search members, and its calls run on that variant. The exporter's own groups
 (`createRegistry()`) carry no connection, so their calls need `registerOnServer` or a server
-instance. `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call. With no
-`systemType` stated, the definitions are listed as they are and every call that would reach a
-system is refused `system_type_required` before anything is sent, whatever `SAP_SYSTEM_TYPE` says.
+instance. `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call. With no `systemType` stated, every definition is listed as it is; a tool stated per variant is refused
+`system_type_required` before anything is sent, and a tool listed alike on every variant runs on the
+connection's recorded kind (the factory's record) or declared kind (`declareSystemKind`), whatever
+`SAP_SYSTEM_TYPE` says. The kind a registration was listed for is the one kind of its calls: a
+provided context (`registerHandlersOnCall`, `registerOnServer`) stating another kind — or any kind,
+where the registration was listed for none — is refused `system_type_conflict`, never run on its kind.
 A server instance
 (`EmbeddableMcpServer`, the binaries) still reads `SAP_SYSTEM_TYPE` when its `systemType` option
 states none. Groups that state different

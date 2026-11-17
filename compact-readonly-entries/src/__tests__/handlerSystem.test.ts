@@ -30,15 +30,13 @@ import {
   handleSearchSource,
   READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,
 } from '../../../src/__tests__/helpers/recordingConnection';
 import type { ProjectionVariant } from '../../../src/lib/adtProjections';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../src/lib/systemContext';
+import { resetSystemContextCache } from '../../../src/lib/systemContext';
 import { declareSystemKind } from '../../../src/lib/systemKind';
 import {
   handleHandlerSystem,

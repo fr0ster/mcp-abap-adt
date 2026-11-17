@@ -102,6 +102,9 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
   shaped only the default registry. Drop them, or build the registry they describe yourself.
   `EmbeddableMcpServerOptions` is a union now; an `interface` that extended it extends
   `EmbeddableMcpServerBaseOptions` instead.
+- `systemContext` is per instance: two `EmbeddableMcpServer`s keep their own, and
+  `getSystemContext()` no longer returns an instance's option. Code that read it there passes the
+  values itself (`setSystemContext` still sets the process context).
 
 ## Starts: nothing stated is ignored
 

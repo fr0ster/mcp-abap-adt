@@ -34,7 +34,6 @@ import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
 import type { HeldLocks } from '../lib/state/heldLocks.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
-import { setSystemContext } from '../lib/systemContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
@@ -172,9 +171,10 @@ export interface EmbeddableMcpServerBaseOptions {
   version?: string;
 
   /**
-   * System context (masterSystem, responsible, masterLanguage).
-   * Set this to avoid HTTP calls that resolve system info at runtime.
-   * If not provided, handlers will use whatever is available from env vars.
+   * System context (masterSystem, responsible, masterLanguage) of this
+   * instance's calls, where the request states none: per instance, never
+   * the process's (two instances keep their own). Without it, the process
+   * configuration answers.
    */
   systemContext?: Partial<IAdtSystemContext>;
 
@@ -306,6 +306,8 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       version: options.version ?? DEFAULT_VERSION,
       logger: options.logger,
       systemType: options.systemType,
+      // This instance's own: never merged into the process context.
+      systemContext: options.systemContext,
       systemContextResolver: options.systemContextResolver,
       systemContextRules: options.systemContextRules,
       stateIdleMinutes: options.stateIdleMinutes,
@@ -343,10 +345,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
 
     // The latest injection of this connection decides.
     registerFreshConnectionFactory(options.connection, options.freshConnection);
-
-    if (options.systemContext) {
-      setSystemContext(options.systemContext);
-    }
 
     // Use provided registry or create default based on exposition
     const registry =

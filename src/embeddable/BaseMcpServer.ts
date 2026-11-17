@@ -178,6 +178,7 @@ import {
 } from '../lib/state/stateHandleArgument.js';
 import {
   getStatedSystemContext,
+  type IAdtSystemContext,
   systemContextFromConfiguration,
 } from '../lib/systemContext.js';
 import {
@@ -312,6 +313,8 @@ export abstract class BaseMcpServer extends McpServer {
    * `SAP_SYSTEM_TYPE` answers ({@link statedSystemType}).
    */
   protected readonly systemType?: SapEnvironment | undefined;
+  /** What the instance's `systemContext` option states, as a destination would. */
+  private readonly instanceSystemContext: DestinationSystemContext | undefined;
   /** The access-check strategy the host gave; `undefined`: none. */
   private readonly accessChecks: IAccessChecks | undefined;
   /** The tools the `-ro` twins serve, read once when a strategy is given. */
@@ -431,6 +434,13 @@ export abstract class BaseMcpServer extends McpServer {
     version?: string | undefined;
     logger?: Logger | undefined;
     systemType?: SapEnvironment | undefined;
+    /**
+     * The system context this instance states (an embedder's
+     * `systemContext`): entered for its calls where neither the request nor
+     * the connection's destination states the key. Per instance, never the
+     * process's.
+     */
+    systemContext?: Partial<IAdtSystemContext> | undefined;
     /** Asks a connection's system for its information; default none. */
     systemContextResolver?: SystemContextResolver | null | undefined;
     /** The rules that make a connection's parameters; default none. */
@@ -593,6 +603,7 @@ export abstract class BaseMcpServer extends McpServer {
     this.stateHandleArgument = options.stateHandleArgument === true;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     this.systemType = options.systemType;
+    this.instanceSystemContext = destinationContextOf(options.systemContext);
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;
     // The session's end: the transport closed (the SDK calls the protocol's
@@ -1026,7 +1037,7 @@ export abstract class BaseMcpServer extends McpServer {
       return { ...statedCallOf(connection, this.systemType), warn };
     }
     return withDestinationSystemContext(
-      this.systemContexts.get(connection),
+      this.statedContextOf(connection),
       () => ({
         kind: systemKindOf(connection, process.env, this.systemType),
         responsible: statedResponsibleOf(destination.responsible),
@@ -1347,6 +1358,18 @@ export abstract class BaseMcpServer extends McpServer {
       this.leftoverSessions?.track(connection, 'built', identity);
     }
     return connection;
+  }
+
+  /**
+   * What `connection`'s calls enter as stated: its destination's own
+   * context, and the instance's `systemContext` for the keys it lacks.
+   */
+  private statedContextOf(
+    connection: IAbapConnection,
+  ): DestinationSystemContext | undefined {
+    const destination = this.systemContexts.get(connection);
+    if (this.instanceSystemContext === undefined) return destination;
+    return { ...this.instanceSystemContext, ...destination };
   }
 
   /**
@@ -1877,7 +1900,7 @@ export abstract class BaseMcpServer extends McpServer {
                 this.inHeldFlow(holdsFlow, context.connection, () =>
                   runWithRequestSignal(signal, () =>
                     withDestinationSystemContext(
-                      this.systemContexts.get(context.connection),
+                      this.statedContextOf(context.connection),
                       () =>
                         // Asked before the tool (`systemBeforeTool`):
                         // nothing is sent here.
@@ -2269,7 +2292,7 @@ export abstract class BaseMcpServer extends McpServer {
           this.inHeldFlow(call.holdsFlow, connection, () =>
             runWithRequestSignal(owner.signal(), () =>
               withDestinationSystemContext(
-                this.systemContexts.get(connection),
+                this.statedContextOf(connection),
                 () =>
                   withKnownSystemContext(call.system, () =>
                     asRecordedCall(() =>
@@ -2891,7 +2914,7 @@ export abstract class BaseMcpServer extends McpServer {
             );
             return await this.inHeldFlow(true, connection, () =>
               withDestinationSystemContext(
-                this.systemContexts.get(connection),
+                this.statedContextOf(connection),
                 () => withKnownSystemContext(system, () => run()),
               ),
             );
@@ -3167,4 +3190,16 @@ function withSearchMeta(name: unknown, registered: unknown): unknown {
     },
   });
   return registered;
+}
+
+/** An embedder's `systemContext` as a destination's stated context: its values only. */
+function destinationContextOf(
+  context: Partial<IAdtSystemContext> | undefined,
+): DestinationSystemContext | undefined {
+  if (context === undefined) return undefined;
+  const stated: DestinationSystemContext = {};
+  if (context.responsible) stated.responsible = context.responsible;
+  if (context.masterSystem) stated.masterSystem = context.masterSystem;
+  if (context.masterLanguage) stated.masterLanguage = context.masterLanguage;
+  return stated;
 }

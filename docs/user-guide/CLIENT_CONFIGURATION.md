@@ -396,7 +396,7 @@ How the scope combines with the process context:
 | Key in the scope | Result for this request |
 |---|---|
 | `responsible` present (even `undefined`) | The scope's value — never a process value (neither `SAP_RESPONSIBLE` nor `setSystemContext`); the connection's parameters replace it where they are made (below) |
-| `responsible` absent | The process value (`SAP_RESPONSIBLE`, or what `setSystemContext` / `systemContext` stated) |
+| `responsible` absent | The instance's `systemContext` (an `EmbeddableMcpServer` option, per instance), else the process value (`SAP_RESPONSIBLE`, or what `setSystemContext` stated) |
 | `login` | The user the request is logged on as: never the responsible by itself — only the rules (below) make it one |
 | `masterSystem` present (even `undefined`) / absent | The scope's value / the process value |
 | `masterLanguage` | Always the scope's value inside a scope, never the process value |

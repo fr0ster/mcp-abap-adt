@@ -1028,13 +1028,19 @@ export abstract class BaseMcpServer extends McpServer {
    * responsible (the request's headers, its own `SAP_RESPONSIBLE`, the
    * process's), its login (its settings' `SAP_USERNAME`, else its source's
    * `x-sap-login`), its master system —; a host's connection's
-   * (`statedCallOf`). The kind is the connection's (`systemKindOf`).
+   * (`statedCallOf`). The kind is the connection's (`systemKindOf`). Both
+   * read inside what the connection's calls enter as stated
+   * (`statedContextOf`), the instance's `systemContext` included: an
+   * injected connection's rules see it as a built one's do.
    */
   private statedCall(connection: IAbapConnection): SystemCall {
     const warn = (message: string) => this.logger?.warn?.(message);
     const destination = this.destinationOf.get(connection);
     if (destination === undefined) {
-      return { ...statedCallOf(connection, this.systemType), warn };
+      return withDestinationSystemContext(
+        this.statedContextOf(connection),
+        () => ({ ...statedCallOf(connection, this.systemType), warn }),
+      );
     }
     return withDestinationSystemContext(
       this.statedContextOf(connection),
@@ -2605,7 +2611,13 @@ export abstract class BaseMcpServer extends McpServer {
       const named = await this.callerUserOf(signal, () =>
         this.systems.get(connection),
       );
-      const stated = statedCallOf(connection, this.systemType);
+      // Read inside what the connection's calls enter as stated: the
+      // instance's `systemContext` names the caller as it names a create's
+      // responsible.
+      const stated = withDestinationSystemContext(
+        this.statedContextOf(connection),
+        () => statedCallOf(connection, this.systemType),
+      );
       return {
         system,
         client: '',

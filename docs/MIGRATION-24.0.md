@@ -104,7 +104,9 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
   `EmbeddableMcpServerBaseOptions` instead.
 - `systemContext` is per instance: two `EmbeddableMcpServer`s keep their own, and
   `getSystemContext()` no longer returns an instance's option. Code that read it there passes the
-  values itself.
+  values itself. The instance's own reaches every path of its calls, a connection the host injected
+  included: the rules (`systemContextRules`) read its `responsible` and `masterSystem` where the
+  system has no `systeminformation`, and a background run's caller is its `responsible`.
 - **`setSystemContext` is removed** (`@mcp-abap-adt/lib/utils` and the system context module): it
   set one context for the whole process. State `systemContext` on the server's options
   (`EmbeddableMcpServer`, `BaseMcpServer`); a process without a server states `SAP_RESPONSIBLE`,

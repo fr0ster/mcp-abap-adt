@@ -560,6 +560,21 @@ export function liveDescribe(
   });
 }
 
+/** The background runs of the `throughServer` describe running now: settles once each has ended. */
+let serverRuns: (() => Promise<void>) | undefined;
+
+/**
+ * Settles once every background run the running `throughServer` describe's
+ * server started has ended (its answer kept by the store): a run's end is
+ * waited for on the store, never polled. Outside such a describe it throws.
+ */
+export function backgroundRunsEnded(): Promise<void> {
+  if (serverRuns === undefined) {
+    throw new Error('no in-process server: call it inside throughServer');
+  }
+  return serverRuns();
+}
+
 /**
  * The enclosing describe's cases run on an in-process server started with
  * `restriction` (nothing denied by default): every call, a read-back and a
@@ -576,6 +591,7 @@ export function throughServer(
   restriction: ServerRestriction | (() => Promise<ServerRestriction>) = {},
 ): void {
   let outer: LiveRunner | undefined;
+  let ownRuns: (() => Promise<void>) | undefined;
   before(async () => {
     const base = current();
     outer = base;
@@ -589,6 +605,8 @@ export function throughServer(
       undefined,
       stated,
     );
+    ownRuns = () => server.runsEnded();
+    serverRuns = ownRuns;
     useLiveRunner({
       system: base.system,
       user: base.user,
@@ -598,6 +616,7 @@ export function throughServer(
     });
   });
   after(async () => {
+    if (serverRuns === ownRuns) serverRuns = undefined;
     const restricted = runner;
     if (outer !== undefined) useLiveRunner(outer);
     if (restricted !== undefined && restricted !== outer) {

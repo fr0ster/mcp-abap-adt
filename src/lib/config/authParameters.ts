@@ -249,7 +249,7 @@ function nameIn(p: Parameter, source: Source, cliName?: string): string {
 
 function valueHint(p: Parameter): string {
   if (p.valueHint !== undefined) return p.valueHint;
-  if (p.kind === 'flag') return '';
+  if (p.kind === 'flag') return '[=true|false]';
   if (p.kind === 'port') return '=<port>';
   if (p.kind === 'enum') return `=<${p.values?.join('|')}>`;
   if (p.kind === 'list') return '=<a,b>';
@@ -354,8 +354,18 @@ function readCli(
     for (let i = 0; i < argv.length; i++) {
       const arg = argv[i];
       if (arg === name) {
-        if (p.kind === 'flag') return { name, raw: true };
         const next = argv[i + 1];
+        if (p.kind === 'flag') {
+          // A flag's value follows `=`: a separate `true` / `false` after a
+          // bare flag is refused, never read as its value nor left behind.
+          const word = next?.trim().toLowerCase();
+          if (next !== undefined && (word === 'true' || word === 'false')) {
+            throw new ParameterRefusal(
+              `${name} ${next}: a flag's value follows "=" — write ${name}=${word}`,
+            );
+          }
+          return { name, raw: true };
+        }
         if (next === undefined || next.startsWith('-')) {
           throw new ParameterRefusal(
             `${name} needs a value: ${name}${valueHint(p)}`,
@@ -573,7 +583,8 @@ ${options.description}
   --version, -v                    Show the version
 
   Each parameter has a CLI form, and an environment and a YAML form where listed; the
-  CLI wins over the environment, which wins over the YAML file. An invalid value is
+  CLI wins over the environment, which wins over the YAML file. A flag is --flag (true)
+  or --flag=true|false; --flag false, in two words, is refused. An invalid value is
   refused at startup, and so is a parameter of another binary, naming the binary that
   serves it. Secrets and the session live in .env or the environment, never in YAML:
   the server refuses a YAML key that looks like one.

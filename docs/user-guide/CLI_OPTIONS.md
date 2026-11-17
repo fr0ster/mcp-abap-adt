@@ -64,6 +64,11 @@ value is **refused at startup**, naming the parameter in the form you used
 (`Invalid --browser-auth-port: "abc". Must be a port between 1 and 65535`), instead of being
 ignored.
 
+**A flag is `--flag` (true) or `--flag=true` / `--flag=false`.** Its value follows `=`:
+`--flag false` in two words is refused at startup with the form to write
+(`--auth-debug false: a flag's value follows "=" — write --auth-debug=false`); before 24.0.0
+the bare flag turned the option on and the `false` was left unread.
+
 ### `--transport` is gone
 
 `--transport`, `MCP_TRANSPORT` and the YAML key `transport`, with any value, stop every binary with

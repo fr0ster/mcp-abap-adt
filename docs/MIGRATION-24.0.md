@@ -89,6 +89,15 @@ entry); a registry's own tool follows the same rule.
 batch mode; one that read the debugger batch's answers with `BatchAnswers` registers
 `DebugBatchHandlersGroup`, which carries `DebugBatchAnswers`.
 
+## Starts: nothing stated is ignored
+
+A value a start states is read as stated, or the start is refused naming it.
+
+- **A flag's value follows `=`.** `--auth-debug false`, `--unsafe false`,
+  `--http-enable-dns-protection false` (and every other flag followed by a separate `true` or
+  `false`) turned the flag **on** and left the word unread. It is refused now, naming the form
+  to write: use `--auth-debug=false`, or leave the flag out. A bare `--flag` is still `true`.
+
 ## RFC destinations: the address is stated
 
 An RFC destination states its own address, its client and its logon language.

@@ -20,6 +20,7 @@
   "src/__tests__/integration/coverage/activateObjectsRefusal.live.test.ts",
   "src/__tests__/integration/coverage/activatePerType.live.test.ts",
   "src/__tests__/integration/coverage/amdpDebugger.live.test.ts",
+  "src/__tests__/integration/coverage/atc.live.test.ts",
   "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
   "src/__tests__/integration/coverage/createLanguage.live.test.ts",
   "src/__tests__/integration/coverage/debugger.live.test.ts",

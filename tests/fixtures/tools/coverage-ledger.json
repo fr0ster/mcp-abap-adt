@@ -916,6 +916,27 @@
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   },
+  "HandlerSystem#atc_findings": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/atc.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/atc.live.test.ts"
+    }
+  },
+  "HandlerSystem#atc_result": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/atc.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/atc.live.test.ts"
+    }
+  },
+  "HandlerSystem#atc_results": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/atc.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/atc.live.test.ts"
+    }
+  },
   "HandlerSystem#package_tree": {
     "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
     "live": {

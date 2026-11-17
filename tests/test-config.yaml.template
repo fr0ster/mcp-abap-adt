@@ -1998,7 +1998,8 @@ get_table_contents:
         test_table: "T000"
         max_rows: 10
 
-# Read by readOnly/atc/AtcHandlers.test.ts. A shared object, the check
+# Read by readOnly/atc/AtcHandlers.test.ts and coverage/atc.live.test.ts
+# (HandlerSystem's ATC reads of one run). A shared object, the check
 # variant, the findings expected. onprem, cloud.
 run_atc:
   test_cases:

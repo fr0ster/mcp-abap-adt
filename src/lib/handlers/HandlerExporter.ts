@@ -175,17 +175,17 @@ export interface HandlerExporterOptions {
   includeData?: boolean;
 
   /**
-   * The SAP system kind the handlers serve, for a connection the factory
-   * did not build: the rules (`systemContextRules`) read a lookup by it.
-   * Never guessed. On a server instance it overrides `SAP_SYSTEM_TYPE`;
-   * not required there: without it and `SAP_SYSTEM_TYPE` the kind is
-   * unknown, and what that means is the rules'. It is also the variant a plain registration
-   * (`createRegistry().registerAllTools(mcpServer)`) lists and calls on:
-   * that variant's tools, descriptions and schemas — and the kind every
-   * handler `getHandlerEntries()` hands out runs on. Without it the
-   * definitions are listed as they are and every call that would reach a
-   * system is refused `system_type_required`; `SAP_SYSTEM_TYPE` is not read
-   * on either path.
+   * The SAP system kind the exporter's own paths serve: the kind every
+   * handler `getHandlerEntries()` hands out runs on, the variant a plain
+   * registration (`registerOnServer`, `createRegistry().registerAllTools(mcpServer)`)
+   * lists and calls on — that variant's tools, descriptions and schemas —
+   * and the kind the rules (`systemContextRules`) read a lookup by. Never
+   * guessed: without it the definitions are listed as they are and every
+   * call that would reach a system is refused `system_type_required`;
+   * `SAP_SYSTEM_TYPE` is not read on either path. A `createRegistry()`
+   * registry handed to a server (`EmbeddableMcpServer`, `BaseMcpServer`)
+   * runs in that server's contexts: the server's `systemType`, resolver,
+   * rules and logger apply there, never this option.
    */
   systemType?: SapEnvironment;
 
@@ -533,9 +533,10 @@ export class HandlerExporter {
 
   /**
    * Create handlers registry for use with EmbeddableMcpServer or BaseMcpServer.
-   * Its tools run in the contexts that server builds: `SearchSource`'s
-   * strategies are that server's options (`sapAnswerStrategy`,
-   * `lineMatchStrategy`), and this exporter's do not apply.
+   * Its tools run in the contexts that server builds: its `systemType`,
+   * resolver, rules, logger and `SearchSource` strategies
+   * (`sapAnswerStrategy`, `lineMatchStrategy`) are that server's options,
+   * and this exporter's do not apply.
    */
   createRegistry(): IHandlersRegistry {
     return new ExportedRegistry(this.registryGroups, this.handlerGroups);

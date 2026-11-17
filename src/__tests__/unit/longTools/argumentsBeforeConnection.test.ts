@@ -17,11 +17,14 @@ import {
   CompactDataHandlersGroup,
   CompactReadOnlyHandlersGroup,
 } from '../../../../compact-readonly-entries/src/group';
+import { notATableType } from '../../../lib/adtTypeCode';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import type { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { SearchHandlersGroup } from '../../../lib/handlers/groups/SearchHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
+import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import * as packageSessions from '../../../lib/packageSessions';
 import { adtStandIn } from '../../helpers/adtStandIn';
@@ -102,7 +105,7 @@ const CASES: readonly Case[] = [
   [
     'HandlerGet',
     { object_type: 'CLASS' },
-    'Invalid arguments for tool GetClass: Invalid input: expected string, received undefined at class_name',
+    'HandlerGet: GetClass: class_name is required at class_name',
   ],
   [
     'HandlerGet',
@@ -127,8 +130,37 @@ const CASES: readonly Case[] = [
   [
     'HandlerGet',
     { object_type: 'INCLUDE', part: 'main_programs' },
-    'Invalid arguments for tool GetMainPrograms',
+    'HandlerGet: GetMainPrograms: Include name is required at include_name',
   ],
+  // A blank value is refused as a missing one, and a type outside the
+  // variant's list as the handler refused it (Codex, 24.0.0 re-review).
+  [
+    'HandlerGet',
+    { object_type: 'CLASS', class_name: '' },
+    'HandlerGet: GetClass: class_name is required at class_name',
+  ],
+  [
+    'GetObjectInfo',
+    { parent_type: 'NOT_A_TYPE', parent_name: 'ZOBJ' },
+    notATableType('parent_type', 'NOT_A_TYPE', 'onprem'),
+  ],
+  [
+    'GetObjectsList',
+    {
+      parent_name: 'ZPROG_A',
+      parent_tech_name: 'ZPROG_A',
+      parent_type: 'NOT_A_TYPE',
+    },
+    notATableType('parent_type', 'NOT_A_TYPE', 'onprem'),
+  ],
+  [
+    'GetWhereUsed',
+    { object_name: 'ZCL_A', object_type: 'NOT_A_TYPE' },
+    'object_type',
+  ],
+  ['GetPackageTree', { package_name: ' ' }, 'package_name is required'],
+  ['SearchObject', { object_name: '' }, 'object_name is required'],
+  ['GetSqlQuery', { sql_query: ' ' }, 'SQL query is required'],
 ];
 
 const textOf = (answer: CallAnswer): string =>
@@ -173,6 +205,7 @@ function groupOf(tool: string, context: HandlerContext): BaseHandlerGroup {
     new SearchHandlersGroup(context),
     new CompactReadOnlyHandlersGroup(context),
     new CompactDataHandlersGroup(context),
+    new DataHandlersGroup(context),
   ];
   const group = groups.find((g) =>
     g.getHandlers().some((e) => e.toolDefinition.name === tool),
@@ -229,6 +262,43 @@ describe('registered on a plain McpServer', () => {
         await client.close().catch(() => undefined);
         await standIn.close();
       }
+    },
+  );
+});
+
+/** The full tools of CASES, as `HandlerExporter` hands them out. */
+const EXPORTED = CASES.filter(([tool]) => !tool.startsWith('Handler'));
+
+describe('handed out by HandlerExporter', () => {
+  it.each(EXPORTED)(
+    '%s %j: refused in its words before any scope, resolver or send',
+    async (tool, args, words) => {
+      const requests: string[] = [];
+      const connection = {
+        getBaseUrl: async () => 'https://system.example.invalid',
+        makeAdtRequest: async (options: { url: string }) => {
+          requests.push(options.url);
+          return { status: 200, data: '' };
+        },
+      };
+      const resolved: string[] = [];
+      const exporter = new HandlerExporter({
+        systemType: 'onprem',
+        includeData: true,
+        systemContextResolver: async () => {
+          resolved.push('asked');
+          return null;
+        },
+      });
+      const entry = exporter
+        .getHandlerEntries()
+        .find((e) => e.toolDefinition.name === tool);
+      if (entry === undefined) throw new Error(`no ${tool}`);
+      await expect(
+        entry.call({ connection, logger: undefined } as never, args),
+      ).rejects.toThrow(words);
+      expect(resolved).toEqual([]);
+      expect(requests).toEqual([]);
     },
   );
 });

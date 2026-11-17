@@ -1,7 +1,7 @@
 /**
- * `HandlerSystem`'s per-action arguments are checked before the call takes
- * a connection: a missing required argument is refused in the target's
- * words, with `background` true and false, with a fresh-connection factory
+ * `HandlerSystem`'s per-action arguments are checked by its schema, before
+ * dispatch: a missing or blank required argument is refused in the
+ * target's words, with `background` true and false, with a fresh-connection factory
  * and without one — no fresh connection opened, no logon, nothing sent, no
  * run started. Both registration paths: the server instance
  * (`BaseMcpServer`) and a group registered on a plain `McpServer`
@@ -39,44 +39,68 @@ const MISSING: ReadonlyArray<
     'search_source',
     'query',
     { packages: ['ZPKG_A'] },
-    'Invalid arguments for tool SearchSource: Invalid input: expected string, received undefined at query',
+    'HandlerSystem: SearchSource: Invalid input: expected string, received undefined at query',
   ],
   [
     'search_object',
     'object_name',
     {},
-    'Invalid arguments for tool SearchObject: Invalid input: expected string, received undefined at object_name',
+    'HandlerSystem: SearchObject: object_name is required at object_name',
   ],
   [
     'where_used',
     'object_name',
     { object_type: 'class' },
-    'Object name is required',
+    'HandlerSystem: GetWhereUsed: Object name is required at object_name',
   ],
   [
     'where_used',
     'object_type',
     { object_name: 'ZCL_A' },
-    'Object type is required',
+    'HandlerSystem: GetWhereUsed: Object type is required at object_type',
   ],
-  ['package_tree', 'package_name', {}, 'package_name is required'],
+  [
+    'package_tree',
+    'package_name',
+    {},
+    'HandlerSystem: GetPackageTree: package_name is required at package_name',
+  ],
   [
     'atc_findings',
     'worklist_id',
     {},
-    'Invalid arguments for tool GetATCFindings: Invalid input: expected string, received undefined at worklist_id',
+    'HandlerSystem: GetATCFindings: worklist_id is required. RunATC answers one on every run. at worklist_id',
   ],
   [
     'atc_results',
     'created_by',
     {},
-    'Invalid arguments for tool ListATCResults: Invalid input: expected string, received undefined at created_by',
+    'HandlerSystem: ListATCResults: created_by is required: a user name, or * for every user. at created_by',
   ],
   [
     'atc_result',
     'display_id',
     {},
-    'Invalid arguments for tool GetATCResult: Invalid input: expected string, received undefined at display_id',
+    'HandlerSystem: GetATCResult: display_id is required. ListATCResults answers one per result. at display_id',
+  ],
+  // A blank value is refused as a missing one (Codex, 24.0.0 re-review).
+  [
+    'search_object',
+    'object_name blank',
+    { object_name: '' },
+    'HandlerSystem: SearchObject: object_name is required at object_name',
+  ],
+  [
+    'where_used',
+    'object_name blank',
+    { object_name: '  ', object_type: 'class' },
+    'HandlerSystem: GetWhereUsed: Object name is required at object_name',
+  ],
+  [
+    'atc_result',
+    'display_id blank',
+    { display_id: ' ' },
+    'HandlerSystem: GetATCResult: display_id is required. ListATCResults answers one per result. at display_id',
   ],
 ];
 

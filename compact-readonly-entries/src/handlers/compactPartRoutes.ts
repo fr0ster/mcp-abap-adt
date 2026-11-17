@@ -207,19 +207,23 @@ const objectDraft = defineTool(
 ).call;
 
 /** `part: 'draft'`: the object's draft, read as the full set's draft tool reads it. */
-const readDraft: CompactHandler = (context, args) => {
+/** The arguments the draft read hands GetObjectDraft: the type's own name argument as `object_name`. */
+export function draftArgsOf(args: ToolArgs): ToolArgs {
   const type = args.object_type;
   const argument =
     typeof type === 'string' ? DRAFT_NAME_ARGUMENT.get(type) : undefined;
   const name = argument === undefined ? undefined : args[argument];
-  return objectDraft(context, {
+  return {
     object_type: type,
     object_name: name,
     ...(type === 'FUNCTION_MODULE'
       ? { function_group_name: args.function_group_name }
       : {}),
-  });
-};
+  };
+}
+
+const readDraft: CompactHandler = (context, args) =>
+  objectDraft(context, draftArgsOf(args));
 
 /** `part: 'draft'`, on the members the draft part reads on `variant`. */
 export function compactDraftRoutes(

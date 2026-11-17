@@ -89,8 +89,9 @@ describe("lib's read and write handler barrels", () => {
     // compact `HandlerSystem` calls beside SearchObject and GetWhereUsed:
     // SearchSource, GetPackageTree, ListTransports and the three ATC reads
     // (68). The two refusals of a where-used and a package-tree call's
-    // arguments, so `HandlerSystem` refuses them before any connection (70).
-    expect(read).toHaveLength(70);
+    // arguments, so `HandlerSystem` refuses them before any connection (70);
+    // a package-contents call's, for `HandlerGet` part `contents` (71).
+    expect(read).toHaveLength(71);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

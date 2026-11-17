@@ -53,10 +53,7 @@ import {
   TOOL_DEFINITION as HandlerDumpView_Tool,
   handleHandlerDumpView,
 } from './handlers/handleHandlerDumpView';
-import {
-  TOOL_DEFINITION as HandlerGet_Tool,
-  handleHandlerGet,
-} from './handlers/handleHandlerGet';
+import { handlerGetEntry } from './handlers/handleHandlerGet';
 import { handlerGetDataEntry } from './handlers/handleHandlerGetData';
 import {
   TOOL_DEFINITION as HandlerProfileList_Tool,
@@ -94,7 +91,7 @@ import {
  */
 export function compactReadOnlyEntries(): HandlerEntry[] {
   return [
-    defineTool(HandlerGet_Tool, handleHandlerGet),
+    handlerGetEntry(),
     handlerSystemEntry(),
     defineTool(HandlerValidate_Tool, handleHandlerValidate),
     defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),

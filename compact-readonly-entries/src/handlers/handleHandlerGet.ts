@@ -11,8 +11,11 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
+  argumentsRefusalOf,
   defineTool,
   type HandlerContext,
+  type HandlerEntry,
+  invalidArgumentsWords,
   variantOf,
 } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -25,6 +28,15 @@ import {
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import type * as z from 'zod';
+import {
+  CONTENTS_REFUSALS,
+  draftRefusals,
+  METADATA_REFUSALS,
+  mainProgramsRefusals,
+  type RouteRefusal,
+  SOURCE_REFUSALS,
+  URL_REFUSALS,
+} from './compactGetRefusals';
 import { hasSourcePart, partsFor, routeCompactPart } from './compactPartRoutes';
 import { routeCompactRead } from './compactReadRoutes';
 
@@ -66,38 +78,66 @@ const objectStructure = defineTool(
   handleGetObjectStructure,
 ).call;
 
+/** An address part's read: its target and the arguments it hands it, or the refusal. */
+type AddressRead =
+  | {
+      readonly target:
+        | 'virtual_folders'
+        | 'node_structure'
+        | 'object_structure';
+      readonly args: ToolArgs;
+    }
+  | { readonly refusal: string };
+
+/** What an address part reads, from the call's arguments: plain code, nothing sent. */
+function addressReadOf(part: string, args: ToolArgs): AddressRead {
+  if (part === 'virtual_folders') {
+    return {
+      target: 'virtual_folders',
+      args: {
+        object_search_pattern: args.object_search_pattern,
+        preselection: args.preselection,
+        facet_order: args.facet_order,
+        with_versions: args.with_versions,
+        ignore_short_descriptions: args.ignore_short_descriptions,
+      },
+    };
+  }
+  if (!args.object_adt_type || !args.object_name) {
+    return { refusal: `part=${part} requires object_adt_type and object_name` };
+  }
+  if (part === 'node_structure') {
+    return {
+      target: 'node_structure',
+      args: {
+        parent_type: args.object_adt_type,
+        parent_name: args.object_name,
+        node_id: args.node_id,
+        with_short_descriptions: args.with_short_descriptions,
+      },
+    };
+  }
+  // GetObjectStructure's own arguments: `objecttype`, `objectname`.
+  return {
+    target: 'object_structure',
+    args: { objecttype: args.object_adt_type, objectname: args.object_name },
+  };
+}
+
 function routeAddressPart(
   context: HandlerContext,
   part: string,
   args: ToolArgs,
 ): Promise<ToolResultLike> | ToolResultLike {
-  if (part === 'virtual_folders') {
-    return virtualFolders(context, {
-      object_search_pattern: args.object_search_pattern,
-      preselection: args.preselection,
-      facet_order: args.facet_order,
-      with_versions: args.with_versions,
-      ignore_short_descriptions: args.ignore_short_descriptions,
-    });
+  const read = addressReadOf(part, args);
+  if ('refusal' in read) return return_error(new Error(read.refusal));
+  if (read.target === 'virtual_folders') {
+    return virtualFolders(context, read.args);
   }
-  if (!args.object_adt_type || !args.object_name) {
-    return return_error(
-      new Error(`part=${part} requires object_adt_type and object_name`),
-    );
+  if (read.target === 'node_structure') {
+    return nodeStructure(context, read.args);
   }
-  if (part === 'node_structure') {
-    return nodeStructure(context, {
-      parent_type: args.object_adt_type,
-      parent_name: args.object_name,
-      node_id: args.node_id,
-      with_short_descriptions: args.with_short_descriptions,
-    });
-  }
-  // GetObjectStructure's own arguments: `objecttype`, `objectname`.
-  return objectStructure(context, {
-    objecttype: args.object_adt_type,
-    objectname: args.object_name,
-  });
+  return objectStructure(context, read.args);
 }
 
 /**
@@ -109,9 +149,7 @@ function routeAddressPart(
  */
 function functionModuleArgs<A extends HandlerGetArgs>(
   args: A,
-):
-  | { ok: true; args: A }
-  | { ok: false; refusal: ReturnType<typeof return_error> } {
+): { ok: true; args: A } | { ok: false; refusal: string } {
   const given =
     typeof args.function_module_name === 'string'
       ? args.function_module_name.trim()
@@ -128,21 +166,14 @@ function functionModuleArgs<A extends HandlerGetArgs>(
   if (segments.length > 2 || !group || !module) {
     return {
       ok: false,
-      refusal: return_error(
-        new Error(
-          'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name: the function group and the module are both required',
-        ),
-      ),
+      refusal:
+        'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name: the function group and the module are both required',
     };
   }
   if (named && separate && separate !== group) {
     return {
       ok: false,
-      refusal: return_error(
-        new Error(
-          `function_module_name names group ${group}, function_group_name names ${separate}: give the group once`,
-        ),
-      ),
+      refusal: `function_module_name names group ${group}, function_group_name names ${separate}: give the group once`,
     };
   }
   return {
@@ -203,7 +234,7 @@ export async function handleHandlerGet(
     (part === 'source' || part === 'metadata' || part === 'draft')
   ) {
     const named = functionModuleArgs(read);
-    if (!named.ok) return named.refusal;
+    if (!named.ok) return return_error(new Error(named.refusal));
     read = named.args;
   }
 
@@ -224,4 +255,117 @@ export async function handleHandlerGet(
   }
 
   return routeCompactPart(context, part, read, hasSource);
+}
+
+/** A variant the compact read tables are stated on. */
+type AbapSystemKind = keyof typeof COMPACT_READ;
+
+/** The address parts' refusals: each target's schema, on the arguments it is handed. */
+const ADDRESS_REFUSALS = {
+  virtual_folders: argumentsRefusalOf(READ_DEFINITIONS.GetVirtualFoldersLow),
+  node_structure: argumentsRefusalOf(READ_DEFINITIONS.GetNodeStructureLow),
+  object_structure: argumentsRefusalOf(READ_DEFINITIONS.GetObjectStructure),
+} as const satisfies Readonly<Record<string, RouteRefusal>>;
+
+/** The refusals of `part`'s route on `variant`, by object type. */
+function partRefusals(
+  part: string,
+  variant: AbapSystemKind,
+): Partial<Record<CompactObjectType, RouteRefusal>> {
+  if (part === 'metadata') return METADATA_REFUSALS;
+  if (part === 'contents') return CONTENTS_REFUSALS;
+  if (part === 'main_programs') return mainProgramsRefusals(variant);
+  if (part === 'draft') return draftRefusals(variant);
+  return URL_REFUSALS;
+}
+
+/**
+ * The refusal a `HandlerGet` call of `args` answers, read before the call
+ * takes a connection (`undefined`: none): the same steps as
+ * `handleHandlerGet` — its schema, the member on `variant`, the part, the
+ * function module's address, the route — then the route's target's
+ * refusal, all in the words the call answers. Without a stated `variant`
+ * only the schema is checked: the call refuses the rest. The run modes
+ * (`activation_status`, `activation_results`) are the call's.
+ */
+export function getArgumentsRefusal(
+  args: ToolArgs,
+  variant?: AbapSystemKind,
+): Error | undefined {
+  const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
+  if (!parsed.success) {
+    return new Error(
+      invalidArgumentsWords(TOOL_DEFINITION.name, parsed.error.issues),
+    );
+  }
+  if (variant === undefined) return undefined;
+  const given = parsed.data;
+  let read: HandlerGetArgs;
+  if (given.object_type) {
+    const member = acceptedOf(given.object_type, COMPACT_READ[variant]);
+    if (member === undefined) {
+      return new Error(
+        `Unsupported read for object_type: ${given.object_type}. ${supported(COMPACT_READ[variant])}`,
+      );
+    }
+    read = { ...given, object_type: member };
+  } else {
+    read = { ...given, object_type: undefined };
+  }
+  const part = read.part ?? 'source';
+  if (
+    part === 'object_structure' ||
+    part === 'node_structure' ||
+    part === 'virtual_folders'
+  ) {
+    const address = addressReadOf(part, read);
+    return 'refusal' in address
+      ? new Error(address.refusal)
+      : ADDRESS_REFUSALS[address.target](address.args);
+  }
+  if (part === 'activation_status' || part === 'activation_results') {
+    return undefined;
+  }
+  const objectType = read.object_type;
+  if (!objectType) return new Error('object_type is required');
+  let routed = { ...read, object_type: objectType };
+  if (
+    objectType === 'FUNCTION_MODULE' &&
+    (part === 'source' || part === 'metadata' || part === 'draft')
+  ) {
+    const named = functionModuleArgs(routed);
+    if (!named.ok) return new Error(named.refusal);
+    routed = named.args;
+  }
+  const hasSource = hasSourcePart(objectType);
+  if (part === 'source') {
+    const offered = partsFor(objectType, false, variant);
+    if (!hasSource && offered.length > 0) {
+      return new Error(
+        `part=source is not available for object_type=${objectType}. ` +
+          `It offers: ${offered.join(', ')}.`,
+      );
+    }
+    const refusal = SOURCE_REFUSALS[objectType];
+    return refusal === undefined
+      ? new Error(`Unsupported get for object_type: ${objectType}`)
+      : refusal(routed);
+  }
+  const refusal = partRefusals(part, variant)[objectType];
+  if (refusal === undefined) {
+    const offered = partsFor(objectType, hasSource, variant);
+    return new Error(
+      `part=${part} is not available for object_type=${objectType}. ` +
+        `It offers: ${offered.length === 0 ? 'nothing' : offered.join(', ')}.`,
+    );
+  }
+  return refusal(routed);
+}
+
+/** `HandlerGet`'s entry: its call, and its arguments' refusal before it. */
+export function handlerGetEntry(): HandlerEntry {
+  return {
+    ...defineTool(TOOL_DEFINITION, handleHandlerGet),
+    refusesArguments: getArgumentsRefusal,
+  };
 }

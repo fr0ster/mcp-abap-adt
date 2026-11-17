@@ -98,6 +98,37 @@ const CASES: readonly Case[] = [
     'parent_type and parent_name are required',
   ],
   ['HandlerGetData', {}, 'object_name or sql_query is required'],
+  ['HandlerGet', {}, 'object_type is required'],
+  [
+    'HandlerGet',
+    { object_type: 'CLASS' },
+    'Invalid arguments for tool GetClass: Invalid input: expected string, received undefined at class_name',
+  ],
+  [
+    'HandlerGet',
+    { object_type: 'FUNCTION_MODULE' },
+    'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name: the function group and the module are both required',
+  ],
+  [
+    'HandlerGet',
+    { object_type: 'PACKAGE', part: 'contents' },
+    'Package name is required',
+  ],
+  [
+    'HandlerGet',
+    { part: 'node_structure' },
+    'part=node_structure requires object_adt_type and object_name',
+  ],
+  [
+    'HandlerGet',
+    { object_type: 'DOMAIN', part: 'urls' },
+    'part=urls is not available for object_type=DOMAIN',
+  ],
+  [
+    'HandlerGet',
+    { object_type: 'INCLUDE', part: 'main_programs' },
+    'Invalid arguments for tool GetMainPrograms',
+  ],
 ];
 
 const textOf = (answer: CallAnswer): string =>

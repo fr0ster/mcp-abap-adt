@@ -52,7 +52,10 @@ export { handleGetMainPrograms } from '../../handlers/include/readonly/handleGet
 export { handleGetInterface } from '../../handlers/interface/high/handleGetInterface.js';
 export { handleGetMetadataExtension } from '../../handlers/metadata_extension/high/handleGetMetadataExtension.js';
 export { handleGetPackage } from '../../handlers/package/high/handleGetPackage.js';
-export { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents.js';
+export {
+  handleGetPackageContents,
+  packageContentsArgumentsRefusal,
+} from '../../handlers/package/readonly/handleGetPackageContents.js';
 export { handleGetProgram } from '../../handlers/program/high/handleGetProgram.js';
 export { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject.js';
 export { handleGetServiceBinding } from '../../handlers/service_binding/high/handleGetServiceBinding.js';

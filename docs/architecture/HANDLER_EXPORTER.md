@@ -10,6 +10,11 @@ The `HandlerExporter` class registers the ABAP ADT tools on an `McpServer` of yo
 - Use your own connection management logic
 - Customize which handlers are available
 
+The exporter serves the full tools only. The compact tools are registered from
+`CompactReadOnlyHandlersGroup` (`@mcp-abap-adt/compact-readonly-entries`) and
+`CompactModifyHandlersGroup` (`@mcp-abap-adt/compact-modify`) on an `EmbeddableMcpServer`
+(background runs, given a strategy) or on a plain `McpServer` (answered in the call).
+
 Every example below is compiled against the real API by
 `src/__tests__/typecheck/handlerExporterGuide.typecheck.ts` (`npm run test:check`).
 

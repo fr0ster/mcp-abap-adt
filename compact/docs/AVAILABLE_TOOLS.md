@@ -3,19 +3,19 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 40
+- Tools: 39
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
 - Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both; no `-compact-http` or `-compact-sse` binary serves them
 - Background-run tools: `@mcp-abap-adt/lib`, in every compact binary: the long reads run in the background by default, and in the write binaries `HandlerProfileRun` too
 - Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or run outside batch mode; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))
-- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool under Tools; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half, the background-run tools and the leftover-session list (the logoff is `mcp-abap-adt-compact`'s). `-compact-sse` and `-compact-sse-ro` serve the same without the leftover-session tools; `-compact-http` and `-compact-http-ro` the same, with what [Streamable HTTP Binaries](#streamable-http-binaries) adds
+- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool under Tools; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half, the background-run tools and the leftover-session list and logoff. `-compact-sse` and `-compact-sse-ro` serve the same without the leftover-session tools; `-compact-http` and `-compact-http-ro` the same, with what [Streamable HTTP Binaries](#streamable-http-binaries) adds
 
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 40 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 39 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -25,7 +25,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), TABLE_TYPE(table_type_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INCLUDE(include_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), TABLE_TYPE(table_type_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INCLUDE(include_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. draft (PROGRAM, INCLUDE, INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT and TABLE_TYPE) reads the active, inactive and working versions of each part of the object together (main, the source or metadata; for CLASS and BEHAVIOR_IMPLEMENTATION the includes implementations, definitions, testclasses, macros in place of the main source) and answers { object_type, object_name, has_draft, parts }: per part draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
 
 **Available in:** cloud, onprem
 
@@ -33,7 +33,7 @@ per request.
 
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.
 - `object_type` — ABAP object type for routed compact operation.
-- `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). main_programs (INCLUDE): the include's main programs.
+- `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). main_programs (INCLUDE): the include's main programs. draft (PROGRAM, INCLUDE, INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT, TABLE_TYPE): whether each part of the object holds an unactivated change, and whose.
 - `package_name` — Package name.
 - `package_names` — Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.
 - `max_results` — Maximum number of members listed per package (part contents).
@@ -70,36 +70,51 @@ per request.
 - `with_versions` — Include versions (virtual_folders).
 - `ignore_short_descriptions` — Leave out short descriptions (virtual_folders).
 
-### HandlerSearch
+### HandlerSystem
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** [read-only] Searches the ABAP repository for the objects whose name matches query, a name or a mask. Required: query*. Optional: object_type, max_results (default 100). Response: one object per line. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the ABAP repository and its transports and ATC results, one read per action: search_source(query*, packages*, query2, exclude, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version) the source lines of the objects in packages that contain query; search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask; where_used(object_name* and object_type*, or objects*; enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package; package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree; transports(user, modifiable_only, detail) the transport requests of user, by default the session's user; atc_findings(worklist_id*, detail) the findings of the ATC run whose worklist is worklist_id; atc_results(created_by*, central_only, age_min, age_max) the stored ATC results, newest first; atc_result(display_id*, detail) the stored ATC result display_id with its findings. Each argument is described with the actions that take it. Response: JSON, per action: search_source the hits (package, object type, object name, include, line, snippet) with the scanned and truncated counters; search_object the objects found; where_used the references with their total (one entry per object for objects); package_tree the tree (one entry per package for package_names); transports the requests; atc_findings and atc_result the findings with the counts per priority; atc_results one entry per result. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
-- `query` (required) — Object name or mask, with * as a wildcard.
-- `object_type` — Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
-- `max_results` — Maximum number of objects returned.
-
-### HandlerWhereUsed
-
-**Half:** `@mcp-abap-adt/compact-readonly-entries`
-
-**Description:** [read-only] Lists where the object named by object_type and object_name is used — a class, interface, program, include, function group, function module (BAPI included), package, table, structure, domain, data element, CDS DDL source or table type: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
-
-**Available in:** cloud, onprem
-
-**Parameters:**
-
-- `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
-- `object_type` (required) — Type of the object whose usages are listed.
-- `object_name` (required) — Object name.
-- `function_group_name` — Function group of the function module (FUNCTION_MODULE).
-- `max_results` — Maximum number of referencing objects returned.
+- `action` (required) — The read: search_source (source text in packages), search_object (objects by name or mask), where_used (the objects that use an object), package_tree (a package tree), transports (transport requests), atc_findings (the findings of an ATC run), atc_results (the stored ATC results), atc_result (one stored ATC result).
+- `query` — search_source: primary substring to match (case-insensitive, ABAP CS).
+- `query2` — search_source: a second substring; when set, both query and query2 must appear on the same line.
+- `exclude` — search_source: up to 3 substrings; a line containing any of them is dropped.
+- `packages` — search_source: packages to scan, each an exact package name or a mask (`*` zero or more characters, `?` one character; `+`, `_`, `%` and `#` are characters of the name).
+- `include_subpackages` — search_source: recurse into subpackages (default true); package_tree: expand subpackages recursively (default true).
+- `object_filter` — search_source: glob applied to object names within each package (e.g. "Z*").
+- `object_types` — search_source: object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD (default all of them).
+- `exclude_comments` — search_source: skip col-1 '*' and full-line '"' comment lines (default false).
+- `max_hits_per_object` — search_source: the most hits answered per object; absent, every hit.
+- `max_hits` — search_source: the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.
+- `answer` — search_source: what each hit is answered as: snippets (the default), lines or objects.
+- `version` — search_source: the version every source is read at (default active).
+- `object_name` — search_object: object name or mask (e.g. 'MARA*'); where_used: name of the object (with object_type), a function module as 'GROUP|FM_NAME'.
+- `object_type` — search_object: Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class). where_used: Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
+- `maxResults` — search_object: maximum number of results to return (default 100).
+- `detail` — search_object, transports, atc_findings, atc_result: How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `objects` — where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.
+- `enable_all_types` — where_used: true selects every object type of the where-used scope (default false, the SAP default scope).
+- `enable_only_types` — where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').
+- `disable_types` — where_used: ADT object types removed from the scope (e.g. ['CLAS/OC']).
+- `package_name` — package_tree: package name (give this or package_names).
+- `package_names` — package_tree: several package names, read together (give this or package_name).
+- `max_depth` — package_tree: maximum depth of the walk (default 5).
+- `include_descriptions` — package_tree: each object's description in the answer (default false).
+- `debug` — package_tree: diagnostic metadata in the answer (counts, types, hierarchy; default false).
+- `user` — transports: the SAP user id whose requests are listed (default the session's user).
+- `modifiable_only` — transports: only modifiable (unreleased) requests (default true).
+- `worklist_id` — atc_findings: worklist identifier an ATC run answered.
+- `created_by` — atc_results: whose results: a user name, or * for every user.
+- `central_only` — atc_results: true lists central results only.
+- `age_min` — atc_results: youngest age to list, in days.
+- `age_max` — atc_results: oldest age to list, in days.
+- `display_id` — atc_result: display ID of a stored ATC result.
 
 ### HandlerValidate
 
@@ -346,6 +361,7 @@ per request.
 - `transport_type` — Transport request type (TRANSPORT create).
 - `target_system` — Target system of the transport request (TRANSPORT create).
 - `owner` — Owner of the transport request (TRANSPORT create).
+- `task_type` — The type given to the request's task (TRANSPORT create): S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.
 - `superclass` — Superclass name (CLASS create).
 - `final` — Mark the class final (CLASS create).
 - `create_protected` — Protected constructor (CLASS create).
@@ -463,7 +479,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Transport create. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner. Response: JSON.
+**Description:** Creates a transport request and gives its task the type task_type. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner, task_type(S|R|X, default S). Response: JSON with transport_number, task_number and task_type.
 
 **Available in:** cloud, onprem
 
@@ -473,6 +489,7 @@ per request.
 - `description` (required) — Transport description.
 - `target_system` — Target system id.
 - `owner` — Transport owner user.
+- `task_type` — Type given to the request's task: S Development/Correction (default), R Repair, X Unclassified.
 
 ### HandlerTransportSortAndCompress
 

@@ -69,20 +69,33 @@ type PackageListing =
   | { package_name: string; objects: PackageItem[] }
   | { package_name: string; error: FailureEntry };
 
+/**
+ * The refusal of a package-contents call's arguments, before anything is
+ * read (`undefined`: none): exactly one of `package_name` and
+ * `package_names`.
+ */
+export function packageContentsArgumentsRefusal(
+  args: GetPackageContentsArgs,
+): string | undefined {
+  const single = typeof args.package_name === 'string' && args.package_name;
+  const list = Array.isArray(args.package_names) ? args.package_names : [];
+  if (single && list.length > 0) {
+    return 'Give exactly one of package_name or package_names';
+  }
+  if (!single && list.length === 0) return 'Package name is required';
+  return undefined;
+}
+
 export async function handleGetPackageContents(
   context: HandlerContext,
   args: GetPackageContentsArgs,
 ) {
   const { connection, logger } = context;
   try {
+    const refusal = packageContentsArgumentsRefusal(args);
+    if (refusal !== undefined) return return_error(refusal);
     const single = typeof args?.package_name === 'string' && args.package_name;
     const list = Array.isArray(args?.package_names) ? args.package_names : [];
-    if (single && list.length > 0) {
-      return return_error('Give exactly one of package_name or package_names');
-    }
-    if (!single && list.length === 0) {
-      return return_error('Package name is required');
-    }
     const packageNames = (single ? [single] : list).map((name) =>
       name.toUpperCase(),
     );

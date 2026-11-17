@@ -936,10 +936,41 @@ function listAnswer(
   };
 }
 
+/**
+ * The refusal of an includes-list call's arguments, before anything is read
+ * (`undefined`: none): one object needs its name and its type; a list
+ * stands alone and holds at least one object.
+ */
+export function includesListArgumentsRefusal(
+  args: IncludesListArgs,
+): string | undefined {
+  if (args.objects === undefined) {
+    const { object_name, object_type } = args;
+    if (typeof object_name !== 'string' || object_name.trim() === '') {
+      return 'Parameter "object_name" (string) is required and cannot be empty.';
+    }
+    if (!object_type || typeof object_type !== 'string') {
+      return 'Parameter "object_type" (string) is required.';
+    }
+    return undefined;
+  }
+  if (
+    args.object_name !== undefined ||
+    args.object_type !== undefined ||
+    !Array.isArray(args.objects) ||
+    args.objects.length === 0
+  ) {
+    return 'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })';
+  }
+  return undefined;
+}
+
 export async function handleGetIncludesList(
   context: HandlerContext,
   args: IncludesListArgs,
 ) {
+  const refusal = includesListArgumentsRefusal(args);
+  if (refusal !== undefined) return return_error(refusal);
   const { logger } = context;
   const listed = args?.objects;
   if (listed === undefined) {

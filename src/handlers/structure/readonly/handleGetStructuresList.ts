@@ -1068,10 +1068,35 @@ function listAnswer(
   };
 }
 
+/**
+ * The refusal of a structures-list call's arguments, before anything is
+ * read (`undefined`: none): `structure_name`, or a non-empty
+ * `structure_names` of names alone.
+ */
+export function structuresListArgumentsRefusal(
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+): string | undefined {
+  const listed = args.structure_names;
+  if (listed === undefined) {
+    return args.structure_name ? undefined : 'structure_name is required';
+  }
+  if (
+    args.structure_name !== undefined ||
+    !Array.isArray(listed) ||
+    listed.length === 0 ||
+    listed.some((name) => typeof name !== 'string' || name === '')
+  ) {
+    return 'Give exactly one of structure_name or structure_names (a non-empty list of names)';
+  }
+  return undefined;
+}
+
 export async function handleGetStructuresList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  const refusal = structuresListArgumentsRefusal(args);
+  if (refusal !== undefined) return return_error(new Error(refusal));
   const listed = args?.structure_names;
   const version = args?.version ?? 'active';
   const includeExtensions = args?.include_extensions !== false;

@@ -57,10 +57,7 @@ import {
   TOOL_DEFINITION as HandlerGet_Tool,
   handleHandlerGet,
 } from './handlers/handleHandlerGet';
-import {
-  TOOL_DEFINITION as HandlerGetData_Tool,
-  handleHandlerGetData,
-} from './handlers/handleHandlerGetData';
+import { handlerGetDataEntry } from './handlers/handleHandlerGetData';
 import {
   TOOL_DEFINITION as HandlerProfileList_Tool,
   handleHandlerProfileList,
@@ -143,7 +140,7 @@ export class CompactReadOnlyHandlersGroup extends BaseHandlerGroup {
  * SAP systems; whether to serve it is the customer's decision.
  */
 export function compactDataEntries(): HandlerEntry[] {
-  return [defineTool(HandlerGetData_Tool, handleHandlerGetData)];
+  return [handlerGetDataEntry()];
 }
 
 /** {@link compactDataEntries} as a group: the compact data tool, opt-in. */

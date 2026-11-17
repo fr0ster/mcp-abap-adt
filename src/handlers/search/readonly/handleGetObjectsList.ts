@@ -344,10 +344,54 @@ function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
     : failureEntry(walk.getError(), 'read node structure');
 }
 
+/**
+ * The refusal of an objects-list call's arguments, before anything is read
+ * (`undefined`: none): a non-empty `objects` stands alone, each entry with
+ * its type and name; else `parent_name`, `parent_tech_name` and
+ * `parent_type`, each a non-empty string.
+ */
+export function objectsListArgumentsRefusal(
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+): string | undefined {
+  const { parent_name, parent_tech_name, parent_type, objects } = args;
+  if (Array.isArray(objects) && objects.length > 0) {
+    if (
+      parent_name !== undefined ||
+      parent_tech_name !== undefined ||
+      parent_type !== undefined
+    ) {
+      return 'Give exactly one of parent_name, parent_tech_name and parent_type, or objects';
+    }
+    for (const entry of objects) {
+      if (
+        typeof entry?.parent_type !== 'string' ||
+        entry.parent_type.trim() === '' ||
+        typeof entry?.parent_name !== 'string' ||
+        entry.parent_name.trim() === ''
+      ) {
+        return 'Each entry of objects needs parent_type and parent_name (non-empty strings).';
+      }
+    }
+    return undefined;
+  }
+  if (typeof parent_name !== 'string' || parent_name.trim() === '') {
+    return 'Parameter "parent_name" (string) is required and cannot be empty.';
+  }
+  if (typeof parent_tech_name !== 'string' || parent_tech_name.trim() === '') {
+    return 'Parameter "parent_tech_name" (string) is required and cannot be empty.';
+  }
+  if (typeof parent_type !== 'string' || parent_type.trim() === '') {
+    return 'Parameter "parent_type" (string) is required and cannot be empty.';
+  }
+  return undefined;
+}
+
 export async function handleGetObjectsList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  const refusal = objectsListArgumentsRefusal(args);
+  if (refusal !== undefined) return return_error(refusal);
   const {
     parent_name,
     parent_tech_name,

@@ -120,13 +120,22 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
  * parses a call's arguments with that schema and hands the handler the
  * result; arguments that do not parse are refused, naming each issue, and
  * the handler does not run. The call answers what the handler answers.
+ * `refuses`: the argument rules the handler checks itself before anything
+ * is sent; given, the entry's `refusesArguments` checks the schema and
+ * them before the call takes a connection.
  */
 export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
   toolDefinition: ToolDefinition<S>,
   handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
+  refuses?: (args: z.output<S>) => string | undefined,
 ): HandlerEntry<R> {
   return {
     toolDefinition,
+    // With `refuses` (the rules its handler checks before it reads): the
+    // entry refuses those arguments before the call takes a connection.
+    ...(refuses !== undefined
+      ? { refusesArguments: argumentsRefusalOf(toolDefinition, refuses) }
+      : {}),
     call: async (context, args) => {
       const parsed = toolDefinition.inputSchema.safeParse(args);
       if (!parsed.success) {

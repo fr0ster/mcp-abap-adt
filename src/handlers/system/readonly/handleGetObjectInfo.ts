@@ -694,10 +694,48 @@ async function buildTreesSequential(
   return { trees };
 }
 
+/**
+ * The refusal of an object-info call's arguments, before anything is read
+ * (`undefined`: none): `parent_type` and `parent_name`, or a non-empty
+ * `objects` alone, each entry with its type and name.
+ */
+export function objectInfoArgumentsRefusal(
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+): string | undefined {
+  const listed = args.objects;
+  if (listed === undefined) {
+    return !args.parent_type || !args.parent_name
+      ? 'parent_type and parent_name are required'
+      : undefined;
+  }
+  if (
+    args.parent_type !== undefined ||
+    args.parent_name !== undefined ||
+    !Array.isArray(listed) ||
+    listed.length === 0
+  ) {
+    return 'Give exactly one of parent_type and parent_name, or objects (a non-empty list of { object_type, object_name })';
+  }
+  if (
+    listed.some(
+      (o) =>
+        typeof o?.object_type !== 'string' ||
+        !o.object_type ||
+        typeof o?.object_name !== 'string' ||
+        !o.object_name,
+    )
+  ) {
+    return 'Each entry of objects needs object_type and object_name';
+  }
+  return undefined;
+}
+
 export async function handleGetObjectInfo(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  const refusal = objectInfoArgumentsRefusal(args);
+  if (refusal !== undefined) return return_error(refusal);
   const { logger } = context;
   const listed = args?.objects;
   let objects: Array<{ type: AdtTypeCode; name: string }>;

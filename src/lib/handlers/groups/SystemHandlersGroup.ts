@@ -21,6 +21,7 @@ import {
 import {
   TOOL_DEFINITION as GetPackageTree_Tool,
   handleGetPackageTree,
+  packageTreeArgumentsRefusal,
 } from '../../../handlers/system/high/handleGetPackageTree';
 import { TOOL_DEFINITION as DescribeByList_Tool } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList.js';
@@ -35,6 +36,7 @@ import {
 import {
   TOOL_DEFINITION as GetObjectInfo_Tool,
   handleGetObjectInfo,
+  objectInfoArgumentsRefusal,
 } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from '../../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetObjectNodeFromCache } from '../../../handlers/system/readonly/handleGetObjectNodeFromCache.js';
@@ -61,6 +63,7 @@ import {
 import {
   TOOL_DEFINITION as GetWhereUsed_Tool,
   handleGetWhereUsed,
+  whereUsedArgumentsRefusal,
 } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
   handleRuntimeAnalyzeProfilerTrace,
@@ -153,8 +156,16 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       ),
       // GetSqlQuery is a data tool: DataHandlersGroup's, served only when
       // asked for.
-      defineTool(GetWhereUsed_Tool, handleGetWhereUsed),
-      defineTool(GetObjectInfo_Tool, handleGetObjectInfo),
+      defineTool(
+        GetWhereUsed_Tool,
+        handleGetWhereUsed,
+        whereUsedArgumentsRefusal,
+      ),
+      defineTool(
+        GetObjectInfo_Tool,
+        handleGetObjectInfo,
+        objectInfoArgumentsRefusal,
+      ),
       defineTool(GetInactiveObjects_Tool, handleGetInactiveObjects),
       // Dynamic import handlers
       defineTool(GetAdtTypes_Tool, handleGetAdtTypes),
@@ -163,7 +174,11 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       defineTool(GetObjectNodeFromCache_Tool, handleGetObjectNodeFromCache),
       defineTool(DescribeByList_Tool, handleDescribeByList),
       // High-level handler for package tree
-      defineTool(GetPackageTree_Tool, handleGetPackageTree),
+      defineTool(
+        GetPackageTree_Tool,
+        handleGetPackageTree,
+        packageTreeArgumentsRefusal,
+      ),
     ];
   }
 }

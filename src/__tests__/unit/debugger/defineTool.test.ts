@@ -13,12 +13,42 @@ import {
 } from '../../../handlers/debugger/debug/handleDebugWait';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { defineTool } from '../../../lib/handlers/interfaces';
+import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
+
+const RAN = { content: [{ type: 'text', text: 'ran' }] };
 
 describe('defineTool', () => {
   it('answers the definition and the handler as an entry', () => {
     const entry = defineTool(Wait, handleDebugWait);
     expect(entry.toolDefinition).toBe(Wait);
-    expect(entry.handler).toBe(handleDebugWait);
+  });
+
+  it("calls the handler with the arguments as the definition's schema parses them", async () => {
+    const seen: unknown[] = [];
+    const entry = defineTool(Wait, async (_context, args) => {
+      seen.push(args);
+      return RAN;
+    });
+    await expect(
+      entry.call(noConnectionContext(), { state_handle: 'h', extra: 1 }),
+    ).resolves.toBe(RAN);
+    expect(seen).toEqual([
+      { state_handle: 'h', hold_seconds: 10, detail: 'terse' },
+    ]);
+  });
+
+  it('refuses arguments the schema does not parse, naming the tool, and the handler does not run', async () => {
+    const seen: unknown[] = [];
+    const entry = defineTool(Wait, async (_context, args) => {
+      seen.push(args);
+      return RAN;
+    });
+    await expect(
+      entry.call(noConnectionContext(), { hold_seconds: 'long' }),
+    ).rejects.toThrow(
+      'Input validation error: Invalid arguments for tool DebugWait',
+    );
+    expect(seen).toEqual([]);
   });
 
   it('refuses, at compile time, a handler that takes other arguments', () => {
@@ -27,13 +57,19 @@ describe('defineTool', () => {
     defineTool(Wait, handleDebugSetVariable);
 
     // A declared type the handler does not take: value is a string.
-    const numeric = async (_c: HandlerContext, _a: { value: number }) =>
-      undefined;
+    const numeric = async (_c: HandlerContext, _a: { value: number }) => RAN;
     // @ts-expect-error the handler disagrees with the schema
     defineTool(SetVariable, numeric);
 
     // The right pairing compiles.
     defineTool(SetVariable, handleDebugSetVariable);
+    expect(true).toBe(true);
+  });
+
+  it('refuses, at compile time, a handler whose answer is not a tool result', () => {
+    // @ts-expect-error a handler answers a tool result, not a bare value
+    defineTool(Wait, async () => 'ran');
+    defineTool(Wait, async () => RAN);
     expect(true).toBe(true);
   });
 });

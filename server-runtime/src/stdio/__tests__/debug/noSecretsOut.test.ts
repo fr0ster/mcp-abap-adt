@@ -77,7 +77,11 @@ function expectNoSecret(where: string, text: string, secrets = secretsOf()) {
 
 describe('a refused token request', () => {
   it('no marker, secret, state, code or URL on any surface; stdout empty', async () => {
-    s = await stand({ auth: 'jwt', clientSecret: CLIENT_SECRET });
+    s = await stand({
+      kind: 'cloud',
+      auth: 'jwt',
+      clientSecret: CLIENT_SECRET,
+    });
     s.tokens.refuseCodes(MARKER);
     const answer = await s.callTool('ProbeAdt', { id: 'REFUSED' });
     expect(answer).not.toBe('cancelled');
@@ -92,6 +96,7 @@ describe('a refused token request', () => {
 
   it('--auth-debug: the prepared form on stderr, nowhere else; never the secret or the marker', async () => {
     s = await stand({
+      kind: 'cloud',
       auth: 'jwt',
       clientSecret: CLIENT_SECRET,
       authDebug: true,
@@ -113,7 +118,11 @@ describe('a refused token request', () => {
 
 describe('a successful login', () => {
   it('no token, secret, state, code or URL on any surface; stdout empty', async () => {
-    s = await stand({ auth: 'jwt', clientSecret: CLIENT_SECRET });
+    s = await stand({
+      kind: 'cloud',
+      auth: 'jwt',
+      clientSecret: CLIENT_SECRET,
+    });
     const answer = await s.callTool('ProbeAdt', { id: 'OK' });
     expect((answer as { isError: boolean }).isError).toBe(false);
     expect(s.tokens.issued.length).toBeGreaterThan(0);
@@ -126,6 +135,7 @@ describe('a successful login', () => {
 
   it('--auth-debug: still no token, code, state or URL; stdout empty', async () => {
     s = await stand({
+      kind: 'cloud',
       auth: 'jwt',
       clientSecret: CLIENT_SECRET,
       authDebug: true,

@@ -1,5 +1,10 @@
-import type { EventEmitter } from 'node:events';
-import { ParameterRefusal, type ParameterTable } from './authParameters.js';
+import type { ShutdownProcess } from '../shutdownSequence.js';
+import { thrownAs } from '../thrownValue';
+import {
+  ParameterRefusal,
+  type ParameterTable,
+  refuseUnreadArguments,
+} from './authParameters.js';
 import { readConfigFile, type YamlConfig } from './yamlConfig.js';
 
 /** The process's edges a binary's start reports through. */
@@ -10,7 +15,8 @@ export interface StartupEdges {
 }
 
 /**
- * A binary's configuration, read by its own table: `--conf` first (a missing
+ * A binary's configuration, read by its own table: every argument checked
+ * against it (an unknown, positional or repeated one refused), `--conf` first (a missing
  * file gets the table's template, and the start ends `0`), then every row. A
  * refusal — a removed parameter, an invalid value, a refused config file —
  * is reported in its words and ends the start `1`; undefined is returned
@@ -28,6 +34,8 @@ export function readStartupConfig<T>(
   ) => T,
 ): T | undefined {
   try {
+    // Every argument is read, or the start ends naming the one that is not.
+    refuseUnreadArguments(table, argv);
     const file = readConfigFile(table, argv);
     if (file.template) {
       edges.stderr(
@@ -38,8 +46,9 @@ export function readStartupConfig<T>(
     }
     return read(argv, env, file.yaml);
   } catch (error) {
-    if (!(error instanceof ParameterRefusal)) throw error;
-    edges.stderr(`[MCP] ${error.words}`);
+    const refusal = thrownAs(error, ParameterRefusal);
+    if (refusal === undefined) throw error;
+    edges.stderr(`[MCP] ${refusal.words}`);
     edges.exit(1);
     return undefined;
   }
@@ -55,8 +64,8 @@ export interface LauncherEdges extends StartupEdges {
   readonly argv: readonly string[];
   /** `--version`'s one line: the only thing a launcher writes to stdout. */
   readonly stdout: (line: string) => void;
-  /** Where the shutdown listens: `process` in the program. */
-  readonly processLike: EventEmitter & { stdin?: EventEmitter };
+  /** Where the shutdown listens: the process's `on`, `stdin` and `stdout` in the program. */
+  readonly processLike: ShutdownProcess;
 }
 
 /** The edges of the program: `process`. */
@@ -66,7 +75,14 @@ export function processEdges(): LauncherEdges {
     stdout: (line) => console.log(line),
     stderr: (line) => process.stderr.write(`${line}\n`),
     exit: (code) => process.exit(code),
-    processLike: process,
+    // The process's own members, never `process` itself.
+    processLike: {
+      on: (event, listener) => {
+        process.on(event, listener);
+      },
+      stdin: process.stdin,
+      stdout: process.stdout,
+    },
   };
 }
 

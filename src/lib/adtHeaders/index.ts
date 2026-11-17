@@ -11,9 +11,8 @@
  * - `withAdtHeaders`, a call with the system's pair, corrected once on a
  *   `406`/`415`, and its `AdtHeadersContext`.
  *
- * The batch-mode scope (`adtCallScope`, `asRecordedCall`), the correction's
- * own reader (`correctedPair`) and the server's context reader
- * (`adtHeadersOf`) stay internal.
+ * The batch-mode scope (`adtCallScope`, `asRecordedCall`) and the
+ * correction's own reader (`correctedPair`) stay internal.
  */
 
 import '../instance.js';

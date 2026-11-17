@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * An ADT stand-in on 127.0.0.1 for the transports' credential suites: it
  * answers every request `200` with a CSRF token and a session cookie — or
@@ -37,6 +38,10 @@ export interface StandInRequest {
   accept: string | undefined;
   /** Its body, once it has arrived in full; `''` before. */
   body: string;
+  /** Every header it carried, by lower-case name (a repeated one joined with `, `). */
+  headers: Record<string, string>;
+  /** Its query: the raw target after the first `?`, `''` when none. */
+  query: string;
 }
 
 /** What `respond` answers a request with. */
@@ -75,7 +80,9 @@ export interface AdtStandIn {
    */
   respond(
     match: (request: StandInRequest) => boolean,
-    respond: (request: StandInRequest) => StandInResponse,
+    respond: (
+      request: StandInRequest,
+    ) => StandInResponse | Promise<StandInResponse>,
   ): void;
   /** The next request `match` accepts is answered `status`, once. */
   answerOnce(match: (request: StandInRequest) => boolean, status: number): void;
@@ -126,6 +133,8 @@ export interface StandInHold {
   arrived: Promise<void>;
   /** Answers the held request (and any held later, if it has not come yet). */
   release(): void;
+  /** Resolves once the held request's answer was written whole (after `release`). */
+  answered: Promise<void>;
 }
 
 export const PROBE_PATH = '/sap/bc/adt/probe/';
@@ -145,6 +154,28 @@ function sessionOf(cookie: string | undefined): string | undefined {
   return undefined;
 }
 
+/** Every header of an incoming request, by lower-case name. */
+function headerMap(headers: http.IncomingHttpHeaders): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    out[name] = Array.isArray(value) ? value.join(', ') : value;
+  }
+  return out;
+}
+
+/** The query of a raw request target: what follows the first `?`. */
+function queryOf(target: string): string {
+  const at = target.indexOf('?');
+  return at < 0 ? '' : target.slice(at + 1);
+}
+
+/**
+ * The stand-in, on a free port of 127.0.0.1 the system gives (port 0): a
+ * fixed port can be held by any socket of the machine — an outgoing one in
+ * the ephemeral range included — so none is ever asked for; a test reads
+ * the bound port from `url`.
+ */
 export async function adtStandIn(): Promise<AdtStandIn> {
   const requests: StandInRequest[] = [];
   let refusing = false;
@@ -160,12 +191,15 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     match: (request: StandInRequest) => boolean;
     taken: boolean;
     arrive: () => void;
+    answer: () => void;
     released: Promise<void>;
     release: () => void;
   }> = [];
   const responders: Array<{
     match: (request: StandInRequest) => boolean;
-    respond: (request: StandInRequest) => StandInResponse;
+    respond: (
+      request: StandInRequest,
+    ) => StandInResponse | Promise<StandInResponse>;
   }> = [];
   const bodies: Array<{
     match: (request: StandInRequest) => boolean;
@@ -195,6 +229,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       contentType,
       accept: req.headers.accept,
       body: '',
+      headers: headerMap(req.headers),
+      query: queryOf(req.url ?? ''),
     };
     requests.push(request);
     const hold = holds.find((h) => !h.taken && h.match(request));
@@ -206,7 +242,10 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', async () => {
       request.body = Buffer.concat(chunks).toString('utf8');
-      if (hold) await hold.released;
+      if (hold) {
+        await hold.released;
+        res.once('finish', hold.answer);
+      }
       if (refusing) {
         res.writeHead(401, { 'content-type': 'text/plain' });
         res.end('');
@@ -214,7 +253,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       }
       const responder = responders.find((r) => r.match(request));
       if (responder) {
-        const answered = responder.respond(request);
+        // A responder may answer later (a read SAP holds until an event).
+        const answered = await responder.respond(request);
         res.writeHead(answered.status, {
           'content-type': 'text/plain',
           ...answered.headers,
@@ -284,9 +324,13 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       );
     });
   });
-  await new Promise<void>((resolve) =>
-    server.listen(0, '127.0.0.1', () => resolve()),
-  );
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
   const { port } = server.address() as AddressInfo;
   return {
     url: `http://127.0.0.1:${port}`,
@@ -305,8 +349,12 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       const released = new Promise<void>((resolve) => {
         release = resolve;
       });
-      holds.push({ match, taken: false, arrive, released, release });
-      return { arrived, release };
+      let answer!: () => void;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      holds.push({ match, taken: false, arrive, answer, released, release });
+      return { arrived, release, answered };
     },
     answer: (match, status, text) => {
       answers.push({ match, status, ...(text !== undefined && { text }) });
@@ -318,7 +366,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       answers.push({ match, status, once: true });
     },
     body: (match, text, headers) => {
-      bodies.push({ match, text, headers });
+      bodies.push({ match, text, ...(headers !== undefined && { headers }) });
     },
     systemInformation: (user, systemId = 'SID') => {
       systemInfo = user === undefined ? undefined : { user, systemId };
@@ -357,17 +405,13 @@ export function probeGroup(
         toolDefinition: {
           name: 'ProbeAdt',
           description: 'sends one request on its connection',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              delayMs: { type: 'number' },
-              state_handle: { type: 'string' },
-            },
-            required: ['id'],
-          },
+          inputSchema: z.object({
+            id: z.string(),
+            delayMs: z.number().optional(),
+            state_handle: z.string().optional(),
+          }),
         } as never,
-        handler: (async (
+        call: (async (
           context: {
             connection: { makeAdtRequest(o: object): Promise<unknown> };
           },

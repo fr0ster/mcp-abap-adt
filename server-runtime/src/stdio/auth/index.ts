@@ -34,6 +34,7 @@ export type {
 export type {
   IAuthBrokerFactoryConfig,
   LoginStrategyOptions,
+  StartDestinationKeys,
 } from './IAuthBrokerFactoryConfig.js';
 export {
   promptLogger,

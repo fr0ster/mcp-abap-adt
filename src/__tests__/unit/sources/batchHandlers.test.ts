@@ -10,7 +10,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
+import {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+} from '../../../../compact-readonly-entries/src/group';
 import {
   BATCH_HANDLERS_FILE,
   type BatchEntry,
@@ -18,12 +21,13 @@ import {
   whenHolds,
 } from '../../../lib/batch/eligibility';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
+import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { LONG_TOOLS } from '../../../lib/longTools';
-import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
+import { BATCH_ENTRY_CASES, SAMPLE_CALLS } from '../../helpers/batchEntryCases';
 
 const REPO = path.resolve(__dirname, '../../../..');
 
@@ -52,10 +56,12 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
   })
     .getHandlerEntries()
     .map((e) => e.toolDefinition.name)
-    // What the exporter leaves out (no store, no debugger): the groups' own.
+    // What the exporter leaves out (no store, no debugger, the data tools
+    // unless asked for): the groups' own.
     .concat(
       [
         new BackgroundRunHandlersGroup(noConnectionContext()),
+        new DataHandlersGroup(noConnectionContext()),
         new DebugHandlersGroup(noConnectionContext()),
       ].flatMap((group) =>
         group.getHandlers().map((e) => e.toolDefinition.name),
@@ -63,6 +69,7 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
     );
   const compact = [
     ...new CompactReadOnlyHandlersGroup(placeholder).getHandlers(),
+    ...new CompactDataHandlersGroup(placeholder).getHandlers(),
     ...new CompactModifyHandlersGroup(placeholder).getHandlers(),
   ].map((e) => e.toolDefinition.name);
   return { full: new Set(full), compact: new Set(compact) };
@@ -90,14 +97,12 @@ const LONG_BY_REQUESTS: Readonly<
   GetATCResult: 'independent',
   RuntimeGetProfilerTraceData: 'independent',
   RuntimeAnalyzeProfilerTrace: 'independent',
-  HandlerSearch: 'independent',
   HandlerGetData: 'independent',
   HandlerProfileView: 'independent',
-  HandlerWhereUsed: 'independent',
   HandlerGet: 'by-arguments',
+  HandlerSystem: 'by-arguments',
   GetWhereUsed: 'by-arguments',
   RuntimeListFeeds: 'by-arguments',
-  SearchSource: 'chained',
   GetPackageContents: 'chained',
   GetPackageTree: 'chained',
   GetObjectsList: 'chained',
@@ -106,7 +111,7 @@ const LONG_BY_REQUESTS: Readonly<
   ListTransports: 'chained',
   GetObjectInfo: 'chained',
   DescribeByList: 'chained',
-  GetAbapSystemSymbols: 'chained',
+  SearchSource: 'chained',
   HandlerDumpList: 'independent',
 };
 
@@ -115,7 +120,8 @@ const GROUPS_DIR = path.join(REPO, 'src/lib/handlers/groups');
 /**
  * Whether a group registers `tool` with handler `fn`: a tool the full set
  * names in its group (`name: 'ActivateDomain'`) over a low handler's
- * definition, `handler: withContext(fn)` in the same registration.
+ * definition, `defineTool({ ...definition, name }, fn)` — the handler the
+ * argument after that definition, before the next tool's name.
  */
 function groupRegisters(tool: string, fn: string): boolean {
   for (const file of fs.readdirSync(GROUPS_DIR)) {
@@ -123,16 +129,14 @@ function groupRegisters(tool: string, fn: string): boolean {
     const source = fs.readFileSync(path.join(GROUPS_DIR, file), 'utf8');
     const at = source.indexOf(`name: '${tool}',`);
     if (at === -1) continue;
-    const handlerAt = source.indexOf('handler:', at);
     const nextName = source.indexOf('name:', at + 1);
     const registration = source.slice(
-      handlerAt,
-      source.indexOf('\n', handlerAt),
+      at,
+      nextName === -1 ? undefined : nextName,
     );
     if (
-      handlerAt !== -1 &&
-      (nextName === -1 || handlerAt < nextName) &&
-      registration.includes(`(${fn})`)
+      registration.includes(`},\n        ${fn},\n`) ||
+      registration.includes(`}, ${fn})`)
     ) {
       return true;
     }
@@ -171,7 +175,7 @@ describe('tools/batch-handlers.json', () => {
         entries.filter((e) => e.tool === tool),
       ),
     );
-    expect(entries.length).toBeGreaterThan(50);
+    expect(entries.length).toBeGreaterThan(40);
   });
 
   it('ships with the package, so eligible() finds it in dist too', () => {
@@ -211,7 +215,7 @@ describe('tools/batch-handlers.json', () => {
         tool: entry.tool,
         extra: [],
       });
-      expect(['full', 'compact']).toContain(entry.set);
+      expect(entry.set).toBe('compact');
       if (entry.connection !== undefined) expect(entry.connection).toBe('http');
       for (const rule of entry.when ?? []) {
         expect(typeof rule.argument).toBe('string');
@@ -283,10 +287,10 @@ describe('tools/batch-handlers.json', () => {
     }
   });
 
-  it('lists every long read whose requests do not chain (spec §4.4)', () => {
+  it("lists every compact long read whose requests do not chain (spec §4.4): batch mode is the compact sets'", () => {
     const tools = new Set(entries.map((e) => e.tool));
     for (const [tool, kind] of Object.entries(LONG_BY_REQUESTS)) {
-      if (kind === 'chained') continue;
+      if (kind === 'chained' || !served.compact.has(tool)) continue;
       expect({ tool, listed: tools.has(tool) }).toEqual({ tool, listed: true });
     }
   });
@@ -321,10 +325,14 @@ describe('tools/batch-handlers.json', () => {
     expect(missing).toEqual([]);
   });
 
-  it('every case is of a listed tool', () => {
+  it("every sample call of a compact tool is in the batch proof; the others are the full set's", () => {
     const tools = new Set(entries.map((e) => e.tool));
+    const unlisted = SAMPLE_CALLS.filter((c) => !tools.has(c.tool));
     expect(
-      BATCH_ENTRY_CASES.filter((c) => !tools.has(c.tool)).map((c) => c.tool),
+      unlisted.filter((c) => served.compact.has(c.tool)).map((c) => c.tool),
+    ).toEqual([]);
+    expect(
+      unlisted.filter((c) => !served.full.has(c.tool)).map((c) => c.tool),
     ).toEqual([]);
   });
 });

@@ -1,12 +1,13 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IAccessChecks } from '../lib/access/accessChecks.js';
 import type { AdtHeaderPairs } from '../lib/adtHeaders/AdtHeaderPairs.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
+import { DataHandlersGroup } from '../lib/handlers/groups/DataHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
 import { RuntimeRunHandlersGroup } from '../lib/handlers/groups/RuntimeRunHandlersGroup.js';
@@ -21,15 +22,18 @@ import type {
   IHandlersRegistry,
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
+import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { registerFreshConnectionFactory } from '../lib/packageSessions.js';
 import type {
   SystemContextResolver,
   SystemContextRules,
 } from '../lib/requestSystemResolution.js';
+import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
+import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
+import type { HeldLocks } from '../lib/state/heldLocks.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
-import { setSystemContext } from '../lib/systemContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
@@ -37,12 +41,13 @@ const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
 /**
  * Options for EmbeddableMcpServer
  */
-export interface EmbeddableMcpServerOptions {
+/** The options of {@link EmbeddableMcpServer} whichever registry it serves. */
+export interface EmbeddableMcpServerBaseOptions {
   /**
    * ABAP connection to use for all handler calls
    * Injected from consumer (e.g., CloudSdkAbapConnection in cloud-llm-hub)
    */
-  connection: AbapConnection;
+  connection: IAbapConnection;
 
   /**
    * A connection of its own for an operation that needs a new ABAP session:
@@ -69,10 +74,44 @@ export interface EmbeddableMcpServerOptions {
    * keeps them in this process's memory).
    * A run tool called with `background: true` runs on a connection of its
    * own — from `freshConnection` on an injected connection — and its answer
-   * is handed to the strategy. Without it, `background: true` and the
-   * background-run tools are refused (`background_runs_unavailable`).
+   * is handed to the strategy; a listed long tool runs in the background by
+   * default, and the server serves the background-run tools beside any long
+   * tool its registry carries. Without it, a code run's `background: true` and the
+   * background-run tools are refused (`background_runs_unavailable`), and a
+   * long tool answers in the call.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
+
+  /**
+   * The system the injected connection reaches, as a key of your choosing,
+   * when the connection answers no URL (`getBaseUrl()` answers `undefined`:
+   * RFC). Background runs are kept per system, client and user; a
+   * connection that answers a URL is keyed by it, and this is not read.
+   * Without a URL and without it, background runs are refused
+   * (`background_runs_unavailable`). Two different systems must be given
+   * different keys: a run of one is never served to the other.
+   */
+  system?: string;
+
+  /**
+   * `SearchSource`'s SAP-answer strategy (DO22): what a SAP answer to a
+   * failed read leads to (`'skip' | 'end' | 'throw'`), asked once per SAP
+   * answer with its place. Only SAP answers reach it: a credential refusal
+   * ends the call, a failed batch envelope and anything that is no SAP
+   * answer are thrown, before any strategy. Absent: the shipped one,
+   * `skipSapAnswers`.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy;
+  /**
+   * `SearchSource`'s line-match strategy (DO24): which lines of a source are
+   * hits. Absent: the shipped one, `substringLineMatch`.
+   */
+  lineMatchStrategy?: LineMatchStrategy;
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -92,10 +131,21 @@ export interface EmbeddableMcpServerOptions {
   batch?: InstanceBatch;
 
   /**
+   * The locks this instance takes, created by the embedder for this instance
+   * alone — `new HeldLocks()` — never shared with another instance: compact
+   * `HandlerLock` keeps the handle it answered there, and a write, a delete
+   * or an unlock under a `lock_handle` is sent only under one it keeps.
+   * Absent: the instance makes its own, as it is constructed. A host that
+   * makes an instance per request and keeps a lock across requests hands
+   * each request's instance the owner it keeps for that caller.
+   */
+  heldLocks?: HeldLocks;
+
+  /**
    * Logger instance
    * @default defaultLogger
    */
-  logger?: Logger;
+  logger?: Logger | undefined;
 
   /**
    * Handlers registry to use
@@ -104,10 +154,15 @@ export interface EmbeddableMcpServerOptions {
   handlersRegistry?: IHandlersRegistry;
 
   /**
-   * Exposition levels to include when creating default registry
+   * Exposition levels to include when creating default registry.
+   * `data` adds the data tools (`GetSqlQuery`, `GetTableContents`), which
+   * are opt-in: no default names it. SAP API Policy FAQ v1.3 (June 2026),
+   * Q33, says ADT APIs are not intended for reading application tables,
+   * exporting business data or running SQL against SAP systems; whether to
+   * serve them is the customer's decision.
    * @default ['readonly', 'high']
    */
-  exposition?: ('readonly' | 'high' | 'compact' | 'system' | 'search')[];
+  exposition?: ('readonly' | 'high' | 'system' | 'search' | 'data')[];
 
   /**
    * Server version
@@ -116,16 +171,20 @@ export interface EmbeddableMcpServerOptions {
   version?: string;
 
   /**
-   * System context (masterSystem, responsible, client, isLegacy).
-   * Set this to avoid HTTP calls that resolve system info at runtime.
-   * If not provided, handlers will use whatever is available from env vars.
+   * System context (masterSystem, responsible, masterLanguage) of this
+   * instance's calls, where the request states none: per instance, never
+   * the process's (two instances keep their own). Without it, the process
+   * configuration answers.
    */
   systemContext?: Partial<IAdtSystemContext>;
 
   /**
-   * SAP system type for this server instance. Governs which tools are
-   * registered via the `available_in` filter (none stated: every tool is
-   * listed). Overrides the process-global `SAP_SYSTEM_TYPE` env var.
+   * SAP system type for this server instance: the kind of every connection
+   * it builds — the logon, a leftover session taken up or logged off, its
+   * runtime file — and hands a tool, and which tools are registered via the
+   * `available_in` filter (none stated: every tool is listed). It wins over
+   * the process-global `SAP_SYSTEM_TYPE` env var, which answers only when
+   * the option is absent.
    *
    * Use this when a single host serves multiple SAP systems (e.g., a proxy
    * that handles both OnPremise and cloud destinations per request) —
@@ -203,6 +262,20 @@ export interface EmbeddableMcpServerOptions {
 }
 
 /**
+ * {@link EmbeddableMcpServer}'s options: a `handlersRegistry` given, or the
+ * default registry built from `exposition` and `readOnlyDedupStrategy` —
+ * never both, since a given registry replaces the default one and the two
+ * would do nothing beside it.
+ */
+export type EmbeddableMcpServerOptions =
+  | (EmbeddableMcpServerBaseOptions & {
+      handlersRegistry: IHandlersRegistry;
+      exposition?: never;
+      readOnlyDedupStrategy?: never;
+    })
+  | (EmbeddableMcpServerBaseOptions & { handlersRegistry?: undefined });
+
+/**
  * Embeddable MCP Server for integration with external applications
  *
  * This server is designed for consumers like cloud-llm-hub that:
@@ -233,6 +306,8 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       version: options.version ?? DEFAULT_VERSION,
       logger: options.logger,
       systemType: options.systemType,
+      // This instance's own: never merged into the process context.
+      systemContext: options.systemContext,
       systemContextResolver: options.systemContextResolver,
       systemContextRules: options.systemContextRules,
       stateIdleMinutes: options.stateIdleMinutes,
@@ -240,10 +315,22 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       ...(options.transportCloseEndsSession !== undefined && {
         transportCloseEndsSession: options.transportCloseEndsSession,
       }),
+      ...(options.accessChecks !== undefined && {
+        accessChecks: options.accessChecks,
+      }),
       ...(options.backgroundRuns !== undefined && {
         backgroundRuns: options.backgroundRuns,
       }),
+      ...(options.sapAnswerStrategy !== undefined && {
+        sapAnswerStrategy: options.sapAnswerStrategy,
+      }),
+      ...(options.lineMatchStrategy !== undefined && {
+        lineMatchStrategy: options.lineMatchStrategy,
+      }),
       ...(options.batch !== undefined && { batch: options.batch }),
+      ...(options.heldLocks !== undefined && {
+        heldLocks: options.heldLocks,
+      }),
       ...(options.adtHeaderPairs !== undefined && {
         adtHeaderPairs: options.adtHeaderPairs,
       }),
@@ -253,15 +340,11 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     this.setConnectionContext({
       kind: 'injected',
       connection: options.connection,
-      sessionId: 'embedded',
+      ...(options.system !== undefined && { system: options.system }),
     });
 
     // The latest injection of this connection decides.
     registerFreshConnectionFactory(options.connection, options.freshConnection);
-
-    if (options.systemContext) {
-      setSystemContext(options.systemContext);
-    }
 
     // Use provided registry or create default based on exposition
     const registry =
@@ -279,14 +362,15 @@ export class EmbeddableMcpServer extends BaseMcpServer {
    * Creates default handlers registry based on exposition levels
    */
   private createDefaultRegistry(
-    exposition: ('readonly' | 'high' | 'compact' | 'system' | 'search')[],
-    logger?: Logger,
+    exposition: NonNullable<EmbeddableMcpServerOptions['exposition']>,
+    logger?: Logger | undefined,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
-    // Dummy context - not actually used because BaseMcpServer.registerHandlers()
-    // creates wrapper lambdas that call getConnection() for fresh context
+    // A registration-only context: BaseMcpServer.registerHandlers() gives
+    // every call a context of its own (getConnection()); this connection
+    // refuses any use in words.
     const dummyContext: HandlerContext = {
-      connection: null as unknown as AbapConnection,
+      connection: noConnection,
       logger: logger ?? noopLogger,
     };
 
@@ -323,6 +407,10 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
     if (exposition.includes('search')) {
       groups.push(new SearchHandlersGroup(dummyContext));
+    }
+    // The data tools, opt-in: only when the exposition names `data`.
+    if (exposition.includes('data')) {
+      groups.push(new DataHandlersGroup(dummyContext));
     }
 
     return new CompositeHandlersRegistry(groups);

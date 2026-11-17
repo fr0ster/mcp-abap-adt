@@ -13,9 +13,6 @@
 # │  4. environment.default_transport  — transport request or ""     │
 # │  5. shared_dependencies.package    — package for shared objects  │
 # │  6. shared_dependencies.software_component — "ZLOCAL"/"HOME"    │
-# │                                                                  │
-# │  OPTIONAL (cloud/BTP, JWT token refresh):                        │
-# │  7. auth_broker.abap.destination   — auth broker destination     │
 # └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
@@ -33,85 +30,107 @@
 # - Views: ZMCP_BLD_VIEW01, ZMCP_BLD_VIEW_H1, etc.
 # - Packages: ZMCP_BLD_PKG01, ZMCP_BLD_PKG02, etc.
 #
-# Test settings
+# No time keys: a live test has no bound, delay or poll limit; each step goes
+# on the answer of the one before it. A step that waits for ever is ended with
+# Ctrl-C (src/__tests__/integration/README.md, "Interrupting a run").
+#
+# Where a test runs is decided in code, not here: a suite runs where the
+# configured system (environment.system_type) serves every tool it calls
+# (helpers/servedHere.ts: servedSuite, skipUnlessServed — the tool's own
+# available_in and the system's ADT type table), or on the systems its
+# liveSuite / systemsDescribe names (helpers/live.ts). No tool lists legacy,
+# so those suites skip on a legacy system. A test case is read for its data
+# only (helpers/configHelpers.ts getTestCase): its `enabled` and
+# `available_in` are no longer read, except the four switches commented
+# below (environment.integration_hard_mode.enabled and three batch cases).
+# An absent case skips, naming its key.
+#
+# Comments below name, per section, the file that reads it (paths under
+# src/__tests__/integration/ unless stated), what it is, and the systems it
+# applies to. "cloud: needed" marks a value a cloud config must state for
+# cases that run on cloud; the kind of value is named, never a value.
 
 # ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
 
+# Read by helpers/configHelpers.ts (cleanup after a failure). All systems.
 test_settings:
-  fail_fast: false
-  verbose: true
-  timeout: 120000  # Global test timeout (120 seconds)
-  retry_on_failure: false
-  max_retries: 1
-  cleanup_after_test: false
   # A failed test keeps the objects it created, so their state can say why it
   # failed; locks are released either way. true deletes them regardless.
   cleanup_on_failure: false
-  # Timeouts for different operations (in milliseconds)
-  timeouts:
-    default: 120000
-    long: 600000  # Long timeout for complex operations (group activation, shared setup, etc.)
-    create: 120000
-    test: 120000
-    delay: 3000  # Delay after delete/create operations
-  # Operation delays (milliseconds) - time to wait for SAP to commit operations
-  # These delays ensure SAP has time to persist state changes between operations
-  operation_delays:
-    lock: 3000      # Delay after lock operation (default: 3 seconds)
-    unlock: 3000    # Delay after unlock operation (default: 3 seconds)
-    update: 3000    # Delay after update operation (default: 3 seconds)
-    create: 3000    # Delay after create operation (default: 3 seconds)
-    cleanup: 3000   # Delay after pre-test cleanup (delete) before test starts
-    default: 3000   # Default delay for any operation (default: 3 seconds)
-
-# Session persistence configuration
-
-session_config:
-  # Enable session persistence (saves cookies and CSRF tokens)
-  persist_session: true
-  # Directory for session files (relative to project root)
-  sessions_dir: ".sessions"
-  # Session ID format: {test_name}_{timestamp} or custom
-  session_id_format: "auto"  # "auto" or custom string
-  # Clean up session after test
-  cleanup_session_after_test: true
-
-# Lock persistence configuration
-
-lock_config:
-  # Directory for lock files (relative to project root)
-  locks_dir: ".locks"
-  # Track locks in persistent storage
-  persist_locks: true
 
 # Environment configuration
+# Read by the harness for every live test, all systems: helpers/configHelpers.ts
+# (env, system_type, connection_type, the RFC keys, default_package,
+# default_transport, cleanup_after, database_system), helpers/configuredSystemKind.ts
+# (env, system_type), globalSetup.ts and helpers/realmCheck.ts (expected_realm,
+# realm_check_url, connection_type), helpers/authHelpers.ts,
+# helpers/sessionHelpers.ts, helpers/testers/hardMode.ts and
+# helpers/testers/LambdaTester.ts (integration_hard_mode), helpers/sharedObjects.ts
+# (default_package, default_transport).
 
 environment:
   # Connection: .env file from standard sessions folder (~/Documents/mcp-abap-adt/sessions/)
-  # Contains SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # HTTP: SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # RFC: no SAP_URL; SAP_ASHOST + SAP_SYSNR (or SAP_MSHOST with SAP_MSSERV or
+  # SAP_SYSID and SAP_GROUP), SAP_CLIENT, SAP_LANGUAGE, SAP_AUTH_TYPE, etc.
+  # The test destination is this file's name without ".env" (on premise and
+  # cloud alike): the auth broker reads sessions/<destination>.env (and, for
+  # a cloud destination, service-keys/<destination>.json) under
+  # auth_broker.paths.service_keys_dir. A path outside that sessions folder
+  # names no destination: the suites that need one are refused.
+  # cloud: needed — the cloud destination's session file name.
   env: ""                                    # ← CHANGE: session file name (e.g., "your-system.env", "another-system.env")
   # System and connection type (explicit, no auto-detection)
+  # cloud: needed — "cloud".
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
+  # The realm check before any logon: an unauthenticated GET of the ADT
+  # discovery must answer 401. On premise its WWW-Authenticate realm must
+  # equal this value; empty refuses the run before anything logs on. On the
+  # cloud it is not read: the session's JWT must not have expired instead.
+  expected_realm: ""                         # ← CHANGE (on premise): the system's 401 realm
+  # RFC only (test-only, never part of the destination): an RFC destination
+  # states no URL, so the realm check runs against this HTTP URL of the
+  # system. Required when connection_type is "rfc"; not read over HTTP, which
+  # checks the session's SAP_URL.
+  realm_check_url: ""                        # ← CHANGE (RFC): the system's HTTP URL
   connection_type: "http"                    # "http" | "rfc"
-  # RFC through a message server and a logon group (optional; rfc only).
-  # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to
-  # dial the application server of SAP_URL. With mshost, msserv or sysid is required.
+  # RFC (rfc only): the destination states its address, client and language,
+  # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)
+  # over the .env's; leave "" to take the .env's. One address: ashost + sysnr
+  # (an application server), or mshost with msserv or sysid and group (a
+  # message server). Nothing is derived from a URL and nothing has a default.
+  ashost: ""                                 # application server host
+  sysnr: ""                                  # system number (two digits)
+  client: ""                                 # SAP client (required over RFC)
+  language: ""                               # logon language (required over RFC)
   mshost: ""                                 # message server host
   msserv: ""                                 # message server service (name or port)
   sysid: ""                                  # system id
-  group: ""                                  # logon group (connection default: PUBLIC)
-  saprouter: ""                              # SAProuter string
+  group: ""                                  # logon group (required with mshost)
+  saprouter: ""                              # SAProuter string, with either address
   # Test defaults
   # database_system: "HDB"                  # the system's database, stated (e.g. ABAP cloud,
                                              # whose system information names none); the AMDP
                                              # tests read SAP's DBSystem when omitted
+  # On ABAP Cloud this is the build package SearchSource's live known-hit case searches with its
+  # subpackages: shared_dependencies.package must be a descendant of it, or that case fails
+  # naming the prerequisite.
+  # The live harness creates only where its package guard allows (src/__tests__/integration/
+  # helpers/packageGuard.ts): on premise "$TMP" or ZAC_TEST_PKG, on the cloud ZADT_BLD_PKG03;
+  # a case's package_name is held to the same, any other fails the case naming the key.
+  # cloud: needed — the cloud build package (a package of the cloud system).
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+  # cloud: needed — a request of the cloud system when default_package records
+  # changes, else "".
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   cleanup_after: true                        # Clean up objects after test
   # Real MCP client mode — tests go through full MCP transport layer
+  # (helpers/testers/hardMode.ts, helpers/testers/LambdaTester.ts). All systems.
   integration_hard_mode:
+    # A switch, still read: false runs the testers in process (soft mode),
+    # true spawns the server and calls its tools over `transport` (hard mode).
     enabled: false
     transport: "stdio"
     mcp_destination: ""                      # MCP destination (optional, for hard mode)
@@ -124,10 +143,25 @@ environment:
 # ============================================================================
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
 # Manage with: npm run shared:setup / shared:teardown / shared:check
+#
+# Data. Read by helpers/sharedObjects.ts, src/__tests__/admin/shared-deps/
+# (setup, teardown, check, presence) and by the tests that use a shared object
+# (batch/*, check, debugger, function, readOnly/*, table_type, coverage/*).
+# onprem and cloud (shared:setup creates nothing on legacy: no entry lists it).
+# Each entry's `available_in` is still read (helpers/sharedObjects.ts,
+# admin/shared-deps/*, batch/batchedReadsTiming.test.ts): it states on which
+# systems that shared object exists — data, not a test switch.
 
 shared_dependencies:
+  # On ABAP Cloud this package must be a descendant of environment.default_package (the build
+  # package): SearchSource's live known-hit case searches the build package's tree for it, and
+  # fails naming the prerequisite when it is not there.
+  # cloud: needed — a package of the cloud system under default_package.
+  # The package guard accepts this package when it is an allowed one itself, else by its
+  # super_package, which must then be an allowed one.
   package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
   super_package: ""                          # super package (optional, leave "" if none)
+  # cloud: needed — the cloud system's software component.
   software_component: "ZLOCAL"               # ← CHANGE: "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
   transport_layer: ""
   # Whether the shared package records changes: required (true) when its super
@@ -598,6 +632,20 @@ shared_dependencies:
             RETURN SELECT n, square FROM :lt_rows;
           ENDMETHOD.
         ENDCLASS.
+    # Locked and unlocked by the deferred-logon live suite's take-up case
+    # (MCP_LIVE_DEFERRED_LOCK_CLASS=ZMCP_SHR_LOCK_CLS,
+    # src/__tests__/integration/live/deferredLogon.test.ts); never changed,
+    # used by no other test.
+    - name: "ZMCP_SHR_LOCK_CLS"
+      description: "Shared class the deferred-logon take-up locks and unlocks"
+      available_in: ["onprem"]
+      source: |
+        CLASS zmcp_shr_lock_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+        ENDCLASS.
+
+        CLASS zmcp_shr_lock_cls IMPLEMENTATION.
+        ENDCLASS.
 
   function_groups:
     - name: "ZMCP_BLD_SHR_FGR"
@@ -707,25 +755,19 @@ shared_dependencies:
         }
 
 
-# Legacy shared_objects (kept for backward compatibility with unit_test_class)
-shared_objects:
-  unit_test_class:
-    class_name: "ZMCP_BLD_CLSUT_L1"
-    # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
-    # transport_request: ""  # Uses environment.default_transport if omitted; "" forces no request, and a transportable package then gets a generated one
-    description: "Shared container class for unit test integration tests"
-
 # ============================================================================
 # AUTHENTICATION BROKER CONFIGURATION
 # ============================================================================
 # Configuration for AuthBroker-based token refresh before integration tests
 # This allows tests to automatically refresh expired tokens using AuthBroker
 # instead of relying solely on refresh tokens from .env file
+# Read by globalSetup.ts, helpers/authHelpers.ts, helpers/configHelpers.ts,
+# helpers/configuredSystemKind.ts, helpers/testers/hardMode.ts. All systems.
 
 auth_broker:
   # Use file-based session store (unsafe) to reuse saved sessions for tests (set MCP_UNSAFE=true)
   unsafe: true
-  # Browser auth callback port (default 3001). Change if port is busy.
+  # Browser auth callback port. Change if the port is busy.
   browser_auth_port: 3101
   # Paths configuration (applies to both ABAP and BTP/XSUAA)
   paths:
@@ -741,82 +783,24 @@ auth_broker:
     #   - ~/.config/mcp-abap-adt/sessions/<destination>.env
     service_keys_dir: "~/.config/mcp-abap-adt"  # Base path for service keys and sessions
 
-  # ABAP destination configuration (for on-premise or cloud ABAP systems)
-  abap:
-    # ABAP destination name (used for service key file: <destination>.json and session file: <destination>.env)
-    # Example: "TRIAL" -> looks for TRIAL.json in service-keys directory and TRIAL.env in sessions directory
-    # This destination is used by refreshTokensForTests() to automatically refresh tokens before integration tests
-    # If not specified, token refresh will be skipped and tests will use tokens from .env file
-    destination: ""                    # Auth broker destination (cloud/BTP only, e.g. "TRIAL", "mcp")
+  # The destination is not stated here: it is environment.env's session file
+  # name without ".env" (see environment.env).
 
 # ============================================================================
 # OBJECT TESTS (High-Level, then Low-Level for each object)
 # ============================================================================
-
-# Behavior Definition (Behavior Definition - Low-Level)
-# The suite creates its own root and child views (ZMCP_BLD_I_BDFL/BCHL) over
-# the shared tables, because a BDEF must carry its root entity's name
-create_behavior_definition_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Behavior Definition low-level handler full workflow test"
-      params:
-        name: "ZMCP_BLD_I_BDFL"
-        description: "Behavior Definition low-level handler test"
-        root_entity: "ZMCP_BLD_I_BDFL"
-        implementation_type: "Managed"
-        root_view_name: "ZMCP_BLD_I_BDFL"
-        root_view_source: |
-          @EndUserText.label : 'Root view for the BDEF low-tier test'
-          @AccessControl.authorizationCheck : #NOT_REQUIRED
-          define root view entity ZMCP_BLD_I_BDFL
-            as select from zmcp_shr_bltbl
-          {
-            key fld1 as Fld1,
-            fld2 as Fld2,
-            fld3 as Fld3,
-            fld4 as Fld4
-          }
-        source_code: |
-          managed implementation in class zbp_mcp_bld_i_bdfl unique;
-          strict ( 2 );
-
-          define behavior for ZMCP_BLD_I_BDFL
-          persistent table zmcp_shr_bltbl
-          lock master
-          authorization master ( instance )
-          {
-            create ( authorization : global );
-            update;
-            delete;
-            field ( readonly ) Fld1;
-          }
-        update_source_code: |
-          managed implementation in class zbp_mcp_bld_i_bdfl unique;
-          strict ( 2 );
-
-          define behavior for ZMCP_BLD_I_BDFL
-          persistent table zmcp_shr_bltbl
-          lock master
-          authorization master ( instance )
-          {
-            create ( authorization : global );
-            update;
-            delete;
-            field ( readonly ) Fld1;
-            field ( readonly ) Fld2;
-          }
 
 # Behavior Definition (Behavior Definition - High-Level)
 # Its own set, disjoint from the low tier's: the two suites used to read this
 # same case and fought over one object, and the BIMPL case named a third BDEF
 # that nothing created. The suite creates the views, the BDEF and the class, and
 # deletes all four in cleanup.
+# Read by high/behaviorDefinitionAndImplementation/BehaviorDefinitionAndImplementationHighHandlers.test.ts
+# (object names and sources). onprem, cloud.
 create_behavior_definition:
   test_cases:
     - name: "full_workflow"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Behavior Definition high-level handler workflow test"
@@ -869,9 +853,12 @@ create_behavior_definition:
 
 # Behavior Implementation (Behavior Implementation - High-Level)
 # Used in combined BDEF+BIMPL test — BDEF (ZMCP_BLD_I_BDEF) is created first in the same test
+# Read by high/behaviorDefinitionAndImplementation/BehaviorDefinitionAndImplementationHighHandlers.test.ts
+# (class name and implementation sources). onprem, cloud.
 create_behavior_implementation:
   test_cases:
     - name: "builder_behavior_implementation"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Behavior Implementation used by combined BDEF+BIMPL workflow tests (high-level)"
@@ -927,14 +914,14 @@ create_behavior_implementation:
 
           ENDCLASS.
 
-# Behavior Implementation (Behavior Implementation - Low-Level)
-# Used in combined BDEF+BIMPL test — BDEF (ZMCP_BLD_I_BDFL) is created first in the same test
-# Create Metadata Extension (Low-Level Handler)
-
 # Class (Class)
+# Read by high/class/ClassHighHandlers.test.ts (params) and
+# high/class/ClassLocalIncludesHandlers.test.ts (params_groups.builder_class);
+# also tools/debug-runtime-explorer.js. Object names and sources. onprem, cloud.
 create_class:
   test_cases:
     - name: "builder_class"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "High-level test for ClassHighHandlers and ClassLocalIncludesHandlers: create → update → get → delete class with local includes"
@@ -944,7 +931,6 @@ create_class:
         # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
-        final: true
         source_code: |
           CLASS ZMCP_BLD_CLSLOC_H1 DEFINITION
             PUBLIC
@@ -1049,7 +1035,6 @@ create_class:
               ).
             ENDMETHOD.
           ENDCLASS.
-        update_activate: true
       # Parameters group for ClassLocalIncludesHandlers test
       # Uses minimal empty class for testing local includes
       params_groups:
@@ -1070,10 +1055,12 @@ create_class:
 
 # Create Package
 
-# Class (Class - Low-Level)
+# Read by high/class/ClassCrudClientDirect.test.ts (class name, source,
+# cleanup_after). onprem, cloud.
 create_class_direct:
   test_cases:
     - name: "crud_direct"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Class CrudClient direct test (reference implementation)"
@@ -1105,57 +1092,15 @@ create_class_direct:
 
         cleanup_after: true
 
-create_class_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Class low-level handler full workflow test"
-      params:
-        class_name: "ZMCP_BLD_CLS_L1"
-        description: "Class low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
-        # transport_request: ""  # Uses environment.default_transport if omitted
-        # Extra delays to give backend time to persist between steps (especially in async env)
-        operation_delays:
-          create: 5000
-          lock: 5000
-          update: 5000
-          unlock: 5000
-          default: 5000
-        source_code: |
-          CLASS ZMCP_BLD_CLS_L1 DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-            PUBLIC SECTION.
-              METHODS: constructor.
-          ENDCLASS.
-          CLASS ZMCP_BLD_CLS_L1 IMPLEMENTATION.
-            METHOD constructor.
-              WRITE: / 'Class instance created'.
-            ENDMETHOD.
-          ENDCLASS.
-        update_source_code: |
-          CLASS ZMCP_BLD_CLS_L1 DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-            PUBLIC SECTION.
-              METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
-          ENDCLASS.
-          CLASS ZMCP_BLD_CLS_L1 IMPLEMENTATION.
-            METHOD get_message.
-              rv_message = 'Updated via low-level handler'.
-            ENDMETHOD.
-          ENDCLASS.
-
 # Create Domain (Low-Level Handler)
 
 # Data Element (Data Element)
+# Read by high/dataElement/DataElementHighHandlers.test.ts (through
+# helpers/testers/HighTester.ts). Object name and definition. onprem, cloud.
 create_data_element:
   test_cases:
     - name: "builder_data_element"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Data element reserved for DataElementBuilder tests"
@@ -1178,8 +1123,6 @@ create_data_element:
         medium_label: "Builder Data"
         long_label: "Builder Data Element"
         heading_label: "Builder Data Element"
-      operation_delays:
-        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
 
 # Create Interface
 
@@ -1187,9 +1130,12 @@ create_data_element:
 # Create Table (Low-Level Handler)
 
 # Domain (Domain)
+# Read by high/domain/DomainHighHandlers.test.ts (through
+# helpers/testers/HighTester.ts). Object name and definition. onprem, cloud.
 create_domain:
   test_cases:
     - name: "builder_domain"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Domain used by DomainBuilder workflow tests"
@@ -1203,10 +1149,6 @@ create_domain:
         decimals: 0
         lowercase: false
         sign_exists: false
-      operation_delays:
-        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
-        create: 5000
-        update: 3000
 
 # Create Data Element
 
@@ -1214,9 +1156,12 @@ create_domain:
 # Create Data Element (Low-Level Handler)
 
 # Function Group & Function Module (High-Level Tests)
+# Read by high/function/FunctionHighHandlers.test.ts (full_workflow_high: group
+# and module names, sources). onprem, cloud.
 create_function:
   test_cases:
     - name: "full_workflow_high"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Complete function group and function module workflow for high level tests"
@@ -1247,46 +1192,17 @@ create_function:
             ev_result = |Additional processing|.
           ENDFUNCTION.
 
-    # Function Group & Function Module (Low-Level Tests)
-    - name: "full_workflow_low"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Complete function group and function module workflow for low level tests"
-      params:
-        # Function Group parameters
-        function_group_name: "ZMCP_BLD_FGR_L1"
-        function_group_description: "FG for low-level tests"
-
-        # Function Module parameters
-        function_module_name: "Z_MCP_BLD_FM_L1"
-        function_module_description: "FM for low-level tests"
-        source_code: |
-          FUNCTION Z_MCP_BLD_FM_L1
-              IMPORTING
-                 VALUE(IV_PARAM) TYPE  STRING
-              EXPORTING
-                 VALUE(EV_RESULT) TYPE  STRING.
-            ev_result = |Result: { iv_param }|.
-            ev_result = |Additional processing|.
-          ENDFUNCTION.
-        update_source_code: |
-          FUNCTION Z_MCP_BLD_FM_L1
-              IMPORTING
-                 VALUE(IV_PARAM) TYPE  STRING
-              EXPORTING
-                 VALUE(EV_RESULT) TYPE  STRING.
-            ev_result = |Updated Result: { iv_param }|.
-            ev_result = |Additional processing|.
-          ENDFUNCTION.
-
 # Create Transport
 
 # Create Package (Low-Level Handler)
 
 # Interface (Interface)
+# Read by high/interface/InterfaceHighHandlers.test.ts (through
+# helpers/testers/HighTester.ts). Object name and source. onprem, cloud.
 create_interface:
   test_cases:
     - name: "builder_interface"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Interface reserved for InterfaceBuilder tests"
@@ -1300,11 +1216,6 @@ create_interface:
             PUBLIC .
             METHODS: test_method.
           ENDINTERFACE.
-      operation_delays:
-        create: 5000  # Increased delay for interface creation
-        lock: 3000
-        update: 3000
-        unlock: 3000
 
 # Create Program
 
@@ -1312,9 +1223,12 @@ create_interface:
 # Create Structure (Low-Level Handler)
 
 # Metadata Extension (Metadata Extension - High-Level)
+# Read by high/metadataExtension/MetadataExtensionHighHandlers.test.ts. Object
+# name and source. onprem, cloud.
 create_metadata_extension:
   test_cases:
     - name: "full_workflow"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Metadata Extension high-level handler full workflow test"
@@ -1343,9 +1257,12 @@ create_metadata_extension:
 
 # Metadata Extension (Metadata Extension - Low-Level)
 # Package (Package)
+# Read by high/package/PackageHighHandlers.test.ts. The package created, its
+# type and software component. onprem, cloud.
 create_package:
   test_cases:
     - name: "builder_package"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Package reserved for PackageBuilder tests"
@@ -1353,15 +1270,9 @@ create_package:
         # package_name: "ZMCP_BLD_PKG01"          # Package where test objects are added (existing package)
         test_package: "ZMCP_BLD_PKG_H1"    # Package created by the test
         description: "PackageBuilder workflow package"
-        updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
+        # cloud: needed — the cloud system's software component.
         software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
-        operation_delays:
-          create: 5000
-          update: 3000
-          unlock: 5000
-          delete: 20000
-          delete_retry: 20000
 
 # Create Domain
 
@@ -1369,9 +1280,13 @@ create_package:
 # Create Behavior Definition (Low-Level Handler)
 
 # Program (Program)
+# Read by high/program/ProgramHighHandlers.test.ts (systemsDescribe onprem);
+# also tools/mcp-crud-matrix.js, tools/mcp-crud-smoke.js. Object name and
+# source. onprem.
 create_program:
   test_cases:
     - name: "builder_program"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "Program reserved for ProgramBuilder tests"
@@ -1388,9 +1303,12 @@ create_program:
 # Program include (Include) — on premise only: ABAP cloud holds no program
 # include of the caller's. The suite creates a fresh local package ($ + a
 # run-unique suffix) and deletes it last.
+# Read by high/include/IncludeHighHandlers.test.ts (systemsDescribe onprem).
+# Include name and source. onprem.
 create_include:
   test_cases:
     - name: "builder_include"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "Include created, written, read back and deleted by the include suite"
@@ -1404,9 +1322,12 @@ create_include:
 # An include's main programs, on premise: a delivered include, read only
 # (GetMainPrograms and compact HandlerGet part main_programs). LSVIMTOP is an
 # include of function group SVIM.
+# Read by readOnly/include/IncludeMainProgramsHandlers.test.ts (systemsDescribe
+# onprem). onprem.
 include_main_programs:
   test_cases:
     - name: "delivered_include"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "Read the main programs of a delivered include"
@@ -1415,20 +1336,28 @@ include_main_programs:
 
 # Program include read on ABAP cloud: a delivered include, read only (both
 # parts). Empty include_name: the case is skipped, naming the reason.
+# Read by high/include/IncludeHighHandlers.test.ts (servedSuite GetInclude,
+# HandlerGet, HandlerDeletionCheck: served on onprem and cloud; the suite's
+# assertions are cloud's).
 include_cloud_read:
   test_cases:
     - name: "read_delivered_include"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["cloud"]
       description: "Read a delivered include's source and metadata on ABAP cloud"
       params:
+        # cloud: needed — a delivered include readable on the cloud system.
         include_name: ""
 
 # Table type (TableType) — on premise and on ABAP cloud. On cloud the suite
-# works in shared_dependencies.package.
+# works in environment.default_package (the build package).
+# Read by high/table_type/TableTypeHighHandlers.test.ts. Object name and
+# definition. onprem, cloud.
 create_table_type:
   test_cases:
     - name: "builder_table_type"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Table type created with its definition, changed, checked and deleted"
@@ -1452,9 +1381,12 @@ create_table_type:
 # Create Interface (Low-Level Handler)
 
 # Structure (Structure)
+# Read by high/structure/StructureHighHandlers.test.ts (through
+# helpers/testers/HighTester.ts). Object name and DDL. onprem, cloud.
 create_structure:
   test_cases:
     - name: "builder_structure"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Structure reserved for StructureBuilder tests"
@@ -1491,9 +1423,12 @@ create_structure:
 # Create Function Group (Low-Level Handler)
 
 # Table (Table)
+# Read by high/table/TableHighHandlers.test.ts (through
+# helpers/testers/HighTester.ts). Object name and DDL. onprem, cloud.
 create_table:
   test_cases:
     - name: "builder_table"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Table reserved for TableBuilder tests"
@@ -1502,8 +1437,6 @@ create_table:
         description: "TableBuilder workflow table"
         # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
-        delivery_class: "A"
-        data_class: "APPL0"
         ddl_code: |
           @EndUserText.label: 'Builder test table'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
@@ -1538,42 +1471,30 @@ create_table:
 # Table (Table - Low-Level)
 # Create View (Low-Level Handler)
 
-# Transport (Transport)
-create_transport:
-  test_cases:
-    - name: "builder_transport"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Transport reserved for TransportBuilder tests"
-      params:
-        description: "TransportBuilder workflow transport"
-        # package_name: "ZMCP_BLD_PKG01"
-
 # Transported Object CRUD (GitHub #11)
-# Tests full lifecycle of an object in a transportable package:
-# create class → read → update → delete, all recorded to a dedicated transport.
-# Reproduces the issue where editing objects in unreleased transports
-# fails on legacy/onprem systems.
-# IMPORTANT: transport_request and package_name must be set to a REAL
-# unreleased transport and a transportable package (not $TMP).
+# Read by high/transport/TransportedObjectCrud.test.ts (target_system): data,
+# no switch. The test creates a workbench request of its own through
+# CreateTransport with this target and records a class of
+# environment.default_package on it; the configured default_transport is not
+# used.
 create_transported_object:
-  enabled: false                                 # ← CHANGE: set true when transport is ready
-  available_in: ["onprem"]
-  transport_request: "TRLK900201"                # ← CHANGE: dedicated unreleased transport
-  package_name: "ZMC_REQUEST_TEST"                # ← CHANGE: transportable package recorded to that transport
-  class_name: "ZMCP_BLD_TRCLS"
-
-# Standard SAP objects registry for read-only tests
-
-# Create Function Group
-
-# View (View - Low-Level)
-# Create Program (Low-Level Handler)
+  # onprem: needed (to run there; absent, the case skips naming this key) —
+  # the transport target of the package's requests: read it from an existing
+  # request of environment.default_package (GetTransport, target_system) and
+  # give it without the enclosing slashes, since CreateTransport sends
+  # /<target_system>/. Without a target the request is created with target
+  # LOCAL and SAP refuses to record the package's class on it (CTS_WBO_API 048).
+  # cloud: not needed — absent, the request is created with target LOCAL, which
+  # the cloud package accepts (measured).
+  target_system: "TARGET"                        # ← CHANGE: the package's transport target, no slashes
 
 # Service Definition (Service Definition - High-Level)
+# Read by high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts. Object
+# name and sources. onprem, cloud.
 create_service_definition:
   test_cases:
     - name: "builder_service_definition"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Service definition reserved for ServiceDefinitionBuilder tests"
@@ -1596,9 +1517,12 @@ create_service_definition:
           }
 
 # Service Binding (Service Binding - High-Level)
+# Read by high/serviceBinding/ServiceBindingHighHandlers.test.ts. Binding,
+# its service definition (shared), variant and service. onprem, cloud.
 create_service_binding:
   test_cases:
     - name: "builder_service_binding"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Service binding CRUD + activate test"
@@ -1611,74 +1535,6 @@ create_service_binding:
         service_version: "0001"
 
 # ============================================================================
-# STANDARD SAP OBJECTS REGISTRY
-# ============================================================================
-
-standard_objects:
-  classes:
-    - name: "CL_ABAP_CHAR_UTILITIES"
-      description: "Character utilities helper (available everywhere)"
-      available_in: ["onprem", "cloud"]
-    - name: "CL_ABAP_CORRESPONDING"
-      description: "Corresponding-move helper for ABAP"
-      available_in: ["onprem", "cloud"]
-
-  interfaces:
-    - name: "IF_BUPA_API_MODIFY"
-      description: "Interface zum BAdI: BUPA_API_MODIFY"
-      available_in: ["onprem", "cloud"]
-
-  domains:
-    - name: "MANDT"
-      description: "Client domain"
-      available_in: ["onprem", "cloud"]
-    - name: "ABAP_BOOL"
-      description: "Boolean domain"
-      available_in: ["onprem", "cloud"]
-
-  data_elements:
-    - name: "MANDT"
-      description: "Client data element"
-      available_in: ["onprem", "cloud"]
-    - name: "ABAP_BOOL"
-      description: "Boolean data element"
-      available_in: ["onprem", "cloud"]
-
-  tables:
-    - name: "T000"
-      description: "Client table (on-premise SAP systems)"
-      available_in: ["onprem"]
-    - name: "T000"
-      description: "Clients"
-      available_in: ["cloud"]
-
-  structures:
-    - name: "SYST"
-      description: "System fields structure"
-      available_in: ["onprem", "cloud"]
-
-  packages:
-    - name: "$TMP"
-      description: "Local package"
-      available_in: ["onprem"]
-    - name: "ZLOCAL"
-      description: "Placeholder for ABAP Cloud package – replace with existing package"
-      available_in: ["cloud"]
-
-  programs:
-    - name: "SAPLSETB"
-      description: "Standard SAP settings program"
-      available_in: ["onprem"]
-
-  views:
-    - name: "H_T000"
-      description: "Client table help view"
-      available_in: ["onprem"]
-    - name: "I_SapPackage"
-      description: "ABAP Cloud: replace with CDS view name existing in tenant"
-      available_in: ["cloud"]
-
-# ============================================================================
 # CLASS UNIT TEST - Low-Level and High-Level Handlers
 # ============================================================================
 
@@ -1686,9 +1542,12 @@ standard_objects:
 # CDS UNIT TEST - High-Level Handlers
 # ============================================================================
 
+# Read by high/unitTest/CdsUnitTestHighHandlers.test.ts. Class, CDS view
+# (shared), test class sources, expected methods. onprem, cloud.
 cds_unit_test:
   test_cases:
     - name: "full_workflow"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "A CDS view's ABAP Unit tools: CreateCdsUnitTest → RunCdsUnitTest → UpdateCdsUnitTest → RunCdsUnitTest; DeleteCdsUnitTest as cleanup"
@@ -1723,9 +1582,12 @@ cds_unit_test:
 # Class Unit Test (Low-Level and High-Level)
         expected_test_methods: ["TEST_METHOD"]
 
+# Read by high/unitTest/ClassUnitTestHighHandlers.test.ts. Class and test
+# class sources, expected methods. onprem, cloud.
 class_unit_test:
   test_cases:
     - name: "full_workflow"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "A class's ABAP Unit tools: CreateUnitTest → RunUnitTest → UpdateUnitTest → RunUnitTest → DeleteUnitTest. The suite creates the class and deletes it."
@@ -1760,9 +1622,12 @@ class_unit_test:
 # A report's ABAP Unit tools. The test class goes into a test include the tool
 # creates and pulls into the report. The suite creates the report and deletes
 # it with the include.
+# Read by high/unitTest/ProgramUnitTestHighHandlers.test.ts (systemsDescribe
+# onprem). onprem.
 program_unit_test:
   test_cases:
     - name: "full_workflow"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "A report's ABAP Unit tools: CreateProgramUnitTest → RunProgramUnitTest → UpdateProgramUnitTest → RunProgramUnitTest"
@@ -1788,9 +1653,12 @@ program_unit_test:
 # include; its INCLUDE is added to the group's main program by ADT. The group
 # run finds every test of the group, the module run the tests that exercise the
 # module. The suite creates the group and its module and deletes the group.
+# Read by high/unitTest/FunctionGroupUnitTestHighHandlers.test.ts. Group,
+# module and test sources. onprem, cloud.
 function_group_unit_test:
   test_cases:
     - name: "full_workflow"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "A function group's ABAP Unit tools: CreateFunctionGroupUnitTest → RunFunctionGroupUnitTest → RunFunctionModuleUnitTest → UpdateFunctionGroupUnitTest → RunFunctionGroupUnitTest"
@@ -1830,9 +1698,11 @@ function_group_unit_test:
 # ============================================================================
 
 # ListTransports Read-Only Handler
+# Read by readOnly/transport/ListTransportsHandlers.test.ts. onprem, cloud.
 list_transports_readonly:
   test_cases:
     - name: "test_list_transports"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "ListTransports handler read-only tests"
@@ -1842,10 +1712,13 @@ list_transports_readonly:
         # user: "DEVELOPER"              # Optional: SAP user name (defaults to current session user)
         # modifiable_only: true           # Optional: only modifiable transports (default: true)
 
-# SearchSource Read-Only Handler — onprem-only
+# SearchSource Read-Only Handler
+# Read by readOnly/system/SearchSourceHandler.test.ts. Queries over the shared
+# package's seeded source. onprem, cloud.
 search_source_readonly:
   test_cases:
     - name: "test_search_source"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "SearchSource integration tests (scans shared package + objects from shared_dependencies)"
@@ -1861,26 +1734,36 @@ search_source_readonly:
         # Substring used as exclusion — present in at least one matching line so the test
         # can assert the line was dropped.
         known_exclude: "ev_output"
-        # Glob that matches only one of the seeded programs/classes — used to verify
-        # object_filter narrows the scan.
-        narrow_object_filter: "Z_MCP_BLD_SHR_FM*"
+        # Glob over the scanned package's objects that matches only one of the
+        # seeded ones — used to verify object_filter narrows the scan. A function
+        # module is not a package object: name its group (the shared group).
+        narrow_object_filter: "ZMCP_BLD_SHR_FGR*"
 
 # WhereUsed Read-Only Handler
+# Read by readOnly/system/WhereUsedHandlers.test.ts. A class and a table to
+# analyse. onprem, cloud.
 whereused_readonly:
   test_cases:
     - name: "test_whereused"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "WhereUsed handler read-only tests"
       params:
         # Test objects for where-used analysis
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
+        # cloud: needed — a table that exists on the cloud system.
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
 
 # Runtime Read-Only Handlers (Profiling + Dumps)
+# Read by readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts (all params)
+# and coverage/dumpsProfiles.live.test.ts (dump_class_name,
+# profiled_class_name). onprem, cloud; profiled_program_name onprem only
+# (RuntimeRunProgram).
 runtime_readonly_handlers:
   test_cases:
     - name: "test_runtime_readonly"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Runtime profiling and dumps handlers integration tests"
@@ -1898,13 +1781,8 @@ runtime_readonly_handlers:
         # Increase for slow systems (e.g. SAP trial cloud) — default in client is 5×2000ms.
         profiled_run_max_trace_attempts: 15
         profiled_run_trace_retry_delay_ms: 2000
-        # Retries for reading profiler trace data (trace can appear with delay)
-        trace_read_retries: 6
-        trace_read_retry_delay_ms: 1500
         # Optional user filter for dumps list (empty = all users)
         dumps_user: ""
-        # Number of dump IDs to read from feed
-        dumps_read_limit: 5
         # Shared class that dumps (division by zero) when run. The test runs it
         # and looks for a dump that was not in the feed before the run.
         dump_class_name: "ZMCP_SHR_DUMP_CLS"
@@ -1939,9 +1817,11 @@ runtime_readonly_handlers:
 # false), so the probe needs no transport ($TMP is refused on ABAP Cloud, and
 # ZLOCAL is a structure package there). The AMDP chain reads and runs the shared AMDP
 # pair (shared_dependencies), created once by npm run shared:setup.
+# Read by debugger/DebuggerHandlers.test.ts. onprem, cloud.
 debugger_handlers:
   test_cases:
     - name: "debugger_chain"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on an ABAP probe the test creates and deletes, and the shared AMDP pair"
@@ -1960,15 +1840,50 @@ debugger_handlers:
         # on that user. Empty: the another-user case is skipped.
         second_user_env: ""
 
+# The draft tool (src/__tests__/integration/high/draft/ObjectDraft.test.ts):
+# GetObjectDraft and HandlerGet part draft on objects the run creates and
+# deletes ($TMP on premise; environment.default_package on the cloud).
+# Read by high/draft/ObjectDraft.test.ts: onprem (program and include suite),
+# onprem and cloud (the other suite).
+draft:
+  # On premise: a session .env name (in the standard sessions folder) of a
+  # second SAP user with basic authentication, who reads the writer's draft
+  # as another user's. Empty skips only the "other" cases, naming the reason.
+  # On the cloud: empty (the trial has one user).
+  second_user_env: ""
+
+# The access restrictions (src/__tests__/integration/high/access/AccessRestrictions.test.ts):
+# an in-process server started with allowed packages and requests.
+# Read by that file (liveSuite onprem, cloud).
+access:
+  # On premise: an open request of the configured user, which the allowed
+  # write records into. On the cloud: empty (the case skips: the probe package
+  # takes no request).
+  transport_request: ""
+  # The package the allowed creates go into: $TMP on premise, the probe
+  # package on the cloud.
+  # cloud: needed — the probe package of the cloud system.
+  package: ""
+  # A package above `package` in its tree, allowed as `<package_parent>/**`
+  # for the tree case. Empty: on premise the case creates a local package of
+  # its own under $TMP and allows `$TMP/**`; on the cloud it reads the
+  # package's own super package.
+  package_parent: ""
+
 # Batch mode (src/__tests__/integration/batch/communicationBatch.test.ts):
 # the compact server started over stdio; reads, then HandlerCreate, HandlerLock,
 # HandlerUpdate, HandlerUnlock and HandlerActivate of three objects, each phase
 # one batch; the objects deleted at the end (HandlerDeletionCheck, HandlerDelete).
 # They go into environment.default_package / default_transport unless named here.
 # The names must be free: a name that reads is refused before anything is created.
+# Readers per case below. Each batch suite runs on the kind the config states
+# (on premise over HTTP or RFC, or cloud; legacy is run as on premise).
 batch:
   test_cases:
+    # Read by batch/communicationBatch.test.ts (getTestCase): object names,
+    # package_name / transport_request when given. onprem, cloud.
     - name: "communication"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: false
       available_in: ["onprem", "cloud"]
       description: "Communication batch through the served compact tools: create, lock, write, unlock, activate, delete"
@@ -1985,8 +1900,13 @@ batch:
     # pair (shared_dependencies: ZMCP_SHR_DBG_AMDP, ZMCP_SHR_DBG_TF), only
     # read; run npm run shared:setup first. Nothing else may debug for the
     # same SAP user while it runs.
+    # Read by batch/debuggerBatch.test.ts (getEnabledTestCase). onprem, cloud;
+    # the AMDP gate onprem only.
     - name: "debugger"
+      # A switch, still read: true runs it. It stops in a debugger for the SAP
+      # user, which would clash with the owner's IDE debugger.
       enabled: false
+      # available_in: no longer read.
       available_in: ["onprem", "cloud"]
       description: "Debugger batch at a live stop (step, stack, variables in one DebugBatchEnd); the AMDP gate"
       params:
@@ -2004,24 +1924,36 @@ batch:
     # batch over Streamable HTTP behind one x-mcp-state-handle (the HTTP launcher
     # from source, x-sap-* user and password headers from the session file), on
     # the shared AMDP pair, with the session trace; on premise over HTTP on HANA.
+    # Read by batch/amdpHttpHandle.test.ts (getEnabledTestCase). onprem.
     - name: "amdp_http_handle"
+      # A switch, still read: true runs it (an AMDP debugger session for the
+      # SAP user, over HTTP).
       enabled: false
+      # available_in: no longer read.
       available_in: ["onprem"]
       description: "AMDP debugger batch over Streamable HTTP behind one state handle; every session logged off"
       params:
         amdp_class: "ZMCP_SHR_DBG_AMDP"
         amdp_ddl: "ZMCP_SHR_DBG_TF"
+    # Read by batch/refusalFollowUps.test.ts (getEnabledTestCase). onprem
+    # (cloud logs on with a token: skipped).
     - name: "refusal_follow_ups"
+      # A switch, still read: true runs it. It logs on with a wrong password,
+      # which counts against the SAP user's failed logons.
       enabled: false
+      # available_in: no longer read.
       available_in: ["onprem"]
       description: "After a credential refusal: the logoff asks no provider; the debugger stop's second stopListener"
       params:
         class_name: "ZMCP_SHR_PROF_CLS"
 
 # Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
+# Read by readOnly/system/RuntimeFeedHandlers.test.ts. onprem, cloud; the
+# gateway error log onprem only (RuntimeGetGatewayErrorLog).
 runtime_feed_handlers:
   test_cases:
     - name: "test_runtime_feeds"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Runtime feed handlers integration tests (feeds, system messages, gateway errors)"
@@ -2032,82 +1964,47 @@ runtime_feed_handlers:
         feed_user: ""
 
 # ============================================================================
-# SYSTEM LOW-LEVEL HANDLERS
-# ============================================================================
-
-# System Low-Level Handlers (VirtualFolders, NodeStructure, ObjectStructure)
-system_low_handlers:
-  test_cases:
-    - name: "test_system_low"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "System low-level handlers tests"
-      params:
-        # Test package for virtual folders and node structure
-        test_package: "$TMP"  # Any existing package with objects
-        # Test class for node structure and object structure
-        test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
-        # Test program for node structure and object structure
-        test_program: "SAPLSLVC_FULLSCREEN"  # Standard SAP program for testing
-        # Test interface for node structure and object structure
-        test_interface: "IF_ABAP_CHAR_UTILITIES"  # Standard SAP interface for testing
-        # Test table for object structure
-        test_table: "SCARR"  # Standard SAP table (Flight: Airlines)
-        # Virtual folders search patterns
-        virtual_folders_pattern_default: "*"  # Default search pattern
-        virtual_folders_pattern_custom: "Z*"  # Custom search pattern for testing
-        # Virtual folders preselection facets
-        virtual_folders_facets: ["package", "group", "type"]  # Facet order
-        # Node structure settings
-        node_structure_with_descriptions: true  # Include short descriptions in node structure
-        # Object structure settings
-        object_structure_include_metadata: true  # Include metadata in object structure
-
-# ============================================================================
 # SYSTEM HIGH-LEVEL HANDLERS
 # ============================================================================
 
 # System High-Level Handlers (PackageTree)
+# Read by high/system/SystemHighHandlers.test.ts (test_package). onprem, cloud.
 system_high_handlers:
   test_cases:
     - name: "test_system_high"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "System high-level handlers tests"
       params:
         # Test package for package tree
+        # cloud: needed — an existing cloud package with objects ($TMP is refused
+        # on cloud).
         test_package: "$TMP"  # Any existing package with objects
-        # Package tree settings
-        package_tree_include_subpackages: true  # Include subpackages in tree
-        package_tree_max_depth: 5  # Maximum depth for recursive package traversal
-        package_tree_include_descriptions: true  # Include object descriptions in response
-        # Test package with subpackages (for testing recursive traversal)
-        test_package_with_subpackages: "$TMP"  # Package that has subpackages for testing
-        # Invalid package name for error handling tests
-        test_invalid_package: "INVALID_PACKAGE_XYZ_123"  # Invalid package name for error tests
 
 # Table Contents (Read-Only)
+# Read by readOnly/system/TableContentsHandlers.test.ts (limited_rows only).
+# onprem, cloud (GetTableContents lists both).
 get_table_contents:
   test_cases:
     - name: "limited_rows"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "Read table contents with row limit"
       params:
+        # cloud: needed — a table whose contents the cloud system lets the user
+        # read.
         test_table: "T000"
         max_rows: 10
-    - name: "full_table"
-      enabled: false
-      available_in: ["onprem"]
-      description: "Read full table contents (disabled by default)"
-      params:
-        test_table: "SCARR"
-        max_rows: 100
 
-# SQL Query (Read-Only)
+# Read by readOnly/atc/AtcHandlers.test.ts and coverage/atc.live.test.ts
+# (HandlerSystem's ATC reads of one run). A shared object, the check
+# variant, the findings expected. onprem, cloud.
 run_atc:
   test_cases:
     - name: "default_variant"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "RunATC over a shared class with the DEFAULT check variant, then its status and findings"
@@ -2120,36 +2017,37 @@ run_atc:
         max_findings: 100
         # At least this many findings, so the per-finding checks run. What a
         # variant finds is the system's: set 0 where DEFAULT finds nothing.
+        # cloud: needed — the count DEFAULT finds there in the object (0 if none).
         min_findings: 1
-        poll_interval_ms: 3000
-        poll_timeout_ms: 120000
 
+# SQL Query (Read-Only)
+# Read by readOnly/system/SqlQueryHandlers.test.ts (simple_select only).
+# onprem, cloud (GetSqlQuery lists both).
 get_sql_query:
   test_cases:
     - name: "simple_select"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "Execute simple SQL query"
       params:
+        # cloud: needed — a query over a table the cloud system lets the user
+        # read.
         test_sql_query: "SELECT MANDT, MTEXT FROM T000"
-        test_row_number: 10
-    - name: "filtered_select"
-      enabled: false
-      available_in: ["onprem"]
-      description: "Execute filtered SQL query (disabled by default)"
-      params:
-        test_sql_query: "SELECT * FROM SCARR WHERE MANDT = '100'"
         test_row_number: 10
 
 # ============================================================================
 # Check Handlers (High-Level) — syntax/semantic validation
 # Uses existing shared objects, no CRUD needed
+# Every check_*_high section is read by high/check/CheckHighHandlers.test.ts
+# (the object to check). onprem, cloud.
 # ============================================================================
 
 # CheckClass
 check_class_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing ABAP class for syntax errors"
@@ -2159,6 +2057,7 @@ check_class_high:
     # created on the test request, saved inactive, and its check must answer
     # the error as a finding (isError: false). Never a shared object.
     - name: "check_findings"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check answers a keyword error as a finding"
@@ -2181,6 +2080,7 @@ check_class_high:
 check_bdef_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing behavior definition for syntax errors"
@@ -2191,6 +2091,7 @@ check_bdef_high:
 check_ddl_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing CDS view for syntax errors"
@@ -2201,6 +2102,7 @@ check_ddl_high:
 check_domain_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing domain for syntax errors"
@@ -2211,6 +2113,7 @@ check_domain_high:
 check_data_element_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing data element for syntax errors"
@@ -2221,6 +2124,7 @@ check_data_element_high:
 check_table_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing table for syntax errors"
@@ -2231,6 +2135,7 @@ check_table_high:
 check_structure_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing structure for syntax errors"
@@ -2241,6 +2146,7 @@ check_structure_high:
 check_interface_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing interface for syntax errors"
@@ -2251,6 +2157,7 @@ check_interface_high:
 check_package_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing package for syntax errors"
@@ -2262,16 +2169,20 @@ check_package_high:
 check_program_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem"]
       description: "Check an existing program for syntax errors (not available on cloud)"
       params:
+        # cloud: needed — a program that exists on the cloud system (the shared
+        # program is on premise only).
         program_name: "ZMCP_SHR_PROG"
 
 # CheckFunctionGroup
 check_function_group_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing function group for syntax errors"
@@ -2279,9 +2190,11 @@ check_function_group_high:
         function_group_name: "ZMCP_SHR_FGRP"
 
 # CheckFunctionModule
+# Also read by readOnly/function/FunctionIncludeReadOnlyHandlers.test.ts.
 check_function_module_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing function module for syntax errors"
@@ -2290,9 +2203,13 @@ check_function_module_high:
         function_module_name: "Z_MCP_SHR_FM"
 
 # GetFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
+# The three sections below are read by
+# readOnly/function/FunctionIncludeReadOnlyHandlers.test.ts (list_modules also
+# by coverage/searchSource.live.test.ts). onprem, cloud.
 read_function_include_readonly:
   test_cases:
     - name: "read_top_include"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Read the TOP include source/metadata of the shared function group"
@@ -2304,6 +2221,7 @@ read_function_include_readonly:
 list_function_group_includes_readonly:
   test_cases:
     - name: "list_includes"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "List the includes of the shared function group"
@@ -2314,6 +2232,7 @@ list_function_group_includes_readonly:
 list_function_modules_readonly:
   test_cases:
     - name: "list_modules"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "List the function modules of the shared function group"
@@ -2321,9 +2240,11 @@ list_function_modules_readonly:
         function_group_name: "ZMCP_SHR_FGRP"
 
 # GetStructuresList (read-only) — recursively lists structures embedded in a structure
+# Read by readOnly/structure/GetStructuresListHandler.test.ts. onprem, cloud.
 get_structures_list_readonly:
   test_cases:
     - name: "list_embedded_structures"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "List the structures embedded (include) and extending (append) the shared base structure"
@@ -2337,9 +2258,11 @@ get_structures_list_readonly:
 
 # FunctionInclude high-level lifecycle (own group -> create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.
+# Read by high/function/FunctionIncludeHighHandlers.test.ts. onprem, cloud.
 function_include_high:
   test_cases:
     - name: "full_workflow_high"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Create, update, read-back and delete a custom function group include"
@@ -2359,6 +2282,7 @@ function_include_high:
 check_metadata_extension_high:
   test_cases:
     - name: "check_existing"
+      # enabled, available_in: no longer read (where it runs is decided in code).
       enabled: true
       available_in: ["onprem", "cloud"]
       description: "Check an existing metadata extension for syntax errors"

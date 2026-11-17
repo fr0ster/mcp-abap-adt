@@ -1,0 +1,22 @@
+{
+  "case": "read-outline-function-group",
+  "step": 1,
+  "stepTag": "objectstructure",
+  "capturedAt": "2026-11-04T00:00:00.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/functions/groups/zmcp_d19e25/objectstructure",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.objectstructure.v2+xml"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.objectstructure.v2+xml; charset=utf-8"
+    },
+    "bodyFile": "read-outline-function-group--01-objectstructure.body.xml"
+  }
+}

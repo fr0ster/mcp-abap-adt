@@ -1,0 +1,127 @@
+{
+  "expect": "typeless-part-typed",
+  "served": [
+    {
+      "name": "GetThing",
+      "variant": "onprem",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "thing_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "GetThing",
+      "variant": "cloud",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "thing_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "DeleteThing",
+      "variant": "onprem",
+      "binary": "mcp-abap-adt",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "thing_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "HandlerGet",
+      "variant": "onprem",
+      "binary": "mcp-abap-adt-compact",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "CLASS"
+            ]
+          },
+          "part": {
+            "type": "string",
+            "enum": [
+              "source",
+              "object_structure"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "listed": {
+    "DeleteThing": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt",
+          "legacy mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ],
+    "GetThing": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt",
+          "cloud mcp-abap-adt",
+          "legacy mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ],
+    "HandlerGet": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt-compact"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  "ledger": {
+    "GetThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts",
+        "cloud": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "DeleteThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "HandlerGet#CLASS#source": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "HandlerGet#-#object_structure": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts"
+      }
+    }
+  },
+  "files": {
+    "src/__tests__/unit/thing.test.ts": "unit.ts",
+    "src/__tests__/integration/thing.test.ts": "live.ts"
+  }
+}

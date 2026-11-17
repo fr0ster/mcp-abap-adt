@@ -1,73 +1,44 @@
-import { rfcParamsFrom, type SapConfig } from '@mcp-abap-adt/connection';
-
 /**
- * RFC through a message server and a logon group (connection 18): the
- * `SapConfig` field each environment variable sets. The server carries them
- * as configured and decides nothing — no default (`group`'s `PUBLIC` is
- * connection's), no check (connection refuses `mshost` with neither
- * `msserv` nor `sysid`, naming both).
+ * The destination keys of an RFC address, and the client and the logon
+ * language: one list for every source — the CLI (`--<key>`), the process
+ * environment (`SAP_<KEY>`), the destination's own means (its `.env`, then a
+ * service key's fallback) and YAML (`<key>`). Read as stated: no default, no
+ * derivation.
  */
-export const MESSAGE_SERVER_ENV = {
+/** The seven keys of an RFC address, in a fixed order. */
+export const RFC_ADDRESS_KEYS = [
+  'ashost',
+  'sysnr',
+  'mshost',
+  'msserv',
+  'sysid',
+  'group',
+  'saprouter',
+] as const;
+
+export type RfcAddressKey = (typeof RFC_ADDRESS_KEYS)[number];
+
+/** Every destination key of this list: the address, then the client and the language. */
+export const DESTINATION_KEYS = [
+  ...RFC_ADDRESS_KEYS,
+  'client',
+  'language',
+] as const;
+
+export type DestinationKey = (typeof DESTINATION_KEYS)[number];
+
+/** Each key's environment (and `.env`) name. */
+export const DESTINATION_KEY_ENV = {
+  ashost: 'SAP_ASHOST',
+  sysnr: 'SAP_SYSNR',
   mshost: 'SAP_MSHOST',
   msserv: 'SAP_MSSERV',
   sysid: 'SAP_SYSID',
   group: 'SAP_GROUP',
   saprouter: 'SAP_SAPROUTER',
-} as const;
+  client: 'SAP_CLIENT',
+  language: 'SAP_LANGUAGE',
+} as const satisfies Record<DestinationKey, string>;
 
-export type MessageServerField = keyof typeof MESSAGE_SERVER_ENV;
-
-/** The five fields, in a fixed order. */
-export const MESSAGE_SERVER_FIELDS = Object.keys(
-  MESSAGE_SERVER_ENV,
-) as readonly MessageServerField[];
-
-/**
- * Sets each field `env` states on `config`, trimmed as `SAP_CLIENT` is; a
- * field `env` does not state (or states blank) gets no key.
- */
-export function applyMessageServerFields(
-  config: SapConfig,
-  env: NodeJS.ProcessEnv,
-): void {
-  for (const field of MESSAGE_SERVER_FIELDS) {
-    const value = env[MESSAGE_SERVER_ENV[field]]?.trim();
-    if (value) config[field] = value;
-  }
-}
-
-/**
- * connection's own refusals of an RFC address it cannot dial — a message
- * server with neither `msserv` nor `sysid`, an address with neither `url` nor
- * `mshost` — read once from connection itself (`rfcParamsFrom`). Each is a
- * fixed sentence that quotes no value of the config.
- */
-const RFC_ADDRESS_REFUSALS: readonly string[] = (() => {
-  const words: string[] = [];
-  for (const probe of [{ mshost: 'probe' }, {}] as SapConfig[]) {
-    try {
-      rfcParamsFrom(probe);
-    } catch (error) {
-      if (error instanceof Error && error.message) words.push(error.message);
-    }
-  }
-  return words;
-})();
-
-/**
- * The words of `error` when it is one of connection's refusals of an RFC
- * address, as connection gave them; `undefined` for anything else, whose
- * message is never read out.
- */
-export function rfcAddressRefusalOf(error: unknown): string | undefined {
-  if (!(error instanceof Error)) return undefined;
-  let message: unknown;
-  try {
-    message = error.message;
-  } catch {
-    return undefined;
-  }
-  return typeof message === 'string' && RFC_ADDRESS_REFUSALS.includes(message)
-    ? message
-    : undefined;
-}
+/** A value of each key, each only when stated. */
+export type DestinationKeyValues = Partial<Record<DestinationKey, string>>;

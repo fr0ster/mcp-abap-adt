@@ -1,20 +1,38 @@
 /**
- * Jest Global Setup for Integration Tests
+ * The live run's setup, called by the node:test runner (`tools/run-tests.mjs`)
+ * in its own process before `node --test` starts (D27, spec §2): ONCE, to
+ * ensure a valid session exists — in a live run only. The running npm script
+ * decides (`npm_lifecycle_event` against `LIVE_SCRIPTS`): a unit run
+ * (`npm test`) returns at once, with no realm check, no logon and no run
+ * directory. The sibling packages resolve through the runner's resolve hook.
  *
- * Runs ONCE before all test suites to ensure a valid session exists.
- * Without a test config (tests/test-config.yaml, or MCP_TEST_CONFIG) it
- * returns at once: nothing is built, nothing logs on, no browser opens.
- *
- * With one, it builds the destination's factory and logs on once through a
- * connection holding the destination's provider (`getProvider`) — cached
- * token, refresh, or an interactive login — then settles the factory, which
- * writes the session (unsafe store) for the test suites to reuse.
+ * 1. A family run (`npm run test:coverage-family -- <files>`) is refused
+ *    unless every selected path is the exact repository path of an existing
+ *    integration test file — before anything is read or sent.
+ * 2. A live run gets its
+ *    run directory under the OS temp directory (`MCP_ABAP_ADT_COVERAGE_RUN`):
+ *    the call log, the run report and the refusal marker live there.
+ * 3. A live script whose suites use no shared logon
+ *    (`test:live-deferred-logon`, `sharesLiveLogon`) returns here: no realm
+ *    check and no logon, whatever test config is present.
+ *    Without a test config (tests/test-config.yaml, or MCP_TEST_CONFIG) it
+ *    returns at once: nothing is built, nothing logs on, no browser opens.
+ * 4. With one, the realm check (`realmCheck`) runs before the factory is
+ *    built: an unauthenticated discovery `GET` must answer `401` with the
+ *    configured realm (on premise), and the session's JWT must not have
+ *    expired (cloud).
+ * 5. Then it builds the destination's factory and logs on once through a
+ *    guarded connection holding the destination's provider (`getProvider`) —
+ *    cached token, refresh, or an interactive login — and settles the
+ *    factory, which writes the session (unsafe store) for the test suites to
+ *    reuse. A credential refusal there latches the run's marker and fails the
+ *    setup: nothing is sent after it.
  *
  * Requires: auth_broker.unsafe: true in test-config.yaml
  */
 
-// First, for its effect: the sibling packages below resolve to their sources.
-import './helpers/packageSources';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import {
@@ -24,79 +42,151 @@ import {
   destinationFailureWords,
   promptLogger,
 } from '@mcp-abap-adt/core/auth';
-import { createAbapConnection } from '../../lib/connectionFactory';
+import { RUN_VARIABLE, startRunDirectory } from './coverageReport/reportFormat';
+import { connectionTypeOf, destinationFileValue } from './helpers/authHelpers';
+import {
+  configuredSystemKindOf,
+  memberOf,
+  sessionVariables,
+  testDestinationName,
+} from './helpers/configuredSystemKind';
+import { isLiveScript, sharesLiveLogon } from './helpers/liveScripts';
 import { endTestConnection } from './helpers/openConnections';
-import { restoreResolution } from './helpers/packageSources';
-import { setupSystemKind } from './helpers/setupSystemKind';
-import { testConfigPathFromEnv } from './helpers/testConfigPath';
+import { realmCheck, realmCheckUrlOf } from './helpers/realmCheck';
+import {
+  credentialRefused,
+  guardedSend,
+  guardedTestConnection,
+} from './helpers/refusalGuard';
+import { loadRunConfig } from './helpers/runConfig';
+import { runScriptOf } from './helpers/runReport';
 
-function loadTestConfig(): any {
-  // MCP_TEST_CONFIG names the file for this run; resolved in one place with
-  // loadTestConfig, which lives one directory deeper than this file.
-  // A named file is read or the setup fails: a blank name or a missing file
-  // is refused there, and an unreadable one is not skipped as "no config".
-  const chosen = testConfigPathFromEnv();
-  if (chosen) {
-    const fs = require('node:fs');
-    const yaml = require('js-yaml');
-    return yaml.load(fs.readFileSync(chosen, 'utf8'));
+/** What the setup is given by the runner. */
+export interface SetupConfig {
+  /** The repository root. */
+  rootDir: string;
+  /** The files named on the command line (a family run's selection). */
+  named: readonly string[];
+}
+
+const INTEGRATION_ROOT = 'src/__tests__/integration/';
+
+/**
+ * Refuses a family run's selection unless each path is, as a string, the
+ * repository path of an existing file under `src/__tests__/integration/`
+ * ending `.test.ts`: a directory, a fragment or a pattern is refused, and so
+ * is an empty selection.
+ */
+export function refuseSelection(
+  patterns: readonly string[],
+  root: string,
+): void {
+  if (patterns.length === 0) {
+    throw new Error(
+      'test:coverage-family needs the live test files to run, each by its repository path',
+    );
   }
-  const configPaths = [
-    path.resolve(process.cwd(), 'tests', 'test-config.yaml'),
-    path.resolve(__dirname, '../../../../tests/test-config.yaml'),
-  ];
-  for (const configPath of configPaths) {
-    try {
-      const fs = require('node:fs');
-      const yaml = require('js-yaml');
-      const content = fs.readFileSync(configPath, 'utf8');
-      return yaml.load(content);
-    } catch {
-      // try next
+  for (const pattern of patterns) {
+    const exact =
+      pattern.startsWith(INTEGRATION_ROOT) &&
+      pattern.endsWith('.test.ts') &&
+      fs.existsSync(path.join(root, pattern));
+    if (!exact) {
+      throw new Error(
+        `test:coverage-family runs exact integration test files only: "${pattern}" is not the repository path of a file under ${INTEGRATION_ROOT} ending .test.ts`,
+      );
     }
   }
-  return null;
 }
 
-export default async function globalSetup(): Promise<void> {
-  try {
-    await setUp();
-  } finally {
-    restoreResolution();
+/** The live run's setup: what the runner calls before `node --test`. */
+export async function setUpLiveRun(config: SetupConfig): Promise<void> {
+  await setUp(config);
+}
+
+/** A parsed document's string member, trimmed, or `''`. */
+const textAt = (value: unknown, ...keys: string[]): string => {
+  let at = value;
+  for (const key of keys) at = memberOf(at, key);
+  return typeof at === 'string' ? at.trim() : '';
+};
+
+async function setUp(globalConfig: SetupConfig): Promise<void> {
+  // A unit run does no live work at all.
+  if (!isLiveScript(process.env.npm_lifecycle_event)) return;
+  const script = runScriptOf(process.env.npm_lifecycle_event);
+  if (script === 'family') {
+    refuseSelection(globalConfig.named, globalConfig.rootDir);
   }
-}
+  if ((process.env[RUN_VARIABLE] ?? '') === '') startRunDirectory();
+  // A script whose suites need no shared logon (`sharesLiveLogon`): no
+  // realm check and no logon, whatever test config is present.
+  if (!sharesLiveLogon(process.env.npm_lifecycle_event)) return;
 
-async function setUp(): Promise<void> {
-  const config = loadTestConfig();
-  if (!config) {
+  const config = loadRunConfig();
+  if (config === undefined || config === null) {
     return;
   }
 
-  const destination =
-    config?.auth_broker?.abap?.destination ||
-    config?.abap?.destination ||
-    config?.environment?.destination;
-
-  if (!destination) {
+  // The destination is the session environment.env names.
+  const destination = testDestinationName(config);
+  if (destination === undefined) {
     return;
   }
 
   // The kind the logon is built for, stated before anything connects: the
-  // config's environment.system_type, else SAP_SYSTEM_TYPE. A session file
-  // need not state one, and none stated refuses the connection before the
+  // config's environment.system_type, else SAP_SYSTEM_TYPE (environment or
+  // the session file). None stated refuses the connection before the
   // cached token, the refresh or a login is tried.
-  const kind = setupSystemKind(config);
-  if (kind === undefined) {
+  const stated = configuredSystemKindOf(config);
+  if (stated === undefined) {
     console.log(
       '[globalSetup] Auth skipped: no system type stated (environment.system_type in the test config, or SAP_SYSTEM_TYPE); nothing was sent to the system',
     );
     return;
   }
+  const kind = stated === 'cloud' ? 'cloud' : 'onprem';
 
+  // The realm check, before the factory is built and before any logon:
+  // against the session's SAP_URL over HTTP, against the test config's
+  // environment.realm_check_url over RFC (a test-only setting, never part
+  // of the destination).
+  const session = sessionVariables(config);
+  const wire = connectionTypeOf(
+    textAt(config, 'environment', 'connection_type') ||
+      process.env.SAP_CONNECTION_TYPE ||
+      session.SAP_CONNECTION_TYPE,
+  ).connectionType;
+  let baseUrl: string | undefined;
+  try {
+    baseUrl = realmCheckUrlOf(
+      wire,
+      session.SAP_URL,
+      textAt(config, 'environment', 'realm_check_url'),
+      'environment.realm_check_url',
+    );
+  } catch (error) {
+    throw new Error(
+      `[globalSetup] ${error instanceof Error ? error.message : 'realm check refused'}`,
+    );
+  }
+  if (baseUrl === undefined) {
+    throw new Error(
+      `[globalSetup] realm check: the session file of "${destination}" names no SAP_URL; nothing was sent`,
+    );
+  }
+  await realmCheck(
+    kind,
+    baseUrl,
+    textAt(config, 'environment', 'expected_realm'),
+    { jwt: session.SAP_JWT_TOKEN },
+  );
+
+  const broker = memberOf(config, 'auth_broker');
   const useUnsafe =
     process.env.MCP_UNSAFE === 'true' ||
-    config?.auth_broker?.unsafe === true ||
-    config?.auth_broker?.unsafe_session_store === true;
+    memberOf(broker, 'unsafe') === true ||
+    memberOf(broker, 'unsafe_session_store') === true;
 
   if (!useUnsafe) {
     console.log(
@@ -104,28 +194,38 @@ async function setUp(): Promise<void> {
     );
   }
 
-  const serviceKeysDir = config?.auth_broker?.paths?.service_keys_dir;
+  const serviceKeysDir = textAt(broker, 'paths', 'service_keys_dir');
   const basePath = serviceKeysDir
-    ? path.resolve(serviceKeysDir.replace(/^~/, require('node:os').homedir()))
+    ? path.resolve(
+        serviceKeysDir.startsWith('~')
+          ? os.homedir() + serviceKeysDir.slice(1)
+          : serviceKeysDir,
+      )
     : undefined;
+  const callbackPort = memberOf(broker, 'browser_auth_port');
 
+  // The test config's browser word, mapped as the server maps --browser.
+  const browser = browserOf(
+    browserFor(
+      { browser: textAt(broker, 'browser') || 'system' },
+      process.platform,
+    ),
+  );
   const factory = new AuthBrokerFactory({
     mcpDestination: destination,
-    authBrokerPath: basePath,
+    ...(basePath !== undefined && { authBrokerPath: basePath }),
     unsafe: useUnsafe,
-    // The test config's browser word, mapped as the server maps --browser.
-    browser: browserOf(
-      browserFor(
-        { browser: config?.auth_broker?.browser ?? 'system' },
-        process.platform,
-      ),
-    ),
-    ...(config?.auth_broker?.browser_auth_port !== undefined && {
-      browserAuthPort: Number(config.auth_broker.browser_auth_port),
+    ...(browser !== undefined && { browser }),
+    ...(callbackPort !== undefined && {
+      browserAuthPort: Number(callbackPort),
     }),
-    ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
-      connectionType: 'rfc' as const,
-    }),
+    // The wire as the run states it, else as the destination's own file
+    // states it (as the launcher reads it); none is refused, naming it.
+    ...(wire !== undefined
+      ? { connectionType: wire }
+      : connectionTypeOf(
+          destinationFileValue(basePath, destination, 'SAP_CONNECTION_TYPE'),
+        )),
     browserStrategy: browserCallbackStrategy,
     // A login's prompts reach the person running the tests, on stderr.
     promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {
@@ -138,24 +238,25 @@ async function setUp(): Promise<void> {
 
   try {
     const settings = await factory.settingsFor(destination);
-    const provider = await factory.getProvider(destination);
-    // connect() logs on: cached token → refresh → browser (if needed).
-    const connection = createAbapConnection(
-      settings,
-      provider,
-      undefined,
-      undefined,
-      undefined,
-      kind,
+    const provider = await guardedSend("the destination's credential", () =>
+      factory.getProvider(destination),
     );
+    // connect() logs on: cached token → refresh → browser (if needed).
+    const connection = guardedTestConnection(settings, provider, { kind });
     await connection.connect();
     console.log(`[globalSetup] Session ready for "${destination}"`);
     await endTestConnection(connection);
   } catch (error: unknown) {
+    if (credentialRefused()) {
+      // The marker is latched: the run stops here, nothing more is sent.
+      throw new Error(
+        `[globalSetup] the credential of "${destination}" was refused: ${destinationFailureWords(error, destination)}`,
+      );
+    }
     console.log(
       `[globalSetup] Auth failed: ${destinationFailureWords(error, destination)}`,
     );
-    // Don't throw — let tests handle missing auth gracefully (skip)
+    // Not a credential refusal: the tests handle missing auth (skip).
   } finally {
     // Writes the session the login produced (unsafe store).
     const report = await factory.settle();

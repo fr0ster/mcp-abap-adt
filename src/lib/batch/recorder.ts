@@ -3,9 +3,9 @@
  * in batch mode, over the open batch's `AdtBatchConnection`.
  *
  * Every member forwards to the batch connection, so a request is recorded,
- * never sent: its part settles when `BatchEnd` executes the batch, and the
+ * never sent: its part settles when the batch end executes the batch, and the
  * promise the handler awaits settles with that part only once the call's
- * number is read (`release()`, spec §6) — `BatchEnd` resumes no handler.
+ * number is read (`release()`, spec §6) — the batch end resumes no handler.
  * Once the batch has ended (or was dropped), a request is not recorded: it
  * is refused `batch_ended`, and that refusal is what the resumed handler
  * meets.
@@ -31,13 +31,14 @@
  *
  * Every request the recorder hands back is raced against the batch's signal
  * (taken when the recorder is created): a drop (`drop()`, `dispose()`, the
- * instance close), a failed `BatchEnd` and the replacement of the batch's
+ * instance close), a failed the batch end and the replacement of the batch's
  * map abort it, and the handler's wait for a part it will never be given
  * ends with `RequestAbortedError` — adt-clients has no discard, its part
  * promise stays pending and is let go with the batch connection. Nothing is
  * sent by the drop. An end that keeps the map never aborts the signal, so
  * an executed part reaches the handler, when read, as it came.
  */
+
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
@@ -46,6 +47,8 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { batchOtherKindWords, ServerRefusal } from '../auth/serverRefusal';
 import { raceRequestSignal } from '../requestSignal';
+import { child, entries, isList } from '../thrownValue';
+import { wireValueOf } from '../wireValue';
 import type { InstanceBatch, PartSettlement, RawPart } from './InstanceBatch';
 import { requestKind, sessionKindLabel } from './sessionKind';
 
@@ -80,35 +83,51 @@ export interface Recorder extends IAbapConnection {
   release(): void;
 }
 
-/** The raw part of a settled request: the inner response, or a failure's `response`. */
-function rawOf(response: unknown): RawPart | undefined {
-  if (response === null || typeof response !== 'object') return undefined;
-  const r = response as {
-    status?: unknown;
-    statusText?: unknown;
-    headers?: unknown;
-    data?: unknown;
-  };
-  if (typeof r.status !== 'number') return undefined;
+/** A part's body as text: a string as it is, anything else as JSON; none is empty. */
+function bodyText(response: Pick<IAdtWireResponse, 'data'>): string {
+  const data = wireValueOf(response.data);
+  if (data.kind === 'undefined' || data.kind === 'null') return '';
+  return data.kind === 'text' ? data.text : JSON.stringify(response.data);
+}
+
+/** A header's value as one line: a list joined, anything else as text. */
+function headerLine(value: IAdtWireResponse['headers'][string]): string {
+  return Array.isArray(value) ? value.join(', ') : String(value);
+}
+
+/** The raw part of a settled request: its inner response. */
+function rawPartOf(response: IAdtWireResponse): RawPart {
   const headers: Record<string, string> = {};
-  if (r.headers !== null && typeof r.headers === 'object') {
-    for (const [name, value] of Object.entries(r.headers)) {
-      if (value === undefined || value === null) continue;
-      headers[name] = Array.isArray(value) ? value.join(', ') : String(value);
-    }
+  for (const [name, value] of Object.entries(response.headers)) {
+    if (value === undefined || value === null) continue;
+    headers[name] = headerLine(value);
   }
-  const data = r.data;
-  const body =
-    data === undefined || data === null
-      ? ''
-      : typeof data === 'string'
-        ? data
-        : JSON.stringify(data);
   return {
-    status: r.status,
-    status_text: typeof r.statusText === 'string' ? r.statusText : '',
+    status: response.status,
+    status_text: response.statusText,
     headers,
-    body,
+    body: bodyText(response),
+  };
+}
+
+/**
+ * The raw part of a request that threw: its `response`, read from a thrown
+ * value, field by field.
+ */
+function thrownRawPart(response: unknown): RawPart | undefined {
+  const status = child(response, 'status');
+  if (typeof status !== 'number') return undefined;
+  const headers: Record<string, string> = {};
+  for (const [name, value] of entries(child(response, 'headers'))) {
+    if (value === undefined || value === null) continue;
+    headers[name] = isList(value) ? value.join(', ') : String(value);
+  }
+  const statusText = child(response, 'statusText');
+  return {
+    status,
+    status_text: typeof statusText === 'string' ? statusText : '',
+    headers,
+    body: bodyText({ data: child(response, 'data') }),
   };
 }
 
@@ -135,7 +154,7 @@ export function createRecorder(
   const listeners: Array<() => void> = [];
   const raw: Array<RawPart | undefined> = [];
   const settled: PartSettlement[] = [];
-  let release!: () => void;
+  let release: () => void = () => {};
   const released = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -147,13 +166,12 @@ export function createRecorder(
     Promise.reject<T>(new ServerRefusal('batch_ended'));
   const recorder: Recorder = {
     connect: () => (ended() ? endedRefusal<void>() : batch.connect()),
-    getBaseUrl: () => (ended() ? endedRefusal<string>() : batch.getBaseUrl()),
+    getBaseUrl: () =>
+      ended() ? endedRefusal<string | undefined>() : batch.getBaseUrl(),
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type) => batch.setSessionType(type),
     getSessionType: () => batch.getSessionType(),
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       // Of the batch's kind, or refused before anything is recorded: the
       // batch connection's session switch, scoped to this request, is
       // undone as its own recording would undo it. Once a part of the call
@@ -162,7 +180,7 @@ export function createRecorder(
       // The batch ended (or was dropped): nothing more is recorded or sent.
       if (ended()) {
         batch.setSessionType(unswitched);
-        const ended = Promise.reject<IAdtWireResponse<T, D>>(
+        const ended = Promise.reject<IAdtWireResponse>(
           new ServerRefusal('batch_ended'),
         );
         ended.catch(() => undefined);
@@ -181,7 +199,7 @@ export function createRecorder(
             taken,
           ),
         );
-        const rejected = Promise.reject<IAdtWireResponse<T, D>>(refused);
+        const rejected = Promise.reject<IAdtWireResponse>(refused);
         // A handler that never reads it leaves no unhandled rejection: the
         // dispatch answers the refusal (`otherKind()`).
         rejected.catch(() => undefined);
@@ -189,7 +207,7 @@ export function createRecorder(
       }
       // Recorded first: a call takes its number only once a request of it
       // is in the envelope — a batch connection that throws takes none.
-      const recorded = batch.makeAdtRequest<T, D>(request);
+      const recorded = batch.makeAdtRequest(request);
       owner.recorded(kind);
       if (taken === undefined) {
         taken = owner.nextNumber();
@@ -211,14 +229,10 @@ export function createRecorder(
         raw.push(undefined);
         recorded.then(
           (response) => {
-            raw[index] = rawOf(response);
+            raw[index] = rawPartOf(response);
           },
           (error: unknown) => {
-            raw[index] = rawOf(
-              error !== null && typeof error === 'object'
-                ? (error as { response?: unknown }).response
-                : undefined,
-            );
+            raw[index] = thrownRawPart(child(error, 'response'));
           },
         );
       }
@@ -254,8 +268,8 @@ export function createRecorder(
  * whichever is first. No timer: a handler that neither records nor settles
  * keeps the call waiting, as it would outside batch mode.
  */
-export function untilSent(
-  handler: Promise<unknown>,
+export function untilSent<T>(
+  handler: Promise<T>,
   recorder: Recorder,
 ): Promise<'recorded' | 'settled'> {
   return new Promise((resolve) => {

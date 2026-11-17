@@ -8,13 +8,13 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody } from '../../lib/adtCorpus';
 import { createAdtClient } from '../../lib/clients';
 import {
   METADATA_READ_TYPES,
   readIncludeMetadata,
   readTableTypeMetadata,
 } from '../../lib/strategies/metadataReads';
+import { corpusBody } from '../helpers/adtCorpus';
 
 // The process declares its system type, as every launcher requires.
 process.env.SAP_SYSTEM_TYPE = 'onprem';

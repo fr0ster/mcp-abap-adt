@@ -125,9 +125,6 @@ transport_number: "<YOUR_TRANSPORT_NUMBER>"  # ⚠️ Оновити на реа
 test_settings:
   fail_fast: false  # Зупинятися на першій помилці
   verbose: true     # Детальний вивід
-  timeout: 30000    # Timeout для тестів (мс)
-  retry_on_failure: false
-  max_retries: 1
   cleanup_after_test: false  # Чи видаляти тестові об'єкти після тесту
 ```
 

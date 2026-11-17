@@ -4,7 +4,8 @@
  * throw — never dressed as SAP's answer (`thrownEntry`). A cleanup that could
  * not undo several things answers each as such an entry, not one text.
  */
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+
+import type { IAdtError, IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
   failureEntry,
@@ -12,20 +13,24 @@ import {
   thrownEntry,
 } from '../answer';
 import { failureOf } from '../auth/failures';
+import type { AnswerObject } from '../json';
 import {
   carryingPayload,
   type LeftBehind,
+  leftBehindRead,
   mergedLeftBehind,
   methodFailureOf,
   noteLeftBehind,
   payloadCarriedBy,
 } from '../strategies/step';
-import { failureText } from './readings';
+import { failed } from '../strategies/stepResponse';
+import { child } from '../thrownValue';
+import { bodyFailureText } from './readings';
 
 export type DebugFailure = FailureEntry;
 
 /** A throw read as a failed answer: what was thrown, kept beside it. */
-const thrownBehind = new WeakMap<object, unknown>();
+const thrownBehind: WeakMap<object, unknown> = new WeakMap();
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -34,13 +39,10 @@ const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * SAP answer is behind it: it is never carried as the method's error to the
  * consumer as if SAP had answered (`isFromThrow`), and its entry is the throw's.
  */
-export function asFailure(e: unknown): IAdtResponse<never> {
-  const error = { origin: 'connection', message: messageOf(e) };
+export function asFailure(e: unknown): IAdtFailure<IAdtError> {
+  const error: IAdtError = { origin: 'connection', message: messageOf(e) };
   thrownBehind.set(error, e);
-  return {
-    ok: false as const,
-    getError: () => error,
-  } as unknown as IAdtResponse<never>;
+  return failed(error);
 }
 
 /** Whether a failed answer's error is a throw `asFailure` read. */
@@ -50,10 +52,10 @@ export function isFromThrow(error: object): boolean {
 
 /** A failed answer as an entry: the method's error as it is, or the throw behind it, with the step. */
 export function failedEntry(
-  answer: IAdtResponse<unknown>,
+  answer: IAdtFailure<IAdtError>,
   step: string,
 ): DebugFailure {
-  const error = (answer as { getError: () => IAdtError }).getError();
+  const error = answer.getError();
   if (thrownBehind.has(error))
     return thrownEntry(thrownBehind.get(error), step);
   return failureEntry(error, step);
@@ -74,13 +76,12 @@ export function describeFailures(list: readonly DebugFailure[]): string {
       const step = typeof entry.step === 'string' ? `${entry.step}: ` : '';
       const message =
         typeof entry.message === 'string'
-          ? failureText({
-              message: entry.message,
-              response: { data: entry.raw_body },
-            })
+          ? bodyFailureText(
+              entry.message,
+              typeof entry.raw_body === 'string' ? entry.raw_body : undefined,
+            )
           : JSON.stringify(entry);
-      const left = (entry.cleanup as { message?: unknown } | undefined)
-        ?.message;
+      const left = child(entry.cleanup, 'message');
       return `${step}${message}${typeof left === 'string' ? `; ${left}` : ''}`;
     })
     .join('; ');
@@ -92,16 +93,18 @@ export function describeFailures(list: readonly DebugFailure[]): string {
  * method error gains them as `cleanup`; an error of ours carries its words
  * with them as its answer; a chain failure is answered as it came.
  */
-export function leaveBehind(error: unknown, left: LeftBehind): void {
+export function leaveBehind(error: Error, left: LeftBehind): void {
   if (methodFailureOf(error) !== undefined) {
     noteLeftBehind(error, left);
     return;
   }
   if (failureOf(error) !== undefined) return;
-  if (error === null || typeof error !== 'object') return;
   carryingPayload(error, {
-    message: messageOf(error),
-    cleanup: mergedLeftBehind(payloadCarriedBy(error)?.cleanup, left),
+    message: error.message,
+    cleanup: mergedLeftBehind(
+      leftBehindRead(payloadCarriedBy(error)?.cleanup),
+      left,
+    ),
   });
 }
 
@@ -125,7 +128,7 @@ export function cleanupPayload(
   failures: readonly DebugFailure[],
   notes: readonly DebugFailure[] = [],
   notAttempted: readonly string[] = [],
-): Record<string, unknown> {
+): AnswerObject {
   const refused = credentialRefusalIn(failures);
   const others = failures.filter((entry) => entry !== refused);
   const skipped = notAttempted.length

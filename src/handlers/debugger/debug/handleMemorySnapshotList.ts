@@ -1,9 +1,9 @@
 import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readSnapshotList } from '../../../lib/debugger/memoryReadings';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
 
@@ -12,17 +12,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] [debug] Memory snapshots the system lists. Empty when the user lacks the memory snapshot authorization.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      user: {
-        type: 'string',
-        description: 'Only the snapshots of this SAP user.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    user: z
+      .string()
+      .optional()
+      .describe('Only the snapshots of this SAP user.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 const NO_AUTHORIZATION =
@@ -30,7 +26,7 @@ const NO_AUTHORIZATION =
 
 export async function handleMemorySnapshotList(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const snapshots = MemorySnapshots.create(context.connection, {
     logger: context.logger,

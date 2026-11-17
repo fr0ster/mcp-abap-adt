@@ -1,7 +1,7 @@
 /**
  * Every entry of `tools/batch-handlers.json` sends requests none of which
  * needs another's answer (the owner, 2026-10-16): a recorded call's answers
- * come only at `BatchEnd`, so a request built from an earlier answer — a
+ * come only at the batch's end, so a request built from an earlier answer — a
  * create then its activation, a fallback after a `404`, a poll — could never
  * be sent. Real adt-clients code runs; nothing of it is doubled.
  *
@@ -24,13 +24,11 @@
 
 import { eligible } from '../../../lib/batch/eligibility';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { BATCH_ENTRY_CASES } from '../../helpers/batchEntryCases';
 import { runCase, servedTools } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

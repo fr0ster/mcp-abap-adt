@@ -28,13 +28,11 @@ import {
   handleDeletePackage,
   TOOL_DEFINITION,
 } from '../../handlers/package/high/handleDeletePackage';
+import { listedJson } from '../helpers/listedJson';
 
 describe('DeletePackage input', () => {
   it('has no connection_config, and still has force_new_connection', () => {
-    const properties = TOOL_DEFINITION.inputSchema.properties as Record<
-      string,
-      unknown
-    >;
+    const properties = listedJson(TOOL_DEFINITION.inputSchema).properties;
     expect(properties).not.toHaveProperty('connection_config');
     expect(properties).toHaveProperty('force_new_connection');
   });

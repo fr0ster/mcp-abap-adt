@@ -1,0 +1,18 @@
+[
+  "compact-http-ro/package.json",
+  "compact-http/package.json",
+  "compact-ro/package.json",
+  "compact-sse-ro/package.json",
+  "compact-sse/package.json",
+  "compact/package.json",
+  "core-ro/package.json",
+  "http-ro/package.json",
+  "http/package.json",
+  "package.json",
+  "server-runtime/package.json",
+  "server/package.json",
+  "sse-ro/package.json",
+  "sse/package.json",
+  "tools/batch-handlers.json",
+  "tools/tool-search.json"
+]

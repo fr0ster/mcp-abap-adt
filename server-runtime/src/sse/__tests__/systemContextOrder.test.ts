@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Who creates objects (responsible) and on which system (master system), per
  * session, over SSE, where an on-premise system has no systeminformation
@@ -56,12 +57,9 @@ const whoAmI: IHandlerGroup = {
       toolDefinition: {
         name: 'WhoAmI',
         description: 'reports the context',
-        inputSchema: {
-          type: 'object',
-          properties: { delayMs: { type: 'number' } },
-        },
+        inputSchema: z.object({ delayMs: z.number().optional() }),
       } as never,
-      handler: (async (_context: unknown, args: { delayMs?: number }) => {
+      call: (async (_context: unknown, args: { delayMs?: number }) => {
         await new Promise((r) => setTimeout(r, args?.delayMs ?? 0));
         const seen = getStatedSystemContext();
         return {
@@ -222,16 +220,17 @@ describe('SseServer: responsible and master system per session', () => {
     };
   }
 
-  it('the opening headers win over the process environment', async () => {
+  it('the opening headers only: the process environment answers neither (D26 D2)', async () => {
     await expect(
       ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
-      masterSystem: 'PROCESS_SYS',
+      masterSystem: null,
     });
+    // No responsible header: the basic connection's login stands in.
     await expect(ask(BASIC)).resolves.toEqual({
-      responsible: 'PROCESS_USER',
-      masterSystem: 'PROCESS_SYS',
+      responsible: 'HEADER_LOGIN',
+      masterSystem: null,
     });
   });
 
@@ -240,7 +239,7 @@ describe('SseServer: responsible and master system per session', () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     await expect(ask(BASIC)).resolves.toEqual({
       responsible: 'HEADER_LOGIN',
-      masterSystem: 'PROCESS_SYS',
+      masterSystem: null,
     });
   });
 
@@ -314,7 +313,7 @@ describe('SseServer: responsible and master system per session', () => {
       ask({ ...BASIC, 'x-sap-responsible': 'FIRST' }, 60),
       ask({ ...BASIC, 'x-sap-master-system': 'HDR' }, 0),
     ]);
-    expect(a).toEqual({ responsible: 'FIRST', masterSystem: 'PROCESS_SYS' });
-    expect(b).toEqual({ responsible: 'PROCESS_USER', masterSystem: 'HDR' });
+    expect(a).toEqual({ responsible: 'FIRST', masterSystem: null });
+    expect(b).toEqual({ responsible: 'HEADER_LOGIN', masterSystem: 'HDR' });
   });
 });

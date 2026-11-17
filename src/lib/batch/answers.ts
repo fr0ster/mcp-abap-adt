@@ -1,9 +1,9 @@
 /**
- * `BatchAnswers`: the map of the last ended batch, read by number (spec §6).
+ * the answers read: the map of the last ended batch, read by number (spec §6).
  * A number's handler, waiting at its first request, is resumed with its
  * parts when the number is first read and builds its answer; the numbers
  * asked in one call are processed in parallel, and the answer is kept. A
- * number of a batch whose `BatchEnd` failed answers that error. Nothing is
+ * number of a batch whose the batch end failed answers that error. Nothing is
  * sent to SAP; served while a batch is open, so the previous phase's
  * answers stay readable while the next phase is recorded.
  */
@@ -13,7 +13,7 @@ import type { BatchAnswer, InstanceBatch } from './InstanceBatch';
 /** A number the last executed batch has no answer for (or no batch ran here). */
 export type NoAnswer = { number: number; error: 'no_answer'; message: string };
 
-/** One entry of `BatchAnswers`' answer: the number's answer, or that it has none. */
+/** One entry of the answers' answer: the number's answer, or that it has none. */
 export type AnswerEntry = BatchAnswer | NoAnswer;
 
 export const NO_ANSWER_WORDS = 'no answer with that number';
@@ -26,21 +26,26 @@ export const ANSWERS_ASK_WORDS =
 export const ANSWERS_NUMBER_WORDS =
   'a batch answer number is an integer of at least 1';
 
-/** What `BatchAnswers` was asked: exactly one of `number` and `numbers`. */
-export type AnswersAsk = { number?: unknown; numbers?: unknown };
+/**
+ * What the answers read was asked, as its schema parses it: exactly one of
+ * `number` and `numbers`, each an integer of at least 1.
+ */
+export type AnswersAsk = {
+  readonly number?: number | undefined;
+  readonly numbers?: readonly number[] | undefined;
+};
 
-const isNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 1;
+const isNumber = (value: number): boolean =>
+  Number.isInteger(value) && value >= 1;
 
 /** The numbers asked, in the order asked; throws its words for an ask it refuses — before anything is read. */
-function numbersAsked(ask: AnswersAsk): number[] {
-  const one = ask.number !== undefined;
-  const many = ask.numbers !== undefined;
-  if (one === many) throw new Error(ANSWERS_ASK_WORDS);
-  const asked = one ? [ask.number] : ask.numbers;
-  if (!Array.isArray(asked) || asked.length === 0) {
+function numbersAsked(ask: AnswersAsk): readonly number[] {
+  const { number, numbers } = ask;
+  if ((number === undefined) === (numbers === undefined)) {
     throw new Error(ANSWERS_ASK_WORDS);
   }
+  const asked = number !== undefined ? [number] : (numbers ?? []);
+  if (asked.length === 0) throw new Error(ANSWERS_ASK_WORDS);
   if (!asked.every(isNumber)) throw new Error(ANSWERS_NUMBER_WORDS);
   return asked;
 }
@@ -69,7 +74,7 @@ export function readAnswers(
   );
 }
 
-/** `BatchAnswers`' answer: its entries, as JSON. */
+/** The answers' answer: its entries, as JSON. */
 export function batchAnswersAnswer(entries: AnswerEntry[]): McpResult {
   return {
     isError: false,

@@ -36,9 +36,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, currentPlatform } = require_('./args.cjs');
+const { sdkMissing, namesRfcKey } = require_('./readings.cjs');
 const { smokeEnv } = require_('./tools.cjs');
 const version =
-  process.argv[2] ?? JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
+  process.argv[2] ??
+  JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
 const platform = currentPlatform();
 const { exe, sdkLib } = PLATFORMS[platform];
 
@@ -47,9 +49,15 @@ const { exe, sdkLib } = PLATFORMS[platform];
 // SAProuter stated there would win over the env file and route the RFC logon.
 const env = smokeEnv(process.env, sdkLib);
 if (process.platform === 'win32') {
-  const system32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', sdkLib);
+  const system32 = path.join(
+    process.env.SystemRoot ?? 'C:\\Windows',
+    'System32',
+    sdkLib,
+  );
   if (fs.existsSync(system32)) {
-    console.log(`warn ${system32} exists: Windows may load it before the archive's copy — check the loaded path as the archive README shows`);
+    console.log(
+      `warn ${system32} exists: Windows may load it before the archive's copy — check the loaded path as the archive README shows`,
+    );
   }
 }
 
@@ -77,26 +85,32 @@ fs.writeFileSync(
 let failed = 0;
 let checked = 0;
 const check = (label, ok, detail) => {
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'ok  ' : 'FAIL'} ${label}${detail ? ` — ${detail}` : ''}`,
+  );
   if (!ok) failed++;
 };
 
 // Where build.mjs works for this version and platform: the bundles and the stage.
 const work = path.join(os.tmpdir(), 'mcp-abap-adt-portable', version, platform);
-const SECOND_COPY = 'Two copies of @mcp-abap-adt/lib are loaded in this process';
+const SECOND_COPY =
+  'Two copies of @mcp-abap-adt/lib are loaded in this process';
 const INSPECTION = 'Starting in inspection-only mode';
-const SDK_MISSING = /needs the SAP NW RFC SDK|is not available/;
 
 // The start against the RFC destination: stdin held open (a closed stdin is a
 // shutdown, which would end the start before its logon), every stderr line
 // kept, the exit awaited — the start ends by itself, on its logon's failure.
 function rfcStart(bin) {
   return new Promise((resolve) => {
-    const child = spawn(bin, [`--env-path=${envFile}`, `--auth-broker-path=${brokerPath}`], {
-      cwd: scratch,
-      env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const child = spawn(
+      bin,
+      [`--env-path=${envFile}`, `--auth-broker-path=${brokerPath}`],
+      {
+        cwd: scratch,
+        env,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => {
@@ -121,13 +135,23 @@ const stageModules = path.join(work, 'stage', 'node_modules');
 // (--version) has none to count, which is a skip, not a failure.
 const stagedLib = (() => {
   try {
-    return JSON.parse(fs.readFileSync(path.join(stageModules, '@mcp-abap-adt/lib/package.json'), 'utf8')).version;
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(stageModules, '@mcp-abap-adt/lib/package.json'),
+        'utf8',
+      ),
+    ).version;
   } catch {
     return undefined;
   }
 })();
-const [libMajor = 0, libMinor = 0] = String(stagedLib ?? '').split('.').map(Number);
-const libHasRegistry = stagedLib === undefined || libMajor > 19 || (libMajor === 19 && libMinor >= 2);
+const [libMajor = 0, libMinor = 0] = String(stagedLib ?? '')
+  .split('.')
+  .map(Number);
+const libHasRegistry =
+  stagedLib === undefined ||
+  libMajor > 19 ||
+  (libMajor === 19 && libMinor >= 2);
 const movedModules = `${stageModules}.smoke-${process.pid}`;
 let moved = false;
 const restore = () => {
@@ -148,14 +172,20 @@ if (fs.existsSync(stageModules)) {
   }
   console.log(`staging node_modules moved away for the run (${stageModules})`);
 } else {
-  console.log(`no staging node_modules at ${stageModules}: nothing to move away`);
+  console.log(
+    `no staging node_modules at ${stageModules}: nothing to move away`,
+  );
 }
 
 // The staging node_modules goes back, and the scratch folder goes, whatever
 // happens in between.
 try {
   for (const server of Object.values(SERVERS)) {
-    const dir = path.join(repo, 'dist-portable', `${server.name}-${version}-${platform}`);
+    const dir = path.join(
+      repo,
+      'dist-portable',
+      `${server.name}-${version}-${platform}`,
+    );
     const bin = path.join(dir, `${server.name}${exe}`);
     if (!fs.existsSync(bin)) {
       console.log(`skip ${server.name}: not built (${dir})`);
@@ -165,23 +195,39 @@ try {
 
     const bundle = path.join(work, `${server.name}.bundle.cjs`);
     if (!libHasRegistry) {
-      console.log(`skip ${server.name} bundles one copy of lib — lib ${stagedLib} predates its instance registry (19.2.0)`);
+      console.log(
+        `skip ${server.name} bundles one copy of lib — lib ${stagedLib} predates its instance registry (19.2.0)`,
+      );
     } else if (fs.existsSync(bundle)) {
       const copies = fs.readFileSync(bundle, 'utf8').split(REGISTRY).length - 1;
-      check(`${server.name} bundles one copy of lib`, copies === 1, `${copies} instance registr${copies === 1 ? 'y' : 'ies'} in ${bundle}`);
+      check(
+        `${server.name} bundles one copy of lib`,
+        copies === 1,
+        `${copies} instance registr${copies === 1 ? 'y' : 'ies'} in ${bundle}`,
+      );
     } else {
-      check(`${server.name} bundles one copy of lib`, false, `no bundle at ${bundle}: build it on this machine first`);
+      check(
+        `${server.name} bundles one copy of lib`,
+        false,
+        `no bundle at ${bundle}: build it on this machine first`,
+      );
     }
 
     const run = spawnSync(bin, ['--version'], { env, encoding: 'utf8' });
     if (run.error || run.status !== 0) {
-      const why = run.error ? String(run.error.message).split('\n')[0] : `exit ${run.status}: ${String(run.stderr).trim().split('\n')[0]}`;
+      const why = run.error
+        ? String(run.error.message)
+        : `exit ${run.status}: ${String(run.stderr).trim().split('\n')[0]}`;
       check(`${server.name} --version`, false, `did not run: ${why}`);
       continue;
     }
     const answered = run.stdout.trim();
     check(`${server.name} --version`, answered === version, answered);
-    check(`${server.name} starts on one registered copy of lib`, !String(run.stderr).includes(SECOND_COPY), 'no second-copy line');
+    check(
+      `${server.name} starts on one registered copy of lib`,
+      !String(run.stderr).includes(SECOND_COPY),
+      'no second-copy line',
+    );
 
     // MCP over stdio in inspection-only mode: no destination, so the start
     // connects nothing and the server answers initialize and tools/list.
@@ -200,7 +246,11 @@ try {
     // One server's failure is reported, not thrown: the other server is still checked.
     try {
       await client.connect(transport);
-      check(`${server.name} MCP initialize`, client.getServerVersion()?.version === version, `server ${client.getServerVersion()?.version}`);
+      check(
+        `${server.name} MCP initialize`,
+        client.getServerVersion()?.version === version,
+        `server ${client.getServerVersion()?.version}`,
+      );
       const tools = (await client.listTools()).tools.map((t) => t.name);
       // The compact server serves only its Handler* tools; the full one the
       // whole surface (more than 250 tools).
@@ -212,30 +262,56 @@ try {
       await client.close();
     } catch (error) {
       const last = stderr.trim().split('\n').at(-1) ?? '';
-      check(`${server.name} MCP session`, false, `${String(error.message).split('\n')[0]}${last ? ` (stderr: ${last})` : ''}`);
+      check(
+        `${server.name} MCP session`,
+        false,
+        `${String(error.message)}${last ? ` (stderr: ${last})` : ''}`,
+      );
       await client.close().catch(() => {});
     }
-    check(`${server.name} MCP started without a destination`, stderr.includes(INSPECTION), 'inspection-only mode');
-    check(`${server.name} served on one registered copy of lib`, !stderr.includes(SECOND_COPY), 'no second-copy line');
+    check(
+      `${server.name} MCP started without a destination`,
+      stderr.includes(INSPECTION),
+      'inspection-only mode',
+    );
+    check(
+      `${server.name} served on one registered copy of lib`,
+      !stderr.includes(SECOND_COPY),
+      'no second-copy line',
+    );
 
     // The RFC stack: the start's logon to a host that does not resolve.
     const rfc = await rfcStart(bin);
-    const lines = rfc.stderr.split('\n').filter((line) => line.startsWith('[MCP]'));
+    const lines = rfc.stderr
+      .split('\n')
+      .filter((line) => line.startsWith('[MCP]'));
     const last = lines.at(-1) ?? '';
-    const rfcKey = /\(RFC_[A-Z_]+\)/.test(last);
+    const rfcKey = namesRfcKey(last);
     check(
       `${server.name} RFC stack loads from nwrfcsdk/lib`,
-      !rfc.error && rfc.status === 1 && rfcKey && !SDK_MISSING.test(rfc.stderr) && rfc.stdout === '',
-      rfc.error ? `did not run: ${rfc.error.message}` : `exit ${rfc.status}: ${last}`,
+      !rfc.error &&
+        rfc.status === 1 &&
+        rfcKey &&
+        !sdkMissing(rfc.stderr) &&
+        rfc.stdout === '',
+      rfc.error
+        ? `did not run: ${rfc.error.message}`
+        : `exit ${rfc.status}: ${last}`,
     );
-    check(`${server.name} started on one registered copy of lib (RFC)`, !rfc.stderr.includes(SECOND_COPY), 'no second-copy line');
+    check(
+      `${server.name} started on one registered copy of lib (RFC)`,
+      !rfc.stderr.includes(SECOND_COPY),
+      'no second-copy line',
+    );
   }
 } finally {
   restore();
   fs.rmSync(scratch, { recursive: true, force: true });
 }
 if (!checked) {
-  console.log(`nothing built for ${platform} at ${version}: run npm run portable:build first`);
+  console.log(
+    `nothing built for ${platform} at ${version}: run npm run portable:build first`,
+  );
   process.exit(1);
 }
 process.exit(failed ? 1 : 0);

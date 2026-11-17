@@ -1,0 +1,15 @@
+<abapsource:objectStructureElement xml:base="/sap/bc/adt/functions/groups/zmcp_d19e25/source/main" adtcore:name="ZMCP_D19E25" adtcore:type="FUGR/F" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:atom="http://www.w3.org/2005/Atom">
+  <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/functions/groups/zmcp_d19e25/source/main"/>
+  <abapsource:objectStructureElement adtcore:name="LZMCP_D19E25TOP" adtcore:type="FUGR/I">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="LZMCP_D19E25UXX" adtcore:type="FUGR/I">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="SAPLZMCP_D19E25" adtcore:type="FUGR/PX">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="Z_MCP_D1_9E25" adtcore:type="FUGR/FF">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main"/>
+  </abapsource:objectStructureElement>
+</abapsource:objectStructureElement>

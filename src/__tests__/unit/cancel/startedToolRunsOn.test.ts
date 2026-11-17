@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A started tool runs to its end: a tool call cannot be cancelled. A
  * client's MCP cancel sent while the tool's first request is on the wire
@@ -78,14 +79,12 @@ function counted(group: IHandlerGroup, runs: Runs): IHandlerGroup {
     getHandlers: (): HandlerEntry[] =>
       group.getHandlers().map((entry) => ({
         ...entry,
-        handler: (async (...args: unknown[]) => {
+        call: async (context, args) => {
           runs.started += 1;
-          const answered = await (
-            entry.handler as (...a: unknown[]) => Promise<unknown>
-          )(...args);
+          const answered = await entry.call(context, args);
           runs.answers.push(answered);
           return answered;
-        }) as never,
+        },
       })),
   });
 }
@@ -293,10 +292,10 @@ describe('no request of a started tool carries a signal', () => {
           toolDefinition: {
             name: 'WhoAmI',
             description: 'reports the connection it was handed',
-            inputSchema: { type: 'object', properties: {} },
+            inputSchema: z.object({}),
           },
           // (context, args): the server hands a two-parameter handler its context.
-          handler: (async (
+          call: (async (
             ctx: { connection: { makeAdtRequest: unknown } },
             _args: unknown,
           ) => {

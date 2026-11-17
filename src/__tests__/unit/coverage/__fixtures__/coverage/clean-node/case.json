@@ -1,0 +1,7 @@
+{
+  "expect": [],
+  "files": {
+    "src/__tests__/integration/thing.test.ts": "live.ts",
+    "src/__tests__/unit/thing.test.ts": "unit.ts"
+  }
+}

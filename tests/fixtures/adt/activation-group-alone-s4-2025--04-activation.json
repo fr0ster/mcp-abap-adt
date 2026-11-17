@@ -1,0 +1,27 @@
+{
+  "case": "activation-group-alone-s4-2025",
+  "step": 4,
+  "stepTag": "activation",
+  "capturedAt": "2026-11-09T13:06:57.252Z",
+  "note": "S/4HANA 2025, fr0ster/mcp-abap-adt#351 live measurement: a fresh function group in a transportable package whose main program (source/main) was changed, so the group and SAPL<group> (FUGR/I) were inactive. The group's reference alone was posted: preauditRequested=true (01) answered ioc:inactiveObjects and activated nothing — the inactive list at once (02) and about 10 s later (03) still lists both; preauditRequested=false on the same single reference (04) answered chkl:messages activationExecuted=\"false\" with no message and also activated nothing (05, 06). Transport numbers are placeholders.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/activation?method=activate&preauditRequested=false",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation?method=activate&preauditRequested=false",
+    "headers": {
+      "Content-Type": "application/vnd.sap.adt.activation+xml",
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run probe over HTTP; it added Authorization, sap-client, the stateful-session header, the session cookie and the CSRF token, none of which is recorded. Of the response headers only content-type was kept.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/zact751p9325\" adtcore:name=\"ZACT751P9325\"/>\n</adtcore:objectReferences>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "activation-group-alone-s4-2025--04-activation.body.xml"
+  }
+}

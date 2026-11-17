@@ -13,16 +13,16 @@ import { logger } from './logger';
  * and are not part of the ILogger interface.
  */
 export const loggerAdapter: ILogger = {
-  info: (message: string, meta?: any) => {
+  info: (message: string, meta?: unknown) => {
     logger?.info(message, meta);
   },
-  error: (message: string, meta?: any) => {
+  error: (message: string, meta?: unknown) => {
     logger?.error(message, meta);
   },
-  warn: (message: string, meta?: any) => {
+  warn: (message: string, meta?: unknown) => {
     logger?.warn(message, meta);
   },
-  debug: (message: string, meta?: any) => {
+  debug: (message: string, meta?: unknown) => {
     logger?.debug(message, meta);
   },
 };

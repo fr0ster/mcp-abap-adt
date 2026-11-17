@@ -1,22 +1,84 @@
 import * as z from 'zod';
-import { answerCaught, thrownEntry } from '../../../lib/answer';
+import {
+  answerCaught,
+  type FailureEntry,
+  thrownEntry,
+} from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import {
   assembleList,
   batchReader,
   concurrentReader,
+  type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
+  type PackageItem,
   readNode,
   rootByRoot,
   walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
+
+/** GetPackageContents' arguments but `background`. */
+const FIELDS = {
+  package_name: z
+    .string()
+    .optional()
+    .describe('Name of the ABAP package (give this or package_names)'),
+  package_names: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Names of several ABAP packages, read together (give this or package_name)',
+    ),
+  include_subpackages: z
+    .boolean()
+    .optional()
+    .describe('Include contents of subpackages recursively (default: false)'),
+  max_depth: z
+    .number()
+    .optional()
+    .describe('Maximum depth for recursive package traversal (default: 5)'),
+  include_descriptions: z
+    .boolean()
+    .optional()
+    .describe(
+      "Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)",
+    ),
+};
+
+/** Exactly one of `package_name` and a non-empty `package_names`. */
+function onePackageForm(
+  args: {
+    package_name?: string | undefined;
+    package_names?: string[] | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const single = stated(args.package_name);
+  const listed = (args.package_names ?? []).length > 0;
+  if (single && listed) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Give exactly one of package_name or package_names',
+      path: ['package_names'],
+    });
+  } else if (!single && !listed) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Package name is required',
+      path: ['package_name'],
+    });
+  }
+}
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
@@ -24,42 +86,20 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time.',
   ),
-  inputSchema: {
-    timeout: timeoutField(),
-    package_name: z
-      .string()
-      .optional()
-      .describe('Name of the ABAP package (give this or package_names)'),
-    package_names: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Names of several ABAP packages, read together (give this or package_name)',
-      ),
-    include_subpackages: z
-      .boolean()
-      .optional()
-      .describe('Include contents of subpackages recursively (default: false)'),
-    max_depth: z
-      .number()
-      .optional()
-      .describe('Maximum depth for recursive package traversal (default: 5)'),
-    include_descriptions: z
-      .boolean()
-      .optional()
-      .describe(
-        "Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)",
-      ),
-  },
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(onePackageForm),
+    z.object(FIELDS).superRefine(onePackageForm),
+  ),
 } as const;
 
-interface GetPackageContentsArgs {
-  package_name?: string;
-  package_names?: string[];
-  include_subpackages?: boolean;
-  max_depth?: number;
-  include_descriptions?: boolean;
-}
+type GetPackageContentsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
+
+/** One package's listing among several: its objects, or the failure of its walk. */
+type PackageListing =
+  | { package_name: string; objects: PackageItem[] }
+  | { package_name: string; error: FailureEntry };
 
 export async function handleGetPackageContents(
   context: HandlerContext,
@@ -67,14 +107,9 @@ export async function handleGetPackageContents(
 ) {
   const { connection, logger } = context;
   try {
-    const single = typeof args?.package_name === 'string' && args.package_name;
-    const list = Array.isArray(args?.package_names) ? args.package_names : [];
-    if (single && list.length > 0) {
-      return return_error('Give exactly one of package_name or package_names');
-    }
-    if (!single && list.length === 0) {
-      return return_error('Package name is required');
-    }
+    // The schema holds the rule: exactly one of the two forms.
+    const single = stated(args.package_name) ? args.package_name : undefined;
+    const list = args.package_names ?? [];
     const packageNames = (single ? [single] : list).map((name) =>
       name.toUpperCase(),
     );
@@ -102,7 +137,7 @@ export async function handleGetPackageContents(
     const walked =
       options.includeDescriptions === true
         ? await walkPackages(
-            concurrentReader<NodeRequest, unknown>(context, readLevel),
+            concurrentReader<NodeRequest, NodeAnswer>(context, readLevel),
             packageNames,
             options,
           )
@@ -110,7 +145,7 @@ export async function handleGetPackageContents(
             context,
             () =>
               walkPackages(
-                batchReader<NodeRequest, unknown>(context, readLevel),
+                batchReader<NodeRequest, NodeAnswer>(context, readLevel),
                 packageNames,
                 options,
               ),
@@ -124,14 +159,14 @@ export async function handleGetPackageContents(
             },
           );
 
-    let answered: unknown;
+    let answered: PackageItem[] | PackageListing[];
     if (single) {
-      const only = walked[0] as (typeof walked)[number];
+      const only = walked[0];
       if (!only.ok) throw only.error;
       answered = assembleList(single.toUpperCase(), only.value);
     } else {
       answered = walked.map((result, i) => {
-        const package_name = packageNames[i] as string;
+        const package_name = packageNames[i];
         return result.ok
           ? { package_name, objects: assembleList(package_name, result.value) }
           : {

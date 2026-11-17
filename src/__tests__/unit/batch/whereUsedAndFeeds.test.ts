@@ -10,6 +10,7 @@
  * connection is a fake, answering from a small model — the same model for
  * an envelope's parts and for the sequential version's requests.
  */
+
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -18,7 +19,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { handleGetWhereUsed as getWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
+  TOOL_DEFINITION as GET_WHERE_USED,
+  handleGetWhereUsed as getWhereUsed,
+} from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
   TOOL_DEFINITION as RUNTIME_LIST_FEEDS,
   handleRuntimeListFeeds as runtimeListFeeds,
@@ -26,7 +30,7 @@ import {
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { eligible } from '../../../lib/batch/eligibility';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { jsonSchemaToZod } from '../../../lib/handlers/utils/schemaUtils';
+import { child, listOf } from '../../../lib/thrownValue';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -35,6 +39,7 @@ import {
   type SeenEnvelope,
   statusError,
 } from '../../helpers/batchEnvelope';
+import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -744,7 +749,9 @@ describe('GetWhereUsed', () => {
       expect(wholeOf(batched)).toEqual(wholeOf(sequential));
       expect(payloadOf(batched)).toMatchObject({ status: 401 });
       expect(batchedCache).toEqual(sequentialCache);
-      expect(batchedCache.content[0].json).toMatchObject({
+      expect(
+        child(listOf(child(batchedCache, 'content'))[0], 'json'),
+      ).toMatchObject({
         object_name: 'ZT_B',
       });
     },
@@ -844,22 +851,17 @@ describe('GetWhereUsed', () => {
     expect(context.batchAvailability?.available()).toBe(false);
   });
 
-  it('exactly one of object_name/object_type or objects', async () => {
+  it('exactly one of object_name/object_type or objects: its schema', () => {
     for (const args of [
       { objects: THREE, object_name: 'ZT_A' },
       { objects: [] },
-      { objects: 'ZT_A' },
     ]) {
-      const fake = system();
-      const result = await withinTurns(
-        handleGetWhereUsed(contextOn(fake), args as never),
-        TURNS,
+      expect(schemaWords(GET_WHERE_USED, args)).toContain(
+        'Give exactly one of',
       );
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('Give exactly one of');
-      expect(fake.envelopes).toHaveLength(0);
-      expect(fake.directs).toHaveLength(0);
     }
+    // Not a list at all: the schema's own type words.
+    expect(schemaWords(GET_WHERE_USED, { objects: 'ZT_A' })).not.toBe('');
   });
 });
 
@@ -1055,26 +1057,22 @@ describe('RuntimeListFeeds', () => {
     expect(context.batchAvailability?.available()).toBe(false);
   });
 
-  it('exactly one of feed_type or feed_types', async () => {
+  it('exactly one of feed_type or feed_types: its schema', () => {
     for (const args of [
       { feed_types: PAGED, feed_type: 'dumps' },
       { feed_types: [] },
-      { feed_types: 'dumps' },
     ]) {
-      const fake = system();
-      const result = await withinTurns(
-        handleRuntimeListFeeds(contextOn(fake), args as never),
-        TURNS,
+      expect(schemaWords(RUNTIME_LIST_FEEDS, args)).toContain(
+        'Give exactly one of',
       );
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('Give exactly one of');
-      expect(fake.envelopes).toHaveLength(0);
-      expect(fake.directs).toHaveLength(0);
     }
+    expect(schemaWords(RUNTIME_LIST_FEEDS, { feed_types: 'dumps' })).not.toBe(
+      '',
+    );
   });
 
   it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {
-    const schema = z.object(jsonSchemaToZod(RUNTIME_LIST_FEEDS.inputSchema));
+    const schema = RUNTIME_LIST_FEEDS.inputSchema;
     const listed = schema.parse({ feed_types: PAGED });
     expect(listed).toEqual({ feed_types: PAGED });
     const fake = system();
@@ -1103,14 +1101,30 @@ describe('RuntimeListFeeds', () => {
 // Batch mode
 // ---------------------------------------------------------------------------
 
+// Batch mode is the compact sets': their where-used and feed reads of one
+// request are recorded; the full set's tools are not listed at all.
 describe('batch mode records the one-request calls only', () => {
   it.each<[string, Record<string, unknown>, boolean]>([
-    ['GetWhereUsed', table('ZT_A'), true],
+    [
+      'HandlerSystem',
+      { action: 'where_used', object_type: 'table', object_name: 'ZT_A' },
+      true,
+    ],
+    [
+      'HandlerSystem',
+      {
+        action: 'where_used',
+        object_type: 'functionmodule',
+        object_name: 'G|M',
+      },
+      false,
+    ],
+    ['HandlerDumpList', {}, true],
+    ['HandlerDumpList', { feed_type: 'system_messages' }, true],
+    ['GetWhereUsed', table('ZT_A'), false],
     ['GetWhereUsed', { objects: THREE }, false],
-    ['GetWhereUsed', { objects: [table('ZT_A')] }, false],
-    ['RuntimeListFeeds', {}, true],
-    ['RuntimeListFeeds', { feed_type: 'variants' }, true],
-    ['RuntimeListFeeds', { feed_types: ['descriptors'] }, false],
+    ['RuntimeListFeeds', {}, false],
+    ['RuntimeListFeeds', { feed_type: 'variants' }, false],
   ])('%s %j: recorded %s', (tool, args, recorded) => {
     expect(eligible(tool, args, 'http').ok).toBe(recorded);
   });

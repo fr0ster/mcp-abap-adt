@@ -1,6 +1,7 @@
 import { compactServiceBindingValidateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleValidateServiceBinding } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingValidate',
@@ -10,13 +11,9 @@ export const TOOL_DEFINITION = {
   inputSchema: compactServiceBindingValidateSchema,
 } as const;
 
-type HandlerServiceBindingValidateArgs = {
-  service_binding_name: string;
-  service_definition_name: string;
-  service_binding_version?: string;
-  package_name: string;
-  description?: string;
-};
+type HandlerServiceBindingValidateArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleHandlerServiceBindingValidate(
   context: HandlerContext,

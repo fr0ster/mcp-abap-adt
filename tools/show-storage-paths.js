@@ -7,6 +7,7 @@
 
 const path = require('path');
 const os = require('os');
+const { splitPathList } = require('./readings.js');
 
 function getPlatformPaths(customPath, subfolder) {
   const paths = [];
@@ -28,7 +29,7 @@ function getPlatformPaths(customPath, subfolder) {
   // Priority 2: AUTH_BROKER_PATH environment variable
   const envPath = process.env.AUTH_BROKER_PATH;
   if (envPath) {
-    const envPaths = envPath.split(/[:;]/).map(p => p.trim()).filter(p => p.length > 0);
+    const envPaths = splitPathList(envPath).map(p => p.trim()).filter(p => p.length > 0);
     paths.push(...envPaths.map(p => {
       const resolved = path.resolve(p);
       return subfolder ? path.join(resolved, subfolder) : resolved;

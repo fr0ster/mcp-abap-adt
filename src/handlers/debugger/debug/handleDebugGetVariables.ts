@@ -1,3 +1,4 @@
+import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugGetVariables.ts
 import {
   debugBatchRecorder,
@@ -6,8 +7,7 @@ import {
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseVariables } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -15,31 +15,25 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      names: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Variables by name; a path reads a component or a table row.',
-      },
-      parents: {
-        type: 'array',
-        items: { type: 'string' },
-        description:
-          'Instead of names: members of these scopes, objects or tables.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    names: z
+      .array(z.string())
+      .optional()
+      .describe('Variables by name; a path reads a component or a table row.'),
+    parents: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Instead of names: members of these scopes, objects or tables.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleDebugGetVariables(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const parents = args.parents?.length ? args.parents : ['@ROOT'];
   const names = args.names?.length ? args.names : undefined;

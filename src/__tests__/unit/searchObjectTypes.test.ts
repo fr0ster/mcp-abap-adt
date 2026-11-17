@@ -1,5 +1,5 @@
 /**
- * SearchObject's `object_type` (and HandlerSearch's, which hands it on): the
+ * SearchObject's `object_type` (and HandlerSystem search_object's, which hands it on): the
  * declared variant's search names (#329, spec 3.6) — a name of the release's
  * object types list (`ADT_SEARCH_TYPES_ONPREM`, `ADT_SEARCH_TYPES_CLOUD`), or
  * an ADT type code, read as the name the search reads it as: the list item
@@ -12,7 +12,7 @@
  * variant — real adt-clients code, no SAP — and reads the `objectType` of
  * the one quickSearch on the wire.
  */
-import { handleHandlerSearch } from '../../../compact-readonly-entries/src/handlers/handleHandlerSearch';
+import { handleHandlerSystem } from '../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import type { ProjectionVariant } from '../../lib/adtProjections';
@@ -157,25 +157,30 @@ describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
     expect(sentObjectType(requests)).toBeNull();
   });
 
-  it('HandlerSearch hands its object_type on to the same boundary', async () => {
+  it('HandlerSystem search_object hands its object_type on to the same boundary', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, variant);
-    await handleHandlerSearch(
+    await handleHandlerSystem(
       { connection },
       {
-        query: 'Z*',
+        action: 'search_object',
+        object_name: 'Z*',
         object_type: 'TABL/DS',
       },
     );
     expect(sentObjectType(connection.requests)).toBe('STRU');
     const refusedConnection = recordingConnection();
     declareSystemKind(refusedConnection, variant);
-    const refused = await handleHandlerSearch(
+    // The target's schema on this variant refuses it, before its handler.
+    const refused = await handleHandlerSystem(
       { connection: refusedConnection },
-      { query: 'Z*', object_type: 'NOPE' },
+      { action: 'search_object', object_name: 'Z*', object_type: 'NOPE' },
+    ).then(
+      () => '',
+      (error: Error) => error.message,
     );
     expect(refusedConnection.requests).toEqual([]);
-    expect(textOf(refused)).toContain(refusal('NOPE'));
+    expect(refused).toContain(refusal('NOPE'));
   });
 
   it('DescribeByList searches an object whose type is no search name without one', async () => {

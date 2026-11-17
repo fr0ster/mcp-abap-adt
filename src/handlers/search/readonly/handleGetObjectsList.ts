@@ -1,51 +1,136 @@
+import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  onEveryVariant,
+  type RuleVariant,
+  stated,
+  withInCallSchema,
+} from '../../../lib/handlers/argumentRules';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { succeeded } from '../../../lib/strategies/stepResponse';
+
+/** GetObjectsList's arguments but `background`. */
+const FIELDS = {
+  parent_name: z
+    .string()
+    .optional()
+    .describe(
+      '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
+    ),
+  parent_tech_name: z
+    .string()
+    .optional()
+    .describe('[read-only] Parent technical name'),
+  parent_type: z
+    .string()
+    .optional()
+    .describe('[read-only] Parent object type (e.g. PROG/P, FUGR)'),
+  objects: z
+    .array(
+      z.object({
+        parent_type: z
+          .string()
+          .describe('Parent object type (e.g. PROG/P, FUGR)'),
+        parent_name: z.string().describe('Parent object name'),
+      }),
+    )
+    .optional()
+    .describe(
+      '[read-only] Several parents, read together (give this or parent_name)',
+    ),
+  with_short_descriptions: z
+    .boolean()
+    .optional()
+    .describe('[read-only] Include short descriptions (default: true)'),
+};
+
+type ObjectsListFields = z.output<z.ZodObject<typeof FIELDS>>;
+
+/**
+ * The rules of a call: a non-empty `objects` alone, each entry with its
+ * type and name; else `parent_name`, `parent_tech_name` and `parent_type`,
+ * none blank; on a stated variant every parent type one of its table's.
+ */
+function objectsListRules(variant: RuleVariant) {
+  return (args: ObjectsListFields, ctx: z.RefinementCtx): void => {
+    const refuse = (message: string, path: string) =>
+      ctx.addIssue({ code: 'custom', message, path: [path] });
+    const typeOf = (argument: string, text: string) => {
+      if (variant !== undefined && tableTypeOf(text, variant) === undefined) {
+        refuse(notATableType(argument, text, variant), argument);
+      }
+    };
+    const { parent_name, parent_tech_name, parent_type, objects } = args;
+    if (objects !== undefined && objects.length > 0) {
+      if (
+        parent_name !== undefined ||
+        parent_tech_name !== undefined ||
+        parent_type !== undefined
+      ) {
+        refuse(
+          'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
+          'objects',
+        );
+        return;
+      }
+      for (const entry of objects) {
+        if (!stated(entry.parent_type) || !stated(entry.parent_name)) {
+          refuse(
+            'Each entry of objects needs parent_type and parent_name (non-empty strings).',
+            'objects',
+          );
+          return;
+        }
+      }
+      for (const entry of objects) {
+        typeOf('objects[].parent_type', entry.parent_type);
+      }
+      return;
+    }
+    if (!stated(parent_name)) {
+      refuse(
+        'Parameter "parent_name" (string) is required and cannot be empty.',
+        'parent_name',
+      );
+    } else if (!stated(parent_tech_name)) {
+      refuse(
+        'Parameter "parent_tech_name" (string) is required and cannot be empty.',
+        'parent_tech_name',
+      );
+    } else if (!stated(parent_type)) {
+      refuse(
+        'Parameter "parent_type" (string) is required and cannot be empty.',
+        'parent_type',
+      );
+    } else {
+      typeOf('parent_type', parent_type);
+    }
+  };
+}
+
+/** The schema on `variant`, `background` listed; its in-the-call twin beside it. */
+function schemaOn(variant: RuleVariant) {
+  const rules = objectsListRules(variant);
+  return withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(rules),
+    z.object(FIELDS).superRefine(rules),
+  );
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
+  ...onEveryVariant(
+    withLongToolAdvice(
+      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
+    ),
+    schemaOn,
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      parent_name: {
-        type: 'string',
-        description:
-          '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
-      },
-      parent_tech_name: {
-        type: 'string',
-        description: '[read-only] Parent technical name',
-      },
-      parent_type: {
-        type: 'string',
-        description: '[read-only] Parent object type (e.g. PROG/P, FUGR)',
-      },
-      objects: {
-        type: 'array',
-        description:
-          '[read-only] Several parents, read together (give this or parent_name)',
-        items: {
-          type: 'object',
-          properties: {
-            parent_type: {
-              type: 'string',
-              description: 'Parent object type (e.g. PROG/P, FUGR)',
-            },
-            parent_name: { type: 'string', description: 'Parent object name' },
-          },
-          required: ['parent_type', 'parent_name'],
-        },
-      },
-      with_short_descriptions: {
-        type: 'boolean',
-        description: '[read-only] Include short descriptions (default: true)',
-      },
-    },
-    required: [],
-  },
 } as const;
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -74,9 +159,7 @@ import {
   batchReader,
   endsTheCall,
   type NodeLevel,
-  type NodeRequest,
   nodeStructureOn,
-  readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -104,13 +187,7 @@ interface FlatObject {
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value: objects }),
-    getError: () => {
-      throw new Error('asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<FlatObject[], IAdtError>;
+  return succeeded(objects);
 }
 
 function flatObjects(level: NodeLevel): FlatObject[] {
@@ -154,9 +231,9 @@ async function collectValidObjects(
         withShortDescriptions,
       }),
   );
-  if (!response.ok) return response as IAdtResponse<FlatObject[], IAdtError>;
+  if (!response.ok) return response;
 
-  const level = response.getResult().value as NodeLevel;
+  const level = response.getResult().value;
   let objects: FlatObject[] = level.objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
@@ -241,15 +318,18 @@ async function walkParentsBatched(
   parents: readonly Parent[],
   withShortDescriptions: boolean,
 ): Promise<ParentWalks> {
-  const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
-    readNode(
-      nodeStructureOn(
-        context,
-        createAdtClient(c, context.logger).getUtils(ourUtils),
-      ),
-      request,
-    ),
-  );
+  // Each node's structure, as `readNode` reads an analysed request.
+  const read = batchReader(context, (node: ListNode, c) => {
+    const parent = parents[node.root];
+    return nodeStructureOn(
+      context,
+      createAdtClient(c, context.logger).getUtils(ourUtils),
+    ).fetchNodeStructure(parent.type, parent.name, {
+      analyse: analyseException,
+      nodeId: node.nodeId,
+      withShortDescriptions,
+    });
+  });
   const failures = new Map<number, IAdtFailure | Thrown>();
   const visited = parents.map(() => new Set<string>(['000000']));
   const roots: ListNode[] = parents.map((_, root) => ({
@@ -261,19 +341,11 @@ async function walkParentsBatched(
 
   let level = roots;
   while (level.length > 0) {
-    const answers = await read(
-      level.map((node) => ({
-        parentType: (parents[node.root] as Parent).type,
-        parentName: (parents[node.root] as Parent).name,
-        nodeId: node.nodeId,
-        withShortDescriptions,
-        analysed: true,
-      })),
-    );
+    const answers = await read(level);
     const next: ListNode[] = [];
     for (const [i, node] of level.entries()) {
       if (failures.has(node.root)) continue;
-      const result = answers[i] as (typeof answers)[number];
+      const result = answers[i];
       // A read that threw is its parent's failure; one that ends the call
       // (a credential failure) is thrown as it came.
       if (!result.ok) {
@@ -281,7 +353,7 @@ async function walkParentsBatched(
         failures.set(node.root, { ok: false, thrown: result.error });
         continue;
       }
-      const response = result.value as IAdtResponse<unknown, IAdtError>;
+      const response = result.value;
       if (!response.ok) {
         if (credentialRefused(response)) {
           return { walks: [], ended: response };
@@ -289,9 +361,9 @@ async function walkParentsBatched(
         failures.set(node.root, response);
         continue;
       }
-      const found = response.getResult().value as NodeLevel;
+      const found = response.getResult().value;
       node.objects = flatObjects(found);
-      const seen = visited[node.root] as Set<string>;
+      const seen = visited[node.root];
       for (const child of found.childNodes) {
         if (seen.has(child.nodeId)) continue;
         seen.add(child.nodeId);
@@ -310,9 +382,7 @@ async function walkParentsBatched(
 
   return {
     walks: roots.map(
-      (root) =>
-        (failures.get(root.root) as ParentWalk | undefined) ??
-        ok(flatten(root)),
+      (root): ParentWalk => failures.get(root.root) ?? ok(flatten(root)),
     ),
   };
 }
@@ -362,14 +432,9 @@ function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
 
 export async function handleGetObjectsList(
   context: HandlerContext,
-  args: {
-    parent_name?: string;
-    parent_tech_name?: string;
-    parent_type?: string;
-    objects?: Array<{ parent_type?: string; parent_name?: string }>;
-    with_short_descriptions?: boolean;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  // The schema holds the rules: the forms, the names, the parent types.
   const {
     parent_name,
     parent_tech_name,
@@ -383,39 +448,19 @@ export async function handleGetObjectsList(
       ? Boolean(with_short_descriptions)
       : true;
 
-  if (Array.isArray(listed) && listed.length > 0) {
-    if (
-      parent_name !== undefined ||
-      parent_tech_name !== undefined ||
-      parent_type !== undefined
-    ) {
-      return return_error(
-        'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
-      );
-    }
-    for (const entry of listed) {
-      if (
-        typeof entry?.parent_type !== 'string' ||
-        entry.parent_type.trim() === '' ||
-        typeof entry?.parent_name !== 'string' ||
-        entry.parent_name.trim() === ''
-      ) {
-        return return_error(
-          'Each entry of objects needs parent_type and parent_name (non-empty strings).',
-        );
-      }
-    }
+  if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];
     for (const entry of listed) {
-      const text = String(entry.parent_type);
+      // The schema accepted the type on this variant: its code. A call that
+      // bypassed the schema gets the schema's words.
       const variant = variantOf(context.connection);
-      const type = tableTypeOf(text, variant);
+      const type = tableTypeOf(entry.parent_type, variant);
       if (type === undefined) {
         return return_error(
-          notATableType('objects[].parent_type', text, variant),
+          notATableType('objects[].parent_type', entry.parent_type, variant),
         );
       }
-      parents.push({ type, name: String(entry.parent_name).toUpperCase() });
+      parents.push({ type, name: entry.parent_name.toUpperCase() });
     }
     let read: ParentWalks = { walks: [] };
     return answer(
@@ -428,7 +473,7 @@ export async function handleGetObjectsList(
         );
         // A credential failure SAP answered ends the call as it came.
         if (read.ended !== undefined) {
-          return read.ended as IAdtResponse<FlatObject[], IAdtError>;
+          return read.ended;
         }
         return ok([]);
       },
@@ -449,39 +494,15 @@ export async function handleGetObjectsList(
     );
   }
 
-  if (
-    !parent_name ||
-    typeof parent_name !== 'string' ||
-    parent_name.trim() === ''
-  ) {
-    return return_error(
-      'Parameter "parent_name" (string) is required and cannot be empty.',
-    );
-  }
-  if (
-    !parent_tech_name ||
-    typeof parent_tech_name !== 'string' ||
-    parent_tech_name.trim() === ''
-  ) {
-    return return_error(
-      'Parameter "parent_tech_name" (string) is required and cannot be empty.',
-    );
-  }
-  if (
-    !parent_type ||
-    typeof parent_type !== 'string' ||
-    parent_type.trim() === ''
-  ) {
-    return return_error(
-      'Parameter "parent_type" (string) is required and cannot be empty.',
-    );
-  }
-
-  const parentName = parent_name.toUpperCase();
+  // The schema required the three, none blank, and the type on this
+  // variant: its code. A call that bypassed the schema gets its words.
+  const parentName = (parent_name ?? '').toUpperCase();
   const variant = variantOf(context.connection);
-  const parentType = tableTypeOf(parent_type, variant);
+  const parentType = tableTypeOf(parent_type ?? '', variant);
   if (parentType === undefined) {
-    return return_error(notATableType('parent_type', parent_type, variant));
+    return return_error(
+      notATableType('parent_type', parent_type ?? '', variant),
+    );
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
@@ -503,7 +524,7 @@ export async function handleGetObjectsList(
             [{ type: parentType, name: parentName }],
             withDescriptions,
           );
-          const walk = (read.ended ?? read.walks[0]) as ParentWalk;
+          const walk = read.ended ?? read.walks[0];
           if ('thrown' in walk) throw walk.thrown;
           return walk;
         },

@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 it('core, at shutdown: no undo sent, every connection logged off, exit 0', async () => {
-  const s = await coreStand({ shutdown: {} });
+  const s = await coreStand({ kind: 'onprem', shutdown: {} });
   try {
     expect(await s.callTool('HoldState', { id: 'S' })).toMatchObject({
       isError: false,

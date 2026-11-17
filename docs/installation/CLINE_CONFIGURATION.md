@@ -113,24 +113,27 @@ server runs:
 }
 ```
 
-A `PATH` in `env` replaces the inherited one: keep the rest of it in the value. When the system number
-cannot be derived from the `SAP_URL` port (`80NN` → `NN`), add `"SAP_SYSNR": "<NN>"` to the block.
+A `PATH` in `env` replaces the inherited one: keep the rest of it in the value. The RFC address, the
+client and the language belong in the destination's `.env` (below).
 
 The `.env` for SNC:
 
 ```env
-SAP_URL=http://your-sap-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
 SAP_RESPONSIBLE=<your ABAP user>
 ```
 
-RFC with a user and password: `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`. Through a
-message server and a logon group: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID`, optionally `SAP_GROUP`
-and `SAP_SAPROUTER`. The SDK, the install order, the SNC options and the message server:
-[RFC Setup](RFC_SETUP.md).
+RFC with a user and password: `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`. An RFC
+destination states its address and no `SAP_URL`: `SAP_ASHOST` and `SAP_SYSNR`, or through a message
+server and a logon group `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` and `SAP_GROUP`; `SAP_CLIENT` and
+`SAP_LANGUAGE` are required, `SAP_SAPROUTER` goes with either address. The SDK, the install order, the
+SNC options and the message server: [RFC Setup](RFC_SETUP.md).
 
 ### A company CA
 

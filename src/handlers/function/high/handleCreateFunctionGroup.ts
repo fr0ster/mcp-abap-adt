@@ -1,3 +1,7 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateFunctionGroup Handler - ABAP Function Group Creation via ADT API
  *
@@ -26,70 +30,59 @@ import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
+  readExceptionRefusal,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { hasT100Key, type T100Key } from '../../../lib/messageKeys';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name. Up to 26 characters.',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Function group description. If not provided, function_group_name will be used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate function group after creation. Default: true. Set to false for batch operations.',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['function_group_name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateFunctionGroup', {
+    function_group_name: z
+      .string()
+      .describe('Function group name. Up to 26 characters.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Function group description. If not provided, function_group_name will be used.',
+      ),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate function group after creation. Default: true. Set to false for batch operations.',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CreateFunctionGroupArgs {
-  function_group_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  activate?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateFunctionGroupArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateFunctionGroup(
   context: HandlerContext,
@@ -110,24 +103,26 @@ export async function handleCreateFunctionGroup(
 
   return answer(
     { tool: 'CreateFunctionGroup', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
-      let created = await atStep('create', () =>
-        withAdtHeaders(context, 'functionGroup.create', (headers) =>
-          obj.create(
-            {
-              functionGroupName,
-              description: args.description || functionGroupName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              masterLanguage: args.master_language,
-            },
-            { headers, analyse: analyseException },
+      let created: IAdtResponse<AdtReading<XmlRead>, IAdtError> = await atStep(
+        'create',
+        () =>
+          withAdtHeaders(context, 'functionGroup.create', (headers) =>
+            obj.create(
+              {
+                functionGroupName,
+                description: args.description || functionGroupName,
+                packageName: args.package_name,
+                transportRequest: args.transport_request,
+                masterLanguage: args.master_language,
+              },
+              { headers, analyse: analyseException },
+            ),
           ),
-        ),
       )();
 
       // SAP's one refusal that can accompany a create that landed: the
@@ -145,12 +140,12 @@ export async function handleCreateFunctionGroup(
           logger?.info(
             `CreateFunctionGroup: ${functionGroupName} reads back, so the create landed`,
           );
-          created = readBack as unknown as typeof created;
+          created = readBack;
         }
       }
 
       if (!created.ok || !shouldActivate) {
-        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return created;
       }
 
       return atStep('activate', () =>
@@ -167,18 +162,25 @@ export async function handleCreateFunctionGroup(
 }
 
 /**
- * ADT's one refusal that can accompany a successful create.
+ * ADT's one refusal that can accompany a successful create: the generated
+ * interface include was not created, "Interface SAPL<group> has not been
+ * created" (`400`).
  *
- * Matched on the message because that is where ADT puts it — the status is
- * 400 for a dozen unrelated reasons, and the `exc:exception` type id is the
- * generic one. Both fragments are required so that a message mentioning only
- * one of them does not trigger a read-back that would answer a different
- * question.
+ * Recognised by its T100 key, whatever the logon language words it: the
+ * status is `400` for a dozen unrelated reasons and the `exc:exception` type
+ * is the generic one. T100 holds this message under two keys of class `EC`,
+ * `304` and `408` (on premise, 2026-11-05); either is this refusal.
  */
-function isInterfaceNotCreated(error: { message?: string }): boolean {
-  const message = error?.message ?? '';
+const INTERFACE_NOT_CREATED_KEYS: readonly T100Key[] = [
+  { id: 'EC', no: '304' },
+  { id: 'EC', no: '408' },
+];
+
+function isInterfaceNotCreated(error: IAdtError): boolean {
+  const refusal = readExceptionRefusal(error.response?.data);
   return (
-    message.includes('Interface SAPL') &&
-    message.includes('has not been created')
+    refusal?.messages.some((message) =>
+      hasT100Key(message, INTERFACE_NOT_CREATED_KEYS),
+    ) ?? false
   );
 }

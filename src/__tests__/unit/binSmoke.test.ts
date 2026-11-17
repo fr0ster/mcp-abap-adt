@@ -27,16 +27,19 @@
  * is why this is one test and not one per bin. It is skipped where the network or
  * a writable temp directory is not available, and says which.
  */
+import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { after, describe, it } from 'node:test';
 import {
   installedFile,
   installPackedRelease,
   RELEASE_DIRS,
   ROOT,
 } from '../helpers/installedRelease';
+import { assertEquals } from '../integration/helpers/liveAssert';
 
 /** The version each package's own manifest states. */
 const version = (manifest: string): string =>
@@ -82,22 +85,19 @@ const serverInfoVersion = (bin: string, cwd: string): string => {
 };
 
 describe('the published bins start from an installed package', () => {
-  // `npm pack` twice and an install of both tarballs: minutes on a cold cache.
-  jest.setTimeout(10 * 60 * 1000);
-
   let workdir: string | undefined;
 
-  afterAll(() => {
+  after(() => {
     if (workdir !== undefined)
       rmSync(workdir, { recursive: true, force: true });
   });
 
-  it('answers --version and --help from each of the twelve bins, each with its own package', () => {
-    if (process.env.SKIP_BIN_SMOKE === 'true') {
-      console.log('[bin-smoke] skipped by SKIP_BIN_SMOKE');
-      return;
-    }
-
+  it('answers --version and --help from each of the twelve bins, each with its own package', {
+    skip:
+      process.env.SKIP_BIN_SMOKE === 'true'
+        ? 'skipped by SKIP_BIN_SMOKE'
+        : false,
+  }, () => {
     workdir = mkdtempSync(join(tmpdir(), 'mcp-bin-smoke-'));
 
     // Pack all eighteen, because each depends on the others by version and the
@@ -106,7 +106,7 @@ describe('the published bins start from an installed package', () => {
     installPackedRelease(workdir, [...RELEASE_DIRS]);
 
     const bin = installedFile(workdir, 'core', 'bin', 'mcp-abap-adt.js');
-    expect(existsSync(bin)).toBe(true);
+    assert.equal(existsSync(bin), true);
 
     // The defect this exists for: from here `__dirname/../..` is the scope
     // directory, and reading a manifest there answers ENOENT.
@@ -137,8 +137,9 @@ describe('the published bins start from an installed package', () => {
       ['compact-sse-ro', 'mcp-abap-adt-compact-sse-ro', 'compact-sse-ro'],
     ] as const) {
       const installed = installedFile(workdir, pkg, 'bin', `${binName}.js`);
-      expect(existsSync(installed)).toBe(true);
-      expect(runNode([installed, '--version'], workdir).trim()).toBe(
+      assert.equal(existsSync(installed), true);
+      assert.equal(
+        runNode([installed, '--version'], workdir).trim(),
         version(`${manifest}/package.json`),
       );
       // `--help` goes to stderr, nothing to stdout, and exits 0.
@@ -146,25 +147,30 @@ describe('the published bins start from an installed package', () => {
         cwd: workdir,
         encoding: 'utf8',
       });
-      expect({ status: usage.status, stdout: usage.stdout }).toEqual({
-        status: 0,
-        stdout: '',
-      });
-      expect(usage.stderr).toContain(`USAGE:\n  ${binName} [options]`);
+      assertEquals(
+        { status: usage.status, stdout: usage.stdout },
+        {
+          status: 0,
+          stdout: '',
+        },
+      );
+      assert.ok(usage.stderr.includes(`USAGE:\n  ${binName} [options]`));
     }
 
-    expect(printed).toBe(version('server/package.json'));
+    assert.equal(printed, version('server/package.json'));
     // And not the library's, which is what two levels up answered in a checkout
     // — the same number today, so this only bites when they diverge.
-    expect(printed).not.toBe('');
+    assert.notEqual(printed, '');
 
     // `initialize` reports the same versions. It answered `1.0.0` whenever npm
     // had not started the process — under every MCP client and under Glama's
     // `mcp-proxy` — because it read `npm_package_version`.
-    expect(serverInfoVersion(bin, workdir)).toBe(
+    assert.equal(
+      serverInfoVersion(bin, workdir),
       version('server/package.json'),
     );
-    expect(serverInfoVersion(compactBin, workdir)).toBe(
+    assert.equal(
+      serverInfoVersion(compactBin, workdir),
       version('compact/package.json'),
     );
     // The stdio -ro bins too: each its own package's version.
@@ -172,12 +178,13 @@ describe('the published bins start from an installed package', () => {
       ['core-ro', 'mcp-abap-adt-ro'],
       ['compact-ro', 'mcp-abap-adt-compact-ro'],
     ] as const) {
-      expect(
+      assert.equal(
         serverInfoVersion(
           installedFile(workdir, pkg, 'bin', `${binName}.js`),
           workdir,
         ),
-      ).toBe(version(`${pkg}/package.json`));
+        version(`${pkg}/package.json`),
+      );
     }
   });
 });

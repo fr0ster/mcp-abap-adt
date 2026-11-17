@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,35 +27,21 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP function module named by function_module_name in the function group named by function_group_name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name containing the function module.',
-      },
-      function_module_name: {
-        type: 'string',
-        description: 'Function module name.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' or 'inactive'. Default: active.",
-        enum: ['active', 'inactive'],
-      },
-    },
-    required: ['function_group_name', 'function_module_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z
+      .string()
+      .describe('Function group name containing the function module.'),
+    function_module_name: z.string().describe('Function module name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe("Version to check: 'active' or 'inactive'. Default: active."),
+  }),
 } as const;
 
 export async function handleCheckFunctionModule(
   context: HandlerContext,
-  args: {
-    function_group_name: string;
-    function_module_name: string;
-    version?: string;
-  },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckFunctionModuleLow(context, args);
   return normalizeCheckResponse(

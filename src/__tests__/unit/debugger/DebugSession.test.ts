@@ -1,4 +1,3 @@
-import { corpusBody } from '../../../lib/adtCorpus';
 import {
   DebugListenerError,
   DebugRefusedError,
@@ -11,6 +10,7 @@ import {
   methodFailureOf,
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,

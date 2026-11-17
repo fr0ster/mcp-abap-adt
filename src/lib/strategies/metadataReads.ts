@@ -39,6 +39,7 @@ import type {
 import type { IServerAdtClient } from '../adtClientContract';
 import { tableCodeOf } from '../adtTypeCode';
 import type { ReadVersion } from '../handlers/readVersion';
+import type { AdtReading } from './reading';
 import { resultsFor } from './resultSets';
 
 type Client = IServerAdtClient;
@@ -269,10 +270,14 @@ export interface MetadataTarget {
   functionGroup?: string;
 }
 
-/** One object's metadata read on a client. */
+/**
+ * One object's metadata read on a client: the document as a verbatim
+ * reading answers it (`AdtReading.raw`), or the document itself where the
+ * type's read answers it whole (an enhancement spot's).
+ */
 export type MetadataRead = (
   client: Client,
-) => Promise<IAdtResponse<unknown, IAdtError>>;
+) => Promise<IAdtResponse<AdtReading<string> | string, IAdtError>>;
 
 type ReadOf = (target: MetadataTarget) => MetadataRead | undefined;
 

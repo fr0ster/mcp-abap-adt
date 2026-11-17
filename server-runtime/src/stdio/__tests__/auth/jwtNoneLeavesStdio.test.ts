@@ -107,6 +107,7 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
     `SAP_URL=${standIn.url}`,
     'SAP_CLIENT=100',
     'SAP_AUTH_TYPE=jwt',
+    'SAP_CONNECTION_TYPE=http',
     'SAP_GRANT_TYPE=none',
     `SAP_JWT_TOKEN=${TOKEN}`,
     `SAP_ISSUED_FOR=${standIn.url}?sap-client=100`,

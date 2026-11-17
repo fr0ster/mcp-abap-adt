@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateLocalDefinitions Handler - Write a class's local definitions include
  *
@@ -24,7 +26,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -32,47 +34,36 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalDefinitions',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      class_name: {
-        type: 'string',
-        description: 'Parent class name.',
-      },
-      definitions_code: {
-        type: 'string',
-        description: 'Updated source code for local definitions.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable objects), not a task.',
-      },
-      activate_on_update: {
-        type: 'boolean',
-        description:
-          'Activate parent class after updating local definitions. Default: false',
-        default: false,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['class_name', 'definitions_code'],
-  },
+  inputSchema: z.object({
+    class_name: z.string().describe('Parent class name.'),
+    definitions_code: z
+      .string()
+      .describe('Updated source code for local definitions.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable objects), not a task.',
+      ),
+    activate_on_update: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Activate parent class after updating local definitions. Default: false',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateLocalDefinitionsArgs {
-  class_name: string;
-  definitions_code: string;
-  transport_request?: string;
-  activate_on_update?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateLocalDefinitionsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateLocalDefinitions(
   context: HandlerContext,
@@ -93,7 +84,7 @@ export async function handleUpdateLocalDefinitions(
 
   return answer(
     { tool: 'UpdateLocalDefinitions', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getLocalDefinitions(
         resultsFor(classDocuments),
       );
@@ -119,7 +110,7 @@ export async function handleUpdateLocalDefinitions(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

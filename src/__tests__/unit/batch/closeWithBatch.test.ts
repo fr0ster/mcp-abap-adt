@@ -10,13 +10,22 @@
  *   (`plainNode.ts`: inside Jest no `unhandledRejection` listener is told),
  *   with handlers that do not guard their parts.
  * - The idle bound ending held state with a batch open (Review Focus 4):
- *   nothing sent, the recorded handlers released, `BatchEnd` then refused
- *   `batch_mode_off`, `BatchAnswers` "no answer with that number" for the
+ *   nothing sent, the recorded handlers released, `HandlerBatch` end then refused
+ *   `batch_mode_off`, `HandlerBatch` answers "no answer with that number" for the
  *   last executed batch's numbers too.
  */
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock below.
+  siblingRecordOf: jest.fn(() => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  })),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import { BATCH_MODE_OFF_WORDS } from '../../../lib/auth/serverRefusal';
@@ -43,7 +52,7 @@ const sap = (inner: InnerRequest): PartAnswer => ({
   body: `source of ${inner.url}`,
 });
 
-const TOOLS = ['GetProgram', 'GetClass'];
+const TOOLS = ['HandlerGet'];
 
 const turns = async (n = 20) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
@@ -65,10 +74,17 @@ describe('the instance close with a batch open', () => {
     const ledger = new HandlerLedger();
     const s = await batchStand({ tools: TOOLS, part: sap, ledger });
     s.begin();
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+    ).toEqual({
       content: [],
     });
-    expect(await s.call('GetClass', { class_name: 'CL_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CL_A' }),
+    ).toEqual({
       content: [],
     });
     const open = s.owner.opened();
@@ -109,7 +125,7 @@ describe('the instance close with a batch open', () => {
   );
 });
 
-describe('the instance close while BatchEnd executes', () => {
+describe('the instance close while HandlerBatch end executes', () => {
   it('plain node: nothing more sent after the drop, no answers afterwards, no unhandled rejection', async () => {
     const report = await runPlainNode(DURING_END);
     expect(report).toEqual({
@@ -121,7 +137,7 @@ describe('the instance close while BatchEnd executes', () => {
       modeAtDrop: 'off',
       mode: 'off',
       holdsState: false,
-      // BatchEnd's end() after the drop re-installs nothing.
+      // the batch end's end() after the drop re-installs nothing.
       answers: [null, null],
       settled: true,
       endSettled: true,
@@ -131,7 +147,7 @@ describe('the instance close while BatchEnd executes', () => {
 });
 
 describe('the idle bound with a batch open (Review Focus 4)', () => {
-  it('nothing sent; recorded handlers released; BatchEnd then batch_mode_off; BatchAnswers no answer with that number', async () => {
+  it('nothing sent; recorded handlers released; HandlerBatch end then batch_mode_off; HandlerBatch answers no answer with that number', async () => {
     jest.useFakeTimers({
       advanceTimers: true,
       doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
@@ -140,7 +156,10 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
     const s = await batchStand({ tools: TOOLS, part: sap, ledger });
     // A batch executed: its answer 1 is kept.
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     expect((await s.end()).summary).toEqual({
       recorded: 1,
       sent: 1,
@@ -151,8 +170,11 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
 
     // The next batch open, two calls recorded, then no call for the bound.
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_B' });
-    await s.call('GetClass', { class_name: 'CL_B' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_B',
+    });
+    await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CL_B' });
     const recorded = [...(s.owner.opened()?.recorded ?? [])];
     expect(recorded.map((call) => call.number)).toEqual([1, 2]);
     const signal = s.owner.signal();
@@ -169,7 +191,7 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
       sentBefore.concat(new Array(s.built.length - sentBefore.length).fill(0)),
     );
 
-    const ended = await s.call('BatchEnd');
+    const ended = await s.call('HandlerBatch', { action: 'end' });
     expect(ended.isError).toBe(true);
     expect(payloadOf(ended)).toEqual({
       error: 'batch_mode_off',

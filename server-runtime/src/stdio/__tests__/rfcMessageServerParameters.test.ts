@@ -1,11 +1,14 @@
 /**
- * The message server's parameters in `mcp-abap-adt`'s table: the CLI, the
- * environment and YAML forms reach the same `CoreConfig` fields, beside
+ * The destination keys in `mcp-abap-adt`'s table — the RFC address (the
+ * application server's and the message server's), the client and the
+ * language: the CLI, the environment and YAML forms reach the same
+ * `CoreConfig` fields, each with the form it came from, beside
  * `--connection-type` and in its form (`SAP_X` → `--x` → `x`); and in the
  * HTTP and SSE binaries, whose credentials come only from `x-sap-*` headers,
  * their CLI or YAML form stops the start like every other destination option.
  */
 
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   DESTINATION_OPTIONS_REMOVED,
   DESTINATIONS_ELSEWHERE,
@@ -18,17 +21,21 @@ import { coreHelp } from '../launcher';
 
 /** Each field with its three forms. */
 const FORMS = [
+  ['ashost', '--ashost', 'SAP_ASHOST', 'ashost'],
+  ['sysnr', '--sysnr', 'SAP_SYSNR', 'sysnr'],
   ['mshost', '--mshost', 'SAP_MSHOST', 'mshost'],
   ['msserv', '--msserv', 'SAP_MSSERV', 'msserv'],
   ['sysid', '--sysid', 'SAP_SYSID', 'sysid'],
   ['group', '--group', 'SAP_GROUP', 'group'],
   ['saprouter', '--saprouter', 'SAP_SAPROUTER', 'saprouter'],
+  ['client', '--client', 'SAP_CLIENT', 'client'],
+  ['language', '--language', 'SAP_LANGUAGE', 'language'],
 ] as const;
 
 const read = (
   argv: readonly string[],
   env: NodeJS.ProcessEnv = {},
-  yaml: Record<string, unknown> | null = null,
+  yaml: YamlConfig | null = null,
 ) => readCoreConfig(argv, env, yaml) as unknown as Record<string, unknown>;
 
 describe('the CLI and YAML forms reach the same fields', () => {
@@ -38,6 +45,25 @@ describe('the CLI and YAML forms reach the same fields', () => {
     expect(read([cli, value])[field]).toBe(value);
     expect(read([], { [env]: value })[field]).toBe(value);
     expect(read([], {}, { [yaml]: value })[field]).toBe(value);
+  });
+
+  it.each(FORMS)(
+    '%s: the form it came from is kept',
+    (field, cli, env, yaml) => {
+      const sourceOf = (config: ReturnType<typeof readCoreConfig>) =>
+        config.destinationKeySource?.[field];
+      expect(sourceOf(readCoreConfig([`${cli}=v`], {}))).toBe(cli);
+      expect(sourceOf(readCoreConfig([], { [env]: 'v' }))).toBe(env);
+      expect(sourceOf(readCoreConfig([], {}, { [yaml]: 'v' }))).toBe(
+        `${yaml} (config file)`,
+      );
+    },
+  );
+
+  it.each(FORMS)('%s: a blank value is unset', (field, cli, env, yaml) => {
+    expect(read([`${cli}=   `])[field]).toBeUndefined();
+    expect(read([], { [env]: '   ' })[field]).toBeUndefined();
+    expect(read([], {}, { [yaml]: '   ' })[field]).toBeUndefined();
   });
 
   it.each(FORMS)('%s: trimmed, as every string parameter is', (field, cli) => {

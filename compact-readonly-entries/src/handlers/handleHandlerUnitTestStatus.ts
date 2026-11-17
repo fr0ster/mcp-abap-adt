@@ -1,6 +1,7 @@
 import { compactUnitTestStatusSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetUnitTestStatus } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestStatus',
@@ -10,10 +11,7 @@ export const TOOL_DEFINITION = {
   inputSchema: compactUnitTestStatusSchema,
 } as const;
 
-type HandlerUnitTestStatusArgs = {
-  run_id: string;
-  with_long_polling?: boolean;
-};
+type HandlerUnitTestStatusArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerUnitTestStatus(
   context: HandlerContext,

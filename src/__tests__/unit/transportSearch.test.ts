@@ -1,8 +1,8 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
-import { corpusBody } from '../../lib/adtCorpus';
 import { parseStructure } from '../../lib/strategies/reading';
 import { MAX_SEARCH_CONFIGURATIONS } from '../../lib/strategies/transportSearch';
+import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 
 /**

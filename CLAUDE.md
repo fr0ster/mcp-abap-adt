@@ -19,14 +19,14 @@ npm run shared:check     # verify they exist
 
 **Important**: Shared object setup and SAP environment verification require collaboration with the user. Don't try to automate everything — run `shared:setup` once, show the result, and ask the user to verify activation in ADT. If activation fails, ask the user what they see rather than retrying blindly.
 
-**Running integration tests**: Always save full output to a log file — do NOT truncate with `tail`. Tests take 15-25 minutes; use `timeout 1800` (30 min) or `run_in_background` with no timeout truncation. This avoids re-running long tests just to see errors.
+**Running integration tests**: Save the full output to a log file; never truncate it with `tail`. Live files run one at a time on node:test; a first Ctrl-C lets the running files finish their cleanup, a second ends them. One file, one case and why one at a time: `src/__tests__/integration/README.md`, "Running".
 
 ```bash
-# Soft mode (mass run) — save full log
-npm run test:integration 2>&1 | tee /tmp/integration-test.log
+# Soft mode (mass run) — save the full log
+npm run test:integration 2>&1 | tee <log>
 
-# Hard mode (targeted, in test-config.yaml set integration_hard_mode.enabled: true)
-npm test -- --testPathPatterns=<specific-test>
+# One file (hard mode: integration_hard_mode.enabled: true in test-config.yaml), by its source path
+npm run test:integration -- src/__tests__/integration/<path>.test.ts
 ```
 
 ### Test Configuration
@@ -42,7 +42,8 @@ cp tests/test-config.yaml.template tests/test-config.yaml
 **Required changes** (marked `# ← CHANGE`):
 - `environment.env` — session .env file name (`"your-system.env"`, `"another-system.env"`) from standard sessions folder
 - `environment.system_type` — `"onprem"`, `"cloud"`, or `"legacy"`
-- `environment.connection_type` — `"http"` (default) or `"rfc"`
+- `environment.connection_type` — `"http"` or `"rfc"`, required (no default); `"rfc"` also needs `environment.realm_check_url`, the HTTP URL the realm check runs against before anything is sent (it is never part of the destination).
+- `environment.ashost` / `sysnr` (or `mshost`, `msserv`, `sysid`, `group`), `client`, `language` — RFC only: the destination's address, client and logon language, over the session `.env`'s; an RFC destination states one address, `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 - `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
 - `environment.default_transport` — transport request or `""` for local packages
 - `shared_dependencies.package` — package for shared test objects
@@ -59,6 +60,8 @@ available_in: ['onprem', 'legacy'] as const,  // not available on cloud
 ```
 
 Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available everywhere. Test-level `available_in` is controlled separately in `test-config.yaml.template`.
+
+**Data tools (24.0.0).** `GetSqlQuery`, `GetTableContents` and compact `HandlerGetData` are served only with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, YAML `enable-data-tools`; off by default, SAP API Policy FAQ v1.3 Q33; the customer decides). They live in `DataHandlersGroup` / `compactDataEntries` / `CompactDataHandlersGroup`, added by a set's `groups(context, transport, { dataTools })`; a new tool that reads business data goes there.
 
 ### Cloud vs On-Prem
 
@@ -246,8 +249,8 @@ We took the fix and skipped the check.
 `src/__tests__/unit/installMatrix.test.ts` installs the binaries by name, as a
 user does, in every layout and proves one `@mcp-abap-adt/lib` per process (19.1.0
 loaded two when a wrapper and its base were installed in one command: a binary
-depended on another binary; none may now). Before a release, make sure both ran
-(CI runs the matrix on ubuntu + Node 22 only), and after publishing run
+depended on another binary; none may now). Before a release, make sure `npm run test:install` ran
+(it runs both; CI runs it as its own step), and after publishing run
 `docs/deployment/RELEASE.md` step 9; when adding a bin, add it to both. And treat
 any `__dirname`-relative path in `server-runtime/` and in the binary packages'
 version modules as suspect: count the levels for both layouts.

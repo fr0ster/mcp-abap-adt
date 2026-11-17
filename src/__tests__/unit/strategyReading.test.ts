@@ -1,11 +1,11 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   parseStructure,
   statusOnly,
   structured,
   verbatim,
 } from '../../lib/strategies/reading';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 /**
  * The parse every structured reading shares, against real documents.
@@ -75,7 +75,14 @@ describe('the shared parse keeps what SAP sent', () => {
 
   it('answers null for a body that is not XML, rather than throwing', () => {
     expect(parseStructure('')).toBeNull();
-    expect(parseStructure(undefined)).toBeNull();
+    // A wire body that is not text is the reading's to turn into text.
+    const none: IAdtWireResponse = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: undefined,
+    };
+    expect(structured(none).value).toBeNull();
   });
 });
 

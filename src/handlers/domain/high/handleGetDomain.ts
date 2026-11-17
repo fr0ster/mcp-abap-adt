@@ -1,36 +1,29 @@
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import { readDomainMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      domain_name: {
-        type: 'string',
-        description: 'Domain name.',
-      },
-      version: READ_VERSION_PROPERTY,
-    },
-    required: ['domain_name'],
-  },
+  inputSchema: z.object({
+    domain_name: requiredText('domain_name is required').describe(
+      'Domain name.',
+    ),
+    version: READ_VERSION_FIELD,
+  }),
 } as const;
 
-interface GetDomainArgs {
-  domain_name: string;
-  version?: ReadVersion;
-}
+type GetDomainArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetDomain(
   context: HandlerContext,
@@ -38,8 +31,6 @@ export async function handleGetDomain(
 ) {
   const { connection, logger } = context;
   const { domain_name, version = 'active' } = args;
-  if (!domain_name) return return_error(new Error('domain_name is required'));
-
   const domainName = domain_name.toUpperCase();
   const client = createAdtClient(connection, logger);
 

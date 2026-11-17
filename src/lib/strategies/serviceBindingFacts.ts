@@ -25,52 +25,66 @@
  * alias is the entity set, not the exposed view's name.
  */
 
+import { afterBlanksAt, isBlank, isWordCharacter, wordAt } from '../plainText';
+import type { XmlRead } from '../xml/tree';
+import {
+  attributeOf,
+  firstAttribute,
+  membersNamed,
+  parseStructure,
+} from './reading';
+
 export interface ServiceBindingFacts {
   /** `srvb:services/@srvb:name` — the published service. */
-  service?: string;
+  service?: string | undefined;
   /** `srvb:serviceDefinition/@adtcore:name` — the SRVD behind it. */
-  serviceDefinition?: string;
+  serviceDefinition?: string | undefined;
   /** `srvb:content/@srvb:version`, e.g. `0001`. */
-  version?: string;
+  version?: string | undefined;
   /** From `srvb:binding/@srvb:version`: `V2` → `odatav2`, `V4` → `odatav4`. */
-  protocol?: 'odatav2' | 'odatav4';
+  protocol?: 'odatav2' | 'odatav4' | undefined;
   /** `srvb:binding/@srvb:type`, normally `ODATA`. */
-  bindingType?: string;
+  bindingType?: string | undefined;
   /**
    * `srvb:binding/@srvb:category`: `'ui'` from `0`, `'web_api'` from `1`.
    * `undefined` when the document does not say, which is not the same as UI.
    */
-  category?: 'ui' | 'web_api';
+  category?: 'ui' | 'web_api' | undefined;
   /** `srvb:published` — false means nothing below will open. */
   published: boolean;
 }
 
+/**
+ * The attribute `name` of the first `element` of a parsed document, in
+ * the grouped parse's order (`walkStructure`); `undefined` when that element does not carry it.
+ */
 const attribute = (
-  xml: string,
+  document: XmlRead,
   element: string,
   name: string,
-): string | undefined => {
-  const open = new RegExp(`<${element}\\b[^>]*>`).exec(xml)?.[0];
-  if (!open) return undefined;
-  const found = new RegExp(`${name}="([^"]*)"`).exec(open);
-  return found?.[1];
-};
+): string | undefined =>
+  attributeOf(membersNamed(document, element)[0]?.node, name);
 
 /** Read the facts the preview URL needs out of a binding document. */
 export function serviceBindingFactsOf(xml: string): ServiceBindingFacts {
-  const bindingVersion = attribute(xml, 'srvb:binding', 'srvb:version');
-  const bindingCategory = attribute(xml, 'srvb:binding', 'srvb:category');
+  const document = parseStructure(xml);
+  const bindingVersion = attribute(document, 'srvb:binding', 'srvb:version');
+  const bindingCategory = attribute(document, 'srvb:binding', 'srvb:category');
   return {
-    service: attribute(xml, 'srvb:services', 'srvb:name'),
-    serviceDefinition: attribute(xml, 'srvb:serviceDefinition', 'adtcore:name'),
-    version: attribute(xml, 'srvb:content', 'srvb:version'),
+    service: attribute(document, 'srvb:services', 'srvb:name'),
+    serviceDefinition: attribute(
+      document,
+      'srvb:serviceDefinition',
+      'adtcore:name',
+    ),
+    version: attribute(document, 'srvb:content', 'srvb:version'),
     protocol:
       bindingVersion === 'V2'
         ? 'odatav2'
         : bindingVersion === 'V4'
           ? 'odatav4'
           : undefined,
-    bindingType: attribute(xml, 'srvb:binding', 'srvb:type'),
+    bindingType: attribute(document, 'srvb:binding', 'srvb:type'),
     category:
       bindingCategory === '0'
         ? 'ui'
@@ -78,7 +92,7 @@ export function serviceBindingFactsOf(xml: string): ServiceBindingFacts {
           ? 'web_api'
           : undefined,
     published:
-      attribute(xml, 'srvb:serviceBinding', 'srvb:published') === 'true',
+      attribute(document, 'srvb:serviceBinding', 'srvb:published') === 'true',
   };
 }
 
@@ -97,11 +111,79 @@ export interface ExposedEntity {
  */
 export function exposedEntitiesOf(source: string): ExposedEntity[] {
   const found: ExposedEntity[] = [];
-  const pattern = /expose\s+([A-Za-z0-9_/]+)(?:\s+as\s+([A-Za-z0-9_]+))?\s*;/gi;
-  for (const match of source.matchAll(pattern)) {
-    found.push({ entity: match[1], entitySet: match[2] ?? match[1] });
+  let at = 0;
+  while (at < source.length) {
+    const read = exposeAt(source, at);
+    if (read === undefined) {
+      at++;
+      continue;
+    }
+    found.push(read.exposed);
+    at = read.end;
   }
   return found;
+}
+
+/** A CDS name: letters, digits and `_`. */
+const isCdsName = (character: string | undefined): boolean =>
+  isWordCharacter(character);
+
+/** A CDS entity name: a CDS name, or a namespaced one (`/NS/NAME`). */
+const isEntityName = (character: string | undefined): boolean =>
+  isWordCharacter(character) || character === '/';
+
+/** The end of the run of characters `accepts` takes, from `at`. */
+function runEnd(
+  text: string,
+  at: number,
+  accepts: (character: string | undefined) => boolean,
+): number {
+  let end = at;
+  while (end < text.length && accepts(text[end])) end++;
+  return end;
+}
+
+/** The index after one or more blanks at `at`; `undefined` when there is none. */
+function afterSomeBlanks(text: string, at: number): number | undefined {
+  const end = afterBlanksAt(text, at);
+  return end > at ? end : undefined;
+}
+
+/** `expose <entity> [as <alias>] ;` at `at`, and where it ends. */
+function exposeAt(
+  source: string,
+  at: number,
+): { exposed: ExposedEntity; end: number } | undefined {
+  if (!wordAt(source, at, 'expose')) return undefined;
+  const entityAt = afterSomeBlanks(source, at + 'expose'.length);
+  if (entityAt === undefined) return undefined;
+  const entityEnd = runEnd(source, entityAt, isEntityName);
+  if (entityEnd === entityAt) return undefined;
+  const entity = source.slice(entityAt, entityEnd);
+  const alias = aliasAfter(source, entityEnd);
+  if (alias !== undefined) {
+    const semicolon = afterBlanksAt(source, alias.end);
+    if (source[semicolon] === ';') {
+      return { exposed: { entity, entitySet: alias.name }, end: semicolon + 1 };
+    }
+  }
+  const semicolon = afterBlanksAt(source, entityEnd);
+  return source[semicolon] === ';'
+    ? { exposed: { entity, entitySet: entity }, end: semicolon + 1 }
+    : undefined;
+}
+
+/** ` as <alias>` at `at` — one or more blanks on each side of `as` — and where it ends. */
+function aliasAfter(
+  text: string,
+  at: number,
+): { name: string; end: number } | undefined {
+  const asAt = afterSomeBlanks(text, at);
+  if (asAt === undefined || !wordAt(text, asAt, 'as')) return undefined;
+  const nameAt = afterSomeBlanks(text, asAt + 2);
+  if (nameAt === undefined) return undefined;
+  const end = runEnd(text, nameAt, isCdsName);
+  return end > nameAt ? { name: text.slice(nameAt, end), end } : undefined;
 }
 
 /**
@@ -131,30 +213,102 @@ export function exposedEntitiesOf(source: string): ExposedEntity[] {
 export function associationsOf(source: string): string[] {
   const found = new Set<string>();
   // Defined here: `association [0..1] to X as name`, `composition [0..*] of Y as name`.
-  for (const match of source.matchAll(
-    /(?:association|composition)(?:\s*\[[^\]]*\])?\s+(?:to|of)\s+(?:parent\s+)?[A-Za-z0-9_/]+\s+as\s+([A-Za-z0-9_]+)/gi,
-  )) {
-    found.add(match[1]);
+  let at = 0;
+  while (at < source.length) {
+    const read = definedAssociationAt(source, at);
+    if (read === undefined) {
+      at++;
+      continue;
+    }
+    found.add(read.name);
+    at = read.end;
   }
   // Redirected in a projection: `name : redirected to [composition child|parent] X`.
-  for (const match of source.matchAll(
-    /([A-Za-z0-9_]+)\s*:\s*redirected\s+to\s+(?:composition\s+child|parent|)\s*[A-Za-z0-9_/]+/gi,
-  )) {
-    found.add(match[1]);
-  }
+  for (const name of redirectedNames(source)) found.add(name);
   return [...found];
+}
+
+/**
+ * `association|composition [<cardinality>] to|of [parent] <target> as <name>`
+ * at `at` — keywords in any case — its name and where it ends.
+ */
+function definedAssociationAt(
+  source: string,
+  at: number,
+): { name: string; end: number } | undefined {
+  const keyword = ['association', 'composition'].find((word) =>
+    wordAt(source, at, word),
+  );
+  if (keyword === undefined) return undefined;
+  let next = at + keyword.length;
+  const bracket = afterBlanksAt(source, next);
+  if (source[bracket] === '[') {
+    const closing = source.indexOf(']', bracket + 1);
+    if (closing === -1) return undefined;
+    next = closing + 1;
+  }
+  const relationAt = afterSomeBlanks(source, next);
+  if (relationAt === undefined) return undefined;
+  if (!wordAt(source, relationAt, 'to') && !wordAt(source, relationAt, 'of')) {
+    return undefined;
+  }
+  const targetAt = afterSomeBlanks(source, relationAt + 2);
+  if (targetAt === undefined) return undefined;
+  // `parent` may be a keyword before the target, or the target itself.
+  if (wordAt(source, targetAt, 'parent')) {
+    const afterParent = afterSomeBlanks(source, targetAt + 'parent'.length);
+    const named =
+      afterParent === undefined
+        ? undefined
+        : targetAliasAt(source, afterParent);
+    if (named !== undefined) return named;
+  }
+  return targetAliasAt(source, targetAt);
+}
+
+/** `<target> as <name>` at `at`: the name and where it ends. */
+function targetAliasAt(
+  source: string,
+  at: number,
+): { name: string; end: number } | undefined {
+  const targetEnd = runEnd(source, at, isEntityName);
+  return targetEnd === at ? undefined : aliasAfter(source, targetEnd);
+}
+
+/** The names of `name : redirected to <target>`, keywords in any case. */
+function redirectedNames(source: string): string[] {
+  const names: string[] = [];
+  for (
+    let colon = source.indexOf(':');
+    colon !== -1;
+    colon = source.indexOf(':', colon + 1)
+  ) {
+    let nameEnd = colon;
+    while (nameEnd > 0 && isBlank(source[nameEnd - 1])) nameEnd--;
+    let nameAt = nameEnd;
+    while (nameAt > 0 && isCdsName(source[nameAt - 1])) nameAt--;
+    if (nameAt === nameEnd) continue;
+    const redirectedAt = afterBlanksAt(source, colon + 1);
+    if (!wordAt(source, redirectedAt, 'redirected')) continue;
+    const toAt = afterSomeBlanks(source, redirectedAt + 'redirected'.length);
+    if (toAt === undefined || !wordAt(source, toAt, 'to')) continue;
+    const targetAt = afterSomeBlanks(source, toAt + 2);
+    if (targetAt === undefined || !isEntityName(source[targetAt])) continue;
+    names.push(source.slice(nameAt, nameEnd));
+  }
+  return names;
 }
 
 /** What the protocol-category resource says about a published service. */
 export interface CategoryServiceUrls {
   /** `…:services/@…:serviceUrl` — the URL the SYSTEM names, often empty. */
-  serviceUrl?: string;
+  serviceUrl?: string | undefined;
   /** `…:services/@…:annotationUrl`. */
-  annotationUrl?: string;
+  annotationUrl?: string | undefined;
   /** `odatav4:serviceGroup/@odatav4:serviceUrlPrefix` — V4 only. */
-  serviceUrlPrefix?: string;
+  serviceUrlPrefix?: string | undefined;
   /** `@…:published` on the list (V2) or the group (V4). */
-  published?: boolean;
+  published?: boolean | undefined;
 }
 
 /**
@@ -181,10 +335,12 @@ export interface CategoryServiceUrls {
  * published V4 service answers `404` to a caller that holds a valid token.
  */
 export function categoryServiceUrlsOf(xml: string): CategoryServiceUrls {
-  const value = (name: string): string | undefined => {
-    const found = new RegExp(`(?:odatav2|odatav4):${name}="([^"]*)"`).exec(xml);
-    return found?.[1];
-  };
+  const document = parseStructure(xml);
+  // The first element (in `walkStructure`'s order) that states it: the V2 spelling,
+  // else the V4 one — a document is of one protocol.
+  const value = (name: string): string | undefined =>
+    firstAttribute(document, `odatav2:${name}`) ??
+    firstAttribute(document, `odatav4:${name}`);
   const url = value('serviceUrl');
   const annotation = value('annotationUrl');
   const prefix = value('serviceUrlPrefix');

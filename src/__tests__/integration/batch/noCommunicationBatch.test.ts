@@ -26,6 +26,8 @@
  * Run: npm test -- --testPathPatterns='noCommunicationBatch' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
  */
 
+import assert from 'node:assert/strict';
+import { before, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
@@ -33,8 +35,10 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../../../lib/batch/availability';
-import { getTimeout, resolvePackageName } from '../helpers/configHelpers';
+import { resolvePackageName } from '../helpers/configHelpers';
+import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 
 const testLogger = createTestLogger('no-communication-batch');
@@ -100,71 +104,68 @@ const envelopes = (urls: string[]) =>
 describe('the communication batch on the system the test config names', () => {
   let connection: IAbapConnection | null = null;
 
-  beforeAll(async () => {
+  before(async () => {
     try {
       connection = (await createTestConnectionAndSession()).connection;
     } catch (_error) {
       connection = null;
     }
-  }, getTimeout('long'));
+  });
 
-  it(
-    "the first envelope's outer status decides; the read equals the sequential one",
-    async () => {
-      if (connection === null) {
-        testLogger?.info(
-          '⏭️  Skipping: runs only on the system the test config names (tests/test-config.yaml); no configuration, connection or session here',
-        );
-        return;
-      }
-      const packageName = resolvePackageName();
-      const args = {
-        parent_type: 'DEVC/K',
-        parent_name: packageName,
-        maxDepth: 1,
-        enrich: false,
-      };
-
-      const batched = recording(connection);
-      const { port, noted } = watchedPort();
-      const context: HandlerContext = {
-        connection: batched.view,
-        batchAvailability: port,
-      };
-      const first = await handleGetObjectInfo(context, args);
-
-      const firstEnvelopes = envelopes(batched.urls);
-      expect(firstEnvelopes).toBeGreaterThan(0);
-      expect(batched.urls[0]).toBe(ENVELOPE_URL);
-      expect(noted.length).toBeGreaterThan(0);
-      const outer = noted[0] as number;
-      process.stderr.write(
-        `communication batch: the first envelope's outer status is ${outer}\n`,
+  it("the first envelope's outer status decides; the read equals the sequential one", async () => {
+    if (connection === null) {
+      skipRunningTest(
+        'runs only on the system the test config names (tests/test-config.yaml); no configuration, connection or session here',
       );
-      const served = outer >= 200 && outer < 300;
-      expect(served || outer === 404).toBe(true);
-      expect(port.available()).toBe(served);
+      return;
+    }
+    const packageName = resolvePackageName();
+    const args = {
+      parent_type: 'DEVC/K',
+      parent_name: packageName,
+      maxDepth: 1,
+      enrich: false,
+    };
 
-      // A second call on the same destination: batched again when served,
-      // sequential (no envelope) when not.
-      const before = batched.urls.length;
-      const second = await handleGetObjectInfo(context, args);
-      expect(envelopes(batched.urls.slice(before))).toBe(
-        served ? firstEnvelopes : 0,
-      );
-      expect(second).toEqual(first);
+    const batched = recording(connection);
+    const { port, noted } = watchedPort();
+    const context: HandlerContext = {
+      connection: batched.view,
+      batchAvailability: port,
+    };
+    const first = await handleGetObjectInfo(context, args);
 
-      // The sequential read: a port already marked not served.
-      const sequential = recording(connection);
-      const answer = await handleGetObjectInfo(
-        { connection: sequential.view, batchAvailability: notServed() },
-        args,
-      );
-      expect(envelopes(sequential.urls)).toBe(0);
-      expect(sequential.urls.length).toBeGreaterThan(0);
-      expect(answer.isError).toBe(false);
-      expect(first).toEqual(answer);
-    },
-    getTimeout('long'),
-  );
+    const firstEnvelopes = envelopes(batched.urls);
+    assert.ok(firstEnvelopes > 0);
+    assert.equal(batched.urls[0], ENVELOPE_URL);
+    assert.ok(noted.length > 0);
+    const outer = noted[0] as number;
+    process.stderr.write(
+      `communication batch: the first envelope's outer status is ${outer}\n`,
+    );
+    const served = outer >= 200 && outer < 300;
+    assert.equal(served || outer === 404, true);
+    assert.equal(port.available(), served);
+
+    // A second call on the same destination: batched again when served,
+    // sequential (no envelope) when not.
+    const before = batched.urls.length;
+    const second = await handleGetObjectInfo(context, args);
+    assert.equal(
+      envelopes(batched.urls.slice(before)),
+      served ? firstEnvelopes : 0,
+    );
+    assertEquals(second, first);
+
+    // The sequential read: a port already marked not served.
+    const sequential = recording(connection);
+    const answer = await handleGetObjectInfo(
+      { connection: sequential.view, batchAvailability: notServed() },
+      args,
+    );
+    assert.equal(envelopes(sequential.urls), 0);
+    assert.ok(sequential.urls.length > 0);
+    assert.equal(answer.isError, false);
+    assertEquals(first, answer);
+  });
 });

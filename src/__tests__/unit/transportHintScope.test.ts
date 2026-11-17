@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The transport hint knows what the call sent even when the failed request's
  * URL does not show it (fr0ster/mcp-abap-adt#314).
@@ -27,10 +28,12 @@ import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
 import { project, terseWrite } from '../../lib/strategies/projections';
 import { refusedResponse } from '../helpers/fakeClient';
 import { withSystemInformation } from '../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../helpers/systemKind';
+import { toolAnswer } from '../helpers/toolAnswer';
 
 beforeEach(() => {
   stateSystemKind();
@@ -66,12 +69,9 @@ const STUBS: HandlerEntry[] = [
     toolDefinition: {
       name: 'StubCreate',
       description: 'creates an object',
-      inputSchema: {
-        type: 'object',
-        properties: { transport_request: { type: 'string' } },
-      },
+      inputSchema: z.object({ transport_request: z.string().optional() }),
     },
-    handler: async (_context: unknown, _args: unknown) => handler(),
+    call: async (_context: unknown, _args: unknown) => handler(),
   } as unknown as HandlerEntry,
 ];
 
@@ -150,7 +150,6 @@ describe('runWithCallTransport', () => {
     ['blanks', { transport_request: '  ' }, undefined],
     ['a number', { transport_request: 7 }, undefined],
     ['no argument', {}, undefined],
-    ['no arguments object', undefined, undefined],
   ])('keeps %s as the call’s request: %p', (_label, args, expected) => {
     expect(runWithCallTransport(args, () => callTransportRequest())).toBe(
       expected,
@@ -199,36 +198,25 @@ describe('the other ways a handler is invoked enter the same scope', () => {
     });
   });
 
-  it.each([
-    ['(context, args)', 2],
-    ['(args)', 1],
-  ])(
-    'an exporter’s handed-out %s handler: the call’s transport_request decides',
-    async (_label, arity) => {
-      const exporter = new HandlerExporter();
-      const entry = {
-        ...STUBS[0],
-        handler:
-          arity === 2
-            ? async (_context: unknown, _args: unknown) => handler()
-            : async (_args: unknown) => handler(),
-      } as unknown as HandlerEntry;
-      (exporter as unknown as { handlerGroups: unknown[] }).handlerGroups = [
-        {
-          getName: () => 'stub',
-          getHandlers: () => [entry],
-          // What the exporter reads an args-only handler's context by.
-          currentContext: () => ({ connection: null }),
-        },
-      ];
-      const [exported] = exporter.getHandlerEntries();
-      const run = exported?.handler as (...a: unknown[]) => Promise<any>;
-      const args = { transport_request: 'SIDK900001' };
-      const result = arity === 2 ? await run({}, args) : await run(args);
-      expect(JSON.parse(result.content[0].text).hint).toEqual({
-        text: TRANSPORT_ENTRY_HELD_WORDS,
-      });
-      expect(run.length).toBe(arity);
-    },
-  );
+  it('an exporter’s handed-out handler: the call’s transport_request decides', async () => {
+    const exporter = new HandlerExporter();
+    const entry: HandlerEntry = {
+      ...STUBS[0],
+      call: async (_context: unknown, _args: unknown) => handler(),
+    };
+    (exporter as unknown as { handlerGroups: unknown[] }).handlerGroups = [
+      {
+        getName: () => 'stub',
+        getHandlers: () => [entry],
+      },
+    ];
+    const [exported] = exporter.getHandlerEntries();
+    const args = { transport_request: 'SIDK900001' };
+    const result = toolAnswer(
+      await exported?.call(noConnectionContext(), args),
+    );
+    expect(JSON.parse(result.content[0]?.text ?? '{}').hint).toEqual({
+      text: TRANSPORT_ENTRY_HELD_WORDS,
+    });
+  });
 });

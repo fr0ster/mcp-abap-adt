@@ -4,6 +4,7 @@ import {
   handleStartUnitTestRun,
   type UnitTestRunner,
 } from '@mcp-abap-adt/lib/handlers/write';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestRun',
@@ -13,36 +14,7 @@ export const TOOL_DEFINITION = {
   inputSchema: compactUnitTestRunSchema,
 } as const;
 
-type HandlerUnitTestRunArgs = {
-  tests?: Array<{
-    container_class: string;
-    test_class: string;
-  }>;
-  target?: {
-    kind: 'object' | 'package';
-    name: string;
-    type?: string;
-    include_subpackages?: boolean;
-  };
-  title?: string;
-  context?: string;
-  scope?: {
-    own_tests?: boolean;
-    foreign_tests?: boolean;
-    add_foreign_tests_as_preview?: boolean;
-  };
-  risk_level?: {
-    harmless?: boolean;
-    dangerous?: boolean;
-    critical?: boolean;
-  };
-  duration?: {
-    short?: boolean;
-    medium?: boolean;
-    long?: boolean;
-  };
-  runner?: UnitTestRunner;
-};
+type HandlerUnitTestRunArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerUnitTestRun(
   context: HandlerContext,

@@ -9,30 +9,33 @@ HTTP and SSE, each `-ro` binary a package of its own:
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
 | core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff |
-| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), batch mode; on stdio the leftover-session list. Nothing that changes the system: no run, trace schedule or logoff |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the background runs of the long reads, batch mode; on stdio the leftover-session list. Nothing that changes the system: no run, trace schedule or logoff |
 | compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger and its batch (`HandlerDebugBatch`), background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
-| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, `HandlerBatch`; on stdio the leftover-session list |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, the background runs of the long reads, `HandlerBatch`; on stdio the leftover-session list |
 
-No `-ro` binary carries a debugger or a background run, no binary a resume of a leftover session
-(a stdio server takes up the one leftover session of its destination at its start), and no http or
+No `-ro` binary carries a debugger or a run of code (each serves the background runs of its long reads, which only read), no binary a resume of a leftover session
+(a stdio server takes up the one leftover session of its destination at its start, or, with
+`--deferred-logon --restore-session`, at its first tool call), and no http or
 sse binary any leftover-session tool: one such server holds the sessions of many users,
 so it writes no runtime session file. A
 write binary keeps every readonly tool: writing needs reading (a `Get<Type>` both groups serve is
 listed once, from the high group, see the dedup below).
 
-Batch mode is in every binary, on every transport: the full binaries, `-ro` ones included, serve
-`BatchBegin`, `BatchEnd` and `BatchAnswers`; the compact ones serve it as one tool, `HandlerBatch`
-(`action: 'begin' | 'end' | 'answers'`). Every other tool's description ends with one sentence
-saying how a call of it behaves in batch mode: recordable, recordable for the arguments it names, or
+Batch mode is the compact binaries', on every transport, `-ro` ones included: one tool,
+`HandlerBatch` (`action: 'begin' | 'end' | 'answers'`). The full binaries serve none. In a compact
+binary every other tool's description ends with one sentence saying how a call of it behaves in
+batch mode: recordable, recordable for the arguments it names, or
 run outside batch mode — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (the tool sets as registered, by the tests and `fullToolSet` / `fullReadOnlyToolSet`),
-on premise, stdio / Streamable HTTP / SSE: core 269 / 269 / 267 (with the 3 batch tools and the
-debugger batch's 2); core-ro 71 / 72 / 70 (each with the 3 batch tools); compact 40 / 39 / 38 (29 +
-4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 19 / 19 / 18
-(17 + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
-premise only), core-ro 70, compact 40, compact-ro 19. stdio adds the leftover-session tools — list and logoff in the full sets, the
+on premise, stdio / Streamable HTTP / SSE: core 267 / 267 / 265 (with the debugger batch's 3);
+core-ro 71 / 72 / 70 (each with the 3 background-run tools); compact 38 / 37 / 36 (27 of the 28 +
+4 debugger tools + `HandlerDebugBatch` + 3 background-run + `HandlerBatch`); compact-ro 20 / 20 / 19
+(15 of the 16 + 3 background-run + `HandlerBatch`). On cloud, stdio: core 256 (the include writes and the program writes are on
+premise only), core-ro 73, compact 38, compact-ro 20. Each count is without the data tools:
+`--enable-data-tools` adds `GetSqlQuery` and `GetTableContents` to core and core-ro, and
+`HandlerGetData` (the 28th, the 16th) to compact and compact-ro. stdio adds the leftover-session tools — list and logoff in the full sets, the
 list alone in the read-only ones; Streamable HTTP
 adds the long session instead — `SessionOpen` and `SessionClose` in the full sets, `HandlerSession`
 in the compact ones — and declares an optional `state_handle` argument on every tool
@@ -65,7 +68,7 @@ in the compact ones — and declares an optional `state_handle` argument on ever
 4. **compact** - Compact facade operations — served by their own commands, `mcp-abap-adt-compact`
    (`@mcp-abap-adt/compact`, every tool below and four debugger tools: `HandlerDebugBreakpoints`,
    `HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`) and `mcp-abap-adt-compact-ro`
-   (`@mcp-abap-adt/compact-ro`, the 17 that change nothing: the reads, searches, where-used,
+   (`@mcp-abap-adt/compact-ro`, the 16 that change nothing: the reads, the system-wide reads,
    checks and validations, the unit-test status and result reads, the profiler list and view,
    the dump list and view and the service-binding type list).
    - `HandlerValidate`
@@ -82,7 +85,8 @@ in the compact ones — and declares an optional `state_handle` argument on ever
    - `HandlerTransportCreate`, `HandlerTransportSortAndCompress`, `HandlerTransportMoveObjects`
    - `HandlerCreate`
    - `HandlerGet`
-   - `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`
+   - `HandlerSystem` — the system-wide reads by `action`: `search_source`, `search_object`, `where_used`, `package_tree`, `transports`, `atc_findings`, `atc_results`, `atc_result`, each one full tool's call (`SearchSource`, `SearchObject`, `GetWhereUsed`, `GetPackageTree`, `ListTransports`, `GetATCFindings`, `ListATCResults`, `GetATCResult`) with its arguments
+   - `HandlerGetData` (a data tool: served only with `--enable-data-tools`)
    - `HandlerUpdate`
    - `HandlerDelete`
    - Contract:
@@ -152,7 +156,8 @@ in the compact ones — and declares an optional `state_handle` argument on ever
      `mcp-abap-adt-compact` only
    - The SAP sessions a killed server process left open, listed or logged off by the user; they
      act only on the caller's own sessions. No tool resumes one: a stdio server takes up the one
-     leftover session of its destination at its start
+     leftover session of its destination at its start (with `--deferred-logon`, only with
+     `--restore-session`, at its first tool call)
    - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
 
 ## Usage
@@ -308,6 +313,28 @@ the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
 4. **Debugging**: the debugger is in every core and compact write binary. A breakpoint
    catches every request of the request user, and a `state_handle` gives whoever holds it that debug session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
 
+5. **Narrower still**: the start-time access restrictions take tools, values, packages,
+   requests and tables away from any binary — see [Access restrictions](ACCESS_RESTRICTIONS.md)
+
+### Access restrictions for an embedder
+
+- `registryOf(toolSet, transport, served, denied)` (`@mcp-abap-adt/lib/tool-set`) and
+  `withoutDenied(groups, denied)` (`@mcp-abap-adt/lib`) leave denied tools out and narrow a
+  compact tool's values; `parseDeniedEntry(text, row)` parses an entry. A group that is not a
+  `BaseHandlerGroup` is the embedder's and is returned as it is.
+- `HandlerExporter` takes `deniedActions` (applied once, in its constructor, to every entry,
+  registration and registry it hands out) and `accessChecks`.
+- `BaseMcpServer` / `EmbeddableMcpServer` take `accessChecks` (`IAccessChecks`): checked once per
+  call before the call's connection is taken, on the server's own path (`registerHandlers`),
+  on a group registered on a plain `McpServer` (from `HandlerContext.accessChecks`), and on the
+  exporter's entries. A registry that registers its own tools is its own.
+- Two strategies ship: `listedAccessChecks(lists)` (names and prefixes, reads nothing) and
+  `packageTreeAccessChecks(lists)` (also `ZFOO/**`, through the `IPackageReader` it is handed:
+  one package metadata read per step, on the call's connection); `accessChecksFor(lists)` picks
+  the one the launchers use. An embedder may give its own.
+- Handlers an embedder takes into its own hands — parsing the exported entries' arguments
+  itself, a registry of its own — are its own.
+
 ## Implementation
 
 Handler sets are a `ToolSet` (`@mcp-abap-adt/lib/tool-set`, [src/lib/toolSet.ts](../../src/lib/toolSet.ts)),
@@ -322,10 +349,10 @@ the one input of each binary's launcher (`main({ toolSet, program, version })`):
   leftover-session group for `'stdio'` only.
 - `fullReadOnlyToolSet` — `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`: `readonly`, `system`,
   search, and on stdio the leftover-session list (`LeftoverSessionListHandlersGroup`).
-- `compactToolSetOf({ readOnly, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
+- `compactToolSetOf({ readOnly, data, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
   `-compact-sse`, with the two halves' entry builders: both halves, the four `HandlerDebug*`
   tools, the background-run tools, on stdio every leftover-session tool; no search.
-- `compactReadOnlyToolSetOf(readOnly)` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
+- `compactReadOnlyToolSetOf({ readOnly, data })` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
   `-compact-sse-ro`: the read-only half (`@mcp-abap-adt/compact-readonly-entries`), on stdio the
   leftover-session list.
 
@@ -336,7 +363,8 @@ hands the server a background-run store.
 ```typescript
 import { fullReadOnlyToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
 
-const registry = registryOf(fullReadOnlyToolSet); // a CompositeHandlersRegistry
+// The transport it serves, and whether the data tools are served (off by default).
+const registry = registryOf(fullReadOnlyToolSet, 'stdio', { dataTools: false }); // a CompositeHandlersRegistry
 ```
 
 ### The variant a plain registration lists
@@ -346,10 +374,14 @@ example from `HandlerExporter` in `@mcp-abap-adt/lib/handlers`) lists the varian
 (`systemType` of their `HandlerContext`, `HandlerExporter`'s `systemType` option), by the same rule
 as a server instance: the variant's tool set, its descriptions and schemas, and search `_meta`
 naming only the members it offers; its calls run on that variant. `SAP_SYSTEM_TYPE` is not read
-there, for the listing or for a call. With no `systemType` stated, every definition is listed as it
-is, and every call that would reach a system is refused `system_type_required` before anything is
-sent, whatever `SAP_SYSTEM_TYPE` says. The binaries and `EmbeddableMcpServer` still read `SAP_SYSTEM_TYPE` when no
-`systemType` option is given. Groups that state different variants are refused when they are
+there, for the listing or for a call. With no `systemType` stated, every definition is listed as it is; a tool stated per variant is refused
+`system_type_required` before anything is sent, and a tool listed alike on every variant runs on the
+connection's recorded kind (the factory's record) or declared kind (`declareSystemKind`), whatever
+`SAP_SYSTEM_TYPE` says. The kind a registration was listed for is the one kind of its calls: a
+provided context (`registerHandlersOnCall`, `registerOnServer`) stating another kind — or any kind,
+where the registration was listed for none — is refused `system_type_conflict`, never run on its kind. The binaries and `EmbeddableMcpServer` read `SAP_SYSTEM_TYPE` once, at
+construction, when no `systemType` option is given: one kind for the server's life. A connection
+recorded or declared for another kind than the one stated is refused `system_type_conflict`. Groups that state different variants are refused when they are
 registered, before anything is registered — a variant stated beside none as well; the error names
 each group and what it states (`none` for a group that states none).
 
@@ -361,23 +393,30 @@ To add handlers to a specific set:
    - `src/handlers/<domain>/readonly/` for read operations
    - `src/handlers/<domain>/high/` for safe writes
 
-2. Export `TOOL_DEFINITION`:
+2. Export `TOOL_DEFINITION`, its `inputSchema` a zod object (the arguments' type and their check):
    ```typescript
+   import * as z from 'zod';
+
    export const TOOL_DEFINITION = {
-     name: 'my_handler',
+     name: 'MyOperation',
      description: 'Handler description',
-     inputSchema: { /* zod schema */ }
+     inputSchema: z.object({
+       object_name: z.string().describe('The object to read.'),
+     }),
    } as const;
    ```
 
-3. Export handler function:
+3. Export handler function, taking the call's context and the schema's output:
    ```typescript
-   export async function handleMyOperation(args: any, context: HandlerContext) {
+   export async function handleMyOperation(
+     context: HandlerContext,
+     args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+   ) {
      // implementation
    }
    ```
 
-4. Register in appropriate group:
+4. Add its entry, `defineTool(TOOL_DEFINITION, handleMyOperation)`, to the appropriate group:
    - `src/lib/handlers/groups/ReadOnlyHandlersGroup.ts`
    - `src/lib/handlers/groups/HighLevelHandlersGroup.ts`
 

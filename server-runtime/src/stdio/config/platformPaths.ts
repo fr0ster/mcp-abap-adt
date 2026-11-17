@@ -72,7 +72,8 @@ export function getPlatformPaths(
     // whatever drive the process is on — a bogus directory added beside the
     // real one, or no match at all when run from another drive.
     const envPaths = envPath
-      .split(isWindows ? /;/ : /[:;]/)
+      .split(';')
+      .flatMap((entry) => (isWindows ? [entry] : entry.split(':')))
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
     paths.push(

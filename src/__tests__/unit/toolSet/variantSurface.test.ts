@@ -16,24 +16,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { compactToolSet } from '../../../../compact/src/launcher';
-import { readOnlyToolSet as compactRoSet } from '../../../../compact-ro/src/launcher';
-import { readOnlyToolSet as coreRoSet } from '../../../../core-ro/src/launcher';
-import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
-import type { SapEnvironment } from '../../../lib/handlers/interfaces';
+import type { ToolSetKind } from '../../../lib/toolSet';
 import {
-  fullToolSet,
-  registryOf,
-  type ToolSet,
-  type ToolSetKind,
-} from '../../../lib/toolSet';
-import {
-  argumentSchema,
-  PROJECTED_ARGUMENTS,
-} from '../../helpers/projectedArguments';
+  type VariantSurface,
+  variantSurface,
+} from '../../helpers/fixtureRenderings';
 
 jest.setTimeout(120_000);
 
@@ -49,13 +37,6 @@ const FIXTURE = path.join(
   'variant-surface.json',
 );
 
-const SETS: Readonly<Record<ToolSetKind, ToolSet>> = {
-  core: fullToolSet,
-  'core-ro': coreRoSet,
-  compact: compactToolSet,
-  'compact-ro': compactRoSet,
-};
-
 const KINDS: readonly ToolSetKind[] = [
   'core',
   'core-ro',
@@ -63,111 +44,14 @@ const KINDS: readonly ToolSetKind[] = [
   'compact-ro',
 ];
 
-/** What one kind of binary registers for a variant. */
-interface KindSurface {
-  /** The tools listed, sorted. */
-  tools: string[];
-  /**
-   * `<tool>.<argument>` → the members its enum lists, in schema order, for
-   * each argument projected from the tables (`PROJECTED_ARGUMENTS`).
-   */
-  members: Record<string, string[]>;
-  /** `<tool>.<argument>` → its description, for the same arguments. */
-  argumentDescriptions: Record<string, string>;
-  /** The description of each tool with a projected argument. */
-  descriptions: Record<string, string>;
-  /** The properties each tool with a projected argument lists, in schema order. */
-  properties: Record<string, string[]>;
-}
-
-type Surface = Record<SapEnvironment, Record<ToolSetKind, KindSurface>>;
-
-/** The members `argument` lists in a listed tool's schema, when it has any. */
-function enumOf(inputSchema: unknown, argument: string): string[] | undefined {
-  const property = argumentSchema(inputSchema, argument);
-  if (typeof property !== 'object' || property === null) return;
-  const listed: unknown = Reflect.get(property, 'enum');
-  if (Array.isArray(listed)) return listed.map(String);
-  // One member left is registered as a literal (`schemaUtils`): `const`.
-  const only: unknown = Reflect.get(property, 'const');
-  return typeof only === 'string' ? [only] : undefined;
-}
-
-async function surfaceOf(
-  environment: SapEnvironment,
-  kind: ToolSetKind,
-): Promise<KindSurface> {
-  process.env.SAP_SYSTEM_TYPE = environment;
-  const server = new StdioServer(registryOf(SETS[kind], 'stdio'), undefined);
-  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await server.start(undefined, serverSide);
-  const client = new Client({ name: 'variant-surface', version: '1' });
-  await client.connect(clientSide);
-  try {
-    const { tools } = await client.listTools();
-    const members: Record<string, string[]> = {};
-    const argumentDescriptions: Record<string, string> = {};
-    const descriptions: Record<string, string> = {};
-    const properties: Record<string, string[]> = {};
-    for (const tool of tools) {
-      for (const projected of PROJECTED_ARGUMENTS) {
-        if (projected.tool !== tool.name) continue;
-        const key = `${tool.name}.${projected.argument}`;
-        const listed = enumOf(tool.inputSchema, projected.argument);
-        if (listed !== undefined) members[key] = listed;
-        const described: unknown = Reflect.get(
-          Object(argumentSchema(tool.inputSchema, projected.argument)),
-          'description',
-        );
-        if (typeof described === 'string') {
-          argumentDescriptions[key] = described;
-        }
-        descriptions[tool.name] = tool.description ?? '';
-        properties[tool.name] = Object.keys(tool.inputSchema.properties ?? {});
-      }
-    }
-    const sorted = <T>(record: Record<string, T>): Record<string, T> =>
-      Object.fromEntries(
-        Object.entries(record).sort(([a], [b]) => a.localeCompare(b)),
-      );
-    return {
-      tools: tools.map((tool) => tool.name).sort(),
-      members: sorted(members),
-      argumentDescriptions: sorted(argumentDescriptions),
-      descriptions: sorted(descriptions),
-      properties: sorted(properties),
-    };
-  } finally {
-    await client.close();
-  }
-}
-
-/** Every kind's surface for `environment`, one server each. */
-async function kindsOf(
-  environment: SapEnvironment,
-): Promise<Record<ToolSetKind, KindSurface>> {
-  return {
-    core: await surfaceOf(environment, 'core'),
-    'core-ro': await surfaceOf(environment, 'core-ro'),
-    compact: await surfaceOf(environment, 'compact'),
-    'compact-ro': await surfaceOf(environment, 'compact-ro'),
-  };
-}
-
-async function surface(): Promise<Surface> {
-  return {
-    onprem: await kindsOf('onprem'),
-    cloud: await kindsOf('cloud'),
-    legacy: await kindsOf('legacy'),
-  };
-}
+type Surface = VariantSurface;
 
 describe('the tool set of each declared variant (WRITE_VARIANT_SURFACE=1 rewrites the fixture)', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
   let current: Surface;
 
   beforeAll(async () => {
-    current = await surface();
+    current = await variantSurface();
     if (process.env.WRITE_VARIANT_SURFACE === '1') {
       if (process.env.CI) {
         throw new Error('WRITE_VARIANT_SURFACE is refused under CI');

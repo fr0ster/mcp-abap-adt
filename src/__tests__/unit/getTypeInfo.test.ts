@@ -5,13 +5,13 @@
  * a connection double that answers by URL: the requests on the wire are the
  * members', a `404` is the kind's absence, any other refusal is the call's.
  *
- * The documents are E19's own (2026-10-24, SAP-delivered objects), trimmed to
+ * The documents are the on-premise system's own (2026-10-24, SAP-delivered objects), trimmed to
  * the fields read and without their author attributes, except the table
  * type's: SAP's whole answer, from the corpus.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody } from '../helpers/adtCorpus';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -121,8 +121,10 @@ const url = {
     `/sap/bc/adt/ddic/tabletypes/${n}?version=workingArea`,
 };
 
-const run = (connection: IAbapConnection, args: Record<string, unknown>) =>
-  handleGetTypeInfo({ connection, logger: undefined } as any, args) as any;
+const run = (
+  connection: IAbapConnection,
+  args: Parameters<typeof handleGetTypeInfo>[1],
+) => handleGetTypeInfo({ connection, logger: undefined } as any, args) as any;
 
 describe('GetTypeInfo', () => {
   it('reads the name as every kind, in alphabetical order, and answers every kind it is', async () => {

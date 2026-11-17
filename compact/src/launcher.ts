@@ -17,8 +17,11 @@
  * the half that changes nothing.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
-import { processEdges } from '@mcp-abap-adt/lib/config';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
+import { packageManifestOf, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
   main as coreMain,
@@ -28,23 +31,23 @@ import {
 /** The compact tool set: both halves, the debugger, the leftover sessions and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
+  data: compactDataEntries,
   modify: compactModifyEntries,
 });
 
 /**
- * THIS package's version, for `--version` and `initialize` — never core's: a
- * version that belongs to a different package reads as the truth (13.0.0
- * shipped that defect in the other direction). `require`, not a file read: a
- * bundler (the portable build) inlines it.
+ * THIS package's manifest, read by its shape (`packageManifestOf`) — never
+ * core's: a version that belongs to a different package reads as the truth
+ * (13.0.0 shipped that defect in the other direction). `require`, not a file
+ * read: a bundler (the portable build) inlines it.
  */
-export const COMPACT_VERSION: string = (
-  require('../package.json') as { version: string }
-).version;
+const MANIFEST = packageManifestOf(require('../package.json'));
+
+/** THIS package's version, for `--version` and `initialize`. */
+export const COMPACT_VERSION: string = MANIFEST.version;
 
 /** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
-export const COMPACT_PACKAGE: string = (
-  require('../package.json') as { name: string }
-).name;
+export const COMPACT_PACKAGE: string = MANIFEST.name;
 
 export function main(
   edges: StdioLauncherEdges = processEdges(),

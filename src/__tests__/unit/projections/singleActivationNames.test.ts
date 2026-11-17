@@ -21,11 +21,9 @@ import {
   TYPE_NAMES,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,

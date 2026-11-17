@@ -11,7 +11,6 @@ import {
   utilActivationRunId,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import type { AdtReading } from '../../lib/strategies/reading';
 import {
   ourUnitTest,
@@ -19,6 +18,7 @@ import {
   READING_BY_SLOT,
   resultsFor,
 } from '../../lib/strategies/resultSets';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 describe('the slot table', () => {
   it('knows a reading for every slot every shipped set declares', () => {
@@ -26,7 +26,8 @@ describe('the slot table', () => {
     const unknown: string[] = [];
     for (const key of Object.keys(m).filter((k) => /Documents$/.test(k))) {
       for (const slot of Object.keys(m[key])) {
-        if (READING_BY_SLOT[slot] === undefined) unknown.push(`${key}.${slot}`);
+        if (!Object.hasOwn(READING_BY_SLOT, slot))
+          unknown.push(`${key}.${slot}`);
       }
     }
     // A slot adt-clients adds arrives here, not as an unshaped answer at a call site.

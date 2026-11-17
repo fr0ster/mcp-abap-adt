@@ -83,7 +83,8 @@ so that no package goes out on top of a dependency that is missing.
    npm run prepare           # only to install this checkout's git hook (husky)
    npm run build          # all eighteen packages
    npm run test:check
-   npm test               # every package's suites, once; includes binSmoke (packs all eighteen, installs them, runs the twelve bins)
+   npm test               # every package's suites, once
+   npm run test:install   # binSmoke (packs all eighteen, installs them, runs the twelve bins)
                           # and the install matrix (one lib per process in every layout)
    npm --prefix server-runtime run test:check
    npm --prefix server run test:check

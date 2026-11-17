@@ -1,6 +1,8 @@
 'use strict';
 // Arguments and platform table of scripts/portable/build.mjs (and smoke.mjs),
 // CommonJS so the unit tests can load them.
+const { isVersionSpec } = require('./readings.cjs');
+
 const SERVERS = {
   full: { name: 'mcp-abap-adt', pkg: '@mcp-abap-adt/core' },
   compact: { name: 'mcp-abap-adt-compact', pkg: '@mcp-abap-adt/compact' },
@@ -33,9 +35,6 @@ const PLATFORMS = {
   },
 };
 
-// A semver or an npm dist-tag: the value reaches npm as `<package>@<version>`.
-const VERSION = /^(\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?|[a-z][a-z0-9-]*)$/;
-
 function currentPlatform(platform = process.platform, arch = process.arch) {
   const key = { linux: 'linux', win32: 'win', darwin: 'macos' }[platform];
   return `${key}-${arch}`;
@@ -54,8 +53,11 @@ function parseArgs(argv, here = currentPlatform()) {
   if (!['full', 'compact', 'all'].includes(opts.which)) {
     throw new Error(`unknown server "${opts.which}": full, compact or all`);
   }
-  if (opts.version !== undefined && !VERSION.test(opts.version)) {
-    throw new Error(`"${opts.version}" is not a version: a semver (1.2.3) or a dist-tag (latest)`);
+  // A semver or an npm dist-tag: the value reaches npm as `<package>@<version>`.
+  if (opts.version !== undefined && !isVersionSpec(opts.version)) {
+    throw new Error(
+      `"${opts.version}" is not a version: a semver (1.2.3) or a dist-tag (latest)`,
+    );
   }
   if (!PLATFORMS[here] && opts.platform === here) {
     throw new Error(

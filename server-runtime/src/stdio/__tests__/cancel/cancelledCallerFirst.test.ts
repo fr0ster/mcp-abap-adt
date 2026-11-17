@@ -19,7 +19,7 @@ const onUnhandled = (reason: unknown) => {
 beforeEach(async () => {
   unhandled.length = 0;
   process.on('unhandledRejection', onUnhandled);
-  s = await stand({ auth: 'jwt' });
+  s = await stand({ kind: 'cloud', auth: 'jwt' });
 });
 
 afterEach(async () => {

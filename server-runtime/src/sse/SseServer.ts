@@ -1,25 +1,35 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
+import type { IAccessChecks } from '@mcp-abap-adt/lib';
 import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   ConnectionContext,
   IBackgroundRuns,
   IHttpApplication,
+  LineMatchStrategy,
   RouteRegistrationOptions,
+  SapAnswerStrategy,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   AdtHeaderPairs,
+  BackgroundRunOwner,
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
 } from '@mcp-abap-adt/lib/embeddable';
-import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import {
+  type IHandlersRegistry,
+  type SapEnvironment,
+  statedEnvironment,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
   getProtocol,
   headerContext,
   refuseDestinationHeader,
+  refuseIncompleteDnsRebinding,
+  refuseListenerOptionsBesideApp,
   requestFailureAnswer,
   withDnsRebindingProtection,
 } from '@mcp-abap-adt/lib/http-transport';
@@ -31,25 +41,35 @@ import {
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
 import {
+  HeldLocks,
   isLatched,
-  parseStateIdleMinutes,
   type StateLogger,
+  stateIdleMinutesOf,
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
+import { jsonAt, jsonOf } from '@mcp-abap-adt/lib/utils';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import { RUNTIME_VERSION } from '../runtimeVersion.js';
+import { SdkTransport } from '../sdkTransport.js';
 
 export interface SseServerOptions {
+  /**
+   * The SAP system type: the kind of every connection the server builds and
+   * hands a tool, and the tools it lists. The launcher passes the one it
+   * resolved; absent, `SAP_SYSTEM_TYPE` as it is at construction answers —
+   * one kind for the server's life.
+   */
+  systemType?: SapEnvironment | undefined;
   /**
    * The idle bound on held state, in minutes: each instance's state ends
    * after this long without a tool call. At least 30; default 30.
    */
-  stateIdleMinutes?: number;
+  stateIdleMinutes?: number | undefined;
   /** Where the state's lifecycle lines go; default stderr, always on. */
-  stateLogger?: StateLogger;
+  stateLogger?: StateLogger | undefined;
   /**
    * Batch mode: each SSE connection's instance gets an `InstanceBatch` of
    * its own, created with these settings (the launcher's). Absent: no
@@ -57,56 +77,75 @@ export interface SseServerOptions {
    */
   batch?: { keepRawParts: boolean };
   /**
-   * Host to bind to (only used when no external app is provided)
+   * Host to bind to (refused beside an external app)
    * @default "127.0.0.1"
    */
-  host?: string;
+  host?: string | undefined;
   /**
-   * Port to listen on (only used when no external app is provided)
+   * Port to listen on (refused beside an external app)
    * @default 3001
    */
-  port?: number;
+  port?: number | undefined;
   /**
    * Path for SSE GET endpoint
    * @default "/sse"
    */
-  ssePath?: string;
+  ssePath?: string | undefined;
   /**
    * Path for POST messages endpoint
    * @default "/messages"
    */
-  postPath?: string;
+  postPath?: string | undefined;
   /**
    * Logger instance
    */
-  logger?: Logger;
+  logger?: Logger | undefined;
   /**
    * Server version
    */
-  version?: string;
+  version?: string | undefined;
   /**
    * External HTTP application to register routes on
    * When provided, start() will only register routes without creating a server
    * This enables integration with existing Express/CDS/CAP servers
    */
-  app?: IHttpApplication;
+  app?: IHttpApplication | undefined;
   /**
    * TLS configuration for HTTPS support
    */
-  tls?: TlsConfig;
+  tls?: TlsConfig | undefined;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
-  allowedHosts?: string[];
+  allowedHosts?: string[] | undefined;
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
-  allowedOrigins?: string[];
-  /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
-  enableDnsRebindingProtection?: boolean;
+  allowedOrigins?: string[] | undefined;
+  /**
+   * Enable DNS-rebinding protection: with allowedHosts and/or allowedOrigins.
+   * Either without the other is refused at construction
+   * (`DnsRebindingSettingsRefusal`): it would check nothing.
+   */
+  enableDnsRebindingProtection?: boolean | undefined;
   /**
    * Where background runs and their answers are kept, handed to every
    * instance (the launcher's `InMemoryBackgroundRuns` of
    * `@mcp-abap-adt/background-runs-memory`). Absent:
    * `background: true` is refused.
    */
-  backgroundRuns?: IBackgroundRuns;
+  backgroundRuns?: IBackgroundRuns | undefined;
+  /**
+   * The access checks every call of this server is checked by (spec
+   * §3.2); one strategy for every instance it makes. Absent: none.
+   */
+  accessChecks?: IAccessChecks | undefined;
+  /**
+   * `SearchSource`'s SAP-answer strategy, handed to every instance (the
+   * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
+   */
+  sapAnswerStrategy?: SapAnswerStrategy | undefined;
+  /**
+   * `SearchSource`'s line-match strategy, handed to every instance (the
+   * launcher's: the shipped `substringLineMatch`). Absent: the handler's default.
+   */
+  lineMatchStrategy?: LineMatchStrategy | undefined;
 }
 
 type SessionEntry = {
@@ -149,17 +188,24 @@ export class SseServer {
   >();
   private readonly logger: Logger;
   private readonly version: string;
-  private readonly externalApp?: IHttpApplication;
-  private standaloneServer?: HttpServer | HttpsServer;
+  private readonly externalApp?: IHttpApplication | undefined;
+  private standaloneServer?: HttpServer | HttpsServer | undefined;
   /** The listener stopped, until its last connections are closed after the last step. */
-  private stoppedListener?: HttpServer | HttpsServer;
-  private readonly tls?: TlsConfig;
-  private readonly allowedHosts?: string[];
-  private readonly allowedOrigins?: string[];
-  private readonly enableDnsRebindingProtection?: boolean;
-  private readonly stateIdleMinutes?: number;
+  private stoppedListener?: HttpServer | HttpsServer | undefined;
+  private readonly tls?: TlsConfig | undefined;
+  private readonly allowedHosts?: string[] | undefined;
+  private readonly allowedOrigins?: string[] | undefined;
+  private readonly enableDnsRebindingProtection?: boolean | undefined;
+  private readonly stateIdleMinutes?: number | undefined;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
+  private readonly accessChecks: IAccessChecks | undefined;
+  private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
+  private readonly lineMatchStrategy: LineMatchStrategy | undefined;
+  /** The SAP system type every stream's instance builds for. */
+  private readonly systemType: SapEnvironment | undefined;
+  /** The running background runs' owner: this server's, shared by every stream's instance. */
+  private readonly runOwner = new BackgroundRunOwner();
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
   /** The corrected header pairs: the process's, shared by every stream's instance. */
   private readonly adtHeaderPairs = new AdtHeaderPairs();
@@ -168,6 +214,10 @@ export class SseServer {
     private readonly handlersRegistry: IHandlersRegistry,
     opts?: SseServerOptions,
   ) {
+    // One kind per server, fixed here: the stated `systemType`, else
+    // `SAP_SYSTEM_TYPE` as it is now; every stream's instance takes it.
+    this.systemType =
+      opts?.systemType ?? statedEnvironment(process.env.SAP_SYSTEM_TYPE);
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3001;
     this.ssePath = opts?.ssePath ?? '/sse';
@@ -176,6 +226,10 @@ export class SseServer {
     this.version = opts?.version ?? RUNTIME_VERSION;
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
+    // Incomplete DNS-rebinding settings check nothing: refused here.
+    refuseIncompleteDnsRebinding(opts ?? {});
+    // The listener's own options beside an embedder's app: read by nothing.
+    refuseListenerOptionsBesideApp(opts ?? {});
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
@@ -183,10 +237,13 @@ export class SseServer {
     this.stateIdleMinutes =
       opts?.stateIdleMinutes === undefined
         ? undefined
-        : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
+        : stateIdleMinutesOf(opts.stateIdleMinutes, 'stateIdleMinutes');
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
+    this.accessChecks = opts?.accessChecks;
+    this.sapAnswerStrategy = opts?.sapAnswerStrategy;
+    this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
       opts?.batch === undefined
         ? undefined
@@ -205,7 +262,7 @@ export class SseServer {
     _options?: RouteRegistrationOptions,
   ): void {
     // Health check endpoint — lightweight, no MCP protocol logic
-    app.get('/mcp/health', ((_req: any, res: any) => {
+    app.get('/mcp/health', (_req: Request, res: Response) => {
       res.json({
         status: 'ok',
         uptime: Math.floor(process.uptime()),
@@ -213,7 +270,7 @@ export class SseServer {
         transport: 'sse',
         activeSessions: this.sessions.size,
       });
-    }) as any);
+    });
 
     const dnsOpts = {
       enable: this.enableDnsRebindingProtection,
@@ -223,23 +280,17 @@ export class SseServer {
 
     app.get(
       this.ssePath,
-      withDnsRebindingProtection(
-        (async (req: any, res: any) => {
-          await this.handleGet(req, res);
-        }) as any,
-        dnsOpts,
-      ) as any,
+      withDnsRebindingProtection(async (req: Request, res: Response) => {
+        await this.handleGet(req, res);
+      }, dnsOpts),
     );
 
     app.post(
       this.postPath,
-      withDnsRebindingProtection(
-        (async (req: any, res: any) => {
-          const url = new URL(req.originalUrl, `http://${req.headers.host}`);
-          await this.handlePost(req, res, url);
-        }) as any,
-        dnsOpts,
-      ) as any,
+      withDnsRebindingProtection(async (req: Request, res: Response) => {
+        const url = new URL(req.originalUrl, `http://${req.headers.host}`);
+        await this.handlePost(req, res, url);
+      }, dnsOpts),
     );
 
     console.error(`[SseServer] Routes registered on external app`);
@@ -278,28 +329,40 @@ export class SseServer {
     const app = express();
     app.use(express.json());
 
-    this.registerRoutes(app as unknown as IHttpApplication);
+    this.registerRoutes(app);
 
     await new Promise<void>((resolve, reject) => {
       const protocol = getProtocol(this.tls);
-      const server = createServerListener(app as any, this.tls);
+      const server = createServerListener(app, this.tls);
       this.standaloneServer = server;
 
       server.listen(this.port, this.host);
       server.once('listening', () => {
+        // The port bound, not the one configured: 0 is the system's choice.
+        const port = this.listeningPort() ?? this.port;
+        console.error(`[SseServer] Server started on ${this.host}:${port}`);
         console.error(
-          `[SseServer] Server started on ${this.host}:${this.port}`,
+          `[SseServer] SSE endpoint: ${protocol}://${this.host}:${port}${this.ssePath}`,
         );
         console.error(
-          `[SseServer] SSE endpoint: ${protocol}://${this.host}:${this.port}${this.ssePath}`,
-        );
-        console.error(
-          `[SseServer] POST endpoint: ${protocol}://${this.host}:${this.port}${this.postPath}`,
+          `[SseServer] POST endpoint: ${protocol}://${this.host}:${port}${this.postPath}`,
         );
         resolve();
       });
-      server.once('error', reject);
+      server.once('error', (error: Error) => reject(error));
     });
+  }
+
+  /**
+   * The port the standalone listener is bound to — the system's choice when
+   * the configured port is 0 — while it listens; undefined before the start,
+   * after the stop and on an external app.
+   */
+  listeningPort(): number | undefined {
+    const address = this.standaloneServer?.address();
+    return address !== null && typeof address === 'object'
+      ? address.port
+      : undefined;
   }
 
   /** Stops taking connections. Embedded on an external app there is no listener of its own. */
@@ -344,7 +407,7 @@ export class SseServer {
     await Promise.all([...this.connections.values()].map((c) => c.close()));
   }
 
-  private async handleGet(req: any, res: any): Promise<void> {
+  private async handleGet(req: Request, res: Response): Promise<void> {
     // The shutdown began: no new connection (embedded hosts keep their
     // listener; a launcher's is closed already).
     if (isLatched()) {
@@ -370,10 +433,17 @@ export class SseServer {
         readonly loggerImpl: Logger,
         readonly ver: string,
         state: {
-          stateIdleMinutes?: number;
+          systemType?: SapEnvironment | undefined;
+          systemTypeFromEnvironment?: false;
+          stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
+          accessChecks?: IAccessChecks;
+          backgroundRunOwner?: BackgroundRunOwner;
+          sapAnswerStrategy?: SapAnswerStrategy;
+          lineMatchStrategy?: LineMatchStrategy;
           batch?: InstanceBatch;
+          heldLocks: HeldLocks;
           adtHeaderPairs?: AdtHeaderPairs;
         },
       ) {
@@ -400,15 +470,34 @@ export class SseServer {
       this.logger,
       this.version,
       {
+        // Every stream's instance builds for the server's kind.
+        systemType: this.systemType,
+        // The server's one kind, fixed at its construction: never re-read.
+        systemTypeFromEnvironment: false,
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        ...(this.sapAnswerStrategy !== undefined && {
+          sapAnswerStrategy: this.sapAnswerStrategy,
+        }),
+        ...(this.lineMatchStrategy !== undefined && {
+          lineMatchStrategy: this.lineMatchStrategy,
+        }),
+        ...(this.accessChecks !== undefined && {
+          accessChecks: this.accessChecks,
+        }),
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,
+          // The running runs' owner is this server's, shared by every
+          // instance it makes: a discard reaching any of them cancels.
+          backgroundRunOwner: this.runOwner,
         }),
         // Batch mode: this connection's own, never shared with another.
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
         }),
+        // The locks this connection's instance took: a write, a delete or
+        // an unlock under a lock_handle is sent only under one it holds.
+        heldLocks: new HeldLocks(),
         adtHeaderPairs: this.adtHeaderPairs,
       },
     );
@@ -441,7 +530,7 @@ export class SseServer {
     });
 
     try {
-      await server.connect(transport);
+      await server.connect(new SdkTransport(transport));
       this.logger.debug(`SSE GET: server connected for session ${sessionId}`);
     } catch (error) {
       this.logger.error(
@@ -484,7 +573,11 @@ export class SseServer {
     }
   }
 
-  private async handlePost(req: any, res: any, url?: URL): Promise<void> {
+  private async handlePost(
+    req: Request,
+    res: Response,
+    url?: URL,
+  ): Promise<void> {
     // A header this server no longer serves is refused on a POST too; the
     // POST's own x-sap-* headers are not read (the connection's are its GET's).
     try {
@@ -494,12 +587,14 @@ export class SseServer {
       return;
     }
 
-    const sessionId = (url?.searchParams.get('sessionId') ||
-      req.headers['x-session-id'] ||
-      '') as string;
+    const header = req.headers['x-session-id'];
+    const sessionId =
+      url?.searchParams.get('sessionId') ||
+      (typeof header === 'string' ? header : undefined) ||
+      '';
 
-    const mcpMethod = req.body?.method as string | undefined;
-    const isPing = mcpMethod === 'ping';
+    // express.json()'s parse, checked once as JSON: typed from here on.
+    const isPing = jsonAt(jsonOf(req.body), 'method') === 'ping';
 
     if (!isPing) {
       console.error(
@@ -554,7 +649,7 @@ export class SseServer {
   }
 
   /** A request refused or failed: the refusal's words (400), the reader's, or as before. */
-  private answerFailure(res: any, error: unknown): void {
+  private answerFailure(res: Response, error: unknown): void {
     const answer = requestFailureAnswer(error);
     if (answer.logLine !== undefined) console.error(answer.logLine);
     if (answer.known) {

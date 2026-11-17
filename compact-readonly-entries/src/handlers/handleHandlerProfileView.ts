@@ -7,6 +7,7 @@ import {
   handleRuntimeAnalyzeProfilerTrace,
   handleRuntimeGetProfilerTraceData,
 } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileView',
@@ -17,16 +18,7 @@ export const TOOL_DEFINITION = {
   inputSchema: compactProfileViewSchema,
 } as const;
 
-type HandlerProfileViewArgs = {
-  trace_id_or_uri: string;
-  view: 'hitlist' | 'statements' | 'db_accesses';
-  mode?: 'raw' | 'analyze';
-  top?: number;
-  with_system_events?: boolean;
-  id?: number;
-  with_details?: boolean;
-  auto_drill_down_threshold?: number;
-};
+type HandlerProfileViewArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerProfileView(
   context: HandlerContext,

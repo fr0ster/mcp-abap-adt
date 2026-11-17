@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * The client's disconnect, http: a dropped request ends no call. Each
  * request has a transport of its own, and the response's close closes it —
@@ -53,9 +54,9 @@ const loseGroup: IHandlerGroup = {
       toolDefinition: {
         name: 'LoseSession',
         description: 'marks the session lost',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: z.object({}),
       } as never,
-      handler: (async (
+      call: (async (
         context: { connection: { isConnected?: () => boolean } },
         _args: unknown,
       ) => {

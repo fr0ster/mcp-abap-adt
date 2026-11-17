@@ -1,16 +1,29 @@
+import * as z from 'zod';
+
 /**
- * `BatchEnd` (spec §5): the open communication batch executed on the
- * connection `BatchEnd` took, every recorded call's answer the one its
+ * The batch end (spec §5), `HandlerBatch` with `action: 'end'` (named
+ * BatchEnd below, as the spec does): the open communication batch executed
+ * on the connection the end took, every recorded call's answer the one its
  * handler builds from what came, batch mode off whatever fails.
  *
  * The batch connection is adt-clients' own `AdtBatchConnection`; every built
  * connection is a fake that answers envelopes part by part (`batchStand`).
- * The batch tools are the served ones (`BatchEnd`, `BatchAnswers`,
- * `HandlerBatch`); the dispatch is the real one.
+ * The batch tool is the served `HandlerBatch` (batch mode is the compact
+ * sets'); the dispatch is the real one. The calls recorded are the compact
+ * tools' (`HandlerGet`, `HandlerLock`, `HandlerUnlock`) and the test's own.
  */
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock above.
+  siblingRecordOf: jest.fn(() => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  })),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import { authError } from '@mcp-abap-adt/auth-errors';
@@ -40,6 +53,7 @@ import {
   LOCK_SUCCESS_XML,
   payloadOf,
 } from '../../helpers/batchStand';
+import { holding } from '../../helpers/heldLocks';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -70,22 +84,16 @@ function sap(inner: InnerRequest): PartAnswer {
   };
 }
 
-const TOOLS = [
-  'GetProgram',
-  'GetClass',
-  'HandlerLock',
-  'HandlerUnlock',
-  'GetInterface',
-  'GetObjectVersionDiff',
-];
+const TOOLS = ['HandlerGet', 'HandlerLock', 'HandlerUnlock'];
 
-const VERSION_FROM =
-  '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
-const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';
-const DIFF_ARGS = {
-  object_type: 'class',
-  content_uri_from: VERSION_FROM,
-  content_uri_to: VERSION_TO,
+/** The program's source, whose three versions a draft read sends. */
+const DRAFT_SOURCE = '/sap/bc/adt/programs/programs/prog_a/source/main';
+
+/** A draft read: the one part's three versions, sent together. */
+const DRAFT_ARGS = {
+  object_type: 'PROGRAM',
+  program_name: 'PROG_A',
+  part: 'draft',
 };
 
 const asAnswer = (entry: unknown) => {
@@ -120,15 +128,12 @@ function own(
         toolDefinition: {
           name,
           description: name,
-          inputSchema: {
-            type: 'object',
-            properties: {
-              program_name: { type: 'string' },
-              class_name: { type: 'string' },
-            },
-          },
+          inputSchema: z.object({
+            program_name: z.string().optional(),
+            class_name: z.string().optional(),
+          }),
         },
-        handler: async (context: HandlerContext, _args: unknown) =>
+        call: async (context: HandlerContext, _args: unknown) =>
           handler(context),
       },
     ],
@@ -161,7 +166,12 @@ describe('BatchEnd', () => {
       },
     });
     s.begin();
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+    ).toEqual({
       content: [],
     });
     const [recording] = s.built;
@@ -177,7 +187,10 @@ describe('BatchEnd', () => {
     // call replaces it, and BatchEnd holds its use, so no logoff comes
     // under it.
     s.loseSession();
-    const later = s.call('GetProgram', { program_name: 'PROG_B' });
+    const later = s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_B',
+    });
     await new Promise((r) => setImmediate(r));
     expect(s.built).toHaveLength(3);
     expect(taken?.connection.disconnect).not.toHaveBeenCalled();
@@ -222,7 +235,7 @@ describe('BatchEnd', () => {
     for (const entry of await s.answers([1, 2])) {
       expect(asAnswer(entry)).toEqual(answer);
     }
-    const again = await s.call('BatchEnd');
+    const again = await s.call('HandlerBatch', { action: 'end' });
     expect(again.isError).toBe(true);
     expect(payloadOf(again)).toEqual({
       error: 'batch_mode_off',
@@ -243,8 +256,14 @@ describe('BatchEnd', () => {
         object_type: 'CLASS',
         object_name: 'CLAS_A',
       }),
-      await s.call('GetProgram', { program_name: 'PROG_A' }),
-      await s.call('GetProgram', { program_name: 'MISSING' }),
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'MISSING',
+      }),
     ];
     // The LOCK phase and the read phase, each its own batch.
     s.begin();
@@ -262,8 +281,14 @@ describe('BatchEnd', () => {
     const locked = await s.answers([1]);
     s.begin();
     for (const answer of [
-      await s.call('GetProgram', { program_name: 'PROG_A' }),
-      await s.call('GetProgram', { program_name: 'MISSING' }),
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'MISSING',
+      }),
     ]) {
       expect(answer).toEqual({ content: [] });
     }
@@ -288,18 +313,25 @@ describe('BatchEnd', () => {
 
   it("a call with two independent parts answers the handler's one answer built from both, under its one number", async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
-    const direct = await s.call('GetObjectVersionDiff', DIFF_ARGS);
+    const direct = await s.call('HandlerGet', DRAFT_ARGS);
     s.begin();
-    await s.call('GetObjectVersionDiff', DIFF_ARGS);
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', DRAFT_ARGS);
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, sent: 3, received: 3 });
+    expect(summary).toEqual({ recorded: 2, sent: 4, received: 4 });
     const [envelope] = s.built[0]?.envelopes ?? [];
-    expect(envelope?.parts).toHaveLength(3);
+    expect(envelope?.parts).toHaveLength(4);
     const [first] = await s.answers([1]);
     expect(asAnswer(first)).toEqual(direct);
-    expect(JSON.stringify(first)).toContain(`source of ${VERSION_FROM}`);
-    expect(JSON.stringify(first)).toContain(`source of ${VERSION_TO}`);
+    // The draft's three reads went together, ahead of the program read.
+    expect(envelope?.parts.slice(0, 3).map((part) => part.url)).toEqual(
+      ['active', 'inactive', 'workingArea'].map(
+        (version) => `${DRAFT_SOURCE}?version=${version}`,
+      ),
+    );
     await s.close();
   });
 
@@ -318,8 +350,14 @@ describe('BatchEnd', () => {
       },
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetInterface', { interface_name: 'INTF_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
+    await s.call('HandlerGet', {
+      object_type: 'INTERFACE',
+      interface_name: 'INTF_A',
+    });
     const { answer, summary } = await s.end();
     expect(answer.isError).toBe(true);
     expect(summary).toEqual({
@@ -340,27 +378,44 @@ describe('BatchEnd', () => {
   it('BatchEnd answers { recorded, sent, received }; a 404 part is no failure of BatchEnd', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
-    await s.call('GetProgram', { program_name: 'MISSING' });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetInterface', { interface_name: 'MISSING_TOO' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'MISSING',
+    });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
+    await s.call('HandlerGet', {
+      object_type: 'INTERFACE',
+      interface_name: 'MISSING_TOO',
+    });
     const { answer, summary } = await s.end();
     expect(answer.isError).toBeFalsy();
     expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
     await s.close();
   });
 
-  it("the served BatchBegin opens the batch; HandlerBatch's end and answers execute and read it as BatchEnd and BatchAnswers do", async () => {
+  it('the served HandlerBatch begin opens the batch; its end and answers execute and read it', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
-    const begun = await s.call('BatchBegin');
+    const begun = await s.call('HandlerBatch', { action: 'begin' });
     expect(payloadOf(begun)).toEqual({
       batch: 'on',
       state_handle: expect.any(String),
     });
     expect(s.owner.mode()).toBe('communication');
-    expect(await s.call('GetProgram', { program_name: 'MISSING' })).toEqual({
+    expect(
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'MISSING',
+      }),
+    ).toEqual({
       content: [],
     });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     // Nothing was sent while recording.
     expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(0);
     const ended = await s.call('HandlerBatch', { action: 'end' });
@@ -384,7 +439,10 @@ describe('BatchEnd', () => {
   it('empty batch answers { recorded: 0, sent: 0, received: 0 } and replaces the map with an empty one', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     await s.end();
     expect((await s.answers([1]))[0]).toMatchObject({ number: 1 });
     expect((await s.answers([1]))[0]).not.toHaveProperty('error');
@@ -410,9 +468,15 @@ describe('BatchEnd', () => {
       },
     });
     s.begin();
-    await s.call('GetInterface', { interface_name: 'INTF_A' });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetClass', { class_name: 'CLAS_A' });
+    await s.call('HandlerGet', {
+      object_type: 'INTERFACE',
+      interface_name: 'INTF_A',
+    });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
+    await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CLAS_A' });
     const { answer } = await s.end();
     const read = failureOf(refused);
     expect(read?.error).toBe('authentication_failed');
@@ -470,8 +534,11 @@ describe('BatchEnd', () => {
   it('a resolve failing at BatchEnd: the call answers it, mode off, no map, every number read answers it as it came, nothing sent', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetClass', { class_name: 'CLAS_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
+    await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CLAS_A' });
     s.failResolve(new AuthRefusedError(refusal(), 'logon'));
     const { answer } = await s.end();
     expect(answer.isError).toBe(true);
@@ -485,7 +552,9 @@ describe('BatchEnd', () => {
     expect(s.built.flatMap((b) => b.envelopes)).toEqual([]);
     expect(s.built.flatMap((b) => b.directs)).toEqual([]);
     // Ended: a second BatchEnd is refused, and nothing recorded is sent.
-    expect(payloadOf(await s.call('BatchEnd')).error).toBe('batch_mode_off');
+    expect(
+      payloadOf(await s.call('HandlerBatch', { action: 'end' })).error,
+    ).toBe('batch_mode_off');
     expect(s.executes).not.toHaveBeenCalled();
     await s.close();
   });
@@ -493,7 +562,7 @@ describe('BatchEnd', () => {
   it('keepRawParts off: no raw; on: raw is one entry per part, in the order sent, each { status, status_text, headers, body: "" for a bodyless 200 }', async () => {
     const off = await batchStand({ tools: TOOLS, part: sap });
     off.begin();
-    await off.call('GetObjectVersionDiff', DIFF_ARGS);
+    await off.call('HandlerGet', DRAFT_ARGS);
     await off.end();
     expect((await off.answers([1]))[0]).not.toHaveProperty('raw');
     await off.close();
@@ -502,9 +571,11 @@ describe('BatchEnd', () => {
       tools: TOOLS,
       part: sap,
       keepRawParts: true,
+      // The instance locked what it unlocks.
+      heldLocks: holding(LOCK_HANDLE_OF_XML),
     });
     on.begin();
-    await on.call('GetObjectVersionDiff', DIFF_ARGS);
+    await on.call('HandlerGet', DRAFT_ARGS);
     await on.end();
     const [read] = await on.answers([1]);
     on.begin();
@@ -515,20 +586,14 @@ describe('BatchEnd', () => {
     });
     await on.end();
     const [unlock] = await on.answers([1]);
-    expect((read as BatchAnswer).raw).toEqual([
-      {
+    expect((read as BatchAnswer).raw).toEqual(
+      ['active', 'inactive', 'workingArea'].map((version) => ({
         status: 200,
         status_text: 'OK',
         headers: { 'content-type': 'text/plain' },
-        body: `source of ${VERSION_FROM}`,
-      },
-      {
-        status: 200,
-        status_text: 'OK',
-        headers: { 'content-type': 'text/plain' },
-        body: `source of ${VERSION_TO}`,
-      },
-    ]);
+        body: `source of ${DRAFT_SOURCE}?version=${version}`,
+      })),
+    );
     expect((unlock as BatchAnswer).raw).toEqual([
       { status: 200, status_text: 'OK', headers: {}, body: '' },
     ]);
@@ -542,18 +607,24 @@ describe('BatchEnd', () => {
         object_type: 'CLASS',
         object_name: 'CLAS_A',
       }),
-      await s.call('GetProgram', { program_name: 'PROG_A' }),
+      await s.call('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
       await s.call('HandlerUnlock', {
         object_type: 'CLASS',
         object_name: 'CLAS_A',
         lock_handle: LOCK_HANDLE_OF_XML,
       }),
-      await s.call('GetInterface', { interface_name: 'INTF_A' }),
+      await s.call('HandlerGet', {
+        object_type: 'INTERFACE',
+        interface_name: 'INTF_A',
+      }),
     ];
     const entries: unknown[] = [];
     for (const [name, args] of [
       ['HandlerLock', { object_type: 'CLASS', object_name: 'CLAS_A' }],
-      ['GetProgram', { program_name: 'PROG_A' }],
+      ['HandlerGet', { object_type: 'PROGRAM', program_name: 'PROG_A' }],
       [
         'HandlerUnlock',
         {
@@ -562,7 +633,7 @@ describe('BatchEnd', () => {
           lock_handle: LOCK_HANDLE_OF_XML,
         },
       ],
-      ['GetInterface', { interface_name: 'INTF_A' }],
+      ['HandlerGet', { object_type: 'INTERFACE', interface_name: 'INTF_A' }],
     ] as const) {
       s.begin();
       await s.call(name, args);
@@ -597,7 +668,10 @@ describe('BatchEnd', () => {
       },
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     const first = s.owner.opened();
     // The moment BatchEnd's batch ends, before its failure reaches the
     // dispatch's catch, the next batch begins.
@@ -621,15 +695,12 @@ describe('BatchEnd', () => {
       getHandlers: () => [
         {
           toolDefinition: {
-            name: 'GetProgram',
-            description: 'GetProgram',
-            inputSchema: {
-              type: 'object',
-              properties: { program_name: { type: 'string' } },
-            },
+            name: 'HandlerProfileList',
+            description: 'HandlerProfileList',
+            inputSchema: z.object({ program_name: z.string().optional() }),
           },
           // Two parameters: the server hands `(context, args)` by the arity.
-          handler: async (context: HandlerContext, _args: unknown) => {
+          call: async (context: HandlerContext, _args: unknown) => {
             await context.connection.makeAdtRequest({
               url: '/sap/bc/adt/programs/programs/prog_a/source/main',
               method: 'GET',
@@ -642,15 +713,19 @@ describe('BatchEnd', () => {
       registerHandlers: () => {},
     } as unknown as IHandlerGroup;
     const s = await batchStand({
-      tools: ['GetClass'],
+      tools: ['HandlerServiceBindingListTypes'],
       part: sap,
       groups: [throwing],
     });
     s.begin();
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
+    ).toEqual({
       content: [],
     });
-    expect(await s.call('GetClass', { class_name: 'CL_A' })).toEqual({
+    expect(
+      await s.call('HandlerServiceBindingListTypes', { class_name: 'CL_A' }),
+    ).toEqual({
       content: [],
     });
     const { answer, summary } = await s.end();
@@ -667,18 +742,20 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it("the dispatch ends the batch on a failure of BatchEnd, or of HandlerBatch with action 'end', alone", () => {
-    expect(endsCommunicationBatch('BatchEnd', {})).toBe(true);
+  it("the dispatch ends the batch on a failure of HandlerBatch with action 'end' alone", () => {
     expect(endsCommunicationBatch('HandlerBatch', { action: 'end' })).toBe(
       true,
     );
     for (const action of ['begin', 'answers', undefined]) {
       expect(endsCommunicationBatch('HandlerBatch', { action })).toBe(false);
     }
+    // The full set's tools of that name are gone; none ends a batch.
     for (const tool of [
       'BatchBegin',
+      'BatchEnd',
       'BatchAnswers',
       'DebugBatchEnd',
+      'DebugBatchAnswers',
       'GetProgram',
     ]) {
       expect(endsCommunicationBatch(tool, { action: 'end' })).toBe(false);
@@ -693,7 +770,7 @@ describe('BatchEnd splits, the read answers', () => {
       tools: [],
       part: sap,
       groups: [
-        own('GetProgram', async (context) => {
+        own('HandlerProfileList', async (context) => {
           await context.connection.makeAdtRequest(READ);
           after = true;
           return built('built when read');
@@ -701,7 +778,9 @@ describe('BatchEnd splits, the read answers', () => {
       ],
     });
     s.begin();
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
+    ).toEqual({
       content: [],
     });
     const { answer, summary } = await s.end();
@@ -736,13 +815,13 @@ describe('BatchEnd splits, the read answers', () => {
       tools: [],
       part: sap,
       groups: [
-        own('GetProgram', waitsForTheOther('first')),
-        own('GetClass', waitsForTheOther('second')),
+        own('HandlerProfileList', waitsForTheOther('first')),
+        own('HandlerServiceBindingListTypes', waitsForTheOther('second')),
       ],
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetClass', { class_name: 'CLAS_B' });
+    await s.call('HandlerProfileList', { program_name: 'PROG_A' });
+    await s.call('HandlerServiceBindingListTypes', { class_name: 'CLAS_B' });
     await s.end();
     const entries = await withinTurns(s.answers([1, 2]), 500);
     expect(entries.map(asAnswer)).toEqual([
@@ -758,7 +837,7 @@ describe('BatchEnd splits, the read answers', () => {
       tools: [],
       part: sap,
       groups: [
-        own('GetProgram', async (context) => {
+        own('HandlerProfileList', async (context) => {
           await context.connection.makeAdtRequest(READ);
           runs += 1;
           return built(`run ${runs}`);
@@ -766,7 +845,7 @@ describe('BatchEnd splits, the read answers', () => {
       ],
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerProfileList', { program_name: 'PROG_A' });
     await s.end();
     const twice = await s.answers([1, 1]);
     const again = await s.answers([1]);
@@ -782,7 +861,7 @@ describe('BatchEnd splits, the read answers', () => {
       tools: [],
       part: sap,
       groups: [
-        own('GetProgram', async (context) => {
+        own('HandlerProfileList', async (context) => {
           await context.connection.makeAdtRequest(READ);
           await context.connection.makeAdtRequest({
             ...READ,
@@ -793,7 +872,7 @@ describe('BatchEnd splits, the read answers', () => {
       ],
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerProfileList', { program_name: 'PROG_A' });
     expect((await s.end()).summary).toEqual({
       recorded: 1,
       sent: 1,
@@ -819,7 +898,7 @@ describe('BatchEnd splits, the read answers', () => {
       tools: [],
       part: sap,
       groups: [
-        own('GetProgram', async (context) => {
+        own('HandlerProfileList', async (context) => {
           try {
             await context.connection.makeAdtRequest(READ);
             return built('read');
@@ -830,7 +909,7 @@ describe('BatchEnd splits, the read answers', () => {
       ],
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerProfileList', { program_name: 'PROG_A' });
     await s.end();
     for (let turn = 0; turn < 20; turn += 1) {
       await new Promise((r) => setImmediate(r));
@@ -865,11 +944,14 @@ describe("BatchEnd's error, no map", () => {
       tools: [],
       part: sap,
       envelope,
-      groups: [own('GetProgram', noting('a')), own('GetClass', noting('b'))],
+      groups: [
+        own('HandlerProfileList', noting('a')),
+        own('HandlerServiceBindingListTypes', noting('b')),
+      ],
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetClass', { class_name: 'CLAS_B' });
+    await s.call('HandlerProfileList', { program_name: 'PROG_A' });
+    await s.call('HandlerServiceBindingListTypes', { class_name: 'CLAS_B' });
     return { s, ran };
   }
 
@@ -932,13 +1014,22 @@ describe("BatchEnd's error, no map", () => {
       },
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetProgram', { program_name: 'PROG_B' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_B',
+    });
     await s.end();
     expect((await s.answers([2]))[0]).not.toHaveProperty('error');
     fail = true;
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_C' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_C',
+    });
     const { answer } = await s.end();
     expect(answer.isError).toBe(true);
     const [first, second] = await s.answers([1, 2]);
@@ -973,13 +1064,18 @@ describe('a lock read by number', () => {
 
   it("read after the instance's SAP session ended: answers the lock, and the instance holds it no more", async () => {
     const heldLocks = new HeldLocks();
-    const s = await batchStand({ tools: TOOLS, part: sap, heldLocks });
+    const s = await batchStand({
+      tools: [...TOOLS, 'HandlerServiceBindingListTypes'],
+      part: sap,
+      heldLocks,
+    });
     s.begin();
     await s.call('HandlerLock', LOCK);
     await s.end();
-    // SAP ends the session the lock lives in; the next call replaces it.
+    // SAP ends the session the lock lives in; the next call (a read on the
+    // instance's own connection) replaces it.
     s.loseSession();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerServiceBindingListTypes', {});
     expect(s.built).toHaveLength(2);
     const [entry] = await s.answers([1]);
     expect((entry as BatchAnswer).isError).toBeUndefined();
@@ -999,14 +1095,14 @@ describe('BatchEnd: more parts than requests', () => {
       envelope: async (parts) =>
         envelopeResponse([...parts, ...parts].map(sap)),
       groups: [
-        own('GetProgram', async (context) => {
+        own('HandlerProfileList', async (context) => {
           await context.connection.makeAdtRequest(READ);
           return built('a');
         }),
       ],
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerProfileList', { program_name: 'PROG_A' });
     const { answer, summary } = await s.end();
     expect(answer.isError).toBe(true);
     expect(summary).toEqual({
@@ -1031,7 +1127,7 @@ describe('a resumed handler reaching the connection after its part', () => {
         tools: [],
         part: sap,
         groups: [
-          own('GetProgram', async (context) => {
+          own('HandlerProfileList', async (context) => {
             await context.connection.makeAdtRequest(READ);
             await context.connection[member]();
             return built('never');
@@ -1039,7 +1135,7 @@ describe('a resumed handler reaching the connection after its part', () => {
         ],
       });
       s.begin();
-      await s.call('GetProgram', { program_name: 'PROG_A' });
+      await s.call('HandlerProfileList', { program_name: 'PROG_A' });
       await s.end();
       const [entry] = await s.answers([1]);
       expect(payloadOf(entry as Answer)).toEqual({

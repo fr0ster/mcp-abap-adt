@@ -63,6 +63,19 @@ describe('enhancementTypeOf', () => {
     ).resolves.toBeUndefined();
   });
 
+  // The search answer is read with adt-strategies' `readSearchHits`, through
+  // the XML parser: attributes in any quoting and order.
+  it('reads a hit whose attributes are quoted with apostrophes, its name last', async () => {
+    const { connection } = connectionAnswering(
+      ok(
+        "<adtcore:objectReferences xmlns:adtcore='http://www.sap.com/adt/core'><adtcore:objectReference adtcore:type='ENHS/XSB' adtcore:uri='/sap/bc/adt/enhancements/enhsxsb/zspot' adtcore:name='ZSPOT'/></adtcore:objectReferences>",
+      ),
+    );
+    await expect(
+      enhancementTypeOf(connection, 'zspot', 'ENHS/XSB'),
+    ).resolves.toBe('ENHS/XSB');
+  });
+
   it('answers undefined when SAP refuses the search', async () => {
     const { connection } = connectionAnswering(async () => {
       throw Object.assign(new Error('Request failed with status code 500'), {

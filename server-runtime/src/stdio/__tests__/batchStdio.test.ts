@@ -6,12 +6,10 @@
  */
 
 import { InstanceBatch } from '@mcp-abap-adt/lib/embeddable';
-import {
-  BatchHandlersGroup,
-  type HandlerContext,
-  HighLevelHandlersGroup,
-} from '@mcp-abap-adt/lib/handlers';
+import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
+import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import { stand, turns, until } from './helpers/loginStand';
 
 jest.setTimeout(30_000);
@@ -26,23 +24,34 @@ afterEach(() => jest.restoreAllMocks());
 it("stdio: the batch is the one instance's; the client's close drops it with nothing sent", async () => {
   const owner = new InstanceBatch({ keepRawParts: false });
   const s = await stand({
+    kind: 'onprem',
     batch: owner,
     groups: [
-      new HighLevelHandlersGroup(placeholder),
-      new BatchHandlersGroup(placeholder),
+      new CompactReadOnlyHandlersGroup(placeholder),
+      new CompactBatchHandlersGroup(placeholder),
     ],
   });
   try {
-    expect(await s.callTool('BatchBegin', {})).toMatchObject({
-      isError: false,
-    });
+    expect(await s.callTool('HandlerBatch', { action: 'begin' })).toMatchObject(
+      {
+        isError: false,
+      },
+    );
     expect(owner.mode()).toBe('communication');
-    expect(await s.callTool('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    expect(
+      await s.callTool('HandlerGet', {
+        object_type: 'PROGRAM',
+        program_name: 'PROG_A',
+      }),
+    ).toEqual({
       text: '',
       isError: false,
     });
     expect(
-      await s.callTool('GetInterface', { interface_name: 'IF_A' }),
+      await s.callTool('HandlerGet', {
+        object_type: 'INTERFACE',
+        interface_name: 'IF_A',
+      }),
     ).toEqual({
       text: '',
       isError: false,

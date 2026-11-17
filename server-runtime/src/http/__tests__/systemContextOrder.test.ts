@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Who creates objects (responsible) and on which system (master system), per
  * request, over Streamable HTTP, where an on-premise system has no
@@ -50,12 +51,9 @@ const whoAmI: IHandlerGroup = {
       toolDefinition: {
         name: 'WhoAmI',
         description: 'reports the context',
-        inputSchema: {
-          type: 'object',
-          properties: { delayMs: { type: 'number' } },
-        },
+        inputSchema: z.object({ delayMs: z.number().optional() }),
       } as never,
-      handler: (async (_context: unknown, args: { delayMs?: number }) => {
+      call: (async (_context: unknown, args: { delayMs?: number }) => {
         await new Promise((r) => setTimeout(r, args?.delayMs ?? 0));
         const seen = getStatedSystemContext();
         return {
@@ -189,22 +187,23 @@ describe('StreamableHttpServer: responsible and master system per request', () =
     };
   }
 
-  it('the headers win over the process environment', async () => {
+  it('the headers only: the process environment answers neither (D26 D2)', async () => {
     await expect(
       ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
-      masterSystem: 'PROCESS_SYS',
+      masterSystem: null,
     });
     await expect(
       ask({ ...BASIC, 'x-sap-master-system': 'HEADER_SYS' }),
     ).resolves.toEqual({
-      responsible: 'PROCESS_USER',
+      // No responsible header: the basic connection's login stands in.
+      responsible: 'HEADER_LOGIN',
       masterSystem: 'HEADER_SYS',
     });
     await expect(ask(BASIC)).resolves.toEqual({
-      responsible: 'PROCESS_USER',
-      masterSystem: 'PROCESS_SYS',
+      responsible: 'HEADER_LOGIN',
+      masterSystem: null,
     });
   });
 
@@ -236,11 +235,11 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       'x-sap-password': 'placeholder-password',
     };
 
-    it('x-sap-login beats the process SAP_USERNAME; SAP_RESPONSIBLE beats x-sap-login', async () => {
+    it('x-sap-login beats the process SAP_USERNAME; the process SAP_RESPONSIBLE is not read (D26 D2)', async () => {
       process.env.SAP_USERNAME = 'PROCESS_LOGIN';
       await expect(ask(direct)).resolves.toEqual({
-        responsible: 'PROCESS_USER',
-        masterSystem: 'PROCESS_SYS',
+        responsible: 'HEADER_LOGIN',
+        masterSystem: null,
       });
       delete process.env.SAP_RESPONSIBLE;
       delete process.env.SAP_MASTER_SYSTEM;

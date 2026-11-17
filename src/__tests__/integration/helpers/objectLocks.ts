@@ -76,7 +76,8 @@ export async function lockHolderOf(
 }
 
 /**
- * Whether this machine has a SAP system configured at all.
+ * Whether this machine has a SAP system configured at all: an HTTP
+ * destination's URL, or an RFC destination's address.
  *
  * The one legitimate reason an integration suite may skip itself. Everything
  * else — a missing package, an unset transport, a user the system will not
@@ -85,7 +86,12 @@ export async function lockHolderOf(
  */
 export function sapIsConfigured(): boolean {
   const url = process.env.SAP_URL?.split('#')[0].trim();
-  return !!url && /^https?:\/\//.test(url);
+  if (url && /^https?:\/\//.test(url)) return true;
+  // An RFC destination has no URL: the setup states its address instead
+  // (`setupAuthBrokerForTests`), an application server or a message server.
+  return [process.env.SAP_ASHOST, process.env.SAP_MSHOST].some(
+    (host) => (host ?? '').trim() !== '',
+  );
 }
 
 /**

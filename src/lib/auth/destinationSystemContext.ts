@@ -15,6 +15,11 @@ export interface DestinationSystemContext {
   login?: string;
   /** `SAP_MASTER_SYSTEM`. */
   masterSystem?: string;
+  /**
+   * The master language of created objects: the destination's `SAP_LANGUAGE`
+   * in effect (the start's CLI or environment, its own `.env`, YAML).
+   */
+  masterLanguage?: string;
   /** `SAP_DEBUG_TERMINAL_ID`. */
   debugTerminalId?: string;
   /** `SAP_DEBUG_IDE_ID`. */

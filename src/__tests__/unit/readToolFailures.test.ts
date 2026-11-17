@@ -15,20 +15,18 @@ import type {
   IAdtError,
   IIncludeConfig,
 } from '@mcp-abap-adt/interfaces-adt';
-import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
-import { handleGetAbapAST } from '../../handlers/system/readonly/handleGetAbapAST';
-import { handleGetAbapSemanticAnalysis } from '../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
 import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
+import { child, listOf } from '../../lib/thrownValue';
 import {
   fakeClientOf,
   okResponse,
@@ -292,44 +290,11 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
     );
     // Nothing of the failure was cached as the node's content.
     expect(
-      (objectsListCache.getCache().objects as any[])[0].object_uri_response,
+      child(
+        listOf(child(objectsListCache.getCache(), 'objects'))[0],
+        'object_uri_response',
+      ),
     ).toBeUndefined();
-  });
-});
-
-describe('GetAbapAST / GetAbapSemanticAnalysis: a local parser that threw', () => {
-  it("GetAbapAST: the parser's own failure, client_threw at the parse step", async () => {
-    const result: any = await handleGetAbapAST(
-      { connection: {} as any, logger: undefined } as any,
-      { code: 42 },
-    );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      error: 'client_threw',
-      tool: 'GetAbapAST',
-      step: 'parse',
-    });
-    expect(payloadOf(result).message).toContain('Failed to parse ABAP code');
-  });
-
-  it("GetAbapSemanticAnalysis: the analysis' own failure, client_threw at the analysis step", async () => {
-    const logger = {
-      debug: () => {
-        throw new Error('logger down');
-      },
-      error: () => undefined,
-    };
-    const result: any = await handleGetAbapSemanticAnalysis(
-      { connection: {} as any, logger } as any,
-      { code: 'DATA a TYPE i.' },
-    );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      error: 'client_threw',
-      tool: 'GetAbapSemanticAnalysis',
-      message: 'logger down',
-      step: 'analyse',
-    });
   });
 });
 
@@ -370,6 +335,8 @@ describe('GetEnhancements include_nested: the nested walk threw', () => {
       message: 'logger down',
       step: 'list includes',
     });
+    // A partial answer is not a failure, and says so as every answer does.
+    expect(result.isError).toBe(false);
   });
 });
 
@@ -503,15 +470,6 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
 });
 
 describe('GetTransport / GetIncludesList: a missing argument', () => {
-  /** How a compliant read answers its missing argument. */
-  const compliant = () =>
-    handleGetClass(
-      { connection: {} as any, logger: undefined } as any,
-      {
-        class_name: '',
-      } as any,
-    );
-
   it('is answered in the shape a compliant read answers its own, before any request', async () => {
     const shape = (result: any) => ({
       isError: result.isError,
@@ -527,8 +485,8 @@ describe('GetTransport / GetIncludesList: a missing argument', () => {
       { connection: {} as any, logger: undefined } as any,
       { object_type: 'PROG/P' },
     );
-    const reference = shape(await compliant());
-    expect(reference).toEqual({ isError: true, types: ['text'] });
+    // A read's own refusal of a missing argument: one text, isError.
+    const reference = { isError: true, types: ['text'] };
     expect(shape(transport)).toEqual(reference);
     expect(shape(includes)).toEqual(reference);
     expect(transport.content[0].text).toBe('Transport number is required');

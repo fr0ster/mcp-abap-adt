@@ -1,11 +1,20 @@
 /**
- * `BatchAnswers` (spec §6): the map of the last ended batch read by number,
+ * `HandlerBatch` answers (spec §6): the map of the last ended batch read by number,
  * in the order asked — each number's handler resumed when first read;
  * nothing sent; served while a batch is open.
  */
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   systemKindOf: jest.fn(() => 'onprem'),
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock below.
+  siblingRecordOf: jest.fn(() => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  })),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
 }));
 
 import {
@@ -54,7 +63,7 @@ const none = (number: number) => ({
   message: NO_ANSWER_WORDS,
 });
 
-describe('BatchAnswers', () => {
+describe('HandlerBatch answers', () => {
   it('number and numbers, in the order asked', async () => {
     const owner = answered();
     expect(await readAnswers(owner, { number: 2 })).toEqual([answerOf(2)]);
@@ -79,7 +88,8 @@ describe('BatchAnswers', () => {
   it('0, -1, 1.5 refused before anything runs; duplicates answered per occurrence', async () => {
     const owner = answered();
     const asked = jest.spyOn(owner, 'answer');
-    for (const bad of [0, -1, 1.5, Number.NaN, '1']) {
+    // A string is ruled out by the ask's type (the schema parses numbers).
+    for (const bad of [0, -1, 1.5, Number.NaN]) {
       expect(() => readAnswers(owner, { number: bad })).toThrow(
         ANSWERS_NUMBER_WORDS,
       );
@@ -107,21 +117,31 @@ describe('BatchAnswers', () => {
 
   it("served while a batch is open: the last batch's answers, nothing sent, nothing recorded", async () => {
     const s = await batchStand({
-      tools: ['GetProgram'],
+      tools: ['HandlerGet'],
       part: () => ({ status: 200, statusText: 'OK', body: 'source' }),
     });
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_A',
+    });
     await s.end();
     const [first] = await s.answers([1]);
     // The next phase is recorded; the previous phase's answers stay readable.
     s.begin();
-    await s.call('GetProgram', { program_name: 'PROG_B' });
+    await s.call('HandlerGet', {
+      object_type: 'PROGRAM',
+      program_name: 'PROG_B',
+    });
     expect(await s.answers([1, 2])).toEqual([first, none(2)]);
     expect(s.owner.opened()?.recorded.map((r) => r.number)).toEqual([1]);
     expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
     // A refused ask, through the tool: the words, nothing read.
-    const refused = await s.call('BatchAnswers', { number: 1, numbers: [1] });
+    const refused = await s.call('HandlerBatch', {
+      action: 'answers',
+      number: 1,
+      numbers: [1],
+    });
     expect(refused.isError).toBe(true);
     expect(refused.content?.[0]?.text).toBe(ANSWERS_ASK_WORDS);
     await s.close();

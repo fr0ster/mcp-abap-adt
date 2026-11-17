@@ -88,12 +88,15 @@ export function compilerOptions(): ts.CompilerOptions {
     'tsconfig.json',
   );
   if (configPath === undefined) throw new Error('tsconfig.json not found');
-  const { config, error } = ts.readConfigFile(configPath, ts.sys.readFile);
-  if (error !== undefined) {
-    throw new Error(ts.flattenDiagnosticMessageText(error.messageText, '\n'));
+  // The file's JSON goes to TypeScript's own parser whole, never read here.
+  const read = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (read.error !== undefined) {
+    throw new Error(
+      ts.flattenDiagnosticMessageText(read.error.messageText, '\n'),
+    );
   }
   const parsed = ts.parseJsonConfigFileContent(
-    config,
+    read.config,
     ts.sys,
     dirname(configPath),
   );

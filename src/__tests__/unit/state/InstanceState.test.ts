@@ -41,7 +41,7 @@ describe('InstanceState', () => {
     s.attach(a.p);
     a.set(true);
     expect(() => s.check(s.handle)).not.toThrow();
-    for (const h of [undefined, 42, 'F'.repeat(32)])
+    for (const h of [undefined, 'F'.repeat(32)])
       expect(() => s.check(h)).toThrow(StateUnavailableError);
     a.set(false);
     expect(() => s.check(s.handle)).toThrow('state is not available');

@@ -7,10 +7,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { hasTodo } = require('./readings.js');
 
 const SRC_DIR = path.join(__dirname, '../src');
 const EXCLUDE_DIRS = ['node_modules', 'dist', '__tests__'];
-const TODO_PATTERN = /@TODO|TODO:/gi;
 
 function findTodos(dir, todos = []) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -37,7 +37,7 @@ function findTodos(dir, todos = []) {
     const lines = content.split('\n');
 
     lines.forEach((line, index) => {
-      if (TODO_PATTERN.test(line)) {
+      if (hasTodo(line)) {
         const lineNumber = index + 1;
         const trimmedLine = line.trim();
         todos.push({

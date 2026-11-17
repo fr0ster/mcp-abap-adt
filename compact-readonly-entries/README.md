@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact-readonly-entries
 
-Compact read-only tools — 16 tools that change nothing.
+Compact read-only tools — 16 tools that change nothing (the data tool `HandlerGetData` among them, opt-in).
 
 > **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); to run a server of these 16 tools alone, [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) (`mcp-abap-adt-compact-ro`, and `-compact-http-ro`, `-compact-sse-ro`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 >
@@ -11,7 +11,7 @@ Compact read-only tools — 16 tools that change nothing.
 A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
-`HandlerCreate` with `object_type`. Twenty-seven tool schemas instead of hundreds.
+`HandlerCreate` with `object_type`. Twenty-eight tool schemas instead of hundreds.
 Each `object_type` enum, and each tool's description, is the declared system type's: its
 members are those the system type's ADT type table serves (22.0.0) — on cloud the writes offer
 no `PROGRAM` and no `INCLUDE` — and a member outside them is refused naming the list, before

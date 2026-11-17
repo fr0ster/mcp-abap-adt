@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 35 tools — 29, plus the four debug tools and `HandlerDebugBatch` the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
+ * The compact surface stays frozen — the same 34 tools — 28, plus the four debug tools and `HandlerDebugBatch` the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture
@@ -11,17 +11,26 @@
  * The rule is the one `toolSurface` applies in `lib`: a tool may gain a parameter
  * (a caller that worked still works), but not lose one, and not lose or rename a
  * tool. The count is asserted first, so a fixture that stopped being read cannot
- * make the rest vacuous.
+ * make the rest vacuous. One loss is decided (`REMOVED`): `HandlerCreate`'s
+ * `program_type` (24.0.0, D2), which SAP ignores on create. Two tools left
+ * by decision (24.0.0, D25): `HandlerSearch` and `HandlerWhereUsed`, whose
+ * calls are `HandlerSystem`'s `search_object` and `where_used`; the fixture
+ * holds `HandlerSystem` in their place.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { compactBatchEntries } from '../../../lib/compact/batch/group';
 import {
   compactDebugBatchEntries,
   compactDebugEntries,
 } from '../../../lib/compact/debug/group';
+import type { ToolDefinition } from '../../../lib/handlers/interfaces';
+import { declaredRequired, listedJson } from '../../helpers/listedJson';
 
 interface Row {
   group: string;
@@ -31,12 +40,9 @@ interface Row {
 }
 
 /** `name*` for a required parameter, `name` for an optional one — the fixture's shape. */
-function inputsOf(schema: unknown): string {
-  const container = schema as
-    | { properties?: Record<string, unknown>; required?: string[] }
-    | undefined;
-  const properties = container?.properties ?? {};
-  const required = new Set(container?.required ?? []);
+function inputsOf(schema: ToolDefinition['inputSchema']): string {
+  const properties = listedJson(schema).properties ?? {};
+  const required = new Set(declaredRequired(schema));
   const names = Object.keys(properties).map((name) =>
     required.has(name) ? `${name}*` : name,
   );
@@ -51,10 +57,11 @@ describe('the compact tool surface', () => {
     ),
   );
 
-  const context = () => ({}) as never;
   const current = [
-    ...compactReadOnlyEntries(context),
-    ...compactModifyEntries(context),
+    ...compactReadOnlyEntries(),
+    // The data tool, opt-in: on the surface, served only when asked for.
+    ...compactDataEntries(),
+    ...compactModifyEntries(),
     ...compactDebugEntries(),
     ...compactDebugBatchEntries(),
     ...compactBatchEntries(),
@@ -73,8 +80,8 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(35);
-    expect(current).toHaveLength(35);
+    expect(frozen).toHaveLength(34);
+    expect(current).toHaveLength(34);
   });
 
   it('has the same tools', () => {
@@ -82,6 +89,12 @@ describe('the compact tool surface', () => {
       frozen.map((row) => row.name).sort(),
     );
   });
+
+  /** The parameters a tool lost by decision, by tool. */
+  const REMOVED: Readonly<Record<string, readonly string[]>> = {
+    // 24.0.0, the owner (D2): SAP ignores the program type on create.
+    HandlerCreate: ['program_type'],
+  };
 
   it('loses no parameter and changes none from optional to required', () => {
     const byName = new Map(frozen.map((row) => [row.name, row]));
@@ -93,7 +106,9 @@ describe('the compact tool surface', () => {
       // Every parameter that existed is still there, with the same requiredness.
       expect({
         tool: row.name,
-        missing: was.filter((p) => !now.includes(p)),
+        missing: was.filter(
+          (p) => !now.includes(p) && !(REMOVED[row.name] ?? []).includes(p),
+        ),
       }).toEqual({ tool: row.name, missing: [] });
     }
   });

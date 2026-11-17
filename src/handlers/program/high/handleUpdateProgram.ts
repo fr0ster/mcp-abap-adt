@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateProgram Handler - Update Existing ABAP Program Source Code
  *
@@ -25,7 +27,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -33,47 +35,36 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { isCloudConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem'] as const,
   description:
     'Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name. Program must already exist.',
-      },
-      source_code: {
-        type: 'string',
-        description: 'Complete ABAP program source code.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name', 'source_code'],
-  },
+  inputSchema: z.object({
+    program_name: z
+      .string()
+      .describe('Program name. Program must already exist.'),
+    source_code: z.string().describe('Complete ABAP program source code.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateProgramArgs {
-  program_name: string;
-  source_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateProgram(
   context: HandlerContext,
@@ -87,28 +78,20 @@ export async function handleUpdateProgram(
     );
   }
 
-  if (isCloudConnection()) {
-    return return_error(
-      new Error(
-        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-      ),
-    );
-  }
-
   const programName = args.program_name.toUpperCase();
   const shouldActivate = args.activate === true;
   const detail = detailOf(args);
 
   return answer(
     { tool: 'UpdateProgram', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createOnPremAdtClient(connection, logger).getProgram(
         resultsFor(programDocuments),
       );
 
       const written = await withLock(
         () => obj.lock({ programName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
           const update = atStep('update', () =>
             withAdtHeaders(context, 'program.update', (headers) =>
               obj.update(
@@ -147,7 +130,7 @@ export async function handleUpdateProgram(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

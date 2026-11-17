@@ -60,7 +60,7 @@ request carrying `x-mcp-destination` with `400`.
 
 ### 3. Test via MCP Inspector or client:
 
-The server connects at its start, before the MCP transport opens: with no valid session the browser login opens then, and the Inspector lists the tools once it is done. Call any tool.
+The server connects at its start, before the MCP transport opens: with no valid session the browser login opens then, and the Inspector lists the tools once it is done. Call any tool. (With `--deferred-logon` the tools are listed at once and the login opens at the first tool call.)
 
 ### 4. Verify that .env file was created:
 
@@ -108,6 +108,31 @@ DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 - `TEST_LOG_FILE=/tmp/adt-tests.log` — optional file sink for test logs (best-effort).
 - `TEST_LOG_SILENT=true` — disable test logging pipeline entirely.
 - `TEST_LOG_COLOR=true` — enable colored/prefixed tags in stdout.
+
+## The deferred logon's live suite
+
+`npm run test:live-deferred-logon` runs `src/__tests__/integration/live/deferredLogon.test.ts`
+(one file at a time). For this script the live run's setup checks no realm and logs on nowhere,
+whatever test config is present: the real-system cases log on only through their own variables.
+
+- **The closed-port case** needs no SAP system: the packed release, installed, started with
+  `--deferred-logon` against a loopback port the case bound and closed. It lists its tools,
+  answers each call `no_connection` (`ECONNREFUSED`) with no address, and exits `0`.
+- **The RFC case** needs `@mcp-abap-adt/sap-rfc-lite` and the SAP NW RFC library
+  (`SAPNWRFC_HOME`, the library search path), else it is skipped: an RFC destination on the
+  reserved host `unreachable.invalid` answers its first call with the RFC key
+  (`RFC_COMMUNICATION_FAILURE`) and no host.
+- **The real-system cases** run only where `MCP_LIVE_DEFERRED_ENV_PATH` names one HTTP `.env`
+  of a real on-premise system (and `MCP_LIVE_DEFERRED_LOCK_CLASS` a class of the test user's,
+  for the take-up: `ZMCP_SHR_LOCK_CLS`, a shared dependency of the test config —
+  `npm run shared:setup` creates it, `npm run shared:check` keeps it present — which the case
+  only locks and unlocks), else they are skipped with their reason: the system becoming reachable
+  mid-session (a forwarder on a loopback port, closed, then opened); and a take-up keeping the
+  same SAP session, its logoff freeing what it held: a killed `mcp-abap-adt-compact` process
+  locked the class, the first call of a `--restore-session` process takes its session up, a
+  separate session of the same user (a connection of the test's own) is refused the class while
+  the second process holds it — SAP's answer is printed — and locks and unlocks it once the
+  second has stopped and logged off. No lock handle is printed. Run the realm check first, and only with the owner's go.
 
 ## Live measurements of 19.0.0 (2026-10-15)
 

@@ -1,0 +1,6 @@
+{
+  "expect": "delete-check-other-object",
+  "files": {
+    "src/__tests__/integration/thing.test.ts": "live.ts"
+  }
+}

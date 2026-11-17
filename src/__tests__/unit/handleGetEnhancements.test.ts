@@ -306,4 +306,55 @@ describe('parseEnhancementsFromXml', () => {
       'ENHO/XHH',
     ]);
   });
+
+  const { parseEnhancementsFromXml: parse } = jest.requireActual(
+    '../../handlers/enhancement/readonly/handleGetEnhancements',
+  );
+  const FIRST = 'ENHANCEMENT 1 z_first.\nENDENHANCEMENT.';
+  const root = (body: string) =>
+    '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    body +
+    '</enh:enhancements>';
+
+  it('reads each source: its implementation, its type, its decoded source', () => {
+    expect(parse(root(impl('Z_FIRST', FIRST)))).toEqual([
+      { name: 'Z_FIRST', type: 'ENHO/XHH', sourceCode: FIRST },
+    ]);
+  });
+
+  it('names a source outside any implementation by the element it sits in', () => {
+    expect(
+      parse(
+        root(
+          `<enh:sourceCodePlugin adtcore:name="Z_PLUGIN" adtcore:type="ENHO/XHH"><enh:source>${b64(FIRST)}</enh:source></enh:sourceCodePlugin>`,
+        ),
+      ),
+    ).toEqual([{ name: 'Z_PLUGIN', type: 'ENHO/XHH', sourceCode: FIRST }]);
+  });
+
+  // Read through the XML parser: an implementation named in apostrophes is
+  // still the owner, and a source in CDATA is still a source.
+  it('names a source by an implementation whose attributes are quoted with apostrophes', () => {
+    const quoted = impl('Z_FIRST', FIRST)
+      .replace('adtcore:name="Z_FIRST"', "adtcore:name='Z_FIRST'")
+      .replace('adtcore:type="ENHO/XHH"', "adtcore:type='ENHO/XHH'");
+    expect(parse(root(quoted))).toEqual([
+      { name: 'Z_FIRST', type: 'ENHO/XHH', sourceCode: FIRST },
+    ]);
+  });
+
+  it('reads a source written in CDATA', () => {
+    const cdata = impl('Z_FIRST', FIRST).replace(
+      `<enh:source>${b64(FIRST)}</enh:source>`,
+      `<enh:source><![CDATA[${b64(FIRST)}]]></enh:source>`,
+    );
+    expect(parse(root(cdata))).toEqual([
+      { name: 'Z_FIRST', type: 'ENHO/XHH', sourceCode: FIRST },
+    ]);
+  });
+
+  it('reads no source of a document without one', () => {
+    expect(parse(root(''))).toEqual([]);
+    expect(parse('')).toEqual([]);
+  });
 });

@@ -1,43 +1,35 @@
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  READ_VERSION_PROPERTY,
+  READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   packageDetails,
   packageSummary,
 } from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      version: READ_VERSION_PROPERTY,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['package_name'],
-  },
+  inputSchema: z.object({
+    package_name: requiredText('package_name is required').describe(
+      'Package name.',
+    ),
+    version: READ_VERSION_FIELD,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface GetPackageArgs {
-  package_name: string;
-  version?: ReadVersion;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetPackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetPackage(
   context: HandlerContext,
@@ -45,8 +37,6 @@ export async function handleGetPackage(
 ) {
   const { connection, logger } = context;
   const { package_name, version = 'active' } = args;
-  if (!package_name) return return_error(new Error('package_name is required'));
-
   const packageName = package_name.toUpperCase();
   const detail = detailOf(args);
   const client = createAdtClient(connection, logger);

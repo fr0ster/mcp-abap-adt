@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateIncludeMetadata Handler - Replace the Metadata Document of an ABAP Include
  *
@@ -13,7 +15,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -26,37 +28,28 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     "Writes the given metadata document as the whole stored metadata of the ABAP include named by include_name: locks it, writes, unlocks. Returns SAP's answer to the write.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      include_name: {
-        type: 'string',
-        description: 'Include name. The include must already exist.',
-      },
-      metadata: {
-        type: 'string',
-        description:
-          'The whole ADT metadata document of the include, as GetInclude part "metadata" returns it, with the changes made; it is sent as given and replaces the stored one.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['include_name', 'metadata'],
-  },
+  inputSchema: z.object({
+    include_name: z
+      .string()
+      .describe('Include name. The include must already exist.'),
+    metadata: z
+      .string()
+      .describe(
+        'The whole ADT metadata document of the include, as GetInclude part "metadata" returns it, with the changes made; it is sent as given and replaces the stored one.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface UpdateIncludeMetadataArgs {
-  include_name?: string;
-  metadata?: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateIncludeMetadataArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateIncludeMetadata(
   context: HandlerContext,

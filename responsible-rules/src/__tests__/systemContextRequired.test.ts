@@ -22,6 +22,7 @@ jest.mock('../../../src/lib/systemInformation', () => ({
   readSystemInformation: jest.fn(),
 }));
 
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../../src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateClass } from '../../../src/handlers/class/high/handleCreateClass';
@@ -38,7 +39,6 @@ import { CompositeHandlersRegistry } from '../../../src/lib/handlers/registry/Co
 import { runWithRequestContext } from '../../../src/lib/requestContext';
 import {
   resetSystemContextCache,
-  setSystemContext,
   systemContextFromConfiguration,
 } from '../../../src/lib/systemContext';
 import { MISSING_RESPONSIBLE } from '../../../src/lib/systemContextGuard';
@@ -117,7 +117,7 @@ describe('cloud', () => {
       getHandlers: (): HandlerEntry[] => [
         {
           toolDefinition: CreateMessageClassTool as never,
-          handler: handleCreateMessageClass as never,
+          call: handleCreateMessageClass as never,
         },
       ],
     },
@@ -338,7 +338,7 @@ describe('on-premise, through the server', () => {
       getHandlers: (): HandlerEntry[] => [
         {
           toolDefinition: CreateMessageClassTool as never,
-          handler: handleCreateMessageClass as never,
+          call: handleCreateMessageClass as never,
         },
       ],
     },

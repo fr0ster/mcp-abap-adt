@@ -1,10 +1,10 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import type { AdtReading } from '../../../lib/strategies/reading';
-import { return_error } from '../../../lib/utils';
-import { type RunOutcome, readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import { readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -12,35 +12,30 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read once by long polling, SAP holding the read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, and a run SAP answers with another status answers the run_id and that status, read on by run_id.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      run_id: {
-        type: 'string',
-        description: 'Run id a unit test run answered.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['run_id'],
-  },
+    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+  inputSchema: z.object({
+    run_id: requiredText('run_id is required').describe(
+      'Run id a unit test run answered.',
+    ),
+    with_navigation_uris: z
+      .boolean()
+      .optional()
+      .describe('Include navigation URIs in result if supported.'),
+    format: z
+      .enum(['abapunit', 'junit'])
+      .optional()
+      .describe('Result format: abapunit or junit.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface GetUnitTestResultArgs {
-  run_id: string;
-  with_navigation_uris?: boolean;
-  format?: 'abapunit' | 'junit';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetUnitTestResultArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetUnitTestResult(
   context: HandlerContext,
   args: GetUnitTestResultArgs,
 ) {
-  const { run_id, with_navigation_uris, format } = args;
-  if (!run_id) return return_error(new Error('run_id is required'));
-
-  // Same v18-convenience departure as `GetUnitTest`: the old `.read({runId})`
+  const { run_id, with_navigation_uris, format } = args; // Same v18-convenience departure as `GetUnitTest`: the old `.read({runId})`
   // this handler called polled status internally before ever answering a
   // result. This tool has no status of its own to poll (`with_long_polling`
   // is not in its surface), so — per the fix ruling — it polls status first
@@ -72,7 +67,7 @@ export async function handleGetUnitTestResult(
     // document; `terse`/`full` both answer the parse (no fixture proves a
     // safe further reduction of a test-run result — see this tool's own
     // description above), so `raw` is where the parameter genuinely differs.
-    (outcome: RunOutcome<AdtReading<unknown>>) =>
+    (outcome) =>
       !outcome.finished
         ? unfinishedRun(run_id, outcome.runStatus)
         : {

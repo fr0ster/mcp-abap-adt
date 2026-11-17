@@ -1,0 +1,6 @@
+{
+  "expect": "request-keys",
+  "files": {
+    "src/__tests__/unit/thing.test.ts": "unit.ts"
+  }
+}

@@ -7,10 +7,13 @@
  * the debugger's labels and a projection list.
  */
 
+import assert from 'node:assert/strict';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { typeCodeFindings } from './helpers/typeCodeScan';
 
-const ROOT = join(__dirname, '../../../..');
+const ROOT = repositoryRoot(__dirname);
 const TSCONFIG = join(ROOT, 'tsconfig.test.json');
 const FIXTURE = join(ROOT, 'src/__typeCodeScanFixture__/fixture.ts');
 
@@ -25,40 +28,43 @@ function scan(text: string): string[] {
 
 describe('the literal scan of type codes', () => {
   it('passes a code literal whose contextual type is AdtTypeCode', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           "import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';",
           "export const code: AdtTypeCode = 'CLAS/OC';",
         ].join('\n'),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('fails a code literal with no code type, naming file and line', () => {
-    expect(scan("export const code: string = 'CLAS/OC';")).toEqual([
+    assert.deepEqual(scan("export const code: string = 'CLAS/OC';"), [
       "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OC' — contextual type string is not made of codes, main types, search names or debugger labels",
     ]);
   });
 
   it('passes a comment naming a code of the tables', () => {
-    expect(
+    assert.deepEqual(
       scan(
         ['/** Reads a `CLAS/OC` class. */', 'export const x = 1;'].join('\n'),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('fails a comment naming a code no table holds', () => {
-    expect(
+    assert.deepEqual(
       scan(['export const x = 1;', '// Reads a `DOMA/DM` domain.'].join('\n')),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:2 'DOMA/DM' — named in a comment, not a code of the tables",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:2 'DOMA/DM' — named in a comment, not a code of the tables",
+      ],
+    );
   });
 
   it('passes a code of the tables inside a longer string or a template span', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           'export const reference = (name: string) =>',
@@ -66,11 +72,12 @@ describe('the literal scan of type codes', () => {
           "export const message = 'pass a code, e.g. CLAS/OC or PROG/P';",
         ].join('\n'),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('fails a code no table holds inside a template span, naming its line', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           'export const reference = (name: string) =>',
@@ -78,13 +85,14 @@ describe('the literal scan of type codes', () => {
           '    adtcore:type="FUGR/ZZ"/>`;',
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:3 'FUGR/ZZ' — inside a string, not a code of the tables",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:3 'FUGR/ZZ' — inside a string, not a code of the tables",
+      ],
+    );
   });
 
   it('passes a tool description naming codes of the tables, and fails one naming a code no table holds', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           'export const TOOL_DEFINITION = {',
@@ -97,14 +105,15 @@ describe('the literal scan of type codes', () => {
           '};',
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:7 'DOMA/DM' — inside a string, not a code of the tables",
-      "src/__typeCodeScanFixture__/fixture.ts:7 'BDEF/BD' — inside a string, not a code of the tables",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:7 'DOMA/DM' — inside a string, not a code of the tables",
+        "src/__typeCodeScanFixture__/fixture.ts:7 'BDEF/BD' — inside a string, not a code of the tables",
+      ],
+    );
   });
 
   it('passes a main type typed by a projection, and fails one typed string', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           "import type { AdtTypeCodeOf } from '@mcp-abap-adt/interfaces-adt';",
@@ -113,13 +122,14 @@ describe('the literal scan of type codes', () => {
           "export const loose: string = 'ENHO';",
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:4 'ENHO' — contextual type string is not made of codes, main types, search names or debugger labels",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:4 'ENHO' — contextual type string is not made of codes, main types, search names or debugger labels",
+      ],
+    );
   });
 
   it("passes a main type typed by its code's entry and a search name typed by the search names, and fails each typed string", () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           "import type { AdtSearchTypeOf } from '@mcp-abap-adt/interfaces-adt';",
@@ -132,28 +142,30 @@ describe('the literal scan of type codes', () => {
           "export const looseGroup: string = 'ABAP_TEST_COCKPIT';",
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:6 'ENHO' — contextual type string is not made of codes, main types, search names or debugger labels",
-      "src/__typeCodeScanFixture__/fixture.ts:7 'STRU' — contextual type string is not made of codes, main types, search names or debugger labels",
-      "src/__typeCodeScanFixture__/fixture.ts:8 'ABAP_TEST_COCKPIT' — contextual type string is not made of codes, main types, search names or debugger labels",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:6 'ENHO' — contextual type string is not made of codes, main types, search names or debugger labels",
+        "src/__typeCodeScanFixture__/fixture.ts:7 'STRU' — contextual type string is not made of codes, main types, search names or debugger labels",
+        "src/__typeCodeScanFixture__/fixture.ts:8 'ABAP_TEST_COCKPIT' — contextual type string is not made of codes, main types, search names or debugger labels",
+      ],
+    );
   });
 
   it('reads a search name in prose as prose: only a word of the code shape is a code', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           '// Searches by STRU or ABAP_TEST_COCKPIT, never by TABL/ZZ.',
           "export const words = 'filter by STRU, DTAB or FUNC';",
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:1 'TABL/ZZ' — named in a comment, not a code of the tables",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:1 'TABL/ZZ' — named in a comment, not a code of the tables",
+      ],
+    );
   });
 
   it("passes the debugger's labels typed by its union, and fails one typed string", () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           "import type { BreakpointLabel } from '../lib/debugger/objectUri';",
@@ -161,13 +173,14 @@ describe('the literal scan of type codes', () => {
           "export const loose: string = 'INCL';",
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:3 'INCL' — contextual type string is not made of codes, main types, search names or debugger labels",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:3 'INCL' — contextual type string is not made of codes, main types, search names or debugger labels",
+      ],
+    );
   });
 
   it('passes a projected list and a satisfies list, and fails a list typed by nothing', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           'import type {',
@@ -183,13 +196,14 @@ describe('the literal scan of type codes', () => {
           "export const LOOSE = ['DTEL/DE'] as const;",
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:11 'DTEL/DE' — no contextual type",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:11 'DTEL/DE' — no contextual type",
+      ],
+    );
   });
 
   it('passes keys, comparisons and type arguments typed by the codes', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           "import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';",
@@ -203,11 +217,12 @@ describe('the literal scan of type codes', () => {
           "export type Module = AdtCodes<'FUGR/FF' | 'FUGR/I'>;",
         ].join('\n'),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('fails a key, a comparison and a literal type not typed by the codes', () => {
-    expect(
+    assert.deepEqual(
       scan(
         [
           "export const keyed = { 'CLAS/OC': 1 };",
@@ -215,10 +230,11 @@ describe('the literal scan of type codes', () => {
           "export type Code = 'CLAS/OC';",
         ].join('\n'),
       ),
-    ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OC' — a property name whose object is not keyed by the code types",
-      "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OC' — compared with string, which is not made of codes, main types, search names or debugger labels",
-      "src/__typeCodeScanFixture__/fixture.ts:3 'CLAS/OC' — a literal type outside a type argument constrained to the code types",
-    ]);
+      [
+        "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OC' — a property name whose object is not keyed by the code types",
+        "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OC' — compared with string, which is not made of codes, main types, search names or debugger labels",
+        "src/__typeCodeScanFixture__/fixture.ts:3 'CLAS/OC' — a literal type outside a type argument constrained to the code types",
+      ],
+    );
   });
 });

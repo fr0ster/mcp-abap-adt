@@ -19,6 +19,7 @@
  */
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
@@ -28,11 +29,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.',
-  inputSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  inputSchema: z.object({}),
 } as const;
 
 export async function handleRuntimeListProfilerTraceFiles(

@@ -27,8 +27,10 @@
  *   package's), whose parameters are not followed.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   createProgram,
   type Finding,
@@ -85,28 +87,45 @@ describe('the sources', () => {
 
   it('scans every package, the launcher included', () => {
     for (const dir of PACKAGES) {
-      expect(files.some((f) => rel(f).startsWith(`${dir}/`))).toBe(true);
+      assert.equal(
+        files.some((f) => rel(f).startsWith(`${dir}/`)),
+        true,
+        dir,
+      );
     }
-    expect(files.map(rel)).toContain('server-runtime/src/stdio/launcher.ts');
+    assert.ok(files.map(rel).includes('server-runtime/src/stdio/launcher.ts'));
   });
 
   it('finds nothing but the listed exceptions', () => {
-    expect(findings.filter((f) => !isAllowed(f))).toEqual([]);
+    assert.deepEqual(
+      findings.filter((f) => !isAllowed(f)),
+      [],
+    );
   });
 
   it('every listed exception is still found (a stale entry fails)', () => {
     for (const allowed of ALLOWED) {
-      expect(
+      assert.equal(
         findings.some(
           (f) => f.where === allowed.where && f.text === allowed.text,
         ),
-      ).toBe(true);
+        true,
+        allowed.where,
+      );
     }
   });
 });
 
 describe('the scan refuses every way past it, and only those', () => {
-  const root = path.join(__dirname, '__fixtures__/failureScan');
+  const root = path.join(
+    REPO,
+    'src',
+    '__tests__',
+    'unit',
+    'sources',
+    '__fixtures__',
+    'failureScan',
+  );
   const refused = fs
     .readdirSync(path.join(root, 'refused'))
     .map((name) => path.join(root, 'refused', name));
@@ -122,22 +141,26 @@ describe('the scan refuses every way past it, and only those', () => {
     findings.filter((f) => f.where.startsWith(`${rel(file)}:`));
 
   it('has fixtures of both kinds', () => {
-    expect(refused.length).toBeGreaterThanOrEqual(20);
-    expect(clean.length).toBeGreaterThanOrEqual(3);
+    assert.ok(refused.length >= 20, `${refused.length} refused fixtures`);
+    assert.ok(clean.length >= 3, `${clean.length} clean fixtures`);
   });
 
-  it.each(refused.map((file) => [path.basename(file, '.ts'), file]))(
-    'refuses %s',
-    (name, file) => {
+  for (const file of refused) {
+    const name = path.basename(file, '.ts');
+    it(`refuses ${name}`, () => {
       const rule = name.startsWith('instanceof') ? 'instanceof' : 'thrown';
-      expect(of(file).map((f) => f.rule)).toContain(rule);
-    },
-  );
+      assert.ok(
+        of(file)
+          .map((f) => f.rule)
+          .includes(rule),
+        `${name}: no ${rule} finding`,
+      );
+    });
+  }
 
-  it.each(clean.map((file) => [path.basename(file, '.ts'), file]))(
-    'accepts %s',
-    (_name, file) => {
-      expect(of(file)).toEqual([]);
-    },
-  );
+  for (const file of clean) {
+    it(`accepts ${path.basename(file, '.ts')}`, () => {
+      assert.deepEqual(of(file), []);
+    });
+  }
 });

@@ -6,21 +6,45 @@
  * Run: npm test -- --testPathPatterns=integration/high/unitTest/CdsUnitTestHighHandlers
  */
 
+import { after, afterEach, before, beforeEach, it } from 'node:test';
+import * as z from 'zod';
+import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleCreateCdsUnitTest } from '../../../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleDeleteCdsUnitTest } from '../../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleRunCdsUnitTest } from '../../../../handlers/unit_test/high/handleRunCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { servedSuite } from '../../helpers/servedHere';
+import { readCaseParams } from '../../helpers/testConfigSchema';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { expectTestsRan, stepsFor } from './unitTestSteps';
+
+/** What this file's cases state, as its tests read them. */
+const CdsUnitTestParams = z.looseObject({
+  class_name: z.string().optional(),
+  cds_view_name: z.string().optional(),
+  test_class_source: z.string().optional(),
+  update_test_class_source: z.string().optional(),
+  expected_test_methods: z.array(z.string()).optional(),
+});
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateCdsUnitTest',
+  'DeleteCdsUnitTest',
+  'RunCdsUnitTest',
+  'UpdateCdsUnitTest',
+]);
 
 describe('Unit Test High-Level Handlers (CDS view)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('cds-unit-test-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'cds_unit_test',
       'full_workflow',
@@ -30,7 +54,11 @@ describe('Unit Test High-Level Handlers (CDS view)', () => {
     await tester.beforeAll(
       async (_context: LambdaTesterContext) => {},
       async (context: LambdaTesterContext) => {
-        const className = context.params?.class_name;
+        const className = readCaseParams(
+          context.params,
+          CdsUnitTestParams,
+          'cds_unit_test',
+        ).class_name;
         if (!className) return;
         await stepsFor(tester, context).cleanup(
           'DeleteCdsUnitTest',
@@ -39,10 +67,15 @@ describe('Unit Test High-Level Handlers (CDS view)', () => {
             transport_request: context.transportRequest,
           },
           handleDeleteCdsUnitTest,
+          {
+            tool: 'GetClass',
+            args: { class_name: className },
+            handler: handleGetClass,
+          },
         );
       },
     );
-  }, getTimeout('long'));
+  });
 
   beforeEach(async () => {
     await tester.beforeEach(async (_context: LambdaTesterContext) => {});
@@ -52,69 +85,70 @@ describe('Unit Test High-Level Handlers (CDS view)', () => {
     await tester.afterEach();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
-  it(
-    'Unit Test High-Level Handlers: create, run, update, run',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { params, packageName, transportRequest } = context;
-        const className: string | undefined = params?.class_name;
-        if (
-          !className ||
-          !params?.cds_view_name ||
-          !params?.test_class_source ||
-          !packageName
-        ) {
-          logger?.warn('cds_unit_test not configured, skipping');
-          return;
-        }
-        const transport = { transport_request: transportRequest };
-        const { step } = stepsFor(tester, context);
-        const expected: string[] = params.expected_test_methods ?? [];
+  it('Unit Test High-Level Handlers: create, run, update, run', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { packageName, transportRequest } = context;
+      const params = readCaseParams(
+        context.params,
+        CdsUnitTestParams,
+        'cds_unit_test',
+      );
+      const className: string | undefined = params?.class_name;
+      if (
+        !className ||
+        !params?.cds_view_name ||
+        !params?.test_class_source ||
+        !packageName
+      ) {
+        logger?.warn('cds_unit_test not configured, skipping');
+        return;
+      }
+      const transport = { transport_request: transportRequest };
+      const { step } = stepsFor(tester, context);
+      const expected: string[] = params.expected_test_methods ?? [];
 
+      await step(
+        'CreateCdsUnitTest',
+        {
+          cds_view_name: params.cds_view_name,
+          class_name: className,
+          package_name: packageName,
+          test_class_source: params.test_class_source,
+          ...transport,
+        },
+        handleCreateCdsUnitTest,
+      );
+      expectTestsRan(
         await step(
-          'CreateCdsUnitTest',
-          {
-            cds_view_name: params.cds_view_name,
-            class_name: className,
-            package_name: packageName,
-            test_class_source: params.test_class_source,
-            ...transport,
-          },
-          handleCreateCdsUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunCdsUnitTest',
-            { class_name: className },
-            handleRunCdsUnitTest,
-          ),
-          expected,
-        );
+          'RunCdsUnitTest',
+          { class_name: className },
+          handleRunCdsUnitTest,
+        ),
+        expected,
+      );
 
+      await step(
+        'UpdateCdsUnitTest',
+        {
+          class_name: className,
+          test_class_source:
+            params.update_test_class_source ?? params.test_class_source,
+          ...transport,
+        },
+        handleUpdateCdsUnitTest,
+      );
+      expectTestsRan(
         await step(
-          'UpdateCdsUnitTest',
-          {
-            class_name: className,
-            test_class_source:
-              params.update_test_class_source ?? params.test_class_source,
-            ...transport,
-          },
-          handleUpdateCdsUnitTest,
-        );
-        expectTestsRan(
-          await step(
-            'RunCdsUnitTest',
-            { class_name: className },
-            handleRunCdsUnitTest,
-          ),
-          expected,
-        );
-      });
-    },
-    getTimeout('long'),
-  );
+          'RunCdsUnitTest',
+          { class_name: className },
+          handleRunCdsUnitTest,
+        ),
+        expected,
+      );
+    });
+  });
 });

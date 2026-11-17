@@ -20,6 +20,7 @@ import {
   streamableHttpSurface,
   type ToolSet,
 } from '../../../lib/toolSet';
+import { jsonAt, listedJson } from '../../helpers/listedJson';
 
 const generator = require('../../../../tools/generate-tools-docs.js');
 const compactGenerator = require('../../../../compact/tools/generate-docs.js');
@@ -50,7 +51,7 @@ describe('the surface a Streamable HTTP binary adds', () => {
       [fullReadOnlyToolSet, ['ListLeftoverSessions']],
     ];
     for (const [set, stdioOnly] of cases) {
-      const surface = streamableHttpSurface(set);
+      const surface = streamableHttpSurface(set, { dataTools: true });
       expect(surface.sessionTools.map((tool) => tool.name)).toEqual([
         'SessionOpen',
         'SessionClose',
@@ -58,10 +59,7 @@ describe('the surface a Streamable HTTP binary adds', () => {
       expect([...surface.stdioOnly].sort()).toEqual(stdioOnly);
       expect(surface.stateHandleWords).toBe(STATE_HANDLE_ARGUMENT_WORDS);
       for (const tool of surface.sessionTools) {
-        const schema = tool.inputSchema as {
-          properties: Record<string, unknown>;
-        };
-        expect(schema.properties.state_handle).toEqual({
+        expect(jsonAt(listedJson(tool.inputSchema), 'state_handle')).toEqual({
           type: 'string',
           description: STATE_HANDLE_ARGUMENT_WORDS,
         });
@@ -72,7 +70,9 @@ describe('the surface a Streamable HTTP binary adds', () => {
   it('the compact sets add HandlerSession', () => {
     for (const set of [compactHttpSet, compactHttpRoSet]) {
       expect(
-        streamableHttpSurface(set).sessionTools.map((tool) => tool.name),
+        streamableHttpSurface(set, { dataTools: true }).sessionTools.map(
+          (tool) => tool.name,
+        ),
       ).toEqual(['HandlerSession']);
     }
   });
@@ -81,7 +81,7 @@ describe('the surface a Streamable HTTP binary adds', () => {
 describe('the full tool pages (npm run docs:tools)', () => {
   it('AVAILABLE_TOOLS.md carries the Streamable HTTP section of mcp-abap-adt-http, as generated now', () => {
     const section = generator.httpSectionMarkdown(
-      streamableHttpSurface(fullToolSet),
+      streamableHttpSurface(fullToolSet, { dataTools: true }),
     );
     expect(section).toContain('`state_handle`');
     expect(section).toContain(STATE_HANDLE_ARGUMENT_WORDS);
@@ -93,7 +93,7 @@ describe('the full tool pages (npm run docs:tools)', () => {
 
   it('AVAILABLE_TOOLS_READONLY.md carries the section of mcp-abap-adt-http-ro', () => {
     const section = generator.httpSectionMarkdown(
-      streamableHttpSurface(fullReadOnlyToolSet),
+      streamableHttpSurface(fullReadOnlyToolSet, { dataTools: true }),
     );
     expect(section).toContain('mcp-abap-adt-http-ro');
     expect(READONLY).toContain(section);
@@ -106,7 +106,7 @@ describe('the full tool pages (npm run docs:tools)', () => {
       return page.slice(start, page.indexOf('\n---\n', start));
     };
     const all = generator.httpNavigationMarkdown(
-      streamableHttpSurface(fullToolSet),
+      streamableHttpSurface(fullToolSet, { dataTools: true }),
     );
     expect(all).toContain('[SessionOpen](#sessionopen-streamable-http)');
     expect(all).toContain('[SessionClose](#sessionclose-streamable-http)');
@@ -114,7 +114,7 @@ describe('the full tool pages (npm run docs:tools)', () => {
     expect(ALL).toContain('<a id="sessionopen-streamable-http"></a>');
     expect(navigation(READONLY)).toContain(
       generator.httpNavigationMarkdown(
-        streamableHttpSurface(fullReadOnlyToolSet),
+        streamableHttpSurface(fullReadOnlyToolSet, { dataTools: true }),
       ),
     );
     expect(navigation(HIGH)).toContain(
@@ -124,7 +124,9 @@ describe('the full tool pages (npm run docs:tools)', () => {
 
   it('AVAILABLE_TOOLS_HIGH.md names the state_handle rule of mcp-abap-adt-http', () => {
     expect(HIGH).toContain(
-      generator.stateHandleRule(streamableHttpSurface(fullToolSet)),
+      generator.stateHandleRule(
+        streamableHttpSurface(fullToolSet, { dataTools: true }),
+      ),
     );
   });
 
@@ -144,8 +146,8 @@ describe('the full tool pages (npm run docs:tools)', () => {
 describe('the compact tool page (compact docs:tools)', () => {
   it('carries the Streamable HTTP section of -compact-http and -compact-http-ro, as generated now', () => {
     const section = compactGenerator.httpSection([
-      streamableHttpSurface(compactHttpSet),
-      streamableHttpSurface(compactHttpRoSet),
+      streamableHttpSurface(compactHttpSet, { dataTools: true }),
+      streamableHttpSurface(compactHttpRoSet, { dataTools: true }),
     ]);
     expect(section).toContain('`state_handle`');
     expect(section).toContain(STATE_HANDLE_ARGUMENT_WORDS);

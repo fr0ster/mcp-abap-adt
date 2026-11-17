@@ -40,7 +40,7 @@ export class CurrentCredential extends AuthProviderBase {
   /** The kind of the credential in force (what the connection logs). */
   get kind(): string {
     try {
-      const kind = (this.#current as { kind?: unknown }).kind;
+      const kind = 'kind' in this.#current ? this.#current.kind : undefined;
       return typeof kind === 'string' ? kind : 'credential';
     } catch {
       return 'credential';

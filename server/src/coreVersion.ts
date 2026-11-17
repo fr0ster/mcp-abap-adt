@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { packageManifestOf } from '@mcp-abap-adt/lib/config';
 
 /**
  * `@mcp-abap-adt/core`'s own version, read from its own manifest.
@@ -13,8 +14,8 @@ import { join } from 'node:path';
  * `node bin/…`, `mcp-proxy` — the variable was unset and every transport answered
  * `serverInfo.version: "1.0.0"`, whatever was installed.
  */
-const manifest: { name: string; version: string } = JSON.parse(
-  readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+const manifest = packageManifestOf(
+  JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')),
 );
 
 export const CORE_VERSION: string = manifest.version;

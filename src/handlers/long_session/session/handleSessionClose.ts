@@ -1,4 +1,4 @@
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
+import * as z from 'zod';
 import {
   CLOSE_SESSION_WORDS,
   closeLongSession,
@@ -8,17 +8,13 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'SessionClose',
   description: `[read-only] ${CLOSE_SESSION_WORDS}`,
-  inputSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  inputSchema: z.object({}),
 } as const;
 
 /** Asks for the instance's close; answers `{ closed, held }`. Works on no connection. */
 export async function handleSessionClose(
   context: HandlerContext,
-  _args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  _args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return closeLongSession(context);
 }

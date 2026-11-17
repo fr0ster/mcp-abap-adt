@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteProgram Handler - Delete ABAP Program via ADT deletion API
  *
@@ -12,7 +14,7 @@ import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -22,29 +24,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     'Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      program_name: {
-        type: 'string',
-        description: 'Program name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['program_name'],
-  },
+  inputSchema: z.object({
+    program_name: z.string().describe('Program name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface DeleteProgramArgs {
-  program_name: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type DeleteProgramArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleDeleteProgram(
   context: HandlerContext,

@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 it("a call read after stdin's end gets the shutdown answer and sends nothing; exit 0 without waiting for the earlier tool", async () => {
-  s = await stand({ shutdown: {} });
+  s = await stand({ kind: 'onprem', shutdown: {} });
   const hold = s.adt.hold((r) => isUnlockOf('A')(r.url));
   void s.callTool('LockedUpdate', { id: 'A' });
   await hold.arrived;

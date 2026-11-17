@@ -18,7 +18,6 @@ import { handleDebugStop } from '../../../handlers/debugger/debug/handleDebugSto
 import { handleDebugTakeOverListener } from '../../../handlers/debugger/debug/handleDebugTakeOverListener';
 import { handleDebugTerminate } from '../../../handlers/debugger/debug/handleDebugTerminate';
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
-import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import {
@@ -27,6 +26,7 @@ import {
 } from '../../../lib/debugger/DebugSession';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { InstanceState } from '../../../lib/state/InstanceState';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { okResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,

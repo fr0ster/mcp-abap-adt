@@ -125,6 +125,44 @@ The bodies are the answers byte for byte, except that every SAP user id
 (`author`, `processor`, `lastChangedBy`) was set to `SAPUSER01`. They were
 taken by a direct GET; the response headers were not recorded.
 
+| Case | What provoked it | What came back |
+|---|---|---|
+| `read-outline-class` | `GET /sap/bc/adt/oo/classes/{name}/objectstructure`, Accept `application/vnd.sap.adt.objectstructure.v2+xml`, a class the measurement created (types, attributes, an event, public, protected and private methods, an implemented interface), 2026-11-04 | 200, nested `abapsource:objectStructureElement`s with `visibility`, `level`, `clif_name`, and `atom:link`s positioned `./source/main#start=l,c;end=l,c` |
+| `read-outline-local-class` | the same read of a class with a local class and a local type | 200, `CLAS/OCL`, `CLAS/OLD` and `CLAS/OLT` elements pointing into `./includes/definitions` and `./includes/implementations` |
+| `read-outline-interface` | `GET /sap/bc/adt/oo/interfaces/{name}/objectstructure`, the same Accept | 200, `INTF/IT`, `INTF/IA`, `INTF/IE`, `INTF/IO` with positions |
+| `read-outline-program` | `GET /sap/bc/adt/programs/programs/{name}/objectstructure`, the same Accept, on premise | 200, `PROG/PL`, `PROG/PLM`, `PROG/PY`, `PROG/PD`, `PROG/PE`, `PROG/PU`, `PROG/I`, `PROG/PX`; links name their target (`#type=…;name=…`), no positions |
+| `read-outline-function-group` | `GET /sap/bc/adt/functions/groups/{name}/objectstructure`, the same Accept | 200, `FUGR/I`, `FUGR/PX` and `FUGR/FF` elements, each link a source URI |
+
+The bodies are the answers byte for byte (plan D1's measurement, on premise and on ABAP cloud: the
+same apart from object names), copied from adt-clients' corpus (`corpus/adt/answers/`); the
+sidecars hold the request and the status, and no response header but the content type.
+`GetObjectOutline` reads them.
+
+| Case | What provoked it | What came back |
+|---|---|---|
+| `read-package-quick-search-mask` | `GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query={shared package}*&maxResults=1000&objectType=DEVC`, Accept `application/xml`, an on-premise system, 2026-11-07 (plan D23b, Step 7) | 200, `adtcore:objectReferences` holding one `adtcore:objectReference` — `uri`, `type="DEVC/K"`, `name`, `packageName`, `description` — the package the `*` matches with zero characters; no count, no "more" marker |
+
+The body is the answer byte for byte; it names no user. The sidecar keeps the response
+headers with `sap-adt-saplb` set to `REDACTED`. It was taken by a direct GET from a live
+test's connection, the request `searchObjects` (adt-clients) sends.
+
+| Case | What provoked it | What came back |
+|---|---|---|
+| `activation-preaudit-still-inactive-751` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=true`, one class reference, SAP_BASIS 751 (fr0ster/mcp-abap-adt#351, 2026-11-09) | 200, `ioc:inactiveObjects` of eight entries, no message; nothing activated |
+| `activation-sync-activated-751` | the same reference with `preauditRequested=false`, the same system | 200, an empty body; activated |
+| `activation-runs-absent-751` | `POST /sap/bc/adt/activation/runs?…`, the same system | 404: the system's discovery lists no `/activation/runs` |
+| `system-description-751-partial` | `GET /sap/bc/adt/discovery`, the same system | the activation collections the issue lists, and nothing else |
+| `activation-group-alone-s4-2025` | a function group's reference alone, `preauditRequested=true` then `false`, with the inactive list after each, S/4HANA 2025, 2026-11-09 | `ioc:inactiveObjects` (01), then `chkl:messages` `activationExecuted="false"` with no message (04); the inactive list still naming the group and `SAPL<group>` (02, 03, 05, 06) |
+| `activation-reactivate-active-s4-2025` | a class activated (01), then again with `preauditRequested=false` (03), the inactive list after each, S/4HANA 2025, 2026-11-09 | `activationExecuted="true"`, then `activationExecuted="false"` with no message; every list empty — nothing to activate |
+
+Copied from adt-clients' corpus (`corpus/adt/answers/`, `corpus/adt/discovery/`), notes
+and placeholders as recorded there, laid out one element per line as that corpus keeps them,
+with no line break after the XML declaration (as SAP sends it, so the ordered round trip holds): the 751 cases come from the issue's measurements, and six
+of the eight `ioc` entries are reconstructed from the types the issue names (their notes say
+so); the S/4HANA 2025 cases were taken by a hand-run probe, transport numbers and the user as
+placeholders. The activation tests replay them (`activationNotActivated`, the group path's
+discovery choice, the read after a run's silent results).
+
 ## Refusals
 
 | Case | What provoked it | How SAP refused |
@@ -517,10 +555,11 @@ file as the documentation of why the readings look the way they do.
 - `adtRefusal.ts` imports `fast-xml-parser` and nothing else. No MCP type, no
   handler, no config, nothing from this repository.
 - The corpus is plain files. No generator, no build step.
-- The fixture location is spelled once, in `src/lib/adtCorpus.ts`. Every test
-  asks that module. Moving the corpus is one edit, not one per test file.
+- The fixture location is spelled once, in `src/__tests__/helpers/adtCorpus.ts`
+  (test support, resolved from the repository root). Every test asks that
+  module. Moving the corpus is one edit, not one per test file.
 
-**What goes:** `src/lib/adtRefusal.ts`, `src/lib/adtCorpus.ts`,
+**What goes:** `src/lib/adtRefusal.ts`, `src/__tests__/helpers/adtCorpus.ts`,
 `tests/fixtures/adt/` entire, `src/__tests__/unit/adtRefusalReadings.test.ts`,
 `adtRefusalCorpus.test.ts`, `adtMetadataShapes.test.ts`, and this README.
 

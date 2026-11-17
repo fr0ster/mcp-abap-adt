@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ActivateMetadataExtensionLow Handler - Activate ABAP Metadata Extension
  *
@@ -10,8 +12,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -20,23 +22,15 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Metadata Extension name.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('Metadata Extension name.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface ActivateMetadataExtensionArgs {
-  name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateMetadataExtensionArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleActivateMetadataExtension(
   context: HandlerContext,
@@ -63,6 +57,6 @@ export async function handleActivateMetadataExtension(
             { headers, analyse: analyseActivation },
           ),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

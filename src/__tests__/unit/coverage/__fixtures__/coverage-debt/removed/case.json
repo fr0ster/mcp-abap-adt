@@ -1,0 +1,4 @@
+{
+  "expect": "debt-removed",
+  "debt": ["RemovedThing"]
+}

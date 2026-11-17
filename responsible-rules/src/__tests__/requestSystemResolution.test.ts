@@ -21,7 +21,10 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import * as z from 'zod';
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
+import { longToolInTheCall } from '../../../src/lib/backgroundRuns/tools';
 import { createAdtClient } from '../../../src/lib/clients';
 import { createAbapConnection } from '../../../src/lib/connectionFactory';
 import type {
@@ -30,6 +33,7 @@ import type {
 } from '../../../src/lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../src/lib/handlers/registry/CompositeHandlersRegistry';
 import { logger } from '../../../src/lib/logger';
+import { isLongTool } from '../../../src/lib/longTools';
 import {
   defaultSystemContextResolver,
   runWithRequestContext,
@@ -38,9 +42,9 @@ import {
 import {
   getStatedSystemContext,
   resetSystemContextCache,
-  setSystemContext,
 } from '../../../src/lib/systemContext';
 import { readSystemInformation } from '../../../src/lib/systemInformation';
+import type { ToolResultLike } from '../../../src/lib/toolResult';
 
 import {
   BaseHandlerGroup,
@@ -112,9 +116,7 @@ function foreignConn(url: string): IAbapConnection {
   return { getBaseUrl: async () => url } as unknown as IAbapConnection;
 }
 
-type Options =
-  | { responsible?: string; masterSystem?: string; masterLanguage?: string }
-  | undefined;
+type Options = ConstructorParameters<typeof AdtClientOnPrem>[2];
 
 /** The options of the last client built, of either variant. */
 function lastOptions(): Options {
@@ -805,6 +807,11 @@ describe('withResolvedSystemContext', () => {
   });
 });
 
+/** A handler's answer that reports what it saw beside its (empty) content. */
+function reported<F extends object>(facts: F): ToolResultLike & F {
+  return { content: [], ...facts };
+}
+
 /** A group whose handlers report the context they ran under. */
 function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
   context: HandlerContext;
@@ -813,20 +820,25 @@ function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
     context: { connection } as HandlerContext,
     getName: () => 'fake',
     registerHandlers: () => {},
-    // What the exporter reads an args-only handler's context by.
-    currentContext: () => group.context,
     getHandlers(): HandlerEntry[] {
       return [
         {
-          toolDefinition: { name: 'WithContext', description: 'd' } as never,
-          handler: async (_context: HandlerContext, _args: unknown) => seen(),
+          toolDefinition: {
+            name: 'WithContext',
+            description: 'd',
+            inputSchema: z.object({}),
+          },
+          call: async (_context: HandlerContext, _args: unknown) =>
+            reported(seen()),
         },
         {
-          toolDefinition: { name: 'Closure', description: 'd' } as never,
-          handler: (async (_args: unknown) => ({
-            ...seen(),
-            connection: group.context.connection,
-          })) as never,
+          toolDefinition: {
+            name: 'Closure',
+            description: 'd',
+            inputSchema: z.object({}),
+          },
+          call: async (context: HandlerContext, _args: unknown) =>
+            reported({ ...seen(), connection: context.connection }),
         },
       ];
     },
@@ -838,48 +850,43 @@ function exporterWith(
   groups: IHandlerGroup[],
   options?: ConstructorParameters<typeof HandlerExporter>[0],
 ): HandlerExporter {
-  // The kind is required at construction; the connections here record their own.
-  const exporter = new HandlerExporter({ systemType: 'onprem', ...options });
+  // States no kind: the connections here record their own, and a stated
+  // kind contradicting one is refused (D26 E11).
+  const exporter = new HandlerExporter({ ...options });
   (exporter as unknown as { handlerGroups: IHandlerGroup[] }).handlerGroups =
     groups;
   return exporter;
 }
 
 describe('HandlerExporter.getHandlerEntries', () => {
-  it('keeps every handler arity the embedders branch on', () => {
+  it("hands out every entry with its group's definition, a listed long tool's without background", () => {
     const exporter = new HandlerExporter({ systemType: 'onprem' });
     const raw = (
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());
     const wrapped = exporter.getHandlerEntries();
-    expect(wrapped.map((e) => e.handler.length)).toEqual(
-      raw.map((e) => e.handler.length),
-    );
     expect(wrapped.map((e) => e.toolDefinition)).toEqual(
-      raw.map((e) => e.toolDefinition),
+      raw.map((e) =>
+        isLongTool(e.toolDefinition.name)
+          ? longToolInTheCall(e.toolDefinition)
+          : e.toolDefinition,
+      ),
     );
-    const arities = new Set(raw.map((e) => e.handler.length));
-    expect(arities.has(1)).toBe(true);
   });
 
-  it('a context+args handler runs with values filled from its connection', async () => {
+  it('a handler runs with values filled from its connection', async () => {
     const exporter = exporterWith([fakeGroup(null)]);
     const entry = exporter.getHandlerEntries()[0];
-    expect(entry.handler.length).toBe(2);
     await expect(
-      entry.handler({ connection: cloudConn() }, {}),
+      entry.call({ connection: cloudConn() }, {}),
     ).resolves.toMatchObject({ responsible: 'CB_USER', masterSystem: 'CLD' });
   });
 
-  it("an args-only handler resolves the group's swapped connection", async () => {
+  it("a handler reading its context's connection gets the call's", async () => {
     const group = fakeGroup(null);
     const entry = exporterWith([group]).getHandlerEntries()[1];
-    expect(entry.handler.length).toBe(1);
     const conn = cloudConn();
-    group.context = { connection: conn };
-    const result = await (entry.handler as unknown as (a: unknown) => unknown)(
-      {},
-    );
+    const result = await entry.call({ connection: conn }, {});
     expect(result).toMatchObject({
       responsible: 'CB_USER',
       masterSystem: 'CLD',
@@ -888,34 +895,26 @@ describe('HandlerExporter.getHandlerEntries', () => {
   });
 
   describe.each([
-    ['context+args', 0],
-    ['args-only', 1],
-  ])('a %s handler', (_arity, index) => {
+    ['WithContext', 0],
+    ['Closure', 1],
+  ])('the %s handler', (_name, index) => {
     /** Calls the entry on `connection` as an embedder does, recording whether it ran. */
     function callOn(connection: IAbapConnection) {
       const group = fakeGroup(connection);
       const ran = jest.fn();
       const original = group.getHandlers;
       group.getHandlers = () =>
-        original().map((e) => {
-          const handler = e.handler as (...a: unknown[]) => Promise<unknown>;
-          const counted =
-            handler.length >= 2
-              ? async (c: unknown, a: unknown) => {
-                  ran();
-                  return handler(c, a);
-                }
-              : async (a: unknown) => {
-                  ran();
-                  return handler(a);
-                };
-          return { ...e, handler: counted as never };
-        });
+        original().map(
+          (e): HandlerEntry => ({
+            ...e,
+            call: async (c, a) => {
+              ran();
+              return e.call(c, a);
+            },
+          }),
+        );
       const entry = exporterWith([group]).getHandlerEntries()[index];
-      const call = () =>
-        index === 0
-          ? entry.handler({ connection }, {})
-          : (entry.handler as unknown as (a: unknown) => Promise<unknown>)({});
+      const call = () => entry.call({ connection }, {});
       return { call, ran };
     }
 
@@ -1016,9 +1015,9 @@ describe('HandlerExporter.getHandlerEntries', () => {
     });
     const result = await exporter
       .getHandlerEntries()[0]
-      .handler({ connection: cloudConn() }, {});
+      .call({ connection: cloudConn() }, {});
     expect(lookup).not.toHaveBeenCalled();
-    expect(result.responsible).toBeUndefined();
+    expect(result).toMatchObject({ responsible: undefined });
   });
 });
 
@@ -1029,7 +1028,7 @@ class ReportingGroup extends BaseHandlerGroup {
     return [
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
-        handler: async () => {
+        call: async () => {
           this.observed = seen();
           return { content: [{ type: 'text', text: 'ok' }] };
         },
@@ -1077,31 +1076,20 @@ describe('BaseMcpServer.registerHandlers', () => {
     return {
       ...inner,
       getHandlers: () =>
-        inner.getHandlers().map((e) => ({
-          ...e,
-          handler: (e.handler.length >= 2
-            ? async (c: HandlerContext, a: unknown) => ({
-                content: [
-                  { type: 'text', text: JSON.stringify(await e.handler(c, a)) },
-                ],
-              })
-            : async (_a: unknown) => ({
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify(
-                      await (e.handler as unknown as (a: unknown) => unknown)(
-                        _a,
-                      ),
-                    ),
-                  },
-                ],
-              })) as never,
-        })),
+        inner.getHandlers().map(
+          (e): HandlerEntry => ({
+            ...e,
+            call: async (c, a) => ({
+              content: [
+                { type: 'text', text: JSON.stringify(await e.call(c, a)) },
+              ],
+            }),
+          }),
+        ),
     };
   }
 
-  it('fills values for both handler arities', async () => {
+  it('fills values for both handlers', async () => {
     const server = new EmbeddableMcpServer({
       connection: cloudConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
@@ -1187,22 +1175,21 @@ describe('BaseMcpServer.registerHandlers', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it("a factory-built connection follows its recorded settings, not the server's systemType", async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+  it("a factory-built connection of another kind than the server's: system_type_conflict, nothing looked up, the tool not run", async () => {
     const server = new EmbeddableMcpServer({
       connection: onPremUserConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
       systemType: 'cloud',
     });
-    // On-premise by its settings: the 404 is the function unavailable, and
-    // the tool runs with the configuration.
+    // One kind per server (the owner, 2026-11-17): the connection was built
+    // for on-premise, the server states cloud.
     const result = (await callTool(server, 'WithContext')) as {
       isError?: boolean;
+      content: Array<{ text: string }>;
     };
-    expect(result.isError).toBeUndefined();
-    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('system_type_conflict');
+    expect(lookup).not.toHaveBeenCalled();
   });
 
   it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; nothing is kept, the next call asks again', async () => {

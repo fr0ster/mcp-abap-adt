@@ -1,6 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
+import {
+  ADT_CORPUS_DIR,
+  corpusBody,
+  corpusSidecar,
+} from '../helpers/adtCorpus';
 
 /**
  * Metadata is not one shape repeated per object type.

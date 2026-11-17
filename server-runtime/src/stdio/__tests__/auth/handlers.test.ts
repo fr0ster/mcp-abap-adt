@@ -37,6 +37,13 @@ function context(over: Partial<AuthHandlerContext> = {}) {
   return { ctx, calls, recorded, requests };
 }
 
+/** `context` with no browser chosen: the key absent, as a context without one has it. */
+function noBrowser(over: Partial<AuthHandlerContext> = {}) {
+  const made = context(over);
+  const { browser: _browser, ...ctx } = made.ctx;
+  return { ...made, ctx };
+}
+
 const request = {
   buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
 } as AuthorizationRequest;
@@ -130,7 +137,7 @@ describe('brokerOptions', () => {
   });
 
   it('leaves the browser and the port out when the context has none', () => {
-    const { ctx, calls } = context({ browser: undefined });
+    const { ctx, calls } = noBrowser();
     handlerFor('d', {
       authType: 'jwt',
       grantType: 'authorization_code',
@@ -151,8 +158,7 @@ describe('jwt / authorization_code checkSettings: the browser', () => {
     try {
       login.checkSettings?.(
         {} as SapConfig,
-        context({ browser: undefined, browserUnavailable: 'no browser here' })
-          .ctx,
+        noBrowser({ browserUnavailable: 'no browser here' }).ctx,
       );
     } catch (e) {
       err = e;
@@ -165,10 +171,7 @@ describe('jwt / authorization_code checkSettings: the browser', () => {
       login.checkSettings?.({} as SapConfig, context().ctx),
     ).not.toThrow();
     expect(() =>
-      login.checkSettings?.(
-        {} as SapConfig,
-        context({ browser: undefined }).ctx,
-      ),
+      login.checkSettings?.({} as SapConfig, noBrowser().ctx),
     ).not.toThrow();
   });
 });

@@ -1,6 +1,7 @@
 import type { AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtNeed } from '../adtProjections';
 import { acceptedOf } from '../adtTypeCode';
+import { digitsAfter } from '../plainText';
 
 /**
  * The source a line breakpoint names, from what a model knows — a type and a
@@ -51,8 +52,8 @@ export const RUN_KINDS = [
 export interface BreakpointTarget {
   object_type: string;
   object_name: string;
-  include?: string;
-  parent_name?: string;
+  include?: string | undefined;
+  parent_name?: string | undefined;
 }
 export interface ObjectAddress {
   object_type: string;
@@ -110,47 +111,73 @@ export function lineUriOf(target: BreakpointTarget, line: number): string {
   return `${sourceUriOf(target)}#start=${line}`;
 }
 
+/**
+ * The `count` non-empty segments of `path` after `prefix`, when it starts
+ * with `prefix` and holds exactly so many; `undefined` otherwise.
+ */
+function segmentsAfter(
+  path: string,
+  prefix: string,
+  count: number,
+): string[] | undefined {
+  if (!path.startsWith(prefix)) return undefined;
+  const segments = path.slice(prefix.length).split('/');
+  return segments.length === count && segments.every((s) => s !== '')
+    ? segments
+    : undefined;
+}
+
 /** The inverse of `lineUriOf`, for answers; `undefined` for a URI of no known kind. */
 export function addressOf(uri: string): ObjectAddress | undefined {
   if (!uri) return undefined;
   const [path, fragment = ''] = uri.split('#');
-  const start = /(?:^|[;,&])start=(\d+)/.exec(fragment)?.[1];
+  const start = digitsAfter(
+    fragment,
+    'start=',
+    (before) => before === undefined || ';,&'.includes(before),
+  );
   const line = start ? { line: Number(start) } : {};
-  let m =
-    /^\/sap\/bc\/adt\/oo\/classes\/([^/]+)\/(?:source\/main|includes\/([^/]+))$/.exec(
-      path,
-    );
-  if (m) {
+  const klass = segmentsAfter(path, '/sap/bc/adt/oo/classes/', 3);
+  if (
+    klass !== undefined &&
+    ((klass[1] === 'source' && klass[2] === 'main') || klass[1] === 'includes')
+  ) {
     const label: BreakpointLabel = 'CLAS';
     return {
       object_type: label,
-      object_name: unseg(m[1]),
-      ...(m[2] ? { include: decodeURIComponent(m[2]) } : {}),
+      object_name: unseg(klass[0]),
+      ...(klass[1] === 'includes'
+        ? { include: decodeURIComponent(klass[2]) }
+        : {}),
       ...line,
     };
   }
-  m =
-    /^\/sap\/bc\/adt\/programs\/(programs|includes)\/([^/]+)\/source\/main$/.exec(
-      path,
-    );
-  if (m) {
-    const label: BreakpointLabel = m[1] === 'programs' ? 'PROG' : 'INCL';
+  const program = segmentsAfter(path, '/sap/bc/adt/programs/', 4);
+  if (
+    program !== undefined &&
+    (program[0] === 'programs' || program[0] === 'includes') &&
+    program[2] === 'source' &&
+    program[3] === 'main'
+  ) {
+    const label: BreakpointLabel = program[0] === 'programs' ? 'PROG' : 'INCL';
     return {
       object_type: label,
-      object_name: unseg(m[2]),
+      object_name: unseg(program[1]),
       ...line,
     };
   }
-  m =
-    /^\/sap\/bc\/adt\/functions\/groups\/([^/]+)\/fmodules\/([^/]+)\/source\/main$/.exec(
-      path,
-    );
-  if (m) {
+  const module = segmentsAfter(path, '/sap/bc/adt/functions/groups/', 5);
+  if (
+    module !== undefined &&
+    module[1] === 'fmodules' &&
+    module[3] === 'source' &&
+    module[4] === 'main'
+  ) {
     const label: BreakpointLabel = 'FUNC';
     return {
       object_type: label,
-      object_name: unseg(m[2]),
-      parent_name: unseg(m[1]),
+      object_name: unseg(module[2]),
+      parent_name: unseg(module[0]),
       ...line,
     };
   }

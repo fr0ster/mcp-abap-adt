@@ -1,0 +1,13 @@
+{
+  // A project the sweep's gate reads in its own program (unknownSweep.test.ts):
+  // `@sibling/unbuilt` maps to a sibling's declarations that were never built.
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "commonjs",
+    "types": [],
+    "paths": { "@sibling/unbuilt": ["./unbuilt/index.d.ts"] }
+  },
+  "include": ["src"]
+}

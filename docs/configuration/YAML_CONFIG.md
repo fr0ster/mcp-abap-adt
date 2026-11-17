@@ -38,7 +38,13 @@ mcp-abap-adt-http --conf=http.yaml --port=8080 --system-type=<onprem|cloud>
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `system-type` | string | — (required, here, as `--system-type` or `SAP_SYSTEM_TYPE`) | `onprem`, `cloud` or `legacy`; never guessed from the credential or the URL |
-| `batch.keepRawParts` | boolean | `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. `true` or `false` only; anything else is refused at startup. Also `--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS` |
+| `batch.keepRawParts` | boolean | `false` | Batch mode: each answer of a batch (`HandlerBatch` `answers`, `DebugBatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. `true` or `false` only; anything else is refused at startup. Also `--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS` |
+| `enable-data-tools` | boolean | `false` | Serves the data tools (`GetSqlQuery`, `GetTableContents`; compact `HandlerGetData`), off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to turn this on is the customer's decision. `true` or `false`; `null` (or an empty value) counts as not given, as for every key, and any other value is refused at startup. Also `--enable-data-tools`, `MCP_ENABLE_DATA_TOOLS` |
+| `restrictions.deny-actions` | string list | — | Tools and values not registered at start (`Tool`, `Prefix*`, `Tool.value`, `Tool.CODE`, `Tool.prefix*`); see [Access restrictions](../user-guide/ACCESS_RESTRICTIONS.md). Also `--deny-actions`, `MCP_DENY_ACTIONS` |
+| `restrictions.allowed-packages` | string list | — | A call naming a package runs only when it matches (`ZFOO`, `Z*`, `ZFOO/**`). Also `--allowed-packages`, `MCP_ALLOWED_PACKAGES` |
+| `restrictions.allowed-requests` | string list | — | A call naming a transport request runs only when it matches (a number or a prefix). Also `--allowed-requests`, `MCP_ALLOWED_REQUESTS` |
+| `restrictions.denied-tables` | string list | — | The data tools refuse these tables (names or prefixes); not with `restrictions.allowed-tables`. Also `--denied-tables`, `MCP_DENIED_TABLES` |
+| `restrictions.allowed-tables` | string list | — | The data tools read only these tables; not with `restrictions.denied-tables`. Also `--allowed-tables`, `MCP_ALLOWED_TABLES` |
 | `shutdown-timeout` | number | — | Seconds after which a shutdown is forced, 1-86400; no default: a shutdown logs off every ADT session at once and interrupts the running tools — it waits for no tool —, then waits for the logoffs to be written and (stdio) the session writes. Forced, it waits only for the logoffs' writes and exits `1`; a session write may be lost. See [CLI options: Shutdown](../user-guide/CLI_OPTIONS.md#shutdown) |
 
 `transport` is gone: the key, with any value, stops every binary naming the binary to run.
@@ -60,12 +66,17 @@ mcp: TRIAL
 # env: trial
 # env-path: .env
 connection-type: http          # http | rfc — required for a destination, no default
-# RFC through a message server and a logon group (rfc only; mshost needs msserv or sysid):
-# mshost: msghost.example
-# msserv: sapmsABC
-# sysid: ABC
-# group: PUBLIC                # logon group; absent: connection's default PUBLIC
+# RFC (rfc only): one address, the client and the language; no URL. Below the CLI, the
+# environment and the destination's .env:
+# ashost: saphost.example      # an application server: its host
+# sysnr: "00"                  # and its system number
+# mshost: msghost.example      # or a message server: its host,
+# msserv: sapmsABC             # its service and/or
+# sysid: ABC                   # its system id,
+# group: <logon group>         # and its logon group (required with mshost)
 # saprouter: /H/router.example/S/3299/H/
+# client: "100"                # required over RFC
+# language: EN                 # required over RFC; also the master language of created objects
 system-type: cloud             # onprem | cloud | legacy
 unsafe: false                  # write named destinations' sessions to disk
 # auth-broker-path: ~/custom/path
@@ -73,6 +84,8 @@ browser: system                # system | auto | chrome | edge | firefox | none 
 # browser-program: /opt/browsers/my-browser   (excludes browser)
 renewal: refresh-then-login    # refresh-then-login | refresh-only
 browser-auth-port: 61001
+# deferred-logon: true         # start without contacting SAP; the first tool call logs on
+# restore-session: true        # with deferred-logon: the first call takes up the leftover session
 # login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
 # auth-debug: true             # providers' debug lines on stderr, secrets' first and last four characters; no environment form
 # shutdown-timeout: 25         # seconds, 1-86400; no default (a shutdown waits)
@@ -84,17 +97,25 @@ browser-auth-port: 61001
 | `env` | string | - | Destination name resolved from the sessions store (`sessions/<name>.env`) |
 | `env-path` | string | - | Explicit path to `.env` file. Nothing is looked up in the working directory: a `.env` there is read only when named (`env-path: ./.env`) |
 | `connection-type` | string | — | SAP connection transport: `http` or `rfc`. Required for a destination unless the CLI, the environment or the destination's `.env` states it; no default |
-| `mshost` | string | — | RFC: the message server host. With it no RFC host or system number comes from the URL (`SAP_SYSNR` is not read); needs `msserv` or `sysid` — with neither, connection refuses naming both |
+| `ashost` | string | — | RFC: the application server host; with `sysnr`, the application-server address |
+| `sysnr` | string | — | RFC: the application server's two-digit system number |
+| `mshost` | string | — | RFC: the message server host; with `msserv` or `sysid` and `group`, the message-server address |
 | `msserv` | string | — | RFC: the message server service (name or port) |
 | `sysid` | string | — | RFC: the system id |
-| `group` | string | — (connection's `PUBLIC`) | RFC: the logon group; the server adds no default |
-| `saprouter` | string | — | RFC: the SAProuter string, with either addressing |
+| `group` | string | — | RFC: the logon group, required with `mshost`; no default |
+| `saprouter` | string | — | RFC: the SAProuter string, with either address |
+| `client` | string | — | The SAP client; required over RFC |
+| `language` | string | — | The logon language (required over RFC) and the master language of created objects |
+
+Each of these ranks below the CLI, the process environment and the destination's own `.env`. An RFC destination states exactly one address, its client and its language, and no URL; nothing is derived from a URL and nothing has a default.
 | `unsafe` | boolean | `false` | Write named destinations' sessions to disk instead of keeping them in memory |
 | `auth-broker-path` | string | - | Base directory of `service-keys/` and `sessions/` |
 | `browser` | string | `system` | Browser for a login: `system`, `auto`, `chrome`, `edge`, `firefox`, `none`, `headless` (mapped by the platform; excludes `browser-program`) |
 | `browser-program` | string | — | The program that opens the login URL (excludes `browser`) |
 | `renewal` | string | `refresh-then-login` | `refresh-then-login` or `refresh-only` (never a login) |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
+| `deferred-logon` | boolean | `false` | Start without contacting the SAP system; the first tool call logs on. Below `--deferred-logon` and `MCP_DEFERRED_LOGON` |
+| `restore-session` | boolean | — | With `deferred-logon`: the first tool call takes up the destination's one leftover session. Stated (any value) without `deferred-logon`, the start is refused; the generated template leaves it unstated |
 | `login-timeout` | number | — | Seconds after which a browser login is ended, 1-86400; no default (no bound) |
 | `auth-debug` | boolean | `false` | The token providers' debug lines on stderr; a refused token request's line names the first and last four characters of each secret it sent. YAML and `--auth-debug` only: no environment variable |
 
@@ -126,20 +147,20 @@ state-idle-minutes: 30
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `http.host` | string | `127.0.0.1` | Host to listen on |
-| `http.port` | number | `3000` | Port to listen on |
+| `http.port` | number | `3000` | Port to listen on; `0` for a free one the system chooses, named on the listening line |
 | `http.json-response` | boolean | `false` | JSON responses rather than SSE streams |
 | `http.allowed-hosts` | string[] | - | DNS-rebinding protection: exact Host header values to allow, including port. NOT browser CORS — no Access-Control-Allow-Origin headers are emitted |
 | `http.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `http.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set); a non-allowlisted Host/Origin gets HTTP 403 |
-| `http.tls.cert`, `http.tls.key`, `http.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+| `http.tls.cert`, `http.tls.key`, `http.tls.ca` | string | - | TLS files (PEM); cert and key together. `ca`, optional beside them: intermediate CA certificate(s) the server sends with its own certificate, completing the chain clients verify — not a trust store for clients (no client certificate is requested); a root CA given there is not sent |
 | `state-idle-minutes` | number | `30` | The idle bound on held state; see [Held State](#held-state) |
 
 `state-idle-minutes` here bounds each pooled instance's held state, reached again by its
 `state_handle`.
 
 Refused in `mcp-abap-adt-http`'s file: the destination and login keys (`mcp`, `env`, `env-path`,
-`auth-broker-path`, `allow-destination-header`, `unsafe`, `connection-type`, `mshost`, `msserv`,
-`sysid`, `group`, `saprouter`, `browser`, `browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`:
+`auth-broker-path`, `allow-destination-header`, `unsafe`, `connection-type`, `ashost`, `sysnr`,
+`mshost`, `msserv`, `sysid`, `group`, `saprouter`, `client`, `language`, `browser`, `browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`:
 ``<key> (config file): destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers``),
 `sse`, `exposition` and
 `transport`.
@@ -162,11 +183,11 @@ state-idle-minutes: 30
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `sse.host` | string | `127.0.0.1` | Host to listen on |
-| `sse.port` | number | `3001` | Port to listen on |
+| `sse.port` | number | `3001` | Port to listen on; `0` for a free one the system chooses, named on the listening line |
 | `sse.allowed-hosts` | string[] | - | DNS-rebinding protection: exact Host header values to allow, including port |
 | `sse.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `sse.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set) |
-| `sse.tls.cert`, `sse.tls.key`, `sse.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+| `sse.tls.cert`, `sse.tls.key`, `sse.tls.ca` | string | - | TLS files (PEM); cert and key together. `ca`, optional beside them: intermediate CA certificate(s) the server sends with its own certificate, completing the chain clients verify — not a trust store for clients (no client certificate is requested); a root CA given there is not sent |
 | `state-idle-minutes` | number | `30` | The idle bound on held state; see [Held State](#held-state) |
 
 `state-idle-minutes` here bounds each SSE connection's instance, which holds its state until the
@@ -194,6 +215,20 @@ A value that is not valid (a port outside 1-65535, an unknown `connection-type`,
 flag value, a `state-idle-minutes` under 30, over 35791 or not a whole number) is **refused at
 startup**, naming the key, instead of being ignored — and so is a key of another binary, or
 `transport`. A file that is not YAML is refused naming its line and column, never quoting it.
+
+**A key no parameter of the binary reads is refused** (24.0.0), at any depth, by its dotted path,
+with the known key it may mean: `system_type` → `Config file key "system_type" is not a parameter
+of this binary; did you mean "system-type"?`; `http.json_response` the same. Before 24.0.0 such a
+key was read by nothing, and the value it meant to set stayed at its default.
+
+**A section or a value of the wrong shape is refused** (24.0.0), naming its key: a section
+(`http`, `sse`, `http.tls`, `restrictions`, …) must be a mapping of its keys — a list or a value
+there is refused (`Config file key "http" is a list: it must be a mapping of its keys (…)`), and
+nothing under it is read; a key that takes one value (a port, a host, a path, an enum) refuses a
+list or a mapping, and a list key (`allowed-hosts`) refuses a mapping or an item that is itself a
+list or a mapping. Before, a section given as a list was skipped: `http: [{enable-dns-protection:
+true, …}]` started with the protection off. YAML `null` and an empty value are not given, for a
+section as for a key.
 
 ### Configuration only (no secrets)
 

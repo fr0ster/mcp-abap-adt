@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateStructure Handler - Update Existing ABAP Structure DDL Source
  *
@@ -29,7 +31,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -38,46 +40,37 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      structure_name: {
-        type: 'string',
-        description: 'Structure name. Structure must already exist.',
-      },
-      ddl_code: {
-        type: 'string',
-        description:
-          "Complete DDL source code for structure. Example: '@EndUserText.label : \\'My Structure\\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'",
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Optional if object is local or already in transport.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate structure after source update. Default: true.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['structure_name', 'ddl_code'],
-  },
+  inputSchema: z.object({
+    structure_name: z
+      .string()
+      .describe('Structure name. Structure must already exist.'),
+    ddl_code: z
+      .string()
+      .describe(
+        "Complete DDL source code for structure. Example: '@EndUserText.label : \\'My Structure\\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'",
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Optional if object is local or already in transport.',
+      ),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate structure after source update. Default: true.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateStructureArgs {
-  structure_name: string;
-  ddl_code: string;
-  transport_request?: string;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateStructure(
   context: HandlerContext,
@@ -95,14 +88,14 @@ export async function handleUpdateStructure(
 
   return answer(
     { tool: 'UpdateStructure', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getStructure(
         resultsFor(structureDocuments),
       );
 
       const written = await withLock(
         () => obj.lock({ structureName }, { analyse: analyseLock }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        (lockHandle): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
           const update = atStep('update', () =>
             withAdtHeaders(context, 'structure.update', (headers) =>
               obj.update(
@@ -141,7 +134,7 @@ export async function handleUpdateStructure(
       );
 
       if (!written.ok || !shouldActivate) {
-        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return written;
       }
 
       return carryCleanup(

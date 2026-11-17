@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,27 +27,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the RAP behavior definition (BDEF) named by name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'BehaviorDefinition name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
-      },
-    },
-    required: ['name'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('BehaviorDefinition name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckBehaviorDefinition(
   context: HandlerContext,
-  args: { name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckBdefLow(context, args);
   return normalizeCheckResponse(result, args.name?.toUpperCase());

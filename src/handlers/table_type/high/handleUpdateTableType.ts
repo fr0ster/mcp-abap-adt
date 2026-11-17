@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateTableType Handler - Update an Existing ABAP Table Type
  *
@@ -11,7 +13,7 @@
  * runs inside the lock, as the domain's does; a refusal there stops the
  * answer exactly as a refused write would. The wait is the long-polling
  * `readMetadata({withLongPolling: true})` (see `handleUpdateDomain.ts` and
- * `xmlPatch.ts`); its document, the inactive version, is the definition SAP
+ * `documentPatch.ts`); its document, the inactive version, is the definition SAP
  * stored, answered beside the result; after a successful activation one read
  * of the active version answers it instead (`tableTypeStored.ts`).
  *
@@ -22,7 +24,10 @@
  * nothing, and the write never reads it.
  */
 
-import { tableTypeDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  patchTableTypeDocument,
+  tableTypeDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -31,19 +36,19 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
+import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
+import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
-import { patchTableTypeXml } from '../../../lib/strategies/tableTypePatch';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import {
   type AccessType,
@@ -58,52 +63,30 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.",
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name. The table type must already exist.',
-      },
-      description: {
-        type: 'string',
-        description: 'New table type description.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number, not a task. Required for transportable packages.',
-      },
-      ...TABLE_TYPE_DEFINITION_PROPERTIES,
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate the table type after the update (default: true).',
-        default: true,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['table_type_name'],
-  },
+  inputSchema: z.object({
+    table_type_name: z
+      .string()
+      .describe('Table type name. The table type must already exist.'),
+    description: z.string().optional().describe('New table type description.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number, not a task. Required for transportable packages.',
+      ),
+    ...TABLE_TYPE_DEFINITION_PROPERTIES,
+    activate: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Activate the table type after the update (default: true).'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system, so a
  * required one may be absent and is refused below. */
-interface UpdateTableTypeArgs {
-  table_type_name?: string;
-  description?: string;
-  transport_request?: string;
-  row_type_kind?: RowTypeKind;
-  row_type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  access_type?: AccessType;
-  key_definition?: KeyDefinition;
-  key_kind?: KeyKind;
-  activate?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateTableType(
   context: HandlerContext,
@@ -140,7 +123,25 @@ export async function handleUpdateTableType(
                 { version: 'workingArea', analyse: analyseException },
               ),
             ),
-            atStep('update metadata', (current) =>
+            async (current) =>
+              patchedDocument(
+                patchTableTypeDocument(
+                  current.raw,
+                  tableTypeChanges({
+                    description: args.description,
+                    row_type_kind: args.row_type_kind,
+                    row_type_name: args.row_type_name,
+                    data_type: args.data_type,
+                    length: args.length,
+                    decimals: args.decimals,
+                    access_type: args.access_type,
+                    key_definition: args.key_definition,
+                    key_kind: args.key_kind,
+                  }),
+                ),
+                `table type ${tableTypeName}`,
+              ),
+            atStep('update metadata', (document) =>
               withAdtHeaders(context, 'tableType.updateMetadata', (headers) =>
                 obj.updateMetadata(
                   {
@@ -149,23 +150,7 @@ export async function handleUpdateTableType(
                   },
                   {
                     headers,
-                    source: patchTableTypeXml(
-                      extractXmlString(
-                        current.raw,
-                        `table type ${tableTypeName}`,
-                      ),
-                      {
-                        description: args.description,
-                        row_type_kind: args.row_type_kind,
-                        row_type_name: args.row_type_name,
-                        data_type: args.data_type,
-                        length: args.length,
-                        decimals: args.decimals,
-                        access_type: args.access_type,
-                        key_definition: args.key_definition,
-                        key_kind: args.key_kind,
-                      },
-                    ),
+                    source: document,
                     lockHandle,
                     analyse: analyseException,
                   },

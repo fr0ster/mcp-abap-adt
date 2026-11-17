@@ -331,35 +331,6 @@
     ],
     "semantic": "Wait until the AMDP method being debugged stops at an SQLScript breakpoint."
   },
-  "BatchAnswers": {
-    "keywords": [
-      "batch answers",
-      "batch results",
-      "answer by number",
-      "batch"
-    ],
-    "semantic": "Read the answers of the calls of the last batch by their number."
-  },
-  "BatchBegin": {
-    "keywords": [
-      "batch mode",
-      "start batch",
-      "record calls",
-      "several calls together",
-      "batch"
-    ],
-    "semantic": "Start batch mode: record several independent calls to send them together."
-  },
-  "BatchEnd": {
-    "keywords": [
-      "end batch",
-      "send batch",
-      "execute batch",
-      "batch mode",
-      "batch"
-    ],
-    "semantic": "Send the recorded calls together in one request and end batch mode."
-  },
   "CheckBehaviorDefinition": {
     "keywords": [
       "syntax check",
@@ -973,6 +944,16 @@
       "class"
     ],
     "semantic": "Write ABAP Unit tests for a class: its local test classes."
+  },
+  "DebugBatchAnswers": {
+    "keywords": [
+      "debugger batch answers",
+      "debugger batch results",
+      "answer by number",
+      "batch",
+      "debugger"
+    ],
+    "semantic": "Read the answers of the calls of the last debugger batch by their number."
   },
   "DebugBatchBegin": {
     "keywords": [
@@ -1600,38 +1581,6 @@
       "test cockpit"
     ],
     "semantic": "Check whether an ABAP Test Cockpit (ATC) run has finished."
-  },
-  "GetAbapAST": {
-    "keywords": [
-      "AST",
-      "abstract syntax tree",
-      "parse ABAP",
-      "parser",
-      "syntax tree"
-    ],
-    "semantic": "Parse a piece of ABAP code into its abstract syntax tree."
-  },
-  "GetAbapSemanticAnalysis": {
-    "keywords": [
-      "semantic analysis",
-      "symbols",
-      "scopes",
-      "dependencies",
-      "code analysis",
-      "static analysis"
-    ],
-    "semantic": "Analyze a piece of ABAP code: its symbols, types, scopes and dependencies."
-  },
-  "GetAbapSystemSymbols": {
-    "keywords": [
-      "resolve symbols",
-      "system symbols",
-      "symbol lookup",
-      "types",
-      "packages of symbols",
-      "code analysis"
-    ],
-    "semantic": "Resolve the symbols of a piece of ABAP code against the system: their types, descriptions and packages."
   },
   "GetAdtTypes": {
     "keywords": [
@@ -2395,13 +2344,25 @@
     ],
     "semantic": "Read one node from the cached object list of an earlier walk."
   },
+  "GetObjectOutline": {
+    "keywords": [
+      "outline",
+      "components",
+      "methods of a class",
+      "attributes",
+      "forms",
+      "source position",
+      "line numbers",
+      "visibility"
+    ],
+    "semantic": "List what a class, interface, program or function group defines — its methods, attributes, types, events, forms or modules — with their visibility and the source lines each occupies."
+  },
   "GetObjectStructure": {
     "keywords": [
       "object structure",
       "ADT structure",
       "tree",
-      "components",
-      "outline"
+      "components"
     ],
     "semantic": "Show the structure of a repository object as a tree of its parts."
   },
@@ -2437,6 +2398,17 @@
       "any object"
     ],
     "semantic": "List the version history of a repository object of any type: who changed it, when, in which transport."
+  },
+  "GetObjectDraft": {
+    "keywords": [
+      "draft",
+      "unactivated change",
+      "inactive version",
+      "who changed",
+      "pending change",
+      "working version"
+    ],
+    "semantic": "Tell whether a repository object holds an unactivated change and whose: the caller's or another user's, with its age."
   },
   "GetObjectsByType": {
     "keywords": [
@@ -3709,18 +3681,6 @@
     ],
     "semantic": "Read or analyze an ABAP profiler trace: the hit list, the statements, the database accesses."
   },
-  "HandlerSearch": {
-    "keywords": [
-      "search",
-      "find object",
-      "search by name",
-      "wildcard",
-      "pattern",
-      "name starts with",
-      "lookup"
-    ],
-    "semantic": "Find repository objects by their name or a name pattern with wildcards."
-  },
   "HandlerServiceBindingListTypes": {
     "keywords": [
       "service binding types",
@@ -3930,40 +3890,6 @@
       "object_type"
     ],
     "semantic": "Check that a new object can be created with the given name and package."
-  },
-  "HandlerWhereUsed": {
-    "keywords": [
-      "where used",
-      "where-used list",
-      "used by",
-      "usages",
-      "references",
-      "callers",
-      "who calls",
-      "who uses",
-      "impact analysis",
-      "class",
-      "function module",
-      "BAPI",
-      "table",
-      "CDS view"
-    ],
-    "semantic": "Who calls this method or function module (BAPI), and who uses this class, table or CDS view: the where-used list of an object.",
-    "members": {
-      "CLASS": [
-        "class"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "DDL": [
-        "CDS view"
-      ]
-    }
   },
   "ListATCResults": {
     "keywords": [
@@ -4360,11 +4286,9 @@
       "occurrences",
       "statement",
       "packages",
-      "cursor",
-      "continue",
-      "next_start_at"
+      "package mask"
     ],
-    "semantic": "Search the source code of the programs, classes and function groups in a package for a text or statement; a scan that stops early answers a cursor to continue from."
+    "semantic": "Search the source code of the programs, classes, function groups and other source objects in packages or package masks for a text or statement; the answer lists every hit with its line."
   },
   "SessionClose": {
     "keywords": [
@@ -4909,5 +4833,23 @@
       "name check"
     ],
     "semantic": "Check that a new service binding can be created with the given name, service definition and package."
+  },
+  "HandlerSystem": {
+    "keywords": [
+      "search source code",
+      "grep",
+      "find object",
+      "search by name",
+      "wildcard",
+      "where used",
+      "used by",
+      "references",
+      "package tree",
+      "subpackages",
+      "transport requests",
+      "ATC findings",
+      "ATC results"
+    ],
+    "semantic": "Read across the system by action: search source code in packages, find objects by name or pattern, list where an object is used, show a package tree, list transport requests, and read ATC findings and results."
   }
 }

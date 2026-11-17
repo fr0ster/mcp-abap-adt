@@ -109,7 +109,7 @@ const PROGRAMS: Readonly<
 const NO_BROWSER: BrowserMapping = Object.freeze({});
 
 function isBrowserName(word: string): word is BrowserName {
-  return (BROWSER_NAMES as readonly string[]).includes(word);
+  return BROWSER_NAMES.some((name) => name === word);
 }
 
 function knownPlatform(platform: string): Platform | undefined {
@@ -160,9 +160,7 @@ export function browserFor(
 
 /** The browser a mapping names, built; `undefined` for no browser or an unavailable one. */
 export function browserOf(mapping: BrowserMapping): IBrowser | undefined {
-  if (!mapping.factory) return undefined;
-  if (mapping.argument === undefined) {
-    return (mapping.factory as () => IBrowser)();
-  }
+  if (mapping.factory === undefined) return undefined;
+  if (mapping.argument === undefined) return mapping.factory();
   return mapping.factory(mapping.argument);
 }

@@ -743,6 +743,7 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/vnd.sap.adt.deletion.request.v1+xml',
   ),
   'transformation.update': pair('text/plain', 'text/plain; charset=utf-8'),
+  'utils.activateObjects': pair('application/xml', 'application/xml'),
   'utils.activateObjectsGroup': pair('application/xml', 'application/xml'),
   'utils.checkDeletionGroup': pair(
     'application/vnd.sap.adt.deletion.check.response.v1+xml',
@@ -788,10 +789,23 @@ export type AdtObjectWith<M extends string> = AdtOperation extends infer K
     : never
   : never;
 
-/** The operation of `member` on `object`. */
+/** Whether `value` names an operation of the table. */
+function isAdtOperation(value: string): value is AdtOperation {
+  return Object.hasOwn(DEFAULT_ADT_HEADERS, value);
+}
+
+/**
+ * The operation of `member` on `object`. The types admit only an object
+ * whose `member` the table holds; TypeScript cannot follow the joined
+ * text back to the table's key, so it is looked up there.
+ */
 export function adtOperation<M extends string>(
   object: AdtObjectWith<M>,
   member: M,
 ): AdtOperation {
-  return `${object}.${member}` as AdtOperation;
+  const operation = `${object}.${member}`;
+  if (!isAdtOperation(operation)) {
+    throw new Error(`${operation} takes no ADT header pair`);
+  }
+  return operation;
 }

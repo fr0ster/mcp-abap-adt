@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,27 +27,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP domain named by domain_name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      domain_name: {
-        type: 'string',
-        description: 'Domain name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
-      },
-    },
-    required: ['domain_name'],
-  },
+  inputSchema: z.object({
+    domain_name: z.string().describe('Domain name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckDomain(
   context: HandlerContext,
-  args: { domain_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckDomainLow(context, args);
   return normalizeCheckResponse(result, args.domain_name?.toUpperCase());

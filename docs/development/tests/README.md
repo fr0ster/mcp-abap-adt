@@ -22,15 +22,6 @@ Technical overview of the test infrastructure:
 - Migration path for legacy tests
 - Test coverage status
 
-### [CREATE_DOMAIN_TOOL.md](CREATE_DOMAIN_TOOL.md)
-Documentation for the CreateDomain MCP tool:
-- Complete API reference
-- Workflow steps (lock → create → check → unlock → activate → verify)
-- Session management architecture
-- Input parameters and response format
-- Error handling
-- Testing examples
-
 ### [DEBUGGING.md](DEBUGGING.md)
 Guide for debugging integration tests:
 - Environment variables for debugging (DEBUG_TESTS, DEBUG_HANDLERS, etc.)
@@ -39,11 +30,12 @@ Guide for debugging integration tests:
 - Common issues and solutions
 - Example debug output
 
-### [test-config.yaml.template](test-config.yaml.template)
-Template for test configuration:
+### [test-config.yaml.template](../../../tests/test-config.yaml.template)
+Template for test configuration (`tests/test-config.yaml.template`):
 - Copy to `tests/test-config.yaml` before running tests
 - Update transport requests and system-specific values
-- Enable/disable test cases as needed
+- It gives data only: where a case runs is decided in code by what the system serves
+  (`src/__tests__/integration/README.md`, "Where a suite runs")
 
 ## Quick Start
 
@@ -62,7 +54,7 @@ Template for test configuration:
    ```bash
    npm run build
    npm run test:integration              # All tests
-   npm test -- --testPathPatterns=class   # Specific object
+   npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts   # One file
    ```
 
 ## 📁 Related Files

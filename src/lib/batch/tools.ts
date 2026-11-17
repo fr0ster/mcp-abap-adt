@@ -1,6 +1,6 @@
 /**
- * What the batch tools do, shared by the full sets' `BatchBegin`,
- * `BatchEnd`, `BatchAnswers` and the compact sets' `HandlerBatch`: each
+ * What the batch tools do, shared by the compact sets' `HandlerBatch`, the
+ * debugger batch's tools and `DebugBatchAnswers`: each
  * reaches the instance's owner through its call's context (`batch`), and
  * without one answers `batch_mode_unavailable`.
  *
@@ -26,6 +26,7 @@ import type { McpResult } from '../answer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import { requireDebugger } from '../debugger/access';
 import { DebugStateError } from '../debugger/DebugSession';
+import { thrownAs } from '../thrownValue';
 import { type AnswersAsk, batchAnswersAnswer, readAnswers } from './answers';
 import { EnvelopeWatch } from './envelopeWatch';
 import { executeBatch, openBatchOf } from './execute';
@@ -44,7 +45,7 @@ function ownerOf(context: HandlerContext): InstanceBatch {
  * target, seen by the envelope watch (nothing is sent, no connection taken).
  */
 export function communicationBatch(logger?: ILogger): OpenBatch {
-  const target = new LateBoundConnection();
+  const target = new LateBoundConnection(logger);
   const envelopes = new EnvelopeWatch();
   const connection = new AdtBatchConnection(envelopes.over(target), {
     endpoint: 'communication',
@@ -53,11 +54,11 @@ export function communicationBatch(logger?: ILogger): OpenBatch {
   return { connection, target, envelopes, recorded: [] };
 }
 
-/** `BatchBegin`: a communication batch opened; answers `{ batch: 'on', state_handle }`. */
+/** The batch begin: a communication batch opened; answers `{ batch: 'on', state_handle }`. */
 export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   owner.begin('communication', communicationBatch(context.logger));
-  const answer: Record<string, unknown> = { batch: 'on' };
+  const answer: { batch: 'on'; state_handle?: string } = { batch: 'on' };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
@@ -65,7 +66,7 @@ export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   };
 }
 
-/** `BatchEnd`: the open communication batch executed on the call's connection. */
+/** The batch end: the open communication batch executed on the call's connection. */
 export async function endBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
   const open = openBatchOf(owner, 'communication');
@@ -98,13 +99,19 @@ export async function beginDebugBatch(
   try {
     connection = debug.abap.openBatch(options);
   } catch (error) {
-    if (!(error instanceof DebugStateError) || !debug.amdp.atBreak())
+    if (
+      thrownAs(error, DebugStateError) === undefined ||
+      !debug.amdp.atBreak()
+    ) {
       throw error;
+    }
     connection = debug.amdp.openBatch(options);
     debuggee = 'amdp';
   }
   owner.begin('debugger', { connection, envelopes, recorded: [], debuggee });
-  const answer: Record<string, unknown> = { debug_batch: 'on' };
+  const answer: { debug_batch: 'on'; state_handle?: string } = {
+    debug_batch: 'on',
+  };
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
@@ -121,7 +128,7 @@ export async function endDebugBatch(
   return executeBatch(owner, open);
 }
 
-/** `BatchAnswers`: the last batch's numbers, each answered when read. */
+/** The answers read: the last batch's numbers, each answered when read. */
 export async function answersOf(
   context: HandlerContext,
   ask: AnswersAsk,

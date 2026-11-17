@@ -1,6 +1,11 @@
-import { scanLines } from '../../../lib/search-source/lineScanner';
+import type { ScanInput } from '../../../lib/search-source/lineMatch';
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 
-describe('scanLines', () => {
+/** Today's `scanLines` cases, run against the shipped strategy unchanged. */
+const scanLines = (lines: readonly string[], input: ScanInput) =>
+  substringLineMatch.match(lines, input);
+
+describe("the shipped line match (substringLineMatch) keeps today's match", () => {
   it('matches a single query and returns 1-based line + snippet', () => {
     const lines = ['DATA lv_foo TYPE i.', 'WRITE lv_foo.', 'ENDFORM.'];
     const r = scanLines(lines, { query: 'lv_foo', max_hits: 10 });

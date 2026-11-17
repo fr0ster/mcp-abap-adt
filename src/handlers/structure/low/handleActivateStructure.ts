@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ActivateStructureLow Handler - Activate ABAP Structure
  *
@@ -10,8 +12,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -20,23 +22,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP structure. Returns activation status and any warnings/errors.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      structure_name: {
-        type: 'string',
-        description: 'Structure name.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['structure_name'],
-  },
+  inputSchema: z.object({
+    structure_name: z.string().describe('Structure name.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface ActivateStructureArgs {
-  structure_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateStructure(
   context: HandlerContext,
@@ -60,6 +52,6 @@ export async function handleActivateStructure(
           .getStructure(resultsFor(structureDocuments))
           .activate({ structureName }, { headers, analyse: analyseActivation }),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

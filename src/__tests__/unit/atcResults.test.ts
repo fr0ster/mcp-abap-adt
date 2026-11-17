@@ -1,9 +1,9 @@
-import { corpusBody } from '../../lib/adtCorpus';
 import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
 import {
   parseAtcResult,
   parseAtcResultList,
 } from '../../lib/strategies/atcResults';
+import { corpusBody } from '../helpers/adtCorpus';
 
 /**
  * The ATC results, read against the documents SAP answered (the cloud trial,

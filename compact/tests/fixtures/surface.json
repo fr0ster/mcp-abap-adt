@@ -157,14 +157,8 @@
   },
   {
     "group": "compact",
-    "name": "HandlerSearch",
-    "inputs": "query*, object_type, max_results",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "compact",
-    "name": "HandlerWhereUsed",
-    "inputs": "object_type*, object_name*, function_group_name, max_results",
+    "name": "HandlerSystem",
+    "inputs": "background, action*, query, query2, exclude, packages, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version, object_name, object_type, maxResults, detail, objects, enable_all_types, enable_only_types, disable_types, package_name, package_names, max_depth, include_descriptions, debug, user, modifiable_only, worklist_id, created_by, central_only, age_min, age_max, display_id",
     "available_in": "cloud, onprem"
   },
   {

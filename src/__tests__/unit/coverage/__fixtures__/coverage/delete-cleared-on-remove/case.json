@@ -1,0 +1,6 @@
+{
+  "expect": "delete-wrong-check",
+  "files": {
+    "src/__tests__/integration/thing.test.ts": "live.ts"
+  }
+}

@@ -22,10 +22,12 @@
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { definedOnly } from '../../../lib/definedOnly';
+import type { compactProfileScheduleSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { profilerTraceParameters } from '../../../lib/profilerTraceParameters';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { atStep, withStep } from '../../../lib/strategies/step';
@@ -36,47 +38,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      description: {
-        type: 'string',
-        description: 'Human-readable trace description.',
-      },
-      all_misc_abap_statements: { type: 'boolean' },
-      all_procedural_units: { type: 'boolean' },
-      all_internal_table_events: { type: 'boolean' },
-      all_dynpro_events: { type: 'boolean' },
-      aggregate: { type: 'boolean' },
-      explicit_on_off: { type: 'boolean' },
-      with_rfc_tracing: { type: 'boolean' },
-      all_system_kernel_events: { type: 'boolean' },
-      sql_trace: { type: 'boolean' },
-      all_db_events: { type: 'boolean' },
-      max_size_for_trace_file: { type: 'number' },
-      amdp_trace: { type: 'boolean' },
-      max_time_for_tracing: { type: 'number' },
-    },
-    required: ['description'],
-  },
+  inputSchema: z.object({
+    description: z.string().describe('Human-readable trace description.'),
+    all_misc_abap_statements: z.boolean().optional(),
+    all_procedural_units: z.boolean().optional(),
+    all_internal_table_events: z.boolean().optional(),
+    all_dynpro_events: z.boolean().optional(),
+    aggregate: z.boolean().optional(),
+    explicit_on_off: z.boolean().optional(),
+    with_rfc_tracing: z.boolean().optional(),
+    all_system_kernel_events: z.boolean().optional(),
+    sql_trace: z.boolean().optional(),
+    all_db_events: z.boolean().optional(),
+    max_size_for_trace_file: z.number().optional(),
+    amdp_trace: z.boolean().optional(),
+    max_time_for_tracing: z.number().optional(),
+  }),
 } as const;
 
-interface RuntimeCreateProfilerTraceParametersArgs {
-  description: string;
-  all_misc_abap_statements?: boolean;
-  all_procedural_units?: boolean;
-  all_internal_table_events?: boolean;
-  all_dynpro_events?: boolean;
-  aggregate?: boolean;
-  explicit_on_off?: boolean;
-  with_rfc_tracing?: boolean;
-  all_system_kernel_events?: boolean;
-  sql_trace?: boolean;
-  all_db_events?: boolean;
-  max_size_for_trace_file?: number;
-  amdp_trace?: boolean;
-  max_time_for_tracing?: number;
-}
+type RuntimeCreateProfilerTraceParametersArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleRuntimeCreateProfilerTraceParameters(
   context: HandlerContext,
@@ -97,22 +79,7 @@ export async function handleRuntimeCreateProfilerTraceParameters(
     () =>
       withAdtHeaders(context, 'classExecutor.scheduleTrace', (headers) =>
         classExecutor.scheduleTrace({
-          ...definedOnly({
-            description: args.description,
-            allMiscAbapStatements: args.all_misc_abap_statements,
-            allProceduralUnits: args.all_procedural_units,
-            allInternalTableEvents: args.all_internal_table_events,
-            allDynproEvents: args.all_dynpro_events,
-            aggregate: args.aggregate,
-            explicitOnOff: args.explicit_on_off,
-            withRfcTracing: args.with_rfc_tracing,
-            allSystemKernelEvents: args.all_system_kernel_events,
-            sqlTrace: args.sql_trace,
-            allDbEvents: args.all_db_events,
-            maxSizeForTraceFile: args.max_size_for_trace_file,
-            amdpTrace: args.amdp_trace,
-            maxTimeForTracing: args.max_time_for_tracing,
-          }),
+          ...profilerTraceParameters(args),
           analyse: analyseException,
           headers,
         }),
@@ -132,10 +99,9 @@ export const SCHEDULE_WITHOUT_ID =
   'SAP answered the trace schedule without a profiler id: no Location header carried one, so no run can name it.';
 
 /** The profiling flags of a schedule, as compact's `HandlerProfileSchedule` takes them. */
-export type ScheduleProfilerTraceArgs = Omit<
-  RuntimeCreateProfilerTraceParametersArgs,
-  'description'
-> & { description?: string };
+export type ScheduleProfilerTraceArgs = z.output<
+  typeof compactProfileScheduleSchema
+>;
 
 /**
  * The trace schedule in one request (compact `HandlerProfileSchedule`; spec
@@ -162,22 +128,7 @@ export async function handleScheduleProfilerTraceOnce(
       const scheduled = await atStep(SCHEDULE_TRACE, () =>
         withAdtHeaders(context, 'classExecutor.scheduleTrace', (headers) =>
           classExecutor.scheduleTrace({
-            ...definedOnly({
-              description: args?.description,
-              allMiscAbapStatements: args?.all_misc_abap_statements,
-              allProceduralUnits: args?.all_procedural_units,
-              allInternalTableEvents: args?.all_internal_table_events,
-              allDynproEvents: args?.all_dynpro_events,
-              aggregate: args?.aggregate,
-              explicitOnOff: args?.explicit_on_off,
-              withRfcTracing: args?.with_rfc_tracing,
-              allSystemKernelEvents: args?.all_system_kernel_events,
-              sqlTrace: args?.sql_trace,
-              allDbEvents: args?.all_db_events,
-              maxSizeForTraceFile: args?.max_size_for_trace_file,
-              amdpTrace: args?.amdp_trace,
-              maxTimeForTracing: args?.max_time_for_tracing,
-            }),
+            ...profilerTraceParameters(args),
             analyse: analyseException,
             headers,
           }),
@@ -188,7 +139,7 @@ export async function handleScheduleProfilerTraceOnce(
       if (profilerId === '') {
         return failedWith<string>(
           withStep(
-            { message: SCHEDULE_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            { message: SCHEDULE_WITHOUT_ID, origin: 'refusal' },
             SCHEDULE_TRACE,
           ),
         );

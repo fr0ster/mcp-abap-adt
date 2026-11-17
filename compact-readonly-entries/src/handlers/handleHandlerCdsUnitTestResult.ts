@@ -1,6 +1,7 @@
 import { compactCdsUnitTestResultSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetCdsUnitTestResultOnce } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCdsUnitTestResult',
@@ -10,11 +11,9 @@ export const TOOL_DEFINITION = {
   inputSchema: compactCdsUnitTestResultSchema,
 } as const;
 
-type HandlerCdsUnitTestResultArgs = {
-  run_id: string;
-  with_navigation_uris?: boolean;
-  format?: 'abapunit' | 'junit';
-};
+type HandlerCdsUnitTestResultArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleHandlerCdsUnitTestResult(
   context: HandlerContext,

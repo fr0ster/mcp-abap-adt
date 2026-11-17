@@ -64,7 +64,9 @@ function headersParameter(
     const headers = type.getProperty('headers');
     if (headers === undefined) continue;
     const headersType = checker.getTypeOfSymbolAtLocation(headers, call);
-    const name = (headersType.aliasSymbol ?? headersType.getSymbol())?.getName();
+    const name = (
+      headersType.aliasSymbol ?? headersType.getSymbol()
+    )?.getName();
     if (name === 'IAdtHeaders') return i;
   }
   return undefined;

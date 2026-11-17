@@ -1,6 +1,7 @@
 import { compactTransportMoveObjectsSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleMoveTransportObjects } from '@mcp-abap-adt/lib/handlers/write';
+import type * as z from 'zod';
 import { namingHandlerGet } from './compactConfirmWith';
 
 export const TOOL_DEFINITION = {
@@ -11,16 +12,9 @@ export const TOOL_DEFINITION = {
   inputSchema: compactTransportMoveObjectsSchema,
 } as const;
 
-type HandlerTransportMoveObjectsArgs = {
-  transport_number: string;
-  target_number: string;
-  objects: {
-    object_name: string;
-    object_type: string;
-    position: string;
-    pgmid?: string;
-  }[];
-};
+type HandlerTransportMoveObjectsArgs = z.output<
+  typeof TOOL_DEFINITION.inputSchema
+>;
 
 export async function handleHandlerTransportMoveObjects(
   context: HandlerContext,

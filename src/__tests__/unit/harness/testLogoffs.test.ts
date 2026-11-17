@@ -62,6 +62,15 @@ describe("the harness's logoffs", () => {
     expect(await settles(ending)).toBe(true);
   });
 
+  it('a tracked connection the test ended itself is disconnected once: the close of tracked connections leaves it', async () => {
+    const c = fakeConnection();
+    trackConnection(c.connection);
+    c.answer();
+    await endTestConnection(c.connection);
+    await closeTrackedConnections();
+    expect(c.connection.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("logOffLeft resolves once the logoffs of the server's connections it ended are answered", async () => {
     const before = new Set<object>();
     const c = fakeConnection();

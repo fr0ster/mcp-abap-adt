@@ -9,6 +9,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as z from 'zod';
 import {
   answer,
   answerThrown,
@@ -22,8 +23,20 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
+import { withSystemKindOf } from '../../../lib/connectionFactory';
+import {
+  DUMP_FILTERS,
+  dumpFiltersRefusal,
+  isOperand,
+} from '../../../lib/dumpFilters';
+import { withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { type JsonValue, jsonOrText } from '../../../lib/json';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { afterLast } from '../../../lib/plainText';
 import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
@@ -37,129 +50,139 @@ import { ourFeeds } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
+/** A page of a feed as answered, in this order. */
+type FeedPageAnswer<T> = {
+  success: true;
+  feed_type: string;
+  count: number;
+  entries: T[];
+  next_to?: string;
+  incomplete_second?: string;
+};
+
+/** RuntimeListFeeds's arguments but `background`. */
+const FIELDS = {
+  feed_type: z
+    .enum([
+      'descriptors',
+      'variants',
+      'dumps',
+      'system_messages',
+      'gateway_errors',
+    ])
+    .optional()
+    .describe(
+      'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
+    ),
+  feed_types: z
+    .array(
+      z.enum([
+        'descriptors',
+        'variants',
+        'dumps',
+        'system_messages',
+        'gateway_errors',
+      ]),
+    )
+    .optional()
+    .describe(
+      'Several feeds, read together with the same filters (give this or feed_type).',
+    ),
+  user: z
+    .string()
+    .optional()
+    .describe('Entries of this SAP user (exact match).'),
+  runtime_error: z
+    .string()
+    .optional()
+    .describe('Dumps whose runtime error contains this text, in any case.'),
+  exception: z
+    .string()
+    .optional()
+    .describe('Dumps whose exception class contains this text, in any case.'),
+  object_name: z
+    .string()
+    .optional()
+    .describe(
+      'Dumps whose terminated object name contains this text, in any case.',
+    ),
+  package: z
+    .string()
+    .optional()
+    .describe('Dumps whose object package contains this text, in any case.'),
+  component: z
+    .string()
+    .optional()
+    .describe(
+      'Dumps whose application component contains this text, in any case.',
+    ),
+  max_results: z
+    .number()
+    .optional()
+    .describe(
+      `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
+    ),
+  from: z
+    .string()
+    .optional()
+    .describe('Start of time range in YYYYMMDDHHMMSS format.'),
+  to: z
+    .string()
+    .optional()
+    .describe(
+      'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
+    ),
+};
+
+/**
+ * One feed (`feed_type`, by default the descriptors) or a non-empty
+ * `feed_types` alone; for one feed, the dumps filters only on the dumps
+ * feed, each a single operand.
+ */
+function oneFeedForm(
+  args: {
+    feed_type?: string | undefined;
+    feed_types?: readonly string[] | undefined;
+    user?: string | undefined;
+    runtime_error?: string | undefined;
+    exception?: string | undefined;
+    object_name?: string | undefined;
+    package?: string | undefined;
+    component?: string | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const refuse = (message: string, path: string) =>
+    ctx.addIssue({ code: 'custom', message, path: [path] });
+  if (args.feed_types !== undefined) {
+    if (args.feed_type !== undefined || args.feed_types.length === 0) {
+      refuse(
+        'Give exactly one of feed_type or feed_types (a non-empty list of feed types).',
+        'feed_types',
+      );
+    }
+    return;
+  }
+  const feedType = args.feed_type ?? 'descriptors';
+  const refused = dumpFiltersRefusal(feedType, args);
+  if (refused !== undefined) refuse(refused.words, refused.path);
+}
+
 export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
     '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
   ),
-  inputSchema: {
-    type: 'object',
-    properties: {
-      timeout: TIMEOUT_PROPERTY,
-      feed_type: {
-        type: 'string',
-        enum: [
-          'descriptors',
-          'variants',
-          'dumps',
-          'system_messages',
-          'gateway_errors',
-        ],
-        description:
-          'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
-      },
-      feed_types: {
-        type: 'array',
-        items: {
-          type: 'string',
-          enum: [
-            'descriptors',
-            'variants',
-            'dumps',
-            'system_messages',
-            'gateway_errors',
-          ],
-        },
-        description:
-          'Several feeds, read together with the same filters (give this or feed_type).',
-      },
-      user: {
-        type: 'string',
-        description: 'Entries of this SAP user (exact match).',
-      },
-      runtime_error: {
-        type: 'string',
-        description:
-          'Dumps whose runtime error contains this text, in any case.',
-      },
-      exception: {
-        type: 'string',
-        description:
-          'Dumps whose exception class contains this text, in any case.',
-      },
-      object_name: {
-        type: 'string',
-        description:
-          'Dumps whose terminated object name contains this text, in any case.',
-      },
-      package: {
-        type: 'string',
-        description:
-          'Dumps whose object package contains this text, in any case.',
-      },
-      component: {
-        type: 'string',
-        description:
-          'Dumps whose application component contains this text, in any case.',
-      },
-      max_results: {
-        type: 'number',
-        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
-      },
-      from: {
-        type: 'string',
-        description: 'Start of time range in YYYYMMDDHHMMSS format.',
-      },
-      to: {
-        type: 'string',
-        description:
-          'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
-      },
-    },
-    required: [],
-  },
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(oneFeedForm),
+    z.object(FIELDS).superRefine(oneFeedForm),
+  ),
 } as const;
 
-interface RuntimeListFeedsArgs {
-  feed_types?: Array<NonNullable<RuntimeListFeedsArgs['feed_type']>>;
-  feed_type?:
-    | 'descriptors'
-    | 'variants'
-    | 'dumps'
-    | 'system_messages'
-    | 'gateway_errors';
-  user?: string;
-  runtime_error?: string;
-  exception?: string;
-  object_name?: string;
-  package?: string;
-  component?: string;
-  max_results?: number;
-  from?: string;
-  to?: string;
-}
-
-/**
- * The dumps feed's filters and the attribute and operator each one is sent
- * as. The attributes are the ones the feed's descriptor declares
- * (`GET /sap/bc/adt/feeds`, `feed:queryAttribute`); `user` offers `equals`
- * and `notEquals` only, the others `contains` as well.
- */
-const DUMP_FILTERS = [
-  ['user', 'user', 'equals'],
-  ['runtime_error', 'runtimeError', 'contains'],
-  ['exception', 'exception', 'contains'],
-  ['object_name', 'objectName', 'contains'],
-  ['package', 'package', 'contains'],
-  ['component', 'component', 'contains'],
-] as const;
-
-/**
- * A value is written into the expression as it stands, so what would end an
- * operand — a blank, a comma, a parenthesis — is refused rather than sent.
- */
-const OPERAND = /^[^\s,()]+$/;
+type RuntimeListFeedsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
  * The dumps feed's `$query` for the filters given — `and ( … )` of one
@@ -170,7 +193,7 @@ export function dumpQueryOf(args: RuntimeListFeedsArgs): string | undefined {
   for (const [param, attribute, operator] of DUMP_FILTERS) {
     const value = args[param]?.trim();
     if (!value) continue;
-    if (!OPERAND.test(value)) {
+    if (!isOperand(value)) {
       throw new Error(
         `${param} must not contain blanks, commas or parentheses: "${value}"`,
       );
@@ -187,7 +210,7 @@ export function dumpQueryOf(args: RuntimeListFeedsArgs): string | undefined {
  * (`/sap/bc/adt/vit/runtime/dumps/<id>`), as it stands in that URI.
  */
 export function dumpIdOf(uri: string): string {
-  return uri.replace(/^.*\/runtime\/dumps\//, '');
+  return afterLast(uri, '/runtime/dumps/');
 }
 
 /**
@@ -200,35 +223,31 @@ function pagedFeeds(
 ) {
   return new AdtRuntimeClient(connection, logger).getFeeds({
     ...ourFeeds,
-    entries: feedPage(feedEntries as never),
-    systemMessages: feedPage(feedSystemMessages as never),
-    gatewayErrors: feedPage(feedGatewayErrors as never),
-  } as never);
+    entries: feedPage(feedEntries),
+    systemMessages: feedPage(feedSystemMessages),
+    gatewayErrors: feedPage(feedGatewayErrors),
+  });
 }
 
-async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
+async function feedsOf(
+  context: HandlerContext,
+  args: RuntimeListFeedsArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
   const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const feedType = args?.feed_type ?? 'descriptors';
 
   const ctx = { tool: 'RuntimeListFeeds', detail: 'terse' as const };
 
-  const dumpOnly = DUMP_FILTERS.filter(
-    ([param]) => param !== 'user' && args?.[param]?.trim(),
-  ).map(([param]) => param);
-  if (feedType !== 'dumps' && dumpOnly.length > 0) {
-    return return_error(
-      new Error(
-        `${dumpOnly.join(', ')} filter the dumps feed; feed_type is ${feedType}.`,
-      ),
-    );
-  }
+  // A feed of a `feed_types` list answers the refusal as its own entry.
+  const refused = dumpFiltersRefusal(feedType, args);
+  if (refused !== undefined) return return_error(new Error(refused.words));
 
   let query: string | undefined;
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
   } catch (thrown) {
-    return return_error(thrown as Error);
+    return return_error(thrown);
   }
 
   // The request's own filters, the same on every page; `feedPages` supplies
@@ -239,8 +258,8 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
     from: args?.from,
   };
   const paging = { maxResults: args?.max_results, to: args?.to };
-  const pageOf = (page: FeedPage<unknown>) => {
-    const answered: Record<string, unknown> = {
+  const pageOf = <T>(page: FeedPage<T>) => {
+    const answered: FeedPageAnswer<T> = {
       success: true,
       feed_type: feedType,
       count: page.entries.length,
@@ -305,7 +324,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             { keyOf: (entry) => entry.id, stampOf: (entry) => entry.updated },
           ),
@@ -330,7 +349,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             {
               keyOf: (entry) => entry.id,
@@ -351,7 +370,7 @@ async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
                 ...base,
                 ...page,
                 analyse: analyseException,
-              }) as never,
+              }),
             paging,
             {
               keyOf: (entry) => `${entry.transactionId}|${entry.dateTime}`,
@@ -388,53 +407,29 @@ const PAGE_FEEDS = {
 export async function handleRuntimeListFeedPage(
   context: HandlerContext,
   args: Omit<RuntimeListFeedsArgs, 'feed_type'> & {
-    feed_type?: keyof typeof PAGE_FEEDS;
-    top?: number;
+    feed_type?: keyof typeof PAGE_FEEDS | undefined;
+    top?: number | undefined;
   },
   tool = 'HandlerDumpList',
 ) {
   const { connection, logger } = context;
   const feedType = args?.feed_type ?? 'dumps';
   const step = PAGE_FEEDS[feedType];
-  if (!step) {
-    return return_error(new Error(`Unknown feed_type: ${String(feedType)}`));
-  }
+  // `HandlerDumpList`'s schema holds the rules: `top` one page at most, the
+  // dumps filters on the dumps feed alone, each one operand.
   const top = args?.top;
-  if (
-    top !== undefined &&
-    (typeof top !== 'number' ||
-      !Number.isInteger(top) ||
-      top < 1 ||
-      top > FEED_PAGE_CAP)
-  ) {
-    return return_error(
-      new Error(
-        `top must be a whole number from 1 to ${FEED_PAGE_CAP}, the most entries SAP answers in one request; read on with the next_to of the answer as to.`,
-      ),
-    );
-  }
-  const dumpOnly = DUMP_FILTERS.filter(
-    ([param]) => param !== 'user' && args?.[param]?.trim(),
-  ).map(([param]) => param);
-  if (feedType !== 'dumps' && dumpOnly.length > 0) {
-    return return_error(
-      new Error(
-        `${dumpOnly.join(', ')} filter the dumps feed; feed_type is ${feedType}.`,
-      ),
-    );
-  }
   let query: string | undefined;
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
   } catch (thrown) {
-    return return_error(thrown as Error);
+    return return_error(thrown);
   }
   const base = { user: args?.user, query, from: args?.from };
   const page = { maxResults: top, to: args?.to };
   const feeds = pagedFeeds(connection, logger);
   const ctx = { tool, detail: 'terse' as const };
-  const shown = (read: FeedPage<unknown>) => {
-    const answered: Record<string, unknown> = {
+  const shown = <T>(read: FeedPage<T>) => {
+    const answered: FeedPageAnswer<T> = {
       success: true,
       feed_type: feedType,
       count: read.entries.length,
@@ -450,7 +445,7 @@ export async function handleRuntimeListFeedPage(
         () =>
           atStep(step, () =>
             feeds.dumps({ ...base, ...page, analyse: analyseException }),
-          )() as never,
+          )(),
         (read: FeedPage<{ id: string }>) =>
           shown({
             ...read,
@@ -470,7 +465,7 @@ export async function handleRuntimeListFeedPage(
               ...page,
               analyse: analyseException,
             }),
-          )() as never,
+          )(),
         shown,
       );
     default:
@@ -483,7 +478,7 @@ export async function handleRuntimeListFeedPage(
               ...page,
               analyse: analyseException,
             }),
-          )() as never,
+          )(),
         shown,
       );
   }
@@ -496,6 +491,13 @@ interface Asked {
   reject: (error: unknown) => void;
 }
 
+/** One feed's read in the rounds: its request waiting, and the signal it was made. */
+interface RoundState {
+  asked: Promise<void>;
+  signal: () => void;
+  pending: Asked | undefined;
+}
+
 /** The fixed words of a request made once the rounds have ended. */
 const ROUNDS_ENDED_WORDS =
   'the feeds read in envelopes have ended: no further request is sent';
@@ -503,13 +505,17 @@ const ROUNDS_ENDED_WORDS =
 /**
  * A connection for one feed's read whose requests wait for their round:
  * `ask` holds each one until the round sends it, and settles it with the
- * part's answer.
+ * part's answer. It has `connection`'s system kind, as every view over a
+ * connection has (`withSystemKindOf`).
  */
-function roundConnection(
+export function roundConnection(
   connection: HandlerContext['connection'],
   ask: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): HandlerContext['connection'] {
-  const view = {
+  // `getSessionType`, optional in the contract: this view states its session.
+  const view: HandlerContext['connection'] & {
+    getSessionType(): 'stateful' | 'stateless';
+  } = {
     connect: () => connection.connect(),
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
@@ -517,13 +523,11 @@ function roundConnection(
     // feed sets no session type of its own.
     setSessionType: (_type: 'stateful' | 'stateless') => undefined,
     getSessionType: (): 'stateful' | 'stateless' => 'stateless',
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
-      return ask(request) as Promise<IAdtWireResponse<T, D>>;
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
+      return ask(request);
     },
   };
-  return view as HandlerContext['connection'];
+  return withSystemKindOf(view, connection);
 }
 
 /** What the rounds answer: every feed's answer, or the one that ends the call. */
@@ -549,12 +553,13 @@ async function feedsInRounds(
   ) => Promise<McpResult>,
 ): Promise<RoundsOutcome> {
   let ended = false;
-  const states = Array.from({ length: count }, () => {
-    let signal!: () => void;
+  const states = Array.from({ length: count }, (): RoundState => {
+    // Replaced by the promise's resolver, which its executor hands over at once.
+    let signal: () => void = () => {};
     const asked = new Promise<void>((resolve) => {
       signal = resolve;
     });
-    return { asked, signal, pending: undefined as Asked | undefined };
+    return { asked, signal, pending: undefined };
   });
   const settled = states.map((state, i) =>
     (async () =>
@@ -600,16 +605,17 @@ async function feedsInRounds(
         return { ended: result.value };
       }
     }
-    const asking = states.filter((state) => state.pending !== undefined);
-    if (asking.length === 0) break;
-    const round = asking.map((state) => {
-      const asked = state.pending as Asked;
+    const round: Asked[] = [];
+    for (const state of states) {
+      const asked = state.pending;
+      if (asked === undefined) continue;
       state.pending = undefined;
       state.asked = new Promise<void>((resolve) => {
         state.signal = resolve;
       });
-      return asked;
-    });
+      round.push(asked);
+    }
+    if (round.length === 0) break;
     let answers: PhaseResult<IAdtWireResponse>[];
     try {
       answers = await runPhase(context, round, (asked, batch) =>
@@ -638,13 +644,8 @@ async function feedsInRounds(
 }
 
 /** An answer's payload: its JSON, else its text. */
-function payloadOfAnswer(result: McpResult): unknown {
-  const text = result.content[0]?.text ?? '';
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+function payloadOfAnswer(result: McpResult): JsonValue {
+  return jsonOrText(result.content[0]?.text ?? '');
 }
 
 /** Whether an answer is a credential failure: it ends a call for several feeds. */
@@ -655,7 +656,7 @@ function endsList(result: McpResult): boolean {
 
 /** A list call's answer: one entry per feed, in the order asked. */
 function listAnswer(
-  feedTypes: readonly unknown[],
+  feedTypes: readonly string[],
   results: readonly McpResult[],
 ): McpResult {
   const entries = results.map((result, i) =>
@@ -692,15 +693,10 @@ export async function handleRuntimeListFeeds(
       context,
       async () => {
         try {
-          const outcome = await feedsInRounds(
-            context,
-            1,
-            (_i, connection) =>
-              feedsOf({ ...context, connection }, args) as Promise<McpResult>,
+          const outcome = await feedsInRounds(context, 1, (_i, connection) =>
+            feedsOf({ ...context, connection }, args),
           );
-          return 'ended' in outcome
-            ? outcome.ended
-            : (outcome.answers[0] as McpResult);
+          return 'ended' in outcome ? outcome.ended : outcome.answers[0];
         } catch (error) {
           // A refusal the connection threw: as `answer()` renders a throw of
           // the sequential version's call.
@@ -708,24 +704,16 @@ export async function handleRuntimeListFeeds(
           return answerThrown(error, ctx);
         }
       },
-      () => feedsOf(context, args) as Promise<McpResult>,
+      () => feedsOf(context, args),
     );
   }
-  if (
-    args.feed_type !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0
-  ) {
-    return return_error(
-      new Error(
-        'Give exactly one of feed_type or feed_types (a non-empty list of feed types).',
-      ),
-    );
-  }
+  // The schema holds the rule: one feed, or a non-empty `feed_types`.
   const { feed_types: _list, ...rest } = args;
-  const single = (feedType: unknown): RuntimeListFeedsArgs => ({
+  const single = (
+    feedType: RuntimeListFeedsArgs['feed_type'],
+  ): RuntimeListFeedsArgs => ({
     ...rest,
-    feed_type: feedType as RuntimeListFeedsArgs['feed_type'],
+    feed_type: feedType,
   });
   return withSequentialFallback<McpResult>(
     context,
@@ -735,10 +723,7 @@ export async function handleRuntimeListFeeds(
           context,
           listed.length,
           (i, connection) =>
-            feedsOf(
-              { ...context, connection },
-              single(listed[i]),
-            ) as Promise<McpResult>,
+            feedsOf({ ...context, connection }, single(listed[i])),
         );
         return 'ended' in outcome
           ? outcome.ended
@@ -753,7 +738,7 @@ export async function handleRuntimeListFeeds(
       // credential failure ends the call, and nothing after it is read.
       const results: McpResult[] = [];
       for (const feedType of listed) {
-        const result = (await feedsOf(context, single(feedType))) as McpResult;
+        const result = await feedsOf(context, single(feedType));
         if (endsList(result)) return result;
         results.push(result);
       }

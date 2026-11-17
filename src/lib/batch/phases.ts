@@ -48,6 +48,7 @@
  * takes; the long call's own `timeout`, when given, cuts it by logging its
  * connection off.
  */
+
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -59,6 +60,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { adtCallScope, type HeaderInvocation } from '../adtHeaders/scope';
 import { correctedPair } from '../adtHeaders/withAdtHeaders';
 import { failureOf, readOwn } from '../auth/failures';
+import { withSystemKindOf } from '../connectionFactory';
 import { NO_BATCH_ENDPOINT_STATUS } from './availability';
 
 /** One item's settlement in a phase. */
@@ -111,28 +113,26 @@ function outerStatusWatch(connection: IAbapConnection): {
   let outer: number | undefined;
   let sent = 0;
   let refused: Error | undefined;
-  const typed = connection as {
-    getSessionType?: () => Session;
-    getSessionMode?: () => Session;
-  };
   const forwarding = {
     connect: () => connection.connect(),
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
     setSessionType: (type: Session) => connection.setSessionType(type),
     getSessionType: (): Session =>
-      typed.getSessionType?.() ?? typed.getSessionMode?.() ?? 'stateless',
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
+      connection.getSessionType?.() ??
+      connection.getSessionMode?.() ??
+      'stateless',
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       sent += 1;
       if (sent > 1) {
         refused ??= new Error(MORE_ENVELOPES_WORDS);
         return Promise.reject(refused);
       }
-      return connection.makeAdtRequest<T, D>(request).then(
+      return connection.makeAdtRequest(request).then(
         (response) => {
-          outer = statusOf(response);
+          outer = Number.isInteger(response.status)
+            ? response.status
+            : undefined;
           return response;
         },
         (error: unknown) => {
@@ -142,7 +142,11 @@ function outerStatusWatch(connection: IAbapConnection): {
       );
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  return { forwarding, outer: () => outer, refused: () => refused };
+  return {
+    forwarding: withSystemKindOf(forwarding, connection),
+    outer: () => outer,
+    refused: () => refused,
+  };
 }
 
 /**
@@ -165,20 +169,18 @@ function itemView(
     getSessionId: () => batch.getSessionId(),
     setSessionType: (type: Session) => batch.setSessionType(type),
     getSessionType: (): Session => batch.getSessionType(),
-    makeAdtRequest<T = unknown, D = unknown>(
-      request: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> {
+    makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
       const correcting = adtCallScope.getStore()?.correcting;
       if (correcting !== undefined && correcting.phase === batch) {
-        return correcting.record(request) as Promise<IAdtWireResponse<T, D>>;
+        return correcting.record(request);
       }
       if (sealed()) return Promise.reject(new Error(LATE_RECORD_WORDS));
-      const answer = record(request) as Promise<IAdtWireResponse<T, D>>;
+      const answer = record(request);
       recorded();
       return answer;
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
-  return view;
+  return withSystemKindOf(view, batch);
 }
 
 /** A part's answer: SAP's response, or the failure it was rejected with. */
@@ -207,7 +209,7 @@ function settledOf(answer: Promise<IAdtWireResponse>): Promise<PartAnswer> {
  * of whose parts SAP answered `406`/`415` naming what its pair did not send
  * is recorded again — the same member call, with the corrected pair (kept
  * for the system) — in one envelope of its own; that call's answer there is
- * its answer (`HeaderInvocation.redone`). One round; nothing else is sent.
+ * its answer (`HeaderInvocation.redo`). One round; nothing else is sent.
  */
 async function correctPhaseParts(
   context: HandlerContext,
@@ -227,13 +229,16 @@ async function correctPhaseParts(
   });
   if (corrected.length === 0) return;
   const watch = outerStatusWatch(context.connection);
-  const batch = new AdtBatchConnection(watch.forwarding, {
-    endpoint: 'communication',
-    ...(context.logger !== undefined ? { logger: context.logger } : {}),
-  });
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
   const waits = corrected.map(({ invocation, pair }) => {
     invocation.port?.remember(invocation.operation, pair);
-    let signal!: () => void;
+    let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });
@@ -248,12 +253,11 @@ async function correctPhaseParts(
           },
         },
       },
-      () => invocation.call(pair),
+      () => invocation.redo(pair),
     );
-    // Read by the call (`withAdtHeaders`); never unhandled here.
-    redone.catch(() => undefined);
-    invocation.redone = redone;
-    return Promise.race([recorded, redone.then(noop, noop)]);
+    // The call reads its own answer (`withAdtHeaders`); the phase waits for
+    // it to be recorded, or to settle.
+    return Promise.race([recorded, redone]);
   });
   await Promise.all(waits);
   await new Promise((resolve) => setImmediate(resolve));
@@ -264,8 +268,6 @@ async function correctPhaseParts(
     // call's answer.
   }
 }
-
-function noop(): void {}
 
 /**
  * One phase: `read(item, batch)` for every item, recorded on one batch
@@ -279,16 +281,48 @@ function noop(): void {}
  * are recorded together with its first (before the read awaits anything
  * else); a request recorded after that is refused (`LATE_RECORD_WORDS`).
  */
+/**
+ * A phase's settlements, and whether its envelope failed (`batch.execute()`
+ * rejected, or the phase was refused): the parts of a failed envelope are
+ * answers adt-clients built from the envelope's rejection, so a caller that
+ * must tell the two apart reads `envelope` first. The outer `404` that is
+ * the endpoint's absence is thrown, as `runPhase` throws it.
+ */
+export interface PhaseOutcome<R> {
+  results: PhaseResult<R>[];
+  envelope: { failed: false } | { failed: true; error: unknown };
+}
+
 export async function runPhase<I, R>(
   context: HandlerContext,
   items: readonly I[],
   read: (item: I, batch: IAbapConnection) => Promise<R>,
 ): Promise<PhaseResult<R>[]> {
+  const { results } = await runPhaseOutcome(context, items, read);
+  // A credential refusal reaches every part as the same object
+  // (adt-clients): the call ends with it, as it came.
+  for (const result of results) {
+    if (!result.ok && failureOf(result.error) !== undefined) {
+      throw result.error;
+    }
+  }
+  return results;
+}
+
+/** `runPhase`, its envelope's failure reported beside the settlements (`PhaseOutcome`). */
+export async function runPhaseOutcome<I, R>(
+  context: HandlerContext,
+  items: readonly I[],
+  read: (item: I, batch: IAbapConnection) => Promise<R>,
+): Promise<PhaseOutcome<R>> {
   const watch = outerStatusWatch(context.connection);
-  const batch = new AdtBatchConnection(watch.forwarding, {
-    endpoint: 'communication',
-    ...(context.logger !== undefined ? { logger: context.logger } : {}),
-  });
+  const batch = withSystemKindOf(
+    new AdtBatchConnection(watch.forwarding, {
+      endpoint: 'communication',
+      ...(context.logger !== undefined ? { logger: context.logger } : {}),
+    }),
+    watch.forwarding,
+  );
   let sealed = false;
   const parts: RecordedPart[] = [];
   // A part's answer reaches its read once the correction is made.
@@ -296,7 +330,7 @@ export async function runPhase<I, R>(
     const invocation = adtCallScope.getStore()?.invocation;
     if (invocation !== undefined) invocation.parts += 1;
     const first = settledOf(batch.makeAdtRequest(request));
-    let answer!: (final: PartAnswer) => void;
+    let answer: (final: PartAnswer) => void = () => {};
     const final = new Promise<PartAnswer>((resolve) => {
       answer = resolve;
     });
@@ -306,7 +340,7 @@ export async function runPhase<I, R>(
     );
   };
   const entries = items.map((item) => {
-    let signal!: () => void;
+    let signal: () => void = () => {};
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });
@@ -352,7 +386,10 @@ export async function runPhase<I, R>(
   if (refused !== undefined) {
     // Nothing of the phase is kept: every item fails with the fixed words.
     await Promise.all(settled);
-    return items.map(() => ({ ok: false, error: refused }));
+    return {
+      results: items.map(() => ({ ok: false, error: refused })),
+      envelope: { failed: true, error: refused },
+    };
   }
   const outer = watch.outer();
   const port = context.batchAvailability;
@@ -374,14 +411,10 @@ export async function runPhase<I, R>(
     throw error;
   }
   const results = await Promise.all(settled);
-  // A credential refusal reaches every part as the same object
-  // (adt-clients): the call ends with it, as it came.
-  for (const result of results) {
-    if (!result.ok && failureOf(result.error) !== undefined) {
-      throw result.error;
-    }
-  }
-  return results;
+  return {
+    results,
+    envelope: failed ? { failed: true, error } : { failed: false },
+  };
 }
 
 /**

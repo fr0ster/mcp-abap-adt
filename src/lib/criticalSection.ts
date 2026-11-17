@@ -15,35 +15,32 @@
  * completion instead of being aborted. We bracket the whole mutating handler
  * with it — begin before it runs, end in a `finally`.
  *
- * The methods are feature-detected via a structural cast, so this degrades to a
- * no-op against an older connection that lacks them (no hard dependency on the
- * IAbapConnection interface shape).
+ * The methods are optional members of `IAbapConnection`, called with `?.`,
+ * so this is a no-op against a connection that lacks them.
  */
 
-interface CriticalSectionCapable {
-  beginCriticalSection?: () => void;
-  endCriticalSection?: () => void;
-}
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
  * Wrap a handler so the connection is held in an uninterruptible critical
  * section for the whole call. `getConnection` is a thunk because the connection
  * lives on the per-request handler context, resolved when the handler runs.
  *
- * Generic over the handler's own signature so the wrapped function keeps the
- * exact arity/return type (and stays assignable to `ToolHandler`).
+ * Generic over the handler's own parameters so the wrapped function keeps the
+ * exact arity/return type (and stays assignable to an entry's `call`), and
+ * hands the handler exactly the arguments it is called with.
  */
-export function withCriticalSection<H extends (...args: any[]) => any>(
-  handler: H,
-  getConnection: () => unknown,
-): (...args: Parameters<H>) => Promise<Awaited<ReturnType<H>>> {
-  return async (...args: Parameters<H>) => {
-    const conn = getConnection() as CriticalSectionCapable | null | undefined;
-    conn?.beginCriticalSection?.();
+export function withCriticalSection<P extends unknown[], R>(
+  handler: (...args: P) => Promise<R>,
+  getConnection: () => IAbapConnection,
+): (...args: P) => Promise<R> {
+  return async (...args: P) => {
+    const conn = getConnection();
+    conn.beginCriticalSection?.();
     try {
       return await handler(...args);
     } finally {
-      conn?.endCriticalSection?.();
+      conn.endCriticalSection?.();
     }
   };
 }
@@ -76,9 +73,18 @@ const MUTATING_TRANSPORT_TOOLS: ReadonlySet<string> = new Set([
   'SortAndCompressTransportTask',
 ]);
 
+/** The name prefixes of the tools that write, compared as they are spelled. */
+const MUTATING_PREFIXES: readonly string[] = [
+  'Create',
+  'Update',
+  'Delete',
+  'Add',
+  'Remove',
+];
+
 export function isMutatingToolName(name: string): boolean {
   return (
-    /^(Create|Update|Delete|Add|Remove)/.test(name) ||
+    MUTATING_PREFIXES.some((prefix) => name.startsWith(prefix)) ||
     MUTATING_TRANSPORT_TOOLS.has(name)
   );
 }

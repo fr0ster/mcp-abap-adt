@@ -6,13 +6,16 @@ import {
   COMPACT_UNLOCK,
   compactUnlockDescription,
   compactUnlockSchemaFor,
-  LOCK_NOT_HELD_WORDS,
+  LOCK_WENT_WITH_SESSION_WORDS,
   lockHeldHere,
+  lockNotHeldWords,
+  spentBy,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { unlockObject } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnlock',
@@ -24,11 +27,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerUnlockArgs = {
-  object_type: string;
-  object_name: string;
-  lock_handle: string;
-};
+type HandlerUnlockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerUnlock(
   context: HandlerContext,
@@ -69,13 +68,44 @@ export async function handleHandlerUnlock(
     };
   }
   if (!lockHeldHere(context.heldLocks, args.lock_handle)) {
-    return return_error(new Error(LOCK_NOT_HELD_WORDS));
+    return return_error(new Error(lockNotHeldWords(context.heldLocks)));
   }
-  const answered = (await unlockObject(context, {
-    object_name: args.object_name,
-    object_type: COMPACT_LOCK_KINDS[member],
-    lock_handle: args.lock_handle,
-  })) as { isError?: boolean };
+  let spent = false;
+  const answered = await unlockObject(
+    context,
+    {
+      object_name: args.object_name,
+      object_type: COMPACT_LOCK_KINDS[member],
+      lock_handle: args.lock_handle,
+    },
+    (error) => {
+      spent = spentBy(error);
+    },
+  );
+  if (spent) {
+    // A spent connection (the owner's decision): the lock went with its SAP
+    // session, and SAP's logoff of it released the lock. It is held no more.
+    context.heldLocks?.release(args.lock_handle);
+    return {
+      isError: false,
+      content: [
+        {
+          type: 'text' as const,
+          text: JSON.stringify(
+            {
+              success: true,
+              object_name: String(args.object_name ?? '').toUpperCase(),
+              object_type: COMPACT_LOCK_KINDS[member],
+              unlocked: false,
+              message: LOCK_WENT_WITH_SESSION_WORDS,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  }
   // The UNLOCK answered: the lock is held no more.
   if (!answered?.isError) context.heldLocks?.release(args.lock_handle);
   return answered;

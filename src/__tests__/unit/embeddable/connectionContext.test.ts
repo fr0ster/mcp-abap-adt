@@ -9,6 +9,7 @@
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
@@ -45,7 +46,6 @@ import {
   getStatedSystemContext,
   getSystemContext,
   resetSystemContextCache,
-  setSystemContext,
 } from '../../../lib/systemContext';
 import { readSystemInformation } from '../../../lib/systemInformation';
 import { presented } from '../../helpers/presented';
@@ -83,7 +83,7 @@ const reportingRegistry = new CompositeHandlersRegistry([
     getHandlers: (): HandlerEntry[] => [
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
-        handler: (async () => {
+        call: (async () => {
           const seen = getStatedSystemContext();
           return {
             content: [
@@ -123,7 +123,7 @@ class TestServer extends BaseMcpServer {
     return this.getConnectionContext();
   }
   fromSource(source: ConnectionSource) {
-    this.setConnectionContext({ kind: 'built', source, sessionId: 'dest-a' });
+    this.setConnectionContext({ kind: 'built', source });
   }
   fromHeaders(headers: Record<string, string | string[] | undefined>) {
     this.setConnectionContext(headerContext(headers));
@@ -393,10 +393,8 @@ describe('headerContext(headers): the x-sap-* headers as the source', () => {
     const answered = fromHeaders.mock.results[0].value;
     const context = server.context();
     expect(context?.kind).toBe('built');
-    expect(context?.sessionId).toBe('direct-jwt');
-    expect(context?.metadata).toMatchObject({
-      masterSystem: 'master-placeholder',
-    });
+    // No session id and no metadata: they were read by nothing (D26 E5).
+    expect(context).toEqual({ kind: 'built', source: expect.anything() });
 
     await server.connection();
     const [settings, credential] = build.mock.calls[0];
@@ -415,7 +413,7 @@ describe('headerContext(headers): the x-sap-* headers as the source', () => {
       'x-sap-login': 'user-placeholder',
       'x-sap-password': 'password-placeholder',
     });
-    expect(server.context()?.sessionId).toBe('direct-basic');
+    expect(server.context()?.kind).toBe('built');
     await server.connection();
     const [settings, credential] = build.mock.calls[0];
     expect(settings.authType).toBe('basic');

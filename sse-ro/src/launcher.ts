@@ -10,7 +10,11 @@
  * decision), and a user installs only what they need. The high,
  * debugger, background-run and resume tools are `mcp-abap-adt-sse`'s.
  */
-import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
+import {
+  type LauncherEdges,
+  packageManifestOf,
+  processEdges,
+} from '@mcp-abap-adt/lib/config';
 import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { main as sseMain } from '@mcp-abap-adt/server-runtime/sse';
 
@@ -21,17 +25,16 @@ import { main as sseMain } from '@mcp-abap-adt/server-runtime/sse';
 export const readOnlyToolSet: ToolSet = fullReadOnlyToolSet;
 
 /**
- * THIS package's version, for `--version` and `initialize`. `require`, not a
- * file read: a bundler (the portable build) inlines it.
+ * THIS package's manifest, read by its shape (`packageManifestOf`). `require`,
+ * not a file read: a bundler (the portable build) inlines it.
  */
-export const SSE_RO_VERSION: string = (
-  require('../package.json') as { version: string }
-).version;
+const MANIFEST = packageManifestOf(require('../package.json'));
+
+/** THIS package's version, for `--version` and `initialize`. */
+export const SSE_RO_VERSION: string = MANIFEST.version;
 
 /** THIS package's name, from the same manifest: what a second copy of lib asks to reinstall. */
-export const SSE_RO_PACKAGE: string = (
-  require('../package.json') as { name: string }
-).name;
+export const SSE_RO_PACKAGE: string = MANIFEST.name;
 
 export function main(
   edges: LauncherEdges = processEdges(),

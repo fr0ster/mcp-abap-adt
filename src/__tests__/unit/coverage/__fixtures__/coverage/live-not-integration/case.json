@@ -1,0 +1,21 @@
+{
+  "expect": "live-not-integration",
+  "ledger": {
+    "GetThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/integration/thing.test.ts",
+        "cloud": "src/__tests__/integration/thing.test.ts"
+      }
+    },
+    "DeleteThing": {
+      "unit": "src/__tests__/unit/thing.test.ts",
+      "live": {
+        "onprem": "src/__tests__/unit/thingLive.test.ts"
+      }
+    }
+  },
+  "files": {
+    "src/__tests__/unit/thingLive.test.ts": "../base/live.ts"
+  }
+}

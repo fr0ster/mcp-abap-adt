@@ -1,17 +1,18 @@
 /**
  * The runtime refuses a second copy of `@mcp-abap-adt/lib` at start.
  *
- * Each loaded copy of lib registers one `{ file }` on a process-wide array;
- * each transport's `main` reads it first — before `--version`, before any
- * parameter, before anything listens — and with more than one entry stops
- * with exit `1` and one line on stderr naming the first two files and the
- * package to reinstall. One entry starts as today.
+ * Each loaded copy of lib registers one entry on a process-wide array — from
+ * 24.0.0 on `{ version, label }`, before it `{ file }`; each transport's
+ * `main` reads it first — before `--version`, before any parameter, before
+ * anything listens — and with more than one entry stops with exit `1` and one
+ * line on stderr naming the first two copies (an earlier one in fixed words,
+ * never its file) and the package to reinstall. One entry starts as today.
  */
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import net from 'node:net';
 import { join } from 'node:path';
-import type { LauncherEdges } from '@mcp-abap-adt/lib/config';
+import type { LauncherEdges, LibInstance } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { main as httpMain } from '../http/launcher';
 import { secondCopyLine } from '../secondCopy';
@@ -19,36 +20,45 @@ import { main as sseMain } from '../sse/launcher';
 import { main as stdioMain } from '../stdio/launcher';
 
 const REGISTRY = Symbol.for('@mcp-abap-adt/lib/instances');
-const holder = globalThis as Record<symbol, unknown>;
 
-const FIRST = '/global/a/node_modules/@mcp-abap-adt/lib/dist/lib/instance.js';
-const SECOND = '/global/b/node_modules/@mcp-abap-adt/lib/dist/lib/instance.js';
-const THIRD = '/global/c/node_modules/@mcp-abap-adt/lib/dist/lib/instance.js';
+const FIRST: LibInstance = { version: '24.0.0', label: 'dist' };
+const SECOND: LibInstance = { version: '24.1.0', label: 'bundled' };
+const THIRD: LibInstance = { version: '24.2.0', label: 'dist' };
+/** A copy before 24.0.0: it registered its file. */
+const EARLIER_FILE =
+  '/global/a/node_modules/@mcp-abap-adt/lib/dist/lib/instance.js';
+const EARLIER: LibInstance = { file: EARLIER_FILE };
 
-const lineFor = (pkg: string, a = FIRST, b = SECOND) =>
+const lineFor = (pkg: string, a = '24.0.0 dist', b = '24.1.0 bundled') =>
   `Two copies of @mcp-abap-adt/lib are loaded in this process (${a}, ${b}): reinstall ${pkg} (npm install -g ${pkg}).`;
 
 let saved: unknown;
 beforeEach(() => {
-  saved = holder[REGISTRY];
+  saved = Reflect.get(globalThis, REGISTRY);
 });
 afterEach(() => {
-  holder[REGISTRY] = saved;
+  Reflect.set(globalThis, REGISTRY, saved);
   jest.restoreAllMocks();
 });
 
-function register(...files: string[]): void {
-  holder[REGISTRY] = files.map((file) => Object.freeze({ file }));
+function register(...entries: LibInstance[]): void {
+  Reflect.set(
+    globalThis,
+    REGISTRY,
+    entries.map((entry) => Object.freeze({ ...entry })),
+  );
+}
+
+interface Recorded {
+  stdout: string[];
+  stderr: string[];
+  exits: number[];
+  argvReads: number;
 }
 
 /** Edges that record every line and exit, and count each read of `argv`. */
 function recordingEdges(argv: string[] = []) {
-  const record = {
-    stdout: [] as string[],
-    stderr: [] as string[],
-    exits: [] as number[],
-    argvReads: 0,
-  };
+  const record: Recorded = { stdout: [], stderr: [], exits: [], argvReads: 0 };
   const edges: LauncherEdges = {
     get argv() {
       record.argvReads += 1;
@@ -70,28 +80,31 @@ const TRANSPORTS = [
 
 describe('secondCopyLine', () => {
   it('one entry: undefined', () => {
-    expect(secondCopyLine([{ file: FIRST }], '@mcp-abap-adt/core')).toBe(
-      undefined,
-    );
+    expect(secondCopyLine([FIRST], '@mcp-abap-adt/core')).toBe(undefined);
   });
 
   it('no entry (a process that loaded no lib cannot ask): undefined, as one', () => {
     expect(secondCopyLine([], '@mcp-abap-adt/core')).toBe(undefined);
   });
 
-  it('two entries: the line, verbatim, naming both files and the package', () => {
-    expect(
-      secondCopyLine([{ file: FIRST }, { file: SECOND }], '@mcp-abap-adt/http'),
-    ).toBe(lineFor('@mcp-abap-adt/http'));
+  it('two entries: the line, verbatim, naming both copies and the package', () => {
+    expect(secondCopyLine([FIRST, SECOND], '@mcp-abap-adt/http')).toBe(
+      lineFor('@mcp-abap-adt/http'),
+    );
   });
 
-  it('three entries: the first two files', () => {
-    expect(
-      secondCopyLine(
-        [{ file: FIRST }, { file: SECOND }, { file: THIRD }],
-        '@mcp-abap-adt/sse',
-      ),
-    ).toBe(lineFor('@mcp-abap-adt/sse'));
+  it('three entries: the first two copies', () => {
+    expect(secondCopyLine([FIRST, SECOND, THIRD], '@mcp-abap-adt/sse')).toBe(
+      lineFor('@mcp-abap-adt/sse'),
+    );
+  });
+
+  it('a copy before 24.0.0 is named in fixed words, never by its file', () => {
+    const line = secondCopyLine([EARLIER, FIRST], '@mcp-abap-adt/core');
+    expect(line).toBe(
+      lineFor('@mcp-abap-adt/core', 'a copy before 24.0.0', '24.0.0 dist'),
+    );
+    expect(line).not.toContain(EARLIER_FILE);
   });
 });
 
@@ -201,7 +214,12 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
       string,
       string,
       (
-        options: { toolSet: unknown; program: string; version: string },
+        options: {
+          toolSet: unknown;
+          program: string;
+          version: string;
+          packageName?: string;
+        },
         edges: LauncherEdges,
       ) => Promise<unknown>,
     ]
@@ -256,7 +274,7 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
           program: 'mcp-abap-adt-test',
           version: '9.9.9',
           packageName: '@mcp-abap-adt/test-package',
-        } as { toolSet: unknown; program: string; version: string },
+        },
         edges,
       );
       expect(record.stderr).toEqual([lineFor('@mcp-abap-adt/test-package')]);

@@ -31,13 +31,15 @@ const ITEMS = ['ITEM_A', 'ITEM_B'] as const;
 const urlOf = (item: string) => `/sap/bc/adt/probe/${item.toLowerCase()}`;
 
 const get = async (item: string, connection: IAbapConnection) =>
-  (
-    await connection.makeAdtRequest<string>({
-      url: urlOf(item),
-      method: 'GET',
-      timeout: 0,
-    })
-  ).data;
+  String(
+    (
+      await connection.makeAdtRequest({
+        url: urlOf(item),
+        method: 'GET',
+        timeout: 0,
+      })
+    ).data,
+  );
 
 /** Every request outside an envelope: `200`, its URL as the body. */
 const direct = async (

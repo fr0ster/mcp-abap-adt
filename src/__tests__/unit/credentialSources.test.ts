@@ -8,6 +8,7 @@ import {
   TokenAuthProvider,
 } from '@mcp-abap-adt/auth-providers';
 import {
+  CERTIFICATE_OVER_RFC_WORDS,
   credentialFromHeaders,
   credentialFromSapConfig,
 } from '../../lib/credentialSources';
@@ -80,6 +81,23 @@ describe('credentialFromSapConfig', () => {
     expect(
       credentialFromSapConfig({ ...base, authType, ...extra } as any),
     ).toBeInstanceOf(Provider);
+  });
+
+  it('refuses a client certificate over RFC before any provider is built', () => {
+    expect(() =>
+      credentialFromSapConfig({
+        authType: 'certificate',
+        certPath: '/placeholder/cert.pem',
+        connectionType: 'rfc',
+        client: '100',
+        language: 'EN',
+        ashost: 'host.example.invalid',
+        sysnr: '00',
+      }),
+    ).toThrow(CERTIFICATE_OVER_RFC_WORDS);
+    expect(CERTIFICATE_OVER_RFC_WORDS).toContain(
+      'SAP_AUTH_TYPE, SAP_CONNECTION_TYPE',
+    );
   });
 
   it('refuses kerberos', () => {

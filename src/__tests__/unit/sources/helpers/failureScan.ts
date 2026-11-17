@@ -21,8 +21,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../../helpers/repoRoot';
 
-export const REPO = path.resolve(__dirname, '../../../../..');
+/**
+ * The repository root, found from here under Jest and from the node:test
+ * build (`.test-build/tree/`) alike: never a count of `..` from `__dirname`.
+ */
+export const REPO = repositoryRoot(__dirname);
 
 export interface Finding {
   readonly rule: 'instanceof' | 'thrown';
@@ -69,7 +74,7 @@ export function tsFiles(dir: string, out: string[] = []): string[] {
 }
 
 /** `@mcp-abap-adt/<pkg>[/sub]` → its source, from each package's `exports` (types → src). */
-function sourcePaths(): Record<string, string[]> {
+export function sourcePaths(): Record<string, string[]> {
   const paths: Record<string, string[]> = {};
   for (const dir of ['.', 'server-runtime', 'server', 'http', 'sse']) {
     const pkg = JSON.parse(

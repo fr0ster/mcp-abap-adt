@@ -17,7 +17,7 @@ import {
   TOOL_DEFINITION as SearchSource_Tool,
 } from '../../../handlers/system/readonly/handleSearchSource';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerEntry } from '../interfaces.js';
+import { defineTool, type HandlerEntry } from '../interfaces.js';
 
 /**
  * Handler group for all search-related handlers
@@ -31,45 +31,11 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: SearchObject_Tool,
-        handler: (args: any) => handleSearchObject(this.context, args),
-      },
-      {
-        toolDefinition: SearchSource_Tool,
-        handler: (args: any) => handleSearchSource(this.context, args),
-      },
+      defineTool(SearchObject_Tool, handleSearchObject),
+      defineTool(SearchSource_Tool, handleSearchSource),
       // Dynamic import handlers
-      {
-        toolDefinition: GetObjectsList_Tool,
-        handler: (args: any) => {
-          return handleGetObjectsList(
-            this.context,
-            args as {
-              parent_name?: string;
-              parent_tech_name?: string;
-              parent_type?: string;
-              with_short_descriptions?: boolean;
-            },
-          );
-        },
-      },
-      {
-        toolDefinition: GetObjectsByType_Tool,
-        handler: (args: any) => {
-          return handleGetObjectsByType(
-            this.context,
-            args as {
-              parent_name?: string;
-              parent_tech_name?: string;
-              parent_type?: string;
-              node_id?: string;
-              format?: string;
-              with_short_descriptions?: boolean;
-            },
-          );
-        },
-      },
+      defineTool(GetObjectsList_Tool, handleGetObjectsList),
+      defineTool(GetObjectsByType_Tool, handleGetObjectsByType),
     ];
   }
 }

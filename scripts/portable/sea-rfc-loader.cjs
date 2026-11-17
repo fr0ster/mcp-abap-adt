@@ -29,7 +29,8 @@ function resolveSdkLibDir({ env, execPath }) {
   return path.join(path.dirname(execPath), 'nwrfcsdk', 'lib');
 }
 
-const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const digest = (bytes) =>
+  crypto.createHash('sha256').update(bytes).digest('hex');
 
 function prepareAddon({ dir, addon, platform, fromEnv = false, fsImpl = fs }) {
   const library = sdkLibraryName(platform);
@@ -79,9 +80,14 @@ function loadEmbeddedAddon() {
   if (loaded) return loaded;
   const sea = require('node:sea');
   if (!sea.isSea()) {
-    throw new Error('the embedded RFC addon is only available in a portable executable');
+    throw new Error(
+      'the embedded RFC addon is only available in a portable executable',
+    );
   }
-  const dir = resolveSdkLibDir({ env: process.env, execPath: process.execPath });
+  const dir = resolveSdkLibDir({
+    env: process.env,
+    execPath: process.execPath,
+  });
   const file = prepareAddon({
     dir,
     addon: Buffer.from(sea.getRawAsset('sapnwrfc.node')),

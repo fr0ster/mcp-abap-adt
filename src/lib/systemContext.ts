@@ -2,15 +2,15 @@ import { registerConnectionResetHook } from './connectionEvents';
 import { getRequestContext } from './requestContext';
 
 export interface IAdtSystemContext {
-  masterSystem?: string;
-  responsible?: string;
-  client?: string;
-  /** Master/original language for created objects (adtcore:masterLanguage). From SAP_LANGUAGE; library defaults to EN when unset. */
-  masterLanguage?: string;
+  masterSystem?: string | undefined;
+  responsible?: string | undefined;
+  /** Original language for created objects, from SAP_LANGUAGE: a create given none states this one (#348); unset, a create states none and SAP takes its logon language. */
+  masterLanguage?: string | undefined;
 }
 
-// The process-wide context: the configuration (`systemContextFromConfiguration`)
-// or what an embedder states (`setSystemContext`). Per-request values — headers,
+// The process-wide context: the configuration (`systemContextFromConfiguration`).
+// An embedder states its own on the server's options (`systemContext`, per
+// instance). Per-request values — headers,
 // a destination's own .env, a cloud system's answer — live in the request scope
 // (requestContext.ts), never here, so they cannot leak between requests.
 let cached: IAdtSystemContext | undefined;
@@ -19,8 +19,13 @@ let cached: IAdtSystemContext | undefined;
  * The system context the configuration states — `SAP_MASTER_SYSTEM`,
  * `SAP_RESPONSIBLE`, `SAP_LANGUAGE` — merged into the process context, or
  * `undefined` when it states none. It fills only what the process context
- * lacks: a value an embedder stated (`setSystemContext`, `systemContext`) survives every request that sets a
- * context up. Sends nothing.
+ * lacks. An embedder's `systemContext` is the instance's, entered per call,
+ * never this one. Sends nothing.
+ *
+ * The environment read here is the process's own: no destination's `.env`
+ * joins it (24.0.0). A destination's master language is its `SAP_LANGUAGE`
+ * in effect, handed with its system context (`withDestinationSystemContext`),
+ * and beats this process value.
  */
 export function systemContextFromConfiguration():
   | IAdtSystemContext
@@ -45,8 +50,8 @@ export function getSystemContext(): IAdtSystemContext {
 /**
  * The system context as the current request states it — what a call reads
  * (a create's responsible). A responsible is only one stated
- * (`x-sap-responsible`, `SAP_RESPONSIBLE`, `setSystemContext`, a scope's
- * `responsible`) or the connection's parameters (made by a host's rules,
+ * (`x-sap-responsible`, `SAP_RESPONSIBLE`, an instance's `systemContext`, a
+ * scope's `responsible`) or the connection's parameters (made by a host's rules,
  * `withKnownSystemContext`); no login stands in for it here.
  *
  * Outside a request scope (stdio) the process values apply. Inside one:
@@ -82,17 +87,6 @@ export function getCreateSystemContext(): IAdtSystemContext {
   if (ctx.responsible?.trim()) return ctx;
   const login = getRequestContext()?.login;
   return login?.trim() ? { ...ctx, responsible: login } : ctx;
-}
-
-/**
- * Set system context explicitly (safe, no HTTP requests).
- * Use this when system info is known upfront (e.g., from BTP destination metadata).
- */
-export function setSystemContext(context: Partial<IAdtSystemContext>): void {
-  cached = {
-    ...cached,
-    ...context,
-  };
 }
 
 export function resetSystemContextCache() {

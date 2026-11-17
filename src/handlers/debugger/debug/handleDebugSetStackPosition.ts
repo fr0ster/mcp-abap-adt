@@ -1,3 +1,4 @@
+import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugSetStackPosition.ts
 import {
   debugBatchRecorder,
@@ -6,8 +7,7 @@ import {
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseStop } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -15,24 +15,21 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[debug] Selects the stack frame variables are read in; execution goes on from the same point. Needs a stopped debuggee.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      position: {
-        type: 'integer',
-        description:
-          'Frame position as the stack numbers it; the stopped frame has the highest position.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'position'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    position: z
+      .number()
+      .int()
+      .describe(
+        'Frame position as the stack numbers it; the stopped frame has the highest position.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleDebugSetStackPosition(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const recorder = debugBatchRecorder(context);
   if (recorder !== undefined) {

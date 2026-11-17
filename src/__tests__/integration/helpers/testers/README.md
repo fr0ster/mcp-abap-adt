@@ -25,7 +25,7 @@ interface TesterContext {
   session: SessionInfo;          // Current session (session_id, session_state)
   logger: LoggerWithExtras;      // Logger with icons and formatting
   objectName: string | null;     // Resolved object name
-  params: any;                   // Test parameters from YAML
+  params: CaseParams;            // Test parameters from YAML, read through readCaseParams
   packageName: string;            // Resolved package name
   transportRequest?: string;     // Resolved transport request
   lockHandle?: string | null;    // Lock handle, when a workflow takes one

@@ -17,6 +17,7 @@ import {
   type ParameterTable,
   readParameters,
 } from './authParameters.js';
+import type { YamlConfig } from './yamlConfig.js';
 
 export {
   BATCH_KEEP_RAW_PARTS_CLI,
@@ -34,7 +35,7 @@ const BATCH_KEEP_RAW_PARTS_ONLY: ParameterTable = {
 export function readBatchKeepRawParts(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): boolean {
   return (
     readParameters(BATCH_KEEP_RAW_PARTS_ONLY, argv, env, yaml)

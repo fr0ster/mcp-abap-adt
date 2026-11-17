@@ -14,25 +14,43 @@
  * Run: npm test -- --testPathPattern=integration/domain
  */
 
-import { handleCreateDomain } from '../../../../handlers/domain/high/handleCreateDomain';
-import { handleDeleteDomain } from '../../../../handlers/domain/high/handleDeleteDomain';
-import { handleUpdateDomain } from '../../../../handlers/domain/high/handleUpdateDomain';
-import { getTimeout } from '../../helpers/configHelpers';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
+import {
+  TOOL_DEFINITION as CreateDomainTool,
+  handleCreateDomain,
+} from '../../../../handlers/domain/high/handleCreateDomain';
+import {
+  TOOL_DEFINITION as DeleteDomainTool,
+  handleDeleteDomain,
+} from '../../../../handlers/domain/high/handleDeleteDomain';
+import {
+  handleUpdateDomain,
+  TOOL_DEFINITION as UpdateDomainTool,
+} from '../../../../handlers/domain/high/handleUpdateDomain';
+
+import { defineTool } from '../../../../lib/handlers/interfaces';
+import { servedSuite } from '../../helpers/servedHere';
 import { HighTester } from '../../helpers/testers/HighTester';
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['CreateDomain', 'DeleteDomain', 'UpdateDomain']);
 
 describe('Domain High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester('create_domain', 'builder_domain', 'domain-high', {
-      create: handleCreateDomain,
-      update: handleUpdateDomain,
-      delete: handleDeleteDomain,
+      create: defineTool(CreateDomainTool, handleCreateDomain),
+      update: defineTool(UpdateDomainTool, handleUpdateDomain),
+      delete: defineTool(DeleteDomainTool, handleDeleteDomain),
     });
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -44,11 +62,7 @@ describe('Domain High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all Domain high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all Domain high-level handlers', async () => {
+    await tester.run();
+  });
 });

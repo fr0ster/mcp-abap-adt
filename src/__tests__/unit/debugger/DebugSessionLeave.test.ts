@@ -97,6 +97,65 @@ describe('leaving a debuggee running', () => {
     expect(world.closed).toContain(debuggee);
   });
 
+  /** What adt-clients carries for a terminateDebugger over RFC whose call the RFC SDK answered with this code. */
+  const rfcFailure = (codeString: 'RFC_CLOSED' | 'RFC_COMMUNICATION_FAILURE') =>
+    refusedResponse('the RFC call failed', {
+      origin: 'connection',
+      rfc: {
+        key: codeString,
+        group: codeString === 'RFC_CLOSED' ? 4 : 3,
+        code: codeString === 'RFC_CLOSED' ? 6 : 1,
+        codeString,
+      },
+    });
+
+  it('release_debugger over RFC: the conversation closed by the system (RFC_CLOSED) is read as freed; the stop is dropped with no further request; the session listens on', async () => {
+    const world = fakeWorld();
+    const { session, debuggee } = await stoppedWith(world);
+    world.override.terminateDebugger = async () => rfcFailure('RFC_CLOSED');
+    await expect(session.releaseDebugger()).resolves.toEqual({
+      state: 'listening',
+    });
+    expect(world.dropped).toEqual([debuggee]);
+    const onIt = world.log.filter((c) => c.connection === idOf(debuggee));
+    expect(onIt[onIt.length - 1].call).toBe('terminateDebugger');
+    expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+    await until(() => world.polls.length === 3);
+    delete world.override.terminateDebugger;
+    await session.stop();
+    expect(world.closed).not.toContain(debuggee);
+    expect(
+      world.log.filter((c) => c.connection === idOf(debuggee)),
+    ).toHaveLength(onIt.length);
+  });
+
+  it('release_debugger over RFC with another RFC code is a failure, and the stop stays for DebugStop', async () => {
+    const world = fakeWorld();
+    const { session, debuggee } = await stoppedWith(world);
+    world.override.terminateDebugger = async () =>
+      rfcFailure('RFC_COMMUNICATION_FAILURE');
+    await expect(session.releaseDebugger()).rejects.toThrow(
+      new DebugRequestError('the RFC call failed'),
+    );
+    expect((await session.wait(0)).state).toBe('stopped');
+    expect(world.dropped).toEqual([]);
+    delete world.override.terminateDebugger;
+    await session.stop();
+    expect(world.closed).toContain(debuggee);
+  });
+
+  it('a connection failure of release_debugger without RFC fields is a failure, and the stop stays', async () => {
+    const world = fakeWorld();
+    const { session } = await stoppedWith(world);
+    world.override.terminateDebugger = async () =>
+      refusedResponse('socket hang up', { origin: 'connection' });
+    await expect(session.releaseDebugger()).rejects.toThrow(
+      new DebugRequestError('socket hang up'),
+    );
+    expect((await session.wait(0)).state).toBe('stopped');
+    expect(world.dropped).toEqual([]);
+  });
+
   it('a refused detach is a failure, and the stop stays', async () => {
     const world = fakeWorld();
     const { session } = await stoppedWith(world);

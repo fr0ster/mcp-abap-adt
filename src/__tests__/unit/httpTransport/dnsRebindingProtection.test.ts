@@ -31,10 +31,10 @@ describe('checkDnsRebinding', () => {
     ).toBe(403);
   });
 
-  it('enabled with empty lists is a no-op', () => {
+  it('enabled with empty lists fails closed (D26 F1: refused at construction)', () => {
     expect(
       checkDnsRebinding({ host: 'x', origin: 'y' }, { enable: true }),
-    ).toBeNull();
+    ).toMatchObject({ status: 403 });
   });
 });
 

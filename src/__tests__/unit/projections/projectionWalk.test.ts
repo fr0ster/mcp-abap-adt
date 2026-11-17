@@ -14,6 +14,7 @@
  * The compact tools' arguments are read from their own descriptions on that
  * variant (`MEMBER(arg*, …)`): what the description promises is what is sent.
  */
+
 import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
@@ -52,7 +53,6 @@ import {
   TOOL_DEFINITION as HandlerValidate,
   handleHandlerValidate,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
-import { handleHandlerWhereUsed } from '../../../../compact-readonly-entries/src/handlers/handleHandlerWhereUsed';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleGetObjectVersionDiff } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { handleGetObjectVersionSource } from '../../../handlers/common/readonly/handleGetObjectVersionSource';
@@ -84,8 +84,6 @@ import {
   COMPACT_UPDATE_ROUTES,
   COMPACT_VALIDATE,
   COMPACT_VALIDATE_ROUTES,
-  COMPACT_WHERE_USED,
-  COMPACT_WHERE_USED_ROUTES,
   INCLUDES_PARENT_ROUTES,
   INCLUDES_PARENTS,
   PROJECTION_VARIANTS,
@@ -102,11 +100,10 @@ import {
   WHERE_USED_NAMES,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { holding } from '../../helpers/heldLocks';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import { PROJECTED_ARGUMENTS } from '../../helpers/projectedArguments';
 import {
   type RecordedRequest,
@@ -194,15 +191,6 @@ const codeRoute = (code: string): Route => ({
   addressed: true,
 });
 
-/** Whether a where-used route is a name of `TYPE_NAMES`. */
-function isTypeName(route: string): route is keyof typeof TYPE_NAMES {
-  return Object.hasOwn(TYPE_NAMES, route);
-}
-
-/** The code a where-used route stands for: a name's code, or the code. */
-const whereUsedCodeOf = (route: string): string =>
-  isTypeName(route) ? TYPE_NAMES[route] : route;
-
 const routesOf = (
   routes: Readonly<
     Record<string, { readonly api: AdtApiName; readonly operation: string }>
@@ -265,6 +253,7 @@ const VALUES: Readonly<Record<string, string>> = {
   root_entity: 'ZBDEF_A',
   behavior_definition_name: 'ZBDEF_A',
   behavior_implementation_name: 'ZBP_A',
+  behavior_definition: 'ZBDEF_A',
   metadata_extension_name: 'ZDDLX_A',
   source_code: 'X',
   ddl_code: 'X',
@@ -485,23 +474,6 @@ const WALKS: Readonly<Record<string, Walk>> = {
       }),
     routes: routesOf(COMPACT_PROFILE_ROUTES),
   }),
-  'HandlerWhereUsed.object_type': walk({
-    values: COMPACT_WHERE_USED,
-    send: (context, value) =>
-      handleHandlerWhereUsed(context, {
-        object_type: value,
-        object_name: 'ZOBJ_A',
-        function_group_name: 'ZFG_A',
-      }),
-    routes: new Map(
-      Object.entries(COMPACT_WHERE_USED_ROUTES).map(
-        ([name, alias]): [string, Route] => [
-          name,
-          codeRoute(whereUsedCodeOf(alias)),
-        ],
-      ),
-    ),
-  }),
   'GetWhereUsed.object_type': walk({
     values: {
       onprem: [...WHERE_USED_CODES.onprem, ...WHERE_USED_NAMES.onprem],
@@ -681,7 +653,11 @@ describe('every projected value reaches a served path', () => {
     process.env.SAP_SYSTEM_TYPE = variant;
     const connection = recordingConnection();
     declareSystemKind(connection, variant);
-    const context: HandlerContext = { connection };
+    // The instance locked what the walk writes under.
+    const context: HandlerContext = {
+      connection,
+      heldLocks: holding('LOCKHANDLE'),
+    };
     const answered = await step
       .send(context)
       .catch((thrown: unknown) => ({ thrown: String(thrown) }));

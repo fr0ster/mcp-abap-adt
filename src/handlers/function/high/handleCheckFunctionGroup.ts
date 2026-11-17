@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,27 +27,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP function group named by function_group_name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      function_group_name: {
-        type: 'string',
-        description: 'Function group name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
-      },
-    },
-    required: ['function_group_name'],
-  },
+  inputSchema: z.object({
+    function_group_name: z.string().describe('Function group name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckFunctionGroup(
   context: HandlerContext,
-  args: { function_group_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckFunctionGroupLow(context, args);
   return normalizeCheckResponse(

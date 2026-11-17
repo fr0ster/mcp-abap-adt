@@ -36,7 +36,7 @@ describe("the --env file: 'fail'", () => {
   });
 
   it('a write that does not land fails the request with persisting-tokens and its sentence, and refuses the destination until a write lands', async () => {
-    s = await stand({ auth: 'jwt' });
+    s = await stand({ kind: 'cloud', auth: 'jwt' });
     dir = path.dirname(s.envFile);
     // A first call logs in; its tokens land in the file.
     expect(await s.callTool('ProbeAdt', { id: 'login' })).toMatchObject({

@@ -30,6 +30,11 @@ export function statedEnvironment(
     : undefined;
 }
 
+/** A tool's search texts, under the search key of its `_meta`. */
+export type SearchMeta = {
+  [TOOL_SEARCH_META_KEY]: { keywords: string[]; semantic: string };
+};
+
 /**
  * The `_meta` a tool is listed with: its search texts under
  * `mcp-abap-adt/search` (`tools/tool-search.json`), for a consumer's tool
@@ -39,7 +44,7 @@ export function statedEnvironment(
 export function searchMeta(
   name: string,
   offered?: readonly string[],
-): { _meta?: Record<string, unknown> } {
+): { _meta?: SearchMeta } {
   const text = toolSearchText(name, offered);
   if (text === undefined) return {};
   return {
@@ -59,7 +64,7 @@ export type ListedTool =
       readonly description: string;
       readonly inputSchema: ToolDefinition['inputSchema'];
       /** Its search `_meta`, spread into the registration's config. */
-      readonly search: { _meta?: Record<string, unknown> };
+      readonly search: { _meta?: SearchMeta };
     }
   | {
       readonly listed: false;
@@ -81,7 +86,7 @@ export function listedTool(
       listed: true,
       description: definition.description,
       inputSchema: definition.inputSchema,
-      search: searchMeta(definition.name),
+      search: searchMeta(definition.name, definition.members),
     };
   }
   const variant = variantOfEnvironment(environment);

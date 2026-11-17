@@ -1,5 +1,7 @@
 /**
- * The sample calls that prove `tools/batch-handlers.json`, entry by entry:
+ * The sample calls that prove `tools/batch-handlers.json`, entry by entry
+ * (`BATCH_ENTRY_CASES`: the compact sets' tools, the only ones the table
+ * lists), and the full set's beside them (`SAMPLE_CALLS`):
  * `oneRequestPerEntry.test.ts` runs each against a counting connection and
  * requires exactly one request; `batchHandlers.test.ts` requires every entry
  * to be admitted by at least one case, and every value an entry's `equals`
@@ -10,7 +12,8 @@
  * end the call before it shows what it sends next).
  */
 
-import { corpusBody } from '../../lib/adtCorpus';
+import { batchEntries } from '../../lib/batch/eligibility';
+import { corpusBody } from './adtCorpus';
 
 export interface BatchEntryCase {
   tool: string;
@@ -24,6 +27,15 @@ export interface BatchEntryCase {
 }
 
 const LOCK_HANDLE = 'LOCK_HANDLE_PLACEHOLDER';
+
+/**
+ * The function module of the corpus metadata document the harness answers
+ * (`read-metadata-function-module--01`), at the group it states.
+ */
+const CORPUS_MODULE = {
+  function_module_name: 'Z_MCP_SHR_FM',
+  function_group_name: 'ZMCP_SHR_FGRP',
+};
 const TRANSPORT = 'XXXK900001';
 const VERSION_URI = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
 
@@ -65,10 +77,6 @@ const PART_READS: Array<[string, Record<string, unknown>]> = [
   ['GetBehaviorDefinition', { behavior_definition_name: 'BDEF_A' }],
   ['GetBehaviorImplementation', { behavior_implementation_name: 'BIMP_A' }],
   ['GetMetadataExtension', { metadata_extension_name: 'DDLX_A' }],
-  [
-    'GetFunctionModule',
-    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-  ],
   [
     'GetFunctionInclude',
     { function_group_name: 'FUGR_A', include_name: 'INCL_A' },
@@ -116,6 +124,12 @@ const FULL: BatchEntryCase[] = [
   ...PART_READS.flatMap(([tool, names]) =>
     ['source', 'metadata'].map((part) => ({ tool, args: { ...names, part } })),
   ),
+  // A function module's metadata is the one request, its group checked
+  // against the group the document states: the corpus module, at its group.
+  {
+    tool: 'GetFunctionModule',
+    args: { ...CORPUS_MODULE, part: 'metadata' },
+  },
   { tool: 'GetInclude', args: { include_name: 'INCL_A' } },
   {
     tool: 'GetTransport',
@@ -137,12 +151,17 @@ const FULL: BatchEntryCase[] = [
     tool: 'GetObjectVersions',
     args: { object_type, object_name: 'OBJ_A' },
   })),
+  // The draft reads: every part's three versions, sent together.
+  ...['CLASS', 'PROGRAM', 'DDL', 'DOMAIN'].map((object_type) => ({
+    tool: 'GetObjectDraft',
+    args: { object_type, object_name: 'OBJ_A' },
+  })),
   {
-    tool: 'GetObjectVersions',
+    tool: 'GetObjectDraft',
     args: {
-      object_type: 'function_module',
-      object_name: 'FM_A',
-      function_group_name: 'FUGR_A',
+      object_type: 'FUNCTION_MODULE',
+      object_name: 'Z_FM_A',
+      function_group_name: 'ZFG_A',
     },
   },
   {
@@ -152,10 +171,6 @@ const FULL: BatchEntryCase[] = [
   { tool: 'GetClassVersions', args: { class_name: 'CLAS_A' } },
   { tool: 'GetProgramVersions', args: { program_name: 'PROG_A' } },
   { tool: 'GetInterfaceVersions', args: { interface_name: 'INTF_A' } },
-  {
-    tool: 'GetFunctionModuleVersions',
-    args: { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-  },
   { tool: 'GetTableVersions', args: { table_name: 'TAB_A' } },
   { tool: 'GetStructureVersions', args: { structure_name: 'STRU_A' } },
   { tool: 'GetDdlVersions', args: { ddl_name: 'DDL_A' } },
@@ -241,11 +256,6 @@ const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
-  [
-    'FUNCTION_MODULE',
-    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-  ],
-  ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -267,11 +277,13 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INCLUDE', { include_name: 'INCL_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
+  ['FUNCTION_MODULE', CORPUS_MODULE],
   [
     'FUNCTION_MODULE',
-    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+    {
+      function_module_name: `${CORPUS_MODULE.function_group_name}|${CORPUS_MODULE.function_module_name}`,
+    },
   ],
-  ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -287,7 +299,6 @@ const LOCKED_TYPES: Array<[string, string]> = [
   ['TABLE_TYPE', 'TTYP_A'],
   ['INTERFACE', 'INTF_A'],
   ['FUNCTION_GROUP', 'FUGR_A'],
-  ['FUNCTION_MODULE', 'FUGR_A|FM_A'],
   ['TABLE', 'TAB_A'],
   ['STRUCTURE', 'STRU_A'],
   ['DDL', 'DDL_A'],
@@ -342,14 +353,6 @@ const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
   ['CDS_UNIT_TEST', { class_name: 'CLAS_T', test_class_source: 'source text' }],
   ['PROGRAM', { program_name: 'PROG_A', source_code: 'source text' }],
   ['INTERFACE', { interface_name: 'INTF_A', source_code: 'source text' }],
-  [
-    'FUNCTION_MODULE',
-    {
-      function_module_name: 'FM_A',
-      function_group_name: 'FUGR_A',
-      source_code: 'source text',
-    },
-  ],
   ['BEHAVIOR_DEFINITION', { name: 'BDEF_A', source_code: 'source text' }],
   [
     'BEHAVIOR_IMPLEMENTATION',
@@ -360,6 +363,19 @@ const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
 
 /** The compact set's single-request calls. */
 const COMPACT: BatchEntryCase[] = [
+  {
+    tool: 'HandlerGet',
+    args: { object_type: 'CLASS', part: 'draft', class_name: 'CLAS_A' },
+  },
+  {
+    tool: 'HandlerGet',
+    args: {
+      object_type: 'FUNCTION_MODULE',
+      part: 'draft',
+      function_module_name: 'Z_FM_A',
+      function_group_name: 'ZFG_A',
+    },
+  },
   ...SOURCE_READS.map(([object_type, names]) => ({
     tool: 'HandlerGet',
     args: { object_type, ...names },
@@ -425,7 +441,37 @@ const COMPACT: BatchEntryCase[] = [
     tool: 'HandlerGet',
     args: { part, run_id: 'RUN_A' },
   })),
-  { tool: 'HandlerSearch', args: { query: 'Z*' } },
+  // HandlerSystem: each action whose full tool sends independent requests.
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'search_object', object_name: 'Z*' },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'search_object', object_name: 'Z*', object_type: 'CLAS' },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'where_used', object_name: 'CLAS_A', object_type: 'class' },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: {
+      action: 'where_used',
+      object_name: 'CLAS_A',
+      object_type: 'class',
+      enable_all_types: false,
+    },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'atc_findings', worklist_id: 'WORKLIST_A' },
+  },
+  { tool: 'HandlerSystem', args: { action: 'atc_results', created_by: '*' } },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'atc_result', display_id: 'RESULT_A' },
+  },
   { tool: 'HandlerGetData', args: { sql_query: 'SELECT * FROM TAB_A' } },
   { tool: 'HandlerGetData', args: { object_name: 'TAB_A' } },
   { tool: 'HandlerProfileList', args: {} },
@@ -522,10 +568,6 @@ const DELETIONS: Array<[string, Record<string, unknown>]> = [
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }],
-  [
-    'FUNCTION_MODULE',
-    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-  ],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -544,10 +586,7 @@ const EMPTIED_INCLUDES = [
 
 /** The deletion check of every type a deletion request removes. */
 const DELETION_CHECKS: Array<[string, string]> = DELETIONS.map(
-  ([object_type]) => [
-    object_type,
-    object_type === 'FUNCTION_MODULE' ? 'FUGR_A|FM_A' : 'OBJ_A',
-  ],
+  ([object_type]) => [object_type, 'OBJ_A'],
 );
 
 const DELETE_CASES: BatchEntryCase[] = [
@@ -573,11 +612,10 @@ const DELETE_CASES: BatchEntryCase[] = [
   })),
 ];
 
-/** `HandlerCreate`: the create request alone, per type but PACKAGE. */
+/** `HandlerCreate`: the create request alone, per type but PACKAGE and TRANSPORT. */
 const CREATES: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A', package_name: 'PKG_A' }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A', package_name: 'PKG_A' }],
-  ['TRANSPORT', { description: 'text' }],
   ['TABLE', { table_name: 'TAB_A', package_name: 'PKG_A' }],
   ['STRUCTURE', { structure_name: 'STRU_A', package_name: 'PKG_A' }],
   ['DDL', { ddl_name: 'DDL_A', package_name: 'PKG_A' }],
@@ -609,7 +647,14 @@ const CREATES: Array<[string, Record<string, unknown>]> = [
     'BEHAVIOR_DEFINITION',
     { name: 'BDEF_A', package_name: 'PKG_A', implementation_type: 'Managed' },
   ],
-  ['BEHAVIOR_IMPLEMENTATION', { class_name: 'BP_A', package_name: 'PKG_A' }],
+  [
+    'BEHAVIOR_IMPLEMENTATION',
+    {
+      class_name: 'BP_A',
+      behavior_definition: 'BDEF_A',
+      package_name: 'PKG_A',
+    },
+  ],
   ['METADATA_EXTENSION', { name: 'DDLX_A', package_name: 'PKG_A' }],
   ['INCLUDE', { include_name: 'INCL_A', package_name: 'PKG_A' }],
   ['TABLE_TYPE', { table_type_name: 'TTYP_A', package_name: 'PKG_A' }],
@@ -619,7 +664,6 @@ const CREATE_CASES: BatchEntryCase[] = [
   ...CREATES.map(([object_type, fields]) => ({
     tool: 'HandlerCreate',
     args: { object_type, ...fields },
-    ...(object_type === 'TRANSPORT' ? { body: TRANSPORT_DOCUMENT } : {}),
   })),
   {
     tool: 'HandlerCreate',
@@ -645,10 +689,6 @@ const ACTIVATIONS: Array<[string, Record<string, unknown>]> = [
   ['ActivateInclude', { include_name: 'INCL_A' }],
   ['ActivateTableType', { table_type_name: 'TTYP_A' }],
   ['ActivateFunctionGroup', { function_group_name: 'FUGR_A' }],
-  [
-    'ActivateFunctionModule',
-    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-  ],
   ['ActivateBehaviorDefinition', { name: 'BDEF_A' }],
   ['ActivateMetadataExtension', { name: 'DDLX_A' }],
   ['ActivateServiceDefinition', { name: 'SRVD_A' }],
@@ -661,10 +701,6 @@ const CHECKS: Array<[string, Record<string, unknown>]> = [
   ['CheckInterface', { interface_name: 'INTF_A' }],
   ['CheckProgram', { program_name: 'PROG_A' }],
   ['CheckFunctionGroup', { function_group_name: 'FUGR_A' }],
-  [
-    'CheckFunctionModule',
-    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-  ],
   ['CheckTable', { table_name: 'TAB_A' }],
   ['CheckStructure', { structure_name: 'STRU_A' }],
   ['CheckDdl', { ddl_name: 'DDL_A' }],
@@ -735,19 +771,6 @@ const WRITES: BatchEntryCase[] = [
     tool: 'HandlerActivate',
     args: { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' },
   },
-  // A function module: one activation run under its group.
-  {
-    tool: 'HandlerActivate',
-    args: { object_type: 'FUNCTION_MODULE', object_name: 'FUGR_A|FM_A' },
-  },
-  {
-    tool: 'HandlerActivate',
-    args: {
-      object_type: 'FUNCTION_MODULE',
-      object_name: 'FM_A',
-      function_group_name: 'FUGR_A',
-    },
-  },
   {
     tool: 'HandlerActivate',
     args: {
@@ -757,18 +780,15 @@ const WRITES: BatchEntryCase[] = [
       ],
     },
   },
-  {
-    tool: 'HandlerActivate',
-    args: {
-      objects: [{ name: 'FM_A', type: 'FUGR/FF', parentName: 'FUGR_A' }],
-    },
-  },
   ...CHECKS.map(([tool, args]) => ({ tool, args, body: CHECKED })),
-  ...COMPACT_TYPES.map((object_type) => ({
-    tool: 'HandlerCheckRun',
-    args: { object_type, object_name: nameOf(object_type) },
-    body: CHECKED,
-  })),
+  // A function module's check reads its metadata first (#2): not recorded.
+  ...COMPACT_TYPES.filter((type) => type !== 'FUNCTION_MODULE').map(
+    (object_type) => ({
+      tool: 'HandlerCheckRun',
+      args: { object_type, object_name: nameOf(object_type) },
+      body: CHECKED,
+    }),
+  ),
   {
     tool: 'HandlerCheckRun',
     args: {
@@ -869,7 +889,6 @@ const WRITES: BatchEntryCase[] = [
       program_name: 'PROG_A',
       package_name: 'PKG_A',
       description: 'text',
-      program_type: 'executable',
     },
   },
   {
@@ -921,15 +940,6 @@ const WRITES: BatchEntryCase[] = [
       activate: false,
     },
   },
-  ...['CreateTransport', 'HandlerTransportCreate'].map((tool) => ({
-    tool,
-    args: { description: 'text' },
-    body: TRANSPORT_DOCUMENT,
-  })),
-  {
-    tool: 'CreateTransportTask',
-    args: { transport_number: TRANSPORT, target_user: 'USER_A' },
-  },
   {
     tool: 'RemoveTransportObject',
     args: {
@@ -973,10 +983,6 @@ const WRITES: BatchEntryCase[] = [
       ['RunUnitTest', { class_name: 'CLAS_A' }],
       ['RunProgramUnitTest', { program_name: 'PROG_A' }],
       ['RunFunctionGroupUnitTest', { function_group_name: 'FUGR_A' }],
-      [
-        'RunFunctionModuleUnitTest',
-        { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-      ],
     ] as const
   ).map(([tool, names]) => ({
     tool,
@@ -1070,18 +1076,6 @@ const WRITES: BatchEntryCase[] = [
       enable_all_types: false,
     },
   },
-  {
-    tool: 'HandlerWhereUsed',
-    args: { object_type: 'CLASS', object_name: 'CLAS_A' },
-  },
-  {
-    tool: 'HandlerWhereUsed',
-    args: {
-      object_type: 'FUNCTION_MODULE',
-      object_name: 'FM_A',
-      function_group_name: 'FUGR_A',
-    },
-  },
 ];
 
 /** Two requests sent together, neither needing the other's answer. */
@@ -1128,7 +1122,11 @@ const TOGETHER: BatchEntryCase[] = [
   })),
 ];
 
-export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
+/**
+ * Every sample call: the full set's tools beside the compact ones. The
+ * version and access suites run each through its served handler.
+ */
+export const SAMPLE_CALLS: readonly BatchEntryCase[] = [
   ...FULL,
   ...COMPACT,
   ...CREATE_CASES,
@@ -1136,3 +1134,11 @@ export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
   ...WRITES,
   ...TOGETHER,
 ];
+
+/** The tools the table lists: batch mode is the compact sets'. */
+const LISTED = new Set(batchEntries().map((entry) => entry.tool));
+
+/** The batch proof: the sample calls of the tools the table lists. */
+export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = SAMPLE_CALLS.filter(
+  (sample) => LISTED.has(sample.tool),
+);

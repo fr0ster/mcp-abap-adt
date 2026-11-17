@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckMetadataExtensionLow Handler - Syntax check for ABAP Metadata Extension
  *
@@ -35,7 +37,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -45,31 +47,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'MetadataExtension name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        default: 'active',
-        description:
-          "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.",
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name'],
-  },
+  inputSchema: z.object({
+    name: z.string().describe('MetadataExtension name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .default('active')
+      .optional()
+      .describe(
+        "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.",
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CheckMetadataExtensionArgs {
-  name: string;
-  version?: 'active' | 'inactive';
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckMetadataExtensionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckMetadataExtension(
   context: HandlerContext,

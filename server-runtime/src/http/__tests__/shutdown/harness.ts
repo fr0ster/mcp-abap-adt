@@ -78,10 +78,16 @@ export async function httpStand(
     server?: Partial<StreamableHttpServerOptions>;
     /** Groups served beside the probe and shutdown tools. */
     groups?: IHandlerGroup[];
+    /**
+     * `SAP_SYSTEM_TYPE` as the server is constructed — its one kind
+     * (`null`: unset); `onprem` by default.
+     */
+    systemTypeEnv?: string | null;
   } = {},
 ): Promise<HttpStand> {
   resetProcessLatchForTests();
-  process.env.SAP_SYSTEM_TYPE = 'onprem';
+  if (options.systemTypeEnv === null) delete process.env.SAP_SYSTEM_TYPE;
+  else process.env.SAP_SYSTEM_TYPE = options.systemTypeEnv ?? 'onprem';
   const standIn = await adtStandIn();
   const stateErrors: string[] = [];
   const mcp = new StreamableHttpServer(

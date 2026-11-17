@@ -9,7 +9,6 @@ export type LoggerWithExtras = Logger & {
   success: (message: string) => void;
   browserUrl: (url: string) => void;
   browserOpening: (message: string) => void;
-  testSkip: (message: string) => void;
 };
 
 const NOOP = () => {};
@@ -23,7 +22,6 @@ const noopLogger: LoggerWithExtras = {
   success: NOOP,
   browserUrl: NOOP,
   browserOpening: NOOP,
-  testSkip: NOOP,
 };
 
 const DEBUG_ENVS_ENABLED =
@@ -145,7 +143,6 @@ export function createTestLogger(category: string): LoggerWithExtras {
     browserOpening: emit(LogLevel.DEBUG, (msg) =>
       baseLogger?.debug(`🌐 ${msg}`),
     ),
-    testSkip: emit(LogLevel.INFO, (msg) => baseLogger?.info(`⏭️  ${msg}`)),
   };
 }
 
@@ -156,7 +153,7 @@ export function logObjectAction(
   logger: Logger,
   action: string,
   objectName: string,
-  extra?: Record<string, any>,
+  extra?: Record<string, unknown>,
 ) {
   const payload = extra ? ` ${JSON.stringify(extra)}` : '';
   logger?.info(`${action} ${objectName}${payload}`);

@@ -97,7 +97,8 @@ The server connects at its start, before the client sees its tools:
 3. The token is stored: in memory, or in `~/.config/mcp-abap-adt/sessions/TRIAL.env` with `--unsafe`
 4. Tool calls use the stored token, and the server renews it
 
-A failure at the start — the login refused, the system unreachable — ends the process (exit `1`,
+With `--deferred-logon` none of this happens at the start: the tools are listed at once and the
+first tool call runs these steps. A failure at the start — the login refused, the system unreachable — ends the process (exit `1`,
 the words on stderr): start it again.
 
 ## Troubleshooting

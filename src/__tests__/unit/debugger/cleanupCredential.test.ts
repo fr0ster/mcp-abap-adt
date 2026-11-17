@@ -58,7 +58,7 @@ describe('a debugger cleanup that meets a credential failure', () => {
     return { session, world };
   }
 
-  const stopFailure = async (session: DebugSession) => {
+  const stopFailure = async (session: DebugSession<string>) => {
     const stopped = session.stop().then(
       () => undefined,
       (e: unknown) => e,

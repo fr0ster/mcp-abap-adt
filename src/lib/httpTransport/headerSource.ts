@@ -85,29 +85,16 @@ export function headerSource(headers: RequestHeaders): ConnectionSource {
 }
 
 /**
- * The instance's context from the headers: `headerSource`, plus what the
+ * The instance's context from the headers: `headerSource`. What the
  * request states beside its credential (`x-sap-master-system`,
- * `x-sap-responsible`, `x-sap-language`) as metadata. The request scope
- * (`runWithRequestContext`) carries those per dispatch; nothing reaches the
+ * `x-sap-responsible`, `x-sap-language`) is carried by the request scope
+ * (`runWithRequestContext`) per dispatch; nothing reaches the
  * process-global system context (#110).
  */
 export function headerContext(headers: RequestHeaders): ConnectionContext {
-  const source = headerSource(headers);
-  const metadata: Record<string, string> = {};
-  const masterSystem = header(headers, 'x-sap-master-system');
-  const responsible = header(headers, 'x-sap-responsible');
-  const masterLanguage = header(headers, 'x-sap-language');
-  if (masterSystem) metadata.masterSystem = masterSystem;
-  if (responsible) metadata.responsible = responsible;
-  if (masterLanguage) metadata.masterLanguage = masterLanguage;
-  return {
-    kind: 'built',
-    source,
-    sessionId: header(headers, 'x-sap-jwt-token')
-      ? 'direct-jwt'
-      : 'direct-basic',
-    metadata,
-  };
+  // The system context headers enter the request scope
+  // (`requestContextFromHeaders`), never the connection context.
+  return { kind: 'built', source: headerSource(headers) };
 }
 
 /** How a transport answers a request it could not serve. */

@@ -33,6 +33,35 @@ describe('return_error emits a bare message (#155)', () => {
     expect(textOf(return_error(err))).toContain('Resource not found');
   });
 
+  // Since @mcp-abap-adt/connection 25 an HTTP failure is not the axios
+  // error: an Error with SAP's answer as `response`, `status` and `code`, and
+  // no `config`, `request` or `isAxiosError`.
+  const connectionFailure = (
+    message: string,
+    facts: { code?: string; status?: number; response?: unknown },
+  ): Error => Object.assign(new Error(message), facts);
+
+  it("extracts the ADT response body from the connection's HTTP failure", () => {
+    const err = connectionFailure('Request failed with status code 404', {
+      code: 'ERR_BAD_REQUEST',
+      status: 404,
+      response: {
+        status: 404,
+        statusText: 'Not Found',
+        headers: {},
+        data: '<exc:exception>Resource not found</exc:exception>',
+      },
+    });
+    expect(textOf(return_error(err))).toContain('Resource not found');
+  });
+
+  it("says a refused connection by the connection's failure code", () => {
+    const err = connectionFailure('The request failed: ECONNREFUSED', {
+      code: 'ECONNREFUSED',
+    });
+    expect(textOf(return_error(err))).toContain('Connection refused');
+  });
+
   it('keeps DNS diagnostics for ENOTFOUND', () => {
     const err = new AxiosError('getaddrinfo ENOTFOUND sap.example.com');
     (err as any).code = 'ENOTFOUND';

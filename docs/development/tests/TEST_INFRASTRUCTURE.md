@@ -53,13 +53,6 @@ All updated tests support:
 - Adding new tests
 - Troubleshooting
 
-**`doc/CREATE_DOMAIN_TOOL.md`** - CreateDomain handler documentation
-- Complete API reference
-- Workflow steps (lock → create → check → unlock → activate → verify)
-- Session management architecture
-- Input parameters and examples
-- Error handling and limitations
-
 ## 📁 File Structure
 
 ```
@@ -75,9 +68,6 @@ tests/
 ├── test-search-object.js     # ⭐ Uses YAML config
 ├── test-get-sql-query.js     # ⭐ Uses YAML config
 └── ... (other legacy tests)
-
-doc/
-└── CREATE_DOMAIN_TOOL.md     # ⭐ New CreateDomain documentation
 ```
 
 ## 🚀 Usage Examples

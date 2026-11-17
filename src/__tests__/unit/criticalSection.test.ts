@@ -5,6 +5,7 @@
  * unlock chain runs uninterruptibly. Feature-detected: a connection without
  * the methods is a no-op.
  */
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   isMutatingToolName,
   withCriticalSection,
@@ -54,7 +55,10 @@ describe('withCriticalSection', () => {
       return { ok: true };
     };
 
-    const wrapped = withCriticalSection(handler, () => conn);
+    const wrapped = withCriticalSection(
+      handler,
+      () => conn as unknown as IAbapConnection,
+    );
     const res = await wrapped({} as any, {});
 
     expect(res).toEqual({ ok: true });
@@ -72,20 +76,29 @@ describe('withCriticalSection', () => {
       throw new Error('boom');
     };
 
-    const wrapped = withCriticalSection(handler, () => conn);
+    const wrapped = withCriticalSection(
+      handler,
+      () => conn as unknown as IAbapConnection,
+    );
     await expect(wrapped({} as any, {})).rejects.toThrow('boom');
     expect(calls).toEqual(['begin', 'handler', 'end']);
   });
 
   it('is a no-op on a connection lacking the methods (older connection)', async () => {
     const handler = async () => 'ok';
-    const wrapped = withCriticalSection(handler, () => ({}) as unknown);
+    const wrapped = withCriticalSection(
+      handler,
+      () => ({}) as unknown as IAbapConnection,
+    );
     await expect(wrapped()).resolves.toBe('ok');
   });
 
-  it('tolerates a null/undefined connection', async () => {
-    const handler = async () => 'ok';
-    const wrapped = withCriticalSection(handler, () => undefined);
-    await expect(wrapped()).resolves.toBe('ok');
+  it('hands the handler exactly the arguments the wrapper is called with', async () => {
+    const conn = {} as unknown as IAbapConnection;
+    const counted = async (...args: unknown[]) => args.length;
+    await expect(withCriticalSection(counted, () => conn)()).resolves.toBe(0);
+    await expect(
+      withCriticalSection(counted, () => conn)({} as any, {}),
+    ).resolves.toBe(2);
   });
 });

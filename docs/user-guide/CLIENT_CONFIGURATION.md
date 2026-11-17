@@ -77,11 +77,11 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-login` | Yes* (for basic) | Username for basic authentication; on-premise also the responsible of created objects when none is stated (only on this `x-sap-url` connection, not on a destination request) | `your_username` |
 | `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
 | `x-sap-master-system` | No | Master system of created objects; wins over the environment | `<system id>` |
-| `x-sap-responsible` | No | Responsible person of created objects; wins over the environment and the login | `<user>` |
+| `x-sap-responsible` | No | Responsible person of created objects; wins over the login. The process's `SAP_RESPONSIBLE` is not read | `<user>` |
 | `x-sap-language` | No | Master language of created objects | `EN` |
-| `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the environment (`SAP_DEBUG_TERMINAL_ID`). Random per instance when none is stated | `<terminal id>` |
+| `x-sap-debug-terminal-id` | No | The debugger's terminal id; the process's `SAP_DEBUG_TERMINAL_ID` is not read. Random per instance when none is stated | `<terminal id>` |
 | `x-sap-debug-ide-id` | No | The debugger's IDE id; same order. The system keys its listener conflict by it: a shared IDE id means shared catches and no conflict ([Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one)) | `<IDE id>` |
-| `x-sap-debug-breakpoint-conflict` | No | `replace` or `refuse-if-held` ([Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)); wins over the destination's `.env` and the environment | `refuse-if-held` |
+| `x-sap-debug-breakpoint-conflict` | No | `replace` or `refuse-if-held` ([Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)); wins over an embedder's `breakpointConflict` option; the process's `SAP_DEBUG_BREAKPOINT_CONFLICT` is not read | `refuse-if-held` |
 | `x-mcp-state-handle` | No (Streamable HTTP) | The `state_handle` of the instance that holds state (a long session, a lock, a batch, a debug session), for a client that sets headers: the alternative to the `state_handle` argument every tool declares on the Streamable HTTP binaries, which is how a model sends it. When both are sent, the header wins. A bearer secret | `<state_handle>` |
 
 \* A request (SSE: the opening `GET`) must carry `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password`; without them it is answered `400`. `x-mcp-destination` is answered `400`.
@@ -148,6 +148,17 @@ mcp-abap-adt --env-path=/path/to/.env --system-type=<onprem|cloud>
 Destinations are served only by `mcp-abap-adt` (stdio); `mcp-abap-adt-http` and `mcp-abap-adt-sse` refuse
 `--mcp`, `--env` and `--env-path` at start, naming `mcp-abap-adt`. Without any of them, stdio starts in
 inspection-only mode (the tool list of the stated system type answers — inspection needs `--system-type` too; a tool call needs a connection).
+
+**Two systems that are never up at the same time** (one server each, as an MCP client starts
+them): `--deferred-logon` starts each without contacting its system, so neither fails at the
+start; a call to the one that is down answers `no_connection` with its cause code, and once the
+system is started the next call logs on — no reconnect by hand
+([--deferred-logon](CLI_OPTIONS.md#--deferred-logon)).
+
+```bash
+mcp-abap-adt --env=system-a --system-type=onprem --deferred-logon
+mcp-abap-adt --env=system-b --system-type=onprem --deferred-logon
+```
 
 ### How It Works
 
@@ -232,7 +243,7 @@ It takes no destination and no `.env`: each request carries its credential in `x
 
 ### Environment Variables
 
-The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`, `SAP_LANGUAGE` and the RFC message server's `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` (of an `--env` / `--env-path` file) reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
+The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CONNECTION_TYPE` and `SAP_SYSTEM_TYPE` reach the process environment; the client, the language and the RFC address (`SAP_CLIENT`, `SAP_LANGUAGE`, `SAP_ASHOST`, `SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER`) are the destination's own, read from the file and ranked after the CLI and the process's own environment and before YAML. Process-level settings (`NODE_EXTRA_CA_CERTS`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
 
 **A JWT you hold** is not served over stdio (19.0.0): send it in the `x-sap-jwt-token` header to
 `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. A `.env` stating
@@ -241,6 +252,7 @@ The connection lives in a `.env` file the server is told about (`--env-path`, `-
 **For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
 ```env
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=authorization_code
 SAP_UAA_URL=https://your-uaa.example
@@ -250,27 +262,34 @@ SAP_UAA_CLIENT_SECRET=your_client_secret
 
 **For SNC (passwordless, RFC):**
 ```env
-SAP_URL=https://your-onpremise-system.com:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 ```
-Add `SAP_CONNECTION_TYPE=rfc` to the `.env`, or start the server with `--connection-type=rfc`. No user and no password: the SNC credential is mapped to an ABAP user by its SNC name.
+Add `SAP_CONNECTION_TYPE=rfc` to the `.env`, or start the server with `--connection-type=rfc`. No user and no password: the SNC credential is mapped to an ABAP user by its SNC name. An RFC destination states its address, `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`; nothing is derived from a URL and nothing has a default.
 
-**For RFC through a message server and a logon group** (basic or SNC), add to the `.env`:
+**For RFC through a message server and a logon group** (basic or SNC), in place of `SAP_ASHOST` and `SAP_SYSNR`:
 ```env
 SAP_CONNECTION_TYPE=rfc
 SAP_MSHOST=your-message-server.example
-# SAP_MSSERV or SAP_SYSID is required beside SAP_MSHOST
+# SAP_MSSERV or SAP_SYSID (or both) is required beside SAP_MSHOST
 SAP_SYSID=ABC
-# Optional: the logon group (connection's default PUBLIC) and a SAProuter string
-# SAP_GROUP=PUBLIC
+# The logon group is required
+SAP_GROUP=<logon group>
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
+# Optional: a SAProuter string, with either address
 # SAP_SAPROUTER=/H/your-router.example/S/3299/H/
 ```
-The RFC wire then takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read. The same fields are `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` and the YAML keys of those names; see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
+The same fields are `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` (and `--ashost`, `--sysnr`, `--client`, `--language`) and the YAML keys of those names; see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 **For basic authentication (on-premise):**
 ```env
 SAP_URL=https://your-onpremise-system.com:8000
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
@@ -319,9 +338,9 @@ new EmbeddableMcpServer({
 });
 ```
 
-Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
+Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe, not required, and not read: a server's kind is fixed when it is constructed.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`. Without both, every tool is listed, and every call that would reach the system is refused `system_type_required`: an embedder states one. That order picks the tools and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL.
+**One kind per server, fixed at construction:** `options.systemType`, else `process.env.SAP_SYSTEM_TYPE` as it is when the server is constructed — a later change is not read. That one kind lists the tools, checks every call's arguments and runs it, and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL. Without one the server still constructs, every tool is listed, and every call that takes a connection is refused `system_type_required` before anything is sent: an embedder states one. A connection built for another kind (`createAbapConnection`) or declared for another (`declareSystemKind`) is refused `system_type_conflict` before it is used.
 
 ### System Context for On-Premise Systems
 
@@ -335,7 +354,7 @@ When creating ABAP objects, SAP ADT takes `responsible` and `masterSystem` attri
 | 2 | `systeminformation` on the connected connection | the system's user | the system id |
 | 3 | Request headers (HTTP/SSE) — on-premise `404` only | `x-sap-responsible` | `x-sap-master-system` |
 | 4 | The destination's own `.env` (`--env` / `--env-path` file, or `sessions/<destination>.env`) — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
-| 5 | The process environment — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
+| 5 | The process environment (stdio; Streamable HTTP and SSE read none, 24.0.0) — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
 | 6 | The login: the destination's own `.env` — on-premise `404` only | `SAP_USERNAME` | — |
 | 7 | The login: an `x-sap-url` connection's header — on-premise `404` only | `x-sap-login` | — |
 | 8 | The login: the process environment — on-premise `404` only | `SAP_USERNAME` | — |
@@ -376,13 +395,13 @@ How the scope combines with the process context:
 
 | Key in the scope | Result for this request |
 |---|---|
-| `responsible` present (even `undefined`) | The scope's value — never a process value (neither `SAP_RESPONSIBLE` nor `setSystemContext`); the connection's parameters replace it where they are made (below) |
-| `responsible` absent | The process value (`SAP_RESPONSIBLE`, or what `setSystemContext` / `systemContext` stated) |
+| `responsible` present (even `undefined`) | The scope's value — never a process value (`SAP_RESPONSIBLE`) nor the instance's `systemContext`; the connection's parameters replace it where they are made (below) |
+| `responsible` absent | The instance's `systemContext` (an `EmbeddableMcpServer` option, per instance), else the process value (`SAP_RESPONSIBLE`) |
 | `login` | The user the request is logged on as: never the responsible by itself — only the rules (below) make it one |
 | `masterSystem` present (even `undefined`) / absent | The scope's value / the process value |
 | `masterLanguage` | Always the scope's value inside a scope, never the process value |
 
-Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE` (or `setSystemContext`).
+Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE`.
 
 **The connection's parameters win, where your host makes them.** The library looks nothing up and applies no rule by default. Pass a resolver (`systemContextResolver: defaultSystemContextResolver`, `@mcp-abap-adt/lib/request-context`, asks `systeminformation`) and the rules (`systemContextRules: responsibleRules`, `@mcp-abap-adt/responsible-rules` — what every server passes) to `EmbeddableMcpServer` or `HandlerExporter`, and the connection's parameters are made once, before its first tool (a `HandlerExporter` handler: before the call it wraps), and kept:
 
@@ -395,6 +414,7 @@ With a resolver and no rules, the information is applied and no information leav
 **Example `.env` for on-premise:**
 ```env
 SAP_URL=http://your-sap-system:8000
+SAP_CONNECTION_TYPE=http
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=JSMITH
 SAP_PASSWORD=secret

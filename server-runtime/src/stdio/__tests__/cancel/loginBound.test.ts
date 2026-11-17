@@ -6,6 +6,8 @@
  * pending, and a later login is unaffected by an earlier bound.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, describe, it, mock } from 'node:test';
 import {
   AuthProviderFailure,
   authError,
@@ -15,6 +17,10 @@ import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
+import {
+  assertEquals,
+  assertMatches,
+} from '../../../../../src/__tests__/integration/helpers/liveAssert';
 import {
   loginBound,
   type ServerLoginContext,
@@ -34,8 +40,6 @@ import {
   until,
 } from '../helpers/loginStand';
 
-jest.setTimeout(30_000);
-
 describe('through the server', () => {
   let s: Stand | undefined;
 
@@ -46,6 +50,7 @@ describe('through the server', () => {
 
   it('--login-timeout=1 ends the login with the chain words and the server sentence', async () => {
     s = await stand({
+      kind: 'cloud',
       auth: 'jwt',
       loginTimeoutMs: 1_000,
       loginTimeoutStated: statedLoginTimeout(1, '--login-timeout'),
@@ -53,30 +58,31 @@ describe('through the server', () => {
     s.browser.answering(false);
     const started = Date.now();
     const answer = await s.call('r1').done;
-    expect(Date.now() - started).toBeGreaterThanOrEqual(900);
-    expect(answer).not.toBe('cancelled');
+    assert.ok(Date.now() - started >= 900);
+    assert.notEqual(answer, 'cancelled');
     const { text, isError } = answer as { text: string; isError: boolean };
-    expect(isError).toBe(true);
+    assert.equal(isError, true);
     const payload = JSON.parse(text) as Record<string, string>;
-    expect(payload).toMatchObject({
+    assertMatches(payload, {
       error: 'authentication_failed',
       kind: 'interactive-login',
       server:
         "The login was ended by the server's login timeout (`--login-timeout=1`).",
     });
-    expect(payload.message).toEqual(expect.any(String));
-    expect(payload.message).not.toContain('login-timeout');
+    assert.equal(typeof payload.message, 'string');
+    assert.equal(payload.message?.includes('login-timeout'), false);
     // One login, ended by the bound — not retried as another caller's abort.
-    expect(s.logins).toEqual(['aborted']);
-    expect(s.browser.ports).toHaveLength(1);
+    assertEquals(s.logins, ['aborted']);
+    assert.equal(s.browser.ports.length, 1);
     await bindsFree(s.browser.ports[0]);
-    expect(s.reached('r1')).toBe(false);
+    assert.equal(s.reached('r1'), false);
   });
 
   it('a login started between the bound firing and the answer neither drops the sentence nor allows a retry', async () => {
     const refused = deferred();
     const answer = deferred();
     s = await stand({
+      kind: 'cloud',
       auth: 'jwt',
       loginTimeoutMs: 500,
       loginTimeoutStated: statedLoginTimeout(1, '--login-timeout'),
@@ -89,7 +95,7 @@ describe('through the server', () => {
     const r1 = s.call('r1');
     // The bound ended R1's login; its connect has not failed yet.
     await refused.promise;
-    expect(s.logins).toEqual(['aborted']);
+    assertEquals(s.logins, ['aborted']);
 
     // Another login starts — and completes — before R1's answer is read.
     s.browser.answering(true);
@@ -98,52 +104,52 @@ describe('through the server', () => {
       const provider = await s.factory.getProvider('default', {
         signal: party.signal,
       });
-      await expect(provider.prepare()).resolves.toEqual({ ok: true });
-      expect(s.logins).toEqual(['aborted', 'ok']);
+      assertEquals(await provider.prepare(), { ok: true });
+      assertEquals(s.logins, ['aborted', 'ok']);
 
       answer.resolve();
       const outcome = await r1.done;
-      expect(outcome).not.toBe('cancelled');
+      assert.notEqual(outcome, 'cancelled');
       const { text, isError } = outcome as { text: string; isError: boolean };
       // R1 is answered the bound's failure, with its sentence — not retried
       // into the other login's token.
-      expect(isError).toBe(true);
-      expect(JSON.parse(text)).toMatchObject({
+      assert.equal(isError, true);
+      assertMatches(JSON.parse(text), {
         error: 'authentication_failed',
         kind: 'interactive-login',
         server:
           "The login was ended by the server's login timeout (`--login-timeout=1`).",
       });
-      expect(s.reached('r1')).toBe(false);
-      expect(s.logins).toEqual(['aborted', 'ok']);
+      assert.equal(s.reached('r1'), false);
+      assertEquals(s.logins, ['aborted', 'ok']);
     } finally {
       party.abort();
     }
   });
 
   it('without --login-timeout the login waits — a cancel aborts nothing — until the session ends it', async () => {
-    s = await stand({ auth: 'jwt' });
+    s = await stand({ kind: 'cloud', auth: 'jwt' });
     s.browser.answering(false);
     const r1 = s.call('r1');
     await s.browser.opened(1);
     await new Promise((resolve) => setTimeout(resolve, 1_500));
-    expect(s.logins).toEqual([]);
-    expect(s.active()).toBe(1);
+    assertEquals(s.logins, []);
+    assert.equal(s.active(), 1);
     r1.cancel();
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(s.logins).toEqual([]);
-    expect(s.active()).toBe(1);
+    assertEquals(s.logins, []);
+    assert.equal(s.active(), 1);
     // The session's end: the client's transport closes.
     await s.client.close();
     await until(() => s?.logins.length === 1);
-    expect(s.logins).toEqual(['aborted']);
-    expect(await r1.done).toBe('cancelled');
+    assertEquals(s.logins, ['aborted']);
+    assert.equal(await r1.done, 'cancelled');
   });
 });
 
 describe('serverLogin with a bound', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    mock.restoreAll();
   });
 
   function context(ms: number): ServerLoginContext {
@@ -176,12 +182,17 @@ describe('serverLogin with a bound', () => {
     signal: new AbortController().signal,
   });
 
-  /** The timers armed with `ms`, the bound's own, from the spy. */
-  const armedWith = (spy: jest.SpyInstance, ms: number) =>
-    spy.mock.calls
-      .map((call, index) => ({ call, handle: spy.mock.results[index]?.value }))
-      .filter(({ call }) => call[1] === ms)
-      .map(({ handle }) => handle as unknown);
+  /** The timers armed with `ms`, the bound's own: what each such call answered. */
+  const armedWith = (
+    calls: ReadonlyArray<{ arguments: readonly unknown[]; result?: unknown }>,
+    ms: number,
+  ): unknown[] =>
+    calls.filter((call) => call.arguments[1] === ms).map((call) => call.result);
+  /** Whether `clearTimeout` was called with `handle`. */
+  const clearedWith = (
+    calls: ReadonlyArray<{ arguments: readonly unknown[] }>,
+    handle: unknown,
+  ): boolean => calls.some((call) => call.arguments[0] === handle);
 
   /** The failure a login rejected with, as the server reads it. */
   async function failureOf(login: Promise<unknown>) {
@@ -194,27 +205,23 @@ describe('serverLogin with a bound', () => {
   }
 
   it('a login that completes clears its bound; a later login is unaffected', async () => {
-    const armed = jest.spyOn(globalThis, 'setTimeout');
-    const cleared = jest.spyOn(globalThis, 'clearTimeout');
+    const armed = mock.method(globalThis, 'setTimeout');
+    const cleared = mock.method(globalThis, 'clearTimeout');
     const ctx = context(1_000);
     const login = serverLogin(answersAfter(0), ctx);
-    await expect(login.authorize(request())).resolves.toMatchObject({
-      payload: 'code',
-    });
+    assertMatches(await login.authorize(request()), { payload: 'code' });
     // The bound's own timer: armed once, cleared when the login settled.
-    const first = armedWith(armed, 1_000);
-    expect(first).toHaveLength(1);
-    expect(cleared).toHaveBeenCalledWith(first[0]);
+    const first = armedWith(armed.mock.calls, 1_000);
+    assert.equal(first.length, 1);
+    assert.ok(clearedWith(cleared.mock.calls, first[0]));
 
     // Past the first login's bound: nothing of it ends a later login.
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     const later = serverLogin(answersAfter(300), ctx);
-    await expect(later.authorize(request())).resolves.toMatchObject({
-      payload: 'code',
-    });
-    const both = armedWith(armed, 1_000);
-    expect(both).toHaveLength(2);
-    expect(cleared).toHaveBeenCalledWith(both[1]);
+    assertMatches(await later.authorize(request()), { payload: 'code' });
+    const both = armedWith(armed.mock.calls, 1_000);
+    assert.equal(both.length, 2);
+    assert.ok(clearedWith(cleared.mock.calls, both[1]));
   });
 
   it('the bound marks the failure of the login it ended — a later login takes nothing away', async () => {
@@ -223,7 +230,7 @@ describe('serverLogin with a bound', () => {
     const ended = await failureOf(
       serverLogin(answersAfter(10_000), ctx).authorize(request()),
     );
-    expect(bound.ended(ended)).toBe(true);
+    assert.equal(bound.ended(ended), true);
     const state = {
       renewal: 'refresh-then-login' as const,
       shuttingDown: false,
@@ -231,13 +238,14 @@ describe('serverLogin with a bound', () => {
     };
     // Another login starts (and completes) before the failure is read.
     await serverLogin(answersAfter(0), ctx).authorize(request());
-    expect(serverSentence(ended, state)).toBe(
+    assert.equal(
+      serverSentence(ended, state),
       loginTimeoutSentence('`loginTimeoutMs: 100`'),
     );
     // Another aborted login, not the bound's, is not marked.
     const other = authError['interactive-login']({ outcome: 'aborted' });
-    expect(bound.ended(other)).toBe(false);
-    expect(serverSentence(other, state)).toBeUndefined();
+    assert.equal(bound.ended(other), false);
+    assert.equal(serverSentence(other, state), undefined);
   });
 
   it("the request's own signal still ends a bounded login, and the bound marks nothing", async () => {
@@ -249,12 +257,12 @@ describe('serverLogin with a bound', () => {
       signal: controller.signal,
     });
     controller.abort();
-    expect(bound.ended(await failureOf(ended))).toBe(false);
+    assert.equal(bound.ended(await failureOf(ended)), false);
   });
 });
 
 describe('the sentence names the bound as it was set', () => {
-  it.each([
+  for (const [source, words] of [
     [
       '--login-timeout',
       "The login was ended by the server's login timeout (`--login-timeout=300`).",
@@ -267,15 +275,21 @@ describe('the sentence names the bound as it was set', () => {
       'login-timeout (config file)',
       "The login was ended by the server's login timeout (`login-timeout: 300` in the configuration file).",
     ],
-  ])('from %s', (source, words) => {
-    expect(loginTimeoutSentence(statedLoginTimeout(300, source))).toBe(words);
-  });
+  ] as const) {
+    it(`from ${source}`, () => {
+      assert.equal(
+        loginTimeoutSentence(statedLoginTimeout(300, source)),
+        words,
+      );
+    });
+  }
 
   it("an embedder's bound is named as its option, never as a CLI value the CLI refuses", () => {
     const sentence = loginTimeoutSentence(loginBound(1_500).stated);
-    expect(sentence).toBe(
+    assert.equal(
+      sentence,
       "The login was ended by the server's login timeout (`loginTimeoutMs: 1500`).",
     );
-    expect(sentence).not.toContain('--login-timeout');
+    assert.equal(sentence.includes('--login-timeout'), false);
   });
 });

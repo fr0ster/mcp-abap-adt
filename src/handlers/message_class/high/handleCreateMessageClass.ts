@@ -1,3 +1,7 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateMessageClass Handler - Create an ABAP Message Class (MSAG) shell
  *
@@ -13,7 +17,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -24,46 +28,30 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Creates the ABAP message class (T100) named by message_class_name, with its description, in the package named by package_name: a shell whose messages are added afterwards. A message class is in effect once saved.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      message_class_name: {
-        type: 'string',
-        description: 'Message class name.',
-      },
-      description: {
-        type: 'string',
-        description:
-          '(optional) Short description. If not provided, message_class_name is used.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          '(optional) Transport request number, not a task. Required for transportable packages.',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          '(optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['message_class_name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateMessageClass', {
+    message_class_name: z.string().describe('Message class name.'),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Short description. If not provided, message_class_name is used.',
+      ),
+    package_name: z.string().describe('Package name.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        '(optional) Transport request number, not a task. Required for transportable packages.',
+      ),
+    master_language: z
+      .string()
+      .optional()
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CreateMessageClassArgs {
-  message_class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateMessageClassArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateMessageClass(
   context: HandlerContext,

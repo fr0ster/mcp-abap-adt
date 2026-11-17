@@ -1,9 +1,11 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, type Terse } from '../../../lib/strategies/projections';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
@@ -11,29 +13,18 @@ export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
   description: '[read-only] Retrieve CDS unit test run status for a run_id. ',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      run_id: {
-        type: 'string',
-        description: 'Run identifier returned by unit test run.',
-      },
-      with_long_polling: {
-        type: 'boolean',
-        description: 'Enable long polling while waiting for status.',
-        default: true,
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['run_id'],
-  },
+  inputSchema: z.object({
+    run_id: z.string().describe('Run identifier returned by unit test run.'),
+    with_long_polling: z
+      .boolean()
+      .default(true)
+      .optional()
+      .describe('Enable long polling while waiting for status.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface GetCdsUnitTestStatusArgs {
-  run_id: string;
-  with_long_polling?: boolean;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type GetCdsUnitTestStatusArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleGetCdsUnitTestStatus(
   context: HandlerContext,
@@ -51,7 +42,7 @@ export async function handleGetCdsUnitTestStatus(
   // Task 28 fix round 1 — same finding, same fix as `GetUnitTestStatus`:
   // `getStatus`'s result is `structured` (a real `AdtReading`), and `detail`
   // was missing while the projection always answered the whole parse.
-  const terseRunStatus: Terse<unknown> = (value) => ({
+  const terseRunStatus = (value: XmlRead) => ({
     run_id,
     finished: runIsFinished(value),
     run_status: runProgressStatus(value),

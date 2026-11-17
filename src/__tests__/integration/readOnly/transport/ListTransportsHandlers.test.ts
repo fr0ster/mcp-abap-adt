@@ -8,12 +8,17 @@
  * Run: npm test -- --testPathPattern=integration/readOnly/transport/ListTransports
  */
 
+import assert from 'node:assert/strict';
+import { after, before, it } from 'node:test';
 import { handleListTransports } from '../../../../handlers/transport/readonly/handleListTransports';
-import { getTimeout } from '../../helpers/configHelpers';
+
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { skipRunningTest } from '../../helpers/runningTest';
+import { servedSuite } from '../../helpers/servedHere';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
+import { transportSearchMissing } from '../../helpers/transportSearch';
 
 function extractResultData(result: any): any {
   const textContent = result.content.find((c: any) => c.type === 'text') as any;
@@ -23,11 +28,17 @@ function extractResultData(result: any): any {
   throw new Error('No response payload found');
 }
 
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite(['ListTransports']);
+
 describe('ListTransports Handler Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('list-transports-test');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'list_transports_readonly',
       'test_list_transports',
@@ -41,77 +52,87 @@ describe('ListTransports Handler Integration', () => {
         // No cleanup needed for read-only handler
       },
     );
-  }, getTimeout('long'));
+  });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll(async (_context: LambdaTesterContext) => {
       logger?.info('Test suite cleanup complete');
     });
   });
 
-  it(
-    'should list modifiable transports for current user',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection } = context;
+  it('should list modifiable transports for current user', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
+      const missing = await transportSearchMissing(connection);
+      if (missing !== undefined) {
+        skipRunningTest(missing);
+        return;
+      }
 
-        const result = await tester.invokeToolOrHandler(
-          'ListTransports',
-          { modifiable_only: true },
-          async () => {
-            const handlerContext = createHandlerContext({ connection, logger });
-            return handleListTransports(handlerContext, {
-              modifiable_only: true,
-            });
-          },
-        );
+      const result = await tester.invokeToolOrHandler(
+        'ListTransports',
+        { modifiable_only: true },
+        async () => {
+          const handlerContext = createHandlerContext({ connection, logger });
+          return handleListTransports(handlerContext, {
+            modifiable_only: true,
+          });
+        },
+      );
 
-        expect(result.isError).toBe(false);
-        expect(result.content).toBeDefined();
+      assert.equal(
+        result.isError,
+        false,
+        `ListTransports answered an error: ${JSON.stringify(result.content)}`,
+      );
+      assert.ok(result.content !== undefined);
 
-        const data = extractResultData(result);
-        expect(data.success).toBe(true);
-        expect(data.count).toBeGreaterThanOrEqual(0);
-        expect(Array.isArray(data.transports)).toBe(true);
+      const data = extractResultData(result);
+      assert.equal(data.success, true);
+      assert.ok(data.count >= 0);
+      assert.equal(Array.isArray(data.transports), true);
 
-        if (data.count > 0) {
-          const first = data.transports[0];
-          expect(first.number).toBeTruthy();
-        }
+      if (data.count > 0) {
+        const first = data.transports[0];
+        assert.ok(first.number);
+      }
 
-        logger?.info(`Found ${data.count} modifiable transport(s)`);
-      });
-    },
-    getTimeout('long'),
-  );
+      logger?.info(`Found ${data.count} modifiable transport(s)`);
+    });
+  });
 
-  it(
-    'should list all transports (modifiable + released)',
-    async () => {
-      await tester.run(async (context: LambdaTesterContext) => {
-        const { connection } = context;
+  it('should list all transports (modifiable + released)', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection } = context;
+      const missing = await transportSearchMissing(connection);
+      if (missing !== undefined) {
+        skipRunningTest(missing);
+        return;
+      }
 
-        const result = await tester.invokeToolOrHandler(
-          'ListTransports',
-          { modifiable_only: false },
-          async () => {
-            const handlerContext = createHandlerContext({ connection, logger });
-            return handleListTransports(handlerContext, {
-              modifiable_only: false,
-            });
-          },
-        );
+      const result = await tester.invokeToolOrHandler(
+        'ListTransports',
+        { modifiable_only: false },
+        async () => {
+          const handlerContext = createHandlerContext({ connection, logger });
+          return handleListTransports(handlerContext, {
+            modifiable_only: false,
+          });
+        },
+      );
 
-        expect(result.isError).toBe(false);
+      assert.equal(
+        result.isError,
+        false,
+        `ListTransports answered an error: ${JSON.stringify(result.content)}`,
+      );
 
-        const data = extractResultData(result);
-        expect(data.success).toBe(true);
-        expect(data.count).toBeGreaterThanOrEqual(0);
-        expect(Array.isArray(data.transports)).toBe(true);
+      const data = extractResultData(result);
+      assert.equal(data.success, true);
+      assert.ok(data.count >= 0);
+      assert.equal(Array.isArray(data.transports), true);
 
-        logger?.info(`Found ${data.count} total transport(s)`);
-      });
-    },
-    getTimeout('long'),
-  );
+      logger?.info(`Found ${data.count} total transport(s)`);
+    });
+  });
 });

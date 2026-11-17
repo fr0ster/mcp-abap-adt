@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * CheckTableType: a delegating wrapper over its low-tier sibling. It reaches
  * the sibling's `detail`-bearing projection through that delegation but
@@ -13,29 +14,19 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a check on the ABAP table type named by table_type_name. Returns errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_type_name: {
-        type: 'string',
-        description: 'Table type name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
-      },
-    },
-    required: ['table_type_name'],
-  },
+  inputSchema: z.object({
+    table_type_name: z.string().describe('Table type name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
+      ),
+  }),
 } as const;
 
 /** What the caller sent: arguments from outside the type system. */
-interface CheckTableTypeArgs {
-  table_type_name?: string;
-  version?: 'active' | 'inactive';
-}
+type CheckTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCheckTableType(
   context: HandlerContext,

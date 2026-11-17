@@ -1,8 +1,8 @@
 /**
- * `BatchEnd`: the open communication batch executed, its answer split into
+ * the batch end: the open communication batch executed, its answer split into
  * the map (spec §5.2–5.3).
  *
- * The late-bound target is pointed at the connection `BatchEnd` took in its
+ * The late-bound target is pointed at the connection the batch end took in its
  * turn — the instance's connection now, with the credential in force now —
  * and the batch connection's `execute()` sends every recorded request in
  * one envelope — the batch holds one session kind (LOCK, UNLOCK or
@@ -10,8 +10,8 @@
  * `batch_other_kind`), and adt-clients starts a new envelope only where the
  * kind changes — awaited to its end with no timeout. Then the settled parts
  * are split by number into the map; no handler is resumed: a number's
- * handler builds its answer when the number is read (`BatchAnswers`, §6).
- * `BatchEnd` knows the count recorded, the count of requests sent and the
+ * handler builds its answer when the number is read (the answers read, §6).
+ * the batch end knows the count recorded, the count of requests sent and the
  * count of parts that came, and checks them: it answers `{ recorded, sent,
  * received }`, or its own error — `execute()`'s as it came, the parts not as
  * many as the requests (`batch_parts_mismatch`), an answer that cannot be
@@ -31,7 +31,7 @@
 
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { answerFailure, type McpResult, requestFailureOf } from '../answer';
+import { answerFailure, type McpResult, requestErrorOf } from '../answer';
 import { answerRead } from '../auth/answerFailure';
 import { failureOf, readOwn } from '../auth/failures';
 import {
@@ -49,7 +49,7 @@ import type {
 } from './InstanceBatch';
 
 /**
- * What `BatchEnd` answers when it worked: how many calls were recorded, how
+ * What the batch end answers when it worked: how many calls were recorded, how
  * many requests were sent and how many parts came — `sent` equal to
  * `received`.
  */
@@ -115,6 +115,14 @@ export function openCommunication(owner: InstanceBatch | undefined): OpenBatch {
   return openBatchOf(owner, 'communication');
 }
 
+/**
+ * the batch end's failure: what `execute()` threw, or the server's own refusal
+ * of a batch that did not split. Whatever was thrown reaches it untyped.
+ */
+interface Rejection {
+  error: unknown;
+}
+
 /** Whether `part` is a part SAP answered: its inner response, 2xx or another status. */
 function cameBack(part: PartSettlement, envelopeError: unknown): boolean {
   if (part.state === 'resolved') return true;
@@ -128,7 +136,7 @@ function cameBack(part: PartSettlement, envelopeError: unknown): boolean {
 
 /**
  * What `execute()`'s settlement makes of the batch: the summary, or
- * `BatchEnd`'s error — the rejection as it came when the connection under
+ * the batch end's error — the rejection as it came when the connection under
  * the batch threw it (or nothing is known of it), `batch_unsplit` when the
  * connection answered and the answer did not split (the parts of that
  * envelope rejected with the very error `execute()` did), and
@@ -138,8 +146,8 @@ function cameBack(part: PartSettlement, envelopeError: unknown): boolean {
  */
 function split(
   open: OpenBatch,
-  rejected: { error: unknown } | undefined,
-): { summary: BatchSummary } | { error: unknown } {
+  rejected: Rejection | undefined,
+): { summary: BatchSummary } | Rejection {
   const parts = open.recorded.flatMap((call) => call.parts());
   const sent = parts.length;
   const received = parts.filter((part) =>
@@ -179,7 +187,7 @@ function split(
 }
 
 /**
- * `BatchEnd`'s error answered: a failure the server's reader answers (a
+ * the batch end's error answered: a failure the server's reader answers (a
  * credential refusal, its own refusal, a closed instance) as the reader
  * answers it; anything else the envelope's error as it came — SAP's outer
  * response, when SAP answered the envelope, as its status and body — with
@@ -189,7 +197,7 @@ function failureAnswer(error: unknown): McpResult {
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
   return answerFailure(
-    withStep(requestFailureOf(error, undefined) as IAdtError, EXECUTE_STEP),
+    withStep(requestErrorOf(error, undefined), EXECUTE_STEP),
   );
 }
 
@@ -198,7 +206,7 @@ function failureAnswer(error: unknown): McpResult {
  * batch's late-bound target points at `connection` for the whole
  * `execute()`; a debugger batch's connection wraps the stop's connection
  * itself, and `connection` is absent. Then, whatever failed, batch mode is
- * off: the split parts are the map (`owner.end`), or, on `BatchEnd`'s
+ * off: the split parts are the map (`owner.end`), or, on the batch end's
  * error, there is none (`owner.fail`). No handler is resumed.
  *
  * A failure the server's reader answers — a credential refusal, the
@@ -217,7 +225,7 @@ export async function executeBatch(
   open: OpenBatch,
   connection?: IAbapConnection,
 ): Promise<McpResult> {
-  let rejected: { error: unknown } | undefined;
+  let rejected: Rejection | undefined;
   open.target?.point(connection);
   try {
     await open.connection.execute();
@@ -238,7 +246,7 @@ export async function executeBatch(
 }
 
 /**
- * `BatchEnd` (or `DebugBatchEnd`) answered an error (spec §5.2 step 2,
+ * the batch end (or `DebugBatchEnd`) answered an error (spec §5.2 step 2,
  * §5.3): the dispatch hands it the call's own answer and `ending`, the batch
  * the call came to end. Still open — the call failed before `execute()` —
  * batch mode ends with no map, every number answering that failure, as it
@@ -256,7 +264,7 @@ export function endWithFailure(
   owner.fail(failure, ending);
 }
 
-/** `BatchEnd`'s answer: the summary, as JSON. */
+/** the batch end's answer: the summary, as JSON. */
 export function batchEndAnswer(summary: BatchSummary): McpResult {
   return {
     isError: false,

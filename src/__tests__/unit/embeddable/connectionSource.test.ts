@@ -6,13 +6,22 @@
  * connector built.
  */
 
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import {
+  type AbapConnection,
+  type CreatedConnection,
+  createConnection,
+  type SapConfig,
+} from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   // The connect's system lookup asks the kind: on-premise sends nothing.
   systemKindOf: jest.fn(() => 'onprem'),
+  // A view over a connection keeps its kind: the kind is mocked above.
+  withSystemKindOf: jest.fn((view: object) => view),
+  // The one kind agrees: the kind is mocked above.
+  admitOnKind: jest.fn(() => undefined),
 }));
 
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
@@ -22,6 +31,7 @@ import type {
 } from '../../../embeddable/ConnectionContext';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { presented } from '../../helpers/presented';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -63,11 +73,34 @@ function provider(): IAuthProvider {
   };
 }
 
+let stand: AdtStandIn;
+
+beforeAll(async () => {
+  stand = await adtStandIn();
+});
+
+afterAll(async () => {
+  await stand.close();
+});
+
+/**
+ * A real connection to the stand-in that sends nothing: its `connect` is a
+ * spy that resolves.
+ */
+function quietConnection(): CreatedConnection {
+  const connection = createConnection({
+    config: { url: stand.url, authType: 'basic' },
+    credential: provider(),
+    system: 'onprem',
+    transport: 'http',
+  });
+  jest.spyOn(connection, 'connect').mockImplementation(async () => {});
+  return connection;
+}
+
 beforeEach(() => {
   build.mockReset();
-  build.mockImplementation(
-    () => ({ connect: jest.fn(async () => {}) }) as unknown as AbapConnection,
-  );
+  build.mockImplementation(() => quietConnection());
 });
 
 describe("'built': the source resolves, the connection is built from its answer", () => {
@@ -79,7 +112,7 @@ describe("'built': the source resolves, the connection is built from its answer"
     }));
     const source: ConnectionSource = { resolve };
     const server = new TestServer();
-    server.use({ kind: 'built', source, sessionId: 's' });
+    server.use({ kind: 'built', source });
 
     const signal = new AbortController().signal;
     const connection = await server.connection(signal);
@@ -101,7 +134,7 @@ describe("'injected': the connection is used as given", () => {
     const connect = jest.fn(async () => {});
     const injected = { connect } as unknown as AbapConnection;
     const server = new TestServer();
-    server.use({ kind: 'injected', connection: injected, sessionId: 's' });
+    server.use({ kind: 'injected', connection: injected });
 
     const signal = new AbortController().signal;
     expect(await server.connection(signal)).toBe(injected);

@@ -8,18 +8,33 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, parseArgs } = require_('./args.cjs');
-const { sdkHome, stagedAddon, isStaged, markStaged, rfcLiteTooOld } = require_('./staging.cjs');
+const { sdkHome, stagedAddon, isStaged, markStaged, rfcLiteTooOld } =
+  require_('./staging.cjs');
 const { patchRunpath, readRunpath, addRunpath } = require_('./elf.cjs');
-const { npmCommand, tarCommand, buildToolSpecs, toolsInstalled, markToolsInstalled } = require_('./tools.cjs');
+const {
+  npmCommand,
+  tarCommand,
+  buildToolSpecs,
+  toolsInstalled,
+  markToolsInstalled,
+} = require_('./tools.cjs');
+const {
+  withoutNpmSettings,
+  withoutOffset,
+  dynamicEntries: dynamicEntriesOf,
+  expectedDynamicEntries,
+  collapseBlanks,
+} = require_('./readings.cjs');
+const { fixVersionModules, bundleOptions } = require_('./bundling.cjs');
 // Taken before cleanEnv drops the npm_* variables.
 const npm = npmCommand();
 const tar = tarCommand();
@@ -33,14 +48,16 @@ function fail(message) {
 }
 
 const run = (cmd, args, opts = {}) =>
-  execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', ...opts });
+  execFileSync(cmd, args, {
+    stdio: ['ignore', 'pipe', 'inherit'],
+    encoding: 'utf8',
+    ...opts,
+  });
 
 // The nested npm runs with none of the npm_* settings `npm run` hands this
 // script, so the outer command's options do not apply to its install.
 function cleanEnv(extra = {}) {
-  const env = { ...process.env, ...extra };
-  for (const key of Object.keys(env)) if (/^npm_/i.test(key)) delete env[key];
-  return env;
+  return withoutNpmSettings({ ...process.env, ...extra });
 }
 
 function stage(work, version) {
@@ -56,14 +73,24 @@ function stage(work, version) {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
-  console.log(`portable: installing ${SERVERS.full.pkg}@${version} and ${SERVERS.compact.pkg}@${version} from npm`);
+  console.log(
+    `portable: installing ${SERVERS.full.pkg}@${version} and ${SERVERS.compact.pkg}@${version} from npm`,
+  );
   // --ignore-scripts: no package of the servers' production tree has an
   // install script (sap-rfc-lite 0.3 has none), so none runs here, outside the
   // checkout and its .npmrc policy.
   run(
     npm.cmd,
-    [...npm.args, 'install', '--prefer-online', '--no-audit', '--no-fund', '--ignore-scripts',
-      `${SERVERS.full.pkg}@${version}`, `${SERVERS.compact.pkg}@${version}`],
+    [
+      ...npm.args,
+      'install',
+      '--prefer-online',
+      '--no-audit',
+      '--no-fund',
+      '--ignore-scripts',
+      `${SERVERS.full.pkg}@${version}`,
+      `${SERVERS.compact.pkg}@${version}`,
+    ],
     { cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'] },
   );
   try {
@@ -95,7 +122,8 @@ function checkRfcLite(stageDir) {
 // folder, so it finds the SDK beside it.
 function addon(stageDir, work, platform) {
   const built = stagedAddon(stageDir);
-  if (built === undefined) fail('the staged @mcp-abap-adt/sap-rfc-lite has no RFC binding');
+  if (built === undefined)
+    fail('the staged @mcp-abap-adt/sap-rfc-lite has no RFC binding');
   console.log(`portable: RFC binding ${path.relative(stageDir, built)}`);
   const out = path.join(work, 'sapnwrfc.node');
   let bytes = fs.readFileSync(built);
@@ -103,7 +131,10 @@ function addon(stageDir, work, platform) {
     // A RUNPATH of $ORIGIN: the one it carries rewritten, else one added (elf.cjs).
     try {
       const runpath = readRunpath(bytes);
-      bytes = runpath === undefined ? addRunpath(bytes, '$ORIGIN') : patchRunpath(bytes, runpath, '$ORIGIN');
+      bytes =
+        runpath === undefined
+          ? addRunpath(bytes, '$ORIGIN')
+          : patchRunpath(bytes, runpath, '$ORIGIN');
     } catch (error) {
       fail(error.message);
     }
@@ -121,12 +152,16 @@ function addon(stageDir, work, platform) {
 
 // Every LC_RPATH of a Mach-O image, as `otool -l` lists them (`path <p> (offset N)`).
 function machoRpaths(file) {
-  const lines = run('otool', ['-l', file]).split('\n').map((line) => line.trim());
+  const lines = run('otool', ['-l', file])
+    .split('\n')
+    .map((line) => line.trim());
   const rpaths = [];
   for (let i = 0; i < lines.length; i++) {
     if (lines[i] !== 'cmd LC_RPATH') continue;
-    const entry = lines.slice(i + 1, i + 4).find((line) => line.startsWith('path '));
-    if (entry !== undefined) rpaths.push(entry.slice(5).replace(/ \(offset \d+\)$/, ''));
+    const entry = lines
+      .slice(i + 1, i + 4)
+      .find((line) => line.startsWith('path '));
+    if (entry !== undefined) rpaths.push(withoutOffset(entry.slice(5)));
   }
   return rpaths;
 }
@@ -136,10 +171,9 @@ function machoRpaths(file) {
 // tail-merge another dynamic string into the one overwritten. readelf comes
 // with binutils; without it, say so.
 function dynamicEntries(file) {
-  return run('readelf', ['-d', file], { stdio: ['ignore', 'pipe', 'ignore'] })
-    .split('\n')
-    .filter((line) => /\((NEEDED|SONAME|RUNPATH|RPATH)\)/.test(line))
-    .map((line) => line.replace(/^\s*0x[0-9a-f]+\s+/i, '').trim());
+  return dynamicEntriesOf(
+    run('readelf', ['-d', file], { stdio: ['ignore', 'pipe', 'ignore'] }),
+  );
 }
 
 function checkElf(before, after) {
@@ -147,16 +181,16 @@ function checkElf(before, after) {
   try {
     original = dynamicEntries(before);
   } catch {
-    console.log('portable: readelf not found — the RUNPATH is not cross-checked');
+    console.log(
+      'portable: readelf not found — the RUNPATH is not cross-checked',
+    );
     return;
   }
-  const added = !original.some((line) => /\((RUNPATH|RPATH)\)/.test(line));
-  const runpath = '(RUNPATH) Library runpath: [$ORIGIN]';
-  const expected = original.map((line) => {
-    if (/\((RUNPATH|RPATH)\)/.test(line)) return line.replace(/\[.*\]$/, '[$ORIGIN]');
-    return added && /\(SONAME\)/.test(line) ? runpath : line;
-  }).map((line) => line.replace(/\s+/g, ' '));
-  const actual = dynamicEntries(after).map((line) => line.replace(/\s+/g, ' '));
+  const added = !original.some(
+    (line) => line.includes('(RUNPATH)') || line.includes('(RPATH)'),
+  );
+  const expected = expectedDynamicEntries(original);
+  const actual = dynamicEntries(after).map(collapseBlanks);
   if (JSON.stringify(expected) !== JSON.stringify(actual)) {
     fail(
       `the RUNPATH ${added ? 'added' : 'rewrite'} changed more than the RUNPATH:\n  ${expected.join('\n  ')}\nbecame\n  ${actual.join('\n  ')}`,
@@ -167,23 +201,35 @@ function checkElf(before, after) {
 // A download that is not 2xx is named as such, not mistaken for a checksum.
 async function download(url) {
   const res = await fetch(url);
-  if (!res.ok) fail(`download failed: ${res.status} ${res.statusText} for ${url}`);
+  if (!res.ok)
+    fail(`download failed: ${res.status} ${res.statusText} for ${url}`);
   return res;
 }
 
 async function nodeBinary(work, platform) {
   const { node: target, ext, exe } = PLATFORMS[platform];
-  const index = await (await download('https://nodejs.org/dist/index.json')).json();
+  const index = await (
+    await download('https://nodejs.org/dist/index.json')
+  ).json();
   const version = index.find((v) => v.version.startsWith(NODE_MAJOR)).version;
   const dir = path.join(work, 'node');
-  const bin = path.join(dir, `node-${version}-${target}`, exe ? 'node.exe' : 'bin/node');
+  const bin = path.join(
+    dir,
+    `node-${version}-${target}`,
+    exe ? 'node.exe' : 'bin/node',
+  );
   if (fs.existsSync(bin)) return { bin, version };
   fs.mkdirSync(dir, { recursive: true });
   const file = `node-${version}-${target}.${ext}`;
   const base = `https://nodejs.org/dist/${version}`;
-  const data = Buffer.from(await (await download(`${base}/${file}`)).arrayBuffer());
+  const data = Buffer.from(
+    await (await download(`${base}/${file}`)).arrayBuffer(),
+  );
   const sums = await (await download(`${base}/SHASUMS256.txt`)).text();
-  const expected = sums.split('\n').find((l) => l.endsWith(`  ${file}`))?.split(' ')[0];
+  const expected = sums
+    .split('\n')
+    .find((l) => l.endsWith(`  ${file}`))
+    ?.split(' ')[0];
   const actual = createHash('sha256').update(data).digest('hex');
   if (!expected || expected !== actual) fail(`checksum mismatch for ${file}`);
   fs.writeFileSync(path.join(dir, file), data);
@@ -205,24 +251,45 @@ async function nodeBinary(work, platform) {
 // checkout needs only its production dependencies (tools.cjs).
 function buildTools() {
   const dir = path.join(os.tmpdir(), 'mcp-abap-adt-portable', 'tools');
-  const specs = buildToolSpecs(JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')));
+  const specs = buildToolSpecs(
+    JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')),
+  );
   if (!toolsInstalled(dir, specs)) {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
-    console.log(`portable: installing ${specs.join(' and ')} into the build cache`);
+    console.log(
+      `portable: installing ${specs.join(' and ')} into the build cache`,
+    );
     // --ignore-scripts: esbuild's postinstall only checks or fetches the binary
     // its platform package (an optional dependency) installs anyway, and
     // postject has none; this cache is outside the checkout and its .npmrc.
-    run(npm.cmd, [...npm.args, 'install', '--no-audit', '--no-fund', '--ignore-scripts', ...specs], {
-      cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'],
-    });
+    run(
+      npm.cmd,
+      [
+        ...npm.args,
+        'install',
+        '--no-audit',
+        '--no-fund',
+        '--ignore-scripts',
+        ...specs,
+      ],
+      {
+        cwd: dir,
+        env: cleanEnv(),
+        stdio: ['ignore', 'ignore', 'inherit'],
+      },
+    );
     markToolsInstalled(dir, specs);
   }
   const resolve = createRequire(path.join(dir, 'package.json'));
   return {
     esbuild: resolve('esbuild'),
-    postject: path.join(path.dirname(resolve.resolve('postject/package.json')), 'dist', 'cli.js'),
+    postject: path.join(
+      path.dirname(resolve.resolve('postject/package.json')),
+      'dist',
+      'cli.js',
+    ),
   };
 }
 
@@ -230,49 +297,20 @@ async function bundle(work, stageDir, server, esbuild) {
   const entry = path.join(work, `${server.name}-entry.cjs`);
   // The package's own bin: it calls `main` with the tool set, name and
   // version that command serves (19.2.0: `main({ toolSet, program, version, packageName })`).
-  const bin = path.join(stageDir, 'node_modules', server.pkg, 'bin', `${server.name}.js`);
+  const bin = path.join(
+    stageDir,
+    'node_modules',
+    server.pkg,
+    'bin',
+    `${server.name}.js`,
+  );
   fs.writeFileSync(entry, `require(${JSON.stringify(bin)});\n`);
   const outfile = path.join(work, `${server.name}.bundle.cjs`);
   const loader = path.join(here, 'sea-rfc-loader.cjs');
-  const coreManifest = JSON.parse(
-    fs.readFileSync(path.join(stageDir, 'node_modules/@mcp-abap-adt/core/package.json'), 'utf8'),
-  );
-  // server-runtime came with 19.2.0; an earlier version (--version) has none.
-  const runtimeManifestFile = path.join(stageDir, 'node_modules/@mcp-abap-adt/server-runtime/package.json');
-  const runtimeManifest = fs.existsSync(runtimeManifestFile)
-    ? JSON.parse(fs.readFileSync(runtimeManifestFile, 'utf8'))
-    : undefined;
-  const result = await esbuild.build({
-    entryPoints: [entry],
-    outfile,
-    bundle: true,
-    platform: 'node',
-    format: 'cjs',
-    target: 'node24',
-    logLevel: 'warning',
-    plugins: [
-      {
-        name: 'sea-rfc-addon',
-        setup(b) {
-          b.onResolve({ filter: /^node-gyp-build$/ }, () => ({ path: loader }));
-          // core reads its version and name from ../package.json beside dist/ at
-          // run time; a single executable has no such file, so both are fixed at build.
-          b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]core[\\/]dist[\\/]coreVersion\.js$/ }, () => ({
-            contents: `exports.CORE_VERSION = ${JSON.stringify(coreManifest.version)};\nexports.CORE_PACKAGE = ${JSON.stringify(coreManifest.name)};`,
-            loader: 'js',
-          }));
-          // server-runtime (19.2.0) reads its version from its own ../package.json the
-          // same way; fixed at build from the staged runtime's manifest.
-          if (runtimeManifest !== undefined) {
-            b.onLoad({ filter: /[\\/]@mcp-abap-adt[\\/]server-runtime[\\/]dist[\\/]runtimeVersion\.js$/ }, () => ({
-              contents: `exports.RUNTIME_VERSION = ${JSON.stringify(runtimeManifest.version)};`,
-              loader: 'js',
-            }));
-          }
-        },
-      },
-    ],
-  });
+  // core and server-runtime read their versions from ../package.json at run
+  // time; a single executable has no such file, so both are fixed at build.
+  fixVersionModules(stageDir);
+  const result = await esbuild.build(bundleOptions({ entry, outfile, loader }));
   if (result.errors.length) fail('bundling failed');
   return outfile;
 }
@@ -321,7 +359,17 @@ function sdkFolderNote(name, exe, sdkLib, platform) {
   return lines;
 }
 
-function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platform, version, sdk }) {
+function inject({
+  bundleFile,
+  addonFile,
+  nodeBin,
+  postject,
+  work,
+  server,
+  platform,
+  version,
+  sdk,
+}) {
   const { exe, sdkLib, sdkExt, archive } = PLATFORMS[platform];
   const name = `${server.name}-${version}-${platform}`;
   const outDir = path.join(repo, 'dist-portable', name);
@@ -332,9 +380,15 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
   const sdkOut = path.join(outDir, 'nwrfcsdk', 'lib');
   fs.mkdirSync(sdkOut, { recursive: true });
   const sdkLibDir = path.join(sdk, 'lib');
-  const runtime = fs.readdirSync(sdkLibDir).filter((f) => f.toLowerCase().endsWith(sdkExt));
-  if (!runtime.includes(sdkLib)) fail(`${sdkLib} is not in ${sdkLibDir}: is SAPNWRFC_HOME the SDK of ${platform}?`);
-  for (const file of runtime) fs.copyFileSync(path.join(sdkLibDir, file), path.join(sdkOut, file));
+  const runtime = fs
+    .readdirSync(sdkLibDir)
+    .filter((f) => f.toLowerCase().endsWith(sdkExt));
+  if (!runtime.includes(sdkLib))
+    fail(
+      `${sdkLib} is not in ${sdkLibDir}: is SAPNWRFC_HOME the SDK of ${platform}?`,
+    );
+  for (const file of runtime)
+    fs.copyFileSync(path.join(sdkLibDir, file), path.join(sdkOut, file));
   fs.copyFileSync(addonFile, path.join(sdkOut, 'sapnwrfc.node'));
 
   const config = path.join(work, `${server.name}.sea.json`);
@@ -354,9 +408,15 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
 
   const target = path.join(outDir, `${server.name}${exe}`);
   fs.copyFileSync(nodeBin, target);
-  if (platform === 'macos-arm64') run('codesign', ['--remove-signature', target]);
+  if (platform === 'macos-arm64')
+    run('codesign', ['--remove-signature', target]);
   run(process.execPath, [
-    postject, target, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', SEA_FUSE,
+    postject,
+    target,
+    'NODE_SEA_BLOB',
+    blob,
+    '--sentinel-fuse',
+    SEA_FUSE,
     ...(platform === 'macos-arm64' ? ['--macho-segment-name', 'NODE_SEA'] : []),
   ]);
   if (platform === 'macos-arm64') run('codesign', ['--sign', '-', target]);
@@ -372,7 +432,9 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
       '',
       `${platform === 'linux-x64' ? 'HTTP and RFC need' : 'HTTP, RFC and SNC need'} nothing else: nwrfcsdk/lib/ holds the SAP NW RFC SDK libraries`,
       'this build was made with.' +
-        (platform === 'linux-x64' ? '' : ' SNC also needs the SNC product (SAP Secure Login Client).'),
+        (platform === 'linux-x64'
+          ? ''
+          : ' SNC also needs the SNC product (SAP Secure Login Client).'),
       '',
       'NOT FOR PUBLICATION: it contains the SAP NW RFC SDK, which SAP licenses through its Support Portal',
       'to your organization. Share it only inside the organization that holds that license.',
@@ -403,7 +465,9 @@ function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platfo
   if (archive === 'tar.gz') run(tar, ['-czf', archiveFile, name], { cwd });
   else run(tar, ['-a', '-cf', archiveFile, name], { cwd });
   const size = (f) => `${(fs.statSync(f).size / 1048576).toFixed(1)} MB`;
-  console.log(`portable: ${target} (${size(target)}), ${archiveFile} (${size(archiveFile)})`);
+  console.log(
+    `portable: ${target} (${size(target)}), ${archiveFile} (${size(archiveFile)})`,
+  );
 }
 
 let opts;
@@ -412,8 +476,15 @@ try {
 } catch (error) {
   fail(error.message);
 }
-opts.version ??= JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
-const work = path.join(os.tmpdir(), 'mcp-abap-adt-portable', opts.version, opts.platform);
+opts.version ??= JSON.parse(
+  fs.readFileSync(path.join(repo, 'package.json'), 'utf8'),
+).version;
+const work = path.join(
+  os.tmpdir(),
+  'mcp-abap-adt-portable',
+  opts.version,
+  opts.platform,
+);
 fs.mkdirSync(work, { recursive: true });
 const { dir: stageDir, sdk } = stage(work, opts.version);
 checkRfcLite(stageDir);
@@ -425,7 +496,14 @@ for (const key of servers) {
   const server = SERVERS[key];
   const bundleFile = await bundle(work, stageDir, server, tools.esbuild);
   inject({
-    bundleFile, addonFile, nodeBin, postject: tools.postject, work, server,
-    platform: opts.platform, version: opts.version, sdk,
+    bundleFile,
+    addonFile,
+    nodeBin,
+    postject: tools.postject,
+    work,
+    server,
+    platform: opts.platform,
+    version: opts.version,
+    sdk,
   });
 }

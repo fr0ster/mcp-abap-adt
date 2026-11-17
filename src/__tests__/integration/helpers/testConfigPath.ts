@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
 /**
  * The config file `MCP_TEST_CONFIG` names, resolved against the repository
@@ -25,7 +26,7 @@ export function testConfigPathFromEnv(
   if (!value) {
     throw new Error('MCP_TEST_CONFIG is set but names no file');
   }
-  const chosen = path.resolve(__dirname, '../../../..', value);
+  const chosen = path.resolve(repositoryRoot(__dirname), value);
   if (!fs.existsSync(chosen)) {
     throw new Error(`MCP_TEST_CONFIG points to a missing file: ${chosen}`);
   }

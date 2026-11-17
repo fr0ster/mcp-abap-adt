@@ -84,7 +84,7 @@ describe('stateful sessions of a debug run', () => {
       },
     };
     const run = deferred<any>();
-    const session = new AmdpSession({
+    const session = new AmdpSession<string>({
       openConnection: async (_o, kind = 'stateful') => {
         const c = { session: kind };
         opened.push(c);
@@ -93,6 +93,7 @@ describe('stateful sessions of a debug run', () => {
       closeConnection: async (c) => {
         closed.push(c);
       },
+      dropConnection: () => {},
       amdpDebugger: () => dbg as never,
       requestUser: async () => 'SAPUSER01',
       run: async () => run.promise,

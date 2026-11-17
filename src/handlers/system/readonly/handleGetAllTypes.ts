@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving all valid ADT object types.
  */
@@ -6,31 +8,36 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import {
+  child,
+  childAt,
+  isList,
+  text,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      validate_type: {
-        type: 'string',
-        description: 'Type name to validate (optional)',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    validate_type: z
+      .string()
+      .optional()
+      .describe('Type name to validate (optional)'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 interface NamedItem {
   name: string;
-  description: string;
+  description: string | undefined;
 }
 
 /**
@@ -43,24 +50,20 @@ interface NamedItem {
  * with exactly one type would hand back a bare object; normalised here the
  * same way the pre-migration handler already did.
  */
-function extractNamedItems(value: unknown): NamedItem[] {
-  const list = (value as any)?.['nameditem:namedItemList'];
-  const raw = list?.['nameditem:namedItem'];
-  const items = raw ? (Array.isArray(raw) ? raw : [raw]) : [];
-  return items
-    .map((item: any) => ({
-      name: item?.['nameditem:name'],
-      description: item?.['nameditem:description'],
-    }))
-    .filter(
-      (item: NamedItem) =>
-        item.name !== undefined && item.name !== null && item.name !== '',
-    );
+function extractNamedItems(value: XmlRead): NamedItem[] {
+  const raw = childAt(value, 'nameditem:namedItemList', 'nameditem:namedItem');
+  const items = raw ? (isList(raw) ? raw : [raw]) : [];
+  return items.flatMap((item) => {
+    const name = text(child(item, 'nameditem:name'));
+    return name === undefined || name === ''
+      ? []
+      : [{ name, description: text(child(item, 'nameditem:description')) }];
+  });
 }
 
 export async function handleGetAdtTypes(
   context: HandlerContext,
-  args: { detail?: 'terse' | 'full' | 'raw' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
   const detail = detailOf(args);

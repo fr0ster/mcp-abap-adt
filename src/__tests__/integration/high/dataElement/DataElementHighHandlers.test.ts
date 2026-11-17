@@ -14,30 +14,52 @@
  * Run: npm test -- --testPathPattern=integration/dataElement
  */
 
-import { handleCreateDataElement } from '../../../../handlers/data_element/high/handleCreateDataElement';
-import { handleDeleteDataElement } from '../../../../handlers/data_element/high/handleDeleteDataElement';
-import { handleUpdateDataElement } from '../../../../handlers/data_element/high/handleUpdateDataElement';
-import { getTimeout } from '../../helpers/configHelpers';
+import { after, afterEach, before, beforeEach, it } from 'node:test';
+import {
+  TOOL_DEFINITION as CreateDataElementTool,
+  handleCreateDataElement,
+} from '../../../../handlers/data_element/high/handleCreateDataElement';
+import {
+  TOOL_DEFINITION as DeleteDataElementTool,
+  handleDeleteDataElement,
+} from '../../../../handlers/data_element/high/handleDeleteDataElement';
+import {
+  handleUpdateDataElement,
+  TOOL_DEFINITION as UpdateDataElementTool,
+} from '../../../../handlers/data_element/high/handleUpdateDataElement';
+
+import { defineTool } from '../../../../lib/handlers/interfaces';
+import { servedSuite } from '../../helpers/servedHere';
 import { HighTester } from '../../helpers/testers/HighTester';
+
+/**
+ * This file's `describe`: the suite runs where the configured system serves
+ * every tool it calls, and skips naming the first it does not serve.
+ */
+const describe = servedSuite([
+  'CreateDataElement',
+  'DeleteDataElement',
+  'UpdateDataElement',
+]);
 
 describe('DataElement High-Level Handlers Integration', () => {
   let tester: HighTester;
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new HighTester(
       'create_data_element',
       'builder_data_element',
       'dataelement-high',
       {
-        create: handleCreateDataElement,
-        update: handleUpdateDataElement,
-        delete: handleDeleteDataElement,
+        create: defineTool(CreateDataElementTool, handleCreateDataElement),
+        update: defineTool(UpdateDataElementTool, handleUpdateDataElement),
+        delete: defineTool(DeleteDataElementTool, handleDeleteDataElement),
       },
     );
     await tester.beforeAll();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await tester.afterAll();
   });
 
@@ -49,11 +71,7 @@ describe('DataElement High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it(
-    'should test all DataElement high-level handlers',
-    async () => {
-      await tester.run();
-    },
-    getTimeout('long'),
-  );
+  it('should test all DataElement high-level handlers', async () => {
+    await tester.run();
+  });
 });

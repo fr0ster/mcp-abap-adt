@@ -22,7 +22,7 @@ Documentation for end users: configuration, usage, and available tools.
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
-- `BATCH_MODE.md` - Batch mode: independent calls recorded, sent together at `BatchEnd`, answered by number; which calls are recorded
+- `BATCH_MODE.md` - Batch mode (the compact binaries' `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
 - `TOOL_SEARCH.md` - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
 

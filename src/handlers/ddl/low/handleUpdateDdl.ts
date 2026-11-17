@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * UpdateDdlLow Handler - Update ABAP DDL Source
  *
@@ -17,7 +19,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -27,41 +29,29 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ddl_name: {
-        type: 'string',
-        description: 'DDL source name. DDL source must already exist.',
-      },
-      ddl_source: {
-        type: 'string',
-        description:
-          "Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.",
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockDdlLow. Required for update operation.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (required for transportable packages), not a task.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['ddl_name', 'ddl_source', 'lock_handle'],
-  },
+  inputSchema: z.object({
+    ddl_name: z
+      .string()
+      .describe('DDL source name. DDL source must already exist.'),
+    ddl_source: z
+      .string()
+      .describe(
+        "Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.",
+      ),
+    lock_handle: z
+      .string()
+      .describe('Lock handle from LockDdlLow. Required for update operation.'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (required for transportable packages), not a task.',
+      ),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface UpdateDdlArgs {
-  ddl_name: string;
-  ddl_source: string;
-  lock_handle: string;
-  transport_request?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type UpdateDdlArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleUpdateDdl(
   context: HandlerContext,

@@ -32,13 +32,24 @@ import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { createAdtClient } from '../../../lib/clients';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
+  configuredSystemKind,
   getSharedDependenciesConfig,
   getSystemType,
   loadTestConfig,
   resolveSharedDependency,
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
+import {
+  guardedChildPackage,
+  guardedPackage,
+  PackageGuardRefusal,
+  type PackageOnSystem,
+  packageOnSystemOf,
+  packageRefusal,
+} from './packageGuard';
 import { createTestConnectionAndSession } from './sessionHelpers';
+import type { SharedDependencies } from './testConfigSchema';
+import { thrownWords } from './thrownValue';
 
 const logger = createTestLogger('shared-objects');
 
@@ -70,12 +81,73 @@ function resolveTransportRequest(override?: string): string | undefined {
   return config?.environment?.default_transport || undefined;
 }
 
-function resolvePackageName(override?: string): string {
-  if (override) return override;
+/**
+ * The package a shared object is created in — the shared package, else the
+ * default one — checked by the package guard first (`packageGuard.ts`): the
+ * shared package by what SAP reads of it (`checkedSharedPackage`).
+ */
+async function resolvePackageName(client: IServerAdtClient): Promise<string> {
   const sharedConfig = getSharedDependenciesConfig();
-  if (sharedConfig?.package) return sharedConfig.package;
+  if (sharedConfig?.package) return checkedSharedPackage(client, sharedConfig);
   const config = loadTestConfig();
-  return config?.environment?.default_package || 'ZLOCAL';
+  return guardedPackage(
+    configuredSystemKind(),
+    'environment.default_package',
+    config?.environment?.default_package || 'ZLOCAL',
+  );
+}
+
+/** What SAP reads of a package: its super package, or that it is not there. */
+async function packageOnSystem(
+  client: IServerAdtClient,
+  packageName: string,
+): Promise<PackageOnSystem> {
+  const read = await client
+    .getPackage(packageDocuments)
+    .readMetadata(
+      { packageName },
+      { version: 'active', analyse: analyseException },
+    );
+  return packageOnSystemOf(
+    'shared_dependencies.package',
+    packageName,
+    read.ok
+      ? { ok: true, document: read.getResult().value }
+      : { ok: false, error: read.getError() },
+  );
+}
+
+/** The shared package once the guard accepted it, for the rest of the process. */
+let _sharedPackageChecked: string | undefined;
+
+/**
+ * The shared package (`shared_dependencies.package`), checked by the package
+ * guard: allowed itself; else, when SAP reads it, by the super package SAP
+ * reads — never by the configured one; else by the configured
+ * `shared_dependencies.super_package` it will be created under.
+ */
+export async function checkedSharedPackage(
+  client: IServerAdtClient,
+  sharedConfig: SharedDependencies,
+): Promise<string> {
+  const packageName = sharedConfig.package ?? '';
+  if (_sharedPackageChecked === packageName) return packageName;
+  const kind = configuredSystemKind();
+  const key = 'shared_dependencies.package';
+  const onSystem: PackageOnSystem =
+    packageRefusal(kind, key, packageName) === undefined
+      ? { exists: false }
+      : await packageOnSystem(client, packageName);
+  guardedChildPackage(
+    kind,
+    key,
+    packageName,
+    onSystem,
+    'shared_dependencies.super_package',
+    sharedConfig.super_package,
+  );
+  _sharedPackageChecked = packageName;
+  return packageName;
 }
 
 /**
@@ -91,7 +163,7 @@ export async function ensureSharedPackage(
   const sharedConfig = getSharedDependenciesConfig();
   if (!sharedConfig?.package) return;
 
-  const packageName = sharedConfig.package;
+  const packageName = await checkedSharedPackage(client, sharedConfig);
 
   // Check if package exists. A package has no source, only its own document
   // (IAdtMetadataReadable, not IAdtReadable) — see IAdtCapabilities.ts.
@@ -152,16 +224,25 @@ export async function ensureSharedPackage(
       throw new Error(createdPackage.getError().message);
     }
     log?.info?.(`Created shared package ${packageName}`);
-  } catch (error: any) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
+  } catch (error) {
+    const words = thrownWords(error);
+    if (words.includes('409') || words.includes('already exist')) {
+      // It exists, yet its read failed: its super package is unknown, so a
+      // package the guard does not allow by itself is not used.
+      if (
+        packageRefusal(
+          configuredSystemKind(),
+          'shared_dependencies.package',
+          packageName,
+        ) !== undefined
+      ) {
+        throw new PackageGuardRefusal(
+          `the package guard: shared_dependencies.package names ${packageName}, which exists but SAP did not read: its super package is unknown, nothing is created in it`,
+        );
+      }
       log?.info?.(`Shared package ${packageName} already exists`);
     } else {
-      log?.warn?.(
-        `Failed to create shared package ${packageName}: ${error.message}`,
-      );
+      log?.warn?.(`Failed to create shared package ${packageName}: ${words}`);
       throw error;
     }
   }
@@ -196,7 +277,7 @@ export async function ensureSharedDependency(
   }
 
   // Skip if not available for current system type
-  const availableIn = depConfig.available_in as string[] | undefined;
+  const availableIn = depConfig.available_in;
   if (availableIn && availableIn.length > 0) {
     const systemType = getSystemType();
     if (!availableIn.includes(systemType)) {
@@ -207,7 +288,7 @@ export async function ensureSharedDependency(
     }
   }
 
-  const packageName = resolvePackageName();
+  const packageName = await resolvePackageName(client);
   const transportRequest = resolveTransportRequest();
 
   // Check if the object already exists. Nothing here throws any more — a
@@ -403,11 +484,9 @@ export async function ensureSharedDependency(
     log?.info?.(`Created shared ${type} ${name}`);
     _verifiedDependencies[cacheKey] = true;
     return { existed: false, created: true };
-  } catch (error: any) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
+  } catch (error) {
+    const words = thrownWords(error);
+    if (words.includes('409') || words.includes('already exist')) {
       log?.info?.(
         `Shared ${type} ${name} already exists (concurrent creation)`,
       );
@@ -437,7 +516,7 @@ export async function safeDelete(
     }
     log?.info?.(`Deleted ${label}`);
     return 'deleted';
-  } catch (error: any) {
+  } catch (error) {
     return classifyDeleteFailure(
       label,
       error instanceof Error ? error.message : String(error),
@@ -493,20 +572,20 @@ export async function ensureSharedObjects(
 
   // Ensure we have a real connection (not an empty stub from hard mode)
   let conn = connection;
-  if (!conn || typeof (conn as any).makeAdtRequest !== 'function') {
+  if (!conn || typeof conn.makeAdtRequest !== 'function') {
     try {
       const result = await createTestConnectionAndSession();
       conn = result.connection;
-    } catch (connError: any) {
+    } catch (connError) {
       logger?.warn?.(
-        `Cannot create connection for shared objects: ${connError.message}`,
+        `Cannot create connection for shared objects: ${thrownWords(connError)}`,
       );
       return [
         {
           success: false,
           name: '',
           action: 'skipped',
-          reason: `Cannot create connection: ${connError.message}`,
+          reason: `Cannot create connection: ${thrownWords(connError)}`,
         },
       ];
     }
@@ -518,7 +597,7 @@ export async function ensureSharedObjects(
   // Verify all shared deps exist (read-only check)
   const typeOrder: Array<{
     type: string;
-    readFn: (name: string) => Promise<any>;
+    readFn: (name: string) => Promise<unknown>;
   }> = [
     {
       type: 'tables',

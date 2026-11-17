@@ -7,6 +7,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import { DataHandlersGroup } from '../groups/DataHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
@@ -38,7 +39,7 @@ export function createReadOnlyServer(context: HandlerContext): McpServer {
 
 /**
  * Example 2: Full-featured server
- * Registers all handler groups
+ * Registers all handler groups, the data tools among them
  */
 export function createFullServer(context: HandlerContext): McpServer {
   const mcpServer = new McpServer({
@@ -50,6 +51,12 @@ export function createFullServer(context: HandlerContext): McpServer {
     new ReadOnlyHandlersGroup(context),
     new HighLevelHandlersGroup(context),
     new SystemHandlersGroup(context),
+    // The data tools (GetSqlQuery, GetTableContents) are opt-in: no group
+    // above serves them. Add DataHandlersGroup only when serving them is the
+    // customer's decision — SAP API Policy FAQ v1.3 (June 2026), Q33, says
+    // ADT APIs are not intended for reading application tables, exporting
+    // business data or running SQL against SAP systems.
+    new DataHandlersGroup(context),
     new SearchHandlersGroup(context),
   ]);
 
@@ -106,7 +113,7 @@ export function createCustomServer(
   const handlerGroups: IHandlerGroup[] = [];
 
   if (includeReadOnly) {
-    handlerGroups.push(new ReadOnlyHandlersGroup(context) as IHandlerGroup);
+    handlerGroups.push(new ReadOnlyHandlersGroup(context));
   }
 
   // Add other groups based on configuration
@@ -121,9 +128,9 @@ export function createCustomServer(
   // }
 
   // Example: Add high-level, system, and search groups
-  handlerGroups.push(new HighLevelHandlersGroup(context) as IHandlerGroup);
-  handlerGroups.push(new SystemHandlersGroup(context) as IHandlerGroup);
-  handlerGroups.push(new SearchHandlersGroup(context) as IHandlerGroup);
+  handlerGroups.push(new HighLevelHandlersGroup(context));
+  handlerGroups.push(new SystemHandlersGroup(context));
+  handlerGroups.push(new SearchHandlersGroup(context));
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
   handlersRegistry.registerAllTools(mcpServer);

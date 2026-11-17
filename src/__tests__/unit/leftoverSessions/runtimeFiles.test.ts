@@ -256,7 +256,10 @@ describe('the owner, without a server', () => {
   it('keeps no identity over RFC; a token credential’s states no user', () => {
     expect(
       sessionIdentity('PLACEHOLDER_DEST', {
-        url: 'http://placeholder.invalid',
+        client: '100',
+        language: 'EN',
+        ashost: 'placeholder.invalid',
+        sysnr: '00',
         authType: 'basic',
         username: 'PLACEHOLDER_USER',
         connectionType: 'rfc',

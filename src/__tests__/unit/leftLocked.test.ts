@@ -18,7 +18,7 @@ import {
   TRANSPORT_HINT_WORDS_020,
   transportHint,
 } from '../../lib/answer';
-import { safeCleanup } from '../../lib/strategies/safeFields';
+import { safeCleanup, thrownCleanup } from '../../lib/strategies/safeFields';
 import { leftLockedWarning } from '../../lib/strategies/withLock';
 import {
   fakeClientOf,
@@ -26,6 +26,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { holding } from '../helpers/heldLocks';
 
 let fakeClient: unknown;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -169,9 +170,9 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
     });
   });
 
-  it('drops each field of the wrong type, and everything the object carries beyond its two strings', () => {
+  it('a thrown carrier: drops each field of the wrong type, and everything the object carries beyond its two strings', () => {
     expect(
-      safeCleanup({
+      thrownCleanup({
         ...base,
         left_locked: 'true',
         lock_handle: 42,
@@ -188,13 +189,29 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
     ['a numeric name', { type: 'CLASS', name: 7 }],
     ['a string', 'CLASS OBJ'],
     ['null', null],
-  ])('drops an object with %s', (_label, object) => {
-    expect(safeCleanup({ ...base, object })).toEqual(base);
+  ])('a thrown carrier: drops an object with %s', (_label, object) => {
+    expect(thrownCleanup({ ...base, object })).toEqual(base);
   });
 
-  it('drops left_locked false and an empty handle', () => {
+  it('drops an object with an empty name, and everything the object carries beyond its two strings', () => {
+    const object = {
+      type: 'CLASS',
+      name: 'OBJ',
+      headers: { authorization: 'x' },
+    };
+    expect(safeCleanup({ ...base, object })).toEqual({
+      ...base,
+      object: { type: 'CLASS', name: 'OBJ' },
+    });
+    expect(safeCleanup({ ...base, object: { type: '', name: 'OBJ' } })).toEqual(
+      base,
+    );
+  });
+
+  it('drops an empty handle; a thrown carrier also left_locked false', () => {
+    expect(safeCleanup({ ...base, lock_handle: '' })).toEqual(base);
     expect(
-      safeCleanup({ ...base, left_locked: false, lock_handle: '' }),
+      thrownCleanup({ ...base, left_locked: false, lock_handle: '' }),
     ).toEqual(base);
   });
 });
@@ -223,8 +240,8 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
       update: async () => saveRefused([ALREADY_LOCKED]),
     });
     const result: any = await handleUpdateUnderLock(
-      // No held-lock port: the handle is taken as held here.
-      context as any,
+      // The instance locked first: its owner holds the handle.
+      { ...context, heldLocks: holding('handle-1') } as any,
       {
         object_type: 'LOCAL_TEST_CLASS',
         lock_handle: 'handle-1',

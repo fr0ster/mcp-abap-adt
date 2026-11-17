@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * A stdio instance's connection is born at its start, before any tool call
  * (`bornAtStart`), with the rules core passes: its parameters are made with
@@ -79,9 +80,9 @@ const needsResponsible = {
   toolDefinition: {
     name: 'NeedsResponsible',
     description: 'NeedsResponsible',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: z.object({}),
   },
-  handler: (async (
+  call: (async (
     context: { connection: { makeAdtRequest(o: object): Promise<unknown> } },
     _args: unknown,
   ) => {

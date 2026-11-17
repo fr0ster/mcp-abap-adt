@@ -1,0 +1,1117 @@
+{
+  "ActivateBehaviorDefinition": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateDdl": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateDomain": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateFunctionGroup": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateFunctionModule": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateInterface": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateMetadataExtension": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateProgram": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateServiceDefinition": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateStructure": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateTable": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "ActivateTableType": {
+    "unit": "src/__tests__/unit/pins/activatePerType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activatePerType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activatePerType.live.test.ts"
+    }
+  },
+  "AmdpDebugCancel": {
+    "unit": "src/__tests__/unit/pins/amdpDebugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts"
+    }
+  },
+  "AmdpDebugSetBreakpoints": {
+    "unit": "src/__tests__/unit/pins/amdpDebugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts"
+    }
+  },
+  "CreateMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "CreateMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "DebugBatchAnswers": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugBatchBegin": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugBatchEnd": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugCreateWatchpoint": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugDeleteBreakpoint": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugDeleteWatchpoint": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugListBreakpoints": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugListWatchpoints": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugSetStackPosition": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugSetVariable": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DebugTerminate": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "DeleteMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "DeleteMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "DiscardBackgroundRun": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetBackgroundRun": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetBehaviorDefinitionVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetBehaviorDefinitionVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetBehaviorDefinitionVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetBehaviorImplementation#metadata": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetBehaviorImplementation#source": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetClassVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetClassVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetClassVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetDdlVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetDdlVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetDdlVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetEnhancementImpl": {
+    "unit": "src/__tests__/unit/pins/enhancements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/enhancements.live.test.ts"
+    }
+  },
+  "GetEnhancementSpot": {
+    "unit": "src/__tests__/unit/pins/enhancements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/enhancements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/enhancements.live.test.ts"
+    }
+  },
+  "GetFunctionModule#source": {
+    "unit": "src/__tests__/unit/pins/searchSource.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "GetFunctionModuleVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetFunctionModuleVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetFunctionModuleVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetInterfaceVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetInterfaceVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetInterfaceVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "GetMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "GetMetadataExtensionVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMetadataExtensionVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetMetadataExtensionVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetObjectDraft#BEHAVIOR_DEFINITION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#BEHAVIOR_IMPLEMENTATION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#CLASS": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#DATA_ELEMENT": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#DDL": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#DOMAIN": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#FUNCTION_GROUP": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#FUNCTION_MODULE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#INCLUDE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#INTERFACE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#METADATA_EXTENSION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#PROGRAM": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#SERVICE_DEFINITION": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#STRUCTURE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#TABLE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectDraft#TABLE_TYPE": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "GetObjectNodeFromCache": {
+    "unit": "src/__tests__/unit/pins/objectsByType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/objectsByType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/objectsByType.live.test.ts"
+    }
+  },
+  "GetObjectOutline#CLAS/OC": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#FUGR/F": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#INTF/OI": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectOutline#PROG/P": {
+    "unit": "src/__tests__/unit/pins/outline.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/outline.live.test.ts"
+    }
+  },
+  "GetObjectStructure": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetObjectsByType": {
+    "unit": "src/__tests__/unit/pins/objectsByType.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/objectsByType.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/objectsByType.live.test.ts"
+    }
+  },
+  "GetPackage": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetProgramVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetProgramVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetProgramVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetServiceBinding#metadata": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "GetServiceBinding#source": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "GetServiceBindingPreviewUrl": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "GetSqlQuery": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetStructureVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetStructureVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetStructureVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableTypeVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableVersionDiff": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableVersionSource": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTableVersions": {
+    "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTransaction": {
+    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "GetUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerBackgroundRunDiscard": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerBackgroundRunGet": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerBackgroundRunList": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerCdsUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTestsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerCdsUnitTestStatus": {
+    "unit": "src/__tests__/unit/pins/unitTestsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerDebugBatch#answers": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "HandlerDebugBatch#begin": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "HandlerDebugBatch#end": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "HandlerDumpList": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerDumpView": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerGet#-#activation_status": {
+    "unit": "src/__tests__/unit/pins/activate.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/activate.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/activate.live.test.ts"
+    }
+  },
+  "HandlerGet#BEHAVIOR_DEFINITION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#BEHAVIOR_IMPLEMENTATION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#CLASS#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#DATA_ELEMENT#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#DDL#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#DOMAIN#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#FUNCTION_GROUP#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#FUNCTION_MODULE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#INCLUDE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#INTERFACE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#METADATA_EXTENSION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#PROGRAM#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#SERVICE_DEFINITION#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#STRUCTURE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#TABLE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#TABLE_TYPE#draft": {
+    "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
+      "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGetData": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "HandlerLeftoverSessionList": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "HandlerLeftoverSessionLogoff": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "HandlerProfileList": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerProfileRun": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerProfileSchedule": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerProfileView": {
+    "unit": "src/__tests__/unit/pins/dumpsProfiles.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
+    }
+  },
+  "HandlerServiceBindingListTypes": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "HandlerServiceBindingValidate": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "HandlerSystem#atc_findings": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/atc.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/atc.live.test.ts"
+    }
+  },
+  "HandlerSystem#atc_result": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/atc.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/atc.live.test.ts"
+    }
+  },
+  "HandlerSystem#atc_results": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/atc.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/atc.live.test.ts"
+    }
+  },
+  "HandlerSystem#package_tree": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/packageTree.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/packageTree.live.test.ts"
+    }
+  },
+  "HandlerSystem#search_object": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "HandlerSystem#search_source": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "HandlerSystem#transports": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
+  "HandlerSystem#where_used": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
+    }
+  },
+  "HandlerTransportCreate": {
+    "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
+  "HandlerTransportMoveObjects": {
+    "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": {
+        "reason": "the cloud trial has only ZLOCAL packages; SAP records no local object on a request (TRINT_APPEND_TO_COMM_ARRAYS: 'Local object is edited without a request')"
+      }
+    }
+  },
+  "HandlerTransportSortAndCompress": {
+    "unit": "src/__tests__/unit/pins/transportsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
+  "HandlerUnitTestResult": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerUnitTestRun": {
+    "unit": "src/__tests__/unit/pins/unitTestsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerUnitTestStatus": {
+    "unit": "src/__tests__/unit/pins/unitTestsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "ListBackgroundRuns": {
+    "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "ListLeftoverSessions": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "ListServiceBindingTypes": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "ListTransports": {
+    "unit": "src/__tests__/unit/pins/listTransports.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportsCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportsCompact.live.test.ts"
+    }
+  },
+  "LogoffLeftoverSession": {
+    "unit": "src/__tests__/unit/pins/leftoverSessions.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "MemorySnapshotDelta": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "MemorySnapshotGet": {
+    "unit": "src/__tests__/unit/pins/debugger.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/debugger.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
+    }
+  },
+  "RunAbapUnit": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "RunUnitTest": {
+    "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "SearchSource": {
+    "unit": "src/__tests__/unit/pins/searchSource.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "UpdateMessageClass": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "UpdateMessageClassMessage": {
+    "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/messageClass.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/messageClass.live.test.ts"
+    }
+  },
+  "UpdateServiceBinding": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "ValidateServiceBinding": {
+    "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  }
+}

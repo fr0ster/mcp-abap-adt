@@ -4,6 +4,7 @@ import {
   STATE_IDLE_ROW,
 } from '../../../lib/config/authParameters';
 import { readStateIdleMinutes } from '../../../lib/config/stateIdleMinutes';
+import type { YamlConfig } from '../../../lib/config/yamlConfig';
 import {
   generateYamlConfigTemplate as templateOf,
   validateYamlConfig as validateTable,
@@ -15,8 +16,7 @@ const IDLE: ParameterTable = {
   rows: [STATE_IDLE_ROW],
   removed: [],
 };
-const validateYamlConfig = (config: Record<string, unknown>) =>
-  validateTable(IDLE, config);
+const validateYamlConfig = (config: YamlConfig) => validateTable(IDLE, config);
 const generateYamlConfigTemplate = () => templateOf(IDLE);
 const rowHelp = () => parametersHelp(IDLE);
 

@@ -88,7 +88,7 @@ describe('GetEnhancementSpot', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 200, data: BADI_SPOT_XML }],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
     expect(r.isError).toBe(false);
@@ -106,6 +106,56 @@ describe('GetEnhancementSpot', () => {
     expect(connection.calls[0]?.data).toBeUndefined();
   });
 
+  it("reads the spot's document as before: name, description, type, package, interface, BAdI definitions", async () => {
+    const connection = connectionAnswering([
+      [/\/enhancements\/enhsxsb\//, { status: 200, data: BADI_SPOT_XML }],
+    ]);
+    const r = await handleGetEnhancementSpot(ctx(connection), {
+      enhancement_spot: 'SADT_REST_RFC_APPLICATION',
+    });
+    expect(json(r).metadata).toEqual({
+      name: 'SADT_REST_RFC_APPLICATION',
+      description: 'REST application class registration',
+      type: 'ENHS/XSB',
+      package: 'SADT_REST',
+      interface: 'IF_ADT_REST_RFC_APPLICATION',
+      badi_definitions: [
+        {
+          name: 'BADI_ADT_REST_RFC_APPLICATION',
+          shorttext: 'REST application class registration',
+          interface: 'IF_ADT_REST_RFC_APPLICATION',
+        },
+      ],
+    });
+  });
+
+  // Read through the XML parser: an entity is decoded, a link that is not
+  // self-closing is a link, attributes are read in any order and quoting.
+  it("reads the spot's document as XML: an entity, a link closed by its own tag, apostrophes", async () => {
+    const document = BADI_SPOT_XML.replace(
+      'adtcore:description="REST application class registration"',
+      "adtcore:description='REST &amp; RFC'",
+    ).replace(
+      '</enhs:objectData>',
+      '<atom:link xmlns:atom="http://www.w3.org/2005/Atom" rel="self" href="/sap/bc/adt/enhancements/enhsxsb/x"></atom:link></enhs:objectData>',
+    );
+    const connection = connectionAnswering([
+      [/\/enhancements\/enhsxsb\//, { status: 200, data: document }],
+    ]);
+    const r = await handleGetEnhancementSpot(ctx(connection), {
+      enhancement_spot: 'SADT_REST_RFC_APPLICATION',
+    });
+    expect(json(r).metadata.description).toBe('REST & RFC');
+    expect(json(r).metadata.links).toEqual([
+      {
+        href: '/sap/bc/adt/enhancements/enhsxsb/x',
+        rel: 'self',
+        type: undefined,
+        title: undefined,
+      },
+    ]);
+  });
+
   it('says a plain enhancement spot is not available through ADT', async () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 500, data: I000 }],
@@ -114,7 +164,7 @@ describe('GetEnhancementSpot', () => {
         { status: 200, data: searchHit('ZSPOT_PLAIN', 'ENHS/XS') },
       ],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_PLAIN',
     });
     expect(r.isError).toBe(true);
@@ -131,7 +181,7 @@ describe('GetEnhancementSpot', () => {
         { status: 200, data: searchHit('ZSPOT_B', 'ENHS/XSB') },
       ],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_B',
     });
     expect(r.isError).toBe(true);
@@ -147,7 +197,7 @@ describe('GetEnhancementSpot', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhsxsb\//, { status: 401, data: '' }],
     ]);
-    const r: any = await handleGetEnhancementSpot(ctx(connection), {
+    const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_B',
     });
     expect(r.isError).toBe(true);
@@ -166,7 +216,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: source },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
@@ -180,11 +230,53 @@ describe('GetEnhancementImpl', () => {
     expect(connection.calls[0]?.headers?.Accept).toBe('text/plain');
   });
 
+  /** What the tool answers as `source_code` for a plugin read answering `data`. */
+  async function sourceRead(data: string): Promise<unknown> {
+    const connection = connectionAnswering([
+      [/\/enhancements\/enhoxhh\//, { status: 200, data }],
+    ]);
+    const r = await handleGetEnhancementImpl(ctx(connection), {
+      enhancement_spot: 'enhoxhh',
+      enhancement_name: 'ZPLUGIN',
+    });
+    return json(r).source_code;
+  }
+
+  const PLUGIN_SOURCE = 'ENHANCEMENT 1  .\r\nWRITE `x`.\r\nENDENHANCEMENT.';
+  const b64 = (text: string) => Buffer.from(text, 'utf-8').toString('base64');
+
+  it('reads a source element written as base64, decoded', async () => {
+    await expect(
+      sourceRead(
+        `<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements"><enh:source>${b64(PLUGIN_SOURCE)}</enh:source></enh:enhancement>`,
+      ),
+    ).resolves.toBe(PLUGIN_SOURCE);
+  });
+
+  // XML reads a line end as LF (XML 1.0 §2.11), CDATA included.
+  it('reads a source element written as CDATA, as XML reads it', async () => {
+    await expect(
+      sourceRead(
+        `<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements"><enh:source>\n<![CDATA[${PLUGIN_SOURCE}]]>\n</enh:source></enh:enhancement>`,
+      ),
+    ).resolves.toBe(PLUGIN_SOURCE.split('\r\n').join('\n'));
+  });
+
+  // Read through the XML parser: a `>` inside an attribute value does not
+  // end the element's start tag.
+  it("reads a source element whose attribute value holds '>'", async () => {
+    await expect(
+      sourceRead(
+        `<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements"><enh:source enh:note="a>b">${b64(PLUGIN_SOURCE)}</enh:source></enh:enhancement>`,
+      ),
+    ).resolves.toBe(PLUGIN_SOURCE);
+  });
+
   it('answers not_found when SAP answers the plugin with no source', async () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhoxhh\//, { status: 200, data: '' }],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZGONE',
     });
@@ -201,7 +293,7 @@ describe('GetEnhancementImpl', () => {
     'refuses %s before any request — it has no source through ADT',
     async (collection, label) => {
       const connection = connectionAnswering([]);
-      const r: any = await handleGetEnhancementImpl(ctx(connection), {
+      const r = await handleGetEnhancementImpl(ctx(connection), {
         enhancement_spot: collection,
         enhancement_name: 'ZANY',
       });
@@ -218,7 +310,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: searchHit('ZCLASS_ENH', 'ENHO/XH') },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZCLASS_ENH',
     });
@@ -234,7 +326,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: searchHit('ZPLUGIN', 'ENHO/XHH') },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZPLUGIN',
     });
@@ -248,7 +340,7 @@ describe('GetEnhancementImpl', () => {
 
   it('a collection name nothing explains is refused, naming enhoxhh', async () => {
     const connection = connectionAnswering([]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZUNKNOWN',
     });
@@ -264,7 +356,7 @@ describe('GetEnhancementImpl', () => {
         { status: 200, data: searchHit('ZPLUGIN', 'ENHO/XHH') },
       ],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
@@ -278,7 +370,7 @@ describe('GetEnhancementImpl', () => {
     const connection = connectionAnswering([
       [/\/enhancements\/enhoxhh\//, { status: 401, data: '' }],
     ]);
-    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+    const r = await handleGetEnhancementImpl(ctx(connection), {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });

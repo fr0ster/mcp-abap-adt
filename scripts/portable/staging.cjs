@@ -44,7 +44,11 @@ const markerOf = (dir) => path.join(dir, '.staged');
 function isStaged(dir, { version, sdk }) {
   try {
     const staged = JSON.parse(fs.readFileSync(markerOf(dir), 'utf8'));
-    return staged.version === version && staged.sdk === sdk && stagedAddon(dir) !== undefined;
+    return (
+      staged.version === version &&
+      staged.sdk === sdk &&
+      stagedAddon(dir) !== undefined
+    );
   } catch {
     return false;
   }
@@ -78,7 +82,9 @@ function rfcLiteTooOld(dir) {
       const entries = name.startsWith('@')
         ? (() => {
             try {
-              return fs.readdirSync(path.join(modules, name)).map((n) => path.join(name, n));
+              return fs
+                .readdirSync(path.join(modules, name))
+                .map((n) => path.join(name, n));
             } catch {
               return [];
             }
@@ -89,12 +95,15 @@ function rfcLiteTooOld(dir) {
         if (entry === RFC_LITE) {
           let version;
           try {
-            version = JSON.parse(fs.readFileSync(path.join(pkg, 'package.json'), 'utf8')).version;
+            version = JSON.parse(
+              fs.readFileSync(path.join(pkg, 'package.json'), 'utf8'),
+            ).version;
           } catch {
             version = undefined;
           }
           const [major, minor] = String(version).split('.').map(Number);
-          if (!(major > 0 || minor >= 3)) old.push({ dir: pkg, version: String(version) });
+          if (!(major > 0 || minor >= 3))
+            old.push({ dir: pkg, version: String(version) });
         }
         walk(path.join(pkg, 'node_modules'));
       }

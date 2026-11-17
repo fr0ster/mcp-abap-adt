@@ -9,12 +9,13 @@
  *
  * Real adt-clients code runs over the batch proof's counting connection.
  */
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
+import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
 import {
   handleHandlerDumpList,
   TOOL_DEFINITION,
@@ -41,7 +42,11 @@ async function runWith(
     logger: silent,
   } as unknown as HandlerContext;
   const pending = Promise.resolve(
-    handleHandlerDumpList(context, structuredClone(args) as never),
+    // Through its entry: the schema is the one check of a call.
+    defineTool(TOOL_DEFINITION, handleHandlerDumpList).call(
+      context,
+      structuredClone(args),
+    ),
   ) as Promise<Answer>;
   if (mode === 'pending') {
     pending.catch(() => undefined);
@@ -140,8 +145,10 @@ describe('HandlerDumpList reads one page', () => {
       "The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.",
     );
     expect(TOOL_DEFINITION.description).toMatch(/\b100\b/);
-    const props = TOOL_DEFINITION.inputSchema.properties;
-    expect(props.top.description).toContain('100');
-    expect(props.to.description).toContain('boundary second, inclusive');
+    const schema = listedJson(TOOL_DEFINITION.inputSchema);
+    expect(jsonAt(schema, 'top').description).toContain('100');
+    expect(jsonAt(schema, 'to').description).toContain(
+      'boundary second, inclusive',
+    );
   });
 });

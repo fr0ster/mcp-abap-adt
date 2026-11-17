@@ -21,11 +21,26 @@
  * answers — the same one.
  */
 
+import type {
+  SapConfig,
+  SapHttpConfig,
+  SapRfcConfig,
+} from '@mcp-abap-adt/connection';
 import {
   type ConnectionSource,
   raceRequestSignal,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IDestinations } from './auth/IAuthBrokerFactory.js';
+
+/** A copy of `settings`, built as a literal of its own shape. */
+function copyOf(settings: SapConfig): SapConfig {
+  if (settings.connectionType === 'rfc') {
+    const rfc: SapRfcConfig = { ...settings };
+    return rfc;
+  }
+  const http: SapHttpConfig = { ...settings };
+  return http;
+}
 
 export function destinationSource(
   destination: string,
@@ -49,7 +64,7 @@ export function destinationSource(
               signal,
             );
       return {
-        settings: { ...settings },
+        settings: copyOf(settings),
         credential,
         ...(systemContext !== undefined ? { systemContext } : {}),
       };

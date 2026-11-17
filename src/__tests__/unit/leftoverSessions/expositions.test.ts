@@ -9,7 +9,10 @@
  */
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { registryForExposition } from '../../../lib/handlers/registry/expositionRegistry';
 import {
@@ -53,19 +56,25 @@ describe('the stdio binaries', () => {
     ['core-ro', fullReadOnlyToolSet, LIST],
     [
       'compact-ro',
-      compactReadOnlyToolSetOf(compactReadOnlyEntries),
+      compactReadOnlyToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
+      }),
       COMPACT_LIST,
     ],
     [
       'compact',
       compactToolSetOf({
         readOnly: compactReadOnlyEntries,
+        data: compactDataEntries,
         modify: compactModifyEntries,
       }),
       COMPACT,
     ],
   ])('%s serves %j and no resume', (_kind, set, expected) => {
-    const tools = namesOf(registryOf(set, 'stdio').getHandlerGroups());
+    const tools = namesOf(
+      registryOf(set, 'stdio', { dataTools: false }).getHandlerGroups(),
+    );
     expect(leftoverOf(tools)).toEqual(expected);
     expect(tools.some((t) => t.includes('Resume'))).toBe(false);
   });

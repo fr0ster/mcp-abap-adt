@@ -1,4 +1,3 @@
-import { corpusBody } from '../../../lib/adtCorpus';
 import { debugAnswer, debugStateAnswer } from '../../../lib/debugger/answer';
 import { DebugListenerError } from '../../../lib/debugger/DebugSession';
 import {
@@ -6,6 +5,7 @@ import {
   readDebuggee,
   readStack,
 } from '../../../lib/debugger/readings';
+import { corpusBody } from '../../helpers/adtCorpus';
 
 describe('debug answers', () => {
   const view = { value: { a: 1, b: 2 }, raw: '<x/>' };
@@ -63,7 +63,7 @@ describe('debug answers', () => {
   });
   it('the handle survives every detail: merged under terse and full, a block of its own under raw', async () => {
     const view = { value: { state: 'listening' }, raw: '<x/>' };
-    for (const detail of ['terse', 'full']) {
+    for (const detail of ['terse', 'full'] as const) {
       const r = await debugAnswer(
         { detail },
         async () => view,

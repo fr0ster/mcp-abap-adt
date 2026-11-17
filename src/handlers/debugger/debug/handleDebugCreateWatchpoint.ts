@@ -1,10 +1,10 @@
+import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -12,27 +12,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      ...STATE_HANDLE_PROPERTY,
-      name: {
-        type: 'string',
-        description: 'Variable to watch; a path reaches a component.',
-      },
-      condition: {
-        type: 'string',
-        description: 'Stops only when this ABAP condition holds.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['state_handle', 'name'],
-  },
+  inputSchema: z.object({
+    ...STATE_HANDLE_PROPERTY,
+    name: z.string().describe('Variable to watch; a path reaches a component.'),
+    condition: z
+      .string()
+      .optional()
+      .describe('Stops only when this ABAP condition holds.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleDebugCreateWatchpoint(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return debugAnswer(
     args,

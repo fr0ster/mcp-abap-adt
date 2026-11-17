@@ -1,12 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { isBackgroundRunTool } from '../../backgroundRuns/tools.js';
 import { listedTool } from '../../listedTool.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type {
+  HandlerEntry,
   IHandlerGroup,
   IHandlersRegistry,
   SapEnvironment,
-  ToolDefinition,
-  ToolHandler,
 } from '../interfaces.js';
 import type { CallContext } from '../utils/handlerCall.js';
 
@@ -109,6 +109,9 @@ export class CompositeHandlersRegistry<
       for (const entry of handlers) {
         if (!listedTool(entry.toolDefinition, environment).listed) continue;
         const name = entry.toolDefinition.name;
+        // A plain registration keeps no background runs: no
+        // background-run tool is listed (`BaseHandlerGroup.registerOneTool`).
+        if (isBackgroundRunTool(name)) continue;
         if (this.registeredTools.has(name)) {
           const msg = `Duplicate tool registration detected: "${name}" in group "${group.getName()}"`;
           if (this.failOnDuplicate) {
@@ -129,19 +132,15 @@ export class CompositeHandlersRegistry<
    * `registerAllTools` registers it: on the variant every group states
    * (`listedTool`; left out when that variant does not serve it), each call
    * through the path of the group that holds a tool of that name
-   * (`BaseHandlerGroup.registerOneTool`) — `handler` called in its form, an
-   * args-only one reading that group's context, on the stated kind. Groups
+   * (`BaseHandlerGroup.registerOneTool`) — the entry's call with that
+   * group's context, on the stated kind. Groups
    * stating different variants — one of them none included — are refused
    * before anything is registered; so is a tool no `BaseHandlerGroup` of the
    * registry holds, which has no context to run on.
    * Note: This method is provided for compatibility, but it's recommended to use handler groups
    */
-  registerTool(
-    server: McpServer,
-    toolName: string,
-    toolDefinition: ToolDefinition,
-    handler: ToolHandler,
-  ): void {
+  registerTool(server: McpServer, entry: HandlerEntry): void {
+    const toolName = entry.toolDefinition.name;
     this.refuseDifferentVariants();
     const holder = this.handlerGroups.find((group) =>
       group
@@ -151,7 +150,7 @@ export class CompositeHandlersRegistry<
     if (!(holder instanceof BaseHandlerGroup)) {
       throw new Error(REGISTER_TOOL_UNHELD_WORDS(toolName));
     }
-    holder.registerOneTool(server, toolName, toolDefinition, handler);
+    holder.registerOneTool(server, entry);
   }
 
   /**

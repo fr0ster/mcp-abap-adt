@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Tools the shutdown and connection-end suites run against the ADT stand-in
  * (`adtStandIn.ts`): each sends real requests on its call's connection, so
@@ -94,21 +95,20 @@ class HeldDebugState implements StatePart {
 
 function entry(
   name: string,
-  properties: Record<string, { type: string }>,
+  properties: readonly string[],
   handler: (ctx: Ctx, args: Record<string, string>) => Promise<unknown>,
 ): HandlerEntry {
   return {
     toolDefinition: {
       name,
       description: name,
-      inputSchema: {
-        type: 'object',
-        // Every tool takes a handle: the pool routes by it.
-        properties: { ...properties, state_handle: { type: 'string' } },
-        required: Object.keys(properties).filter((k) => k !== 'state_handle'),
-      },
+      // Every tool takes a handle: the pool routes by it.
+      inputSchema: z.object({
+        ...Object.fromEntries(properties.map((key) => [key, z.string()])),
+        state_handle: z.string().optional(),
+      }),
     },
-    handler,
+    call: handler,
   } as unknown as HandlerEntry;
 }
 
@@ -116,7 +116,7 @@ const text = (value: string) => ({ content: [{ type: 'text', text: value }] });
 
 export function shutdownTools(): HandlerEntry[] {
   return [
-    entry('LockedUpdate', { id: { type: 'string' } }, async (ctx, args) => {
+    entry('LockedUpdate', ['id'], async (ctx, args) => {
       const id = args.id ?? '';
       await send(ctx.connection, 'POST', lockUrl(id));
       await send(ctx.connection, 'PUT', updateUrl(id));
@@ -127,11 +127,11 @@ export function shutdownTools(): HandlerEntry[] {
       }
       return text(id);
     }),
-    entry('LockOnly', { id: { type: 'string' } }, async (ctx, args) => {
+    entry('LockOnly', ['id'], async (ctx, args) => {
       await send(ctx.connection, 'POST', lockUrl(args.id ?? ''));
       return text(args.id ?? '');
     }),
-    entry('HoldState', { id: { type: 'string' } }, async (ctx, args) => {
+    entry('HoldState', ['id'], async (ctx, args) => {
       const id = args.id ?? '';
       const own_ = await openFreshConnection(ctx.connection, undefined);
       own(own_, { role: 'state' });
@@ -139,7 +139,7 @@ export function shutdownTools(): HandlerEntry[] {
       ctx.state.attach(new HeldDebugState(id, own_));
       return text(ctx.state.handle);
     }),
-    entry('LongRead', { id: { type: 'string' } }, async (ctx, args) => {
+    entry('LongRead', ['id'], async (ctx, args) => {
       const id = args.id ?? '';
       const own_ = await openFreshConnection(ctx.connection, undefined);
       own(own_, { role: 'long' });
@@ -150,7 +150,7 @@ export function shutdownTools(): HandlerEntry[] {
       }
       return text(id);
     }),
-    entry('MainThenFresh', { id: { type: 'string' } }, async (ctx, args) => {
+    entry('MainThenFresh', ['id'], async (ctx, args) => {
       const id = args.id ?? '';
       await send(ctx.connection, 'GET', mainReadUrl(id));
       const own_ = await openFreshConnection(ctx.connection, undefined);
@@ -158,15 +158,11 @@ export function shutdownTools(): HandlerEntry[] {
       await send(own_, 'GET', listenUrl(id));
       return text(id);
     }),
-    entry(
-      'StopState',
-      { state_handle: { type: 'string' } },
-      async (ctx, args) => {
-        ctx.state.check(args.state_handle);
-        ctx.state.endWhenEmpty();
-        await ctx.state.dispose();
-        return text('stopped');
-      },
-    ),
+    entry('StopState', [], async (ctx, args) => {
+      ctx.state.check(args.state_handle);
+      ctx.state.endWhenEmpty();
+      await ctx.state.dispose();
+      return text('stopped');
+    }),
   ];
 }

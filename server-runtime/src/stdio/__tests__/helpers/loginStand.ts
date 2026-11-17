@@ -269,6 +269,11 @@ export function fakeBrowser(): FakeBrowser {
 export type LoginSettlements = Array<'ok' | 'aborted' | 'failed'>;
 
 export interface StandOptions {
+  /**
+   * The system kind the stand states (`SAP_SYSTEM_TYPE`, unless the case
+   * already stated one): required, and never read from the credential.
+   */
+  kind: 'onprem' | 'cloud';
   /** `basic` (the default) or a browser login (`jwt` / `authorization_code`). */
   auth?: 'basic' | 'jwt';
   /** The factory's `loginTimeoutMs`. */
@@ -339,10 +344,10 @@ export interface Stand {
   close(): Promise<void>;
 }
 
-export async function stand(options: StandOptions = {}): Promise<Stand> {
-  // The system kind is required: a jwt stand is a cloud stand-in, a basic
-  // one on-premise — as the cases were written for.
-  stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem');
+export async function stand(options: StandOptions): Promise<Stand> {
+  // The system kind is required, and stated by the case: the credential is
+  // not the system kind.
+  stateSystemKind(options.kind);
   process.env.NO_PROXY = '127.0.0.1,localhost';
   process.env.no_proxy = '127.0.0.1,localhost';
   const adt = await adtStandIn();
@@ -469,13 +474,14 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     },
   );
 
+  // stderr captured by a plain replacement of its write, the same under
+  // Jest and node:test; `close()` puts the original back.
   const stderr: string[] = [];
-  const spy = jest
-    .spyOn(process.stderr, 'write')
-    .mockImplementation((chunk: unknown) => {
-      stderr.push(String(chunk));
-      return true;
-    });
+  const writeStderr = process.stderr.write;
+  process.stderr.write = (chunk: unknown): boolean => {
+    stderr.push(String(chunk));
+    return true;
+  };
 
   resetProcessLatchForTests();
   const processLike = Object.assign(new EventEmitter(), {
@@ -563,7 +569,7 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
       await factory
         .settle({ signal: AbortSignal.abort() })
         .catch(() => undefined);
-      spy.mockRestore();
+      process.stderr.write = writeStderr;
       await adt.close();
       await tokens.close();
       // A given env file lives elsewhere: only this stand's own directory goes.

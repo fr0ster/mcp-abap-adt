@@ -22,8 +22,12 @@ jest.mock('../../lib/clients', () => ({
 
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
-import { handleGetObjectVersionDiff } from '../../handlers/common/readonly/handleGetObjectVersionDiff';
+import {
+  TOOL_DEFINITION as GET_OBJECT_VERSION_DIFF,
+  handleGetObjectVersionDiff,
+} from '../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
+import { defineTool } from '../../lib/handlers/interfaces';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
@@ -96,13 +100,18 @@ describe('version diff tools (#30)', () => {
     expect(data.identical).toBe(true);
   });
 
-  it('returns an error for an unknown object_type', async () => {
-    const result = await handleGetObjectVersionDiff(ctx, {
-      object_type: 'nonsense',
-      content_uri_from: '/x?version=00001',
-      content_uri_to: '/x?version=00002',
-    });
-    expect(result.isError).toBe(true);
+  it('refuses an unknown object_type at the schema', async () => {
+    const refused = expect(
+      defineTool(GET_OBJECT_VERSION_DIFF, handleGetObjectVersionDiff).call(
+        ctx,
+        {
+          object_type: 'nonsense',
+          content_uri_from: '/x?version=00001',
+          content_uri_to: '/x?version=00002',
+        },
+      ),
+    ).rejects.toThrow('Invalid arguments for tool GetObjectVersionDiff: ');
+    await refused;
     expect(mockClassGetVersionSource).not.toHaveBeenCalled();
   });
 

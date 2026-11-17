@@ -16,10 +16,8 @@ import { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import { runWithRequestContext } from '../../lib/requestContext';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
+import { setSystemContext } from '../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -27,7 +25,7 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 const conn = {} as IAbapConnection;
 
-function lastOptions(): { masterLanguage?: string } | undefined {
+function lastOptions(): ConstructorParameters<typeof AdtClientOnPrem>[2] {
   const calls = jest.mocked(AdtClientOnPrem).mock.calls;
   return calls.at(-1)?.[2];
 }

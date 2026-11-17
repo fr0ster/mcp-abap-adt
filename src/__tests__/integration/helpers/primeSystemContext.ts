@@ -1,9 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
-import {
-  setSystemContext,
-  systemContextFromConfiguration,
-} from '../../../lib/systemContext';
+import { systemContextFromConfiguration } from '../../../lib/systemContext';
+import { setSystemContext } from '../../helpers/processSystemContext';
 
 /**
  * Fills the process system context for a test that calls handlers or

@@ -1,3 +1,5 @@
+import * as z from 'zod';
+
 /**
  * On stdio the user is fixed for the process. The
  * broker answers the same provider for the process's life — a renewed token
@@ -71,9 +73,9 @@ const registry = new CompositeHandlersRegistry([
         toolDefinition: {
           name: 'WhichConnection',
           description: 'answers its connection',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema: z.object({}),
         } as never,
-        handler: (async (
+        call: (async (
           context: { connection: { tag: string } },
           _args: unknown,
         ) => ({

@@ -1,0 +1,32 @@
+{
+ "case": "read-package-quick-search-mask",
+ "step": 1,
+ "stepTag": "quick-search",
+ "capturedAt": "2026-11-07",
+ "request": {
+  "method": "GET",
+  "url": "/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=TEST_MCP_SHR_PKG*&maxResults=1000&objectType=DEVC",
+  "params": null,
+  "effectiveUrl": "/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=TEST_MCP_SHR_PKG*&maxResults=1000&objectType=DEVC",
+  "headers": {
+   "Accept": "application/xml"
+  },
+  "headersNote": "Caller-supplied headers only. The connection adds sap-adt-connection-id, the session headers, CSRF and Authorization below this interception point."
+ },
+ "response": {
+  "status": 200,
+  "statusText": "OK",
+  "headers": {
+   "content-type": "application/xml; charset=utf-8",
+   "content-length": "361",
+   "sap-authenticated": "true",
+   "sap-adt-saplb": "REDACTED",
+   "sap-cache-control": "+0",
+   "sap-isc-uagent": "0",
+   "x-sap-adt-profiling": "server-time=81079",
+   "sap-server": "true",
+   "sap-perf-fesrec": "85004.000000"
+  },
+  "bodyFile": "read-package-quick-search-mask--01-quick-search.body.xml"
+ }
+}

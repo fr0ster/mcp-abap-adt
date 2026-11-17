@@ -20,12 +20,15 @@
  * Plain code over the arguments, no regular expression.
  */
 
+import { isJsonObject, type JsonValue, jsonAt } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
+import { thrownAs } from '../thrownValue';
 import type { TlsConfig } from './IServerConfig.js';
+import type { YamlConfig } from './yamlConfig.js';
 
 /** A start the parameters refuse, in words that name parameters only. */
 export class ParameterRefusal extends Error {
@@ -73,9 +76,22 @@ export interface Parameter {
   /** An enum's words. */
   readonly values?: readonly string[];
   /** A custom row's reader: the typed value, or a throw in its own words. */
-  readonly parse?: (raw: unknown, name: string) => ParameterValue;
+  readonly parse?: (raw: JsonValue, name: string) => ParameterValue;
   /** The value when no form gives one; also the template's value. */
   readonly default?: ParameterValue;
+  /**
+   * A flag the `--conf` template leaves unstated (an empty value) instead of
+   * writing `false`: one whose stated `false` is refused in some starts
+   * (`--restore-session` without `--deferred-logon`), so a template written
+   * and used as it is never states it.
+   */
+  readonly unstatedInTemplate?: true;
+  /**
+   * A `port` that may be 0: a listener's port, where 0 is a free port the
+   * system chooses (announced by the listener). Absent: 1-65535 only — a
+   * port someone else must know in advance, such as a login callback.
+   */
+  readonly ephemeral?: true;
   /** The value placeholder of the help (`=<minutes>`); default by kind. */
   readonly valueHint?: string;
   /** The help section the row is listed under. */
@@ -111,7 +127,7 @@ export interface RemovedParameter {
    * the form alone; a removed `--exposition` names the binary its words ask
    * for.
    */
-  readonly words: (form: string, value?: unknown) => string;
+  readonly words: (form: string, value?: JsonValue) => string;
 }
 
 export interface ParameterTable {
@@ -135,38 +151,39 @@ function argName(arg: string): string {
 
 /** The value at a dotted YAML path, or undefined. Plain code. */
 function yamlAt(
-  yaml: Record<string, unknown> | null | undefined,
+  yaml: YamlConfig | null | undefined,
   dotted: string | undefined,
-): unknown {
+): JsonValue | undefined {
   if (!yaml || dotted === undefined) return undefined;
-  let node: unknown = yaml;
-  for (const segment of dotted.split('.')) {
-    if (node === null || typeof node !== 'object' || Array.isArray(node)) {
-      return undefined;
-    }
-    node = (node as Record<string, unknown>)[segment];
-  }
-  return node;
+  return jsonAt(yaml, ...dotted.split('.'));
 }
+
+/**
+ * The program's arguments, by contract: what a reader of a removed
+ * parameter is handed (`process.argv.slice(2)`, by the embedder). A value
+ * read from it is the program's input, like one read from the environment.
+ */
+interface ProgramArguments extends ReadonlyArray<string> {}
 
 interface RemovedHit {
   readonly form: string;
-  readonly value: unknown;
+  /** The value given: the program's input (CLI, environment, YAML). */
+  readonly value: JsonValue | undefined;
   readonly removed: RemovedParameter;
 }
 
 function removedYamlHits(
   table: ParameterTable,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): RemovedHit[] {
-  if (!yaml || typeof yaml !== 'object') return [];
+  if (!yaml) return [];
   const found: RemovedHit[] = [];
   for (const removed of table.removed) {
     for (const key of removed.yaml ?? []) {
       if (key in yaml) {
         found.push({
           form: `${key} (config file)`,
-          value: (yaml as Record<string, unknown>)[key],
+          value: yaml[key],
           removed,
         });
       }
@@ -178,9 +195,9 @@ function removedYamlHits(
 /** The first form of a removed parameter, as the user used it: CLI, then env, then YAML. */
 function removedHit(
   table: ParameterTable,
-  argv: readonly string[],
+  argv: ProgramArguments,
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): RemovedHit | undefined {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -218,7 +235,7 @@ export function refuseRemovedParameters(
   table: ParameterTable,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): void {
   const hit = removedHit(table, argv, env, yaml);
   if (hit) throw new ParameterRefusal(hit.removed.words(hit.form, hit.value));
@@ -232,7 +249,7 @@ function nameIn(p: Parameter, source: Source, cliName?: string): string {
 
 function valueHint(p: Parameter): string {
   if (p.valueHint !== undefined) return p.valueHint;
-  if (p.kind === 'flag') return '';
+  if (p.kind === 'flag') return '[=true|false]';
   if (p.kind === 'port') return '=<port>';
   if (p.kind === 'enum') return `=<${p.values?.join('|')}>`;
   if (p.kind === 'list') return '=<a,b>';
@@ -256,12 +273,45 @@ function splitList(text: string): string[] {
 }
 
 /** Convert one raw value to its typed form, or say why not. */
+/**
+ * What a config file value is when it is not one value: `a list`, `a
+ * mapping`; `undefined` for a string, a number or a boolean.
+ */
+function compoundShapeOf(raw: JsonValue): string | undefined {
+  if (Array.isArray(raw)) return 'a list';
+  return raw !== null && typeof raw === 'object' ? 'a mapping' : undefined;
+}
+
 function convert(
   p: Parameter,
   name: string,
-  raw: unknown,
+  raw: JsonValue | undefined,
 ): ParameterValue | undefined {
   if (raw === undefined || raw === null) return undefined;
+
+  // Only a config file gives a list or a mapping: where the row takes one
+  // value (a list row: a list of values), it is refused, naming the key —
+  // never read through its text (`[object Object]`, `a,b`).
+  const shape = compoundShapeOf(raw);
+  if (p.kind === 'list') {
+    if (shape === 'a mapping') {
+      throw new ParameterRefusal(
+        `Invalid ${name}: a mapping where a list is expected`,
+      );
+    }
+    if (
+      Array.isArray(raw) &&
+      raw.some((item) => item !== null && typeof item === 'object')
+    ) {
+      throw new ParameterRefusal(
+        `Invalid ${name}: every item of the list is one value, not a list or a mapping`,
+      );
+    }
+  } else if (shape !== undefined && p.kind !== 'custom' && p.kind !== 'flag') {
+    throw new ParameterRefusal(
+      `Invalid ${name}: ${shape} where one value is expected`,
+    );
+  }
 
   if (p.kind === 'custom') {
     if (typeof raw === 'string' && raw.trim() === '') return undefined;
@@ -270,8 +320,9 @@ function convert(
     } catch (error) {
       // A row's reader words its refusal as a ParameterRefusal; any other
       // throw gets fixed words — its message never reaches the refusal.
+      const refusal = thrownAs(error, ParameterRefusal);
       throw new ParameterRefusal(
-        error instanceof ParameterRefusal ? error.words : `Invalid ${name}`,
+        refusal !== undefined ? refusal.words : `Invalid ${name}`,
       );
     }
   }
@@ -303,9 +354,12 @@ function convert(
 
   if (p.kind === 'port') {
     const port = isDigits(text) ? Number.parseInt(text, 10) : Number.NaN;
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    const lowest = p.ephemeral === true ? 0 : 1;
+    if (!Number.isInteger(port) || port < lowest || port > 65535) {
       throw new ParameterRefusal(
-        `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,
+        p.ephemeral === true
+          ? `Invalid ${name}: "${text}". Must be a port between 0 and 65535 (0: one the system chooses)`
+          : `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,
       );
     }
     return port;
@@ -333,8 +387,18 @@ function readCli(
     for (let i = 0; i < argv.length; i++) {
       const arg = argv[i];
       if (arg === name) {
-        if (p.kind === 'flag') return { name, raw: true };
         const next = argv[i + 1];
+        if (p.kind === 'flag') {
+          // A flag's value follows `=`: a separate `true` / `false` after a
+          // bare flag is refused, never read as its value nor left behind.
+          const word = next?.trim().toLowerCase();
+          if (next !== undefined && (word === 'true' || word === 'false')) {
+            throw new ParameterRefusal(
+              `${name} ${next}: a flag's value follows "=" — write ${name}=${word}`,
+            );
+          }
+          return { name, raw: true };
+        }
         if (next === undefined || next.startsWith('-')) {
           throw new ParameterRefusal(
             `${name} needs a value: ${name}${valueHint(p)}`,
@@ -355,19 +419,22 @@ function readRow(
   p: Parameter,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): { value: ParameterValue; source: string } | undefined {
   const cli = readCli(p, argv);
-  const sources: [Source, unknown, string | undefined][] = [
-    ['cli', cli?.raw, cli?.name],
-    ['env', p.env === undefined ? undefined : env[p.env], undefined],
-    ['yaml', yamlAt(yaml, p.yaml), undefined],
-  ];
-  for (const [source, raw, cliName] of sources) {
-    const name = nameIn(p, source, cliName);
-    const value = convert(p, name, raw);
-    if (value !== undefined) return { value, source: name };
-  }
+  const cliName = nameIn(p, 'cli', cli?.name);
+  const fromCli = convert(p, cliName, cli?.raw);
+  if (fromCli !== undefined) return { value: fromCli, source: cliName };
+  const envName = nameIn(p, 'env');
+  const fromEnv = convert(
+    p,
+    envName,
+    p.env === undefined ? undefined : env[p.env],
+  );
+  if (fromEnv !== undefined) return { value: fromEnv, source: envName };
+  const yamlName = nameIn(p, 'yaml');
+  const fromYaml = convert(p, yamlName, yamlAt(yaml, p.yaml));
+  if (fromYaml !== undefined) return { value: fromYaml, source: yamlName };
   return undefined;
 }
 
@@ -380,7 +447,7 @@ export function readParameters(
   table: ParameterTable,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): Record<string, ParameterValue> {
   refuseRemovedParameters(table, argv, env, yaml);
   const out: Record<string, ParameterValue> = {};
@@ -390,6 +457,134 @@ export function readParameters(
     else if (p.default !== undefined) out[p.key] = p.default;
   }
   return out;
+}
+
+/** The edit distance of two names, by plain code (two rows of the table). */
+function editDistance(a: string, b: string): number {
+  let previous: number[] = [];
+  for (let j = 0; j <= b.length; j += 1) previous.push(j);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current: number[] = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current.push(
+        Math.min(
+          (previous[j] ?? 0) + 1,
+          (current[j - 1] ?? 0) + 1,
+          (previous[j - 1] ?? 0) + cost,
+        ),
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length] ?? 0;
+}
+
+/**
+ * The known name `name` may mean: the same once `_` reads `-` and case is
+ * folded, else the closest within two edits. Plain string comparison.
+ */
+function closestName(
+  name: string,
+  known: readonly string[],
+): string | undefined {
+  const folded = (text: string) => text.toLowerCase().split('_').join('-');
+  const same = known.find((each) => folded(each) === folded(name));
+  if (same !== undefined) return same;
+  let best: string | undefined;
+  let bestDistance = 3;
+  for (const each of known) {
+    const distance = editDistance(folded(name), folded(each));
+    if (distance < bestDistance) {
+      best = each;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/** Whether a CLI name is a removed parameter's of the table. */
+function isRemovedCli(table: ParameterTable, name: string): boolean {
+  return table.removed.some(
+    (removed) =>
+      (removed.cli?.includes(name) ?? false) ||
+      (removed.cliPrefixes?.some((prefix) => name.startsWith(prefix)) ?? false),
+  );
+}
+
+/**
+ * Every argument of a start must be read: each is a row's CLI name (or its
+ * `=` form) or a removed parameter's (whose own words refuse it later); a
+ * row's two-word value (`--port 3000`) is its value. Anything else — an
+ * unknown name, a positional, a single-dash word other than `-h` / `-v`,
+ * which are answered before — is refused naming it, and a row stated twice
+ * (in any of its names) is refused naming both forms. Called with a binary's
+ * whole table, before its rows are read.
+ */
+export function refuseUnreadArguments(
+  table: ParameterTable,
+  argv: readonly string[],
+): void {
+  // `--conf` is read for every table (`readConfigFile`), listed or not.
+  const rows = table.rows.includes(CONF_ROW)
+    ? table.rows
+    : [CONF_ROW, ...table.rows];
+  const seen = new Map<Parameter, string>();
+  const known = rows.flatMap(cliNames);
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index] ?? '';
+    if (!arg.startsWith('-')) {
+      throw new ParameterRefusal(
+        `"${arg}" is not an argument of ${table.program}: every argument is --name or --name=<value>`,
+      );
+    }
+    if (
+      arg === '-h' ||
+      arg === '-v' ||
+      arg === '--help' ||
+      arg === '--version'
+    ) {
+      continue;
+    }
+    const name = argName(arg);
+    const row = rows.find((each) => cliNames(each).includes(name));
+    const twoWord = arg.length === name.length;
+    const next = argv[index + 1];
+    const takesNext = twoWord && next !== undefined && !next.startsWith('-');
+    if (row === undefined) {
+      if (name.startsWith('--') && isRemovedCli(table, name)) {
+        if (takesNext) index += 1;
+        continue;
+      }
+      const near = name.startsWith('--') ? closestName(name, known) : undefined;
+      throw new ParameterRefusal(
+        `${name} is not an argument of ${table.program}${near === undefined ? '' : `; did you mean ${near}?`}`,
+      );
+    }
+    const word = next?.trim().toLowerCase();
+    if (
+      row.kind === 'flag' &&
+      twoWord &&
+      next !== undefined &&
+      (word === 'true' || word === 'false')
+    ) {
+      throw new ParameterRefusal(
+        `${name} ${next}: a flag's value follows "=" — write ${name}=${word}`,
+      );
+    }
+    let form = arg;
+    if (row.kind !== 'flag' && takesNext) {
+      form = `${arg} ${next}`;
+      index += 1;
+    }
+    const earlier = seen.get(row);
+    if (earlier !== undefined) {
+      throw new ParameterRefusal(
+        `${row.cli} is given twice (${earlier}, ${form}): state it once`,
+      );
+    }
+    seen.set(row, form);
+  }
 }
 
 /**
@@ -402,7 +597,7 @@ export function parameterSource(
   key: string,
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  yaml?: Record<string, unknown> | null,
+  yaml?: YamlConfig | null,
 ): string | undefined {
   const p = table.rows.find((row) => row.key === key);
   if (!p) return undefined;
@@ -424,13 +619,13 @@ const SECRET_KEY_FRAGMENTS = [
 ] as const;
 
 /** Every secret- or session-looking key at any depth, by its dotted path. Never a value. */
-export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
+export function findSecretYamlKeys(value: JsonValue, prefix = ''): string[] {
   if (value === null || typeof value !== 'object') return [];
   const found: string[] = [];
-  const entries: [string, unknown][] = Array.isArray(value)
+  const members: [string, JsonValue][] = Array.isArray(value)
     ? value.map((v, i) => [String(i), v])
-    : Object.entries(value as Record<string, unknown>);
-  for (const [key, inner] of entries) {
+    : Object.entries(value);
+  for (const [key, inner] of members) {
     const path = prefix ? `${prefix}.${key}` : key;
     const lower = key.toLowerCase();
     if (
@@ -444,10 +639,92 @@ export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
   return found;
 }
 
+/**
+ * Every key of a config file that is no row's: at each level a key must be a
+ * row's YAML key or the section of one (`http` of `http.port`); a top-level
+ * key of a removed parameter is refused in its own words, not here. Each is
+ * named by its dotted path, with the known key of its level it may mean.
+ */
+function unknownYamlKeys(table: ParameterTable, yaml: YamlConfig): string[] {
+  const paths = table.rows.flatMap((p) =>
+    p.yaml === undefined ? [] : [p.yaml.split('.')],
+  );
+  const removed = new Set(table.removed.flatMap((each) => each.yaml ?? []));
+  const found: string[] = [];
+  const walk = (value: JsonValue, prefix: readonly string[]) => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return;
+    }
+    const under = paths.filter((segments) =>
+      prefix.every((segment, i) => segments[i] === segment),
+    );
+    const known = [
+      ...new Set(
+        under.flatMap((segments) => {
+          const next = segments[prefix.length];
+          return next === undefined ? [] : [next];
+        }),
+      ),
+    ];
+    for (const [key, inner] of Object.entries(value)) {
+      if (prefix.length === 0 && removed.has(key)) continue;
+      const path = [...prefix, key];
+      if (!known.includes(key)) {
+        const near = closestName(key, known);
+        found.push(
+          `Config file key "${path.join('.')}" is not a parameter of this binary${near === undefined ? '' : `; did you mean "${[...prefix, near].join('.')}"?`}`,
+        );
+        continue;
+      }
+      const leaf = under.some(
+        (segments) =>
+          segments.length === path.length &&
+          segments.every((segment, i) => segment === path[i]),
+      );
+      if (!leaf) walk(inner, path);
+    }
+  };
+  walk(yaml, []);
+  return found;
+}
+
+/**
+ * Every section of a config file that is not a mapping of its keys: at each
+ * level a row's YAML key passes through (`http` and `http.tls` of
+ * `http.tls.cert`), the value must be a mapping, YAML null or an empty
+ * value (not given). A list or a value there is refused, naming the key and
+ * the keys it holds — never skipped, so nothing stated is ignored. The keys
+ * under a refused section are not read (and not refused again).
+ */
+function sectionShapeErrors(table: ParameterTable, yaml: YamlConfig): string[] {
+  const sections = new Map<string, Set<string>>();
+  for (const p of table.rows) {
+    if (p.yaml === undefined) continue;
+    const segments = p.yaml.split('.');
+    for (let depth = 1; depth < segments.length; depth += 1) {
+      const section = segments.slice(0, depth).join('.');
+      const held = sections.get(section) ?? new Set<string>();
+      held.add(segments[depth] ?? '');
+      sections.set(section, held);
+    }
+  }
+  const found: string[] = [];
+  for (const [section, held] of sections) {
+    const value = jsonAt(yaml, ...section.split('.'));
+    if (value === undefined || value === null || isJsonObject(value)) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    const shape = Array.isArray(value) ? 'a list' : 'a value';
+    found.push(
+      `Config file key "${section}" is ${shape}: it must be a mapping of its keys (${[...held].join(', ')})`,
+    );
+  }
+  return found;
+}
+
 /** Every refusal of a YAML file against the table: removed keys, secrets, values. */
 export function validateYamlParameters(
   table: ParameterTable,
-  yaml: Record<string, unknown>,
+  yaml: YamlConfig,
 ): string[] {
   const errors: string[] = removedYamlHits(table, yaml).map(
     ({ form, value, removed }) => removed.words(form, value),
@@ -458,14 +735,15 @@ export function validateYamlParameters(
         `Config file key "${key}" looks like a secret or a session value. YAML is configuration only: put secrets and the session in .env or the environment`,
     ),
   );
+  errors.push(...sectionShapeErrors(table, yaml));
+  errors.push(...unknownYamlKeys(table, yaml));
   for (const p of table.rows) {
     if (p.yaml === undefined) continue;
     try {
       convert(p, nameIn(p, 'yaml'), yamlAt(yaml, p.yaml));
     } catch (error) {
-      errors.push(
-        error instanceof ParameterRefusal ? error.words : `Invalid ${p.yaml}`,
-      );
+      const refusal = thrownAs(error, ParameterRefusal);
+      errors.push(refusal !== undefined ? refusal.words : `Invalid ${p.yaml}`);
     }
   }
   return errors;
@@ -550,9 +828,11 @@ ${options.description}
   --version, -v                    Show the version
 
   Each parameter has a CLI form, and an environment and a YAML form where listed; the
-  CLI wins over the environment, which wins over the YAML file. An invalid value is
+  CLI wins over the environment, which wins over the YAML file. A flag is --flag (true)
+  or --flag=true|false; --flag false, in two words, is refused. An invalid value is
   refused at startup, and so is a parameter of another binary, naming the binary that
-  serves it. Secrets and the session live in .env or the environment, never in YAML:
+  serves it, an argument or a YAML key no row of this binary reads, and a parameter
+  given twice. Secrets and the session live in .env or the environment, never in YAML:
   the server refuses a YAML key that looks like one.
 
 ${parametersHelp(table)}
@@ -574,7 +854,11 @@ interface TemplateNode {
 }
 
 function newNode(): TemplateNode {
-  return { leaves: new Map(), children: new Map(), order: [] };
+  return {
+    leaves: new Map<string, Parameter>(),
+    children: new Map<string, TemplateNode>(),
+    order: [],
+  };
 }
 
 function renderNode(node: TemplateNode, depth: number): string {
@@ -590,7 +874,7 @@ function renderNode(node: TemplateNode, depth: number): string {
     if (!p) continue;
     const values = p.values ? ` (${p.values.join(' | ')})` : '';
     const value =
-      p.kind === 'flag'
+      p.kind === 'flag' && p.unstatedInTemplate !== true
         ? templateValue(p.default ?? false)
         : templateValue(p.default);
     const forms = [p.cli, ...(p.cliAliases ?? []), ...(p.env ? [p.env] : [])];
@@ -670,8 +954,9 @@ export const STATE_IDLE_ROW: Parameter = {
     } catch (error) {
       // main's own reader words the refusal (it quotes only the user's value);
       // the row hands those words on as its refusal, as main prints them.
+      const failure = thrownAs(error, Error);
       throw new ParameterRefusal(
-        error instanceof Error ? error.message : `Invalid ${name}`,
+        failure !== undefined ? failure.message : `Invalid ${name}`,
       );
     }
   },
@@ -700,7 +985,32 @@ export const BATCH_KEEP_RAW_PARTS_ROW: Parameter = {
   kind: 'flag',
   default: false,
   section: 'BATCH MODE',
-  help: "Each answer of a batch (BatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
+  help: "Each answer of a batch (HandlerBatch answers, DebugBatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
+};
+
+export const ENABLE_DATA_TOOLS_CLI = '--enable-data-tools';
+export const ENABLE_DATA_TOOLS_ENV = 'MCP_ENABLE_DATA_TOOLS';
+export const ENABLE_DATA_TOOLS_YAML = 'enable-data-tools';
+
+/**
+ * `--enable-data-tools` / `MCP_ENABLE_DATA_TOOLS` / YAML `enable-data-tools`:
+ * whether the binary serves the tools that read business data —
+ * `GetSqlQuery` and `GetTableContents`, compact `HandlerGetData`. `true` or
+ * `false`, default `false`; an empty value or YAML null is not given (the
+ * next form decides, as for every row), and any other value is refused at
+ * startup. In every binary's table: on Streamable HTTP and SSE it is a start parameter of the
+ * server, never a request header. SAP API Policy FAQ v1.3 (June 2026), Q33,
+ * is the reason for the default; whether to turn it on is the customer's.
+ */
+export const ENABLE_DATA_TOOLS_ROW: Parameter = {
+  key: 'enableDataTools',
+  cli: ENABLE_DATA_TOOLS_CLI,
+  env: ENABLE_DATA_TOOLS_ENV,
+  yaml: ENABLE_DATA_TOOLS_YAML,
+  kind: 'flag',
+  default: false,
+  section: 'DATA TOOLS',
+  help: "Serves the tools that read business data: GetSqlQuery and GetTableContents (compact: HandlerGetData). true or false; off by default (an empty value counts as not given). SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems. Whether to turn this on is the customer's decision.",
 };
 
 /** The longest `--shutdown-timeout`: a day. */
@@ -710,7 +1020,13 @@ export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
  * `--shutdown-timeout`'s value: a whole number of seconds from 1 to 86 400,
  * read by plain code — ASCII digits only, as a string or a YAML number.
  */
-export function parseShutdownTimeout(raw: unknown, name: string): number {
+export function parseShutdownTimeout(raw: JsonValue, name: string): number {
+  const shape = compoundShapeOf(raw);
+  if (shape !== undefined) {
+    throw new ParameterRefusal(
+      `Invalid ${name}: ${shape} where a whole number of seconds is expected`,
+    );
+  }
   const text = typeof raw === 'string' ? raw.trim() : String(raw);
   let digits = text.length > 0;
   for (let i = 0; i < text.length; i += 1) {
@@ -789,18 +1105,23 @@ export function tlsRows(yamlPrefix: 'http' | 'sse'): readonly Parameter[] {
       kind: 'string',
       valueHint: '=<path>',
       section: 'TLS/HTTPS',
-      help: 'CA certificate file (PEM), optional',
+      help: 'Intermediate CA certificate(s) (PEM) the server sends with its own certificate, completing the chain clients verify. Not a trust store for clients: no client certificate is requested. A root CA given here is not sent. Only beside --tls-cert and --tls-key',
     },
   ];
+}
+
+/** A text parameter's value; any other kind is none. */
+function textValue(value: ParameterValue | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 /** The TLS configuration of the read values: cert and key together, or no TLS. */
 export function tlsConfigOf(
   values: Record<string, ParameterValue>,
 ): TlsConfig | undefined {
-  const cert = values.tlsCert as string | undefined;
-  const key = values.tlsKey as string | undefined;
-  const ca = values.tlsCa as string | undefined;
+  const cert = textValue(values.tlsCert);
+  const key = textValue(values.tlsKey);
+  const ca = textValue(values.tlsCa);
   if (cert === undefined && key === undefined && ca === undefined) {
     return undefined;
   }
@@ -886,11 +1207,15 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     '--allow-destination-header',
     '--unsafe',
     '--connection-type',
+    '--ashost',
+    '--sysnr',
     '--mshost',
     '--msserv',
     '--sysid',
     '--group',
     '--saprouter',
+    '--client',
+    '--language',
     '--login-timeout',
     '--renewal',
     '--auth-debug',
@@ -904,11 +1229,15 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     'allow-destination-header',
     'unsafe',
     'connection-type',
+    'ashost',
+    'sysnr',
     'mshost',
     'msserv',
     'sysid',
     'group',
     'saprouter',
+    'client',
+    'language',
     'browser',
     'browser-program',
     'browser-auth-port',

@@ -14,7 +14,12 @@ This module provides a flexible system for registering MCP tool handlers through
 ### Handler Groups
 
 Handlers are organized into logical groups:
-- **`ReadOnlyHandlersGroup`** - All read-only handlers (get operations)
+- **`ReadOnlyHandlersGroup`** - All read-only handlers (get operations), but the data tools
+- **`DataHandlersGroup`** - The data tools, `GetSqlQuery` and `GetTableContents`: opt-in. No other
+  group serves them; add this group only when serving them is the customer's decision (SAP API
+  Policy FAQ v1.3, June 2026, Q33, says ADT APIs are not intended for reading application tables,
+  exporting business data or running SQL against SAP systems). The compact form, `HandlerGetData`,
+  is `CompactDataHandlersGroup`'s (`@mcp-abap-adt/compact-readonly-entries`)
 - Additional groups can be created (HighLevel, LowLevel, System, Search, etc.)
 
 ## Usage Examples
@@ -75,10 +80,10 @@ the error names each group and the variant it states (`none` for a group that st
 by any (the definitions as they are); one group stating a variant beside another stating none is
 refused.
 
-`registerTool(server, name, definition, handler)` registers a tool of one of the registry's groups
-through that group's path, as `registerAllTools` registers it: the handler called in its form, an
-args-only one reading the group's context, on the stated variant. A name no group of the registry
-holds is refused at registration: its call would have no context to run on.
+`registerTool(server, entry)` registers a tool of one of the registry's groups through that
+group's path, as `registerAllTools` registers it: the entry's call with the group's context, on
+the stated variant. A tool no group of the registry holds (by its definition's name) is refused at
+registration: its call would have no context to run on.
 
 ### Selective Handler Registration
 
@@ -128,35 +133,35 @@ console.log(registry.getRegisteredTools()); // Array of tool names
 ### Creating Custom Handler Groups
 
 ```typescript
+import * as z from "zod";
 import { BaseHandlerGroup } from "./handlers/base/BaseHandlerGroup.js";
-import { HandlerEntry } from "./handlers/interfaces.js";
+import { defineTool, type HandlerEntry } from "./handlers/interfaces.js";
 
 export class CustomHandlersGroup extends BaseHandlerGroup {
   protected groupName = "CustomHandlers";
 
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: {
+      defineTool(
+        {
           name: "MyCustomTool",
           description: "Description of my custom tool",
-          inputSchema: {
-            type: "object",
-            properties: {
-              param1: { type: "string" },
-            },
-            required: ["param1"],
-          },
+          inputSchema: z.object({
+            param1: z.string().describe("The first parameter."),
+          }),
         },
-        handler: async (args: any) => {
-          // Handler implementation
-          return { content: [{ type: "text", text: "Result" }] };
+        // context: the call's HandlerContext; args: { param1: string }
+        async (context, args) => {
+          return { content: [{ type: "text", text: `Result for ${args.param1}` }] };
         },
-      },
+      ),
     ];
   }
 }
 ```
+
+`defineTool` types the handler by the schema; the entry's `call(context, args)` parses the
+arguments with it before the handler runs, and refuses, naming each issue, what does not parse.
 
 ## Benefits
 

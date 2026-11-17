@@ -4,7 +4,6 @@
  * broker, no store, no login. The tools are the `ToolSet` the command passes.
  */
 
-import type { EventEmitter } from 'node:events';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import {
   answerVersionOrHelp,
@@ -14,12 +13,19 @@ import {
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
+import {
+  skipSapAnswers,
+  substringLineMatch,
+} from '@mcp-abap-adt/lib/embeddable';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
+import {
+  type ShutdownProcess,
+  stderrStateLogger,
+} from '@mcp-abap-adt/lib/state';
 import {
   fullToolSet,
-  registryOf,
+  restrictedStart,
   type ToolSet,
 } from '@mcp-abap-adt/lib/tool-set';
 import { listenerSystemTypeRequiredWords } from '@mcp-abap-adt/responsible-rules';
@@ -40,7 +46,7 @@ import { StreamableHttpServer } from './StreamableHttpServer.js';
  * `mcp-abap-adt-compact-http-ro` the compact sets.
  */
 export interface HttpLauncherOptions {
-  /** The tools served: fixed by the command, never by a flag. */
+  /** The tools served: fixed by the command, but for the data tools (`--enable-data-tools`). */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -55,7 +61,7 @@ export interface HttpLauncherDeps {
   stderr: (line: string) => void;
   exit: (code: number) => void;
   /** Where the shutdown listens: `process` in the program. */
-  processLike: EventEmitter;
+  processLike: ShutdownProcess;
 }
 
 const HELP_SECTIONS = `
@@ -76,8 +82,9 @@ CREDENTIALS (each request's headers; nothing is stored, shared or cached):
     x-sap-debug-breakpoint-conflict  replace (default) or refuse-if-held: whether a take-over
                                    of the debugger, and every later change of its breakpoints,
                                    first asks if another debugger listens for the same SAP user
-    Then SAP_RESPONSIBLE, SAP_MASTER_SYSTEM, SAP_DEBUG_TERMINAL_ID, SAP_DEBUG_IDE_ID,
-    SAP_DEBUG_BREAKPOINT_CONFLICT of the environment; with x-sap-login, the login is the responsible when none is stated.
+    From the headers only: SAP_RESPONSIBLE, SAP_MASTER_SYSTEM and SAP_DEBUG_* of the
+    process environment are not read. With x-sap-login, the login is the responsible
+    when none is stated.
 
   Held state (a long session, a lock, a batch, a debug session) is reached again
   with its state_handle, on the instance that holds it: send it as the
@@ -159,10 +166,24 @@ export async function launch(
     deps.exit(1);
     return undefined;
   }
-  // The connector and the tool filter read the system kind from the
-  // environment (`resolveSystemKind`).
-  process.env.SAP_SYSTEM_TYPE = config.systemType;
-  const server = new StreamableHttpServer(registryOf(options.toolSet, 'http'), {
+  // The access restrictions: the denied actions applied to the registry,
+  // one strategy for every instance, and the start line, once per process.
+  const restricted = restrictedStart(
+    options.toolSet,
+    'http',
+    // The data tools only when the start parameters turn them on; no
+    // request header does.
+    { dataTools: config.enableDataTools === true },
+    config.accessRestrictions,
+  );
+  deps.stderr(restricted.startLine);
+  const server = new StreamableHttpServer(restricted.registry, {
+    // The kind resolved here, passed explicitly: nothing is written into
+    // the process environment.
+    systemType: config.systemType,
+    ...(restricted.accessChecks !== undefined && {
+      accessChecks: restricted.accessChecks,
+    }),
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
     // Batch mode: one InstanceBatch per pooled instance.
@@ -171,7 +192,8 @@ export async function launch(
     stateLogger: stderrStateLogger,
     host: config.host,
     port: config.port,
-    enableJsonResponse: config.httpJsonResponse || undefined,
+    // As stated: `false` gives SSE streams; absent, the server's default.
+    enableJsonResponse: config.httpJsonResponse,
     path: config.httpPath,
     logger: noopLogger,
     tls: config.tls,
@@ -180,13 +202,15 @@ export async function launch(
     enableDnsRebindingProtection: config.enableDnsRebindingProtection,
     // No runtime session file and no leftover-session tool: one server holds
     // the sessions of many users, so they are stdio's only.
-    // Background runs of the run tools, kept in this process's memory
-    // and handed to every instance; they end with the process.
-    // Only where the set serves them: a -ro command has none, so a
-    // run's `background: true` is refused.
+    // Background runs of the long reads (and, in the write sets, of the
+    // run tools), kept in this process's memory and handed to every
+    // instance; they end with the process. Every set serves them.
     ...(options.toolSet.backgroundRuns && {
       backgroundRuns: new InMemoryBackgroundRuns(),
     }),
+    // SearchSource's strategies: the shipped ones (DO22, DO24).
+    sapAnswerStrategy: skipSapAnswers,
+    lineMatchStrategy: substringLineMatch,
   });
   installTransportShutdown({
     begin: () => server.beginShutdown(),

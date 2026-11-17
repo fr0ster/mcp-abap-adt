@@ -1,0 +1,22 @@
+{
+  "expect": "served-mismatch",
+  "listed": {
+    "DeleteThing": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt",
+          "legacy mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ],
+    "GetThing": [
+      {
+        "listedBy": [
+          "onprem mcp-abap-adt"
+        ],
+        "value": {}
+      }
+    ]
+  }
+}

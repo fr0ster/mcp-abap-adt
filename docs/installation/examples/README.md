@@ -57,6 +57,7 @@ A `.env` for basic authentication:
 
 ```env
 SAP_URL=https://your-sap-system.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=<your ABAP user>
@@ -106,14 +107,16 @@ them from the `.env`. On Windows the SDK's `lib` directory must be on `PATH` whe
 ```
 
 A `PATH` in the `env` block replaces the inherited one, so keep the rest of it (Node.js among it) in the
-value. If the system number cannot be derived from the `SAP_URL` port (`80NN` → `NN`), add
-`"SAP_SYSNR": "<NN>"` to the same block.
+value. The RFC address, the client and the language belong in the destination's `.env` (below);
+the `env` block carries process settings only.
 
 The `.env` for SNC (no user, no password):
 
 ```env
-SAP_URL=http://your-sap-system.example:8000
+SAP_ASHOST=your-application-server.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
@@ -122,10 +125,11 @@ SAP_SYSTEM_TYPE=onprem
 ```
 
 For RFC with a user and password, use `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`
-instead of the SNC keys. Through a message server and a logon group, add `SAP_MSHOST` with
-`SAP_MSSERV` or `SAP_SYSID`, and optionally `SAP_GROUP` and `SAP_SAPROUTER`: then the system number
-comes from neither the port nor `SAP_SYSNR`. The SDK, the install order, the SNC options and the
-message server: [RFC Setup](../RFC_SETUP.md).
+instead of the SNC keys. An RFC destination states its address and no `SAP_URL`: `SAP_ASHOST` and
+`SAP_SYSNR`, or through a message server and a logon group `SAP_MSHOST` with `SAP_MSSERV` or
+`SAP_SYSID` and `SAP_GROUP`; `SAP_CLIENT` and `SAP_LANGUAGE` are required, and `SAP_SAPROUTER` goes
+with either address. The SDK, the install order, the SNC options and the message server:
+[RFC Setup](../RFC_SETUP.md).
 
 ## 4. A company CA
 

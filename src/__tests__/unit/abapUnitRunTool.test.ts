@@ -14,7 +14,9 @@ import {
   handleRunAbapUnit,
   TOOL_DEFINITION,
 } from '../../handlers/unit_test/high/handleRunAbapUnit';
-import { corpusBody } from '../../lib/adtCorpus';
+import { defineTool } from '../../lib/handlers/interfaces';
+import { corpusBody } from '../helpers/adtCorpus';
+import { jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -54,7 +56,7 @@ async function run(args: Parameters<typeof handleRunAbapUnit>[1]) {
 describe('RunAbapUnit: a run by target, on the wire', () => {
   it('an object target goes as an osl:flatObjectSet with one osl:object, then polls and answers the result', async () => {
     const { connection, result } = await run({
-      target: { kind: 'object', name: 'zcl_x', type: 'clas/oc' },
+      target: { kind: 'object', name: 'zcl_x', type: 'CLAS/OC' },
     });
 
     expect(result.isError).toBe(false);
@@ -132,11 +134,6 @@ describe('RunAbapUnit: a run by target, on the wire', () => {
 describe('RunAbapUnit: refused before anything is sent', () => {
   it.each([
     [
-      'a type outside the run registry',
-      { kind: 'object', name: 'ZCL_X', type: 'DEVC' },
-      'target.type "DEVC" is not one of: CLAS, CLAS/OC',
-    ],
-    [
       'an object without its type',
       { kind: 'object', name: 'ZCL_X' },
       'target.type is required for kind object',
@@ -166,14 +163,7 @@ describe('RunAbapUnit: refused before anything is sent', () => {
       },
       'target.include_subpackages is read for kind package only',
     ],
-    [
-      'an unknown kind',
-      { kind: 'class', name: 'ZCL_X', type: 'CLAS' },
-      'target.kind "class" is not one of: object, package',
-    ],
-    ['no name', { kind: 'object', type: 'CLAS' }, 'target.name is required'],
-    ['no target', undefined, 'target is required'],
-  ])('%s', async (_case, target, words) => {
+  ] as const)('%s', async (_case, target, words) => {
     const connection = recordingConnection([STARTED, FINISHED, RESULT]);
 
     const result = await handleRunAbapUnit({ connection }, { target });
@@ -183,45 +173,72 @@ describe('RunAbapUnit: refused before anything is sent', () => {
     expect(textOf(result)).toContain('nothing was sent');
     expect(connection.requests).toEqual([]);
   });
-});
 
-it.each([
-  [
-    'scope',
-    { foreign_tests: 'yes' },
-    'scope.foreign_tests must be true or false',
-  ],
-  ['risk_level', { critical: 1 }, 'risk_level.critical must be true or false'],
-  ['duration', 'long', 'duration must be an object'],
-])(
-  'a %s flag that is not a boolean is refused before anything is sent',
-  async (field, value, words) => {
-    const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-
-    const result = await handleRunAbapUnit(
-      { connection },
+  /**
+   * The model's call names its target through the tool's schema: a value
+   * the schema does not take is refused there, naming the argument, before
+   * the handler runs, and nothing is sent.
+   */
+  it.each([
+    [
+      'a type outside the run registry',
+      { target: { kind: 'object', name: 'ZCL_X', type: 'DEVC' } },
+      'target.type',
+    ],
+    [
+      'an unknown kind',
+      { target: { kind: 'class', name: 'ZCL_X', type: 'CLAS' } },
+      'target.kind',
+    ],
+    ['no name', { target: { kind: 'object', type: 'CLAS' } }, 'target.name'],
+    ['no target', {}, 'target'],
+    [
+      'a scope flag that is not a boolean',
       {
         target: { kind: 'object', name: 'ZCL_X', type: 'CLAS' },
-        [field]: value,
+        scope: { foreign_tests: 'yes' },
       },
-    );
-
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain(words);
+      'scope.foreign_tests',
+    ],
+    [
+      'a risk level flag that is not a boolean',
+      {
+        target: { kind: 'object', name: 'ZCL_X', type: 'CLAS' },
+        risk_level: { critical: 1 },
+      },
+      'risk_level.critical',
+    ],
+    [
+      'a duration that is not an object',
+      {
+        target: { kind: 'object', name: 'ZCL_X', type: 'CLAS' },
+        duration: 'long',
+      },
+      'duration',
+    ],
+  ])('%s: refused at the schema, nothing sent', async (_case, given, path) => {
+    const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+    const refused = expect(
+      defineTool(TOOL_DEFINITION, handleRunAbapUnit).call(
+        { connection },
+        given,
+      ),
+    ).rejects.toThrow(`at ${path}`);
+    await refused;
     expect(connection.requests).toEqual([]);
-  },
-);
+  });
+});
 
 describe('RunAbapUnit: the schema', () => {
   it("target.type's enum is the keys of ABAP_UNIT_RUN_TYPES, in their order", () => {
     expect(
-      TOOL_DEFINITION.inputSchema.properties.target.properties.type.enum,
+      jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'target', 'type').enum,
     ).toEqual(Object.keys(ABAP_UNIT_RUN_TYPES));
   });
 
   it("target.kind's enum is the run target's kinds", () => {
     expect(
-      TOOL_DEFINITION.inputSchema.properties.target.properties.kind.enum,
+      jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'target', 'kind').enum,
     ).toEqual(['object', 'package']);
   });
 });

@@ -10,6 +10,7 @@
  * Each case runs the tool's own handler over a recording connection declared
  * the variant — real adt-clients code, no SAP.
  */
+
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
@@ -18,11 +19,9 @@ import { handleGetObjectStructure } from '../../../handlers/system/readonly/hand
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -64,8 +63,8 @@ const NOT_SERVED: readonly (readonly [string, Send])[] = [
     'GetObjectStructure.object_type',
     (context, value) =>
       handleGetObjectStructure(context, {
-        object_type: value,
-        object_name: 'ZV',
+        objecttype: value,
+        objectname: 'ZV',
       }),
   ],
   [

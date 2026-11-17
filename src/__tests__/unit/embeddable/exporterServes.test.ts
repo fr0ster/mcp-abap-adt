@@ -17,6 +17,7 @@ import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { SapEnvironment } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { countingConnection } from '../../helpers/batchHarness';
+import { listedJson } from '../../helpers/listedJson';
 
 const LEFT_OUT = [
   ...new BackgroundRunHandlersGroup(noConnectionContext()).getHandlers(),
@@ -27,7 +28,9 @@ const RUN_TOOLS = ['RuntimeRunClass', 'RuntimeRunProgram'];
 /** What a tool is handed out or listed with: its name and schema. */
 interface Shown {
   readonly name: string;
-  readonly inputSchema: { readonly properties?: Record<string, unknown> };
+  readonly inputSchema: {
+    readonly properties?: Record<string, unknown> | undefined;
+  };
 }
 
 async function listed(server: McpServer): Promise<Shown[]> {
@@ -50,7 +53,10 @@ const PATHS: Readonly<
   getHandlerEntries: async (systemType) =>
     exporterFor(systemType)
       .getHandlerEntries()
-      .map((entry) => entry.toolDefinition),
+      .map((entry) => ({
+        name: entry.toolDefinition.name,
+        inputSchema: listedJson(entry.toolDefinition.inputSchema),
+      })),
   'createRegistry().registerAllTools': (systemType) => {
     const server = new McpServer({ name: 'plain', version: '1.0.0' });
     exporterFor(systemType).createRegistry().registerAllTools(server);

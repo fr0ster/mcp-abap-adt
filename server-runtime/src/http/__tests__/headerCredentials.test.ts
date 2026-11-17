@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Streamable HTTP takes credentials only from each request's `x-sap-*`
  * headers, through lib's `headerSource`, on a new instance
@@ -54,13 +55,9 @@ const heldTools: HandlerEntry[] = [
     toolDefinition: {
       name: 'HoldAndProbe',
       description: 'holds state and probes',
-      inputSchema: {
-        type: 'object',
-        properties: { id: { type: 'string' } },
-        required: ['id'],
-      },
+      inputSchema: z.object({ id: z.string() }),
     } as never,
-    handler: (async (ctx: Ctx, args: { id: string }) => {
+    call: (async (ctx: Ctx, args: { id: string }) => {
       ctx.state.attach(new HeldPart());
       await ctx.connection.makeAdtRequest({
         url: `${PROBE_PATH}${args.id}`,
@@ -74,16 +71,9 @@ const heldTools: HandlerEntry[] = [
     toolDefinition: {
       name: 'HeldProbe',
       description: 'probes on the instance the handle names',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-          state_handle: { type: 'string' },
-        },
-        required: ['id', 'state_handle'],
-      },
+      inputSchema: z.object({ id: z.string(), state_handle: z.string() }),
     } as never,
-    handler: (async (ctx: Ctx, args: { id: string; state_handle: string }) => {
+    call: (async (ctx: Ctx, args: { id: string; state_handle: string }) => {
       ctx.state.check(args.state_handle);
       await ctx.connection.makeAdtRequest({
         url: `${PROBE_PATH}${args.id}`,

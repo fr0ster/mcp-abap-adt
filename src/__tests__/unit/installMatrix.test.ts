@@ -46,6 +46,7 @@
  * installs, four at a time (third-party packages from npm's cache when it has
  * them). `SKIP_INSTALL_MATRIX=true` skips it, and says so.
  */
+import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import {
   cpSync,
@@ -57,6 +58,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { promisify } from 'node:util';
 import { packRelease, RELEASE_DIRS, ROOT } from '../helpers/installedRelease';
 import { spawnOptionsForNpm } from '../helpers/platform';
@@ -64,6 +66,7 @@ import {
   startTarballRegistry,
   type TarballRegistry,
 } from '../helpers/tarballRegistry';
+import { assertEquals } from '../integration/helpers/liveAssert';
 
 const execFileAsync = promisify(execFile);
 
@@ -229,7 +232,7 @@ const entering = runtimeRoots.size > 0
   : [{ name: loaded[0].specifier, lib: loaded[0].lib, context: loaded[0].context }];
 const config = fromRequire('@mcp-abap-adt/lib/config');
 const instances = typeof config.libInstances === 'function'
-  ? config.libInstances().map((entry) => entry.file)
+  ? config.libInstances().map((entry) => ('file' in entry ? 'a copy before 24.0.0' : entry.version + ' ' + entry.label))
   : null;
 const seen = {};
 entering.forEach((enter, index) => {
@@ -308,9 +311,6 @@ const spec = (name: string, version = RELEASE_VERSION): string =>
   `@mcp-abap-adt/${name}@${version}`;
 
 describe('one @mcp-abap-adt/lib per server process, in every install layout', () => {
-  // One pack of eighteen and about twenty installs: minutes on a cold cache.
-  jest.setTimeout(20 * 60 * 1000);
-
   let workdir: string | undefined;
   const registries: TarballRegistry[] = [];
   const cases = new Map<string, Promise<Installed>>();
@@ -322,213 +322,208 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
     return found;
   };
 
-  beforeAll(
-    async () => {
-      if (SKIPPED) return;
-      workdir = mkdtempSync(join(tmpdir(), 'mcp-install-matrix-'));
-      checker = join(workdir, 'checker.cjs');
-      writeFileSync(checker, CHECKER);
+  before(async () => {
+    if (SKIPPED) return;
+    workdir = mkdtempSync(join(tmpdir(), 'mcp-install-matrix-'));
+    checker = join(workdir, 'checker.cjs');
+    writeFileSync(checker, CHECKER);
 
-      // Every package of the release, packed once; and for layout 5 a copy of
-      // the runtime at the next patch, packed from a prepared directory.
-      const packs = join(workdir, 'packs');
-      mkdirSync(packs);
-      const tarballs = packRelease(packs, RELEASE_DIRS);
-      const skewed = join(workdir, 'runtime-later-patch');
-      mkdirSync(skewed);
-      for (const part of ['dist', 'README.md', 'LICENSE'])
-        cpSync(join(ROOT, 'server-runtime', part), join(skewed, part), {
-          recursive: true,
-        });
-      const runtimeManifest = JSON.parse(
-        readFileSync(join(ROOT, 'server-runtime', 'package.json'), 'utf8'),
-      );
-      writeFileSync(
-        join(skewed, 'package.json'),
-        JSON.stringify(
-          { ...runtimeManifest, version: laterPatch(runtimeManifest.version) },
-          null,
-          2,
-        ),
-      );
-      const skewPacks = join(workdir, 'skew-packs');
-      mkdirSync(skewPacks);
-      const [laterRuntime] = packRelease(skewPacks, [skewed]);
-
-      const release = await startTarballRegistry(tarballs);
-      const skew = await startTarballRegistry([
-        ...tarballs,
-        laterRuntime as string,
-      ]);
-      registries.push(release, skew);
-
-      const limit = pool(4);
-      const start = (
-        label: string,
-        install: () => Promise<Omit<Installed, 'label'>>,
-      ): void => {
-        const running = limit(async () => ({ label, ...(await install()) }));
-        // Awaited by its test; marked handled so a failure is that test's.
-        running.catch(() => undefined);
-        cases.set(label, running);
-      };
-      const freshDir = (label: string): string => {
-        const dir = join(workdir as string, label);
-        mkdirSync(dir);
-        return dir;
-      };
-      const globalInstall = (
-        registry: TarballRegistry,
-        prefix: string,
-        names: readonly string[],
-      ): Promise<string> =>
-        npm(
-          [
-            'install',
-            '-g',
-            '--prefix',
-            prefix,
-            ...INSTALL_FLAGS,
-            ...registry.npmArgs,
-            ...names.map((name) => spec(name)),
-          ],
-          prefix,
-        );
-      const localInstall = async (
-        registry: TarballRegistry,
-        dir: string,
-        names: readonly string[],
-        extra: readonly string[] = [],
-      ): Promise<void> => {
-        writeFileSync(
-          join(dir, 'package.json'),
-          '{"name":"install-matrix","version":"0.0.0","private":true}\n',
-        );
-        await npm(
-          [
-            'install',
-            ...INSTALL_FLAGS,
-            ...extra,
-            ...registry.npmArgs,
-            ...names.map((name) => spec(name)),
-          ],
-          dir,
-        );
-      };
-
-      // 1. Global, each wrapper in one command with its former base.
-      for (const [wrapper, base] of Object.entries(FORMER_BASE)) {
-        start(`global ${wrapper} with ${base}`, async () => {
-          const prefix = freshDir(`l1-${wrapper}`);
-          await globalInstall(release, prefix, [wrapper, base]);
-          return {
-            global: true,
-            dir: prefix,
-            modules: globalRoot(prefix),
-            binaries: [BINARIES[wrapper as BinaryName], BINARIES[base]],
-            registry: release,
-          };
-        });
-      }
-
-      // 2. Global, wrapper and base in two commands, either order.
-      const wrappers = ['compact', 'http-ro', 'compact-sse'] as const;
-      const bases = wrappers.map(
-        (wrapper) => FORMER_BASE[wrapper] as BinaryName,
-      );
-      for (const [order, first, second] of [
-        ['wrappers first', wrappers, bases],
-        ['bases first', bases, wrappers],
-      ] as const) {
-        start(`global, two commands, ${order}`, async () => {
-          const prefix = freshDir(`l2-${order.replace(' ', '-')}`);
-          await globalInstall(release, prefix, first);
-          await globalInstall(release, prefix, second);
-          return {
-            global: true,
-            dir: prefix,
-            modules: globalRoot(prefix),
-            binaries: [...wrappers, ...bases].map((name) => BINARIES[name]),
-            registry: release,
-          };
-        });
-      }
-
-      // 3. Local, the default (hoisted) install of all twelve.
-      start('local, hoisted, all twelve', async () => {
-        const dir = freshDir('l3');
-        await localInstall(release, dir, Object.keys(BINARIES));
-        return {
-          global: false,
-          dir,
-          modules: join(dir, 'node_modules'),
-          binaries: Object.values(BINARIES),
-          registry: release,
-        };
+    // Every package of the release, packed once; and for layout 5 a copy of
+    // the runtime at the next patch, packed from a prepared directory.
+    const packs = join(workdir, 'packs');
+    mkdirSync(packs);
+    const tarballs = packRelease(packs, RELEASE_DIRS);
+    const skewed = join(workdir, 'runtime-later-patch');
+    mkdirSync(skewed);
+    for (const part of ['dist', 'README.md', 'LICENSE'])
+      cpSync(join(ROOT, 'server-runtime', part), join(skewed, part), {
+        recursive: true,
       });
+    const runtimeManifest = JSON.parse(
+      readFileSync(join(ROOT, 'server-runtime', 'package.json'), 'utf8'),
+    );
+    writeFileSync(
+      join(skewed, 'package.json'),
+      JSON.stringify(
+        { ...runtimeManifest, version: laterPatch(runtimeManifest.version) },
+        null,
+        2,
+      ),
+    );
+    const skewPacks = join(workdir, 'skew-packs');
+    mkdirSync(skewPacks);
+    const [laterRuntime] = packRelease(skewPacks, [skewed]);
 
-      // 4. Local, nested: plain and compact of each transport.
-      for (const [plain, compact] of [
-        ['core', 'compact'],
-        ['http', 'compact-http'],
-        ['sse', 'compact-sse'],
-      ] as const) {
-        start(`local, nested, ${plain} and ${compact}`, async () => {
-          const dir = freshDir(`l4-${plain}`);
-          await localInstall(
-            release,
-            dir,
-            [plain, compact],
-            ['--install-strategy=nested'],
-          );
-          return {
-            global: false,
-            dir,
-            modules: join(dir, 'node_modules'),
-            binaries: [BINARIES[plain], BINARIES[compact]],
-            registry: release,
-          };
-        });
-      }
+    const release = await startTarballRegistry(tarballs);
+    const skew = await startTarballRegistry([
+      ...tarballs,
+      laterRuntime as string,
+    ]);
+    registries.push(release, skew);
 
-      // 5. The runtime at a later patch than the binaries.
-      start('global, the runtime at a later patch', async () => {
-        const prefix = freshDir('l5');
-        await globalInstall(skew, prefix, ['compact', 'core']);
+    const limit = pool(4);
+    const start = (
+      label: string,
+      install: () => Promise<Omit<Installed, 'label'>>,
+    ): void => {
+      const running = limit(async () => ({ label, ...(await install()) }));
+      // Awaited by its test; marked handled so a failure is that test's.
+      running.catch(() => undefined);
+      cases.set(label, running);
+    };
+    const freshDir = (label: string): string => {
+      const dir = join(workdir as string, label);
+      mkdirSync(dir);
+      return dir;
+    };
+    const globalInstall = (
+      registry: TarballRegistry,
+      prefix: string,
+      names: readonly string[],
+    ): Promise<string> =>
+      npm(
+        [
+          'install',
+          '-g',
+          '--prefix',
+          prefix,
+          ...INSTALL_FLAGS,
+          ...registry.npmArgs,
+          ...names.map((name) => spec(name)),
+        ],
+        prefix,
+      );
+    const localInstall = async (
+      registry: TarballRegistry,
+      dir: string,
+      names: readonly string[],
+      extra: readonly string[] = [],
+    ): Promise<void> => {
+      writeFileSync(
+        join(dir, 'package.json'),
+        '{"name":"install-matrix","version":"0.0.0","private":true}\n',
+      );
+      await npm(
+        [
+          'install',
+          ...INSTALL_FLAGS,
+          ...extra,
+          ...registry.npmArgs,
+          ...names.map((name) => spec(name)),
+        ],
+        dir,
+      );
+    };
+
+    // 1. Global, each wrapper in one command with its former base.
+    for (const [wrapper, base] of Object.entries(FORMER_BASE)) {
+      start(`global ${wrapper} with ${base}`, async () => {
+        const prefix = freshDir(`l1-${wrapper}`);
+        await globalInstall(release, prefix, [wrapper, base]);
         return {
           global: true,
           dir: prefix,
           modules: globalRoot(prefix),
-          binaries: [BINARIES.compact, BINARIES.core],
-          registry: skew,
+          binaries: [BINARIES[wrapper as BinaryName], BINARIES[base]],
+          registry: release,
         };
       });
+    }
 
-      // An embedder: compact-readonly-entries with lib, and alone.
-      for (const [label, names] of [
-        [
-          'compact-readonly-entries with lib',
-          ['compact-readonly-entries', 'lib'],
-        ],
-        ['compact-readonly-entries alone', ['compact-readonly-entries']],
-      ] as const) {
-        start(`local, ${label}`, async () => {
-          const dir = freshDir(`embed-${names.length}`);
-          await localInstall(release, dir, names);
-          return {
-            global: false,
-            dir,
-            modules: join(dir, 'node_modules'),
-            binaries: [],
-            registry: release,
-          };
-        });
-      }
-    },
-    20 * 60 * 1000,
-  );
+    // 2. Global, wrapper and base in two commands, either order.
+    const wrappers = ['compact', 'http-ro', 'compact-sse'] as const;
+    const bases = wrappers.map((wrapper) => FORMER_BASE[wrapper] as BinaryName);
+    for (const [order, first, second] of [
+      ['wrappers first', wrappers, bases],
+      ['bases first', bases, wrappers],
+    ] as const) {
+      start(`global, two commands, ${order}`, async () => {
+        const prefix = freshDir(`l2-${order.replace(' ', '-')}`);
+        await globalInstall(release, prefix, first);
+        await globalInstall(release, prefix, second);
+        return {
+          global: true,
+          dir: prefix,
+          modules: globalRoot(prefix),
+          binaries: [...wrappers, ...bases].map((name) => BINARIES[name]),
+          registry: release,
+        };
+      });
+    }
 
-  afterAll(async () => {
+    // 3. Local, the default (hoisted) install of all twelve.
+    start('local, hoisted, all twelve', async () => {
+      const dir = freshDir('l3');
+      await localInstall(release, dir, Object.keys(BINARIES));
+      return {
+        global: false,
+        dir,
+        modules: join(dir, 'node_modules'),
+        binaries: Object.values(BINARIES),
+        registry: release,
+      };
+    });
+
+    // 4. Local, nested: plain and compact of each transport.
+    for (const [plain, compact] of [
+      ['core', 'compact'],
+      ['http', 'compact-http'],
+      ['sse', 'compact-sse'],
+    ] as const) {
+      start(`local, nested, ${plain} and ${compact}`, async () => {
+        const dir = freshDir(`l4-${plain}`);
+        await localInstall(
+          release,
+          dir,
+          [plain, compact],
+          ['--install-strategy=nested'],
+        );
+        return {
+          global: false,
+          dir,
+          modules: join(dir, 'node_modules'),
+          binaries: [BINARIES[plain], BINARIES[compact]],
+          registry: release,
+        };
+      });
+    }
+
+    // 5. The runtime at a later patch than the binaries.
+    start('global, the runtime at a later patch', async () => {
+      const prefix = freshDir('l5');
+      await globalInstall(skew, prefix, ['compact', 'core']);
+      return {
+        global: true,
+        dir: prefix,
+        modules: globalRoot(prefix),
+        binaries: [BINARIES.compact, BINARIES.core],
+        registry: skew,
+      };
+    });
+
+    // An embedder: compact-readonly-entries with lib, and alone.
+    for (const [label, names] of [
+      [
+        'compact-readonly-entries with lib',
+        ['compact-readonly-entries', 'lib'],
+      ],
+      ['compact-readonly-entries alone', ['compact-readonly-entries']],
+    ] as const) {
+      start(`local, ${label}`, async () => {
+        const dir = freshDir(`embed-${names.length}`);
+        await localInstall(release, dir, names);
+        return {
+          global: false,
+          dir,
+          modules: join(dir, 'node_modules'),
+          binaries: [],
+          registry: release,
+        };
+      });
+    }
+  });
+
+  after(async () => {
     await Promise.allSettled([...cases.values()]);
     await Promise.all(registries.map((registry) => registry.close()));
     if (workdir !== undefined)
@@ -555,10 +550,11 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
   };
 
   const expectOneLib = (verdict: Awaited<ReturnType<typeof load>>): void => {
-    expect(verdict.instances).toHaveLength(1);
-    expect(verdict.libs).toHaveLength(1);
-    expect(Object.values(verdict.seen).length).toBeGreaterThan(0);
-    expect(verdict.seen).toEqual(
+    assert.equal(verdict.instances?.length, 1);
+    assert.equal(verdict.libs.length, 1);
+    assert.ok(Object.values(verdict.seen).length > 0);
+    assertEquals(
+      verdict.seen,
       Object.fromEntries(Object.keys(verdict.seen).map((key) => [key, true])),
     );
   };
@@ -582,16 +578,19 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
         if (served !== undefined) {
           found.push(name);
           // The newest served version: npm takes the highest one the ranges allow.
-          expect({ name, version: node.version }).toEqual({
-            name,
-            version: served.at(-1),
-          });
+          assertEquals(
+            { name, version: node.version },
+            {
+              name,
+              version: served.at(-1),
+            },
+          );
         }
         walk((node.dependencies ?? {}) as never);
       }
     };
     walk(tree.dependencies);
-    expect(found).toContain('@mcp-abap-adt/lib');
+    assert.ok(found.includes('@mcp-abap-adt/lib'));
   };
 
   /** A local install's lockfile: every package of the release from its tarball. */
@@ -603,12 +602,15 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
       const name = path.split('node_modules/').at(-1) ?? '';
       return installed.registry.served.has(name);
     });
-    expect(ours.length).toBeGreaterThan(0);
+    assert.ok(ours.length > 0);
     for (const [path, entry] of ours)
-      expect({
-        path,
-        own: installed.registry.isOwnTarball(entry.resolved),
-      }).toEqual({ path, own: true });
+      assertEquals(
+        {
+          path,
+          own: installed.registry.isOwnTarball(entry.resolved),
+        },
+        { path, own: true },
+      );
   };
 
   const expectBinaries = async (installed: Installed): Promise<void> => {
@@ -621,7 +623,8 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
         '@mcp-abap-adt/lib/tool-set',
         '@mcp-abap-adt/lib/config',
       ]);
-      expect({ binary: bin.pkg, instances: verdict.instances?.length }).toEqual(
+      assertEquals(
+        { binary: bin.pkg, instances: verdict.instances?.length },
         {
           binary: bin.pkg,
           instances: 1,
@@ -632,20 +635,26 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
       const runtimeVersion = installed.registry.served
         .get('@mcp-abap-adt/server-runtime')
         ?.at(-1);
-      expect({ binary: bin.pkg, runtimes: verdict.runtimes }).toEqual({
-        binary: bin.pkg,
-        runtimes: [`@mcp-abap-adt/server-runtime@${runtimeVersion}`],
-      });
+      assertEquals(
+        { binary: bin.pkg, runtimes: verdict.runtimes },
+        {
+          binary: bin.pkg,
+          runtimes: [`@mcp-abap-adt/server-runtime@${runtimeVersion}`],
+        },
+      );
 
       const { stdout } = await execFileAsync(
         process.execPath,
         [join(dir, 'bin', `${bin.bin}.js`), '--version'],
         { cwd: installed.dir, encoding: 'utf8' },
       );
-      expect({ binary: bin.pkg, version: stdout.trim() }).toEqual({
-        binary: bin.pkg,
-        version: sourceVersion(bin.dir),
-      });
+      assertEquals(
+        { binary: bin.pkg, version: stdout.trim() },
+        {
+          binary: bin.pkg,
+          version: sourceVersion(bin.dir),
+        },
+      );
     }
   };
 
@@ -657,99 +666,107 @@ describe('one @mcp-abap-adt/lib per server process, in every install layout', ()
     return installed;
   };
 
-  const skippable = SKIPPED ? it.skip : it;
-  if (SKIPPED) console.log('[install-matrix] skipped by SKIP_INSTALL_MATRIX');
+  /** Each case's skip: the reason when the run says to skip (one CI cell runs the matrix). */
+  const skip = SKIPPED ? 'skipped by SKIP_INSTALL_MATRIX' : false;
 
   describe('1. global, each wrapper in one command with its former base', () => {
-    skippable.each(Object.entries(FORMER_BASE))(
-      '%s with %s',
-      async (wrapper, base) => {
+    for (const [wrapper, base] of Object.entries(FORMER_BASE)) {
+      it(`${wrapper} with ${base}`, { skip }, async () => {
         await check(`global ${wrapper} with ${base}`);
-      },
-    );
+      });
+    }
   });
 
   describe('2. global, wrapper and base in two commands', () => {
-    skippable.each(['wrappers first', 'bases first'])('%s', async (order) => {
-      await check(`global, two commands, ${order}`);
-    });
+    for (const order of ['wrappers first', 'bases first']) {
+      it(order, { skip }, async () => {
+        await check(`global, two commands, ${order}`);
+      });
+    }
   });
 
-  skippable(
-    '3. local, the default install of all twelve binaries',
-    async () => {
-      await check('local, hoisted, all twelve');
-    },
-  );
+  it('3. local, the default install of all twelve binaries', {
+    skip,
+  }, async () => {
+    await check('local, hoisted, all twelve');
+  });
 
   describe('4. local, --install-strategy=nested', () => {
-    skippable.each([
+    for (const [plain, compact] of [
       ['core', 'compact'],
       ['http', 'compact-http'],
       ['sse', 'compact-sse'],
-    ])('%s and %s', async (plain, compact) => {
-      await check(`local, nested, ${plain} and ${compact}`);
-    });
+    ]) {
+      it(`${plain} and ${compact}`, { skip }, async () => {
+        await check(`local, nested, ${plain} and ${compact}`);
+      });
+    }
   });
 
-  skippable(
-    '5. the runtime at a later patch than the binaries: still one copy',
-    async () => {
-      const installed = await check('global, the runtime at a later patch');
-      for (const bin of installed.binaries) {
-        const verdict = await load(
-          join(installed.modules, '@mcp-abap-adt', bin.pkg),
-          [
-            join(
-              installed.modules,
-              '@mcp-abap-adt',
-              bin.pkg,
-              'dist',
-              'launcher.js',
-            ),
-          ],
-        );
-        expect({ binary: bin.pkg, runtimes: verdict.runtimes }).toEqual({
+  it('5. the runtime at a later patch than the binaries: still one copy', {
+    skip,
+  }, async () => {
+    const installed = await check('global, the runtime at a later patch');
+    for (const bin of installed.binaries) {
+      const verdict = await load(
+        join(installed.modules, '@mcp-abap-adt', bin.pkg),
+        [
+          join(
+            installed.modules,
+            '@mcp-abap-adt',
+            bin.pkg,
+            'dist',
+            'launcher.js',
+          ),
+        ],
+      );
+      assertEquals(
+        { binary: bin.pkg, runtimes: verdict.runtimes },
+        {
           binary: bin.pkg,
           runtimes: [
             `@mcp-abap-adt/server-runtime@${laterPatch(RELEASE_VERSION)}`,
           ],
-        });
-      }
-    },
-  );
-
-  describe('an embedder: compact-readonly-entries takes lib as its peer', () => {
-    skippable.each(['with lib', 'alone'])('%s', async (how) => {
-      const installed = await check(`local, compact-readonly-entries ${how}`);
-      const verdict = await load(installed.dir, [
-        '@mcp-abap-adt/lib/request-context',
-        '@mcp-abap-adt/compact-readonly-entries',
-      ]);
-      expectOneLib(verdict);
-    });
+        },
+      );
+    }
   });
 
-  skippable(
-    'never asks the public registry for a package of the release',
-    async () => {
-      await Promise.allSettled([...cases.values()]);
-      const ours = new Set(
-        RELEASE_DIRS.map(
-          (dir) =>
-            (
-              JSON.parse(
-                readFileSync(join(ROOT, dir, 'package.json'), 'utf8'),
-              ) as {
-                name: string;
-              }
-            ).name,
-        ),
+  describe('an embedder: compact-readonly-entries takes lib as its peer', () => {
+    for (const how of ['with lib', 'alone']) {
+      it(how, { skip }, async () => {
+        const installed = await check(`local, compact-readonly-entries ${how}`);
+        const verdict = await load(installed.dir, [
+          '@mcp-abap-adt/lib/request-context',
+          '@mcp-abap-adt/compact-readonly-entries',
+        ]);
+        expectOneLib(verdict);
+      });
+    }
+  });
+
+  it('never asks the public registry for a package of the release', {
+    skip,
+  }, async () => {
+    await Promise.allSettled([...cases.values()]);
+    const ours = new Set(
+      RELEASE_DIRS.map(
+        (dir) =>
+          (
+            JSON.parse(
+              readFileSync(join(ROOT, dir, 'package.json'), 'utf8'),
+            ) as {
+              name: string;
+            }
+          ).name,
+      ),
+    );
+    for (const registry of registries) {
+      assertEquals(
+        registry.proxied.filter((name) => ours.has(name)),
+        [],
       );
-      for (const registry of registries) {
-        expect(registry.proxied.filter((name) => ours.has(name))).toEqual([]);
-        expect(new Set(registry.served.keys())).toEqual(ours);
-      }
-    },
-  );
+      assert.deepEqual(new Set(registry.served.keys()), ours);
+    }
+  });
 });

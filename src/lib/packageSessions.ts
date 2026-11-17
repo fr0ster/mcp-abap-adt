@@ -35,7 +35,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isLatched } from './activeTools';
 import { ClosedInstanceRefusal } from './auth/failures';
 import { ServerRefusal } from './auth/serverRefusal';
-import { createAbapConnection, siblingRecordOf } from './connectionFactory';
+import {
+  admitOnKind,
+  createAbapConnection,
+  siblingRecordOf,
+  systemKindOf,
+  withSystemKindOf,
+} from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
 import type { HandlerContext } from './handlers/interfaces';
 import {
@@ -126,7 +132,15 @@ export async function openFreshConnection(
   if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
   // Once handed over it is the server's, treated exactly like a
   // connection the server built.
-  const given = await factory();
+  // It runs on the kind of the connection it is fresh for (the server
+  // declared its systemType on it), never on what SAP_SYSTEM_TYPE says now.
+  const returned = await factory();
+  // The one kind: a connection the host's factory built or declared for
+  // another kind than the one it is fresh for is refused before its
+  // connect — nothing sent.
+  const conflict = admitOnKind(returned, systemKindOf(connection));
+  if (conflict !== undefined) throw conflict;
+  const given = withSystemKindOf(returned, connection);
   own(given, { role: 'fresh' });
   await bornOrEnded(given, born, logger);
   return connectedOrClosed(given, logger);
@@ -171,14 +185,13 @@ async function connectedOrClosed(
   fresh: IAbapConnection,
   logger: Logger,
 ): Promise<IAbapConnection> {
-  const connectable = fresh as { connect?: () => Promise<void> };
   // Right before the connect, with no await between: a close that ended this
   // connection after it was recorded (its instance's sweep, or the cut of the
   // background runs that instance started) leaves nothing to connect.
   if (isEnded(fresh)) throw new ClosedInstanceRefusal(isLatched());
   refuseWhenClosed(fresh);
   try {
-    if (typeof connectable.connect === 'function') await connectable.connect();
+    await fresh.connect();
   } catch (error) {
     await closeQuietly(fresh, logger, 'A fresh connection');
     // A connect its instance's close cut short: the close's refusal.

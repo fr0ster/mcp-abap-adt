@@ -119,7 +119,7 @@ describe('the same tool in readonly and high', () => {
           connection: {} as never,
           exposition: ['readonly', 'high'],
           systemType: 'onprem',
-          readOnlyDedupStrategy: strategy,
+          ...(strategy !== undefined && { readOnlyDedupStrategy: strategy }),
         });
         expect(
           registeredToolNames(server).filter((n) => n === TOOL),

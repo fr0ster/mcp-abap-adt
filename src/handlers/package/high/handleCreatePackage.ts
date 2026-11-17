@@ -30,7 +30,9 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { createArguments } from '../../../lib/handlers/createArguments';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
 import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
@@ -42,7 +44,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
-  inputSchema: {
+  inputSchema: createArguments('CreatePackage', {
     package_name: z.string().describe('Package name.'),
     description: z
       .string()
@@ -55,6 +57,7 @@ export const TOOL_DEFINITION = {
       .describe('Parent package name. Required for structure packages.'),
     package_type: z
       .enum(['development', 'structure'])
+      .optional()
       .default('development')
       .describe("Package type: 'development' (default) or 'structure'"),
     software_component: z
@@ -84,9 +87,7 @@ export const TOOL_DEFINITION = {
     master_language: z
       .string()
       .optional()
-      .describe(
-        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      ),
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
     detail: z
       .enum(['terse', 'full', 'raw'])
       .optional()
@@ -94,22 +95,10 @@ export const TOOL_DEFINITION = {
       .describe(
         'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
       ),
-  },
+  }),
 } as const;
 
-interface CreatePackageArgs {
-  package_name: string;
-  description?: string;
-  super_package: string;
-  package_type?: string;
-  software_component?: string;
-  transport_layer?: string;
-  transport_request?: string;
-  record_changes?: boolean;
-  application_component?: string;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreatePackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreatePackage(
   context: HandlerContext,

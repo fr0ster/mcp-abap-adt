@@ -2,6 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOf,
   okResponse,
@@ -88,20 +89,11 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
  * this is the end-to-end proof of it, on the handler the review named.
  */
 describe('CreateDomain (high) — a lock nobody released reaches the caller', () => {
-  // The full shape ADT answers, because the handler patches the document it
-  // read: a stub without `<doma:datatype>` fails in the patch instead, which
-  // is a different path from the one under test.
-  const DOMAIN_XML = `<?xml version="1.0" encoding="UTF-8"?>
-<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="d" adtcore:version="active" adtcore:masterLanguage="EN">
-  <doma:datatype>CHAR</doma:datatype>
-  <doma:length>10</doma:length>
-  <doma:decimals>0</doma:decimals>
-  <doma:conversionExit/>
-  <doma:signExists>false</doma:signExists>
-  <doma:lowercase>false</doma:lowercase>
-  <doma:valueTableRef/>
-  <doma:fixValues/>
-</doma:domain>`;
+  // The document SAP answers for a fresh domain (the corpus capture), because
+  // the handler patches the document it read: a stub without the elements
+  // the create writes fails in the patch instead, which is a different path
+  // from the one under test.
+  const DOMAIN_XML = corpusBody('create-domain--01-ddic-domains');
 
   it('names it on the answer, past the check and the activation that follow', async () => {
     fakeClient = fakeClientOf({

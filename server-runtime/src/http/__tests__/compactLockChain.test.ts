@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Compact's lock chain over Streamable HTTP: every request is an MCP session
  * of its own, and a lock lives in the SAP session that took it until its
@@ -34,9 +35,9 @@ const loseGroup: IHandlerGroup = {
       toolDefinition: {
         name: 'LoseSession',
         description: 'marks the session lost',
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: z.object({}),
       } as never,
-      handler: (async (
+      call: (async (
         context: { connection: { isConnected?: () => boolean } },
         _args: unknown,
       ) => {
@@ -56,12 +57,9 @@ const echoGroup: IHandlerGroup = {
       toolDefinition: {
         name: 'EchoArgs',
         description: 'answers its arguments',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'string' } },
-        },
+        inputSchema: z.object({ value: z.string().optional() }),
       } as never,
-      handler: (async (_context: unknown, args: unknown) => ({
+      call: (async (_context: unknown, args: unknown) => ({
         content: [{ type: 'text', text: JSON.stringify(args) }],
       })) as never,
     },

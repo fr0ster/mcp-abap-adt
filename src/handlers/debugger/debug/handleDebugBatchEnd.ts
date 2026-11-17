@@ -1,6 +1,6 @@
+import * as z from 'zod';
 // src/handlers/debugger/debug/handleDebugBatchEnd.ts
 import { endDebugBatch } from '../../../lib/batch/tools';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -8,11 +8,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     "[debug] Sends the recorded calls of the stopped debuggee in one envelope on the session the batch started on — the ABAP debuggee's session, or the AMDP session's command session — and ends the debugger batch. Splits SAP's answer into each call's parts and answers the number of recorded calls, of requests sent and of parts received; when sending fails, the parts received differ from the requests sent or the answer fails to split, answers that error, and every number of the batch then answers it.",
-  inputSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-  },
+  inputSchema: z.object({}),
 } as const;
 
 /**
@@ -22,7 +18,7 @@ export const TOOL_DEFINITION = {
  */
 export async function handleDebugBatchEnd(
   context: HandlerContext,
-  _args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  _args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return endDebugBatch(context);
 }

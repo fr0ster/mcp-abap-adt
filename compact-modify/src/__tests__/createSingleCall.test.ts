@@ -1,9 +1,13 @@
 /**
- * Compact `HandlerCreate` is one ADT request: the `POST` of the type's
- * adt-clients `create()`, for every type — no validate, lock, write, unlock,
- * check or activate, no service-group read, no read-back (spec §4.6, the
- * owner's rule: compact is one request per tool call, the consumer chains).
- * There is no flag and no mode.
+ * Compact `HandlerCreate` is one operation, the create: no validate, lock,
+ * write, unlock, check or activate, no service-group read, no read-back
+ * (spec §4.6, the owner's rule: a compact tool does one operation, the
+ * consumer chains). There is no flag and no mode. For every type but
+ * TRANSPORT the create is the `POST` of the type's adt-clients `create()`.
+ * A TRANSPORT create also types the task SAP creates with the request,
+ * Unclassified (`CL_CTS_ADT_RES_OBJ_RECORD` inserts it with
+ * `wi_trfunction = 'X'`): the `POST`, the read of the new request for its
+ * task, and the `changetasktype` `PUT` on that task, and nothing else.
  *
  * Real adt-clients code runs over a recording connection; nothing of it is
  * doubled. Pinned per type:
@@ -16,6 +20,7 @@
  * - UNIT_TEST and CDS_UNIT_TEST, whose create is a chain, are refused before
  *   any request, pointing to the full set.
  */
+
 import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -39,11 +44,13 @@ import {
   handleCreateTableType,
   handleCreateTransport,
 } from '@mcp-abap-adt/lib/handlers/write';
-import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../src/lib/systemContext';
+  jsonFind,
+  listedJson,
+} from '../../../src/__tests__/helpers/listedJson';
+import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
+import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
+import { resetSystemContextCache } from '../../../src/lib/systemContext';
 import { compactWriteRouterMap } from '../handlers/compactWriteRoutes';
 import {
   handleHandlerCreate,
@@ -59,13 +66,15 @@ type Mode = 'pending' | 'answered' | 'not-found' | 'bad-request';
 type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
 
 /**
- * The `400` SAP may answer a function group create that landed: the full
- * create reads the group back after it; every type's create answers it here.
+ * The `400` SAP may answer a function group create that landed, with its
+ * T100 key (`EC 304`): the full create reads the group back after it; every
+ * type's create answers it here.
  */
 const INTERFACE_NOT_CREATED =
   '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
   '<namespace id="com.sap.adt"/><type id="ExceptionResourceCreationFailure"/>' +
-  '<message lang="EN">Interface SAPLZFG_A has not been created</message></exc:exception>';
+  '<message lang="EN">Interface SAPLZFG_A has not been created</message>' +
+  '<properties><entry key="T100KEY-ID">EC</entry><entry key="T100KEY-NO">304</entry></properties></exc:exception>';
 
 /** A connection that records every request and answers per `mode`. */
 function recording(mode: Mode, body = '') {
@@ -149,9 +158,12 @@ async function run(
   return { sent, answer };
 }
 
-/** What SAP answers a created transport request: its number. */
+/**
+ * What SAP answers a created transport request: its number — and, read
+ * back, the request with the one task SAP created with it.
+ */
 const TRANSPORT_DOCUMENT =
-  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"/>';
+  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"><tm:request tm:number="XXXK900001"><tm:task tm:number="XXXK900002" tm:type="X"/></tm:request></tm:root>';
 
 /** The answer body per type, where an empty one is not an answer of a create. */
 const BODY: Record<string, string> = { TRANSPORT: TRANSPORT_DOCUMENT };
@@ -204,7 +216,14 @@ const TYPES: Array<[string, Record<string, unknown>]> = [
       implementation_type: 'Managed',
     },
   ],
-  ['BEHAVIOR_IMPLEMENTATION', { class_name: 'ZBP_A', package_name: 'ZPKG_A' }],
+  [
+    'BEHAVIOR_IMPLEMENTATION',
+    {
+      class_name: 'ZBP_A',
+      behavior_definition: 'ZBDEF_A',
+      package_name: 'ZPKG_A',
+    },
+  ],
   ['METADATA_EXTENSION', { name: 'ZDDLX_A', package_name: 'ZPKG_A' }],
   ['INCLUDE', { include_name: 'ZINCL_A', package_name: 'ZPKG_A' }],
   ['TABLE_TYPE', { table_type_name: 'ZTTYP_A', package_name: 'ZPKG_A' }],
@@ -307,7 +326,81 @@ describe('HandlerCreate is one POST', () => {
     );
   });
 
-  it.each(TYPES)(
+  it('TRANSPORT: the create’s POST, the read of the new request, the type change of its task, and nothing else', async () => {
+    const fields = new Map(TYPES).get('TRANSPORT') ?? {};
+    const held = await run('pending', create('TRANSPORT', fields));
+    const answered = await run(
+      'answered',
+      create('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    const notFound = await run('not-found', create('TRANSPORT', fields));
+    const full = await run(
+      'answered',
+      fullCreate('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    expect(held.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      'POST /sap/bc/adt/cts/transportrequests',
+    ]);
+    expect(answered.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      'POST /sap/bc/adt/cts/transportrequests',
+      'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
+      'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
+    ]);
+    expect(String(answered.sent[2]?.data)).toContain(
+      'tm:useraction="changetasktype"',
+    );
+    expect(answered.answer?.isError).not.toBe(true);
+    // A refused create is the answer: nothing follows it.
+    expect(notFound.sent).toEqual(held.sent);
+    expect(notFound.answer?.isError).toBe(true);
+    // The same requests as the full set's CreateTransport.
+    expect(full.sent).toEqual(answered.sent);
+  });
+
+  it('TRANSPORT task_type R: the task is typed R, as the full set’s CreateTransport types it', async () => {
+    const fields = { description: 'A request', task_type: 'R' };
+    const answered = await run(
+      'answered',
+      create('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    const full = await run(
+      'answered',
+      fullCreate('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    expect(answered.answer?.isError).not.toBe(true);
+    expect(answered.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      'POST /sap/bc/adt/cts/transportrequests',
+      'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
+      'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
+    ]);
+    expect(String(answered.sent[2]?.data)).toContain(
+      '<tm:task tm:number="XXXK900002" tm:type="R"/>',
+    );
+    expect(full.sent).toEqual(answered.sent);
+  });
+
+  it('TRANSPORT task_type X: the task stays as SAP created it, no type change sent', async () => {
+    const fields = { description: 'A request', task_type: 'X' };
+    const answered = await run(
+      'answered',
+      create('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    const full = await run(
+      'answered',
+      fullCreate('TRANSPORT', fields),
+      TRANSPORT_DOCUMENT,
+    );
+    expect(answered.answer?.isError).not.toBe(true);
+    expect(answered.sent.map((sent) => sent.method)).not.toContain('PUT');
+    expect(full.sent).toEqual(answered.sent);
+  });
+
+  it.each(TYPES.filter(([type]) => type !== 'TRANSPORT'))(
     '%s: exactly one request, the create’s POST',
     async (objectType, fields) => {
       const held = await run('pending', create(objectType, fields));
@@ -363,27 +456,89 @@ describe('HandlerCreate is one POST', () => {
     expect(textOf(answered.answer)).toContain('has not been created');
   });
 
-  // An include is its own resource (`HandlerCreate INCLUDE`): a program
-  // create with program_type include is refused before any request — today
-  // by adt-clients' guard, whose words reach the answer.
-  it('PROGRAM with program_type include: no request, an error', async () => {
-    for (const mode of ['pending', 'answered'] as const) {
+  // 24.0.0 (D2, the owner): a program create takes no program type — SAP
+  // ignores it on create (measured). One still given is not an argument of
+  // HandlerCreate: refused before any request, naming it.
+  it('PROGRAM with program_type: refused before any request, naming it', async () => {
+    const answered = await run(
+      'answered',
+      create('PROGRAM', {
+        program_name: 'ZPROG_A',
+        package_name: 'ZPKG_A',
+        program_type: 'include',
+      }),
+    );
+    expect(answered.sent).toEqual([]);
+    expect(answered.answer?.isError).toBe(true);
+    expect(textOf(answered.answer)).toContain(
+      'program_type is not an argument of HandlerCreate',
+    );
+  });
+
+  // A type whose create is a target tool's is parsed with that tool's
+  // schema: what the target requires or lists is refused in its words,
+  // naming the target, before any request (spec §3).
+  it.each([
+    ['PACKAGE', { super_package: undefined }, 'CreatePackage', 'super_package'],
+    ['PACKAGE', { package_type: 'X' }, 'CreatePackage', 'package_type'],
+    ['TRANSPORT', { description: undefined }, 'CreateTransport', 'description'],
+    ['TABLE', { table_name: undefined }, 'CreateTable', 'table_name'],
+    ['DDL', { ddl_name: undefined }, 'CreateDdl', 'ddl_name'],
+    ['CLASS', { class_name: undefined }, 'CreateClass', 'class_name'],
+    ['PROGRAM', { program_name: undefined }, 'CreateProgram', 'program_name'],
+    [
+      'INTERFACE',
+      { interface_name: undefined },
+      'CreateInterface',
+      'interface_name',
+    ],
+    [
+      'FUNCTION_MODULE',
+      { function_module_name: undefined },
+      'CreateFunctionModule',
+      'function_module_name',
+    ],
+    ['INCLUDE', { include_name: undefined }, 'CreateInclude', 'include_name'],
+  ])(
+    "%s with %o: refused by %s's schema at %s, before any request",
+    async (objectType, change, target, at) => {
       const answered = await run(
-        mode,
-        create('PROGRAM', {
-          program_name: 'ZPROG_A',
-          package_name: 'ZPKG_A',
-          program_type: 'include',
+        'answered',
+        create(objectType, { ...fieldsOf(objectType), ...change }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        `Input validation error: Invalid arguments for tool ${target}: `,
+      );
+      expect(textOf(answered.answer)).toContain(` at ${at}`);
+    },
+  );
+
+  it('BEHAVIOR_IMPLEMENTATION without behavior_definition: refused before any request', async () => {
+    for (const behavior_definition of [undefined, '']) {
+      const answered = await run(
+        'answered',
+        create('BEHAVIOR_IMPLEMENTATION', {
+          ...fieldsOf('BEHAVIOR_IMPLEMENTATION'),
+          behavior_definition,
         }),
       );
       expect(answered.sent).toEqual([]);
-      if (mode === 'answered') {
-        expect(answered.answer?.isError).toBe(true);
-        expect(textOf(answered.answer)).toContain(
-          "programType 'include' is not a program",
-        );
-      }
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        'behavior_definition is required',
+      );
     }
+  });
+
+  it('BEHAVIOR_IMPLEMENTATION with behavior_definition: the one create sent', async () => {
+    const held = await run(
+      'pending',
+      create('BEHAVIOR_IMPLEMENTATION', fieldsOf('BEHAVIOR_IMPLEMENTATION')),
+    );
+    expect(held.sent).toHaveLength(1);
+    expect(held.sent[0].method).toBe('POST');
   });
 
   it.each(CHAINS)(
@@ -431,7 +586,7 @@ const CARRIES: Record<string, string[]> = {
   ],
   DOMAIN: ['domain_name', 'master_language'],
   DATA_ELEMENT: ['data_element_name', 'master_language'],
-  TRANSPORT: ['transport_type', 'target_system', 'owner'],
+  TRANSPORT: ['transport_type', 'target_system', 'owner', 'task_type'],
   TABLE: ['table_name', 'master_language'],
   STRUCTURE: ['structure_name', 'master_language'],
   DDL: ['ddl_name', 'master_language'],
@@ -451,12 +606,12 @@ const CARRIES: Record<string, string[]> = {
     'create_protected',
     'master_language',
   ],
-  PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
+  PROGRAM: ['program_name', 'application', 'master_language'],
   INTERFACE: ['interface_name', 'master_language'],
   FUNCTION_GROUP: ['function_group_name', 'master_language'],
   FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
   BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
-  BEHAVIOR_IMPLEMENTATION: ['class_name'],
+  BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
   METADATA_EXTENSION: ['name', 'master_language'],
   INCLUDE: ['include_name', 'master_language'],
   TABLE_TYPE: ['table_type_name', 'master_language'],
@@ -482,14 +637,19 @@ const ACCEPTED_NOT_SENT: Record<string, string[]> = {
   SERVICE_BINDING: ['transport_request'],
   FUNCTION_MODULE: ['package_name'],
   METADATA_EXTENSION: ['transport_request'],
+  // adt-clients' create config requires it; the class shell's request does
+  // not carry it.
+  BEHAVIOR_IMPLEMENTATION: ['behavior_definition'],
 };
 
 /** A value an accepted argument may take, so the create still builds. */
 const SAMPLE: Record<string, unknown> = {
   transport_request: 'XXXK900001',
   transport_type: 'workbench',
+  // Sent with the task's type change after the create, not in its POST.
+  task_type: 'R',
   binding_variant: 'ODATA_V4_UI',
-  program_type: 'executable',
+  package_type: 'development',
   implementation_type: 'Managed',
   record_changes: true,
   final: true,
@@ -499,7 +659,9 @@ const SAMPLE: Record<string, unknown> = {
 
 /**
  * Every argument a caller of 18 could give `HandlerCreate` (its schema then)
- * and a few no create names: what no create sends is refused, schema or not.
+ * and a few no create names: what the schema declares and no create sends is
+ * refused; what it does not declare is refused by the parse too, naming it
+ * (spec §3, the owner's decision for the create tools).
  */
 const KNOWN: Record<string, 'string' | 'boolean' | 'number' | 'array'> = {
   activate: 'boolean',
@@ -523,15 +685,28 @@ const KNOWN: Record<string, 'string' | 'boolean' | 'number' | 'array'> = {
   lock_handle: 'string',
 };
 
-const schemaProperties = compactCreateSchema.properties as Record<
-  string,
-  { type?: string }
->;
+const schemaJson = listedJson(compactCreateSchema);
 
-const kindOf = (name: string) => KNOWN[name] ?? schemaProperties[name]?.type;
+/** The arguments the schema declares. */
+const DECLARED = new Set(Object.keys(schemaJson.properties ?? {}));
 
-/** A value of `name`'s kind and its empty one (`false`, `0`, `''`, `[]`). */
+const kindOf = (name: string) =>
+  KNOWN[name] ?? jsonFind(schemaJson, name)?.type;
+
+/** The values `name`'s schema lists, when it lists them. */
+const listedOf = (name: string) => jsonFind(schemaJson, name)?.enum;
+
+/**
+ * A value of `name`'s kind and its empty one (`false`, `0`, `''`, `[]`); for
+ * an argument with listed values, the first of them (any other is refused by
+ * the schema: see `ENUM_CASES`).
+ */
 function valuesOf(name: string): Array<[string, unknown]> {
+  const listed = listedOf(name);
+  if (listed !== undefined) {
+    const first = listed[0];
+    return [[`'${String(first)}'`, first]];
+  }
   switch (kindOf(name)) {
     case 'boolean':
       return [
@@ -561,12 +736,8 @@ type NotSentCase = [string, string, string, unknown];
 /** Per type, every argument its create does not send, with each value tried. */
 function notSentCases(objectType: string): NotSentCase[] {
   const accepted = new Set([...ACCEPTED_EVERYWHERE, ...CARRIES[objectType]]);
-  const names = new Set([
-    ...Object.keys(schemaProperties),
-    ...Object.keys(KNOWN),
-  ]);
   const cases: NotSentCase[] = [];
-  for (const name of names) {
+  for (const name of DECLARED) {
     if (accepted.has(name)) continue;
     for (const [shown, value] of valuesOf(name)) {
       cases.push([objectType, name, shown, value]);
@@ -578,6 +749,21 @@ function notSentCases(objectType: string): NotSentCase[] {
 const NOT_SENT_CASES = TYPES.flatMap(([objectType]) =>
   notSentCases(objectType),
 );
+
+/** Per type, each argument of {@link KNOWN} the schema does not declare. */
+const UNDECLARED_CASES = TYPES.flatMap(([objectType]) =>
+  Object.keys(KNOWN)
+    .filter((name) => !DECLARED.has(name))
+    .map((name): NotSentCase => {
+      const [shown, value] = valuesOf(name)[0] ?? ['undefined', undefined];
+      return [objectType, name, shown, value];
+    }),
+);
+
+/** Per type, every argument with listed values its create does not send. */
+const ENUM_CASES = NOT_SENT_CASES.filter(
+  ([, name]) => listedOf(name) !== undefined,
+).map(([objectType, name]) => [objectType, name]);
 
 const TYPE_FIELDS = new Map(TYPES);
 const fieldsOf = (objectType: string) => TYPE_FIELDS.get(objectType) ?? {};
@@ -603,27 +789,76 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
     },
   );
 
+  it.each(ENUM_CASES)(
+    '%s with %s outside its listed values: refused by the schema before any request, naming it',
+    async (objectType, name) => {
+      const answered = await run(
+        'answered',
+        create(objectType, {
+          ...fieldsOf(objectType),
+          [name]: 'NOT_A_LISTED_VALUE',
+        }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        'Input validation error: Invalid arguments for tool HandlerCreate: Invalid option',
+      );
+      expect(textOf(answered.answer)).toContain(`at ${name}`);
+    },
+  );
+
+  it.each(UNDECLARED_CASES)(
+    '%s with %s = %s, which the schema does not declare: refused before any request, naming it',
+    async (objectType, name, _shown, value) => {
+      const answered = await run(
+        'answered',
+        create(objectType, { ...fieldsOf(objectType), [name]: value }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        `${name} is not an argument of HandlerCreate`,
+      );
+    },
+  );
+
+  // Named in the schema's order: the parse hands the handler its arguments so.
   it('names every argument it does not send', async () => {
     const answered = await run(
       'answered',
       create('STRUCTURE', {
         ...fieldsOf('STRUCTURE'),
-        fields: [],
-        activate: false,
+        application: 'S',
+        program_name: 'ZPROG_A',
       }),
     );
     expect(answered.sent).toEqual([]);
     expect(textOf(answered.answer)).toContain(
-      'HandlerCreate sends the create request alone: fields, activate are not sent',
+      'HandlerCreate sends the create request alone: program_name, application are not sent',
     );
   });
 
+  // A declared argument given as undefined is absent: `superclass` is
+  // declared and DOMAIN's create does not send it. An undeclared one is
+  // refused whatever its value — the strict parse reads the key.
   it('an argument given as undefined is absent', async () => {
     const held = await run(
       'pending',
-      create('DOMAIN', { ...fieldsOf('DOMAIN'), activate: undefined }),
+      create('DOMAIN', { ...fieldsOf('DOMAIN'), superclass: undefined }),
     );
     expect(held.sent).toHaveLength(1);
+  });
+
+  it('an undeclared argument given as undefined is refused, naming it', async () => {
+    const answered = await run(
+      'answered',
+      create('DOMAIN', { ...fieldsOf('DOMAIN'), activate: undefined }),
+    );
+    expect(answered.sent).toEqual([]);
+    expect(textOf(answered.answer)).toContain(
+      'activate is not an argument of HandlerCreate',
+    );
   });
 
   it.each(TYPES.map(([type]) => [type]))(
@@ -679,7 +914,9 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
 
 describe('the HandlerCreate schema and description', () => {
   it('create_only is not in the schema', () => {
-    expect(Object.keys(schemaProperties)).not.toContain('create_only');
+    expect(Object.keys(schemaJson.properties ?? {})).not.toContain(
+      'create_only',
+    );
   });
 
   it('names only what some create sends', () => {
@@ -688,7 +925,9 @@ describe('the HandlerCreate schema and description', () => {
       ...Object.values(CARRIES).flat(),
     ]);
     expect(
-      Object.keys(schemaProperties).filter((name) => !sent.has(name)),
+      Object.keys(schemaJson.properties ?? {}).filter(
+        (name) => !sent.has(name),
+      ),
     ).toEqual([]);
   });
 

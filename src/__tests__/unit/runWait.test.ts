@@ -3,20 +3,20 @@
  * Against the real adt-clients over a recording connection:
  *
  * - `wait: false` sends the start alone and answers the run id;
- * - `wait: true`, and the default, read the status once by long polling
- *   (`?withLongPolling=true`): `FINISHED` reads the result, another status is
- *   answered with the run id, and a status with no `aunit:progress` is a
- *   failure carrying SAP's document — one status read each time;
+ * - `wait: true`, and the default, read the status at once (no long
+ *   polling), and long-poll (`?withLongPolling=true`) only while SAP answers
+ *   `RUNNING`: `FINISHED` reads the result, `NOT_STARTED` is answered with
+ *   the run id, and a status with no `aunit:progress` is a failure carrying
+ *   SAP's document;
  * - `wait` with `runner: 'sync'` is refused with nothing sent, and a value
  *   that is not a boolean is refused with nothing sent;
  * - the readers (`GetUnitTestResult`, the library's `GetUnitTest`,
- *   `GetCdsUnitTest`, `GetCdsUnitTestResult`) read the status the same way,
- *   once.
+ *   `GetCdsUnitTest`, `GetCdsUnitTestResult`) read the status the same way.
  *
  * A status long poll is held by ADT until the run has finished (measured on
- * premise, 2026-10-31), so a `RUNNING` answer is rare on the wire; each
- * recording queues a `FINISHED` answer after the one under test, so a second
- * status read would be answered and seen.
+ * premise, 2026-10-31); a plain read answers at once (measured on both
+ * systems, 2026-11-05). Each recording queues a `FINISHED` answer after the
+ * one under test, so a further status read would be answered and seen.
  */
 
 import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
@@ -50,7 +50,9 @@ import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../handlers/unit_test/high/handleRunUnitTest';
-import { corpusBody } from '../../lib/adtCorpus';
+import { defineTool } from '../../lib/handlers/interfaces';
+import { corpusBody } from '../helpers/adtCorpus';
+import { declaredRequired, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
   type RecordingConnection,
@@ -70,15 +72,20 @@ const FINISHED = {
 const RESULT = {
   data: corpusBody(`unittest-run-passing--03-results-${RUN.toLowerCase()}`),
 };
-// Synthetic (no fixture): a status read while the run is in progress.
+// A status read while the run is in progress (measured, its run details left out).
 const RUNNING = {
-  data: '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING" percentage="40"/></aunit:run>',
+  data: '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING"/></aunit:run>',
+};
+// A run SAP does not know (measured, its result links left out).
+const NOT_STARTED = {
+  data: '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="NOT_STARTED"/><aunit:time/></aunit:run>',
 };
 // Synthetic (no fixture): a status document that names no progress.
 const NO_PROGRESS_DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" title="no progress here"/>';
 const NO_PROGRESS = { data: NO_PROGRESS_DOCUMENT };
-const STATUS_URL = `/sap/bc/adt/abapunit/runs/${RUN}?withLongPolling=true`;
+const STATUS_URL = `/sap/bc/adt/abapunit/runs/${RUN}`;
+const LONG_POLL_URL = `${STATUS_URL}?withLongPolling=true`;
 
 interface Answer {
   readonly isError?: boolean;
@@ -212,10 +219,10 @@ describe.each(RUN_TOOLS)('$name: wait', (tool) => {
       expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
     });
 
-    it('a RUNNING status: the run id and the status, one status read, no result read', async () => {
+    it('a NOT_STARTED status: the run id and the status, one status read, no result read', async () => {
       const connection = recordingConnection([
         STARTED,
-        RUNNING,
+        NOT_STARTED,
         FINISHED,
         RESULT,
       ]);
@@ -229,8 +236,25 @@ describe.each(RUN_TOOLS)('$name: wait', (tool) => {
       expect(answerOf(result)).toEqual({
         success: true,
         run_id: RUN,
-        status: 'RUNNING',
+        status: 'NOT_STARTED',
       });
+    });
+
+    it('a RUNNING status: long-polled until FINISHED, then the result', async () => {
+      const connection = recordingConnection([
+        STARTED,
+        RUNNING,
+        FINISHED,
+        RESULT,
+      ]);
+      const result = await tool.call(connection, wait);
+      expect(result.isError).toBe(false);
+      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
+        STATUS_URL,
+        LONG_POLL_URL,
+      ]);
+      expect(resultReads(connection.requests)).toHaveLength(1);
+      expect(answerOf(result).finished).toBe(true);
     });
 
     it('a status with no progress: a failure carrying the document, one status read', async () => {
@@ -319,8 +343,7 @@ describe('wait with runner sync', () => {
 
 /**
  * The arguments of a call as they arrive from a client: parsed JSON, outside
- * the type system — the only way a `wait` that is not a boolean reaches a
- * handler typed `wait?: boolean`.
+ * the type system, handed to the tool's entry, whose schema reads them first.
  */
 function fromClient(json: string) {
   return JSON.parse(json);
@@ -335,12 +358,15 @@ describe('a wait that is not a boolean, on each run tool', () => {
     '{"on":true}',
   ];
   const calls: ReadonlyArray<
-    readonly [string, (c: RecordingConnection, wait: string) => Promise<Answer>]
+    readonly [
+      string,
+      (c: RecordingConnection, wait: string) => Promise<unknown>,
+    ]
   > = [
     [
       'RunUnitTest',
       (connection, wait) =>
-        handleRunUnitTest(
+        defineTool(RunUnitTest_Tool, handleRunUnitTest).call(
           { connection },
           fromClient(`{"class_name":"zcl_x","wait":${wait}}`),
         ),
@@ -348,7 +374,7 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunCdsUnitTest',
       (connection, wait) =>
-        handleRunCdsUnitTest(
+        defineTool(RunCdsUnitTest_Tool, handleRunCdsUnitTest).call(
           { connection },
           fromClient(`{"class_name":"zcl_x","wait":${wait}}`),
         ),
@@ -356,7 +382,7 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunProgramUnitTest',
       (connection, wait) =>
-        handleRunProgramUnitTest(
+        defineTool(RunProgramUnitTest_Tool, handleRunProgramUnitTest).call(
           { connection },
           fromClient(`{"program_name":"zr_x","wait":${wait}}`),
         ),
@@ -364,7 +390,10 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunFunctionGroupUnitTest',
       (connection, wait) =>
-        handleRunFunctionGroupUnitTest(
+        defineTool(
+          RunFunctionGroupUnitTest_Tool,
+          handleRunFunctionGroupUnitTest,
+        ).call(
           { connection },
           fromClient(`{"function_group_name":"zfg_x","wait":${wait}}`),
         ),
@@ -372,7 +401,10 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunFunctionModuleUnitTest',
       (connection, wait) =>
-        handleRunFunctionModuleUnitTest(
+        defineTool(
+          RunFunctionModuleUnitTest_Tool,
+          handleRunFunctionModuleUnitTest,
+        ).call(
           { connection },
           fromClient(`{"function_module_name":"z_fm_x","wait":${wait}}`),
         ),
@@ -380,7 +412,7 @@ describe('a wait that is not a boolean, on each run tool', () => {
     [
       'RunAbapUnit',
       (connection, wait) =>
-        handleRunAbapUnit(
+        defineTool(RunAbapUnit_Tool, handleRunAbapUnit).call(
           { connection },
           fromClient(
             `{"target":{"kind":"object","name":"zcl_x","type":"CLAS/OC"},"wait":${wait}}`,
@@ -389,18 +421,19 @@ describe('a wait that is not a boolean, on each run tool', () => {
     ],
   ];
   describe.each(calls)('%s', (_name, call) => {
-    it.each(NOT_BOOLEAN)('refuses %s before anything is sent', async (wait) => {
-      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-      const result = await call(connection, wait);
-      expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('wait must be true or false');
-      expect(result.content[0]?.text).toContain('nothing was sent');
-      expect(connection.requests).toEqual([]);
-    });
+    it.each(NOT_BOOLEAN)(
+      "the tool's schema refuses %s before anything is sent",
+      async (wait) => {
+        const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+        const refused = expect(call(connection, wait)).rejects.toThrow('wait');
+        await refused;
+        expect(connection.requests).toEqual([]);
+      },
+    );
   });
 });
 
-describe.each(READERS)('$name reads the status once', (reader) => {
+describe.each(READERS)('$name reads the status first', (reader) => {
   it('a FINISHED status: one status read, then the result', async () => {
     const connection = recordingConnection([FINISHED, RESULT]);
     const result = await reader.call(connection);
@@ -415,16 +448,28 @@ describe.each(READERS)('$name reads the status once', (reader) => {
     expect(answer).toHaveProperty('run_result');
   });
 
-  it('a RUNNING status: the run id and the status, one status read, no result read', async () => {
-    const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
+  it('a NOT_STARTED status: the run id and the status, one status read, no result read', async () => {
+    const connection = recordingConnection([NOT_STARTED, FINISHED, RESULT]);
     const result = await reader.call(connection);
     expect(result.isError).toBe(false);
     expect(connection.requests.map((r) => r.url)).toEqual([STATUS_URL]);
     expect(answerOf(result)).toEqual({
       success: true,
       run_id: RUN,
-      status: 'RUNNING',
+      status: 'NOT_STARTED',
     });
+  });
+
+  it('a RUNNING status: long-polled until FINISHED, then the result', async () => {
+    const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
+    const result = await reader.call(connection);
+    expect(result.isError).toBe(false);
+    expect(connection.requests.map((r) => r.url)).toEqual([
+      STATUS_URL,
+      LONG_POLL_URL,
+      expect.stringContaining('/abapunit/results/'),
+    ]);
+    expect(answerOf(result).finished).toBe(true);
   });
 
   it('a status with no progress: a failure carrying the document, one status read', async () => {
@@ -449,7 +494,7 @@ describe('the schema', () => {
   ])(
     '$name declares wait: an optional boolean with no schema default (true when absent), and says what each value does',
     (tool) => {
-      const properties: Record<string, unknown> = tool.inputSchema.properties;
+      const properties = listedJson(tool.inputSchema).properties ?? {};
       expect(properties.wait).toEqual({
         type: 'boolean',
         description: expect.stringContaining(
@@ -457,7 +502,7 @@ describe('the schema', () => {
         ),
       });
       expect(properties).not.toHaveProperty('max_status_polls');
-      expect(tool.inputSchema.required).not.toContain('wait');
+      expect(declaredRequired(tool.inputSchema)).not.toContain('wait');
       expect(tool.description).toContain('with wait true (default)');
       expect(tool.description).toContain(
         'with wait false the call answers the run_id right after the start',
@@ -466,21 +511,24 @@ describe('the schema', () => {
         'A long run under a client with a request time limit is started with wait false.',
       );
       expect(tool.description).toContain(
-        'a run SAP answers with another status returns the run_id and that status, read on by run_id',
+        'a run SAP reports unstarted (its answer for an unknown run_id) returns the run_id and that status',
       );
     },
   );
 
   it('GetUnitTestResult declares no wait and no max_status_polls', () => {
-    const properties: Record<string, unknown> =
-      GetUnitTestResult_Tool.inputSchema.properties;
+    const properties =
+      listedJson(GetUnitTestResult_Tool.inputSchema).properties ?? {};
     expect(properties).not.toHaveProperty('wait');
     expect(properties).not.toHaveProperty('max_status_polls');
   });
 
   it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {
     expect(GetUnitTestResult_Tool.description).toContain(
-      'a run SAP answers with another status answers the run_id and that status, read on by run_id',
+      'a run SAP answers running is read again by long polling',
+    );
+    expect(GetUnitTestResult_Tool.description).toContain(
+      'a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once',
     );
   });
 });

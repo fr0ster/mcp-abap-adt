@@ -75,6 +75,22 @@ describe('nextToOf', () => {
     ).toBe('20260101000000');
   });
 
+  it('reads a next link whose attributes are quoted with apostrophes, as XML allows', () => {
+    expect(
+      nextToOf(
+        "<atom:feed xmlns:atom=\"http://www.w3.org/2005/Atom\"><atom:link rel='next' href='/sap/bc/adt/runtime/dumps?$top=100&amp;to=20260930043748'/></atom:feed>",
+      ),
+    ).toBe('20260930043748');
+  });
+
+  it('reads a next link that is not self-closing', () => {
+    expect(
+      nextToOf(
+        '<atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:link href="/x?$top=100&amp;to=2026" rel="next"></atom:link></atom:feed>',
+      ),
+    ).toBe('2026');
+  });
+
   it('answers nothing without a next link', () => {
     expect(
       nextToOf('<atom:feed><atom:link href="/x?to=1" rel="self"/></atom:feed>'),

@@ -1,3 +1,7 @@
+import * as z from 'zod';
+import { createArguments } from '../../../lib/handlers/createArguments';
+import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateMetadataExtension Handler - ABAP Metadata Extension Creation via ADT API
  *
@@ -12,7 +16,7 @@
  * while holding it. The wait before `activate` is the pre-migration
  * handler's long-polling `read({withLongPolling: true})`, discarded for its
  * result but not for what it does — see `handleUpdateDomain.ts` (high) for
- * the live incident this guards against, documented in `xmlPatch.ts`.
+ * the live incident this guards against, documented in `documentPatch.ts`.
  */
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
@@ -25,7 +29,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -33,6 +37,7 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
+import type { XmlRead } from '../../../lib/xml/tree.js';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -40,49 +45,27 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: {
-        type: 'string',
-        description: 'Metadata Extension name',
-      },
-      description: {
-        type: 'string',
-        description: 'Description',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name',
-      },
-      transport_request: {
-        type: 'string',
-        description: 'Transport request number, not a task',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after creation. Default: true',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['name', 'package_name'],
-  },
+  inputSchema: createArguments('CreateMetadataExtension', {
+    name: z.string().describe('Metadata Extension name'),
+    description: z.string().optional().describe('Description'),
+    package_name: z.string().describe('Package name'),
+    transport_request: z
+      .string()
+      .optional()
+      .describe('Transport request number, not a task'),
+    activate: z
+      .boolean()
+      .optional()
+      .describe('Activate after creation. Default: true'),
+    master_language: z
+      .string()
+      .optional()
+      .describe(MASTER_LANGUAGE_DESCRIPTION),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CreateMetadataExtensionArgs {
-  name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  activate?: boolean;
-  master_language?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CreateMetadataExtensionArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleCreateMetadataExtension(
   context: HandlerContext,
@@ -97,7 +80,7 @@ export async function handleCreateMetadataExtension(
   try {
     validateTransportRequest(args.package_name, args.transport_request);
   } catch (error) {
-    return return_error(error as Error);
+    return return_error(error);
   }
 
   const name = args.name.toUpperCase();
@@ -106,7 +89,7 @@ export async function handleCreateMetadataExtension(
 
   return answer(
     { tool: 'CreateMetadataExtension', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+    async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getMetadataExtension(
         resultsFor(metadataExtensionDocuments),
       );
@@ -146,7 +129,7 @@ export async function handleCreateMetadataExtension(
         { type: 'METADATA_EXTENSION', name: name },
       );
       if (!checked.ok) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
@@ -158,7 +141,7 @@ export async function handleCreateMetadataExtension(
         .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+        return checked;
       }
 
       return carryCleanup(

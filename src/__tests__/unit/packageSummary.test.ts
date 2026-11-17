@@ -2,11 +2,12 @@
  * A package's metadata, read three ways: the summary (`terse`), the summary with
  * every sub-package (`full`), the document itself (`raw`, not here).
  */
-import { corpusBody } from '../../lib/adtCorpus';
+
 import {
   packageDetails,
   packageSummary,
 } from '../../lib/strategies/packageSummary';
+import { corpusBody } from '../helpers/adtCorpus';
 
 const WITH_SUB_PACKAGES = `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZPARENT" adtcore:description="Parent"><pak:attributes pak:packageType="structure"/><pak:subPackages><pak:packageRef adtcore:name="ZCHILD_A" adtcore:description="Child A"/><pak:packageRef adtcore:name="ZCHILD_B" adtcore:description="Child B"/></pak:subPackages></pak:package>`;
 

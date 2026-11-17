@@ -1,9 +1,11 @@
+import * as z from 'zod';
+
 /**
  * Batch mode over Streamable HTTP (spec §2, "How each transport reaches
  * it"): every request is an MCP session of its own, so a batch is the pooled
  * instance's, and the client's calls reach it by the instance's handle — the
  * `x-mcp-state-handle` request header first, else the `tools/call`'s
- * `state_handle` argument, which the debugger tools keep. `BatchBegin` holds
+ * `state_handle` argument, which the debugger tools keep. `HandlerBatch` begin holds
  * state and answers the handle; a call without it reaches a new instance,
  * where no batch is open. Every call goes over real HTTP to a server whose
  * per-request connections talk to the ADT stand-in; the envelope is answered
@@ -11,17 +13,14 @@
  */
 
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
-import {
-  BatchHandlersGroup,
-  type HandlerContext,
-  HighLevelHandlersGroup,
-  type IHandlerGroup,
-} from '@mcp-abap-adt/lib/handlers';
+import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import type { InstanceState } from '@mcp-abap-adt/lib/state';
+import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import {
   envelopeResponse,
   innerRequests,
 } from '../../../../src/__tests__/helpers/batchEnvelope';
+import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import { InstancePool } from '../InstancePool.js';
 import {
   basicHeaders,
@@ -44,13 +43,10 @@ const echoGroup: IHandlerGroup = {
       toolDefinition: {
         name: 'EchoHandle',
         description: 'answers the handle of the instance it ran on',
-        inputSchema: {
-          type: 'object',
-          properties: { state_handle: { type: 'string' } },
-        },
+        inputSchema: z.object({ state_handle: z.string().optional() }),
       } as never,
       // Two parameters: the registration hands `(context, args)` only then.
-      handler: (async (context: { state: InstanceState }, _args: unknown) => ({
+      call: (async (context: { state: InstanceState }, _args: unknown) => ({
         content: [{ type: 'text', text: context.state.handle }],
       })) as never,
     },
@@ -75,8 +71,8 @@ beforeEach(async () => {
     server: { batch: { keepRawParts: false } },
     groups: [
       echoGroup,
-      new HighLevelHandlersGroup(placeholder),
-      new BatchHandlersGroup(placeholder),
+      new CompactReadOnlyHandlersGroup(placeholder),
+      new CompactBatchHandlersGroup(placeholder),
     ],
   });
   // Each part answers `200` with the inner request it answers, so an answer
@@ -120,7 +116,7 @@ const withHeader = (handle: string) => ({
 });
 
 async function begin(): Promise<string> {
-  const begun = await s.call('BatchBegin', {});
+  const begun = await s.call('HandlerBatch', { action: 'begin' });
   expect(begun.status).toBe(200);
   expect(begun.isError).toBe(false);
   const answer = JSON.parse(begun.text) as {
@@ -162,14 +158,14 @@ it("a debugger tool's argument still routes", async () => {
   await until(() => poolSize() === 0);
 });
 
-it('BatchBegin holds state and answers the handle; a later call with the header is recorded there', async () => {
+it('HandlerBatch begin holds state and answers the handle; a later call with the header is recorded there', async () => {
   const handle = await begin();
   // It holds state: the instance stays in the pool between requests.
   expect(poolSize()).toBe(1);
 
   const recorded = await s.call(
-    'GetProgram',
-    { program_name: 'PROG_A' },
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_A' },
     withHeader(handle),
   );
   expect(recorded).toEqual({ status: 200, text: '', isError: false });
@@ -177,7 +173,11 @@ it('BatchBegin holds state and answers the handle; a later call with the header 
   expect(programReads()).toEqual([]);
   expect(envelopes()).toEqual([]);
 
-  const ended = await s.call('BatchEnd', {}, withHeader(handle));
+  const ended = await s.call(
+    'HandlerBatch',
+    { action: 'end' },
+    withHeader(handle),
+  );
   expect(ended.isError).toBe(false);
   expect(JSON.parse(ended.text)).toMatchObject({
     recorded: 1,
@@ -187,8 +187,8 @@ it('BatchBegin holds state and answers the handle; a later call with the header 
   expect(envelopes().filter((r) => r.method === 'POST')).toHaveLength(1);
 
   const answers = await s.call(
-    'BatchAnswers',
-    { number: 1 },
+    'HandlerBatch',
+    { action: 'answers', number: 1 },
     withHeader(handle),
   );
   expect(answers.isError).toBe(false);
@@ -199,31 +199,52 @@ it('BatchBegin holds state and answers the handle; a later call with the header 
   expect(s.stderr.join('\n')).not.toContain(handle);
 });
 
-it('no header → a fresh instance: BatchAnswers no answer with that number', async () => {
+it('no header → a fresh instance: HandlerBatch answers no answer with that number', async () => {
   const handle = await begin();
-  await s.call('GetProgram', { program_name: 'PROG_A' }, withHeader(handle));
-  const ended = await s.call('BatchEnd', {}, withHeader(handle));
+  await s.call(
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_A' },
+    withHeader(handle),
+  );
+  const ended = await s.call(
+    'HandlerBatch',
+    { action: 'end' },
+    withHeader(handle),
+  );
   expect(JSON.parse(ended.text)).toMatchObject({ recorded: 1 });
   // With the header, the answer is there.
   expect(
-    (await s.call('BatchAnswers', { number: 1 }, withHeader(handle))).text,
+    (
+      await s.call(
+        'HandlerBatch',
+        { action: 'answers', number: 1 },
+        withHeader(handle),
+      )
+    ).text,
   ).toContain(partOf('PROG_A'));
 
   // Without it, a new instance, where no batch ran.
-  const lost = await s.call('BatchAnswers', { number: 1 });
+  const lost = await s.call('HandlerBatch', { action: 'answers', number: 1 });
   expect(lost.text).toContain('no answer with that number');
   expect(lost.text).not.toContain(partOf('PROG_A'));
 });
 
 it('a call without the header while a batch is open is not recorded there', async () => {
   const handle = await begin();
-  const direct = await s.call('GetProgram', { program_name: 'PROG_D' });
+  const direct = await s.call('HandlerGet', {
+    object_type: 'PROGRAM',
+    program_name: 'PROG_D',
+  });
   expect(direct.status).toBe(200);
   // Sent at once, on a new instance.
   expect(programReads().map((r) => r.url)).toEqual([
     expect.stringContaining('/prog_d/'),
   ]);
-  const ended = await s.call('BatchEnd', {}, withHeader(handle));
+  const ended = await s.call(
+    'HandlerBatch',
+    { action: 'end' },
+    withHeader(handle),
+  );
   expect(JSON.parse(ended.text)).toMatchObject({
     recorded: 0,
     sent: 0,
@@ -231,9 +252,13 @@ it('a call without the header while a batch is open is not recorded there', asyn
   });
 });
 
-it('a dropped BatchEnd request keeps its answers', async () => {
+it('a dropped HandlerBatch end request keeps its answers', async () => {
   const handle = await begin();
-  await s.call('GetProgram', { program_name: 'PROG_A' }, withHeader(handle));
+  await s.call(
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_A' },
+    withHeader(handle),
+  );
   const held = s.standIn.hold((r) => isEnvelope(r.url) && r.method === 'POST');
 
   const client = new AbortController();
@@ -249,7 +274,7 @@ it('a dropped BatchEnd request keeps its answers', async () => {
       jsonrpc: '2.0',
       id: 9100,
       method: 'tools/call',
-      params: { name: 'BatchEnd', arguments: {} },
+      params: { name: 'HandlerBatch', arguments: { action: 'end' } },
     }),
   }).catch(() => 'dropped');
   await held.arrived;
@@ -257,9 +282,13 @@ it('a dropped BatchEnd request keeps its answers', async () => {
   expect(await dropped).toBe('dropped');
   await turns(20);
 
-  // The next call with the header waits for BatchEnd's lease, then reads
+  // The next call with the header waits for the batch end's lease, then reads
   // what came.
-  const reading = s.call('BatchAnswers', { number: 1 }, withHeader(handle));
+  const reading = s.call(
+    'HandlerBatch',
+    { action: 'answers', number: 1 },
+    withHeader(handle),
+  );
   await turns(20);
   held.release();
   const answers = await reading;
@@ -303,14 +332,14 @@ it('two requests with the same header at once: both recorded, numbered in arriva
   });
 
   const first = s.call(
-    'GetProgram',
-    { program_name: 'PROG_A' },
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_A' },
     withHeader(handle),
   );
   await leaseHeld;
   const second = s.call(
-    'GetProgram',
-    { program_name: 'PROG_B' },
+    'HandlerGet',
+    { object_type: 'PROGRAM', program_name: 'PROG_B' },
     withHeader(handle),
   );
   // Both are at the pool; the second waits for the lease.
@@ -323,14 +352,26 @@ it('two requests with the same header at once: both recorded, numbered in arriva
   expect(await second).toEqual({ status: 200, text: '', isError: false });
   expect(programReads()).toEqual([]);
 
-  const ended = await s.call('BatchEnd', {}, withHeader(handle));
+  const ended = await s.call(
+    'HandlerBatch',
+    { action: 'end' },
+    withHeader(handle),
+  );
   expect(JSON.parse(ended.text)).toMatchObject({
     recorded: 2,
     sent: 2,
     received: 2,
   });
-  const one = await s.call('BatchAnswers', { number: 1 }, withHeader(handle));
-  const two = await s.call('BatchAnswers', { number: 2 }, withHeader(handle));
+  const one = await s.call(
+    'HandlerBatch',
+    { action: 'answers', number: 1 },
+    withHeader(handle),
+  );
+  const two = await s.call(
+    'HandlerBatch',
+    { action: 'answers', number: 2 },
+    withHeader(handle),
+  );
   expect(one.text).toContain(partOf('PROG_A'));
   expect(one.text).not.toContain(partOf('PROG_B'));
   expect(two.text).toContain(partOf('PROG_B'));

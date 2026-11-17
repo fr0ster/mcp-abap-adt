@@ -8,6 +8,7 @@
     "moduleResolution": "node16",
     "isolatedModules": true,
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -20,7 +21,6 @@
     ],
     "rootDir": "..",
     "outDir": "./dist",
-    "noImplicitAny": false,
     "paths": {
       "@mcp-abap-adt/compact-modify": [
         "../compact-modify/src/index.ts"

@@ -11,9 +11,9 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { readDebuggeeEnd } from '../../../lib/debugger/readings';
+import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 
 /** Replays one recorded exchange; a status of 400 or more is thrown the way the transport throws it. */
 function replaying(name: string, body?: string): IAbapConnection {

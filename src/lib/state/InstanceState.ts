@@ -15,8 +15,8 @@ import { logger as processLogger } from '../logger';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   NO_IDLE_BOUND,
-  parseStateIdleMinutes,
   type StateIdleBound,
+  stateIdleMinutesOf,
 } from './idleBound';
 
 /**
@@ -92,8 +92,8 @@ export const stderrStateLogger: StateLogger = {
  * pass that default here — it passes nothing, and stderr answers.
  */
 export function stateLoggerOf(options: {
-  stateLogger?: StateLogger;
-  logger?: StateLogger;
+  stateLogger?: StateLogger | undefined;
+  logger?: StateLogger | undefined;
 }): StateLogger {
   return options.stateLogger ?? options.logger ?? stderrStateLogger;
 }
@@ -106,7 +106,7 @@ export interface InstanceStateOptions {
    * else is refused. `NO_IDLE_BOUND` (stdio): none — no timer is ever armed,
    * and held state ends only by a stop, the host, the backend or shutdown.
    */
-  idleMinutes?: StateIdleBound;
+  idleMinutes?: StateIdleBound | undefined;
   /**
    * Run after the idle bound's stop, whatever its undo answered: the host's
    * terminal close of what the state owns. A failure is reported
@@ -144,7 +144,7 @@ export class InstanceState {
         ? DEFAULT_STATE_IDLE_MINUTES
         : options.idleMinutes === NO_IDLE_BOUND
           ? NO_IDLE_BOUND
-          : parseStateIdleMinutes(options.idleMinutes, 'stateIdleMinutes');
+          : stateIdleMinutesOf(options.idleMinutes, 'stateIdleMinutes');
   }
 
   private readonly parts: StatePart[] = [];
@@ -189,9 +189,9 @@ export class InstanceState {
   }
 
   /** For a call on existing state: the handle must be this one and something must be held. */
-  check(handle: unknown): void {
+  check(handle: string | undefined): void {
     if (
-      typeof handle !== 'string' ||
+      handle === undefined ||
       handle !== this.current ||
       !this.holdsState() ||
       // A complete stop is disposing: no call runs on a session being stopped.

@@ -1,3 +1,4 @@
+import type * as z from 'zod';
 /**
  * Task 28: why this compact facade carries no `detail` of its own.
  *
@@ -33,8 +34,12 @@ import {
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
   handleValidateServiceBinding,
+  PACKAGE_NAME_REQUIRED,
+  SERVICE_BINDING_NAME_REQUIRED,
+  SERVICE_DEFINITION_NAME_REQUIRED,
   validateObject,
 } from '@mcp-abap-adt/lib/handlers/read';
+import { return_error } from '@mcp-abap-adt/lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerValidate',
@@ -46,19 +51,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerValidateArgs = {
-  object_type: string;
-  object_name: string;
-  package_name?: string;
-  description?: string;
-  super_package?: string;
-  superclass?: string;
-  behavior_definition?: string;
-  root_entity?: string;
-  implementation_type?: string;
-  service_definition_name?: string;
-  service_binding_version?: string;
-};
+type HandlerValidateArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerValidate(
   context: HandlerContext,
@@ -76,11 +69,26 @@ export async function handleHandlerValidate(
   }
 
   if (member === 'SERVICE_BINDING') {
+    // The callee's arguments require both names; an absent one is refused
+    // here in the callee's words and order, as the callee refuses it, and
+    // nothing is sent. An empty or blank package reaches the callee, which
+    // refuses it in the same words.
+    const definition = args.service_definition_name;
+    const packageName = args.package_name;
+    if (!args.object_name) {
+      return return_error(new Error(SERVICE_BINDING_NAME_REQUIRED));
+    }
+    if (!definition) {
+      return return_error(new Error(SERVICE_DEFINITION_NAME_REQUIRED));
+    }
+    if (packageName === undefined) {
+      return return_error(new Error(PACKAGE_NAME_REQUIRED));
+    }
     return handleValidateServiceBinding(context, {
       service_binding_name: args.object_name,
-      service_definition_name: args.service_definition_name,
+      service_definition_name: definition,
       service_binding_version: args.service_binding_version,
-      package_name: args.package_name,
+      package_name: packageName,
       description: args.description,
     });
   }

@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,32 +27,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      table_name: {
-        type: 'string',
-        description: 'Table name.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.",
-        enum: ['active', 'inactive', 'new'],
-      },
-      ddl_code: {
-        type: 'string',
-        description:
-          'Optional: DDL source code to validate instead of the saved version.',
-      },
-    },
-    required: ['table_name'],
-  },
+  inputSchema: z.object({
+    table_name: z.string().describe('Table name.'),
+    version: z
+      .enum(['active', 'inactive', 'new'])
+      .optional()
+      .describe(
+        "Version to check: 'active', 'inactive', or 'new'. Without `version` the active version is checked.",
+      ),
+    ddl_code: z
+      .string()
+      .optional()
+      .describe(
+        'Optional: DDL source code to validate instead of the saved version.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckTable(
   context: HandlerContext,
-  args: { table_name: string; version?: string; ddl_code?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckTableLow(context, args);
   return normalizeCheckResponse(result, args.table_name?.toUpperCase());

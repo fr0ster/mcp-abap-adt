@@ -27,7 +27,7 @@ describe('the debug set', () => {
   describe('the binaries', () => {
     const groupsOf = (set: typeof fullToolSet) =>
       set
-        .groups({ connection: undefined } as any, 'stdio')
+        .groups({ connection: undefined } as any, 'stdio', { dataTools: false })
         .map((g) => g.getName());
 
     it('mcp-abap-adt (and -http, -sse) serves it always', () => {

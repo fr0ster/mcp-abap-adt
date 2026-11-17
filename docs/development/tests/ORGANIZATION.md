@@ -15,8 +15,7 @@ doc/tests/
 ├── README.md                      # Documentation index
 ├── TESTING_GUIDE.md              # Complete testing guide
 ├── TEST_INFRASTRUCTURE.md        # Technical overview
-├── CREATE_DOMAIN_TOOL.md         # CreateDomain handler docs
-└── test-config.yaml.template     # Template reference copy
+└── test-config.yaml.template     # A pointer to tests/test-config.yaml.template (no copy)
 ```
 
 ## 🎯 Key Points
@@ -75,7 +74,6 @@ doc/tests/
 - **Quick Start**: `tests/README.md`
 - **Full Guide**: `doc/tests/TESTING_GUIDE.md`
 - **Technical Details**: `doc/tests/TEST_INFRASTRUCTURE.md`
-- **CreateDomain Tool**: `doc/tests/CREATE_DOMAIN_TOOL.md`
 
 ## ⚠️ Important
 

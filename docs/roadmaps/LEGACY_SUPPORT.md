@@ -115,7 +115,7 @@ Unsupported tools are hidden from the client automatically.
 
 ### Step 8: Integration tests on legacy system
 
-- Need access to legacy system (E77-class, BASIS ~7.40)
+- Need access to legacy system (BASIS ~7.40)
 - Test config with `sap_auth_type: rfc`
 - Tests should auto-skip unsupported operations based on system detection
 - RFC tests need SAP NW RFC SDK installed on test machine

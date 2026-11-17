@@ -10,6 +10,7 @@
  * Each case runs the tool's own handler over a recording connection
  * declared the variant — real adt-clients code, no SAP.
  */
+
 import {
   ADT_SEARCH_TYPES_CLOUD,
   ADT_SEARCH_TYPES_ONPREM,
@@ -20,7 +21,7 @@ import {
   type AdtApiTable,
 } from '@mcp-abap-adt/interfaces-adt';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
-import { handleHandlerSearch } from '../../../../compact-readonly-entries/src/handlers/handleHandlerSearch';
+import { handleHandlerSystem } from '../../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../../handlers/common/low/handleActivateObject';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
@@ -33,11 +34,9 @@ import {
   TYPE_NAMES,
 } from '../../../lib/adtProjections';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../../lib/systemContext';
+import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -102,8 +101,8 @@ const TABLE_ARGUMENTS: readonly (readonly [string, Send])[] = [
     'GetObjectStructure.object_type',
     (context, value) =>
       handleGetObjectStructure(context, {
-        object_type: value,
-        object_name: 'ZV',
+        objecttype: value,
+        objectname: 'ZV',
       }),
   ],
   [
@@ -136,9 +135,9 @@ async function run(send: Send, variant: ProjectionVariant, value: string) {
   };
 }
 
-/** The `objectType` a search sent, through SearchObject or HandlerSearch. */
+/** The `objectType` a search sent, through SearchObject or HandlerSystem search_object. */
 async function searched(
-  tool: 'SearchObject' | 'HandlerSearch',
+  tool: 'SearchObject' | 'HandlerSystem',
   variant: ProjectionVariant,
   value: string,
 ) {
@@ -150,9 +149,9 @@ async function searched(
       { object_name: 'Z*', object_type: value },
     );
   } else {
-    await handleHandlerSearch(
+    await handleHandlerSystem(
       { connection },
-      { query: 'Z*', object_type: value },
+      { action: 'search_object', object_name: 'Z*', object_type: value },
     );
   }
   expect(connection.requests).toHaveLength(1);
@@ -310,7 +309,7 @@ describe('a lower-case value is a friendly name, an upper-case one a code, main 
   );
 
   const searchCases = VARIANTS.flatMap((variant) =>
-    (['SearchObject', 'HandlerSearch'] as const).map(
+    (['SearchObject', 'HandlerSystem'] as const).map(
       (tool) => [tool, variant] as const,
     ),
   );

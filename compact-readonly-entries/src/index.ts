@@ -11,4 +11,9 @@
  * imported, not by a flag a caller could pass, and checked against the module graph
  * rather than against a list of names.
  */
-export { CompactReadOnlyHandlersGroup, compactReadOnlyEntries } from './group';
+export {
+  CompactDataHandlersGroup,
+  CompactReadOnlyHandlersGroup,
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from './group';

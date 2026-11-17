@@ -14,7 +14,7 @@ jest.setTimeout(30_000);
 let s: Stand;
 
 beforeEach(async () => {
-  s = await stand({ auth: 'jwt' });
+  s = await stand({ kind: 'cloud', auth: 'jwt' });
 });
 
 afterEach(async () => {

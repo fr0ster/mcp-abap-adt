@@ -5,6 +5,7 @@ require('dotenv').config();
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
+const { isUpperAbapName } = require('./readings.js');
 const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
 // `js-yaml`, which this project declares, rather than `yaml`, which it never
@@ -14,6 +15,9 @@ const yaml = require('js-yaml');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('../dist/lib/connectionFactory.js');
 const { credentialFromSapConfig } = require('../dist/lib/credentialSources.js');
+const {
+  isAlreadyExistsError: takenNameRefused,
+} = require('../dist/lib/utils.js');
 const {
   AuthBrokerFactory,
   browserCallbackStrategy,
@@ -91,12 +95,12 @@ function ensureAbapObjectName(name, objectType, maxLength = 30) {
       `${objectType} name "${name}" is too long (${name.length}), max ${maxLength}`,
     );
   }
-  if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
+  if (!isUpperAbapName(name)) {
     throw new Error(
-      `${objectType} name "${name}" must match ^[A-Z][A-Z0-9_]*$`,
+      `${objectType} name "${name}" must be a letter, then letters, digits or _ (upper case)`,
     );
   }
-  if (!/^[ZY]/.test(name)) {
+  if (!name.startsWith('Z') && !name.startsWith('Y')) {
     throw new Error(
       `${objectType} name "${name}" must start with Z or Y in test systems`,
     );
@@ -112,12 +116,12 @@ function ensureLocalClassName(name, objectType, maxLength = 30) {
       `${objectType} name "${name}" is too long (${name.length}), max ${maxLength}`,
     );
   }
-  if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
+  if (!isUpperAbapName(name)) {
     throw new Error(
-      `${objectType} name "${name}" must match ^[A-Z][A-Z0-9_]*$`,
+      `${objectType} name "${name}" must be a letter, then letters, digits or _ (upper case)`,
     );
   }
-  if (!/^(LTC_|LCL_)/.test(name)) {
+  if (!name.startsWith('LTC_') && !name.startsWith('LCL_')) {
     throw new Error(
       `${objectType} name "${name}" must start with LTC_ or LCL_`,
     );
@@ -347,7 +351,6 @@ function compact(data, max = 1200) {
 function parseAdtException(error) {
   const raw = error?.response?.data;
   if (typeof raw !== 'string') return null;
-  if (!raw.includes('<exc:exception')) return null;
   try {
     const parser = new XMLParser({
       ignoreAttributes: false,
@@ -389,14 +392,14 @@ function parseAdtException(error) {
   }
 }
 
+/**
+ * An existing object, by the error's code or by the library's reading of SAP's
+ * answer (its T100 key, or the exception type where SAP gives none) — never its words.
+ */
 function isAlreadyExistsError(error) {
-  const status = error?.response?.status;
-  const payload = String(error?.response?.data || error?.message || '');
   return (
     error?.code === AdtObjectErrorCodes.VALIDATION_FAILED ||
-    (status === 400 &&
-      (payload.includes('ExceptionResourceAlreadyExists') ||
-        payload.includes('does already exist')))
+    takenNameRefused(error)
   );
 }
 

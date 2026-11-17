@@ -10,10 +10,7 @@ export {
   BackgroundRunHandlersGroup,
   backgroundRunEntries,
 } from './BackgroundRunHandlersGroup.js';
-export {
-  BatchHandlersGroup,
-  batchToolEntries,
-} from './BatchHandlersGroup.js';
+export { DataHandlersGroup } from './DataHandlersGroup.js';
 export {
   DebugBatchHandlersGroup,
   debugBatchToolEntries,

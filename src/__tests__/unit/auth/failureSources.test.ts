@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Failures outside a handler (the connect phase), each through a
  * real request: a provider's failure from a token endpoint stand-in, and
@@ -44,9 +45,9 @@ class StubGroup {
         toolDefinition: {
           name: TOOL,
           description: 'a tool that would read the system',
-          inputSchema: { type: 'object', properties: {} },
+          inputSchema: z.object({}),
         },
-        handler: async () => {
+        call: async () => {
           this.reached();
           return { content: [{ type: 'text', text: 'read' }] };
         },
@@ -73,7 +74,6 @@ class TestServer extends BaseMcpServer {
           credential: await destinations.getProvider(),
         }),
       },
-      sessionId: 'dest',
     });
     this.registerHandlers(new CompositeHandlersRegistry([group as never]));
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

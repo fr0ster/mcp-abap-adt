@@ -5,11 +5,8 @@
  * ABAP program leaves in its session — a static buffer, say — is still there
  * on the next call. Over HTTP a stateless request ends its session.
  */
-export function isRfcConnection(connection: unknown): boolean {
-  const config = (
-    connection as
-      | { getConfig?: () => { connectionType?: string } | undefined }
-      | undefined
-  )?.getConfig?.();
-  return config?.connectionType === 'rfc';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+
+export function isRfcConnection(connection: IAbapConnection): boolean {
+  return connection.getConfig?.().connectionType === 'rfc';
 }

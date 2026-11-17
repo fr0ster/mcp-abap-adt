@@ -24,16 +24,34 @@ export function newDebuggerId(): string {
 }
 
 /**
+ * A value the request scope states for `key`: a scope that carries the key
+ * (http/sse state every header, an absent one as `undefined`) answers alone;
+ * otherwise (stdio, a destination's `.env` entered where it had a value)
+ * the scope's value, else the environment's.
+ */
+function scopedOrEnvironment(
+  key: 'debugTerminalId' | 'debugIdeId' | 'debugBreakpointConflict',
+  fromEnvironment: string | undefined,
+): string | undefined {
+  const scope = getRequestContext();
+  const value = scope?.[key]?.trim() || undefined;
+  if (scope !== undefined && key in scope) return value;
+  return value ?? (fromEnvironment?.trim() || undefined);
+}
+
+/**
  * The ids the user states, each on its own: the request scope (a header, or
- * the destination's `.env` entered into it), then the environment.
+ * the destination's `.env` entered into it), then — on stdio only — the
+ * environment.
  */
 export function statedDebuggerIds(
   env: NodeJS.ProcessEnv = process.env,
 ): Partial<DebuggerIds> {
-  const scope = getRequestContext();
-  const terminalId =
-    scope?.debugTerminalId || env.SAP_DEBUG_TERMINAL_ID?.trim() || undefined;
-  const ideId = scope?.debugIdeId || env.SAP_DEBUG_IDE_ID?.trim() || undefined;
+  const terminalId = scopedOrEnvironment(
+    'debugTerminalId',
+    env.SAP_DEBUG_TERMINAL_ID,
+  );
+  const ideId = scopedOrEnvironment('debugIdeId', env.SAP_DEBUG_IDE_ID);
   return {
     ...(terminalId ? { terminalId } : {}),
     ...(ideId ? { ideId } : {}),
@@ -65,23 +83,30 @@ export function resolveDebuggerIds(
  * whether another IDE holds the key and refuses if so (under listener mode
  * refuse a start and a replacement ask in either case). The host's choice,
  * stated like the ids: the request scope (a header, or the destination's
- * `.env` entered into it), then the environment, then the embedder's option.
+ * `.env` entered into it), then the embedder's option, then — on stdio
+ * only — the environment.
  */
 export type BreakpointConflict = 'replace' | 'refuse-if-held';
-const BREAKPOINT_CONFLICTS: readonly string[] = ['replace', 'refuse-if-held'];
+function isBreakpointConflict(value: string): value is BreakpointConflict {
+  return value === 'replace' || value === 'refuse-if-held';
+}
 
 export function resolveBreakpointConflict(
   fallback?: BreakpointConflict,
   env: NodeJS.ProcessEnv = process.env,
 ): BreakpointConflict {
-  const stated =
-    getRequestContext()?.debugBreakpointConflict?.trim() ||
-    env.SAP_DEBUG_BREAKPOINT_CONFLICT?.trim() ||
-    fallback ||
-    'replace';
-  if (!BREAKPOINT_CONFLICTS.includes(stated))
+  const scope = getRequestContext();
+  const inScope = scope?.debugBreakpointConflict?.trim() || undefined;
+  // A scope that carries the key (http/sse) is answered by its header or
+  // the option; the environment only where it carries none (stdio).
+  const environment =
+    scope !== undefined && 'debugBreakpointConflict' in scope
+      ? undefined
+      : env.SAP_DEBUG_BREAKPOINT_CONFLICT?.trim() || undefined;
+  const stated = inScope ?? fallback ?? environment ?? 'replace';
+  if (!isBreakpointConflict(stated))
     throw new Error(
       `SAP_DEBUG_BREAKPOINT_CONFLICT: ${stated} is neither replace nor refuse-if-held`,
     );
-  return stated as BreakpointConflict;
+  return stated;
 }

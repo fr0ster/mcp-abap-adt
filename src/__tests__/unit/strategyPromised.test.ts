@@ -1,11 +1,11 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   answerRead,
   readingFor,
   writeProjection,
   writeReading,
 } from '../../lib/strategies/promised';
+import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 
 function wire(name: string): IAdtWireResponse {
   const meta = corpusSidecar(name);

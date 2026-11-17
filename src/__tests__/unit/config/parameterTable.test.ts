@@ -11,8 +11,10 @@ import {
   parametersTemplate,
   readParameters,
   tlsConfigOf,
+  tlsRows,
   validateYamlParameters,
 } from '../../../lib/config/authParameters';
+import type { YamlConfig } from '../../../lib/config/yamlConfig';
 
 const TABLE: ParameterTable = {
   program: 'test-binary',
@@ -154,9 +156,18 @@ describe("a row's own reader", () => {
 
 describe('the template', () => {
   it('nests dotted keys and validates clean', () => {
-    const parsed = load(parametersTemplate(TABLE)) as Record<string, unknown>;
+    const parsed = load(parametersTemplate(TABLE)) as YamlConfig;
     expect(parsed).toEqual({ x: { hosts: null, deep: { port: 4000 } } });
     expect(validateYamlParameters(TABLE, parsed)).toEqual([]);
+  });
+});
+
+describe('--tls-ca', () => {
+  it('says it is the chain the server sends, not a trust store for clients', () => {
+    const help = tlsRows('http').find((row) => row.cli === '--tls-ca')?.help;
+    expect(help).toContain('the server sends with its own certificate');
+    expect(help).toContain('Not a trust store for clients');
+    expect(help).toContain('no client certificate is requested');
   });
 });
 

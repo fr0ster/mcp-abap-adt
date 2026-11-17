@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CheckObject Handler - Syntax check for ABAP objects via ADT API.
  *
@@ -41,7 +43,8 @@ import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
+import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -51,56 +54,40 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      object_name: {
-        type: 'string',
-        description: 'Object name',
-      },
-      object_type: {
-        type: 'string',
-        description: 'Object type',
-        enum: [
-          'class',
-          'program',
-          'interface',
-          'function_group',
-          'function_module',
-          'table',
-          'structure',
-          'ddl',
-          'domain',
-          'data_element',
-          'package',
-          'behavior_definition',
-          'metadata_extension',
-        ],
-      },
-      source_code: {
-        type: 'string',
-        description:
-          'Source to check instead of the saved one (class, structure, ddl only); nothing is saved.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' or 'inactive' (default active)",
-        enum: ['active', 'inactive'],
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['object_name', 'object_type'],
-  },
+  inputSchema: z.object({
+    object_name: z.string().describe('Object name'),
+    object_type: z
+      .enum([
+        'class',
+        'program',
+        'interface',
+        'function_group',
+        'function_module',
+        'table',
+        'structure',
+        'ddl',
+        'domain',
+        'data_element',
+        'package',
+        'behavior_definition',
+        'metadata_extension',
+      ])
+      .describe('Object type'),
+    source_code: z
+      .string()
+      .optional()
+      .describe(
+        'Source to check instead of the saved one (class, structure, ddl only); nothing is saved.',
+      ),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe("Version to check: 'active' or 'inactive' (default active)"),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface CheckObjectArgs {
-  object_name: string;
-  object_type: string;
-  version?: string;
-  source_code?: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type CheckObjectArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** The types whose check can take source that is not saved. */
 const SOURCE_TYPES = ['class', 'structure', 'ddl'];
@@ -143,9 +130,8 @@ export async function checkObject(
 
   const objectType = object_type;
 
-  const checkVersion = ['active', 'inactive'].includes(version.toLowerCase())
-    ? (version.toLowerCase() as 'active' | 'inactive')
-    : 'active';
+  const checkVersion =
+    version.toLowerCase() === 'inactive' ? 'inactive' : 'active';
 
   if (source_code !== undefined && !SOURCE_TYPES.includes(objectType)) {
     return return_error(
@@ -155,8 +141,9 @@ export async function checkObject(
 
   // A function module is addressed under its group: GROUP|MODULE, as the
   // lock takes it.
-  let functionGroupName: string | undefined;
-  let functionModuleName: string | undefined;
+  // Set for a function module only, and read only for one.
+  let functionGroupName = '';
+  let functionModuleName = '';
   if (objectType === 'function_module') {
     const [group, module] = object_name.toUpperCase().split('|');
     if (!group || !module) {
@@ -291,15 +278,25 @@ export async function checkObject(
               }),
           );
         case 'function_module':
-          return withAdtHeaders(context, 'functionModule.check', (headers) =>
-            client.getFunctionModule(resultsFor(functionModuleDocuments)).check(
-              {
-                functionGroupName: functionGroupName as string,
-                functionModuleName: functionModuleName as string,
-              },
-              checkVersion,
-              { headers, analyse: analyseException },
-            ),
+          // SAP ignores the group of the address (#2): the check is sent
+          // after the module's metadata names the group given.
+          return inCheckedGroupOn(
+            client,
+            functionGroupName,
+            functionModuleName,
+            () =>
+              withAdtHeaders(context, 'functionModule.check', (headers) =>
+                client
+                  .getFunctionModule(resultsFor(functionModuleDocuments))
+                  .check(
+                    {
+                      functionGroupName,
+                      functionModuleName,
+                    },
+                    checkVersion,
+                    { headers, analyse: analyseException },
+                  ),
+              ),
           );
         case 'package':
           // A package check runs on the active version, like every check.

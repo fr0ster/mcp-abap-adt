@@ -8,6 +8,7 @@
  * Each case runs the real client over a recording connection declared the
  * variant — no SAP — and reads the quickSearch on the wire.
  */
+
 import { enhancementTypeOf } from '../../handlers/enhancement/readonly/enhancementAvailability';
 import type { ProjectionVariant } from '../../lib/adtProjections';
 import {
@@ -15,6 +16,7 @@ import {
   PACKAGE_SEARCH_NAME,
   resolvePackagePatterns,
 } from '../../lib/search-source/packageResolver';
+import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import { declareSystemKind } from '../../lib/systemKind';
 import {
   type RecordedRequest,
@@ -48,7 +50,10 @@ describe.each(VARIANTS)('the searches the server sends, on %s', (variant) => {
     expect(PACKAGE_SEARCH_NAME).toBe('DEVC');
     const connection = declared(variant);
     await resolvePackagePatterns(
-      { searchObjects: createPackagePatternResolver({ connection }) },
+      {
+        searchObjects: createPackagePatternResolver({ connection }),
+        sapAnswers: skipSapAnswers,
+      },
       ['ZPKG*'],
     );
     expect(sentSearch(connection.requests)).toEqual({

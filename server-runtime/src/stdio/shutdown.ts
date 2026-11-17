@@ -103,15 +103,21 @@ interface StartBirthState extends StartBirth {
   settled(): Promise<void>;
 }
 
+/** Each start's shutdown side, by the start `startBirth` answered. */
+const birthStates = new WeakMap<StartBirth, StartBirthState>();
+
 /** A new start, not yet opened. */
 export function startBirth(): StartBirth {
   let began = false;
   let opened = false;
-  let birth: Promise<unknown> = Promise.resolve();
+  let birth: Promise<void> = Promise.resolve();
   const state: StartBirthState = {
     shutdownBegan: () => began,
     joining: (pending) => {
-      birth = pending;
+      birth = pending.then(
+        () => undefined,
+        () => undefined,
+      );
       return pending;
     },
     open: () => {
@@ -123,12 +129,9 @@ export function startBirth(): StartBirth {
       began = true;
     },
     opened: () => opened,
-    settled: () =>
-      birth.then(
-        () => undefined,
-        () => undefined,
-      ),
+    settled: () => birth,
   };
+  birthStates.set(state, state);
   return state;
 }
 
@@ -143,7 +146,11 @@ export function notStoredLine(entry: string): string {
  */
 export function installShutdown(options: ShutdownOptions): () => Promise<void> {
   const { factory, instance } = options;
-  const birth = options.birth as StartBirthState | undefined;
+  const birth =
+    options.birth === undefined ? undefined : birthStates.get(options.birth);
+  if (options.birth !== undefined && birth === undefined) {
+    throw new Error('installShutdown takes a birth made by startBirth()');
+  }
   return installShutdownSequence({
     begin: () => {
       birth?.began();

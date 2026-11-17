@@ -10,6 +10,11 @@ The `HandlerExporter` class registers the ABAP ADT tools on an `McpServer` of yo
 - Use your own connection management logic
 - Customize which handlers are available
 
+The exporter serves the full tools only. The compact tools are registered from
+`CompactReadOnlyHandlersGroup` (`@mcp-abap-adt/compact-readonly-entries`) and
+`CompactModifyHandlersGroup` (`@mcp-abap-adt/compact-modify`) on an `EmbeddableMcpServer`
+(background runs, given a strategy) or on a plain `McpServer` (answered in the call).
+
 Every example below is compiled against the real API by
 `src/__tests__/typecheck/handlerExporterGuide.typecheck.ts` (`npm run test:check`).
 
@@ -55,14 +60,21 @@ await connection.disconnect();
 (`createRegistry().registerAllTools(mcpServer)`, see
 [the handlers README](../../src/lib/handlers/README.md#which-variant-a-plain-registration-lists)),
 through the same code: the tools, descriptions, schemas and search members of the variant
-`systemType` states. With no `systemType`, every definition is listed as it is, and every call
-that would reach a system is refused `system_type_required` before anything is sent.
+`systemType` states. With no `systemType` stated, every definition is listed as it is; a tool stated per variant is refused
+`system_type_required` before anything is sent, and a tool listed alike on every variant runs on the
+connection's recorded kind (the factory's record) or declared kind (`declareSystemKind`), whatever
+`SAP_SYSTEM_TYPE` says. The kind a registration was listed for is the one kind of its calls: a
+provided context (`registerHandlersOnCall`, `registerOnServer`) stating another kind — or any kind,
+where the registration was listed for none — is refused `system_type_conflict`, never run on its kind.
 `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call.
 
-The exporter keeps no background-run store and no debugger, so it hands out neither, on every
-path (`getHandlerEntries()`, `createRegistry()`, `registerOnServer`): no background-run tool
-(`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`), no `background` parameter on
-`RuntimeRunClass` / `RuntimeRunProgram`, and no debugger tool (its options have no
+The exporter keeps no background-run store and no debugger, so on its own paths
+(`getHandlerEntries()`, `registerOnServer`, `createRegistry()` registered on a plain `McpServer`)
+it hands out neither: no background-run tool (`GetBackgroundRun`, `ListBackgroundRuns`,
+`DiscardBackgroundRun`), no `background` parameter on `RuntimeRunClass` / `RuntimeRunProgram` or
+on a listed long tool (its read runs in the call), and no debugger tool. A `createRegistry()`
+registry handed to a server runs its run tools as the server's own: with `background` on a server
+given `backgroundRuns` (24.0.0) (its options have no
 `includeDebug`). A server instance (`EmbeddableMcpServer`) serves them.
 
 ## Connection Provider
@@ -89,13 +101,16 @@ Each call:
    `SAP_SYSTEM_TYPE` is not read for it);
 3. with a `systemContextResolver` (and `systemContextRules`), fills the connection's parameters
    before the handler runs, as `getHandlerEntries()` does;
-4. calls the handler in the form it takes: `handler(context, args)`, or — for an args-only
-   handler (`(args) => handleX(this.context, args)`) — `handler(args)` with its group's context
-   set to the call's for exactly that call, so calls at once each run on their own connection.
+4. calls the entry with the call's context — `entry.call(context, args)` — so calls at once
+   each run on their own connection. The entry parses the arguments with the tool's schema
+   before its handler runs.
 
-A call refused for its arguments (a `timeout` a long tool does not take there) is refused before
-the provider is asked. A listed long tool's read runs on a connection of its own, opened from the
-call's, as on a plain registration.
+A listed long tool's read runs in the call on a connection of its own, opened from the call's, as
+on a plain registration. For long reads in the background, an embedder serves its groups from a
+server instance with a strategy: an `EmbeddableMcpServer` given `backgroundRuns` serves the
+background-run tools beside every long tool its registry carries (`createRegistry()` included),
+whatever the exposition. Without a strategy, or on a plain registration, no background-run tool is
+listed.
 
 ### Async Connection Provider
 
@@ -171,10 +186,15 @@ const exporter = new HandlerExporter({
   systemType: "cloud",
   includeReadOnly: true,
   includeHighLevel: false,
-  includeSystem: true,
+  includeSystem: false, // the system group carries the class and program runs, which run code
   includeSearch: true,
 });
 ```
+
+`includeSystem` brings the system reads together with the runs (`RuntimeRunClass`,
+`RuntimeRunProgram` and the profiler's), which run code in the system, so a server that must
+change nothing leaves it off; the `-ro` binaries' set (`fullReadOnlyToolSet` of
+`@mcp-abap-adt/lib/tool-set`) serves the system reads without the runs.
 
 ## Inspecting Handlers
 
@@ -186,18 +206,25 @@ const toolNames = exporter.getToolNames();
 const entries = exporter.getHandlerEntries();
 for (const entry of entries) {
   console.error(`Tool: ${entry.toolDefinition.name}`);
+  await entry.call(context, {}); // the call's HandlerContext and its arguments
 }
 ```
 
 ### What `getHandlerEntries()` hands back
 
-Each entry's `handler` is wrapped. The wrapper, before the handler runs:
+Each entry is `{ toolDefinition, call(context, args), connectionless? }`
+(`HandlerEntry`); its `toolDefinition.inputSchema` is the tool's zod schema.
+Its `call` is wrapped. The wrapper, before the handler runs:
 
+- parses `args` with the tool's schema first — on the kind the exporter states, whose schema
+  holds that variant's type lists (24.0.0): a refused call is rejected with the schema's words
+  before any scope, resolver, access check or request;
 - states the exporter's `systemType` on the call's connection — the
-  connection of the `context` it is called with, or, for an args-only handler,
-  of its group's context at call time. The handler runs on that kind; with no
-  `systemType` stated, the connection has none, and a call that would reach a
-  system is refused `system_type_required` before anything is sent.
+  connection of the `context` it is called with — and the handler runs on that kind. A
+  connection `createAbapConnection` built for the other kind, or declared for it
+  (`declareSystemKind`), is refused `system_type_conflict` (24.0.0), naming both kinds. With
+  no `systemType` stated, a tool stated per variant is refused `system_type_required` before
+  anything is sent, and the others run on the connection's recorded or declared kind.
   `SAP_SYSTEM_TYPE` is not read for it;
 - runs it in the call-transport scope with its call's own
   `transport_request` (the failure renderer's transport hint);
@@ -210,9 +237,10 @@ Each entry's `handler` is wrapped. The wrapper, before the handler runs:
 
 Two things follow for an embedder that calls the handlers itself:
 
-- The wrapper preserves the handler's arity: `isArgsOnly(handler)` tells the
-  two forms apart, and `callInItsForm(handler, context, args, inGroupContext)`
-  (both from `@mcp-abap-adt/lib/handlers`) calls a handler in the form it takes.
+- `entry.call(context, args)` parses `args` with the tool's schema, as the SDK does
+  over MCP: arguments that do not parse are refused — an `Error` whose message starts
+  `Input validation error: Invalid arguments for tool <Tool>:` and names each
+  issue — and the handler does not run. A schema default reaches the handler as if given.
 - The wrapper is built per call, so two calls to `getHandlerEntries()` return
   functions that are not identity-equal. Compare tool names, not functions.
 
@@ -236,6 +264,30 @@ const server = new EmbeddableMcpServer({
 });
 ```
 
+## SearchSource's strategies
+
+`SearchSource` takes two strategies, both the consumer's, both optional, given
+only as options — `HandlerExporter`'s, or the hosting server's:
+
+- **`sapAnswerStrategy`** (`SapAnswerStrategy`): what a SAP answer to a failed
+  read leads to — `'skip'`, `'end'` (the call ends with the failure) or
+  `'throw'` — asked once per SAP answer with its place (`'mask'`, `'package'`,
+  `'level'`, `'structure'`, `'source'`). Only SAP answers reach it: a failure
+  carrying a response with an HTTP status, whatever its `origin`, or an ADT
+  refusal. A credential refusal always ends the call; a failed batch envelope
+  and anything else are always thrown. Absent: `skipSapAnswers`.
+- **`lineMatchStrategy`** (`LineMatchStrategy`): which lines of a source are
+  hits (`ScanInput` in, `ScanResult` out). Absent: `substringLineMatch`.
+
+Both contracts and both shipped strategies are exported from
+`@mcp-abap-adt/lib/embeddable`. On `getHandlerEntries()` and
+`registerOnServer` the exporter's options apply, and an embedder's own
+context is not a way to pass them (the exporter sets the context's fields
+from its options). On `createRegistry()` the tools run in the contexts of the
+server the registry is handed to: there the server's own `systemType`, resolver,
+rules, logger and `sapAnswerStrategy` / `lineMatchStrategy` options apply, never the
+exporter's.
+
 ## Logging
 
 Pass a logger (`Logger` from `@mcp-abap-adt/logger`):
@@ -243,6 +295,9 @@ Pass a logger (`Logger` from `@mcp-abap-adt/logger`):
 ```typescript
 const exporter = new HandlerExporter({ systemType: "onprem", logger });
 ```
+
+The handlers `getHandlerEntries()` hands out run with it, over the logger of the context you
+call them with (24.0.0); without one, your context's logger stays.
 
 ## See Also
 

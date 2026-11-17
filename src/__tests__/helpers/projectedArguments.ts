@@ -21,7 +21,6 @@ import {
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
-  COMPACT_WHERE_USED,
   INCLUDES_PARENTS,
   SINGLE_ACTIVATION,
   type VariantValues,
@@ -65,7 +64,6 @@ export const PROJECTED_ARGUMENTS: readonly ProjectedArgument[] = [
   each('HandlerCheckRun', 'object_type', true, COMPACT_CHECK),
   each('HandlerDeletionCheck', 'object_type', true, COMPACT_DELETION_CHECK),
   each('HandlerProfileRun', 'target_type', true, COMPACT_PROFILE),
-  each('HandlerWhereUsed', 'object_type', true, COMPACT_WHERE_USED),
   each(
     'GetWhereUsed',
     'object_type',

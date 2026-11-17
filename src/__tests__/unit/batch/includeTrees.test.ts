@@ -17,7 +17,10 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
-import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
+import {
+  TOOL_DEFINITION as GetIncludesList,
+  handleGetIncludesList,
+} from '../../../handlers/include/readonly/handleGetIncludesList';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
@@ -29,6 +32,7 @@ import {
   type SeenEnvelope,
   statusError,
 } from '../../helpers/batchEnvelope';
+import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -725,16 +729,14 @@ describe('GetIncludesList', () => {
     expect(context.batchAvailability?.available()).toBe(false);
   });
 
-  it('exactly one of object_name/object_type or objects', async () => {
-    const fake = system();
-    const result = await handleGetIncludesList(contextOn(fake), {
-      object_name: 'ZPROG',
-      object_type: 'PROG/P',
-      objects: [{ object_name: 'ZFG', object_type: 'FUGR/F' }],
-    });
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(0);
+  it('exactly one of object_name/object_type or objects: its schema', () => {
+    expect(
+      schemaWords(GetIncludesList, {
+        object_name: 'ZPROG',
+        object_type: 'PROG/P',
+        objects: [{ object_name: 'ZFG', object_type: 'FUGR/F' }],
+      }),
+    ).toContain('Give exactly one of object_name and object_type, or objects');
   });
 });
 

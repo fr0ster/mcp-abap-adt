@@ -9,7 +9,16 @@ import type {
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { DestinationKeyValues } from '@mcp-abap-adt/lib/config';
 import type { RenewalMode } from './serverSentences.js';
+
+/** The destination keys of the start parameters, by their rank against the means. */
+export interface StartDestinationKeys {
+  /** `--<key>` or `SAP_<KEY>` in the process's own environment. */
+  readonly overMeans: DestinationKeyValues;
+  /** `<key>` in YAML. */
+  readonly underMeans: DestinationKeyValues;
+}
 
 /** What the login strategy is built from: auth-providers' `CallbackStrategyOptions`. */
 export interface LoginStrategyOptions {
@@ -50,16 +59,18 @@ export interface IAuthBrokerFactoryConfig {
   /** How the connector reaches the system (`--connection-type`). */
   connectionType?: 'http' | 'rfc';
   /**
-   * RFC through a message server and a logon group (`--mshost`, `--msserv`,
-   * `--sysid`, `--group`, `--saprouter` and their `SAP_*` / YAML forms):
-   * each reaches the destination's `SapConfig` as configured; an absent one
-   * has no key. No default and no check here — connection's.
+   * The system type in effect (`--system-type`): ABAP Cloud over RFC is
+   * refused naming both keys.
    */
-  mshost?: string;
-  msserv?: string;
-  sysid?: string;
-  group?: string;
-  saprouter?: string;
+  systemType?: 'onprem' | 'cloud' | 'legacy';
+  /**
+   * The destination keys the start parameters state (the RFC address, the
+   * client, the language), by rank: `overMeans` — the CLI and the process's
+   * own environment — beats the destination's means (its `.env`, then a
+   * service key's fallback), which beat `underMeans` — YAML. Absent: none
+   * stated.
+   */
+  destinationKeys?: StartDestinationKeys;
   /** `--renewal`; absent: `refresh-then-login`. */
   renewal?: RenewalMode;
   /**

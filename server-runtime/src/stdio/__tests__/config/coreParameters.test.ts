@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
   ParameterRefusal,
@@ -379,7 +380,7 @@ describe('every removed parameter stops core with its words', () => {
 
 describe('the YAML template and validation come from the table', () => {
   const template = generateYamlConfigTemplate(CORE_PARAMETERS);
-  const parsed = load(template) as Record<string, unknown>;
+  const parsed = load(template) as YamlConfig;
 
   it('the template is valid and sets only defaults', () => {
     expect(validateYamlConfig(CORE_PARAMETERS, parsed).errors).toEqual([]);
@@ -390,24 +391,32 @@ describe('the YAML template and validation come from the table', () => {
   it('holds core rows and no other binary keys', () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
+        'ashost',
         'auth-broker-path',
         'auth-debug',
         'batch',
         'browser',
         'browser-auth-port',
         'browser-program',
+        'client',
         'connection-type',
+        'deferred-logon',
+        'enable-data-tools',
         'env',
         'env-path',
         'group',
+        'language',
         'login-timeout',
         'mcp',
         'msserv',
         'mshost',
         'renewal',
+        'restore-session',
+        'restrictions',
         'saprouter',
         'shutdown-timeout',
         'sysid',
+        'sysnr',
         'system-type',
         'unsafe',
       ].sort(),

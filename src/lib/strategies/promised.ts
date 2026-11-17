@@ -1,6 +1,22 @@
-import { type Terse, terseWrite } from './projections';
+import { type JsonValue, jsonOfNode } from '../json';
+import { terseWrite } from './projections';
 import type { AdtReading } from './reading';
-import { statusOnly, structured, verbatim } from './reading';
+import {
+  parseStructure,
+  rawOf,
+  reading,
+  statusOnly,
+  verbatim,
+} from './reading';
+
+/**
+ * The structured reading of a tool that promised JSON: the document's parse,
+ * typed at the parse and written as JSON ({@link jsonOfNode}); `null` for one
+ * that does not parse.
+ */
+const jsonReading = reading(
+  (answer): JsonValue => jsonOfNode(parseStructure(rawOf(answer))),
+);
 
 /**
  * What the tool promised to return. That is what picks the strategy.
@@ -22,7 +38,7 @@ export type PromisedForm = 'text' | 'xml' | 'json';
  * will do with it. Parsing either would break the promise.
  */
 export function readingFor(form: PromisedForm) {
-  return form === 'json' ? structured : verbatim;
+  return form === 'json' ? jsonReading : verbatim;
 }
 
 /**
@@ -39,7 +55,7 @@ export const writeReading = statusOnly;
 /**
  * And its projection: worked, or nothing — never `undefined` on a success.
  *
- * `Terse<T>` — two parameters, `(value, status)` — same as `terseWrite`
+ * `Terse<T, R>` — two parameters, `(value, status)` — same as `terseWrite`
  * itself. **Not what `answer()`'s `project` takes.** `answer<T>(ctx, call,
  * project: (value: T) => unknown)` is one parameter, and a function requiring
  * a second, required one is not assignable where the caller supplies only the
@@ -53,7 +69,7 @@ export const writeReading = statusOnly;
  * it be exercised directly against a reading in `strategyPromised.test.ts`
  * without a caller in between.
  */
-export const writeProjection: Terse<unknown> = terseWrite;
+export const writeProjection = terseWrite;
 
 /**
  * A read's answer, in the promised form, at the requested detail.
@@ -64,9 +80,9 @@ export const writeProjection: Terse<unknown> = terseWrite;
  */
 export function answerRead(
   form: PromisedForm,
-  reading: AdtReading<unknown>,
+  reading: AdtReading<JsonValue>,
   detail: 'terse' | 'full' | 'raw',
-): unknown {
+): JsonValue {
   if (form !== 'json') return reading.raw;
   if (detail === 'raw') return reading.raw;
   return reading.value;

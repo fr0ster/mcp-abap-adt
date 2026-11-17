@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "test": "node tools/npm-test.mjs --concurrency 1",
+    "test:integration": "npm run test:build && node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration",
+    "test:words": "echo 'no --test-timeout, --test-force-exit or --forceExit here' && node -e \"console.log('--forceExit')\"",
+    "test:near": "node tools/run-tests.mjs --concurrency 1 --test-timeouts --forceExitCode --test-force-exited"
+  }
+}

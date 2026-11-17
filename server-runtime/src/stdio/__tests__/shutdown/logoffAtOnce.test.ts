@@ -42,7 +42,7 @@ const connects = () =>
 it.each(triggers)(
   '%s: the connector and the state are logged off under the held update; the queued call never sends; exit 0 before the tool settles; no UNLOCK',
   async (_name, trigger) => {
-    s = await stand({ shutdown: {} });
+    s = await stand({ kind: 'onprem', shutdown: {} });
     expect(await s.callTool('HoldState', { id: 'S' })).toMatchObject({
       isError: false,
     });
@@ -81,7 +81,7 @@ it.each(triggers)(
 it.each(triggers)(
   "%s: a long read's own connection is logged off under its held read",
   async (_name, trigger) => {
-    s = await stand({ shutdown: {} });
+    s = await stand({ kind: 'onprem', shutdown: {} });
     const hold = s.adt.hold((r) => r.url.startsWith(longReadUrl('L')));
     const running = s.callTool('LongRead', { id: 'L' });
     await hold.arrived;
@@ -107,7 +107,7 @@ it.each(triggers)(
 it.each(triggers)(
   "%s: SAP answers the tool's main-connection request after the logoffs: its next step opens no fresh connection — no second logon, nothing owned",
   async (_name, trigger) => {
-    s = await stand({ shutdown: {} });
+    s = await stand({ kind: 'onprem', shutdown: {} });
     const hold = s.adt.hold((r) => r.url.startsWith(mainReadUrl('M')));
     const running = s.callTool('MainThenFresh', { id: 'M' });
     await hold.arrived;

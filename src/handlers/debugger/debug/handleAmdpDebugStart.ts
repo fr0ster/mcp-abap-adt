@@ -1,4 +1,9 @@
-import { heldStateHandle, requireDebugger } from '../../../lib/debugger/access';
+import * as z from 'zod';
+import {
+  debugState,
+  heldStateHandle,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   AMDP_BREAKPOINTS_PROPERTY,
@@ -7,33 +12,28 @@ import {
   RUN_PROPERTY,
   runFromArgs,
 } from '../../../lib/debugger/schemas';
-import type { ArgsOf } from '../../../lib/handlers/argsOf';
-import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugStart',
   available_in: ['onprem', 'cloud'] as const,
   description: `[debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${AMDP_CATCH_SENTENCE}`,
-  inputSchema: {
-    type: 'object',
-    properties: {
-      stop_existing: {
-        type: 'boolean',
-        default: false,
-        description: 'Ends an AMDP debug session of this user left behind.',
-      },
-      ...AMDP_BREAKPOINTS_PROPERTY,
-      ...RUN_PROPERTY,
-      ...DETAIL_PROPERTY,
-    },
-    required: ['breakpoints'],
-  },
+  inputSchema: z.object({
+    stop_existing: z
+      .boolean()
+      .default(false)
+      .optional()
+      .describe('Ends an AMDP debug session of this user left behind.'),
+    ...AMDP_BREAKPOINTS_PROPERTY,
+    ...RUN_PROPERTY,
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
 export async function handleAmdpDebugStart(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return debugAnswer(
     args,
@@ -48,7 +48,7 @@ export async function handleAmdpDebugStart(
     },
     (v) => v,
     (v) => v,
-    () => ({ state_handle: context.state!.handle }),
+    () => ({ state_handle: debugState(context).handle }),
     () => heldStateHandle(context),
   );
 }

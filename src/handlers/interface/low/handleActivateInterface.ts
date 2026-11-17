@@ -1,3 +1,5 @@
+import * as z from 'zod';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ActivateInterface Handler - Activate ABAP Interface
  *
@@ -10,8 +12,8 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseActivation } from '../../../lib/strategies/projections';
+import { detailOf } from '../../../lib/strategies/detail';
+import { projectActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -20,23 +22,13 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP interface. Returns activation status and any warnings/errors.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      interface_name: {
-        type: 'string',
-        description: 'Interface name.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['interface_name'],
-  },
+  inputSchema: z.object({
+    interface_name: z.string().describe('Interface name.'),
+    ...DETAIL_SHAPE,
+  }),
 } as const;
 
-interface ActivateInterfaceArgs {
-  interface_name: string;
-  detail?: 'terse' | 'full' | 'raw';
-}
+type ActivateInterfaceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleActivateInterface(
   context: HandlerContext,
@@ -60,6 +52,6 @@ export async function handleActivateInterface(
           .getInterface(resultsFor(interfaceDocuments))
           .activate({ interfaceName }, { headers, analyse: analyseActivation }),
       ),
-    project(detail, terseActivation),
+    projectActivation(detail),
   );
 }

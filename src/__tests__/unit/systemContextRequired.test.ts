@@ -3,6 +3,7 @@ import {
   serviceDefinitionDocuments,
   transformationDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import { setSystemContext } from '../helpers/processSystemContext';
 
 /**
  * The responsible person is sent wherever a create carries it; the master
@@ -42,7 +43,6 @@ import { CompositeHandlersRegistry } from '../../lib/handlers/registry/Composite
 import { runWithRequestContext } from '../../lib/requestContext';
 import {
   resetSystemContextCache,
-  setSystemContext,
   systemContextFromConfiguration,
 } from '../../lib/systemContext';
 import { MISSING_RESPONSIBLE } from '../../lib/systemContextGuard';

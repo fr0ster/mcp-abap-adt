@@ -1,4 +1,3 @@
-import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import {
   locationId,
   readAmdpEvents,
@@ -7,6 +6,7 @@ import {
   terseAmdpEvent,
 } from '../../../lib/debugger/amdpReadings';
 import { TERSE_STACK_FRAMES } from '../../../lib/debugger/readings';
+import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import {
   AMDP_BREAK_LINE,
   AMDP_MAIN_ID,
@@ -306,5 +306,75 @@ describe('AMDP readings', () => {
       expect(read.mainId).toMatch(/^[0-9A-F]{32}$/);
       expect(read.hanaSession).toContain(':');
     });
+  });
+});
+
+/**
+ * The start and the events read through the XML parser: each recorded event's
+ * body is its `mainResponse` as recorded, and what the text search mishandled
+ * reads as XML says.
+ */
+describe('AMDP documents read through the XML parser', () => {
+  /** The recorded `mainResponse` elements of a body, found by plain string search. */
+  function recordedSpans(body: string): string[] {
+    const open = '<amdpdbg:mainResponse ';
+    const close = '</amdpdbg:mainResponse>';
+    const spans: string[] = [];
+    let at = body.indexOf(open);
+    while (at >= 0) {
+      const end = body.indexOf(close, at) + close.length;
+      spans.push(body.slice(at, end));
+      at = body.indexOf(open, end);
+    }
+    return spans;
+  }
+
+  it.each([
+    'amdp-debugger--03-events-sync-breakpoints',
+    'amdp-debugger--04-events-toggle-breakpoints',
+    'amdp-debugger--05-events-on-break',
+    'amdp-debugger--06-events-on-execution-end',
+    'amdp-debugger--07-events-on-break-table-function',
+    'amdp-debugger--10-events-on-break-nested',
+  ])('each event of %s keeps its recorded body', (name) => {
+    const body = corpusBody(name);
+    const spans = recordedSpans(body);
+    expect(spans.length).toBeGreaterThan(0);
+    expect(readAmdpEvents(body).map((e) => e.body)).toEqual(spans);
+  });
+
+  it("an event's body runs to its own end, past a closing tag written inside CDATA", () => {
+    const body =
+      '<amdpdbg:mainResponseList xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger">' +
+      '<amdpdbg:mainResponse amdpdbg:kind="ON_BREAK" amdpdbg:requestId="R1" amdpdbg:debuggeeId="D1">' +
+      '<amdpdbg:value><![CDATA[a</amdpdbg:mainResponse>b]]></amdpdbg:value>' +
+      '</amdpdbg:mainResponse></amdpdbg:mainResponseList>';
+    const [event] = readAmdpEvents(body);
+    expect(event.body).toBe(
+      '<amdpdbg:mainResponse amdpdbg:kind="ON_BREAK" amdpdbg:requestId="R1" amdpdbg:debuggeeId="D1">' +
+        '<amdpdbg:value><![CDATA[a</amdpdbg:mainResponse>b]]></amdpdbg:value>' +
+        '</amdpdbg:mainResponse>',
+    );
+  });
+
+  it('the HANA session of a start whose attributes are quoted with apostrophes, its key after its value', () => {
+    expect(
+      readAmdpStart({
+        headers: { location: '/x/ABCDEF0123456789ABCDEF0123456789' },
+        data: "<amdpdbg:startParameters xmlns:amdpdbg='http://www.sap.com/adt/amdp/debugger'><amdpdbg:parameter amdpdbg:value='host:30015:42' amdpdbg:key='HANA_SESSION_ID'/></amdpdbg:startParameters>",
+      }),
+    ).toEqual({
+      mainId: 'ABCDEF0123456789ABCDEF0123456789',
+      hanaSession: 'host:30015:42',
+    });
+  });
+
+  it('no HANA session in a start that names none', () => {
+    expect(
+      readAmdpStart({
+        headers: {},
+        data: '<amdpdbg:startParameters xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"><amdpdbg:parameter amdpdbg:key="OTHER" amdpdbg:value="x"/></amdpdbg:startParameters>',
+      }).hanaSession,
+    ).toBe('');
   });
 });

@@ -18,7 +18,9 @@ import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
 } from '@mcp-abap-adt/interfaces-adt';
+import * as z from 'zod';
 import {
+  DataHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -42,6 +44,7 @@ const objectOrientedTools = [
   new ReadOnlyHandlersGroup(context),
   new HighLevelHandlersGroup(context),
   new SystemHandlersGroup(context),
+  new DataHandlersGroup(context),
   new RuntimeRunHandlersGroup(context),
   new SearchHandlersGroup(context),
   new DebugHandlersGroup(context),
@@ -110,41 +113,45 @@ describe('the needs against the tables', () => {
 });
 
 describe('servedDefinition', () => {
-  const tool = (name: string, inputSchema: object) => ({
+  const tool = (name: string, inputSchema: z.ZodObject) => ({
     name,
     description: name,
     inputSchema,
   });
 
   it('drops a tool whose need the table does not list, keeps it where it does', () => {
-    const definition = tool('RuntimeRunProgram', { type: 'object' });
+    const definition = tool('RuntimeRunProgram', z.object({}));
     expect(servedDefinition(definition, 'cloud')).toBeUndefined();
     expect(servedDefinition(definition, 'onprem')).toBe(definition);
   });
 
   it('keeps a tool with no need on every variant', () => {
-    const definition = tool('SearchObject', { type: 'object' });
+    const definition = tool('SearchObject', z.object({}));
     expect(servedDefinition(definition, 'cloud')).toBe(definition);
     expect(servedDefinition(definition, 'onprem')).toBe(definition);
   });
 
   it('a tool that states itself per variant is registered as it states itself there', () => {
+    const onprem = z.object({ onprem: z.boolean() });
+    const cloud = z.object({ cloud: z.boolean() });
     const definition = {
-      ...tool('HandlerProfileRun', { type: 'object', properties: {} }),
+      ...tool('HandlerProfileRun', z.object({})),
       variants: {
-        onprem: { description: 'on premise', inputSchema: { onprem: true } },
-        cloud: { description: 'on cloud', inputSchema: { cloud: true } },
+        onprem: { description: 'on premise', inputSchema: onprem },
+        cloud: { description: 'on cloud', inputSchema: cloud },
       },
     };
     expect(servedDefinition(definition, 'cloud')).toEqual({
       ...definition,
       description: 'on cloud',
-      inputSchema: { cloud: true },
+      inputSchema: cloud,
     });
+    expect(servedDefinition(definition, 'cloud')?.inputSchema).toBe(cloud);
     expect(servedDefinition(definition, 'onprem')).toEqual({
       ...definition,
       description: 'on premise',
-      inputSchema: { onprem: true },
+      inputSchema: onprem,
     });
+    expect(servedDefinition(definition, 'onprem')?.inputSchema).toBe(onprem);
   });
 });

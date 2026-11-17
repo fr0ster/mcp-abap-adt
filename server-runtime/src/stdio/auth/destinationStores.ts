@@ -26,6 +26,7 @@ import {
   assertDestinationName,
   type DestinationSystemContext,
 } from '@mcp-abap-adt/lib/auth';
+import { type JsonValue, jsonAt, parseJson } from '@mcp-abap-adt/lib/utils';
 import * as dotenv from 'dotenv';
 import { DestinationRefusal } from './destinationFailure';
 
@@ -98,25 +99,31 @@ export function readDestinationSystemContext(
 }
 
 /**
+ * A parsed key with `url`, `clientid` and `clientsecret` at its root, and no
+ * `uaa` object: read in plain code, the file being outside the type system.
+ */
+function isXsuaaKey(raw: JsonValue | undefined): boolean {
+  const uaa = jsonAt(raw, 'uaa');
+  if (typeof uaa === 'object' && uaa !== null) return false;
+  return Boolean(
+    jsonAt(raw, 'url') &&
+      jsonAt(raw, 'clientid') &&
+      jsonAt(raw, 'clientsecret'),
+  );
+}
+
+/**
  * The shape of `keysDir/<name>.json`: `url` + `clientid` + `clientsecret` at
  * the root is an XSUAA key; anything else, or no readable key, is ABAP.
  */
 export function keyShapeOf(keysDir: string, name: string): 'abap' | 'xsuaa' {
   assertDestinationName(name, 'destination');
   try {
-    const raw = JSON.parse(
+    // The key file, read as JSON and checked: typed from here on.
+    const raw = parseJson(
       fs.readFileSync(path.join(keysDir, `${name}.json`), 'utf8'),
     );
-    if (
-      raw &&
-      typeof raw === 'object' &&
-      !(raw.uaa && typeof raw.uaa === 'object') &&
-      raw.url &&
-      raw.clientid &&
-      raw.clientsecret
-    ) {
-      return 'xsuaa';
-    }
+    if (isXsuaaKey(raw)) return 'xsuaa';
   } catch {
     // no key, or not readable: read as ABAP
   }

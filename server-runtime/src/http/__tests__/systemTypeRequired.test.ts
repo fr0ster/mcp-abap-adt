@@ -3,8 +3,9 @@
  * (`--system-type`, `SAP_SYSTEM_TYPE`, YAML) — no request header states it —
  * and it is required. The binaries do not start without it
  * (`systemTypeAtStart.test.ts`); an embedder's own `StreamableHttpServer`
- * host reads `SAP_SYSTEM_TYPE` at each call, so a call it lets through
- * without one is refused `system_type_required`, before anything is sent.
+ * fixes its one kind at construction (`SAP_SYSTEM_TYPE` as it was then,
+ * never read again), so a call it lets through without one is refused
+ * `system_type_required`, before anything is sent.
  */
 
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../../src/lib/auth/serverRefusal';
@@ -13,22 +14,20 @@ import { type HttpStand, httpStand, turns } from './shutdown/harness';
 jest.setTimeout(30_000);
 
 let s: HttpStand;
-beforeEach(async () => {
-  s = await httpStand();
-});
 afterEach(async () => {
   await turns(20);
   await s.close();
 });
 
 it.each([
-  ['no SAP_SYSTEM_TYPE', undefined],
+  ['no SAP_SYSTEM_TYPE', null],
   ['an SAP_SYSTEM_TYPE of no kind', 'abap-cloud'],
 ])(
-  '%s: the call is refused system_type_required, nothing sent',
+  '%s at construction: the call is refused system_type_required, nothing sent',
   async (_what, value) => {
-    if (value === undefined) delete process.env.SAP_SYSTEM_TYPE;
-    else process.env.SAP_SYSTEM_TYPE = value;
+    s = await httpStand({ systemTypeEnv: value });
+    // Stated after construction: not read — one kind for the server's life.
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
     const answer = await s.call('ProbeAdt', { id: 'NO_KIND' });
     expect(answer.isError).toBe(true);
     expect(JSON.parse(answer.text)).toMatchObject({
@@ -40,7 +39,7 @@ it.each([
 );
 
 it('stated: the same call reaches the system', async () => {
-  process.env.SAP_SYSTEM_TYPE = 'onprem';
+  s = await httpStand({ systemTypeEnv: 'onprem' });
   const answer = await s.call('ProbeAdt', { id: 'WITH_KIND' });
   expect(answer.isError).toBe(false);
   expect(s.standIn.requests.length).toBeGreaterThan(0);

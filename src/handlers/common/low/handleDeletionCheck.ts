@@ -9,12 +9,12 @@
  * deletion request removes (`deletionTargets.ts`). Nothing is changed.
  */
 
-import { adtOperation } from '../../../lib/adtHeaders/defaultPairs';
-import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
+import type * as z from 'zod';
 import { COMPACT_DELETION_CHECK, supported } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import type { compactDeletionCheckSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import {
@@ -22,17 +22,19 @@ import {
   terseDeletionCheck,
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
+import type { ToolResultLike } from '../../../lib/toolResult';
 import { return_error } from '../../../lib/utils';
 import { DELETION_TARGETS } from './deletionTargets';
 
-type Args = { object_type?: unknown; object_name?: unknown };
+/** HandlerDeletionCheck's arguments, as its schema parses them: the one caller's. */
+type Args = z.output<typeof compactDeletionCheckSchema>;
 
 const ANSWER = { tool: 'HandlerDeletionCheck', detail: 'terse' } as const;
 
 export async function handleDeletionCheck(
   context: HandlerContext,
   args: Args,
-): Promise<unknown> {
+): Promise<ToolResultLike> {
   const objectType = String(args?.object_type ?? '');
   // The boundary of object_type: one of the declared variant's members
   // (`COMPACT_DELETION_CHECK`); past it, the target is typed by it.
@@ -68,21 +70,14 @@ export async function handleDeletionCheck(
   return answer(
     ANSWER,
     () =>
-      atStep(
-        'delete check',
-        () =>
-          withAdtHeaders(
-            context,
-            adtOperation(target.objectType, 'checkDeletion'),
-            (headers) =>
-              target
-                .checked(createAdtClient(connection, logger))
-                .checkDeletion(
-                  target.config({ name, ...(group ? { group } : {}) }),
-                  { headers, analyse: analyseDeletion },
-                ),
-          ) as Promise<never>,
-      )() as Promise<never>,
+      atStep('delete check', () =>
+        target.checkDeletion(
+          context,
+          createAdtClient(connection, logger),
+          { name, ...(group ? { group } : {}) },
+          analyseDeletion,
+        ),
+      )(),
     project('terse', terseDeletionCheck),
   );
 }

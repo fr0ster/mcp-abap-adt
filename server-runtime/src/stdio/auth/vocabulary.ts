@@ -49,17 +49,12 @@ const AUTH_TYPE_REASON =
   'authType is missing or not one of: basic, jwt, saml, snc, certificate, kerberos.';
 const GRANT_REASON = 'grantType is missing or not a known grant.';
 
-function isAuthType(value: unknown): value is AuthType {
-  return (
-    typeof value === 'string' &&
-    (AUTH_TYPES as readonly string[]).includes(value)
-  );
+function isAuthType(value: string | undefined): value is AuthType {
+  return AUTH_TYPES.some((type) => type === value);
 }
 
-function isGrant(value: unknown): value is DestinationGrant {
-  return (
-    typeof value === 'string' && (GRANTS as readonly string[]).includes(value)
-  );
+function isGrant(value: string | undefined): value is DestinationGrant {
+  return GRANTS.some((grant) => grant === value);
 }
 
 export interface VettedAuthentication {
@@ -72,7 +67,7 @@ export function vetMeans(
   destination: string,
   means: IConnectionConfig | null,
 ): VettedAuthentication {
-  const authType: unknown = means?.authType;
+  const authType: string | undefined = means?.authType;
   if (!isAuthType(authType)) {
     throw new DestinationConfigError(
       destination,
@@ -82,7 +77,7 @@ export function vetMeans(
   }
   // The broker reads a grant for `jwt` and `saml` only.
   if (authType !== 'jwt' && authType !== 'saml') return { authType };
-  const grantType: unknown = means?.grantType;
+  const grantType: string | undefined = means?.grantType;
   if (!isGrant(grantType)) {
     throw new DestinationConfigError(destination, ['grantType'], GRANT_REASON);
   }

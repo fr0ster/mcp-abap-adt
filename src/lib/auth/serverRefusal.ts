@@ -9,6 +9,8 @@
  * with the same fields is not one.
  */
 
+import type { ConnectionCauseCode } from './connectionCause';
+
 /** The codes of the server's own refusals, as the answer's `error` names them. */
 export type ServerRefusalCode =
   | 'inspection_only'
@@ -25,6 +27,7 @@ export type ServerRefusalCode =
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
+  | 'system_type_conflict'
   | 'variant_not_served'
   | 'instance_closed'
   | 'batch_mode_unavailable'
@@ -33,12 +36,24 @@ export type ServerRefusalCode =
   | 'batch_mode_off'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_no_timeout'
+  | 'batch_no_background'
   | 'batch_ended'
   | 'batch_parts_mismatch'
   | 'batch_unsplit'
   | 'long_session_unavailable'
-  | 'connection_provider_failed';
+  | 'connection_provider_failed'
+  | 'no_connection'
+  | AccessRefusalCode;
+
+/**
+ * The refusals of a call an access-check strategy refused (spec §3.4):
+ * named in the strategy's verdict, worded here from its argument and value.
+ */
+export type AccessRefusalCode =
+  | 'package_not_allowed'
+  | 'package_tree_unreadable'
+  | 'request_not_allowed'
+  | 'table_not_allowed';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -80,6 +95,14 @@ export const BACKGROUND_RUNS_UNAVAILABLE_WORDS =
   'background runs are not available here: the host gave this server no store for them';
 
 /**
+ * `background_runs_unavailable` on an injected connection that answers no
+ * URL (RFC) when the host stated no `system`: a run is kept only for a
+ * caller whose system is known.
+ */
+export const BACKGROUND_RUNS_NO_SYSTEM_WORDS =
+  'background runs are not available here: the connection the host gave answers no URL, and the host stated no `system` (EmbeddableMcpServerOptions.system) to identify the system a run is kept for';
+
+/**
  * A `run_handle` that names no background run of the caller's: unknown or
  * someone else's — the same words for each.
  */
@@ -88,7 +111,7 @@ export const BACKGROUND_RUN_NOT_AVAILABLE_WORDS =
 
 /** A discard of a run still running: it cannot be stopped. */
 export const BACKGROUND_RUN_RUNNING_WORDS =
-  'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
+  'this background run is still running and cannot be discarded here: a started code run runs to its end; discard it once it has finished';
 
 /**
  * A call whose system gave no information where it must (ABAP Cloud, which
@@ -196,9 +219,9 @@ export const BATCH_MODE_OTHER_WORDS =
 export const BATCH_MODE_OFF_WORDS =
   'no batch of this kind is open on this server: begin one first';
 
-/** A long read given `timeout` in batch mode: refused before anything is recorded. */
-export const BATCH_NO_TIMEOUT_WORDS =
-  'in batch mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline';
+/** A long read given `background: true` in batch mode: refused before anything is recorded. */
+export const BATCH_NO_BACKGROUND_WORDS =
+  'in batch mode a read takes no background: it is recorded, and the batch is sent at its end';
 
 /**
  * A request of a recorded call after its batch ended: a handler resumed when
@@ -207,12 +230,12 @@ export const BATCH_NO_TIMEOUT_WORDS =
 export const BATCH_ENDED_WORDS =
   'the batch has ended; this call can send nothing more';
 
-/** `BatchEnd`'s error: the envelope's answer did not split into parts. */
+/** The batch end's error: the envelope's answer did not split into parts. */
 export const BATCH_UNSPLIT_WORDS =
   "the envelope's answer could not be split into the calls' parts";
 
 /**
- * `BatchEnd`'s error: fewer parts came than requests were sent, so no part
+ * the batch end's error: fewer parts came than requests were sent, so no part
  * can be matched to its call.
  */
 export function batchPartsMismatchWords(
@@ -223,7 +246,7 @@ export function batchPartsMismatchWords(
 }
 
 /**
- * `BatchEnd`'s error (`batch_parts_mismatch`): more parts came than requests
+ * the batch end's error (`batch_parts_mismatch`): more parts came than requests
  * were sent. adt-clients settles one part per request and drops the rest
  * unread, so how many more is not known here.
  */
@@ -268,16 +291,65 @@ export function batchOtherKindWords(
     : `${words}. An earlier part of this call was recorded, under number ${recorded}, and will be sent at the batch end; its answer under that number is this refusal`;
 }
 
+/**
+ * `system_type_conflict`'s words: a connection (or a call's context) of one
+ * kind, handed to a server, a registration or an exporter whose one kind is
+ * another — `none` where it was listed for no kind.
+ */
+export function systemTypeConflictWords(
+  built: 'onprem' | 'cloud',
+  stated: 'onprem' | 'cloud' | 'none',
+): string {
+  return `the system types contradict: the connection was built for ${built} and the server, registration or exporter states ${stated} — one kind: state the kind the connection was built for, or hand it a connection of its kind; nothing was sent to the system`;
+}
+
 /** The refusals whose words are given at construction. */
 type WordedCode =
+  | 'system_type_conflict'
   | 'destination_refused'
   | 'background_run_limit'
   | 'batch_not_recordable'
   | 'batch_other_kind'
-  | 'batch_parts_mismatch';
+  | 'batch_parts_mismatch'
+  | AccessRefusalCode;
+
+/**
+ * An access refusal's words: the argument the call named and its value, as
+ * given (a package, a request or a table name — no secret).
+ */
+export function accessRefusalWords(
+  code: AccessRefusalCode,
+  argument: string,
+  value: string,
+): string {
+  switch (code) {
+    case 'package_not_allowed':
+      return `${argument} names a package outside the allowed packages: ${value}`;
+    case 'package_tree_unreadable':
+      return `the package tree above ${value} could not be read, so ${argument} is not checked against the allowed packages`;
+    case 'request_not_allowed':
+      return `${argument} names a request outside the allowed requests: ${value}`;
+    case 'table_not_allowed':
+      return `the data of ${value} is not readable through this server`;
+  }
+}
 
 /** The refusals whose words are fixed. */
-type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
+type FixedCode = Exclude<ServerRefusalCode, WordedCode | 'no_connection'>;
+
+/** `no_connection`'s words, built from `cause` alone. */
+function noConnectionText(cause: string): string {
+  return `no connection to the SAP system: the connection failed (${cause}); the next tool call tries again`;
+}
+
+/**
+ * stdio with `--deferred-logon` (#353): the instance's connection could not
+ * be built because the system cannot be reached. The words name the cause
+ * code only — never the address, the error's message or a credential.
+ */
+export function noConnectionWords(cause: ConnectionCauseCode): string {
+  return noConnectionText(cause);
+}
 
 const WORDS: Readonly<Record<FixedCode, string>> = {
   inspection_only: INSPECTION_ONLY_WORDS,
@@ -298,7 +370,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_mode_on: BATCH_MODE_ON_WORDS,
   batch_mode_other: BATCH_MODE_OTHER_WORDS,
   batch_mode_off: BATCH_MODE_OFF_WORDS,
-  batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
+  batch_no_background: BATCH_NO_BACKGROUND_WORDS,
   batch_ended: BATCH_ENDED_WORDS,
   batch_unsplit: BATCH_UNSPLIT_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
@@ -324,18 +396,33 @@ export class ServerRefusal extends Error {
    * `batch_not_recordable` in `batchNotRecordableWords` or
    * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`;
    * `batch_parts_mismatch` in `batchPartsMismatchWords` or
-   * `batchMorePartsWords`.
+   * `batchMorePartsWords`; an access refusal in `accessRefusalWords`.
    */
   constructor(code: WordedCode, words: string);
+  /** `background_runs_unavailable` for an injected connection with no system known. */
+  constructor(
+    code: 'background_runs_unavailable',
+    words: typeof BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+  );
+  /** `no_connection`, its words built from the listed `cause` (`noConnectionWords`). */
+  constructor(code: 'no_connection', cause: ConnectionCauseCode);
   constructor(code: ServerRefusalCode, words?: string) {
     const text =
-      code === 'destination_refused' ||
-      code === 'background_run_limit' ||
-      code === 'batch_not_recordable' ||
-      code === 'batch_other_kind' ||
-      code === 'batch_parts_mismatch'
-        ? (words ?? '')
-        : WORDS[code];
+      code === 'no_connection'
+        ? noConnectionText(words ?? '')
+        : (code === 'background_runs_unavailable' && words !== undefined) ||
+            code === 'destination_refused' ||
+            code === 'system_type_conflict' ||
+            code === 'background_run_limit' ||
+            code === 'batch_not_recordable' ||
+            code === 'batch_other_kind' ||
+            code === 'batch_parts_mismatch' ||
+            code === 'package_not_allowed' ||
+            code === 'package_tree_unreadable' ||
+            code === 'request_not_allowed' ||
+            code === 'table_not_allowed'
+          ? (words ?? '')
+          : WORDS[code];
     super(text);
     this.name = 'ServerRefusal';
     this.serverRefusal = code;

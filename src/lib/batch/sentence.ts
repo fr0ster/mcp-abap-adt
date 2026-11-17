@@ -42,7 +42,10 @@ const listed = (values: string[]): string =>
 /** One rule of an entry, in words. */
 function ruleWords(tool: string, rule: WhenRule[number]): string[] {
   const words: string[] = [];
-  const name = rule.argument;
+  const name =
+    rule.field === undefined
+      ? rule.argument
+      : `the ${rule.field} of every ${rule.argument} entry`;
   if (rule.present === true) words.push(`${name} is given`);
   if (rule.present === false) words.push(`${name} is absent`);
   if (rule.equals !== undefined) {

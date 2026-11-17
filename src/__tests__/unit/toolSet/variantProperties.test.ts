@@ -9,6 +9,7 @@
  * (`TYPE(arg*, …)`) are held to the same takes.
  */
 
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
@@ -27,7 +28,6 @@ import {
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
-  COMPACT_WHERE_USED,
   type VariantValues,
 } from '../../../lib/adtProjections';
 import type { ServerVariant } from '../../../lib/clients';
@@ -43,7 +43,6 @@ import {
   COMPACT_UNLOCK_TAKES,
   COMPACT_UPDATE_TAKES,
   COMPACT_VALIDATE_TAKES,
-  COMPACT_WHERE_USED_TAKES,
 } from '../../../lib/compact/compactSchemas';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
 
@@ -74,10 +73,6 @@ const TOOLS: Readonly<
     members: COMPACT_DELETION_CHECK,
   },
   HandlerActivate: { takes: COMPACT_ACTIVATE_TAKES, members: COMPACT_ACTIVATE },
-  HandlerWhereUsed: {
-    takes: COMPACT_WHERE_USED_TAKES,
-    members: COMPACT_WHERE_USED,
-  },
   HandlerProfileRun: { takes: COMPACT_PROFILE_TAKES, members: COMPACT_PROFILE },
 };
 
@@ -96,7 +91,14 @@ async function listed(
   variant: ServerVariant,
 ): Promise<readonly Listed[]> {
   process.env.SAP_SYSTEM_TYPE = variant;
-  const server = new StdioServer(registryOf(set, 'stdio'), undefined);
+  // As the launcher builds it: every set keeps background runs.
+  const server = new StdioServer(
+    registryOf(set, 'stdio', { dataTools: true }),
+    undefined,
+    {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    },
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.start(undefined, serverSide);
   const client = new Client({ name: 'variant-properties', version: '1' });
@@ -213,7 +215,7 @@ describe('a compact tool offers on each variant the properties its offered membe
           );
           if (absent.length > 0) missing[tool.name] = absent;
         }
-        expect(checked).toBeGreaterThanOrEqual(kind === 'compact' ? 12 : 5);
+        expect(checked).toBeGreaterThanOrEqual(kind === 'compact' ? 11 : 4);
         expect({ untaken, missing }).toEqual({ untaken: {}, missing: {} });
       });
 

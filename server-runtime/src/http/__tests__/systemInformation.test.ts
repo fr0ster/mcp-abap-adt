@@ -21,8 +21,8 @@ const isProbe = (r: StandInRequest) => r.url.includes('/probe/');
 
 let s: HttpStand;
 beforeEach(async () => {
-  s = await httpStand();
-  process.env.SAP_SYSTEM_TYPE = 'cloud';
+  // The server's one kind, fixed at its construction.
+  s = await httpStand({ systemTypeEnv: 'cloud' });
 });
 afterEach(async () => {
   // The server logs a call's completion once its response is flushed: let
@@ -103,8 +103,10 @@ it('systeminformation naming its user: the tool runs', async () => {
 });
 
 describe('on-premise: asked the same way; the headers when it gives no information', () => {
-  beforeEach(() => {
-    process.env.SAP_SYSTEM_TYPE = 'onprem';
+  beforeEach(async () => {
+    // An on-premise server: its one kind, fixed at its construction.
+    await s.close();
+    s = await httpStand({ systemTypeEnv: 'onprem' });
   });
 
   it('systeminformation naming its user: asked before the tool, which runs', async () => {

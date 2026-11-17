@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,32 +27,26 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP structure named by structure_name. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      structure_name: {
-        type: 'string',
-        description: 'Structure name.',
-      },
-      version: {
-        type: 'string',
-        description:
-          "Version to check: 'active' or 'inactive'. Without `version` the active version is checked.",
-        enum: ['active', 'inactive'],
-      },
-      ddl_code: {
-        type: 'string',
-        description:
-          'Optional: DDL source code to validate instead of the saved version.',
-      },
-    },
-    required: ['structure_name'],
-  },
+  inputSchema: z.object({
+    structure_name: z.string().describe('Structure name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        "Version to check: 'active' or 'inactive'. Without `version` the active version is checked.",
+      ),
+    ddl_code: z
+      .string()
+      .optional()
+      .describe(
+        'Optional: DDL source code to validate instead of the saved version.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckStructure(
   context: HandlerContext,
-  args: { structure_name: string; version?: string; ddl_code?: string },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckStructureLow(context, args);
   return normalizeCheckResponse(result, args.structure_name?.toUpperCase());

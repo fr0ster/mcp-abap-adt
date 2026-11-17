@@ -3,14 +3,15 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import type { SqlPreview } from '../../../lib/strategies/sqlPreview';
-import { return_error } from '../../../lib/utils';
 import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
@@ -19,9 +20,11 @@ export const TOOL_DEFINITION = {
   description: withLongToolAdvice(
     '[read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows.',
   ),
-  inputSchema: {
-    timeout: timeoutField(),
-    table_name: z.string().describe('Name of the ABAP table'),
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    table_name: requiredText('Table name is required').describe(
+      'Name of the ABAP table',
+    ),
     max_rows: z
       .number()
       .optional()
@@ -40,18 +43,14 @@ export const TOOL_DEFINITION = {
       .describe(
         'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
       ),
-  },
+  }),
 } as const;
 
 export async function handleGetTableContents(
   context: HandlerContext,
-  args: { table_name: string; max_rows?: number; detail?: AnswerDetail },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
-  if (!args?.table_name) {
-    return return_error('Table name is required');
-  }
-
   const tableName = args.table_name;
   const maxRows = args.max_rows || 100;
   const detail = detailOf(args);
@@ -79,7 +78,7 @@ export async function handleGetTableContents(
             { headers, analyse: analyseException },
           ),
       ),
-    (reading: AdtReading<SqlPreview>) => {
+    (reading) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;
       logger?.debug(

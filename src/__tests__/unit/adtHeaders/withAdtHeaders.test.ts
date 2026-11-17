@@ -35,7 +35,7 @@ const failed = (
 ) => ({
   ok: false as const,
   getError: () => ({
-    origin: 'refusal',
+    origin: 'refusal' as const,
     message: 'refused',
     response: { status, statusText: '', headers, data },
   }),

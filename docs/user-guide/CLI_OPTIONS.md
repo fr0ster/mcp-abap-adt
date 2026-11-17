@@ -47,7 +47,13 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 |-----|-------------|------|-------|---------|
 | `--conf=<path>` (alias `--config`) | — | — | path | The YAML config file of this binary; a missing file gets the binary's template and the start ends |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type, **required** (no default, never guessed): the tools offered, the connector and how the system's answers are read. stdio: a destination without it does not start; http/sse: the binary does not start (exit `1`, nothing listens). Inspection-only stdio needs it too and lists that system type's tools |
-| `--batch-keep-raw-parts` | `MCP_BATCH_KEEP_RAW_PARTS` | `batch.keepRawParts` | `true`, `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. Default `false`; any other value is refused at startup |
+| `--batch-keep-raw-parts` | `MCP_BATCH_KEEP_RAW_PARTS` | `batch.keepRawParts` | `true`, `false` | Batch mode: each answer of a batch (`HandlerBatch` `answers`, `DebugBatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. Default `false`; any other value is refused at startup |
+| `--enable-data-tools` | `MCP_ENABLE_DATA_TOOLS` | `enable-data-tools` | `true`, `false` | Serves the data tools: `GetSqlQuery` and `GetTableContents` (compact: `HandlerGetData`). Default `false`: without it no binary lists them. A value other than empty, `true` or `false` is refused at startup; an empty value (or YAML null) counts as not given and the next form decides, as for every row. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to turn this on is the customer's decision. On HTTP and SSE a start parameter, never a header; see [README, The data tools](../../README.md#the-data-tools-off-unless-enabled) |
+| `--deny-actions=<entries>` | `MCP_DENY_ACTIONS` | `restrictions.deny-actions` | `Tool`, `Prefix*`, `Tool.value`, `Tool.CODE`, `Tool.prefix*`, comma-separated | Tools and values not registered at start; see [Access restrictions](ACCESS_RESTRICTIONS.md) |
+| `--allowed-packages=<entries>` | `MCP_ALLOWED_PACKAGES` | `restrictions.allowed-packages` | `ZFOO`, `Z*`, `ZFOO/**`, comma-separated | A call naming a package runs only when it matches; a `/**` entry reads the package tree |
+| `--allowed-requests=<entries>` | `MCP_ALLOWED_REQUESTS` | `restrictions.allowed-requests` | numbers or prefixes, comma-separated | A call naming a transport request runs only when it matches; a task is matched as given |
+| `--denied-tables=<entries>` | `MCP_DENIED_TABLES` | `restrictions.denied-tables` | names or prefixes, comma-separated | The data tools refuse these tables; not with `--allowed-tables` |
+| `--allowed-tables=<entries>` | `MCP_ALLOWED_TABLES` | `restrictions.allowed-tables` | names or prefixes, comma-separated | The data tools read only these tables; not with `--denied-tables` |
 | `--shutdown-timeout=<seconds>` | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | 1-86400 | Forces a shutdown not finished after this many seconds (default: none); see [Shutdown](#shutdown) |
 | `--help`, `-h` | — | — | — | The binary's help |
 | `--version`, `-v` | — | — | — | The binary's version |
@@ -57,6 +63,17 @@ hold secrets and the session; YAML holds configuration only. An invalid port, en
 value is **refused at startup**, naming the parameter in the form you used
 (`Invalid --browser-auth-port: "abc". Must be a port between 1 and 65535`), instead of being
 ignored.
+
+**A flag is `--flag` (true) or `--flag=true` / `--flag=false`.** Its value follows `=`:
+`--flag false` in two words is refused at startup with the form to write
+(`--auth-debug false: a flag's value follows "=" — write --auth-debug=false`); before 24.0.0
+the bare flag turned the option on and the `false` was left unread.
+
+**Every argument is read.** An argument no parameter of the binary reads (`--unsfe`), a
+positional word (`stray`, a value with no option before it) and a parameter given twice
+(`--port=3000 --port=4000`, or `--port` beside `--http-port`) stop the start, naming them — with
+the option a misspelling may mean (`--sytem-type is not an argument of mcp-abap-adt; did you mean
+--system-type?`). Before 24.0.0 they were left unread, and the first of two values won.
 
 ### `--transport` is gone
 
@@ -97,14 +114,20 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--browser-program=<program>` | `MCP_BROWSER_PROGRAM` | `browser-program` | a program | The program that opens the login URL; excludes `--browser` |
 | `--renewal=<mode>` | `MCP_RENEWAL` | `renewal` | `refresh-then-login`, `refresh-only` | How an expired session is renewed (default `refresh-then-login`); `refresh-only` never logs in |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
+| `--deferred-logon` | `MCP_DEFERRED_LOGON` | `deferred-logon` | flag | Start without contacting the SAP system: the tools are listed at once, the first tool call logs on (default: off — the start logs on and exits `1` when it fails). See [--deferred-logon](#--deferred-logon) |
+| `--restore-session` | `MCP_RESTORE_SESSION` | `restore-session` | flag | With `--deferred-logon`: the first tool call takes up the destination's one leftover session instead of logging on. Refused without `--deferred-logon` |
 | `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
 | `--auth-debug` | — | `auth-debug` | flag | Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent (default: off). **No environment variable** |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type, required for a destination: no default. With `--mcp=<name>` the destination's `.env` may state it; a service key does not |
-| `--mshost=<host>` | `SAP_MSHOST` | `mshost` | host | RFC: the message server host; needs `--msserv` or `--sysid` |
+| `--ashost=<host>` | `SAP_ASHOST` | `ashost` | host | RFC: the application server host; with `--sysnr`, the application-server address |
+| `--sysnr=<NN>` | `SAP_SYSNR` | `sysnr` | two digits | RFC: the application server's system number |
+| `--mshost=<host>` | `SAP_MSHOST` | `mshost` | host | RFC: the message server host; with `--msserv` or `--sysid` and `--group`, the message-server address |
 | `--msserv=<service>` | `SAP_MSSERV` | `msserv` | name or port | RFC: the message server service |
 | `--sysid=<SID>` | `SAP_SYSID` | `sysid` | system id | RFC: the system id |
-| `--group=<group>` | `SAP_GROUP` | `group` | logon group | RFC: the logon group (connection's default `PUBLIC`) |
-| `--saprouter=<string>` | `SAP_SAPROUTER` | `saprouter` | SAProuter string | RFC: the SAProuter string, with either addressing |
+| `--group=<group>` | `SAP_GROUP` | `group` | logon group | RFC: the logon group, required with `--mshost` |
+| `--saprouter=<string>` | `SAP_SAPROUTER` | `saprouter` | SAProuter string | RFC: the SAProuter string, with either address |
+| `--client=<client>` | `SAP_CLIENT` | `client` | client | The SAP client; required over RFC |
+| `--language=<language>` | `SAP_LANGUAGE` | `language` | language | The logon language (required over RFC) and the master language of created objects |
 
 The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--mcp` and `--env`
 (or their YAML keys).
@@ -119,6 +142,7 @@ The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--m
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 | `--tls-*` | ``<form>: TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse` `` |
 | `--allow-destination-header`, YAML `allow-destination-header` | ``<form> is gone: `mcp-abap-adt` serves the destination it is started with (--mcp, --env, --env-path); the HTTP and SSE binaries take credentials only from `x-sap-*` headers`` |
+| `--restore-session`, `MCP_RESTORE_SESSION`, YAML `restore-session` (any value) without `--deferred-logon` | ``<form> needs --deferred-logon: a start without it takes up the destination's leftover session on its own`` |
 
 `MCP_SSE_*`, `MCP_HTTP_*` and `MCP_TLS_*` are not read by `mcp-abap-adt`.
 | `--auth-broker`, `MCP_USE_AUTH_BROKER`, YAML `auth-broker` (16.0.0) | `<form> was removed in 16.0.0 — remove it from the configuration` |
@@ -134,11 +158,15 @@ mcp-abap-adt --env-path=/opt/config/sap-prod.env --system-type=<onprem|cloud> # 
 mcp-abap-adt --env-path=../configs/dev.env --system-type=<onprem|cloud> # relative to the current directory
 ```
 
-The server resolves the env file in this order:
+The server reads the env file one of two ways — give one of them:
 1. `--env-path=<path|file>` (or `MCP_ENV_PATH`)
 2. `--env=<destination>` -> platform sessions path:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
+
+`--env` with `--env-path` (or `MCP_ENV_PATH`), and `--mcp` with either, are refused at startup
+(24.0.0), naming both: before, the path won over the name, and `--mcp` was served while the env
+file's credentials and URL were ignored.
 
 **Nothing is looked up in the working directory.** A server started inside someone else's project
 must not take their settings, so a `.env` there is read only when you name it
@@ -167,8 +195,8 @@ How the server communicates with the SAP system: `http` (HTTP/HTTPS) or `rfc` (v
 SDK, any system it supports). **Required for a destination: there is no default.** Without it a
 stdio destination does not start (exit `1`, naming the places it can be set). It may be set as
 `--connection-type`, in the process environment, in the destination's own `.env` (the `--env` /
-`--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`; it joins the environment, never over
-a value already set) or as YAML `connection-type`. Precedence: the CLI flag, then the environment,
+`--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`; read below the process environment,
+never copied into it) or as YAML `connection-type`. Precedence: the CLI flag, then the environment,
 then YAML. A service key carries no connection type.
 
 ```bash
@@ -179,29 +207,32 @@ RFC requires the SAP NW RFC library at run time — SAP GUI's 64-bit `sapnwrfc.d
 else the SAP NW RFC SDK installed and on the library search path. See
 [RFC Setup Guide](../installation/RFC_SETUP.md). The same option can be set with
 `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` `.env`
-(which joins the environment, never over a value already set), or YAML `connection-type: rfc`.
+(read below the process environment, never copied into it), or YAML `connection-type: rfc`.
 Precedence: the CLI flag, then the environment, then YAML.
 
-### --mshost, --msserv, --sysid, --group, --saprouter
+### --ashost, --sysnr, --mshost, --msserv, --sysid, --group, --saprouter, --client, --language
 
-RFC through a message server and a logon group (load-balanced logon):
+An RFC destination states its own address, its client and its logon language, and no `SAP_URL`:
+an application server, or a message server and a logon group (load-balanced logon):
 
 ```bash
+mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=onprem \
+  --ashost=<application server host> --sysnr=<NN> --client=<client> --language=<language>
+
 mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=onprem \
   --mshost=<message server host> --sysid=<SID> --group=<logon group>
 ```
 
-- `--mshost` needs `--msserv` or `--sysid`. With neither, `@mcp-abap-adt/connection` refuses the
-  connection naming both, and the refusal reaches you as it came.
-- With `--mshost` the RFC wire takes no host and no system number from `SAP_URL`; `SAP_SYSNR` is
-  not read.
-- `--group` absent: connection uses `PUBLIC`. The server adds no default and checks nothing; it
-  passes the five as configured.
-- `--saprouter` works with either addressing.
-- Each has an environment form (`SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`,
-  `SAP_SAPROUTER`), which the `--env` / `--env-path` `.env` may also state (it joins the
-  environment, never over a value already set), and a YAML key of the option's name. Precedence,
-  as for `--connection-type`: the CLI flag, then the environment, then YAML.
+- One address: `--ashost` with `--sysnr`, or `--mshost` with `--msserv` or `--sysid` (or both) and
+  `--group`. Keys of both, none, or an incomplete one stop the start, naming the keys.
+- `--client` and `--language` are required over RFC; there is no default client, language or group,
+  and nothing is derived from a URL. An RFC destination stating `SAP_URL` is refused.
+- `--saprouter` works with either address.
+- Each has an environment form (`SAP_ASHOST`, `SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`,
+  `SAP_GROUP`, `SAP_SAPROUTER`, `SAP_CLIENT`, `SAP_LANGUAGE`), which the destination's `.env` may
+  also state, and a YAML key of the option's name. Precedence: the CLI flag, then the process's own
+  environment, then the destination's `.env` (then a service key's fallback), then YAML; the `.env`
+  does not join the environment for them.
 - Logon through a message server is implemented and unit-tested, but not yet measured on a live
   system (as of 2026-10-20); see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
@@ -246,6 +277,48 @@ is registered elsewhere.
 
 ```bash
 mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
+```
+
+### --deferred-logon
+
+By default `mcp-abap-adt` logs on at its start, before the MCP transport opens, and a start
+that cannot reach the system ends with exit `1` (since 19.0.0). With `--deferred-logon`
+(`MCP_DEFERRED_LOGON=true`, YAML `deferred-logon: true`) the start contacts no SAP system: the
+configuration is still checked as before — the connection type and the system type are still
+required — and the tools of the declared system type are listed at once. The first tool call
+that needs the connection logs on (a browser login included).
+
+While the system cannot be reached, such a call answers
+
+```json
+{ "error": "no_connection",
+  "message": "no connection to the SAP system: the connection failed (ECONNREFUSED); the next tool call tries again" }
+```
+
+naming the cause by the same code the start line names (`ECONNREFUSED`, `ECONNRESET`,
+`EPIPE`, `ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENETUNREACH`, or a TLS failure
+code; `EPIPE` is the system cutting the connection while the request was written, as macOS
+reports a connection reset at accept) —
+never the URL, the host, the port or a credential. The next call tries once more: there is no
+retry, no polling and no timer. A refused credential, an answer of SAP and an RFC logon that
+fails (named by its RFC key) are answered as before. A request on a connection already made
+that reaches no answer — the system stopped after the logon — answers `no_connection` too, with
+the network code adt-clients names on its failure (one of the seven above; a TLS failure on a
+connection already made is answered as before): one attempt, the next call sends again.
+
+The parameter beats the variable, and the variable beats the configuration file; the
+destination's `.env` is not read for it.
+
+**Leftover sessions.** With `--deferred-logon` the destination's leftover session (see the user
+guide) is not taken up on its own: the first call logs on, and the leftover stays for
+`ListLeftoverSessions` / `LogoffLeftoverSession`. With `--restore-session` as well, the first
+tool call takes it up, as a start without the flag does. `--restore-session` (any value) without
+`--deferred-logon` stops the start.
+
+```bash
+# Two systems, one server each, never up at the same time: neither fails at the start.
+mcp-abap-adt --env=system-a --system-type=onprem --deferred-logon
+mcp-abap-adt --env=system-b --system-type=onprem --deferred-logon
 ```
 
 ### Shutdown
@@ -344,13 +417,15 @@ inherited one changes nothing, and stdio starts with no bound. See [Held State](
 
 ### The debugger's ids
 
-`SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (where the debugger is served): first found, the
-destination's `.env`, then the process environment; else random per instance. See
+`SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (stdio, where the debugger is served): first found, the
+destination's `.env`, then the process environment; else random per instance. Streamable HTTP and
+SSE take them from the `x-sap-debug-*` headers only (24.0.0). See
 [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one).
 
 `SAP_DEBUG_BREAKPOINT_CONFLICT` (`replace`, the default, or `refuse-if-held`): whether a take-over
 of the debugger, and every later change of its breakpoints, first asks if another debugger
-listens for the same SAP user, and refuses if so. Same order. See
+listens for the same SAP user, and refuses if so. The header (or the destination's `.env`), then an
+embedder's `breakpointConflict` option, then — on stdio only — the environment. See
 [Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key).
 
 ## `mcp-abap-adt-http` (Streamable HTTP)
@@ -363,22 +438,21 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 | CLI | Environment | YAML | Value | Meaning |
 |-----|-------------|------|-------|---------|
 | `--host=<host>` (alias `--http-host`) | `MCP_HTTP_HOST` | `http.host` | host | Host to listen on (default `127.0.0.1`; `0.0.0.0` for every interface) |
-| `--port=<port>` (alias `--http-port`) | `MCP_HTTP_PORT` | `http.port` | 1-65535 | Port to listen on (default `3000`) |
+| `--port=<port>` (alias `--http-port`) | `MCP_HTTP_PORT` | `http.port` | 0-65535 | Port to listen on (default `3000`); `0` binds a free port the system chooses, and the listening line (`[StreamableHttpServer] Server started on <host>:<port>`) names it |
 | `--path=<path>` (alias `--http-path`) | — | — | path | The MCP endpoint path (default `/mcp/stream/http`) |
 | `--http-json-response` | `MCP_HTTP_ENABLE_JSON_RESPONSE` | `http.json-response` | flag | Answer with JSON responses rather than SSE streams |
 | `--http-allowed-hosts=<list>` | `MCP_HTTP_ALLOWED_HOSTS` | `http.allowed-hosts` | list | Host header values accepted with DNS-rebinding protection (exact, with the port) |
 | `--http-allowed-origins=<list>` | `MCP_HTTP_ALLOWED_ORIGINS` | `http.allowed-origins` | list | Origin header values accepted with DNS-rebinding protection (exact, with the scheme) |
-| `--http-enable-dns-protection` | `MCP_HTTP_ENABLE_DNS_PROTECTION` | `http.enable-dns-protection` | flag | Enable DNS-rebinding protection |
+| `--http-enable-dns-protection` | `MCP_HTTP_ENABLE_DNS_PROTECTION` | `http.enable-dns-protection` | flag | Enable DNS-rebinding protection, with `--http-allowed-hosts` and/or `--http-allowed-origins`: either without the other is refused at startup (it would check nothing) |
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `http.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `http.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
-| `--tls-ca=<path>` | `MCP_TLS_CA` | `http.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
+| `--tls-ca=<path>` | `MCP_TLS_CA` | `http.tls.ca` | path | Intermediate CA certificate(s) (PEM) the server sends with its own certificate, completing the chain clients verify; optional, beside cert and key. Not a trust store for clients — no client certificate is requested — and a root CA given here is not sent |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 
 Per request, the system context comes from the headers `x-sap-responsible`,
 `x-sap-master-system`, `x-sap-language`, and the debugger's `x-sap-debug-terminal-id` /
-`x-sap-debug-ide-id` / `x-sap-debug-breakpoint-conflict`; then `SAP_RESPONSIBLE`,
-`SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID`,
-`SAP_DEBUG_BREAKPOINT_CONFLICT` of the environment. Held state is reached again with its `state_handle`, on
+`x-sap-debug-ide-id` / `x-sap-debug-breakpoint-conflict` — from the headers only: the process's
+`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_DEBUG_*` are not read (24.0.0). Held state is reached again with its `state_handle`, on
 the instance that holds it.
 
 **What `mcp-abap-adt-http` refuses** (each stops the start, naming the form you used):
@@ -387,12 +461,12 @@ the instance that holds it.
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the http sentence above |
 | `--exposition`, YAML `exposition`, with any value | the sentence of its word, naming the binary of this transport that serves it (see [Handler Exposition](#handler-exposition)) |
-| `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
+| `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--ashost`, `--sysnr`, `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, `--client`, `--language`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
 | `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
 
 `MCP_SSE_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
-`AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and
-`SAP_SAPROUTER` are not read by `mcp-abap-adt-http`.
+`AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE`, `SAP_ASHOST`, `SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`,
+`SAP_SYSID`, `SAP_GROUP` and `SAP_SAPROUTER` are not read by `mcp-abap-adt-http`.
 
 TLS needs `--tls-cert` and `--tls-key` together; one without the other (or `--tls-ca` alone) is
 refused at start.
@@ -433,15 +507,15 @@ answered `400`; a `GET` or `POST` with `x-mcp-destination` is answered `400`.
 | CLI | Environment | YAML | Value | Meaning |
 |-----|-------------|------|-------|---------|
 | `--sse-host=<host>` | `MCP_SSE_HOST` | `sse.host` | host | Host to listen on (default `127.0.0.1`; `0.0.0.0` for every interface) |
-| `--sse-port=<port>` | `MCP_SSE_PORT` | `sse.port` | 1-65535 | Port to listen on (default `3001`) |
+| `--sse-port=<port>` | `MCP_SSE_PORT` | `sse.port` | 0-65535 | Port to listen on (default `3001`); `0` binds a free port the system chooses, and the listening line (`[SseServer] Server started on <host>:<port>`) names it |
 | `--sse-path=<path>` | — | — | path | The path of the `GET` that opens an SSE connection (default `/sse`) |
 | `--post-path=<path>` | — | — | path | The path of a connection's `POST` messages (default `/messages`) |
 | `--sse-allowed-hosts=<list>` | `MCP_SSE_ALLOWED_HOSTS` | `sse.allowed-hosts` | list | Host header values accepted with DNS-rebinding protection (exact, with the port) |
 | `--sse-allowed-origins=<list>` | `MCP_SSE_ALLOWED_ORIGINS` | `sse.allowed-origins` | list | Origin header values accepted with DNS-rebinding protection (exact, with the scheme) |
-| `--sse-enable-dns-protection` | `MCP_SSE_ENABLE_DNS_PROTECTION` | `sse.enable-dns-protection` | flag | Enable DNS-rebinding protection |
+| `--sse-enable-dns-protection` | `MCP_SSE_ENABLE_DNS_PROTECTION` | `sse.enable-dns-protection` | flag | Enable DNS-rebinding protection, with `--sse-allowed-hosts` and/or `--sse-allowed-origins`: either without the other is refused at startup (it would check nothing) |
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `sse.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `sse.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
-| `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
+| `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | Intermediate CA certificate(s) (PEM) the server sends with its own certificate, completing the chain clients verify; optional, beside cert and key. Not a trust store for clients — no client certificate is requested — and a root CA given here is not sent |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 
 The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
@@ -462,8 +536,8 @@ until the connection closes; see [Held State](#held-state).
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 
 `MCP_HTTP_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
-`AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and
-`SAP_SAPROUTER` are not read by `mcp-abap-adt-sse`.
+`AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE`, `SAP_ASHOST`, `SAP_SYSNR`, `SAP_MSHOST`, `SAP_MSSERV`,
+`SAP_SYSID`, `SAP_GROUP` and `SAP_SAPROUTER` are not read by `mcp-abap-adt-sse`.
 
 `--host` and `--port` are Streamable HTTP's: the SSE binary listens on `--sse-host` /
 `--sse-port`.
@@ -536,7 +610,7 @@ mcp-abap-adt-http --state-idle-minutes=60 --system-type=<onprem|cloud>
 
 **stdio (`mcp-abap-adt` and its compact and `-ro` variants) has no idle bound.** The stdio
 server's life and its state are governed only by the LLM client that started it: held state ends
-by its stop tool (`DebugStop`, `BatchEnd`, …), the client closing stdin (the server then shuts down
+by its stop tool (`DebugStop`, `DebugBatchEnd`, `HandlerBatch` `end`, …), the client closing stdin (the server then shuts down
 and logs off), the backend's answer, or the process's shutdown — never on the server's clock.
 `--state-idle-minutes` and the YAML key `state-idle-minutes` were removed from the stdio binaries
 in 20.1.1: each stops the start, naming the form used, so a configuration that states a bound is
@@ -550,15 +624,16 @@ inherited one changes nothing, and stdio starts with no bound.
 These are typically set in the destination's `.env` file:
 
 **Basic Authentication:**
-- `SAP_URL` - SAP system URL (required)
-- `SAP_CLIENT` - SAP client number (required)
+- `SAP_URL` - SAP system URL (required over HTTP; an RFC destination states none, and one that does is refused)
+- `SAP_CLIENT` - SAP client number (required over RFC)
 - `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X" cannot be used: authType`). `saml`, `certificate` and `kerberos` are not supported
-- `SAP_SYSTEM_TYPE` - SAP system type: `cloud`, `onprem` or `legacy` (same as `--system-type`). **Required (19.0.0): there is no default** — not for the tools offered (e.g., a program's writes require `onprem`), not for the connector (a `jwt` destination is no longer taken for cloud), and the kind is never guessed from the URL. Without it a stdio destination does not start (exit `1`, naming the parameter), and neither do Streamable HTTP / SSE (exit `1` before anything listens). Inspection-only stdio (no destination) needs it too: it lists the tools of that system type's ADT type table, and without it the start is refused (exit `1`). It may be set in the process environment or in the `--env` / `--env-path` `.env` (which joins the environment, never over a value already set), as `--system-type` or as YAML `system-type`. Precedence: the CLI flag, then the environment, then YAML. `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
+- `SAP_SYSTEM_TYPE` - SAP system type: `cloud`, `onprem` or `legacy` (same as `--system-type`). **Required (19.0.0): there is no default** — not for the tools offered (e.g., a program's writes require `onprem`), not for the connector (a `jwt` destination is no longer taken for cloud), and the kind is never guessed from the URL. Without it a stdio destination does not start (exit `1`, naming the parameter), and neither do Streamable HTTP / SSE (exit `1` before anything listens). Inspection-only stdio (no destination) needs it too: it lists the tools of that system type's ADT type table, and without it the start is refused (exit `1`). It may be set in the process environment or in the `--env` / `--env-path` `.env` (read below the process environment, never copied into it), as `--system-type` or as YAML `system-type`. No binary writes the value it resolved into the process environment (24.0.0): it is passed to the server. Precedence: the CLI flag, then the environment, then YAML. `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth). On-premise, also the login the responsible of created objects falls back to when no `SAP_RESPONSIBLE` is stated (the destination's own first, then the process environment's); not on a cloud system, whose login is the system's user. The environment is read once: a change while the server runs is not picked up
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` or `rfc`. **Required for a destination: there is no default** (see [--connection-type](#--connection-typetype)). Process environment, or the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`)
-- `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` - RFC through a message server and a logon group: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID`, the logon group (connection's default `PUBLIC`), a SAProuter string. Process environment, or the `--env` / `--env-path` `.env`; see [--mshost, …](#--mshost---msserv---sysid---group---saprouter)
-- `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
+- `SAP_ASHOST`, `SAP_SYSNR` - RFC to an application server: its host and two-digit system number
+- `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` - RFC through a message server and a logon group: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (or both) and `SAP_GROUP` (required), and a SAProuter string with either address. One address per RFC destination; the CLI, the process environment, the destination's `.env`, YAML, in that order; see [--ashost, …](#--ashost---sysnr---mshost---msserv---sysid---group---saprouter---client---language)
+- `SAP_LANGUAGE` - Logon language (required over RFC) and the master language of created objects (e.g., EN, DE)
 - `SAP_MASTER_SYSTEM` - Master system of created objects (the system id), optional; no tool takes it as an argument. In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the destination's `.env` wins over the environment. Used only where an on-premise system has no `systeminformation` (`404`): elsewhere the system id the system names wins; with neither, the attribute is left out of the request and the system applies itself. Never refused
 - `SAP_RESPONSIBLE` - Responsible person of created objects, optional, and used only where an on-premise system has no `systeminformation` (it answers `404`): elsewhere the user the system names is the responsible, on every kind. Same order; when none is stated, the login (`SAP_USERNAME` of the destination, then of the environment). A create that finds none (SNC) is refused naming `SAP_RESPONSIBLE`, nothing sent. A message class is created with the system's own default responsible (the one exception)
 - `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID` - The debugger's terminal id and IDE id, optional, each on its own. In the destination's own `.env` or the process environment, the `.env` first. Read when an instance's debugger is first used; when none is stated, each is random per instance. The system keys its listener conflict by the IDE id: a shared one means shared catches and no conflict — your choice, see [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one). Terminal mode catches the requests that carry both ids, and the runs the server starts carry them; it needs neither stated. Not validated by the server
@@ -634,6 +709,7 @@ mcp-abap-adt-http --port=9000 --system-type=<onprem|cloud>
 cd ~/dev/my-abap-project
 cat > .env << EOF
 SAP_URL=https://dev.sap.company.example
+SAP_CONNECTION_TYPE=http
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_SYSTEM_TYPE=onprem
@@ -649,8 +725,10 @@ mcp-abap-adt --env-path=./.env --system-type=<onprem|cloud>
 
 ```bash
 cat > rfc-system.env << EOF
-SAP_URL=https://sap.company.example
+SAP_ASHOST=sap.company.example
+SAP_SYSNR=00
 SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_AUTH_TYPE=basic
 SAP_SYSTEM_TYPE=onprem
 SAP_USERNAME=developer

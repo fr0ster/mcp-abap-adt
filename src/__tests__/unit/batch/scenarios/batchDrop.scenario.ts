@@ -1,6 +1,6 @@
 /**
  * Plain-node scenario (`plainNode.ts`): an instance with a batch open and
- * two calls recorded, then the batch's end without `BatchEnd` —
+ * two calls recorded, then the batch's end without `HandlerBatch` end —
  *
  * - `close`: the instance close (`closeInstance`);
  * - `dispose`: the state's undo (what the idle bound and the pool run).
@@ -15,6 +15,7 @@ import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import * as z from 'zod';
 import { EmbeddableMcpServer } from '../../../../embeddable/EmbeddableMcpServer';
 import { InstanceBatch } from '../../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../../lib/batch/lateBound';
@@ -57,18 +58,15 @@ const tool = (name: string, property: string, handler: Handler) =>
     toolDefinition: {
       name,
       description: name,
-      inputSchema: {
-        type: 'object',
-        properties: { [property]: { type: 'string' } },
-      },
+      inputSchema: z.object({ [property]: z.string().optional() }),
     },
-    handler: handler as never,
+    call: handler as never,
   }) as HandlerEntry;
 
 const group = {
   getName: () => 'batch-drop',
   getHandlers: () => [
-    tool('GetProgram', 'program_name', async (context, _args) => {
+    tool('HandlerProfileList', 'program_name', async (context, _args) => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/programs/programs/prog_a/source/main',
         method: 'GET',
@@ -76,7 +74,7 @@ const group = {
       });
       return { isError: false, content: [{ type: 'text', text: 'a' }] };
     }),
-    tool('GetInterface', 'interface_name', async (context, _args) => {
+    tool('HandlerUnitTestStatus', 'interface_name', async (context, _args) => {
       const first = context.connection.makeAdtRequest({
         url: '/sap/bc/adt/oo/interfaces/if_a/source/main',
         method: 'GET',
@@ -122,11 +120,11 @@ const ledger = new HandlerLedger();
 
   const answers = [
     await client.callTool({
-      name: 'GetProgram',
+      name: 'HandlerProfileList',
       arguments: { program_name: 'PROG_A' },
     }),
     await client.callTool({
-      name: 'GetInterface',
+      name: 'HandlerUnitTestStatus',
       arguments: { interface_name: 'IF_A' },
     }),
   ];

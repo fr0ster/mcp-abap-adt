@@ -1,3 +1,4 @@
+import * as z from 'zod';
 /**
  * Task 28: why this delegating wrapper carries no `detail` of its own.
  *
@@ -26,27 +27,20 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Runs a syntax check on the ABAP data element named by data_element_name. Returns syntax errors, warnings, and messages.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      data_element_name: {
-        type: 'string',
-        description: 'Data element name.',
-      },
-      version: {
-        type: 'string',
-        enum: ['active', 'inactive'],
-        description:
-          'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
-      },
-    },
-    required: ['data_element_name'],
-  },
+  inputSchema: z.object({
+    data_element_name: z.string().describe('Data element name.'),
+    version: z
+      .enum(['active', 'inactive'])
+      .optional()
+      .describe(
+        'Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.',
+      ),
+  }),
 } as const;
 
 export async function handleCheckDataElement(
   context: HandlerContext,
-  args: { data_element_name: string; version?: 'active' | 'inactive' },
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const result = await handleCheckDataElementLow(context, args);
   return normalizeCheckResponse(result, args.data_element_name?.toUpperCase());

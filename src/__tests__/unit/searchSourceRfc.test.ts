@@ -10,6 +10,7 @@ jest.mock('../../lib/search-source/orchestrator', () => ({
 }));
 
 import { handleSearchSource } from '../../handlers/system/readonly/handleSearchSource';
+import { substringLineMatch } from '../../lib/search-source/lineScanner';
 
 const connectionOf = (connectionType: string) => ({
   getConfig: () => ({ connectionType }),
@@ -27,5 +28,10 @@ describe('SearchSource concurrency by connection', () => {
   it("over HTTP the sequential version's own default applies", async () => {
     await handleSearchSource({ connection: connectionOf('http') } as any, args);
     expect((run.mock.calls[0] as any[])[1]).not.toHaveProperty('concurrency');
+  });
+
+  it('the handler wires the shipped strategy', async () => {
+    await handleSearchSource({ connection: connectionOf('http') } as any, args);
+    expect((run.mock.calls[0] as any[])[2].lineMatch).toBe(substringLineMatch);
   });
 });

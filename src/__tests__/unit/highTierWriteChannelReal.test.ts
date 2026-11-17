@@ -54,7 +54,10 @@ import { handleCreateMessageClass } from '../../handlers/message_class/high/hand
 import { handleCreateMessageClassMessage } from '../../handlers/message_class/high/handleCreateMessageClassMessage';
 import { handleUpdateMessageClass } from '../../handlers/message_class/high/handleUpdateMessageClass';
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
-import { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage';
+import {
+  TOOL_DEFINITION as CreatePackage,
+  handleCreatePackage,
+} from '../../handlers/package/high/handleCreatePackage';
 import { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
 import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
@@ -65,10 +68,9 @@ import { handleCreateTransport } from '../../handlers/transport/high/handleCreat
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import {
-  resetSystemContextCache,
-  setSystemContext,
-} from '../../lib/systemContext';
+import { resetSystemContextCache } from '../../lib/systemContext';
+import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
 import {
   type RecordedRequest,
   recordingConnection,
@@ -116,6 +118,24 @@ const TRANSPORT_CREATED_XML =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">' +
   '<tm:request tm:number="SIDK900123" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project="">' +
   '<tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
+
+/**
+ * SAP's read of the created request: its own `tm:request` element, with the
+ * one task SAP created beside it, out of the corpus listing (the element a
+ * read of `/sap/bc/adt/cts/transportrequests/{number}` answers under its
+ * `tm:root`).
+ */
+const REQUEST_WITH_TASK_XML = (() => {
+  const listing = corpusBody(
+    'read-transport-list-structure--01-cts-transportrequests',
+  );
+  const start = listing.indexOf('<tm:request ');
+  const endTag = '</tm:request>';
+  const end = listing.indexOf(endTag, start);
+  if (start < 0 || end < 0)
+    throw new Error('the corpus listing holds no request');
+  return `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="TRLK900438" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core">${listing.slice(start, end + endTag.length)}</tm:root>`;
+})();
 
 const cases: ChannelCase[] = [
   {
@@ -320,11 +340,14 @@ const cases: ChannelCase[] = [
     method: 'POST',
     urlContains: '/sap/bc/adt/packages',
     run: (marker, connection) =>
-      handleCreatePackage(ctx(connection) as any, {
-        package_name: 'ZP_X',
-        super_package: 'ZP',
-        description: marker,
-      }),
+      handleCreatePackage(
+        ctx(connection) as any,
+        CreatePackage.inputSchema.parse({
+          package_name: 'ZP_X',
+          super_package: 'ZP',
+          description: marker,
+        }),
+      ),
   },
   {
     name: 'CreateProgram',
@@ -379,13 +402,31 @@ const cases: ChannelCase[] = [
   {
     // `parseCreatedTransport` throws on a document with no `tm:root` — a
     // real create answer is required, not the connection's 200/empty
-    // default.
+    // default. The request is then read back for the task SAP created with
+    // it, and that task is typed: SAP's read of a request with one task,
+    // then the type change's empty `200`.
     name: 'CreateTransport',
     method: 'POST',
     urlContains: '/sap/bc/adt/cts/transportrequests',
-    seedAnswers: [{ data: TRANSPORT_CREATED_XML }],
+    seedAnswers: [
+      { data: TRANSPORT_CREATED_XML },
+      { data: REQUEST_WITH_TASK_XML },
+      { status: 200, data: '' },
+    ],
     run: (marker, connection) =>
       handleCreateTransport(ctx(connection) as any, { description: marker }),
+    extraChecks: (_marker, requests) => {
+      expect(requests.map((r) => `${r.method} ${r.url.split('?')[0]}`)).toEqual(
+        [
+          'POST /sap/bc/adt/cts/transportrequests',
+          'GET /sap/bc/adt/cts/transportrequests/SIDK900123',
+          'PUT /sap/bc/adt/cts/transportrequests/TRLK900439',
+        ],
+      );
+      expect(String(requests[2]?.data ?? '')).toContain(
+        'tm:useraction="changetasktype"',
+      );
+    },
   },
   {
     // `checkCdsTestDoubles` runs first; its default (200/empty) reading has

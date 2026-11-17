@@ -3,11 +3,15 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+  # Every pull request, whatever its base: a stacked PR into a feature branch
+  # gets the same jobs (the rulesets require them by name).
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   build-and-test:
+    # The name the branch ruleset requires, word for word: the matrix's
+    # test-concurrency key must not change it.
+    name: build-and-test (${{ matrix.os }}, ${{ matrix.node-version }})
     # A hung test is capped here instead of by GitHub's 6-hour default. The
     # slowest cell took ~21 minutes (windows-latest, Node 22, 2026-10-22); on
     # Windows the suite has hung for 40+ minutes before (see SKIP_INSTALL_MATRIX).
@@ -22,6 +26,17 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [22, 24]
+        # How many node:test files run at once, per runner kind (D27, measured
+        # 2026-11-08; docs/development/tests/TESTING_GUIDE.md, "Concurrency is
+        # a setting"): from 2 on the longest file bounds the wall time, 4 costs
+        # 0.9-1.4 GB more for at most 2 s, and macOS (3 cores) slows above 2.
+        include:
+          - os: ubuntu-latest
+            test-concurrency: 2
+          - os: macos-latest
+            test-concurrency: 2
+          - os: windows-latest
+            test-concurrency: 2
 
     steps:
       - name: Checkout code
@@ -122,13 +137,21 @@ jobs:
       # `packageEntryPoints` sat inside green runs until `release.yml`, which
       # has no such line, gated a tag on it. Tests that do not gate are a
       # report nobody reads.
+      # The runner has no default concurrency: each cell passes its own
+      # (the matrix above); after the script's own value, the last one wins.
       - name: Run tests
-        run: npm test
+        run: npm test -- --concurrency ${{ matrix.test-concurrency }}
+
+      # The suites that pack and install the release (`npm run test:install`:
+      # installMatrix, binSmoke) are a run of their own (D27, step 15): the
+      # unit run reaches no outside service.
+      - name: Run install tests
+        run: npm run test:install
         env:
           # The install matrix (installMatrix.test.ts: ~100 s and ~20 npm
           # installs on Linux) runs on one cell only, ubuntu-latest + Node 22;
           # every other cell skips it, and the suite says so. On windows-latest
-          # both cells hung for 40+ minutes in this step with it (cause not
+          # both cells hung for 40+ minutes in the test step with it (cause not
           # established), so Windows is not covered by it in CI.
           SKIP_INSTALL_MATRIX: ${{ (matrix.os == 'ubuntu-latest' && matrix.node-version == 22) && 'false' || 'true' }}
 

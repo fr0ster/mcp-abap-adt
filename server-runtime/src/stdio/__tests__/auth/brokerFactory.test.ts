@@ -522,14 +522,24 @@ describe('AuthBrokerFactory', () => {
       ]);
     });
 
-    it('SNC over rfc: accepted', async () => {
-      snc();
+    it('SNC over rfc: accepted, its address as stated and no URL', async () => {
+      writeSession('dest', [
+        'SAP_AUTH_TYPE=snc',
+        'SAP_SNC_PARTNERNAME=p:placeholder',
+        'SAP_ASHOST=system.example.test',
+        'SAP_SYSNR=00',
+        'SAP_CLIENT=100',
+        'SAP_LANGUAGE=EN',
+      ]);
       await expect(
         factory({ connectionType: 'rfc' }).settingsFor('dest'),
       ).resolves.toEqual({
-        url: SYSTEM_URL,
         authType: 'snc',
         connectionType: 'rfc',
+        client: '100',
+        language: 'EN',
+        ashost: 'system.example.test',
+        sysnr: '00',
       });
     });
   });

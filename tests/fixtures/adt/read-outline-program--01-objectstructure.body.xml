@@ -1,0 +1,31 @@
+<abapsource:objectStructureElement xml:base="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main" adtcore:name="ZMCP_D1_9E25_PR" adtcore:type="PROG/P" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:atom="http://www.w3.org/2005/Atom">
+  <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr"/>
+  <abapsource:objectStructureElement adtcore:name="LCL_LOCAL" include="ZMCP_D1_9E25_PR" adtcore:type="PROG/PL">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPL;name=LCL_LOCAL"/>
+    <abapsource:objectStructureElement adtcore:name="GO" clif_name="LCL_LOCAL" adtcore:type="PROG/PLM" visibility="public">
+      <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO"/>
+      <atom:link rel="http://www.sap.com/adt/relations/source/implementationIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPLM;name=LCL_LOCAL%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20GO"/>
+    </abapsource:objectStructureElement>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="TY_NUM" adtcore:type="PROG/PY">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPY;name=TY_NUM"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="GV_TEXT" adtcore:type="PROG/PD">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPD;name=GV_TEXT"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="START-OF-SELECTION" adtcore:type="PROG/PE">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPE;name=START-OF-SELECTION"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="INC_FORM" adtcore:type="PROG/PU">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr#type=PROG%2FPU;name=INC_FORM"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="MAIN_FORM" adtcore:type="PROG/PU">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main#type=PROG%2FPU;name=MAIN_FORM"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="ZMCP_D1_9E25_I01" adtcore:type="PROG/I">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr"/>
+  </abapsource:objectStructureElement>
+  <abapsource:objectStructureElement adtcore:name="ZMCP_D1_9E25_PR" adtcore:type="PROG/PX">
+    <atom:link rel="http://www.sap.com/adt/relations/source/definitionIdentifier" href="/sap/bc/adt/textelements/programs/zmcp_d1_9e25_pr/source/symbols"/>
+  </abapsource:objectStructureElement>
+</abapsource:objectStructureElement>

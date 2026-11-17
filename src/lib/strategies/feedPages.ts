@@ -15,7 +15,19 @@
  * caller passes back as `to` to go on.
  */
 import { rawOf } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
+import { isAsciiDigit } from '../plainText';
+import {
+  localName,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
+import { attributeOf, parseStructure, walkStructure } from './reading';
 import { succeededWith } from './sequence';
 
 /**
@@ -43,16 +55,34 @@ export interface FeedPage<T> {
 }
 
 /**
- * The `to` of the `rel="next"` link, or nothing. Attributes are read in any
- * order and the href may carry the query encoded or with `&amp;`.
+ * The `to` of the `rel="next"` link, or nothing: a `link` element of any
+ * prefix, at any depth, read through the XML parser.
  */
 export function nextToOf(xml: string): string | undefined {
-  for (const match of xml.matchAll(/<(?:\w+:)?link\b([^>]*)\/?>/g)) {
-    const attributes = match[1];
-    if (!/\brel="next"/.test(attributes)) continue;
-    const href = /\bhref="([^"]*)"/.exec(attributes)?.[1] ?? '';
-    const to = /[?&;]to=([^&]*)/.exec(href.replace(/&amp;/g, '&'))?.[1];
+  for (const visit of walkStructure(parseStructure(xml))) {
+    if (localName(visit.name) !== 'link') continue;
+    if (attributeOf(visit.node, 'rel') !== 'next') continue;
+    // The parser has decoded the attribute: `&amp;` is `&` here.
+    const href = attributeOf(visit.node, 'href') ?? '';
+    const to = toParameterOf(href);
     if (to) return decodeURIComponent(to);
+  }
+  return undefined;
+}
+
+/**
+ * The value of the first `to=` parameter of `href` — one after `?`, `&` or
+ * `;` — up to the next `&`; `undefined` when there is none.
+ */
+function toParameterOf(href: string): string | undefined {
+  for (
+    let at = href.indexOf('to=');
+    at !== -1;
+    at = href.indexOf('to=', at + 1)
+  ) {
+    if (at === 0 || !'?&;'.includes(href.charAt(at - 1))) continue;
+    const end = href.indexOf('&', at + 3);
+    return href.slice(at + 3, end === -1 ? href.length : end);
   }
   return undefined;
 }
@@ -62,10 +92,10 @@ export function nextToOf(xml: string): string | undefined {
  * library's readings answer the entries alone.
  */
 export function feedPage<T>(
-  read: (answer: never) => T[],
-): (answer: never) => FeedPage<T> {
+  read: IResultStrategy<T[]>,
+): IResultStrategy<FeedPage<T>> {
   return (answer) => {
-    const next_to = nextToOf(String(rawOf(answer as never) ?? ''));
+    const next_to = nextToOf(rawOf(answer));
     return next_to === undefined
       ? { entries: read(answer) }
       : { entries: read(answer), next_to };
@@ -74,9 +104,9 @@ export function feedPage<T>(
 
 export interface FeedPaging {
   /** How many entries the caller wants; absent — {@link FEED_PAGE_DEFAULT}. */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /** The upper time bound the first request carries. */
-  to?: string;
+  to?: string | undefined;
 }
 
 /** How an entry is told apart and when it was stamped. */
@@ -91,10 +121,22 @@ export interface FeedEntryIdentity<T> {
  * own next link, which carries the oldest entry's `atom:updated` in UTC.
  */
 export function toBoundOf(stamp: string | undefined): string | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(
-    stamp ?? '',
-  );
-  return match ? match.slice(1).join('') : undefined;
+  const text = stamp ?? '';
+  // `YYYY-MM-DDTHH:MM:SS`: digits where the form has them, its separators between.
+  const form = 'dddd-dd-ddTdd:dd:dd';
+  if (text.length < form.length) return undefined;
+  let bound = '';
+  for (let at = 0; at < form.length; at++) {
+    const wanted = form.charAt(at);
+    const character = text.charAt(at);
+    if (wanted === 'd') {
+      if (!isAsciiDigit(character)) return undefined;
+      bound += character;
+    } else if (character !== wanted) {
+      return undefined;
+    }
+  }
+  return bound;
 }
 
 /** The second before a `to` bound — `to` is inclusive, so this excludes it. */
@@ -103,7 +145,10 @@ export function secondBefore(bound: string): string {
     Number(bound.slice(at, at + (i === 0 ? 4 : 2))),
   );
   const before = new Date(Date.UTC(y, mo - 1, d, h, mi, se) - 1000);
-  return before.toISOString().replace(/\D/g, '').slice(0, 14);
+  return [...before.toISOString()]
+    .filter((character) => isAsciiDigit(character))
+    .join('')
+    .slice(0, 14);
 }
 
 /**
@@ -139,7 +184,7 @@ export function secondBefore(bound: string): string {
 export async function feedPages<T>(
   fetch: (page: {
     maxResults?: number;
-    to?: string;
+    to?: string | undefined;
   }) => Promise<IAdtResponse<FeedPage<T>, IAdtError>>,
   paging: FeedPaging,
   identity: FeedEntryIdentity<T>,

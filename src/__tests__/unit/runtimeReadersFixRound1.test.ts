@@ -513,3 +513,50 @@ describe('GetPackageTree', () => {
     expect(result.isError).toBe(false);
   });
 });
+
+describe('feedVariantsOf', () => {
+  it('reads each feed with variants from the recorded feed list', () => {
+    expect(feedVariantsOf({ data: feedListXml })).toEqual([
+      {
+        feed: '/sap/bc/adt/runtime/dumps',
+        title: 'ABAP Runtime Errors',
+        variants: [
+          {
+            title: 'Runtime Errors caused by me (OKYSLYTSIA)',
+            query: 'and ( equals ( user , OKYSLYTSIA ) )',
+            is_default: true,
+          },
+          {
+            title:
+              'Runtime Errors for objects I am responsible for (OKYSLYTSIA)',
+            query: 'and ( equals ( responsible , OKYSLYTSIA ) )',
+            is_default: false,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('reads a title in CDATA, an attribute quoted with apostrophes and an entity, as the XML parser does', () => {
+    const xml =
+      '<atom:feed xmlns:atom="http://www.w3.org/2005/Atom">' +
+      '<atom:entry><atom:id>/sap/bc/adt/runtime/dumps</atom:id><atom:title type="text"><![CDATA[Errors & dumps]]></atom:title>' +
+      '<feed:extendedData xmlns:feed="http://www.sap.com/adt/feeds"><feed:queryVariants>' +
+      "<feed:queryVariant title='Mine &amp; yours' queryString='equals ( user , X )' isDefault='true'/>" +
+      '</feed:queryVariants></feed:extendedData></atom:entry>' +
+      '</atom:feed>';
+    expect(feedVariantsOf({ data: xml })).toEqual([
+      {
+        feed: '/sap/bc/adt/runtime/dumps',
+        title: 'Errors & dumps',
+        variants: [
+          {
+            title: 'Mine & yours',
+            query: 'equals ( user , X )',
+            is_default: true,
+          },
+        ],
+      },
+    ]);
+  });
+});

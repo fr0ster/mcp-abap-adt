@@ -79,6 +79,14 @@ let root: string;
 let keysDir: string;
 let sessionsDir: string;
 let stdioStart: jest.SpyInstance;
+/** The servers the launcher started, in order. */
+let started: StdioServer[] = [];
+
+/** The system type the launcher passed the server it started (D26 B4). */
+function startedSystemType(): string | undefined {
+  const server: unknown = started[0];
+  return (server as { systemType?: string } | undefined)?.systemType;
+}
 
 beforeEach(() => {
   // Real path: on macOS the temp dir is under /var, a link to /private/var.
@@ -109,9 +117,12 @@ beforeEach(() => {
   // (a case about the type itself deletes or restates it).
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   constructed.mockClear();
+  started = [];
   stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+    .mockImplementation(async function (this: StdioServer) {
+      started.push(this);
+    });
   // The connection at start is the launcher's own step: not made here.
   jest
     .spyOn(StdioServer.prototype, 'connectAtStart')
@@ -194,13 +205,21 @@ const abapKey = {
 const writeKey = (name: string, body: unknown) =>
   fs.writeFileSync(path.join(keysDir, `${name}.json`), JSON.stringify(body));
 const basicLines = (password = PASSWORD, wire: string | null = 'http') => [
-  `SAP_URL=${SYSTEM_URL}`,
+  // An RFC destination states its address and language, and no URL.
+  ...(wire === 'rfc'
+    ? ['SAP_ASHOST=system.example.test', 'SAP_SYSNR=00', 'SAP_LANGUAGE=EN']
+    : [`SAP_URL=${SYSTEM_URL}`]),
   'SAP_CLIENT=100',
   'SAP_AUTH_TYPE=basic',
   // A destination states its wire (#320); `null` leaves it out.
   ...(wire === null ? [] : [`SAP_CONNECTION_TYPE=${wire}`]),
   'SAP_USERNAME=placeholder-user',
   `SAP_PASSWORD=${password}`,
+];
+/** A file stating rfc beside an HTTP destination's URL: usable only once HTTP wins. */
+const rfcStatedBesideUrl = () => [
+  ...basicLines(PASSWORD, null),
+  'SAP_CONNECTION_TYPE=rfc',
 ];
 const writeSession = (name: string, lines: string[]) =>
   fs.writeFileSync(
@@ -364,6 +383,8 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
         [
           '--mcp=dest',
           `--auth-broker-path=${root}`,
+          // A key states no wire: the start states it (decided first).
+          '--connection-type=http',
           `--browser=${browser}`,
           `--browser-auth-port=${port}`,
         ],
@@ -485,7 +506,9 @@ describe('one destination per process', () => {
     const { exits } = await run(['--system-type=cloud']);
     expect(exits).toEqual([]);
     expect(stdioStart).toHaveBeenCalledWith(undefined);
-    expect(process.env.SAP_SYSTEM_TYPE).toBe('cloud');
+    // Passed to the server; the process environment is not written.
+    expect(startedSystemType()).toBe('cloud');
+    expect(process.env.SAP_SYSTEM_TYPE).toBeUndefined();
   });
 });
 
@@ -518,6 +541,7 @@ describe('a destination that cannot be served stops the start', () => {
     const { stderr, exits } = await run([
       '--mcp=dest',
       `--auth-broker-path=${root}`,
+      '--connection-type=http',
     ]);
     expect(exits).toEqual([1]);
     const said = stderr.join('\n');
@@ -533,7 +557,10 @@ describe('a destination that cannot be served stops the start', () => {
 
   it('an --env-path file that does not exist: the parameter and the path', async () => {
     const missing = path.join(root, 'nope.env');
-    const { stderr, exits } = await run([`--env-path=${missing}`]);
+    const { stderr, exits } = await run([
+      `--env-path=${missing}`,
+      '--connection-type=http',
+    ]);
     expect(exits).toEqual([1]);
     expect(stderr).toEqual([
       `[MCP] --env-path: the file does not exist: ${missing}`,
@@ -673,8 +700,8 @@ describe('factoryConfigFrom: the env file', () => {
 
 /**
  * The connection type a destination's .env states, as in 15.x: the file's
- * SAP_CONNECTION_TYPE joins the process environment (never over a value
- * already there), and the precedence is CLI, then that environment, then YAML.
+ * SAP_CONNECTION_TYPE is read below the process environment (never copied
+ * into it), and the precedence is CLI, then that environment, then YAML.
  */
 describe('SAP_CONNECTION_TYPE inside the env file', () => {
   async function settingsOf(argv: string[]) {
@@ -698,7 +725,10 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
 
   it('snc + rfc in the file: not refused, rfc', async () => {
     const file = envFile([
-      `SAP_URL=${SYSTEM_URL}`,
+      'SAP_ASHOST=system.example.test',
+      'SAP_SYSNR=00',
+      'SAP_CLIENT=100',
+      'SAP_LANGUAGE=EN',
       'SAP_AUTH_TYPE=snc',
       'SAP_SNC_PARTNERNAME=p:placeholder',
       'SAP_CONNECTION_TYPE=rfc',
@@ -709,7 +739,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('--connection-type=http beats the file', async () => {
-    const file = envFile(basicLines(PASSWORD, 'rfc'));
+    const file = envFile(rfcStatedBesideUrl());
     const settings = await settingsOf([
       `--env-path=${file}`,
       '--connection-type=http',
@@ -729,7 +759,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 
   it('the process environment beats the file', async () => {
-    const file = envFile(basicLines(PASSWORD, 'rfc'));
+    const file = envFile(rfcStatedBesideUrl());
     process.env.SAP_CONNECTION_TYPE = 'http';
     const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('http');
@@ -820,9 +850,12 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
     return file;
   };
   async function systemTypeOf(argv: string[]) {
+    const before = { ...process.env };
     const result = await run([...argv]);
     expect(result.exits).toEqual([]);
-    return process.env.SAP_SYSTEM_TYPE;
+    // Passed to the server; the process environment is unchanged.
+    expect(process.env).toEqual(before);
+    return startedSystemType();
   }
 
   it('the file beats YAML system-type', async () => {

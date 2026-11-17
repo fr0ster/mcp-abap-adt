@@ -8,9 +8,9 @@
 import { BACKGROUND_RUNS_PER_CALLER, InMemoryBackgroundRuns } from '../index';
 
 describe('the in-memory store', () => {
-  const alice = { url: 'http://sys', client: '100', user: 'ALICE' };
-  const bob = { url: 'http://sys', client: '100', user: 'BOB' };
-  const otherClient = { url: 'http://sys', client: '200', user: 'ALICE' };
+  const alice = { system: 'http://sys', client: '100', user: 'ALICE' };
+  const bob = { system: 'http://sys', client: '100', user: 'BOB' };
+  const otherClient = { system: 'http://sys', client: '200', user: 'ALICE' };
   const run = { tool: 'RuntimeRunClass', object: 'X', started_at: 't0' };
   const answer = { content: [{ type: 'text' as const, text: 'out' }] };
 
@@ -73,5 +73,36 @@ describe('the in-memory store', () => {
     if (!('handle' in a) || !('handle' in b)) throw new Error('refused');
     expect(a.handle).toMatch(/^i7-[0-9a-f]{32}$/);
     expect(a.handle).not.toBe(b.handle);
+  });
+
+  it('a kept answer carrying cancelled: true is read and listed as cancelled, and is discarded like a finished one', () => {
+    const store = new InMemoryBackgroundRuns();
+    const read = { tool: 'GetSqlQuery', object: '', started_at: 't0' };
+    const started = store.start(alice, read);
+    if (!('handle' in started)) throw new Error('refused');
+    const cancelled = {
+      cancelled: true as const,
+      content: [{ type: 'text' as const, text: 'cancelled' }],
+    };
+    store.finish(started.handle, cancelled, 't1');
+    // A late answer changes nothing: the first kept answer stays.
+    store.finish(started.handle, answer, 't2');
+    expect(store.get(started.handle, alice)).toEqual({
+      ...read,
+      run_handle: started.handle,
+      state: 'cancelled',
+      finished_at: 't1',
+      answer: cancelled,
+    });
+    expect(store.list(alice)).toEqual([
+      {
+        ...read,
+        run_handle: started.handle,
+        state: 'cancelled',
+        finished_at: 't1',
+      },
+    ]);
+    expect(store.discard(started.handle, alice)).toBe('discarded');
+    expect(store.get(started.handle, alice)).toBeUndefined();
   });
 });

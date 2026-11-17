@@ -19,7 +19,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { corpusBody } from '../../../lib/adtCorpus';
 import type { FailureCode } from '../../../lib/auth/failures';
 import * as refusals from '../../../lib/auth/serverRefusal';
 import {
@@ -37,11 +36,11 @@ import {
   DebuggerInstance,
   DebugSession,
 } from '../../../lib/debugger/index';
-import { BatchHandlersGroup } from '../../../lib/handlers/groups/BatchHandlersGroup';
 import { DebugBatchHandlersGroup } from '../../../lib/handlers/groups/DebugBatchHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import type { IHandlerGroup } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { corpusBody } from '../../helpers/adtCorpus';
 import {
   type EnvelopeAnswer,
   envelopeConnection,
@@ -197,6 +196,7 @@ async function stand(set: SetKind): Promise<Stand> {
       closeConnection: async () => undefined,
       // The session's own connections answer through the script; a
       // recorder (a recorded call's connection) through a real debugger.
+      dropConnection: () => {},
       amdpDebugger: (c) =>
         own(c) ? (scripted.dbg as never) : AmdpDebugger.create(c),
       requestUser: async () => 'TESTUSER',
@@ -211,7 +211,6 @@ async function stand(set: SetKind): Promise<Stand> {
       ? [
           new DebugHandlersGroup(placeholder),
           new DebugBatchHandlersGroup(placeholder),
-          new BatchHandlersGroup(placeholder),
         ]
       : [
           new CompactDebugHandlersGroup(placeholder),
@@ -313,7 +312,7 @@ const answersOf = async (s: Stand, set: SetKind, numbers: number[]) =>
   jsonOf(
     set === 'compact'
       ? await s.call('HandlerDebugBatch', { action: 'answers', numbers })
-      : await s.call('BatchAnswers', { numbers }),
+      : await s.call('DebugBatchAnswers', { numbers }),
   ) as Array<Record<string, any>>;
 
 /** The data preview, step over and continue, as each set calls them. */
@@ -573,7 +572,7 @@ describe('a complete stop ends the debugger batch answers with the debug state (
     expect(stopped.isError).toBe(true);
     expect(s.owner.holdsState()).toBe(true);
     expect(s.holds()).toBe(true);
-    const answers = jsonOf(await s.call('BatchAnswers', { numbers: [1] }));
+    const answers = jsonOf(await s.call('DebugBatchAnswers', { numbers: [1] }));
     expect(answers[0]?.number).toBe(1);
   });
 });

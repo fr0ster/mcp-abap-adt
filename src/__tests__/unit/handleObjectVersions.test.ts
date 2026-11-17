@@ -23,7 +23,11 @@ jest.mock('../../lib/clients', () => ({
 }));
 
 import { handleGetObjectVersionSource } from '../../handlers/common/readonly/handleGetObjectVersionSource';
-import { handleGetObjectVersions } from '../../handlers/common/readonly/handleGetObjectVersions';
+import {
+  TOOL_DEFINITION as GET_OBJECT_VERSIONS,
+  handleGetObjectVersions,
+} from '../../handlers/common/readonly/handleGetObjectVersions';
+import { defineTool } from '../../lib/handlers/interfaces';
 import { okResponse } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
@@ -147,13 +151,14 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
     expect(data.source).toBe('CLASS zcl_x DEFINITION.');
   });
 
-  it('returns an error for an unknown object_type', async () => {
-    const result = await handleGetObjectVersions(ctx, {
-      object_type: 'nonsense',
-      object_name: 'X',
-    });
-
-    expect(result.isError).toBe(true);
+  it('refuses an unknown object_type at the schema', async () => {
+    const refused = expect(
+      defineTool(GET_OBJECT_VERSIONS, handleGetObjectVersions).call(ctx, {
+        object_type: 'nonsense',
+        object_name: 'X',
+      }),
+    ).rejects.toThrow('Invalid arguments for tool GetObjectVersions: ');
+    await refused;
     expect(mockClassGetVersions).not.toHaveBeenCalled();
   });
 });

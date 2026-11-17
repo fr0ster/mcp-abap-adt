@@ -6,6 +6,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleDeletionCheck } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDeletionCheck',
@@ -17,10 +18,7 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-type HandlerDeletionCheckArgs = {
-  object_type: string;
-  object_name: string;
-};
+type HandlerDeletionCheckArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 export async function handleHandlerDeletionCheck(
   context: HandlerContext,

@@ -9,8 +9,18 @@ import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
+import {
+  attr,
+  child,
+  childAt,
+  listOf,
+  type XmlList,
+  type XmlNode,
+  type XmlRead,
+} from '../xml/tree';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
+import { succeeded } from './stepResponse';
 
 /**
  * `getWhereUsedList`'s replacement, composed — the guide's "Sequences are
@@ -26,20 +36,45 @@ import { atStep } from './step';
 export interface WhereUsedSource {
   getWhereUsedScope(
     params: IAdtWhereUsedScopeParamsOf,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   /** Local — issues no request. */
   modifyWhereUsedScope(
     scopeXml: string,
     options: {
-      enableAll?: boolean;
-      enableOnly?: string[];
-      enable?: string[];
-      disable?: string[];
+      enableAll?: boolean | undefined;
+      enableOnly?: string[] | undefined;
+      enable?: string[] | undefined;
+      disable?: string[] | undefined;
     },
   ): string;
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
+}
+
+/** What `modifyWhereUsedScope` takes: each option may be absent. */
+export type WhereUsedScopeOptions = Parameters<
+  WhereUsedSource['modifyWhereUsedScope']
+>[1];
+
+/**
+ * The scope options with only the ones that have a value, for a client whose
+ * options are declared without `| undefined`.
+ */
+export function presentScopeOptions(options: WhereUsedScopeOptions): {
+  enableAll?: boolean;
+  enableOnly?: string[];
+  enable?: string[];
+  disable?: string[];
+} {
+  return {
+    ...(options.enableAll !== undefined && { enableAll: options.enableAll }),
+    ...(options.enableOnly !== undefined && {
+      enableOnly: options.enableOnly,
+    }),
+    ...(options.enable !== undefined && { enable: options.enable }),
+    ...(options.disable !== undefined && { disable: options.disable }),
+  };
 }
 
 /**
@@ -50,12 +85,12 @@ export interface WhereUsedMembers {
   getWhereUsedScope(
     params: IAdtWhereUsedScopeParamsOf,
     options: { headers: IAdtHeaders },
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   modifyWhereUsedScope: WhereUsedSource['modifyWhereUsedScope'];
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
     options: { headers: IAdtHeaders },
-  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
 }
 
 /**
@@ -80,35 +115,31 @@ export function whereUsedOn(
   };
 }
 
-export interface WhereUsedReference {
+/** One reference of a where-used list: a JSON object, as the tool answers it. */
+export type WhereUsedReference = {
   name: string;
   type: string;
-  uri?: string;
-  package_name?: string;
-  responsible?: string;
-  usage_information?: string;
-}
+  uri?: string | undefined;
+  package_name?: string | undefined;
+  responsible?: string | undefined;
+  usage_information?: string | undefined;
+};
 
 export interface WhereUsedListResult {
   totalReferences: number;
-  resultDescription?: string;
+  resultDescription?: string | undefined;
   references: WhereUsedReference[];
 }
 
 export interface WhereUsedFilter {
-  enableAllTypes?: boolean;
-  enableOnlyTypes?: string[];
-  disableTypes?: string[];
+  enableAllTypes?: boolean | undefined;
+  enableOnlyTypes?: string[] | undefined;
+  disableTypes?: string[] | undefined;
 }
 
-function asArray<T>(value: T | T[] | undefined | null): T[] {
-  if (value === undefined || value === null) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-function attrs(node: unknown): Record<string, string> {
-  const a = (node as { '@'?: Record<string, string> } | undefined)?.['@'];
-  return a && typeof a === 'object' ? a : {};
+/** The attribute `name` of `node`'s attribute group (`@`). */
+function attrOf(node: XmlRead, name: string): string | undefined {
+  return attr(child(node, '@'), name);
 }
 
 /**
@@ -122,46 +153,35 @@ function attrs(node: unknown): Record<string, string> {
  * `tests/fixtures/adt/read-where-used-list-structure--01-informationsystem-
  * usagereferences.body.xml`, the one captured fixture for this endpoint.
  */
-export function parseWhereUsedReferences(value: unknown): WhereUsedListResult {
-  const root = (value as Record<string, unknown> | undefined)?.[
-    'usagereferences:usageReferenceResult'
-  ];
-  const rootAttrs = attrs(root);
-  const objectsRoot = (root as Record<string, unknown> | undefined)?.[
-    'usagereferences:referencedObjects'
-  ];
-  const rawRefs = (objectsRoot as Record<string, unknown> | undefined)?.[
-    'usagereferences:referencedObject'
-  ];
+export function parseWhereUsedReferences(value: XmlRead): WhereUsedListResult {
+  const root = child(value, 'usagereferences:usageReferenceResult');
+  const rawRefs = childAt(
+    root,
+    'usagereferences:referencedObjects',
+    'usagereferences:referencedObject',
+  );
 
-  const references: WhereUsedReference[] = asArray(rawRefs as unknown)
+  const references: WhereUsedReference[] = listOf(rawRefs)
     .map((ref) => {
-      const refAttrs = attrs(ref);
-      const adtObject = (ref as Record<string, unknown> | undefined)?.[
-        'usagereferences:adtObject'
-      ];
-      const adtAttrs = attrs(adtObject);
-      const packageRef = (adtObject as Record<string, unknown> | undefined)?.[
-        'adtcore:packageRef'
-      ];
-      const packageAttrs = attrs(packageRef);
+      const adtObject = child(ref, 'usagereferences:adtObject');
+      const packageRef = child(adtObject, 'adtcore:packageRef');
       return {
-        name: adtAttrs['adtcore:name'] ?? '',
-        type: adtAttrs['adtcore:type'] ?? '',
-        uri: refAttrs.uri || undefined,
-        package_name: packageAttrs['adtcore:name'] || undefined,
-        responsible: adtAttrs['adtcore:responsible'] || undefined,
-        usage_information: refAttrs.usageInformation || undefined,
+        name: attrOf(adtObject, 'adtcore:name') ?? '',
+        type: attrOf(adtObject, 'adtcore:type') ?? '',
+        uri: attrOf(ref, 'uri') || undefined,
+        package_name: attrOf(packageRef, 'adtcore:name') || undefined,
+        responsible: attrOf(adtObject, 'adtcore:responsible') || undefined,
+        usage_information: attrOf(ref, 'usageInformation') || undefined,
       };
     })
     .filter((r) => r.name);
 
-  const declaredTotal = Number(rootAttrs.numberOfResults);
+  const declaredTotal = Number(attrOf(root, 'numberOfResults'));
   return {
     totalReferences: Number.isFinite(declaredTotal)
       ? declaredTotal
       : references.length,
-    resultDescription: rootAttrs.resultDescription || undefined,
+    resultDescription: attrOf(root, 'resultDescription') || undefined,
     references,
   };
 }
@@ -175,15 +195,7 @@ function needsScope(filter: WhereUsedFilter): boolean {
 }
 
 function noResult<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error(
-        'fetchWhereUsedReferences: asked for the error of a success',
-      );
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  return succeeded(value, 'fetchWhereUsedReferences');
 }
 
 /**
@@ -219,7 +231,7 @@ export async function fetchWhereUsedReferences(
       }),
     )();
     if (!scope.ok) {
-      return scope as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
+      return scope;
     }
     const rawScope = scope.getResult().value?.raw ?? '';
     scopeXml = utils.modifyWhereUsedScope(rawScope, {
@@ -237,7 +249,7 @@ export async function fetchWhereUsedReferences(
     }),
   )();
   if (!result.ok) {
-    return result as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
+    return result;
   }
 
   return noResult(parseWhereUsedReferences(result.getResult().value?.value));

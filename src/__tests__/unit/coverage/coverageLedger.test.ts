@@ -167,8 +167,9 @@ describe('the coverage ledger guard', () => {
   it('the served list is the listed-schema fixture', () => {
     // 24.0.0: GetObjectDraft, one more; BatchBegin, BatchEnd and
     // BatchAnswers left the full sets, three fewer; DebugBatchAnswers, one
-    // more.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 312);
+    // more; compact HandlerSearch and HandlerWhereUsed left for
+    // HandlerSystem (D25), one fewer.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 311);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 

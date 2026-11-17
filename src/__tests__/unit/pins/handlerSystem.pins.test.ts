@@ -1,0 +1,470 @@
+/**
+ * `HandlerSystem`, pinned on each variant: one row per action, each the
+ * call of its full tool's entry, so its requests are that tool's.
+ *
+ * - `search_source` over an exact package name without its subpackages, on
+ *   the ADT stand-in (a listed long tool reads on a session of its own): one
+ *   batch envelope asking the package's node structure, answered with the
+ *   corpus's empty package;
+ * - the other actions on `recordingConnection` with real adt-clients code,
+ *   SAP's answers the corpus documents (in their envelope where the read is
+ *   enveloped): `search_object` the quick search, `where_used` the usage
+ *   references of a domain, `package_tree` the package's metadata and root
+ *   node structure in one envelope, `transports` the saved search
+ *   configurations and then the listing, `atc_findings` the worklist,
+ *   `atc_results` the result list, `atc_result` one result.
+ *
+ * `background` is not among the rows: the entry drops it (the server
+ * decides it at the dispatch, `src/__tests__/unit/handlerSystem/longTool.test.ts`),
+ * so a row with it sends what the row without it sends.
+ */
+
+import { corpusBody } from '../../helpers/adtCorpus';
+import { envelopeResponse } from '../../helpers/batchEnvelope';
+import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
+
+/** The node structure of an empty package, in a batch envelope. */
+const EMPTY_PACKAGE = envelopeResponse([
+  {
+    status: 200,
+    body: corpusBody('read-empty-package-contents--01-nodestructure'),
+  },
+]);
+
+/** A corpus document as SAP answered it. */
+const document = (name: string) => ({
+  status: 200,
+  headers: { 'Content-Type': 'application/xml' },
+  data: corpusBody(name),
+});
+
+/** The package's metadata and its root node structure, in one envelope. */
+const PACKAGE_ROOT = envelopeResponse([
+  {
+    status: 200,
+    body: corpusBody('read-metadata-package--01-packages-zmcpshrpkg'),
+  },
+  {
+    status: 200,
+    body: corpusBody('read-empty-package-contents--01-nodestructure'),
+  },
+]);
+
+/** The saved search configurations, then the listing of the one used. */
+const LISTING = [
+  envelopeResponse([
+    {
+      status: 200,
+      headers: {
+        'Content-Type':
+          'application/vnd.sap.adt.configurations.v1+xml; charset=utf-8',
+      },
+      body: corpusBody(
+        'read-transport-search-configurations--01-searchconfiguration-configurations',
+      ),
+    },
+  ]),
+  envelopeResponse([
+    {
+      status: 200,
+      headers: {
+        'Content-Type':
+          'application/vnd.sap.adt.transportorganizertree.v1+xml; charset=utf-8',
+      },
+      body: corpusBody(
+        'read-transport-list-structure--01-cts-transportrequests',
+      ),
+    },
+  ]),
+];
+
+const WORKLIST = document(
+  'atc-findings-worklist--01-worklists-2aaa2806861e1fd1ad9bd28dca5c37ed',
+);
+const RESULTS = document('atc-results-list-central--01-results');
+const RESULT = document(
+  'atc-result-by-display-id--01-results-e6ac99b2161f1fe1b5a1e9b68e5cd628',
+);
+const USAGES = document(
+  'read-where-used-list-structure--01-informationsystem-usagereferences',
+);
+const QUICK_SEARCH = document(
+  'read-package-quick-search-mask--01-quick-search',
+);
+
+describe('onprem', () => {
+  pinCases([
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'adtStandIn',
+      args: {
+        action: 'search_source',
+        packages: ['ZPIN_PKG'],
+        include_subpackages: false,
+        query: 'FUNCTION',
+      },
+      answers: [undefined, EMPTY_PACKAGE],
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            accept: 'multipart/mixed',
+            'content-type':
+              'multipart/mixed; boundary=batch_51854c50-758c-497d-afaf-181ae0d3a4ca',
+            'sap-adt-saplb': 'fetch',
+            'sap-adt-connection-id': 'ec1e23e9-9820-4055-ac8b-209478db6143',
+            'sap-adt-request-id': '4a89fb30c3244204a703c8e6027bd09a',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'x-csrf-token': 'csrf-placeholder',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-1; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'content-length': '750',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: '--batch_51854c50-758c-497d-afaf-181ae0d3a4ca\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZPIN_PKG&parent_tech_name=ZPIN_PKG&withShortDescriptions=false HTTP/1.1\r\nAccept: application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml\r\nContent-Type: application/vnd.sap.as+xml; charset=UTF-8; dataname=null\r\nContent-Length: 181\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>\r\n\r\n--batch_51854c50-758c-497d-afaf-181ae0d3a4ca--\r\n',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        action: 'search_object',
+        object_name: 'ZCL_MCP_SHARED_CLS',
+        object_type: 'CLAS',
+      },
+      answers: [QUICK_SEARCH],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZCL_MCP_SHARED_CLS&maxResults=100&objectType=CLAS',
+          headers: { Accept: 'application/xml' },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        action: 'where_used',
+        object_name: 'ZMCP_SHR_DOMAIN',
+        object_type: 'DOMA/DD',
+      },
+      answers: [USAGES],
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fdomains%2Fzmcp_shr_domain',
+          headers: {
+            Accept:
+              'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
+            'Content-Type':
+              'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
+          },
+          body: '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: { action: 'package_tree', package_name: 'ZMCP_SHR_PKG' },
+      answers: [PACKAGE_ROOT],
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            'Content-Type':
+              'multipart/mixed; boundary=batch_8c17a172-0cce-420f-a470-94906158b44e',
+            Accept: 'multipart/mixed',
+          },
+          body: '--batch_8c17a172-0cce-420f-a470-94906158b44e\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/packages/zmcp_shr_pkg?version=active HTTP/1.1\r\nAccept: application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml\r\n\r\n\r\n--batch_8c17a172-0cce-420f-a470-94906158b44e\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZMCP_SHR_PKG&parent_tech_name=ZMCP_SHR_PKG&withShortDescriptions=false HTTP/1.1\r\nAccept: application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml\r\nContent-Type: application/vnd.sap.as+xml; charset=UTF-8; dataname=null\r\nContent-Length: 181\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>\r\n\r\n--batch_8c17a172-0cce-420f-a470-94906158b44e--\r\n',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: { action: 'transports', user: 'PIN_USER', modifiable_only: true },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            'Content-Type':
+              'multipart/mixed; boundary=batch_23834b60-b3ba-481b-aaa0-9aaf356625b2',
+            Accept: 'multipart/mixed',
+          },
+          body: '--batch_23834b60-b3ba-481b-aaa0-9aaf356625b2\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations HTTP/1.1\r\nAccept: application/vnd.sap.adt.configurations.v1+xml\r\n\r\n\r\n\r\n--batch_23834b60-b3ba-481b-aaa0-9aaf356625b2--\r\n',
+        },
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            'Content-Type':
+              'multipart/mixed; boundary=batch_2eba6535-4c65-40c1-af52-cc96f701bc3b',
+            Accept: 'multipart/mixed',
+          },
+          body: '--batch_2eba6535-4c65-40c1-af52-cc96f701bc3b\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests?configUri=%2Fsap%2Fbc%2Fadt%2Fcts%2Ftransportrequests%2Fsearchconfiguration%2Fconfigurations%2F22D2111643541FE1A5AA03DC2D3DE702 HTTP/1.1\r\nAccept: application/vnd.sap.adt.transportorganizertree.v1+xml\r\n\r\n\r\n\r\n--batch_2eba6535-4c65-40c1-af52-cc96f701bc3b--\r\n',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        action: 'atc_findings',
+        worklist_id: '2AAA2806861E1FD1AD9BD28DCA5C37ED',
+      },
+      answers: [WORKLIST],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/atc/worklists/2AAA2806861E1FD1AD9BD28DCA5C37ED?includeExemptedFindings=false',
+          headers: {
+            Accept:
+              'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: { action: 'atc_results', created_by: '*' },
+      answers: [RESULTS],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/atc/results?createdBy=*',
+          headers: { Accept: 'application/xml' },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        action: 'atc_result',
+        display_id: 'E6AC99B2161F1FE1B5A1E9B68E5CD628',
+      },
+      answers: [RESULT],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/atc/results/E6AC99B2161F1FE1B5A1E9B68E5CD628',
+          headers: { Accept: 'application/xml' },
+          body: undefined,
+        },
+      ],
+    },
+  ]);
+});
+
+describe('cloud', () => {
+  pinCases([
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'adtStandIn',
+      args: {
+        action: 'search_source',
+        packages: ['ZPIN_PKG'],
+        include_subpackages: false,
+        query: 'FUNCTION',
+      },
+      answers: [undefined, undefined, EMPTY_PACKAGE],
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            accept: 'multipart/mixed',
+            'content-type':
+              'multipart/mixed; boundary=batch_ae2357e3-03cd-4685-a7f7-ce0041ee85dc',
+            'sap-adt-saplb': 'fetch',
+            'x-sap-security-session': 'use',
+            'sap-adt-connection-id': '0276fab1-dae1-48e1-ada6-849e4ee3b065',
+            'sap-adt-request-id': 'a9104076e0534732a83280be1f98c5c8',
+            'x-sap-adt-profiling': 'server-time',
+            authorization: 'Basic UElOX1VTRVI6cGluLXBhc3N3b3Jk',
+            'x-csrf-token': 'csrf-placeholder',
+            'sap-client': '100',
+            cookie:
+              'SAP_SESSIONID_X01_100=session-1; sap-usercontext=sap-client=100',
+            'user-agent': 'axios/1.20.0',
+            'content-length': '750',
+            'accept-encoding': 'gzip, compress, deflate, br',
+            host: PIN_STAND_HOST,
+            connection: 'keep-alive',
+          },
+          body: '--batch_ae2357e3-03cd-4685-a7f7-ce0041ee85dc\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZPIN_PKG&parent_tech_name=ZPIN_PKG&withShortDescriptions=false HTTP/1.1\r\nAccept: application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml\r\nContent-Type: application/vnd.sap.as+xml; charset=UTF-8; dataname=null\r\nContent-Length: 181\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>\r\n\r\n--batch_ae2357e3-03cd-4685-a7f7-ce0041ee85dc--\r\n',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: {
+        action: 'search_object',
+        object_name: 'ZCL_MCP_SHARED_CLS',
+        object_type: 'CLAS',
+      },
+      answers: [QUICK_SEARCH],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZCL_MCP_SHARED_CLS&maxResults=100&objectType=CLAS',
+          headers: { Accept: 'application/xml' },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: {
+        action: 'where_used',
+        object_name: 'ZMCP_SHR_DOMAIN',
+        object_type: 'DOMA/DD',
+      },
+      answers: [USAGES],
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Fddic%2Fdomains%2Fzmcp_shr_domain',
+          headers: {
+            Accept:
+              'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
+            'Content-Type':
+              'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
+          },
+          body: '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: { action: 'package_tree', package_name: 'ZMCP_SHR_PKG' },
+      answers: [PACKAGE_ROOT],
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            'Content-Type':
+              'multipart/mixed; boundary=batch_e43fda6d-c456-4de8-ae80-89ef9c2fd97a',
+            Accept: 'multipart/mixed',
+          },
+          body: '--batch_e43fda6d-c456-4de8-ae80-89ef9c2fd97a\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/packages/zmcp_shr_pkg?version=active HTTP/1.1\r\nAccept: application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml\r\n\r\n\r\n--batch_e43fda6d-c456-4de8-ae80-89ef9c2fd97a\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nPOST /sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZMCP_SHR_PKG&parent_tech_name=ZMCP_SHR_PKG&withShortDescriptions=false HTTP/1.1\r\nAccept: application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml\r\nContent-Type: application/vnd.sap.as+xml; charset=UTF-8; dataname=null\r\nContent-Length: 181\r\n\r\n<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>\r\n\r\n--batch_e43fda6d-c456-4de8-ae80-89ef9c2fd97a--\r\n',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: { action: 'transports', user: 'PIN_USER', modifiable_only: true },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            'Content-Type':
+              'multipart/mixed; boundary=batch_53110bcc-c2b6-4e0b-af83-dfa2c9bac1b2',
+            Accept: 'multipart/mixed',
+          },
+          body: '--batch_53110bcc-c2b6-4e0b-af83-dfa2c9bac1b2\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations HTTP/1.1\r\nAccept: application/vnd.sap.adt.configurations.v1+xml\r\n\r\n\r\n\r\n--batch_53110bcc-c2b6-4e0b-af83-dfa2c9bac1b2--\r\n',
+        },
+        {
+          method: 'POST',
+          url: '/sap/bc/adt/communication/batch',
+          headers: {
+            'Content-Type':
+              'multipart/mixed; boundary=batch_b68c92f1-a2fa-4080-ade4-1c855bec0458',
+            Accept: 'multipart/mixed',
+          },
+          body: '--batch_b68c92f1-a2fa-4080-ade4-1c855bec0458\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests?configUri=%2Fsap%2Fbc%2Fadt%2Fcts%2Ftransportrequests%2Fsearchconfiguration%2Fconfigurations%2F22D2111643541FE1A5AA03DC2D3DE702 HTTP/1.1\r\nAccept: application/vnd.sap.adt.transportorganizertree.v1+xml\r\n\r\n\r\n\r\n--batch_b68c92f1-a2fa-4080-ade4-1c855bec0458--\r\n',
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: {
+        action: 'atc_findings',
+        worklist_id: '2AAA2806861E1FD1AD9BD28DCA5C37ED',
+      },
+      answers: [WORKLIST],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/atc/worklists/2AAA2806861E1FD1AD9BD28DCA5C37ED?includeExemptedFindings=false',
+          headers: {
+            Accept:
+              'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: { action: 'atc_results', created_by: '*' },
+      answers: [RESULTS],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/atc/results?createdBy=*',
+          headers: { Accept: 'application/xml' },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'HandlerSystem',
+      variant: 'cloud',
+      stand: 'recording',
+      args: {
+        action: 'atc_result',
+        display_id: 'E6AC99B2161F1FE1B5A1E9B68E5CD628',
+      },
+      answers: [RESULT],
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/atc/results/E6AC99B2161F1FE1B5A1E9B68E5CD628',
+          headers: { Accept: 'application/xml' },
+          body: undefined,
+        },
+      ],
+    },
+  ]);
+});

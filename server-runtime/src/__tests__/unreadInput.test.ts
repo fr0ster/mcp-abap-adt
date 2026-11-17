@@ -180,3 +180,25 @@ describe.each(LAUNCHERS)('$name: unknown YAML keys', (launcher) => {
     ).toBe(true);
   });
 });
+
+describe.each(LAUNCHERS)('$name: an empty value is not given', (launcher) => {
+  it('--system-type= is read as not given, and the next form decides', () => {
+    const { exits, config } = startWith(
+      launcher,
+      ['--system-type='],
+      'system-type: cloud\n',
+    );
+    expect(exits).toEqual([]);
+    expect(config).toHaveProperty('systemType', 'cloud');
+  });
+
+  it('a YAML key with no value is a known key, read as not given', () => {
+    const { exits, config } = startWith(
+      launcher,
+      ['--system-type=onprem'],
+      'enable-data-tools:\n',
+    );
+    expect(exits).toEqual([]);
+    expect(config).toHaveProperty('enableDataTools', false);
+  });
+});

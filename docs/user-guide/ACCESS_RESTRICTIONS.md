@@ -52,7 +52,7 @@ does not see it and cannot call it. No call checks a deny list.
 |---|---|
 | `Tool` | the tool (`DeleteClass`) |
 | `Prefix*` | every tool whose name starts with `Prefix` (`Delete*`) |
-| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock, HandlerUnlock, HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerBatch, HandlerDebugBatch, HandlerSession), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
+| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock, HandlerUnlock, HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
 | `Tool.CODE` | on HandlerActivate and HandlerGet, an ADT type code as the ADT tables write it (`HandlerActivate.CLAS/OC`, `HandlerGet.DDLS/DF`) |
 | `Tool.prefix*` | every value (and, on HandlerActivate and HandlerGet, every code) starting with `prefix` (`HandlerDebugSession.get*`; `HandlerActivate.CLAS*` names `CLASS` and `CLAS/OC`) |
 
@@ -76,6 +76,11 @@ does not see it and cannot call it. No call checks a deny list.
 - **Denying `Activate*` closes only the activation tools**, not the `activate` argument of a
   write (`UpdateClass` with `activate: true`).
 - An entry that matches nothing in this binary is ignored and named in the start line.
+- **HandlerSystem is narrowed by `action`** (`HandlerSystem.where_used`, `HandlerSystem.atc_*`):
+  a denied action leaves the `action` enum, the description, and every argument only denied
+  actions take; an argument another action left takes too stays, in that action's words.
+  `where_used` takes no deniable object type: the 23.x entries `HandlerWhereUsed.<TYPE>` match
+  nothing and are named in the start line, and nothing replaces them.
 - A batch can record only registered tools and values: a denied one cannot be recorded.
 
 ## Allowed packages, allowed requests

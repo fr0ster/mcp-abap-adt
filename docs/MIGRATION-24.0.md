@@ -905,8 +905,12 @@ tool. Six reads are new to compact: `search_source`, `package_tree`, `transports
   function module, `atc_findings`, `atc_results` and `atc_result` are recorded; `search_source`,
   `package_tree` and `transports` are refused `batch_not_recordable` in batch mode, as their full
   tools' reads chain.
-- **Access restrictions.** A deny entry `HandlerWhereUsed.<TYPE>` matches nothing now and is named
-  in the start line; `HandlerSystem` is denied by its tool entry (`HandlerSystem`).
+- **Access restrictions.** `HandlerSystem.<action>` denies one action (`HandlerSystem.where_used`,
+  `HandlerSystem.atc_*`): it leaves the `action` enum, the description and every argument only
+  denied actions take, and the tool is left out when every action is denied. A deny entry
+  `HandlerWhereUsed.<TYPE>` matches nothing now and is named in the start line, with no
+  replacement: `where_used` is not narrowed by object type. Deny `HandlerSystem.where_used` to
+  close the where-used read whole.
 - **Embedders:** `compactSearchSchema`, `compactWhereUsedSchema`, `compactWhereUsedSchemaFor`,
   `COMPACT_WHERE_USED_TAKES`, `compactWhereUsedDescription`, `COMPACT_WHERE_USED` and
   `COMPACT_WHERE_USED_ROUTES` are gone from `@mcp-abap-adt/lib/compact-shared`; `SYSTEM_ACTIONS`,

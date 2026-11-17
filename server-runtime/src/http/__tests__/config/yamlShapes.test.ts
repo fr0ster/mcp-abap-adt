@@ -2,8 +2,9 @@
  * Nothing stated is ignored: a config file section or value of the wrong
  * shape — a list or a value where a mapping of keys is expected, a mapping
  * or a list where one value is expected — is refused in words naming its
- * key, in every binary's table and every section it reads. An empty value
- * and YAML null are not given, as before.
+ * key, in every section `mcp-abap-adt-http`'s table reads (the SSE and
+ * stdio tables: their own suites). An empty value and YAML null are not
+ * given, as before.
  */
 
 import {
@@ -12,8 +13,6 @@ import {
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { load } from 'js-yaml';
-import { SSE_PARAMETERS } from '../../../sse/config/sseParameters';
-import { CORE_PARAMETERS } from '../../../stdio/config/coreParameters';
 import { HTTP_PARAMETERS } from '../../config/httpParameters';
 
 /** The YAML text as `loadYamlConfig` reads it: its top-level mapping. */
@@ -49,17 +48,15 @@ describe('a section of the wrong shape is refused, naming its key', () => {
       'http:\n  tls: cert.pem\n',
       'http.tls',
     ],
-    ['sse as a list', SSE_PARAMETERS, 'sse:\n  - port: 3001\n', 'sse'],
-    ['sse.tls as a value', SSE_PARAMETERS, 'sse:\n  tls: 1\n', 'sse.tls'],
     [
       'restrictions as a list',
-      CORE_PARAMETERS,
+      HTTP_PARAMETERS,
       'restrictions:\n  - deny-actions: DeleteClass\n',
       'restrictions',
     ],
     [
       'restrictions as a value',
-      CORE_PARAMETERS,
+      HTTP_PARAMETERS,
       'restrictions: all\n',
       'restrictions',
     ],
@@ -109,8 +106,6 @@ describe('a value of the wrong shape is refused, naming its key', () => {
       'http:\n  allowed-hosts: [{a: b}]\n',
       'http.allowed-hosts',
     ],
-    ['a string as a list', CORE_PARAMETERS, 'env: [a, b]\n', 'env'],
-    ['an enum as a mapping', CORE_PARAMETERS, 'renewal: {a: b}\n', 'renewal'],
     [
       'a whole number as a list',
       HTTP_PARAMETERS,
@@ -129,7 +124,7 @@ describe('an empty value and null are not given', () => {
     ['http null', HTTP_PARAMETERS, 'http:\n'],
     ['http empty', HTTP_PARAMETERS, "http: ''\n"],
     ['http.tls null', HTTP_PARAMETERS, 'http:\n  tls:\n'],
-    ['restrictions null', CORE_PARAMETERS, 'restrictions:\n'],
+    ['restrictions null', HTTP_PARAMETERS, 'restrictions:\n'],
     ['a port null', HTTP_PARAMETERS, 'http:\n  port:\n'],
     ['a host empty', HTTP_PARAMETERS, "http:\n  host: ''\n"],
   ])('%s', (_case, table, text) => {

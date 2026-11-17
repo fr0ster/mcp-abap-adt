@@ -17,6 +17,7 @@ import {
   type ToolDefinition,
   type VariantToolDefinition,
 } from '../handlers/interfaces.js';
+import type { AbapSystemKind } from '../systemKind.js';
 import {
   type DeniedActions,
   type DeniedEntry,
@@ -149,10 +150,10 @@ function narrowed(
     // the original refusal of what it parsed.
     ...(refuses !== undefined
       ? {
-          refusesArguments: (args: ToolArgs) => {
+          refusesArguments: (args: ToolArgs, variant?: AbapSystemKind) => {
             const parsed = own.inputSchema.safeParse(args);
             return parsed.success
-              ? refuses(parsed.data)
+              ? refuses(parsed.data, variant)
               : new Error(
                   invalidArgumentsWords(
                     entry.toolDefinition.name,

@@ -1763,6 +1763,7 @@ export abstract class BaseMcpServer extends McpServer {
               isBackgroundTool(entry.toolDefinition.name) || longTool
                 ? withoutBackground(args)
                 : args,
+              statedSystemKind(this.statedSystemType()),
             );
             if (refusedArguments !== undefined) {
               return this.refusalAnswer(refusedArguments);

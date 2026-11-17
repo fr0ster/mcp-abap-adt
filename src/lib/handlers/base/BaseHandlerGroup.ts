@@ -25,7 +25,7 @@ import {
 } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
-import { stateSystemKind } from '../../systemKind.js';
+import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
@@ -201,7 +201,10 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const read = listed && isLongRead(toolName, args);
           // Arguments its call would refuse (`HandlerSystem`'s action's
           // target's): refused before the call's context, nothing sent.
-          const refusedArguments = refusesArguments?.(args);
+          const refusedArguments = refusesArguments?.(
+            args,
+            statedSystemKind(this.statedSystemType()),
+          );
           if (refusedArguments !== undefined) {
             return return_error(refusedArguments);
           }

@@ -103,9 +103,14 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
    * schema cannot express a rule its call checks — `HandlerSystem`'s
    * per-action arguments, each its target's — so a refused call opens no
    * connection, logs on nowhere, starts no run and sends nothing. Every
-   * registration path reads it first.
+   * registration path reads it first. `variant`: the kind the instance (or
+   * the group) states, for a refusal that depends on it (`HandlerGet`'s
+   * members); none stated, such a refusal is left to the call.
    */
-  readonly refusesArguments?: (args: ToolArgs) => Error | undefined;
+  readonly refusesArguments?: (
+    args: ToolArgs,
+    variant?: AbapSystemKind,
+  ) => Error | undefined;
   /**
    * The tool begins and ends the communication batch (`HandlerBatch`): a set
    * that serves it has batch mode, and only there does every other tool's

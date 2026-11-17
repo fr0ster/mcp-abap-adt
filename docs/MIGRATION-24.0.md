@@ -128,6 +128,10 @@ A value a start states is read as stated, or the start is refused naming it.
   `@mcp-abap-adt/server-runtime`) is removed: `readEnvFileContext(path)` answers the file's
   `SAP_CONNECTION_TYPE` / `SAP_SYSTEM_TYPE`, and `withEnvFileContext(env, context)` the values
   with the environment's first, writing neither.
+- **`setConfigOverride` and `getManagedConnection` take a kind** (`@mcp-abap-adt/lib/utils`):
+  `setConfigOverride(config, 'onprem' | 'cloud')` builds and rebuilds for that kind,
+  `getManagedConnection(kind)` states the one it needs — a configured connection asked for
+  another kind is refused. Without a kind, `SAP_SYSTEM_TYPE` answers, as before.
 
 ## RFC destinations: the address is stated
 

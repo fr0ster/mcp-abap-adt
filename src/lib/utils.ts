@@ -23,8 +23,13 @@ import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
 } from './connectionEvents';
-import { createAbapConnection } from './connectionFactory.js';
+import {
+  createAbapConnection,
+  resolveSystemKind,
+  systemKindOf,
+} from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
+import type { SapEnvironment } from './handlers/interfaces';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 import {
@@ -35,6 +40,7 @@ import {
 import { endConnection } from './ownedConnections.js';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
+import { type AbapSystemKind, statedSystemKind } from './systemKind';
 import { child, childAt } from './thrownValue';
 import { wireValueOf } from './wireValue';
 import { parseXml, type XmlNode } from './xml/node';
@@ -68,6 +74,8 @@ export {
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
 let overrideConfig: SapConfig | undefined;
+/** The kind `setConfigOverride` was given with its config; none: `SAP_SYSTEM_TYPE` answers. */
+let overrideKind: AbapSystemKind | undefined;
 let overrideConnection: IAbapConnection | undefined;
 /** Whether `overrideConnection` was built here, from a config: then it is ours to end. */
 let overrideBuilt = false;
@@ -85,6 +93,8 @@ function endManaged(
   if (connection !== undefined && built) void endConnection(connection);
 }
 let cachedConfigSignature: string | undefined;
+/** The kind the cached connection was built for: part of the reuse decision. */
+let cachedKind: AbapSystemKind | undefined;
 
 // AsyncLocalStorage for storing session context
 export const sessionContext = new AsyncLocalStorage<{
@@ -501,9 +511,22 @@ export function return_error(error: unknown): FailureAnswer {
   };
 }
 
-export function getManagedConnection(): IAbapConnection {
+/**
+ * The managed connection. `kind`, when given, states the system kind it is
+ * for: below it the kind `setConfigOverride` was given, then
+ * `SAP_SYSTEM_TYPE`. A connection built for one kind is never handed out
+ * for another: a configured one asked for another kind is refused.
+ */
+export function getManagedConnection(kind?: SapEnvironment): IAbapConnection {
+  const asked = statedSystemKind(kind);
   // If override connection is set, use it (for backward compatibility)
   if (overrideConnection) {
+    const built = systemKindOf(overrideConnection);
+    if (asked !== undefined && built !== undefined && built !== asked) {
+      throw new Error(
+        `The configured connection is built for ${built}; ${asked} was asked for`,
+      );
+    }
     return overrideConnection;
   }
 
@@ -562,8 +585,15 @@ export function getManagedConnection(): IAbapConnection {
   }
 
   const signature = sapConfigSignature(config);
+  // The kind decides with the settings: the asked kind, else the configured
+  // one, else SAP_SYSTEM_TYPE (refused when none states one).
+  const builtKind = asked ?? overrideKind ?? resolveSystemKind(config);
 
-  if (!cachedConnection || cachedConfigSignature !== signature) {
+  if (
+    !cachedConnection ||
+    cachedConfigSignature !== signature ||
+    cachedKind !== builtKind
+  ) {
     connectionManagerLogger?.debug(
       `[DEBUG] getManagedConnection - Creating new connection (cached: ${!!cachedConnection}, signature changed: ${cachedConfigSignature !== signature})`,
     );
@@ -592,9 +622,12 @@ export function getManagedConnection(): IAbapConnection {
       credentialFromSapConfig(config),
       loggerAdapter,
       fallbackSessionId,
+      undefined,
+      builtKind,
     );
 
     cachedConfigSignature = signature;
+    cachedKind = builtKind;
 
     // Don't call connect() here - it will be called lazily on first request
     // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
@@ -608,7 +641,13 @@ export function getManagedConnection(): IAbapConnection {
   return cachedConnection;
 }
 
-export function setConfigOverride(override?: SapConfig) {
+/**
+ * The configuration the managed connection is built from, and the system
+ * kind it is built for — kept with it, so a rebuild after
+ * `invalidateConnectionCache` keeps it. Without `kind`, `SAP_SYSTEM_TYPE`
+ * answers when the connection is built.
+ */
+export function setConfigOverride(override?: SapConfig, kind?: SapEnvironment) {
   connectionManagerLogger?.debug(
     `[DEBUG] setConfigOverride - Setting config override`,
     {
@@ -617,12 +656,16 @@ export function setConfigOverride(override?: SapConfig) {
     },
   );
   overrideConfig = override;
+  overrideKind = override === undefined ? undefined : statedSystemKind(kind);
   endManaged(overrideConnection, overrideBuilt);
   overrideConnection = override
     ? createAbapConnection(
         override,
         credentialFromSapConfig(override),
         loggerAdapter,
+        undefined,
+        undefined,
+        overrideKind ?? resolveSystemKind(override),
       )
     : undefined;
   overrideBuilt = override !== undefined;
@@ -631,6 +674,7 @@ export function setConfigOverride(override?: SapConfig) {
   endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  cachedKind = undefined;
   notifyConnectionResetListeners();
 }
 
@@ -649,10 +693,12 @@ export function setConnectionOverride(connection?: IAbapConnection) {
   overrideConnection = connection;
   overrideBuilt = false;
   overrideConfig = undefined;
+  overrideKind = undefined;
 
   endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  cachedKind = undefined;
   notifyConnectionResetListeners();
 }
 
@@ -669,8 +715,10 @@ export function cleanup() {
   overrideConnection = undefined;
   overrideBuilt = false;
   overrideConfig = undefined;
+  overrideKind = undefined;
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  cachedKind = undefined;
   notifyConnectionResetListeners();
 }
 
@@ -690,6 +738,7 @@ export function invalidateConnectionCache() {
   endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  cachedKind = undefined;
   // Also invalidate override connection if it exists
   if (overrideConnection) {
     endManaged(overrideConnection, overrideBuilt);
@@ -709,6 +758,7 @@ registerConnectionResetHook(() => {
   );
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  cachedKind = undefined;
 });
 
 export async function getBaseUrl() {

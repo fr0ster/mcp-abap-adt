@@ -530,10 +530,10 @@ describe('the ./utils process cache', () => {
   afterEach(() => cleanup());
 
   it('a managed connection replaced by a new config, and one dropped by cleanup(), each end once; a connection handed in is the caller’s', async () => {
-    setConfigOverride({ ...SETTINGS, ashost: 'one.invalid' });
+    setConfigOverride({ ...SETTINGS, ashost: 'one.invalid' }, 'onprem');
     const firstOverride = built[0];
     expect(getManagedConnection()).toBe(firstOverride);
-    setConfigOverride({ ...SETTINGS, ashost: 'two.invalid' });
+    setConfigOverride({ ...SETTINGS, ashost: 'two.invalid' }, 'onprem');
     expect(firstOverride?.disconnects).toBe(1);
     const given = closable();
     setConnectionOverride(given);

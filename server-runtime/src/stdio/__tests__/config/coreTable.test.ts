@@ -436,13 +436,7 @@ describe('the env file names its source', () => {
     [[], { MCP_ENV_PATH: './conn.env' }, undefined, 'MCP_ENV_PATH'],
     [[], {}, { 'env-path': './conn.env' }, 'env-path (config file)'],
     [[], {}, { env: './conn.env' }, 'env (config file)'],
-    // --env-path wins over --env, as the resolver does
-    [
-      ['--env=./other.env', '--env-path=./conn.env'],
-      {},
-      undefined,
-      '--env-path',
-    ],
+    // --env with --env-path is refused (D26 D3): contradictoryDestination.test.ts
   ] as const)('%j %j %j → %s', (argv, env, yaml, source) => {
     process.argv = ['node', 'server', ...argv];
     Object.assign(process.env, env);

@@ -511,6 +511,26 @@ export function readCoreConfig(
   const envDestination = str(values.envDestination);
   const envPath = str(values.envPath);
   const authBrokerPath = str(values.authBrokerPath);
+  // Two names for the env file, or a stored destination beside one: one of
+  // them would be ignored, so the start is refused naming both as used.
+  const envDestinationSource = source('envDestination') ?? '--env';
+  const envPathSource = source('envPath') ?? '--env-path';
+  if (envDestination !== undefined && envPath !== undefined) {
+    throw new ParameterRefusal(
+      `${envDestinationSource} and ${envPathSource} both name the env file: give one of them`,
+    );
+  }
+  const mcpDestination = str(values.mcpDestination);
+  if (
+    mcpDestination !== undefined &&
+    (envDestination !== undefined || envPath !== undefined)
+  ) {
+    const fileSource =
+      envPath !== undefined ? envPathSource : envDestinationSource;
+    throw new ParameterRefusal(
+      `${source('mcpDestination') ?? '--mcp'} and ${fileSource} both name the destination: give --mcp (a stored destination) or the env file, not both`,
+    );
+  }
   // --env: a destination name (sessions/<name>.env under the platform paths);
   // --env-path: an explicit path. Nothing is looked up in the working
   // directory: a .env there is read only when named (--env-path=./.env).
@@ -531,12 +551,12 @@ export function readCoreConfig(
     enableDataTools: values.enableDataTools === true,
     accessRestrictions: readAccessRestrictions(argv, env, yaml),
     shutdownTimeout: numberValue(values.shutdownTimeout),
-    mcpDestination: str(values.mcpDestination),
+    mcpDestination,
     envDestination,
     envPath,
     envFile,
     envFilePath: envFile,
-    // The resolver prefers the path over the name; so does the source.
+    // At most one of the path and the name is given (refused above).
     envFileSource:
       envFile === undefined
         ? undefined

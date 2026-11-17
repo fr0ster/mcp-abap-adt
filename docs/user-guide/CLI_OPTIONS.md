@@ -158,11 +158,15 @@ mcp-abap-adt --env-path=/opt/config/sap-prod.env --system-type=<onprem|cloud> # 
 mcp-abap-adt --env-path=../configs/dev.env --system-type=<onprem|cloud> # relative to the current directory
 ```
 
-The server resolves the env file in this order:
+The server reads the env file one of two ways — give one of them:
 1. `--env-path=<path|file>` (or `MCP_ENV_PATH`)
 2. `--env=<destination>` -> platform sessions path:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
+
+`--env` with `--env-path` (or `MCP_ENV_PATH`), and `--mcp` with either, are refused at startup
+(24.0.0), naming both: before, the path won over the name, and `--mcp` was served while the env
+file's credentials and URL were ignored.
 
 **Nothing is looked up in the working directory.** A server started inside someone else's project
 must not take their settings, so a `.env` there is read only when you name it

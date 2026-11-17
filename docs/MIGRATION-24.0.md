@@ -132,6 +132,9 @@ A value a start states is read as stated, or the start is refused naming it.
   `setConfigOverride(config, 'onprem' | 'cloud')` builds and rebuilds for that kind,
   `getManagedConnection(kind)` states the one it needs — a configured connection asked for
   another kind is refused. Without a kind, `SAP_SYSTEM_TYPE` answers, as before.
+- **One destination source on stdio.** `--env` with `--env-path` (or `MCP_ENV_PATH`), and `--mcp`
+  with an env file, are refused at startup. Keep the one you meant: before, `--env-path` silently
+  won over `--env`, and `--mcp` was served while the env file's credentials were ignored.
 
 ## RFC destinations: the address is stated
 

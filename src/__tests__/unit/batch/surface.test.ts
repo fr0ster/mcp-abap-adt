@@ -234,7 +234,7 @@ describe('the batch tools on the surface', () => {
       if (kind === 'compact') {
         // Recordable for every call, for some arguments, and outside batch mode.
         expect(
-          byName.get('HandlerSearch')?.endsWith(` ${ELIGIBLE_WORDS}`),
+          byName.get('HandlerProfileList')?.endsWith(` ${ELIGIBLE_WORDS}`),
         ).toBe(true);
         expect(byName.get('HandlerLock')).toContain(
           ' When object_type is one of CLASS,',

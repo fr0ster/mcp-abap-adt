@@ -116,6 +116,6 @@ describe('compact tools that offer INCLUDE on ABAP cloud', () => {
         .filter((entry) => membersOn(entry, 'cloud').includes('INCLUDE'))
         .map((entry) => entry.toolDefinition.name)
         .sort(),
-    ).toEqual(['HandlerDeletionCheck', 'HandlerGet', 'HandlerWhereUsed']);
+    ).toEqual(['HandlerDeletionCheck', 'HandlerGet']);
   });
 });

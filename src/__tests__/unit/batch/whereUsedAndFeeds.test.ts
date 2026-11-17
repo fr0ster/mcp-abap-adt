@@ -1110,10 +1110,18 @@ describe('RuntimeListFeeds', () => {
 // request are recorded; the full set's tools are not listed at all.
 describe('batch mode records the one-request calls only', () => {
   it.each<[string, Record<string, unknown>, boolean]>([
-    ['HandlerWhereUsed', { object_type: 'TABLE', object_name: 'ZT_A' }, true],
     [
-      'HandlerWhereUsed',
-      { object_type: 'FUNCTION_MODULE', object_name: 'G|M' },
+      'HandlerSystem',
+      { action: 'where_used', object_type: 'table', object_name: 'ZT_A' },
+      true,
+    ],
+    [
+      'HandlerSystem',
+      {
+        action: 'where_used',
+        object_type: 'functionmodule',
+        object_name: 'G|M',
+      },
       false,
     ],
     ['HandlerDumpList', {}, true],

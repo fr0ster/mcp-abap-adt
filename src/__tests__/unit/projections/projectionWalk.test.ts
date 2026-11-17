@@ -52,7 +52,6 @@ import {
   TOOL_DEFINITION as HandlerValidate,
   handleHandlerValidate,
 } from '../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
-import { handleHandlerWhereUsed } from '../../../../compact-readonly-entries/src/handlers/handleHandlerWhereUsed';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleGetObjectVersionDiff } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { handleGetObjectVersionSource } from '../../../handlers/common/readonly/handleGetObjectVersionSource';
@@ -84,8 +83,6 @@ import {
   COMPACT_UPDATE_ROUTES,
   COMPACT_VALIDATE,
   COMPACT_VALIDATE_ROUTES,
-  COMPACT_WHERE_USED,
-  COMPACT_WHERE_USED_ROUTES,
   INCLUDES_PARENT_ROUTES,
   INCLUDES_PARENTS,
   PROJECTION_VARIANTS,
@@ -194,15 +191,6 @@ const codeRoute = (code: string): Route => ({
   collection: (variant) => collectionOfCode(variant, code),
   addressed: true,
 });
-
-/** Whether a where-used route is a name of `TYPE_NAMES`. */
-function isTypeName(route: string): route is keyof typeof TYPE_NAMES {
-  return Object.hasOwn(TYPE_NAMES, route);
-}
-
-/** The code a where-used route stands for: a name's code, or the code. */
-const whereUsedCodeOf = (route: string): string =>
-  isTypeName(route) ? TYPE_NAMES[route] : route;
 
 const routesOf = (
   routes: Readonly<
@@ -486,23 +474,6 @@ const WALKS: Readonly<Record<string, Walk>> = {
         program_name: 'ZPROG_A',
       }),
     routes: routesOf(COMPACT_PROFILE_ROUTES),
-  }),
-  'HandlerWhereUsed.object_type': walk({
-    values: COMPACT_WHERE_USED,
-    send: (context, value) =>
-      handleHandlerWhereUsed(context, {
-        object_type: value,
-        object_name: 'ZOBJ_A',
-        function_group_name: 'ZFG_A',
-      }),
-    routes: new Map(
-      Object.entries(COMPACT_WHERE_USED_ROUTES).map(
-        ([name, alias]): [string, Route] => [
-          name,
-          codeRoute(whereUsedCodeOf(alias)),
-        ],
-      ),
-    ),
   }),
   'GetWhereUsed.object_type': walk({
     values: {

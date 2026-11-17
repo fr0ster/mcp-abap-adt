@@ -1,6 +1,6 @@
 /**
  * The compact tools a deny list narrows value by value (spec §3.1): the
- * twelve whose `object_type` / `target_type` is projected per variant, the
+ * eleven whose `object_type` / `target_type` is projected per variant, the
  * seven with a fixed `action` / `operation`, and `HandlerGetData` (`sql`).
  * Each states its values per variant, its ADT codes where a code argument
  * takes them (HandlerActivate, HandlerGet), and its definition for the
@@ -20,7 +20,6 @@ import {
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
-  COMPACT_WHERE_USED,
   type ProjectionVariant,
   TABLE_CODES,
 } from '../adtProjections';
@@ -40,7 +39,6 @@ import {
   compactUnlockDescription,
   compactUpdateDescription,
   compactValidateDescription,
-  compactWhereUsedDescription,
 } from '../compact/compactDescriptions';
 import {
   COMPACT_MAIN_PROGRAMS,
@@ -55,7 +53,6 @@ import {
   compactUnlockSchemaFor,
   compactUpdateSchemaFor,
   compactValidateSchemaFor,
-  compactWhereUsedSchemaFor,
   handlerGetDataDefinition,
 } from '../compact/compactSchemas';
 import {
@@ -259,18 +256,6 @@ const NARROWING_LIST: readonly Narrowing[] = [
           members,
           COMPACT_VALIDATE[variant],
         ),
-        members,
-      };
-    },
-  },
-  {
-    tool: 'HandlerWhereUsed',
-    values: (variant) => COMPACT_WHERE_USED[variant],
-    definition(variant, values) {
-      const members = keptOf(COMPACT_WHERE_USED[variant], values);
-      return {
-        description: compactWhereUsedDescription(variant, members),
-        inputSchema: compactWhereUsedSchemaFor(members),
         members,
       };
     },

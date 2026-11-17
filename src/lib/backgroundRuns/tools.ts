@@ -66,8 +66,6 @@ export function isBackgroundRunTool(name: string): boolean {
 
 /** The compact listed long tools: their runs are read and discarded by compact's tools. */
 const COMPACT_LONG_READS: ReadonlySet<string> = new Set([
-  'HandlerWhereUsed',
-  'HandlerSearch',
   'HandlerDumpList',
   'HandlerGetData',
   'HandlerProfileView',

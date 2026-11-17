@@ -306,7 +306,7 @@ export type TypeName = keyof typeof TYPE_NAMES;
 export type TypeNameFor<P> = ServedCodeName<typeof TYPE_NAMES, P>;
 
 // ---------------------------------------------------------------------------
-// Where-used (GetWhereUsed, HandlerWhereUsed)
+// Where-used (GetWhereUsed, HandlerSystem's where_used)
 // ---------------------------------------------------------------------------
 
 /** The codes where-used is asked of on `V` (adt-clients' `getWhereUsed`). */
@@ -449,81 +449,6 @@ export function codesWithNames(
 export function whereUsedTypeDescription(variant: ProjectionVariant): string {
   return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
 }
-
-/**
- * HandlerWhereUsed's `object_type`: each compact name with the name of
- * {@link TYPE_NAMES} it is handed to GetWhereUsed as, or its code where no
- * name stands for it (a table type, `TTYP/DA`).
- */
-export const COMPACT_WHERE_USED_ROUTES = {
-  ...({
-    CLASS: 'class',
-    INTERFACE: 'interface',
-    PROGRAM: 'program',
-    INCLUDE: 'include',
-    FUNCTION_GROUP: 'functiongroup',
-    FUNCTION_MODULE: 'functionmodule',
-    PACKAGE: 'package',
-    TABLE: 'table',
-    STRUCTURE: 'structure',
-    DOMAIN: 'domain',
-    DATA_ELEMENT: 'dataelement',
-    DDL: 'view',
-  } as const satisfies Readonly<Record<string, TypeName>>),
-  // A code where no name stands for it.
-  ...({
-    TABLE_TYPE: 'TTYP/DA',
-  } as const satisfies Readonly<Record<string, WhereUsedCode<'onprem'>>>),
-} as const;
-
-/** The code a where-used route stands for: a name's code, or the code. */
-type WhereUsedRouteCode<R> = R extends TypeName ? (typeof TYPE_NAMES)[R] : R;
-
-/** The compact names whose where-used route stands for a code of `P`. */
-type CompactWhereUsedName<P> = {
-  [K in keyof typeof COMPACT_WHERE_USED_ROUTES]: WhereUsedRouteCode<
-    (typeof COMPACT_WHERE_USED_ROUTES)[K]
-  > extends P
-    ? K
-    : never;
-}[keyof typeof COMPACT_WHERE_USED_ROUTES];
-
-/** HandlerWhereUsed's `object_type`. */
-export const COMPACT_WHERE_USED = projected<
-  CompactWhereUsedName<WhereUsedCode<'onprem'>>,
-  CompactWhereUsedName<WhereUsedCode<'cloud'>>
->()({
-  onprem: [
-    'CLASS',
-    'INTERFACE',
-    'PROGRAM',
-    'INCLUDE',
-    'FUNCTION_GROUP',
-    'FUNCTION_MODULE',
-    'PACKAGE',
-    'TABLE',
-    'STRUCTURE',
-    'DOMAIN',
-    'DATA_ELEMENT',
-    'DDL',
-    'TABLE_TYPE',
-  ],
-  cloud: [
-    'CLASS',
-    'INTERFACE',
-    'PROGRAM',
-    'INCLUDE',
-    'FUNCTION_GROUP',
-    'FUNCTION_MODULE',
-    'PACKAGE',
-    'TABLE',
-    'STRUCTURE',
-    'DOMAIN',
-    'DATA_ELEMENT',
-    'DDL',
-    'TABLE_TYPE',
-  ],
-});
 
 // ---------------------------------------------------------------------------
 // Activation (ActivateObjects, HandlerActivate)

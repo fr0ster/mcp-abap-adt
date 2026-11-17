@@ -194,12 +194,6 @@
     ]
   },
   {
-    "tool": "HandlerSearch",
-    "set": "compact",
-    "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
-    "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
-  },
-  {
     "tool": "HandlerGetData",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
@@ -711,20 +705,6 @@
         "argument": "runner",
         "equals": [
           "async"
-        ]
-      }
-    ]
-  },
-  {
-    "tool": "HandlerWhereUsed",
-    "set": "compact",
-    "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
-    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope",
-    "when": [
-      {
-        "argument": "object_type",
-        "notEquals": [
-          "FUNCTION_MODULE"
         ]
       }
     ]

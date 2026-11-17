@@ -149,8 +149,8 @@ describe('the four tool sets', () => {
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
     ]);
-    // The 29 compact tools but the data tool (HandlerGetData, opt-in).
-    expect(both).toHaveLength(28);
+    // The 28 compact tools but the data tool (HandlerGetData, opt-in).
+    expect(both).toHaveLength(27);
     expect(
       shape(compact.groups(context, 'stdio', { dataTools: false })),
     ).toEqual([
@@ -181,10 +181,10 @@ describe('the four tool sets', () => {
     ]);
   });
 
-  it('compact-ro: the 17 that change nothing, background runs, the leftover-session list, HandlerBatch', () => {
+  it('compact-ro: the 16 that change nothing, background runs, the leftover-session list, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
-    // The 17 that change nothing but the data tool (HandlerGetData, opt-in).
-    expect(half).toHaveLength(16);
+    // The 16 that change nothing but the data tool (HandlerGetData, opt-in).
+    expect(half).toHaveLength(15);
     expect(
       shape(compactRo.groups(context, 'stdio', { dataTools: false })),
     ).toEqual([

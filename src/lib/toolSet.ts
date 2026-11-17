@@ -512,7 +512,7 @@ export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
         transport,
         'compact-ro',
         [
-          'the compact tools that change nothing, one per operation with the object in object_type: HandlerGet, HandlerSearch, HandlerWhereUsed, ...; no create, update, delete, activate, lock, unlock, unit-test run or profiler run',
+          'the compact tools that change nothing, one per operation with the object in object_type: HandlerGet, HandlerValidate, HandlerCheckRun, ..., and HandlerSystem, the system-wide reads by action; no create, update, delete, activate, lock, unlock, unit-test run or profiler run',
           ...leftoverLine(
             transport,
             'the leftover SAP sessions of an ended process: list',

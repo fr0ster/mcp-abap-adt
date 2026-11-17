@@ -1,6 +1,6 @@
 /**
  * `mcp-abap-adt-compact-sse-ro`: the read-only tool set over HTTP+SSE (sse's launcher), and
- * this package's own name and version — nothing else: the 17 compact tools that change nothing — no leftover-session tool, which is stdio's.
+ * this package's own name and version — nothing else: the 16 compact tools that change nothing — no leftover-session tool, which is stdio's.
  * The behaviour beside the write binary is
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */
@@ -74,7 +74,7 @@ describe('mcp-abap-adt-compact-sse-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set without the data tool: 20 tools (HandlerBatch among them), the background-run tools, none of a leftover session', () => {
+  it('serves the read-only set without the data tool: 19 tools (HandlerBatch among them), the background-run tools, none of a leftover session', () => {
     expect(shape(readOnlyToolSet)).toEqual(
       shape(
         compactReadOnlyToolSetOf({
@@ -83,7 +83,7 @@ describe('mcp-abap-adt-compact-sse-ro', () => {
         }),
       ),
     );
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(20);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(19);
     expect(readOnlyToolSet.backgroundRuns).toBe(true);
     // The leftover-session tools are stdio's.
     expect(

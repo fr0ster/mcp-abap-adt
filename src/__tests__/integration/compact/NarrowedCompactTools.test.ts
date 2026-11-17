@@ -10,8 +10,8 @@
  *   `object_type: 'CLASS'` refused.
  * - one value of each compact write and check denied (`DOMAIN`, or
  *   `INTERFACE` for the lock tools and the update): each refused; the class
- *   created, locked, written, unlocked, validated, checked, its usages read,
- *   its deletion checked and deleted, all by `CLASS`.
+ *   created, locked, written, unlocked, validated, checked, its deletion
+ *   checked and deleted, all by `CLASS`.
  * - `HandlerBatch.end`: `begin` runs, `end` refused.
  *
  * Every object is the run's own and deleted after.
@@ -152,7 +152,6 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
       'HandlerDeletionCheck.DOMAIN',
       'HandlerValidate.DOMAIN',
       'HandlerCheckRun.DOMAIN',
-      'HandlerWhereUsed.DOMAIN',
       'HandlerLock.INTERFACE',
       'HandlerUpdate.INTERFACE',
       'HandlerUnlock.INTERFACE',
@@ -177,10 +176,6 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           object_name: 'ZMNC_DENIED',
         });
         await refusedAtParse('HandlerCheckRun', {
-          object_type: 'DOMAIN',
-          object_name: 'ZMNC_DENIED',
-        });
-        await refusedAtParse('HandlerWhereUsed', {
           object_type: 'DOMAIN',
           object_name: 'ZMNC_DENIED',
         });
@@ -258,13 +253,6 @@ liveSuite(['onprem', 'cloud'], 'compact tools with values denied', () => {
           succeeded(
             'HandlerCheckRun CLASS',
             await livePrepare('HandlerCheckRun', {
-              object_type: 'CLASS',
-              object_name: written,
-            }),
-          );
-          succeeded(
-            'HandlerWhereUsed CLASS',
-            await livePrepare('HandlerWhereUsed', {
               object_type: 'CLASS',
               object_name: written,
             }),

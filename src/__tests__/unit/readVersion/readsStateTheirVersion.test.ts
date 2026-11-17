@@ -273,8 +273,9 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   HandlerProfileSchedule:
     'reads or runs runtime dumps, traces, feeds or messages',
   HandlerProfileView: 'reads or runs runtime dumps, traces, feeds or messages',
-  HandlerSearch: 'searches the repository',
   HandlerServiceBindingListTypes: 'lists the binding types',
+  HandlerSystem:
+    'its search_source reads follow a package walk the fake does not answer (searchSourceVersions.test.ts asserts them); its other actions search the repository and read where-used lists, package trees, transports and ATC results',
   HandlerServiceBindingValidate: 'validates a binding name',
   HandlerTransportCreate: 'works on transport requests',
   HandlerTransportMoveObjects: 'works on transport requests',
@@ -285,7 +286,6 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   HandlerUnlock: 'unlocks',
   HandlerUpdate: "writes the document it is given under the caller's lock",
   HandlerValidate: 'validates a name',
-  HandlerWhereUsed: 'reads the where-used list',
   ListServiceBindingTypes: 'lists the binding types',
   ListTransports: 'works on transport requests',
   MoveTransportObjects: 'works on transport requests',

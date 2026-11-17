@@ -27,7 +27,7 @@
  *   -> compact: HandlerCreate, HandlerGet, HandlerLock, HandlerUpdate with the
  *      read document, HandlerUnlock, HandlerValidate (a free name),
  *      HandlerCheckRun, HandlerDeletionCheck, HandlerActivate (its run read by
- *      HandlerGet activation_status until it ends), HandlerWhereUsed,
+ *      HandlerGet activation_status until it ends), HandlerSystem where_used,
  *      HandlerDelete
  *   -> ActivateObjects TTYP/DA (the sorted version becomes active) -> DeleteTableType
  *   -> afterAll: whatever is left deleted, the package last; SearchObject by
@@ -49,8 +49,8 @@ import { handleHandlerUpdate } from '../../../../../compact-modify/src/handlers/
 import { handleHandlerCheckRun } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerCheckRun';
 import { handleHandlerDeletionCheck } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerDeletionCheck';
 import { handleHandlerGet } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import { handleHandlerSystem } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { handleHandlerValidate } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerValidate';
-import { handleHandlerWhereUsed } from '../../../../../compact-readonly-entries/src/handlers/handleHandlerWhereUsed';
 import { handleActivateObjects } from '../../../../handlers/common/high/handleActivateObjects';
 import {
   TOOL_DEFINITION as GetObjectVersionSource,
@@ -229,10 +229,10 @@ const describe = servedSuite([
   'HandlerDeletionCheck',
   'HandlerGet',
   'HandlerLock',
+  'HandlerSystem',
   'HandlerUnlock',
   'HandlerUpdate',
   'HandlerValidate',
-  'HandlerWhereUsed',
   'SearchObject',
   'UpdateTableType',
 ]);
@@ -747,9 +747,10 @@ describe('TableType High-Level Handlers Integration', () => {
         key_definition: 'standard',
         key_kind: 'nonUnique',
       });
-      await must(`HandlerWhereUsed TABLE_TYPE ${COMPACT_TABLE_TYPE}`, () =>
-        handleHandlerWhereUsed(context, {
-          object_type: 'TABLE_TYPE',
+      await must(`HandlerSystem where_used TTYP/DA ${COMPACT_TABLE_TYPE}`, () =>
+        handleHandlerSystem(context, {
+          action: 'where_used',
+          object_type: 'TTYP/DA',
           object_name: COMPACT_TABLE_TYPE,
         }),
       );

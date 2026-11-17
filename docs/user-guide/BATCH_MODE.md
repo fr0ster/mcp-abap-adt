@@ -422,7 +422,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 <!-- batch-handlers:start -->
 
-50 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+48 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Compact sets (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries for the reads)
 
@@ -458,7 +458,6 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerProfileRun` | every call | POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name}; with profiler_id, ?profilerId={profiler_id} |
 | `HandlerProfileSchedule` | every call | POST /sap/bc/adt/runtime/traces/abaptraces/parameters: schedules a trace and answers its profiler_id |
 | `HandlerProfileView` | every call | GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses (mode analyze: summarised locally) |
-| `HandlerSearch` | every call | GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
 | `HandlerServiceBindingListTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `HandlerServiceBindingValidate` | every call | POST /sap/bc/adt/cts/transportchecks |
 | `HandlerSystem` | when action is search_object | search_object: GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
@@ -477,6 +476,5 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerUpdate` | when lock_handle is given and object_type is one of DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, INCLUDE, TABLE_TYPE | one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request |
 | `HandlerUpdate` | when lock_handle is given and object_type is PACKAGE and the connection is HTTP | PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerValidate` | every call | POST the type's validation endpoint (…/validation?objname=…, /cts/transportchecks for a service binding) |
-| `HandlerWhereUsed` | when object_type is any value but FUNCTION_MODULE | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope |
 
 <!-- batch-handlers:end -->

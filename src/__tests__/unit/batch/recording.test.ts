@@ -443,9 +443,10 @@ describe('recording in batch mode', () => {
   it('a long read with independent requests is recorded: runLongCall and openFreshConnection not called', async () => {
     const run = jest.spyOn(longCall, 'runLongCall');
     const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
-    const s = await stand([shipped('HandlerSearch')]);
-    const answer = await s.call('HandlerSearch', {
-      query: 'ZPLACEHOLDER*',
+    const s = await stand([shipped('HandlerSystem')]);
+    const answer = await s.call('HandlerSystem', {
+      action: 'search_object',
+      object_name: 'ZPLACEHOLDER*',
     });
     expect(answer).toEqual({ content: [] });
     expect(run).not.toHaveBeenCalled();
@@ -461,14 +462,15 @@ describe('recording in batch mode', () => {
     // A server that lists `background`: a strategy and the tool reading its runs.
     const s = await stand(
       [
-        shipped('HandlerSearch'),
+        shipped('HandlerSystem'),
         new BackgroundRunHandlersGroup(noConnectionContext()),
       ],
       { backgroundRuns: true },
     );
     const refused = refusalOf(
-      await s.call('HandlerSearch', {
-        query: 'ZPLACEHOLDER*',
+      await s.call('HandlerSystem', {
+        action: 'search_object',
+        object_name: 'ZPLACEHOLDER*',
         background: true,
       }),
     );
@@ -603,7 +605,7 @@ describe('recording in batch mode', () => {
     const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
     // The batch opens while the call is past its entry: during its system
     // lookup, which it makes in a turn of its own (it holds none).
-    const s = await stand([shipped('HandlerSearch')], {
+    const s = await stand([shipped('HandlerSystem')], {
       open: false,
       onLookup: (stand) => {
         if (stand.owner.mode() === 'off') {
@@ -616,10 +618,15 @@ describe('recording in batch mode', () => {
       },
     });
     expect(
-      refusalOf(await s.call('HandlerSearch', { query: 'ZPLACEHOLDER*' })),
+      refusalOf(
+        await s.call('HandlerSystem', {
+          action: 'search_object',
+          object_name: 'ZPLACEHOLDER*',
+        }),
+      ),
     ).toEqual({
       error: 'batch_not_recordable',
-      message: batchNotServedWords('HandlerSearch'),
+      message: batchNotServedWords('HandlerSystem'),
     });
     expect(s.owner.mode()).toBe('communication');
     expect(run).not.toHaveBeenCalled();

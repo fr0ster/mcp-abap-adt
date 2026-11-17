@@ -441,7 +441,6 @@ const COMPACT: BatchEntryCase[] = [
     tool: 'HandlerGet',
     args: { part, run_id: 'RUN_A' },
   })),
-  { tool: 'HandlerSearch', args: { query: 'Z*' } },
   // HandlerSystem: each action whose full tool sends independent requests.
   {
     tool: 'HandlerSystem',
@@ -1076,10 +1075,6 @@ const WRITES: BatchEntryCase[] = [
       object_type: 'class',
       enable_all_types: false,
     },
-  },
-  {
-    tool: 'HandlerWhereUsed',
-    args: { object_type: 'CLASS', object_name: 'CLAS_A' },
   },
 ];
 

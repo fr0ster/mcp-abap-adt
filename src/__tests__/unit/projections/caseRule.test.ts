@@ -20,7 +20,7 @@ import {
   type AdtApiTable,
 } from '@mcp-abap-adt/interfaces-adt';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
-import { handleHandlerSearch } from '../../../../compact-readonly-entries/src/handlers/handleHandlerSearch';
+import { handleHandlerSystem } from '../../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../../handlers/common/low/handleActivateObject';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
@@ -136,9 +136,9 @@ async function run(send: Send, variant: ProjectionVariant, value: string) {
   };
 }
 
-/** The `objectType` a search sent, through SearchObject or HandlerSearch. */
+/** The `objectType` a search sent, through SearchObject or HandlerSystem search_object. */
 async function searched(
-  tool: 'SearchObject' | 'HandlerSearch',
+  tool: 'SearchObject' | 'HandlerSystem',
   variant: ProjectionVariant,
   value: string,
 ) {
@@ -150,9 +150,9 @@ async function searched(
       { object_name: 'Z*', object_type: value },
     );
   } else {
-    await handleHandlerSearch(
+    await handleHandlerSystem(
       { connection },
-      { query: 'Z*', object_type: value },
+      { action: 'search_object', object_name: 'Z*', object_type: value },
     );
   }
   expect(connection.requests).toHaveLength(1);
@@ -310,7 +310,7 @@ describe('a lower-case value is a friendly name, an upper-case one a code, main 
   );
 
   const searchCases = VARIANTS.flatMap((variant) =>
-    (['SearchObject', 'HandlerSearch'] as const).map(
+    (['SearchObject', 'HandlerSystem'] as const).map(
       (tool) => [tool, variant] as const,
     ),
   );

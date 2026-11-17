@@ -114,18 +114,6 @@
     "sends": "GET …/abaptraces/{id}/hitlist or /statements, then a local summary"
   },
   {
-    "tool": "HandlerWhereUsed",
-    "set": "compact",
-    "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
-    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope: GetWhereUsed without a type filter"
-  },
-  {
-    "tool": "HandlerSearch",
-    "set": "compact",
-    "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
-    "sends": "as SearchObject"
-  },
-  {
     "tool": "HandlerDumpList",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",

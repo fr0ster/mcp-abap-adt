@@ -16,9 +16,6 @@ const LOCK = 'LOCK_HANDLE_PLACEHOLDER';
 
 describe('eligible', () => {
   it('a listed tool with no when is eligible', () => {
-    expect(eligible('HandlerSearch', { query: 'Z*' }, 'http')).toEqual({
-      ok: true,
-    });
     expect(eligible('HandlerProfileList', {}, 'rfc')).toEqual({
       ok: true,
     });
@@ -385,9 +382,13 @@ describe('eligible', () => {
         { object_name: 'FM_A', object_adt_type: 'FUGR/FF', parentName: 'G' },
         'http',
       ),
-      'HandlerWhereUsed FUNCTION_MODULE': eligible(
-        'HandlerWhereUsed',
-        { object_name: 'G|M', object_type: 'FUNCTION_MODULE' },
+      'HandlerSystem where_used functionmodule': eligible(
+        'HandlerSystem',
+        {
+          action: 'where_used',
+          object_name: 'G|M',
+          object_type: 'functionmodule',
+        },
         'http',
       ),
       'HandlerCheckRun FUNCTION_MODULE': eligible(
@@ -406,7 +407,7 @@ describe('eligible', () => {
       'objects function_module': no,
       'objects without a module': { ok: true },
       'object_adt_type FUGR/FF': no,
-      'HandlerWhereUsed FUNCTION_MODULE': no,
+      'HandlerSystem where_used functionmodule': no,
       'HandlerCheckRun FUNCTION_MODULE': no,
       'HandlerDeletionCheck FUNCTION_MODULE': no,
     });

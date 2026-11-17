@@ -224,9 +224,10 @@ const readCall = (
         },
       }
     : {
-        name: 'HandlerWhereUsed',
+        name: 'HandlerSystem',
         arguments: {
-          object_type: 'CLASS',
+          action: 'where_used',
+          object_type: 'class',
           object_name: className,
           background: false,
         },
@@ -980,12 +981,12 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           served: false,
         });
       }
-      // compact: the 29, the four debugger tools, HandlerDebugBatch, the
+      // compact: the 28, the four debugger tools, HandlerDebugBatch, the
       // three background-run tools beside the run tool, HandlerBatch, and on
       // stdio the leftover-session list and logoff (no set serves a resume);
-      // without --enable-data-tools, not HandlerGetData: 28 of the 29.
+      // without --enable-data-tools, not HandlerGetData: 27 of the 28.
       expect(compact.tools).toHaveLength(
-        28 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+        27 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
       );
       expect(compact.tools).toEqual(
         expect.arrayContaining([
@@ -995,12 +996,12 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'HandlerBatch',
         ]),
       );
-      // compact-ro: the 17 that change nothing, the three background-run
+      // compact-ro: the 16 that change nothing, the three background-run
       // tools of the long reads, HandlerBatch, and on stdio the
       // leftover-session list; without --enable-data-tools, not
-      // HandlerGetData: 16 of the 17.
+      // HandlerGetData: 15 of the 16.
       expect(compactRo.tools).toHaveLength(
-        16 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
+        15 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
       );
       expect(compactRo.tools).toContain('HandlerBackgroundRunGet');
       expect(compactRo.tools).toContain('HandlerGet');

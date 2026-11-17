@@ -209,7 +209,7 @@ const REFUSED: ReadonlyArray<readonly [string, ToolArgs, string]> = [
   ],
 ];
 
-describe('every compact binary serves HandlerSystem and refuses a malformed argument before dispatch', () => {
+describe('every compact binary serves HandlerSystem, refuses a malformed argument before dispatch, and serves neither HandlerSearch nor HandlerWhereUsed', () => {
   let standIn: AdtStandIn;
   const saved = process.env.SAP_SYSTEM_TYPE;
 
@@ -236,6 +236,20 @@ describe('every compact binary serves HandlerSystem and refuses a malformed argu
     try {
       const listed = (await client.listTools()).tools.map((t) => t.name);
       expect(listed).toContain('HandlerSystem');
+      // HandlerSearch and HandlerWhereUsed are in no compact set, and a call
+      // to either answers as any unknown tool name does.
+      expect(listed).not.toContain('HandlerSearch');
+      expect(listed).not.toContain('HandlerWhereUsed');
+      const unknownAnswer = async (name: string) =>
+        JSON.stringify(
+          await client.callTool({ name, arguments: { query: 'Z*' } }),
+        )
+          .split(name)
+          .join('<tool>');
+      const madeUp = await unknownAnswer('HandlerMadeUpTool');
+      expect(madeUp).toContain('<tool>');
+      expect(await unknownAnswer('HandlerSearch')).toBe(madeUp);
+      expect(await unknownAnswer('HandlerWhereUsed')).toBe(madeUp);
       for (const [name, args, argument] of REFUSED) {
         const answer = await client.callTool({
           name: 'HandlerSystem',

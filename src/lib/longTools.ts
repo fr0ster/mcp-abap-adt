@@ -40,8 +40,6 @@ export const LONG_TOOLS: readonly string[] = [
   'GetATCResult',
   'RuntimeGetProfilerTraceData',
   'RuntimeAnalyzeProfilerTrace',
-  'HandlerWhereUsed',
-  'HandlerSearch',
   'HandlerDumpList',
   'HandlerGetData',
   'HandlerProfileView',

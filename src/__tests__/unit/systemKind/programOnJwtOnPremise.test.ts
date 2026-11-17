@@ -281,7 +281,6 @@ describe('a cloud system with a basic credential', () => {
       'HandlerGet',
       'HandlerCheckRun',
       'HandlerDeletionCheck',
-      'HandlerWhereUsed',
     ]) {
       expect({
         tool,

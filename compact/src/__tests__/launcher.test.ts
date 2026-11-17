@@ -51,13 +51,13 @@ describe('mcp-abap-adt-compact', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the compact tool set without the data tool: 28 of the 29 tools, the four debugger tools, HandlerDebugBatch, the three background-run tools, the two leftover-session tools and HandlerBatch', () => {
+  it('serves the compact tool set without the data tool: 27 of the 28 tools, the four debugger tools, HandlerDebugBatch, the three background-run tools, the two leftover-session tools and HandlerBatch', () => {
     const tools = compactToolSet
       .groups({ connection: undefined as never, logger: undefined }, 'stdio', {
         dataTools: false,
       })
       .flatMap((group) => group.getHandlers());
-    expect(tools).toHaveLength(39);
+    expect(tools).toHaveLength(38);
   });
 
   it('stops on --exposition, naming the binary its words ask for', async () => {

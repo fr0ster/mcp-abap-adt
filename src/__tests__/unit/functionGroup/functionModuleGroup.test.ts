@@ -644,12 +644,12 @@ const CASES: readonly GroupCase[] = [
     ],
   },
   {
-    label: 'HandlerWhereUsed',
-    tool: 'HandlerWhereUsed',
+    label: 'HandlerSystem where_used',
+    tool: 'HandlerSystem',
     args: {
-      object_type: 'FUNCTION_MODULE',
-      function_group_name: 'ZPIN_FG',
-      object_name: 'ZPIN_FM',
+      action: 'where_used',
+      object_type: 'functionmodule',
+      object_name: 'ZPIN_FG|ZPIN_FM',
     },
     matched: [inGroup('ZPIN_FM', 'ZPIN_FG')],
     mismatched: [inGroup('ZPIN_FM', 'ZPIN_OTHER')],

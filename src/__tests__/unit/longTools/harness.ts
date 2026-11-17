@@ -84,8 +84,6 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
     view: 'hitlist',
   },
   RuntimeAnalyzeProfilerTrace: { trace_id_or_uri: 'trace-placeholder-1' },
-  HandlerWhereUsed: { object_type: 'CLASS', object_name: 'PLACEHOLDER_CLASS' },
-  HandlerSearch: { query: 'PLACEHOLDER*' },
   HandlerDumpList: {},
   HandlerGetData: { object_name: 'PLACEHOLDER_TABLE' },
   HandlerProfileView: {

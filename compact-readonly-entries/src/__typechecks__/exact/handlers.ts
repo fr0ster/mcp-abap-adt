@@ -43,10 +43,6 @@ import {
   handleHandlerProfileView,
 } from '../../handlers/handleHandlerProfileView';
 import {
-  TOOL_DEFINITION as HandlerSearch,
-  handleHandlerSearch,
-} from '../../handlers/handleHandlerSearch';
-import {
   TOOL_DEFINITION as HandlerServiceBindingListTypes,
   handleHandlerServiceBindingListTypes,
 } from '../../handlers/handleHandlerServiceBindingListTypes';
@@ -54,6 +50,10 @@ import {
   TOOL_DEFINITION as HandlerServiceBindingValidate,
   handleHandlerServiceBindingValidate,
 } from '../../handlers/handleHandlerServiceBindingValidate';
+import {
+  TOOL_DEFINITION as HandlerSystem,
+  handleHandlerSystem,
+} from '../../handlers/handleHandlerSystem';
 import {
   TOOL_DEFINITION as HandlerUnitTestResult,
   handleHandlerUnitTestResult,
@@ -66,10 +66,6 @@ import {
   TOOL_DEFINITION as HandlerValidate,
   handleHandlerValidate,
 } from '../../handlers/handleHandlerValidate';
-import {
-  TOOL_DEFINITION as HandlerWhereUsed,
-  handleHandlerWhereUsed,
-} from '../../handlers/handleHandlerWhereUsed';
 
 /** The arguments `H` takes. */
 type ArgsOf<H> = H extends (context: HandlerContext, args: infer A) => unknown
@@ -86,14 +82,13 @@ export const pairings = [
   defineTool(HandlerDeletionCheck, handleHandlerDeletionCheck),
   defineTool(HandlerGetData, handleHandlerGetData),
   defineTool(HandlerValidate, handleHandlerValidate),
-  defineTool(HandlerWhereUsed, handleHandlerWhereUsed),
+  defineTool(HandlerSystem, handleHandlerSystem),
   defineTool(HandlerGet, handleHandlerGet),
   defineTool(HandlerCdsUnitTestResult, handleHandlerCdsUnitTestResult),
   defineTool(HandlerCdsUnitTestStatus, handleHandlerCdsUnitTestStatus),
   defineTool(HandlerDumpList, handleHandlerDumpList),
   defineTool(HandlerDumpView, handleHandlerDumpView),
   defineTool(HandlerProfileView, handleHandlerProfileView),
-  defineTool(HandlerSearch, handleHandlerSearch),
   defineTool(
     HandlerServiceBindingListTypes,
     handleHandlerServiceBindingListTypes,
@@ -136,14 +131,14 @@ export const handlerValidateCloud: Accepts<
   typeof handleHandlerValidate
 > = true;
 
-export const handlerWhereUsedOnprem: Accepts<
-  (typeof HandlerWhereUsed.variants)['onprem']['inputSchema'],
-  typeof handleHandlerWhereUsed
+export const handlerSystemOnprem: Accepts<
+  (typeof HandlerSystem.variants)['onprem']['inputSchema'],
+  typeof handleHandlerSystem
 > = true;
 
-export const handlerWhereUsedCloud: Accepts<
-  (typeof HandlerWhereUsed.variants)['cloud']['inputSchema'],
-  typeof handleHandlerWhereUsed
+export const handlerSystemCloud: Accepts<
+  (typeof HandlerSystem.variants)['cloud']['inputSchema'],
+  typeof handleHandlerSystem
 > = true;
 
 export const handlerGetOnprem: Accepts<

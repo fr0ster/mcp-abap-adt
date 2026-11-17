@@ -85,8 +85,11 @@ describe("lib's read and write handler barrels", () => {
     // compact read route is the target tool's entry (58); the draft read,
     // for `HandlerGet` part `draft` (59). ValidateServiceBinding's three
     // refusals of a missing name, so compact `HandlerValidate` refuses an
-    // absent one in the callee's words before the call (62).
-    expect(read).toHaveLength(62);
+    // absent one in the callee's words before the call (62). The six reads
+    // compact `HandlerSystem` calls beside SearchObject and GetWhereUsed:
+    // SearchSource, GetPackageTree, ListTransports and the three ATC reads
+    // (68).
+    expect(read).toHaveLength(68);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

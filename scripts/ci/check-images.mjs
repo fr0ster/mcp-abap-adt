@@ -259,8 +259,12 @@ const callOf = (variant) => ({
   method: 'tools/call',
   params: variant.startsWith('compact')
     ? {
-        name: 'HandlerSearch',
-        arguments: { query: 'ZIMAGE_CHECK*', background: false },
+        name: 'HandlerSystem',
+        arguments: {
+          action: 'search_object',
+          object_name: 'ZIMAGE_CHECK*',
+          background: false,
+        },
       }
     : {
         name: 'SearchObject',

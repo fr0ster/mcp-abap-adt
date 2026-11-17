@@ -28,7 +28,6 @@ import {
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
-  COMPACT_WHERE_USED,
   type VariantValues,
 } from '../../../lib/adtProjections';
 import type { ServerVariant } from '../../../lib/clients';
@@ -44,7 +43,6 @@ import {
   COMPACT_UNLOCK_TAKES,
   COMPACT_UPDATE_TAKES,
   COMPACT_VALIDATE_TAKES,
-  COMPACT_WHERE_USED_TAKES,
 } from '../../../lib/compact/compactSchemas';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
 
@@ -75,10 +73,6 @@ const TOOLS: Readonly<
     members: COMPACT_DELETION_CHECK,
   },
   HandlerActivate: { takes: COMPACT_ACTIVATE_TAKES, members: COMPACT_ACTIVATE },
-  HandlerWhereUsed: {
-    takes: COMPACT_WHERE_USED_TAKES,
-    members: COMPACT_WHERE_USED,
-  },
   HandlerProfileRun: { takes: COMPACT_PROFILE_TAKES, members: COMPACT_PROFILE },
 };
 
@@ -221,7 +215,7 @@ describe('a compact tool offers on each variant the properties its offered membe
           );
           if (absent.length > 0) missing[tool.name] = absent;
         }
-        expect(checked).toBeGreaterThanOrEqual(kind === 'compact' ? 12 : 5);
+        expect(checked).toBeGreaterThanOrEqual(kind === 'compact' ? 11 : 4);
         expect({ untaken, missing }).toEqual({ untaken: {}, missing: {} });
       });
 

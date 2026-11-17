@@ -18,7 +18,6 @@ import {
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
-  COMPACT_WHERE_USED,
   type ProjectionVariant,
 } from '../adtProjections';
 import { parentedCodesOf } from '../adtTypeCode';
@@ -447,34 +446,4 @@ export function compactProfileRunDescription(
   return `Runs ${either(
     members.map((member) => (member === 'CLASS' ? 'a class' : 'a program')),
   )} in one request. Required: target_type*(${members.join('|')}) + ${either(names)}. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.`;
-}
-
-const WHERE_USED_WORDS: Tokens<(typeof COMPACT_WHERE_USED.onprem)[number]> = {
-  CLASS: 'class',
-  INTERFACE: 'interface',
-  PROGRAM: 'program',
-  INCLUDE: 'include',
-  FUNCTION_GROUP: 'function group',
-  FUNCTION_MODULE: 'function module (BAPI included)',
-  PACKAGE: 'package',
-  TABLE: 'table',
-  STRUCTURE: 'structure',
-  DOMAIN: 'domain',
-  DATA_ELEMENT: 'data element',
-  DDL: 'CDS DDL source',
-  TABLE_TYPE: 'table type',
-};
-
-/** HandlerWhereUsed's description on `variant`. */
-export function compactWhereUsedDescription(
-  variant: ProjectionVariant,
-  members: readonly (typeof COMPACT_WHERE_USED.onprem)[number][] = COMPACT_WHERE_USED[
-    variant
-  ],
-): string {
-  const left = leftOf(COMPACT_WHERE_USED[variant], members);
-  const kinds = members.map((member) => WHERE_USED_WORDS[member]);
-  return withLongToolAdvice(
-    `[read-only] Lists where the object named by object_type and object_name is used — a ${either(kinds)}: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: ${when(left.has('FUNCTION_MODULE'), 'function_group_name (FUNCTION_MODULE), ')}max_results (default 100). Response: JSON.`,
-  );
 }

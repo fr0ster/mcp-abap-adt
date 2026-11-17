@@ -13,7 +13,6 @@ import {
   COMPACT_UNLOCK,
   COMPACT_UPDATE,
   COMPACT_VALIDATE,
-  COMPACT_WHERE_USED,
   type ProjectionVariant,
   supported,
   whereUsedTypeDescription,
@@ -1978,69 +1977,6 @@ export function compactActivateSchemaFor<
 export const compactActivateSchema = compactActivateSchemaWithNamesFor(
   COMPACT_ACTIVATE.onprem,
   'onprem',
-);
-
-/** Object search by name or mask. */
-export const compactSearchSchema = z.object({
-  background: COMPACT_LONG_BACKGROUND_FIELD,
-  query: z.string().describe('Object name or mask, with * as a wildcard.'),
-  object_type: z.string().optional().describe(SEARCH_TYPE_DESCRIPTION),
-  max_results: z
-    .number()
-    .default(100)
-    .optional()
-    .describe('Maximum number of objects returned.'),
-});
-
-/** A member of `HandlerWhereUsed`'s `object_type`. */
-type WhereUsedMember = (typeof COMPACT_WHERE_USED.onprem)[number];
-
-function whereUsedProperties<const M extends readonly WhereUsedMember[]>(
-  members: M,
-) {
-  return {
-    background: COMPACT_LONG_BACKGROUND_FIELD,
-    object_type: listedValues(members)
-      .optional()
-      .describe('Type of the object whose usages are listed.'),
-    object_name: z.string().optional().describe('Object name.'),
-    function_group_name: z
-      .string()
-      .optional()
-      .describe('Function group of the function module (FUNCTION_MODULE).'),
-    max_results: z
-      .number()
-      .default(100)
-      .optional()
-      .describe('Maximum number of referencing objects returned.'),
-  } as const;
-}
-
-/** What `HandlerWhereUsed` takes: a function module's group beside the object every call names. */
-export const COMPACT_WHERE_USED_TAKES = takesOf<
-  keyof ReturnType<typeof whereUsedProperties<readonly WhereUsedMember[]>>,
-  WhereUsedMember
->()({
-  every: ['background', 'object_type', 'object_name', 'max_results'],
-  members: { FUNCTION_MODULE: ['function_group_name'] },
-});
-
-/** Where-used list of one object. */
-export function compactWhereUsedSchemaFor<
-  const M extends readonly WhereUsedMember[],
->(members: M) {
-  const properties = whereUsedProperties(members);
-  return z.object({
-    ...offered(properties, COMPACT_WHERE_USED_TAKES, members),
-    background: properties.background,
-    object_type: requiredField(properties.object_type),
-    object_name: requiredField(properties.object_name),
-    max_results: properties.max_results,
-  });
-}
-
-export const compactWhereUsedSchema = compactWhereUsedSchemaFor(
-  COMPACT_WHERE_USED.onprem,
 );
 
 /**

@@ -1,6 +1,6 @@
 /**
- * The compact tools that change nothing — seventeen of the twenty-nine: the
- * sixteen of `compactReadOnlyEntries`, and the data tool `HandlerGetData`,
+ * The compact tools that change nothing — sixteen of the twenty-eight: the
+ * fifteen of `compactReadOnlyEntries`, and the data tool `HandlerGetData`,
  * opt-in, of `compactDataEntries`.
  *
  * **Why a group of its own, and why it matters what it imports.** Compact is a
@@ -70,10 +70,6 @@ import {
   handleHandlerProfileView,
 } from './handlers/handleHandlerProfileView';
 import {
-  TOOL_DEFINITION as HandlerSearch_Tool,
-  handleHandlerSearch,
-} from './handlers/handleHandlerSearch';
-import {
   TOOL_DEFINITION as HandlerServiceBindingListTypes_Tool,
   handleHandlerServiceBindingListTypes,
 } from './handlers/handleHandlerServiceBindingListTypes';
@@ -97,10 +93,6 @@ import {
   TOOL_DEFINITION as HandlerValidate_Tool,
   handleHandlerValidate,
 } from './handlers/handleHandlerValidate';
-import {
-  TOOL_DEFINITION as HandlerWhereUsed_Tool,
-  handleHandlerWhereUsed,
-} from './handlers/handleHandlerWhereUsed';
 
 /**
  * The entries: each takes the call's context at the call, from whichever
@@ -109,8 +101,6 @@ import {
 export function compactReadOnlyEntries(): HandlerEntry[] {
   return [
     defineTool(HandlerGet_Tool, handleHandlerGet),
-    defineTool(HandlerSearch_Tool, handleHandlerSearch),
-    defineTool(HandlerWhereUsed_Tool, handleHandlerWhereUsed),
     defineTool(HandlerSystem_Tool, handleHandlerSystem),
     defineTool(HandlerValidate_Tool, handleHandlerValidate),
     defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),

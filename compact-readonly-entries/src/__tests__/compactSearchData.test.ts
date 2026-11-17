@@ -1,12 +1,11 @@
 /**
- * The read operations compact gained for issue #259: search, where-used, data
- * and a package's contents. Each is a routing onto a core reader; these pin
- * which reader and with which arguments, and what the facade adds of its own —
- * the where-used cap and the function module's group.
+ * The read operations compact gained for issue #259: data and a package's
+ * contents (search and where-used are `HandlerSystem`'s actions, pinned in
+ * `handlerSystem.test.ts`). Each is a routing onto a core reader; these pin
+ * which reader and with which arguments, and what the facade adds of its own.
  */
 
 const calls: Array<{ tool: string; args: any }> = [];
-let whereUsedAnswer: unknown;
 let contentsAnswer: unknown;
 
 jest.mock('@mcp-abap-adt/lib/handlers/read', () => {
@@ -19,8 +18,6 @@ jest.mock('@mcp-abap-adt/lib/handlers/read', () => {
     });
   return {
     ...jest.requireActual('@mcp-abap-adt/lib/handlers/read'),
-    handleSearchObject: record('SearchObject'),
-    handleGetWhereUsed: record('GetWhereUsed', () => whereUsedAnswer),
     handleGetTableContents: record('GetTableContents'),
     handleGetSqlQuery: record('GetSqlQuery'),
     handleGetPackageContents: record(
@@ -32,8 +29,6 @@ jest.mock('@mcp-abap-adt/lib/handlers/read', () => {
 
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
 import { handleHandlerGetData } from '../handlers/handleHandlerGetData';
-import { handleHandlerSearch } from '../handlers/handleHandlerSearch';
-import { handleHandlerWhereUsed } from '../handlers/handleHandlerWhereUsed';
 
 // The process declares its system type, as every launcher requires: the
 // type argument is checked against the declared variant's projection.
@@ -46,115 +41,7 @@ const context = {
 
 beforeEach(() => {
   calls.length = 0;
-  whereUsedAnswer = { isError: false, content: [{ type: 'text', text: '{}' }] };
   contentsAnswer = { isError: false, content: [{ type: 'text', text: '[]' }] };
-});
-
-describe('HandlerSearch', () => {
-  it('searches by the mask, with the type and the cap', async () => {
-    await handleHandlerSearch(context, {
-      query: 'Z*',
-      object_type: 'CLAS/OC',
-      max_results: 20,
-    });
-    expect(calls).toEqual([
-      {
-        tool: 'SearchObject',
-        // As SearchObject's schema parses them: its `detail` default added.
-        args: {
-          object_name: 'Z*',
-          object_type: 'CLAS/OC',
-          maxResults: 20,
-          detail: 'terse',
-        },
-      },
-    ]);
-  });
-
-  it('refuses without a query, asking nothing', async () => {
-    const answered: any = await handleHandlerSearch(context, {} as never);
-    expect(answered.isError).toBe(true);
-    expect(calls).toHaveLength(0);
-  });
-});
-
-describe('HandlerWhereUsed', () => {
-  it('names the type the where-used reader knows', async () => {
-    await handleHandlerWhereUsed(context, {
-      object_type: 'DDL',
-      object_name: 'ZI_VIEW',
-    });
-    expect(calls[0]).toEqual({
-      tool: 'GetWhereUsed',
-      // As GetWhereUsed's schema parses them: its `enable_all_types` default added.
-      args: {
-        object_name: 'ZI_VIEW',
-        object_type: 'view',
-        enable_all_types: false,
-      },
-    });
-  });
-
-  it('names a table type by its code, which no name stands for', async () => {
-    await handleHandlerWhereUsed(context, {
-      object_type: 'TABLE_TYPE',
-      object_name: 'ZTTYP_A',
-    });
-    expect(calls[0]).toEqual({
-      tool: 'GetWhereUsed',
-      args: {
-        object_name: 'ZTTYP_A',
-        object_type: 'TTYP/DA',
-        enable_all_types: false,
-      },
-    });
-  });
-
-  it('addresses a function module under its group', async () => {
-    await handleHandlerWhereUsed(context, {
-      object_type: 'FUNCTION_MODULE',
-      object_name: 'Z_FM',
-      function_group_name: 'ZFG',
-    });
-    expect(calls[0].args).toEqual({
-      object_name: 'ZFG|Z_FM',
-      object_type: 'functionmodule',
-      enable_all_types: false,
-    });
-  });
-
-  it('refuses a function module without its group', async () => {
-    const answered: any = await handleHandlerWhereUsed(context, {
-      object_type: 'FUNCTION_MODULE',
-      object_name: 'Z_FM',
-    });
-    expect(answered.isError).toBe(true);
-    expect(calls).toHaveLength(0);
-  });
-
-  it('caps the references and keeps the total', async () => {
-    const references = Array.from({ length: 250 }, (_, i) => ({
-      name: `R${i}`,
-    }));
-    whereUsedAnswer = {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ total_references: 250, references }),
-        },
-      ],
-    };
-    const answered: any = await handleHandlerWhereUsed(context, {
-      object_type: 'CLASS',
-      object_name: 'ZCL_X',
-      max_results: 10,
-    });
-    const value = JSON.parse(answered.content[0].text);
-    expect(value.references).toHaveLength(10);
-    expect(value.total_references).toBe(250);
-    expect(value.returned_references).toBe(10);
-  });
 });
 
 describe('HandlerGetData', () => {

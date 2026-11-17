@@ -85,7 +85,6 @@ import { runWithCallTransport } from '../lib/callTransport.js';
 import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
-  kindOfCall,
   systemKindOf,
   withSystemKindOf,
 } from '../lib/connectionFactory.js';
@@ -1401,7 +1400,7 @@ export abstract class BaseMcpServer extends McpServer {
     const context = this.connectionContext;
     const recorded =
       context?.kind === 'injected'
-        ? kindOfCall(context.connection, undefined, {})
+        ? systemKindOf(context.connection, {}, undefined)
         : undefined;
     return recorded ?? process.env.SAP_SYSTEM_TYPE;
   }
@@ -1419,7 +1418,7 @@ export abstract class BaseMcpServer extends McpServer {
       return statedSystemKind(this.statedSystemType());
     }
     // The host's: as it is dispatched (`declareSystemKind`, `systemKindOf`).
-    return kindOfCall(context.connection, this.systemType, process.env);
+    return systemKindOf(context.connection, process.env, this.systemType);
   }
 
   /**

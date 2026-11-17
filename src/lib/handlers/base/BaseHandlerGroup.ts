@@ -18,7 +18,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../../backgroundRuns/tools.js';
-import { kindOfCall } from '../../connectionFactory.js';
+import { systemKindOf } from '../../connectionFactory.js';
 import {
   listedTool,
   type SearchMeta,
@@ -305,5 +305,5 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
  * neither names one.
  */
 function kindOfContext(context: HandlerContext): AbapSystemKind | undefined {
-  return kindOfCall(context.connection, context.systemType, {});
+  return systemKindOf(context.connection, {}, context.systemType);
 }

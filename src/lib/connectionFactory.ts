@@ -319,6 +319,12 @@ const records = new WeakMap<object, ConnectionRecord>();
  * read for it. `undefined` when none states one — the kind is never
  * guessed, not from the URL either. What a missing kind means is the
  * host's rules'.
+ *
+ * The one resolver of the kind a call is checked and dispatched on: the
+ * server's precheck (the environment its fallback), a plain registration
+ * and `HandlerExporter` (`env` empty: the environment is not read) and an
+ * entry's call all read it, with the kind they state as `declared`; it
+ * reads and records nothing.
  */
 export function systemKindOf(
   connection: object,
@@ -332,23 +338,6 @@ export function systemKindOf(
   // A plain registration stated none: no kind, the environment not read.
   if (stated === 'none') return undefined;
   return stated ?? statedSystemKind(env.SAP_SYSTEM_TYPE);
-}
-
-/**
- * The kind a call on `connection` is checked and dispatched on — the one
- * resolver of both: `systemKindOf`'s order (the factory's record, the kind
- * `stated` by the server, the context or the exporter, the kind declared
- * for the connection, then `environment`'s `SAP_SYSTEM_TYPE`). The
- * environment is the process's where an embedder that states no kind may
- * fall back to it (a server instance), none where it may not (a plain
- * registration, `HandlerExporter`). Reads; never records a kind.
- */
-export function kindOfCall(
-  connection: object,
-  stated: string | undefined,
-  environment: NodeJS.ProcessEnv | Record<string, string | undefined>,
-): AbapSystemKind | undefined {
-  return systemKindOf(connection, environment, stated);
 }
 
 /**

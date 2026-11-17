@@ -16,7 +16,7 @@ import {
   longToolInTheCall,
   withoutBackgroundParameter,
 } from '../backgroundRuns/tools.js';
-import { kindOfCall } from '../connectionFactory.js';
+import { systemKindOf } from '../connectionFactory.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -410,7 +410,7 @@ export class HandlerExporter {
         // read); none is `system_type_required`, before anything else.
         let kind: AbapSystemKind | undefined;
         if (entry.toolDefinition.variants !== undefined) {
-          kind = kindOfCall(context.connection, this.systemType, {});
+          kind = systemKindOf(context.connection, {}, this.systemType);
           if (kind === undefined) {
             return Promise.reject(new ServerRefusal('system_type_required'));
           }

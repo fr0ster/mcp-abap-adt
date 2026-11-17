@@ -1,5 +1,6 @@
 /**
- * The kind a call is checked on before dispatch (`kindOfCall`) is the kind
+ * The kind a call is checked on before dispatch (`systemKindOf` with the
+ * kind the path states) is the kind
  * it is dispatched on, for every combination of a stated kind, a factory
  * record, a declared kind and `SAP_SYSTEM_TYPE` — a conflicting one
  * included — on the server (the environment its fallback) and on a plain
@@ -11,7 +12,6 @@
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   createAbapConnection,
-  kindOfCall,
   systemKindOf,
 } from '../../lib/connectionFactory';
 import {
@@ -61,7 +61,7 @@ describe.each(COMBINATIONS)(
     it('the server: checked as dispatched', () => {
       const connection = connectionWith(record);
       if (declared !== undefined) declareSystemKind(connection, declared);
-      const checked = kindOfCall(connection, stated, process.env);
+      const checked = systemKindOf(connection, process.env, stated);
       // Dispatch: the server declares its kind, the call reads the kind.
       declareSystemKind(connection, stated);
       expect(checked).toBe(systemKindOf(connection));
@@ -70,7 +70,7 @@ describe.each(COMBINATIONS)(
     it('a plain registration and the exporter: checked as dispatched, the environment unread', () => {
       const connection = connectionWith(record);
       if (declared !== undefined) declareSystemKind(connection, declared);
-      const checked = kindOfCall(connection, stated, {});
+      const checked = systemKindOf(connection, {}, stated);
       // Dispatch: the group states its kind, the call reads the kind.
       stateSystemKind(connection, stated);
       expect(checked).toBe(systemKindOf(connection));
@@ -86,7 +86,7 @@ describe.each(COMBINATIONS)(
     it('checking records nothing; stating none erases no declared kind', () => {
       const connection = connectionWith(record);
       if (declared !== undefined) declareSystemKind(connection, declared);
-      kindOfCall(connection, stated, process.env);
+      systemKindOf(connection, process.env, stated);
       expect(declaredSystemKindOf(connection)).toBe(declared);
       stateSystemKind(connection, undefined);
       expect(declaredSystemKindOf(connection)).toBe(declared ?? 'none');

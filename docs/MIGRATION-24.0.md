@@ -940,7 +940,15 @@ action), `HandlerGetData`, and the creates and updates `HandlerCreate` and
 `HandlerUpdate` delegate. An argument the target requires that the compact call left out (an
 object's name, `run_id`), or a value outside a list the target declares (`package_type`), is
 refused in the target schema's words, naming the target, where 23.x ran the
-target's handler and refused in its words. `HandlerGet` part `virtual_folders` now sends
+target's handler and refused in its words. For the listed long tools — `HandlerGet` and
+`HandlerGetData` as `HandlerSystem` — that refusal comes before the call takes a connection: with
+`background` true or false, with or without a fresh-connection factory, no session of its own
+is opened and no run started (a call that a refusal used to answer with a `run_handle`, or with
+`fresh_connection_unavailable`, is answered the refusal now). The full long reads do the same with
+the rules their handlers check: `GetWhereUsed`, `GetPackageContents`, `GetPackageTree`,
+`GetObjectsList`, `GetStructuresList`, `GetIncludesList` and `GetObjectInfo` refuse a missing or
+contradictory argument (`Object name is required`, `package_name is required`, `Give exactly
+one of …`) before any connection, in the words they answered before. `HandlerGet` part `virtual_folders` now sends
 `with_versions` and `ignore_short_descriptions` as `false` where it sent none (`GetVirtualFolders`'
 schema defaults).
 

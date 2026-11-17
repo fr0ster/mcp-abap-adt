@@ -83,6 +83,7 @@
   "src/__tests__/integration/readOnly/system/WhereUsedHandlers.test.ts",
   "src/__tests__/integration/readOnly/transport/ListTransportsHandlers.test.ts",
   "src/__tests__/integration/server/EmbeddableMcpServer.systemType.test.ts",
+  "src/__tests__/integration/server/serverSystemKind.test.ts",
   "src/__tests__/unit/access/accessLists.test.ts",
   "src/__tests__/unit/access/accessWrappers.test.ts",
   "src/__tests__/unit/access/builders.test.ts",

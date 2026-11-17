@@ -728,5 +728,103 @@
         ]
       }
     ]
+  },
+  {
+    "tool": "HandlerSystem",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
+    "sends": "search_object: GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]",
+    "when": [
+      {
+        "argument": "action",
+        "equals": [
+          "search_object"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerSystem",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
+    "sends": "where_used of one object without a type filter: POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope",
+    "when": [
+      {
+        "argument": "action",
+        "equals": [
+          "where_used"
+        ]
+      },
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "enable_all_types",
+        "notEquals": [
+          "true"
+        ]
+      },
+      {
+        "argument": "enable_only_types",
+        "present": false
+      },
+      {
+        "argument": "disable_types",
+        "present": false
+      },
+      {
+        "argument": "object_type",
+        "notEquals": [
+          "FUGR/FF",
+          "function",
+          "functionmodule",
+          "function_module",
+          "func"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerSystem",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
+    "sends": "atc_findings: GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false",
+    "when": [
+      {
+        "argument": "action",
+        "equals": [
+          "atc_findings"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerSystem",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
+    "sends": "atc_results: GET /sap/bc/adt/atc/results?createdBy={user}[&centralResult=true][&ageMin=N][&ageMax=N]",
+    "when": [
+      {
+        "argument": "action",
+        "equals": [
+          "atc_results"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerSystem",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
+    "sends": "atc_result: GET /sap/bc/adt/atc/results/{displayId}",
+    "when": [
+      {
+        "argument": "action",
+        "equals": [
+          "atc_result"
+        ]
+      }
+    ]
   }
 ]

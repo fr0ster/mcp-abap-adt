@@ -412,6 +412,95 @@ describe('eligible', () => {
     });
   });
 
+  it('HandlerSystem is eligible by its action: the reads whose requests do not chain', () => {
+    const no = { ok: false, reason: 'arguments' };
+    const system = (args: Record<string, unknown>) =>
+      eligible('HandlerSystem', args, 'http');
+    expect({
+      search_object: system({ action: 'search_object', object_name: 'Z*' }),
+      where_used: system({
+        action: 'where_used',
+        object_name: 'CLAS_A',
+        object_type: 'class',
+      }),
+      'where_used enable_all_types false': system({
+        action: 'where_used',
+        object_name: 'CLAS_A',
+        object_type: 'class',
+        enable_all_types: false,
+      }),
+      atc_findings: system({ action: 'atc_findings', worklist_id: 'W' }),
+      atc_results: system({ action: 'atc_results', created_by: '*' }),
+      atc_result: system({ action: 'atc_result', display_id: 'D' }),
+      search_source: system({
+        action: 'search_source',
+        query: 'q',
+        packages: ['Z'],
+      }),
+      package_tree: system({ action: 'package_tree', package_name: 'Z' }),
+      transports: system({ action: 'transports' }),
+      'no action': system({ object_name: 'Z*' }),
+      'where_used objects': system({
+        action: 'where_used',
+        objects: [{ object_name: 'CLAS_A', object_type: 'class' }],
+      }),
+      'where_used enable_all_types': system({
+        action: 'where_used',
+        object_name: 'CLAS_A',
+        object_type: 'class',
+        enable_all_types: true,
+      }),
+      'where_used enable_only_types': system({
+        action: 'where_used',
+        object_name: 'CLAS_A',
+        object_type: 'class',
+        enable_only_types: ['CLAS/OC'],
+      }),
+      'where_used disable_types': system({
+        action: 'where_used',
+        object_name: 'CLAS_A',
+        object_type: 'class',
+        disable_types: ['CLAS/OC'],
+      }),
+    }).toEqual({
+      search_object: { ok: true },
+      where_used: { ok: true },
+      'where_used enable_all_types false': { ok: true },
+      atc_findings: { ok: true },
+      atc_results: { ok: true },
+      atc_result: { ok: true },
+      search_source: no,
+      package_tree: no,
+      transports: no,
+      'no action': no,
+      'where_used objects': no,
+      'where_used enable_all_types': no,
+      'where_used enable_only_types': no,
+      'where_used disable_types': no,
+    });
+  });
+
+  it.each([
+    'FUGR/FF',
+    'fugr/ff',
+    'function',
+    'functionmodule',
+    'function_module',
+    'func',
+    'FUNC',
+  ])(
+    'HandlerSystem where_used of a function module (%s) is not recorded: its group is read first (#2)',
+    (object_type) => {
+      expect(
+        eligible(
+          'HandlerSystem',
+          { action: 'where_used', object_name: 'G|M', object_type },
+          'http',
+        ),
+      ).toEqual({ ok: false, reason: 'arguments' });
+    },
+  );
+
   it('an empty objects list is the single form, as HandlerActivate dispatches it: a function module there is not recorded (#2)', () => {
     const no = { ok: false, reason: 'arguments' };
     expect({

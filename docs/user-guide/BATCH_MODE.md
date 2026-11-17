@@ -422,7 +422,7 @@ one envelope cannot hold a request built from another's answer. Each is refused
 
 <!-- batch-handlers:start -->
 
-45 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+50 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Compact sets (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`, and their `-ro` binaries for the reads)
 
@@ -461,6 +461,11 @@ one envelope cannot hold a request built from another's answer. Each is refused
 | `HandlerSearch` | every call | GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
 | `HandlerServiceBindingListTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `HandlerServiceBindingValidate` | every call | POST /sap/bc/adt/cts/transportchecks |
+| `HandlerSystem` | when action is search_object | search_object: GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
+| `HandlerSystem` | when action is where_used and objects is absent and enable_all_types is any value but true and enable_only_types is absent and disable_types is absent and object_type is any value but FUGR/FF, function, functionmodule, function_module, func | where_used of one object without a type filter: POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope |
+| `HandlerSystem` | when action is atc_findings | atc_findings: GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false |
+| `HandlerSystem` | when action is atc_results | atc_results: GET /sap/bc/adt/atc/results?createdBy={user}[&centralResult=true][&ageMin=N][&ageMax=N] |
+| `HandlerSystem` | when action is atc_result | atc_result: GET /sap/bc/adt/atc/results/{displayId} |
 | `HandlerTransportMoveObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
 | `HandlerTransportSortAndCompress` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress |
 | `HandlerUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |

@@ -442,6 +442,37 @@ const COMPACT: BatchEntryCase[] = [
     args: { part, run_id: 'RUN_A' },
   })),
   { tool: 'HandlerSearch', args: { query: 'Z*' } },
+  // HandlerSystem: each action whose full tool sends independent requests.
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'search_object', object_name: 'Z*' },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'search_object', object_name: 'Z*', object_type: 'CLAS' },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'where_used', object_name: 'CLAS_A', object_type: 'class' },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: {
+      action: 'where_used',
+      object_name: 'CLAS_A',
+      object_type: 'class',
+      enable_all_types: false,
+    },
+  },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'atc_findings', worklist_id: 'WORKLIST_A' },
+  },
+  { tool: 'HandlerSystem', args: { action: 'atc_results', created_by: '*' } },
+  {
+    tool: 'HandlerSystem',
+    args: { action: 'atc_result', display_id: 'RESULT_A' },
+  },
   { tool: 'HandlerGetData', args: { sql_query: 'SELECT * FROM TAB_A' } },
   { tool: 'HandlerGetData', args: { object_name: 'TAB_A' } },
   { tool: 'HandlerProfileList', args: {} },

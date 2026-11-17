@@ -102,6 +102,7 @@ const LONG_BY_REQUESTS: Readonly<
   HandlerProfileView: 'independent',
   HandlerWhereUsed: 'independent',
   HandlerGet: 'by-arguments',
+  HandlerSystem: 'by-arguments',
   GetWhereUsed: 'by-arguments',
   RuntimeListFeeds: 'by-arguments',
   GetPackageContents: 'chained',

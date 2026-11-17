@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * ReadTransportObjects — what a transport request or task holds.
@@ -34,7 +35,6 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 import {
   attr,
   child,
@@ -53,11 +53,9 @@ export const TOOL_DEFINITION = {
   description:
     "[read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
   inputSchema: z.object({
-    transport_number: z
-      .string()
-      .describe(
-        'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
-      ),
+    transport_number: requiredText('transport_number is required').describe(
+      'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
+    ),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -149,10 +147,6 @@ export async function handleReadTransportObjects(
   args: ReadTransportObjectsArgs,
 ) {
   const { connection, logger } = context;
-
-  if (!args?.transport_number) {
-    return return_error(new Error('transport_number is required'));
-  }
 
   const detail = detailOf(args);
 

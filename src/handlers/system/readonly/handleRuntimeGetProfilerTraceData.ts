@@ -7,13 +7,13 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import { ourProfiler } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetProfilerTraceData',
@@ -23,9 +23,9 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
-    trace_id_or_uri: z
-      .string()
-      .describe('Profiler trace ID or full ADT trace URI.'),
+    trace_id_or_uri: requiredText(
+      'Parameter "trace_id_or_uri" is required',
+    ).describe('Profiler trace ID or full ADT trace URI.'),
     view: z
       .enum(['hitlist', 'statements', 'db_accesses'])
       .describe('Trace view to retrieve.'),
@@ -57,10 +57,6 @@ export async function handleRuntimeGetProfilerTraceData(
   args: RuntimeGetProfilerTraceDataArgs,
 ) {
   const { connection, logger } = context;
-
-  if (!args?.trace_id_or_uri) {
-    return return_error(new Error('Parameter "trace_id_or_uri" is required'));
-  }
 
   const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
     ourProfiler,

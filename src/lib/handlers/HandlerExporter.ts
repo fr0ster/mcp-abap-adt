@@ -16,6 +16,7 @@ import {
   longToolInTheCall,
   withoutBackgroundParameter,
 } from '../backgroundRuns/tools.js';
+import { systemKindOf } from '../connectionFactory.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../requestSystemResolution.js';
 import type { LineMatchStrategy } from '../search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../search-source/readFailure.js';
+import { statedSystemKind } from '../systemKind.js';
 import { readOnlyToolNames } from '../toolSet.js';
 import { return_error } from '../utils.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
@@ -40,6 +42,7 @@ import type {
   IHandlersRegistry,
   SapEnvironment,
 } from './interfaces.js';
+import { argumentsRefusalOf } from './interfaces.js';
 import { noConnection } from './noConnection.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
 import { type CallContext, inStatedScope } from './utils/handlerCall.js';
@@ -397,8 +400,21 @@ export class HandlerExporter {
         : checkedArgumentsOf(entry.toolDefinition, access.readOnly);
     return {
       ...entry,
-      call: (context, args) =>
-        inStatedScope(
+      call: (context, args) => {
+        // The tool's schema first — the one check of a call, the SDK's parse
+        // on the other paths: a refused call reaches no scope, no resolver,
+        // no access check and no handler. Read on the kind this exporter
+        // states, else the one the connection was built for.
+        const refused = argumentsRefusalOf(
+          entry.toolDefinition,
+          args,
+          entry.toolDefinition.variants === undefined
+            ? undefined
+            : (statedSystemKind(this.systemType) ??
+                systemKindOf(context.connection)),
+        );
+        if (refused !== undefined) return Promise.reject(refused);
+        return inStatedScope(
           { ...this.stated(), connection: context?.connection },
           args,
           async () => {
@@ -421,7 +437,8 @@ export class HandlerExporter {
             }
             return original(this.withStrategies(context), args);
           },
-        ),
+        );
+      },
     };
   }
 

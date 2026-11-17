@@ -3,6 +3,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_PART_FIELD,
@@ -32,7 +33,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: `[read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
-    include_name: z.string().describe('Include name.'),
+    include_name: requiredText('Include name is required').describe(
+      'Include name.',
+    ),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD_UNDEFAULTED,
     ...SOURCE_RANGE_SHAPE,
@@ -61,7 +64,6 @@ async function readInclude<R>(
 ) {
   const { connection, logger } = context;
   const { include_name, version } = args;
-  if (!include_name) return return_error('Include name is required');
   const part = readPartOf(args.part);
   const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);

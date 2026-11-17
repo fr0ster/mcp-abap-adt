@@ -25,6 +25,12 @@ import {
 } from '../../../lib/answer';
 import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  onEveryVariant,
+  type RuleVariant,
+  stated,
+  withInCallSchema,
+} from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
@@ -49,60 +55,119 @@ import { succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
+/** GetObjectInfo's arguments but `background`. */
+const FIELDS = {
+  parent_type: z
+    .string()
+    .optional()
+    .describe(
+      '[read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects',
+    ),
+  parent_name: z.string().optional().describe('[read-only] Parent object name'),
+  objects: z
+    .array(
+      z.object({
+        object_type: z
+          .string()
+          .describe('Object type (e.g. DEVC/K, CLAS/OC, PROG/P)'),
+        object_name: z.string().describe('Object name'),
+      }),
+    )
+    .optional()
+    .describe(
+      '[read-only] Several objects, read together (give this or parent_type and parent_name)',
+    ),
+  maxDepth: z
+    .number()
+    .int()
+    .default(1)
+    .optional()
+    .describe(
+      "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
+    ),
+  enrich: z
+    .boolean()
+    .default(true)
+    .optional()
+    .describe(
+      '[read-only] Whether to add description and package via SearchObject (default true)',
+    ),
+  include_descriptions: z
+    .boolean()
+    .default(false)
+    .optional()
+    .describe(
+      "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
+    ),
+};
+
+type ObjectInfoFields = z.output<z.ZodObject<typeof FIELDS>>;
+
+/**
+ * The rules of a call: `parent_type` and `parent_name`, or a non-empty
+ * `objects` alone, each entry with its type and name; on a stated variant
+ * every type one of its table's.
+ */
+function objectInfoRules(variant: RuleVariant) {
+  return (args: ObjectInfoFields, ctx: z.RefinementCtx): void => {
+    const refuse = (message: string, path: string) =>
+      ctx.addIssue({ code: 'custom', message, path: [path] });
+    const typeOf = (argument: string, text: string) => {
+      if (variant !== undefined && tableTypeOf(text, variant) === undefined) {
+        refuse(notATableType(argument, text, variant), argument);
+      }
+    };
+    const listed = args.objects;
+    if (listed === undefined) {
+      if (!stated(args.parent_type) || !stated(args.parent_name)) {
+        refuse('parent_type and parent_name are required', 'parent_type');
+      } else {
+        typeOf('parent_type', args.parent_type);
+      }
+      return;
+    }
+    if (
+      args.parent_type !== undefined ||
+      args.parent_name !== undefined ||
+      listed.length === 0
+    ) {
+      refuse(
+        'Give exactly one of parent_type and parent_name, or objects (a non-empty list of { object_type, object_name })',
+        'objects',
+      );
+      return;
+    }
+    if (listed.some((o) => !stated(o.object_type) || !stated(o.object_name))) {
+      refuse(
+        'Each entry of objects needs object_type and object_name',
+        'objects',
+      );
+      return;
+    }
+    for (const o of listed) typeOf('objects[].object_type', o.object_type);
+  };
+}
+
+/** The schema on `variant`, `background` listed; its in-the-call twin beside it. */
+function schemaOn(variant: RuleVariant) {
+  const rules = objectInfoRules(variant);
+  return withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(rules),
+    z.object(FIELDS).superRefine(rules),
+  );
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
+  ...onEveryVariant(
+    withLongToolAdvice(
+      '[read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
+    ),
+    schemaOn,
   ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    parent_type: z
-      .string()
-      .optional()
-      .describe(
-        '[read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P); with parent_name, or give objects',
-      ),
-    parent_name: z
-      .string()
-      .optional()
-      .describe('[read-only] Parent object name'),
-    objects: z
-      .array(
-        z.object({
-          object_type: z
-            .string()
-            .describe('Object type (e.g. DEVC/K, CLAS/OC, PROG/P)'),
-          object_name: z.string().describe('Object name'),
-        }),
-      )
-      .optional()
-      .describe(
-        '[read-only] Several objects, read together (give this or parent_type and parent_name)',
-      ),
-    maxDepth: z
-      .number()
-      .int()
-      .default(1)
-      .optional()
-      .describe(
-        "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
-      ),
-    enrich: z
-      .boolean()
-      .default(true)
-      .optional()
-      .describe(
-        '[read-only] Whether to add description and package via SearchObject (default true)',
-      ),
-    include_descriptions: z
-      .boolean()
-      .default(false)
-      .optional()
-      .describe(
-        "[read-only] Include each leaf's description. Where the system serves ADT batch, each description is read from the leaf's metadata: one more read per leaf, which on a large tree takes most of the call (default false)",
-      ),
-  }),
 } as const;
 
 function getDefaultDepth(parent_type: string): number {
@@ -694,78 +759,20 @@ async function buildTreesSequential(
   return { trees };
 }
 
-/**
- * The refusal of an object-info call's arguments, before anything is read
- * (`undefined`: none): `parent_type` and `parent_name`, or a non-empty
- * `objects` alone, each entry with its type and name.
- */
-export function objectInfoArgumentsRefusal(
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
-): string | undefined {
-  const listed = args.objects;
-  if (listed === undefined) {
-    return !args.parent_type || !args.parent_name
-      ? 'parent_type and parent_name are required'
-      : undefined;
-  }
-  if (
-    args.parent_type !== undefined ||
-    args.parent_name !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0
-  ) {
-    return 'Give exactly one of parent_type and parent_name, or objects (a non-empty list of { object_type, object_name })';
-  }
-  if (
-    listed.some(
-      (o) =>
-        typeof o?.object_type !== 'string' ||
-        !o.object_type ||
-        typeof o?.object_name !== 'string' ||
-        !o.object_name,
-    )
-  ) {
-    return 'Each entry of objects needs object_type and object_name';
-  }
-  return undefined;
-}
-
 export async function handleGetObjectInfo(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const refusal = objectInfoArgumentsRefusal(args);
-  if (refusal !== undefined) return return_error(refusal);
+  // The schema holds the rules: the forms, the names, the types.
   const { logger } = context;
   const listed = args?.objects;
   let objects: Array<{ type: AdtTypeCode; name: string }>;
   if (listed !== undefined) {
-    if (
-      args.parent_type !== undefined ||
-      args.parent_name !== undefined ||
-      !Array.isArray(listed) ||
-      listed.length === 0
-    ) {
-      return return_error(
-        'Give exactly one of parent_type and parent_name, or objects (a non-empty list of { object_type, object_name })',
-      );
-    }
-    if (
-      listed.some(
-        (o) =>
-          typeof o?.object_type !== 'string' ||
-          !o.object_type ||
-          typeof o?.object_name !== 'string' ||
-          !o.object_name,
-      )
-    ) {
-      return return_error(
-        'Each entry of objects needs object_type and object_name',
-      );
-    }
     objects = [];
     for (const o of listed) {
-      const text = String(o.object_type);
+      // The schema accepted the type on this variant: its code. A call that
+      // bypassed the schema gets the schema's words.
+      const text = o.object_type;
       const variant = variantOf(context.connection);
       const type = tableTypeOf(text, variant);
       if (type === undefined) {
@@ -773,20 +780,16 @@ export async function handleGetObjectInfo(
           notATableType('objects[].object_type', text, variant),
         );
       }
-      objects.push({ type, name: String(o.object_name) });
+      objects.push({ type, name: o.object_name });
     }
   } else {
-    if (!args?.parent_type || !args?.parent_name) {
-      return return_error('parent_type and parent_name are required');
-    }
+    const parentType = args.parent_type ?? '';
     const variant = variantOf(context.connection);
-    const type = tableTypeOf(args.parent_type, variant);
+    const type = tableTypeOf(parentType, variant);
     if (type === undefined) {
-      return return_error(
-        notATableType('parent_type', args.parent_type, variant),
-      );
+      return return_error(notATableType('parent_type', parentType, variant));
     }
-    objects = [{ type, name: args.parent_name }];
+    objects = [{ type, name: args.parent_name ?? '' }];
   }
   logger?.info(
     `Building object info tree for ${objects.map((o) => `${o.type}/${o.name}`).join(', ')}`,

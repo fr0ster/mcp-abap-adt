@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
@@ -8,7 +9,6 @@ import {
 } from '../../../lib/handlers/readVersion';
 import { readFunctionGroupMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetFunctionGroup',
@@ -16,7 +16,9 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: z.object({
-    function_group_name: z.string().describe('FunctionGroup name.'),
+    function_group_name: requiredText(
+      'function_group_name is required',
+    ).describe('FunctionGroup name.'),
     version: READ_VERSION_FIELD,
   }),
 } as const;
@@ -29,9 +31,6 @@ export async function handleGetFunctionGroup(
 ) {
   const { connection, logger } = context;
   const { function_group_name, version = 'active' } = args;
-  if (!function_group_name)
-    return return_error(new Error('function_group_name is required'));
-
   const functionGroupName = function_group_name.toUpperCase();
   const client = createAdtClient(connection, logger);
 

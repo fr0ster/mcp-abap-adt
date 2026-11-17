@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
@@ -11,7 +12,6 @@ import {
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 import type { XmlList, XmlNode, XmlRead } from '../../../lib/xml/tree';
 
 /**
@@ -46,7 +46,9 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
-    sql_query: z.string().describe('SQL query to execute'),
+    sql_query: requiredText('SQL query is required').describe(
+      'SQL query to execute',
+    ),
     row_number: z
       .number()
       .default(100)
@@ -62,10 +64,6 @@ export async function handleGetSqlQuery(
 ) {
   const { connection, logger } = context;
   logger?.info('handleGetSqlQuery called');
-
-  if (!args?.sql_query) {
-    return return_error('SQL query is required');
-  }
 
   const sqlQuery = args.sql_query;
   const rowNumber = args.row_number || 100; // Default to 100 rows if not specified

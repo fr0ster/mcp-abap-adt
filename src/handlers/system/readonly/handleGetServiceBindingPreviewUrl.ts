@@ -50,6 +50,7 @@ import {
   requestThrownEntry,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withoutTrailing } from '../../../lib/plainText';
 import {
@@ -74,7 +75,6 @@ import {
   serviceBindingFactsOf,
 } from '../../../lib/strategies/serviceBindingFacts';
 import { atStep, withStep } from '../../../lib/strategies/step';
-import { return_error } from '../../../lib/utils';
 import { wireValueOf } from '../../../lib/wireValue';
 
 /** The resource `getSystemInformation` reads. */
@@ -162,7 +162,9 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the active binding for the service, version and protocol, and the active service definition for the entity sets; the preview URL needs an entity set, and the answer names what is missing. For a published binding it also reads the $metadata of the service once and answers live: true when the service answers 200, or live: false with the status (live_status) and the words (live_text) SAP answered — on ABAP Cloud a publication is a background job of SAP, and the service answers 403, blocked by UCON, until that job ends. A Web API binding answers the service URLs alone. Over RFC, the URLs are answered as their paths and query, to prefix with the HTTP origin of the system.',
   inputSchema: z.object({
-    service_binding_name: z.string().describe('Service binding name.'),
+    service_binding_name: requiredText(
+      'service_binding_name is required',
+    ).describe('Service binding name.'),
     entity_set: z
       .string()
       .optional()
@@ -202,9 +204,6 @@ export async function handleGetServiceBindingPreviewUrl(
 ) {
   const { connection, logger } = context;
   const { service_binding_name } = args;
-  if (!service_binding_name)
-    return return_error(new Error('service_binding_name is required'));
-
   const bindingName = service_binding_name.trim().toUpperCase();
   const adt = createAdtClient(connection, logger);
   const binding = adt.getServiceBinding(resultsFor(serviceDocuments));

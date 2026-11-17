@@ -21,6 +21,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import * as z from 'zod';
 import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
 import { longToolInTheCall } from '../../../src/lib/backgroundRuns/tools';
@@ -822,12 +823,20 @@ function fakeGroup(connection: IAbapConnection | null): IHandlerGroup & {
     getHandlers(): HandlerEntry[] {
       return [
         {
-          toolDefinition: { name: 'WithContext', description: 'd' } as never,
+          toolDefinition: {
+            name: 'WithContext',
+            description: 'd',
+            inputSchema: z.object({}),
+          },
           call: async (_context: HandlerContext, _args: unknown) =>
             reported(seen()),
         },
         {
-          toolDefinition: { name: 'Closure', description: 'd' } as never,
+          toolDefinition: {
+            name: 'Closure',
+            description: 'd',
+            inputSchema: z.object({}),
+          },
           call: async (context: HandlerContext, _args: unknown) =>
             reported({ ...seen(), connection: context.connection }),
         },

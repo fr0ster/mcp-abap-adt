@@ -6,11 +6,9 @@
  * argument of another action among them — is dropped. The action alone picks
  * the tool.
  *
- * The same check runs before the call takes a connection
- * (`systemArgumentsRefusal`, the entry's `refusesArguments`): a missing
- * required argument is refused in the target's words with `background`
- * true or false, with or without a fresh-connection factory — no
- * connection opened, no run started, nothing sent.
+ * `HandlerSystem`'s own schema checks each action's arguments with its
+ * target's schema (`compactSystemSchemaFor`), so a refused call is refused
+ * before dispatch, on every path: no connection, no run, nothing sent.
  *
  * `background` is `HandlerSystem`'s own: the server decides it at the
  * dispatch (a listed long tool), and the target's call runs inside that run
@@ -22,11 +20,8 @@ import {
   type SystemAction,
 } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  argumentsRefusalOf,
   defineTool,
   type HandlerContext,
-  type HandlerEntry,
-  invalidArgumentsWords,
   type ToolArgs,
   type ToolResultLike,
 } from '@mcp-abap-adt/lib/handlers';
@@ -39,9 +34,7 @@ import {
   handleListTransports,
   handleSearchObject,
   handleSearchSource,
-  packageTreeArgumentsRefusal,
   READ_DEFINITIONS,
-  whereUsedArgumentsRefusal,
 } from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 
@@ -72,51 +65,6 @@ const SYSTEM_TARGETS = {
 } as const satisfies Readonly<Record<SystemAction, SystemTarget>>;
 
 type HandlerSystemArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
-
-/** One action's arguments refused without the call: its target's refusal. */
-type SystemRefusal = (args: ToolArgs) => Error | undefined;
-
-/**
- * Each action's refusal of its arguments, its target's own: the full
- * tool's schema, then the rules its handler checks before it reads.
- */
-const SYSTEM_REFUSALS = {
-  search_source: argumentsRefusalOf(D.SearchSource),
-  search_object: argumentsRefusalOf(D.SearchObject),
-  where_used: argumentsRefusalOf(D.GetWhereUsed, whereUsedArgumentsRefusal),
-  package_tree: argumentsRefusalOf(
-    D.GetPackageTree,
-    packageTreeArgumentsRefusal,
-  ),
-  transports: argumentsRefusalOf(D.ListTransports),
-  atc_findings: argumentsRefusalOf(D.GetATCFindings),
-  atc_results: argumentsRefusalOf(D.ListATCResults),
-  atc_result: argumentsRefusalOf(D.GetATCResult),
-} as const satisfies Readonly<Record<SystemAction, SystemRefusal>>;
-
-/**
- * The refusal a `HandlerSystem` call of `args` answers, read before the
- * call takes a connection: `HandlerSystem`'s own schema, then the action's
- * target's (`undefined`: none).
- */
-export function systemArgumentsRefusal(args: ToolArgs): Error | undefined {
-  const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
-  if (!parsed.success) {
-    return new Error(
-      invalidArgumentsWords(TOOL_DEFINITION.name, parsed.error.issues),
-    );
-  }
-  const { action, background: _background, ...given } = parsed.data;
-  return SYSTEM_REFUSALS[action](given);
-}
-
-/** `HandlerSystem`'s entry: its call, and its arguments' refusal before it. */
-export function handlerSystemEntry(): HandlerEntry {
-  return {
-    ...defineTool(TOOL_DEFINITION, handleHandlerSystem),
-    refusesArguments: systemArgumentsRefusal,
-  };
-}
 
 /**
  * The call of `args.action`'s target among `targets`, with the call's

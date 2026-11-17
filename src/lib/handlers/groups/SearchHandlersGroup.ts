@@ -5,7 +5,6 @@ import {
 import {
   TOOL_DEFINITION as GetObjectsList_Tool,
   handleGetObjectsList,
-  objectsListArgumentsRefusal,
 } from '../../../handlers/search/readonly/handleGetObjectsList';
 // Import search handlers
 // Import TOOL_DEFINITION from handlers
@@ -35,11 +34,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
       defineTool(SearchObject_Tool, handleSearchObject),
       defineTool(SearchSource_Tool, handleSearchSource),
       // Dynamic import handlers
-      defineTool(
-        GetObjectsList_Tool,
-        handleGetObjectsList,
-        objectsListArgumentsRefusal,
-      ),
+      defineTool(GetObjectsList_Tool, handleGetObjectsList),
       defineTool(GetObjectsByType_Tool, handleGetObjectsByType),
     ];
   }

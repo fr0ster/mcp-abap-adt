@@ -11,12 +11,12 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
 import {
-  argumentsRefusalOf,
   defineTool,
   type HandlerContext,
-  type HandlerEntry,
-  invalidArgumentsWords,
+  schemaOn as schemaOnVariant,
+  type ToolDefinition,
   variantOf,
+  withInCallSchema,
 } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetActivationResults,
@@ -40,24 +40,42 @@ import {
 import { hasSourcePart, partsFor, routeCompactPart } from './compactPartRoutes';
 import { routeCompactRead } from './compactReadRoutes';
 
+/** HandlerGet's fields on `variant`, before its rules. */
+function fieldsOn(variant: AbapSystemKind) {
+  return compactGetSchemaWithNamesFor(
+    COMPACT_READ[variant],
+    COMPACT_MAIN_PROGRAMS[variant],
+    undefined,
+    COMPACT_READ[variant],
+    HANDLER_GET_DRAFT_TYPES[variant],
+  );
+}
+
+/** The call's arguments, as HandlerGet's schema parses them. */
+type HandlerGetGiven = z.output<ReturnType<typeof fieldsOn>>;
+
+/** HandlerGet's schema on `variant`, its in-the-call twin beside it. */
+function schemaOn(variant: AbapSystemKind) {
+  const fields = fieldsOn(variant);
+  const rules = handlerGetRules(variant);
+  return withInCallSchema(
+    fields.superRefine(rules),
+    fields.omit({ background: true }).superRefine(rules),
+  );
+}
+
 export const TOOL_DEFINITION = {
   name: 'HandlerGet',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description: compactGetDescription(variant),
-    inputSchema: compactGetSchemaWithNamesFor(
-      COMPACT_READ[variant],
-      COMPACT_MAIN_PROGRAMS[variant],
-      undefined,
-      COMPACT_READ[variant],
-      HANDLER_GET_DRAFT_TYPES[variant],
-    ),
+    inputSchema: schemaOn(variant),
     members: COMPACT_READ[variant],
   })),
+  // No variant stated: the fields alone, the members' rules unread (the
+  // call refuses `system_type_required`).
+  inputSchema: fieldsOn('onprem'),
 } as const;
-
-/** The call's arguments, as HandlerGet's schema parses them. */
-type HandlerGetGiven = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /** The arguments past the boundary of object_type: the member it names. */
 type HandlerGetArgs = Omit<HandlerGetGiven, 'object_type'> & {
@@ -260,14 +278,14 @@ export async function handleHandlerGet(
 /** A variant the compact read tables are stated on. */
 type AbapSystemKind = keyof typeof COMPACT_READ;
 
-/** The address parts' refusals: each target's schema, on the arguments it is handed. */
+/** The address parts' targets' schemas, on the arguments each is handed. */
 const ADDRESS_REFUSALS = {
-  virtual_folders: argumentsRefusalOf(READ_DEFINITIONS.GetVirtualFoldersLow),
-  node_structure: argumentsRefusalOf(READ_DEFINITIONS.GetNodeStructureLow),
-  object_structure: argumentsRefusalOf(READ_DEFINITIONS.GetObjectStructure),
-} as const satisfies Readonly<Record<string, RouteRefusal>>;
+  virtual_folders: READ_DEFINITIONS.GetVirtualFoldersLow,
+  node_structure: READ_DEFINITIONS.GetNodeStructureLow,
+  object_structure: READ_DEFINITIONS.GetObjectStructure,
+} as const;
 
-/** The refusals of `part`'s route on `variant`, by object type. */
+/** The routes' target rules of `part` on `variant`, by object type. */
 function partRefusals(
   part: string,
   variant: AbapSystemKind,
@@ -280,92 +298,111 @@ function partRefusals(
 }
 
 /**
- * The refusal a `HandlerGet` call of `args` answers, read before the call
- * takes a connection (`undefined`: none): the same steps as
- * `handleHandlerGet` — its schema, the member on `variant`, the part, the
- * function module's address, the route — then the route's target's
- * refusal, all in the words the call answers. Without a stated `variant`
- * only the schema is checked: the call refuses the rest. The run modes
- * (`activation_status`, `activation_results`) are the call's.
+ * HandlerGet's rules on `variant`, its schema's: the same steps as
+ * `handleHandlerGet` — the member, the part, the function module's
+ * address, the route — then the route's target's own schema, each refusal
+ * in the words the call answered. The run modes (`activation_status`,
+ * `activation_results`) are their targets' to check.
  */
-export function getArgumentsRefusal(
-  args: ToolArgs,
-  variant?: AbapSystemKind,
-): Error | undefined {
-  const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
-  if (!parsed.success) {
-    return new Error(
-      invalidArgumentsWords(TOOL_DEFINITION.name, parsed.error.issues),
-    );
-  }
-  if (variant === undefined) return undefined;
-  const given = parsed.data;
-  let read: HandlerGetArgs;
-  if (given.object_type) {
-    const member = acceptedOf(given.object_type, COMPACT_READ[variant]);
-    if (member === undefined) {
-      return new Error(
-        `Unsupported read for object_type: ${given.object_type}. ${supported(COMPACT_READ[variant])}`,
-      );
+function handlerGetRules(variant: AbapSystemKind) {
+  return (given: HandlerGetGiven, ctx: z.RefinementCtx): void => {
+    const refuse = (message: string, path: string) =>
+      ctx.addIssue({ code: 'custom', message, path: [path] });
+    let read: HandlerGetArgs;
+    if (given.object_type) {
+      const member = acceptedOf(given.object_type, COMPACT_READ[variant]);
+      if (member === undefined) {
+        refuse(
+          `Unsupported read for object_type: ${given.object_type}. ${supported(COMPACT_READ[variant])}`,
+          'object_type',
+        );
+        return;
+      }
+      read = { ...given, object_type: member };
+    } else {
+      read = { ...given, object_type: undefined };
     }
-    read = { ...given, object_type: member };
-  } else {
-    read = { ...given, object_type: undefined };
-  }
-  const part = read.part ?? 'source';
-  if (
-    part === 'object_structure' ||
-    part === 'node_structure' ||
-    part === 'virtual_folders'
-  ) {
-    const address = addressReadOf(part, read);
-    return 'refusal' in address
-      ? new Error(address.refusal)
-      : ADDRESS_REFUSALS[address.target](address.args);
-  }
-  if (part === 'activation_status' || part === 'activation_results') {
-    return undefined;
-  }
-  const objectType = read.object_type;
-  if (!objectType) return new Error('object_type is required');
-  let routed = { ...read, object_type: objectType };
-  if (
-    objectType === 'FUNCTION_MODULE' &&
-    (part === 'source' || part === 'metadata' || part === 'draft')
-  ) {
-    const named = functionModuleArgs(routed);
-    if (!named.ok) return new Error(named.refusal);
-    routed = named.args;
-  }
-  const hasSource = hasSourcePart(objectType);
-  if (part === 'source') {
-    const offered = partsFor(objectType, false, variant);
-    if (!hasSource && offered.length > 0) {
-      return new Error(
-        `part=source is not available for object_type=${objectType}. ` +
-          `It offers: ${offered.join(', ')}.`,
-      );
+    const part = read.part ?? 'source';
+    if (
+      part === 'object_structure' ||
+      part === 'node_structure' ||
+      part === 'virtual_folders'
+    ) {
+      const address = addressReadOf(part, read);
+      if ('refusal' in address) {
+        refuse(address.refusal, 'part');
+        return;
+      }
+      targetRule(ADDRESS_REFUSALS[address.target], address.args, variant, ctx);
+      return;
     }
-    const refusal = SOURCE_REFUSALS[objectType];
-    return refusal === undefined
-      ? new Error(`Unsupported get for object_type: ${objectType}`)
-      : refusal(routed);
-  }
-  const refusal = partRefusals(part, variant)[objectType];
-  if (refusal === undefined) {
-    const offered = partsFor(objectType, hasSource, variant);
-    return new Error(
-      `part=${part} is not available for object_type=${objectType}. ` +
-        `It offers: ${offered.length === 0 ? 'nothing' : offered.join(', ')}.`,
-    );
-  }
-  return refusal(routed);
+    if (part === 'activation_status' || part === 'activation_results') {
+      return;
+    }
+    const objectType = read.object_type;
+    if (!objectType) {
+      refuse('object_type is required', 'object_type');
+      return;
+    }
+    let routed = { ...read, object_type: objectType };
+    if (
+      objectType === 'FUNCTION_MODULE' &&
+      (part === 'source' || part === 'metadata' || part === 'draft')
+    ) {
+      const named = functionModuleArgs(routed);
+      if (!named.ok) {
+        refuse(named.refusal, 'function_module_name');
+        return;
+      }
+      routed = named.args;
+    }
+    const hasSource = hasSourcePart(objectType);
+    if (part === 'source') {
+      const offered = partsFor(objectType, false, variant);
+      if (!hasSource && offered.length > 0) {
+        refuse(
+          `part=source is not available for object_type=${objectType}. ` +
+            `It offers: ${offered.join(', ')}.`,
+          'part',
+        );
+        return;
+      }
+      const rule = SOURCE_REFUSALS[objectType];
+      if (rule === undefined) {
+        refuse(`Unsupported get for object_type: ${objectType}`, 'object_type');
+        return;
+      }
+      rule(routed, variant, ctx);
+      return;
+    }
+    const rule = partRefusals(part, variant)[objectType];
+    if (rule === undefined) {
+      const offered = partsFor(objectType, hasSource, variant);
+      refuse(
+        `part=${part} is not available for object_type=${objectType}. ` +
+          `It offers: ${offered.length === 0 ? 'nothing' : offered.join(', ')}.`,
+        'part',
+      );
+      return;
+    }
+    rule(routed, variant, ctx);
+  };
 }
 
-/** `HandlerGet`'s entry: its call, and its arguments' refusal before it. */
-export function handlerGetEntry(): HandlerEntry {
-  return {
-    ...defineTool(TOOL_DEFINITION, handleHandlerGet),
-    refusesArguments: getArgumentsRefusal,
-  };
+/** `definition`'s schema on the arguments an address part hands it. */
+function targetRule(
+  definition: ToolDefinition,
+  args: ToolArgs,
+  variant: AbapSystemKind,
+  ctx: z.RefinementCtx,
+): void {
+  const parsed = schemaOnVariant(definition, variant).safeParse(args);
+  if (parsed.success) return;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `${definition.name}: ${issue.message}`,
+      path: issue.path,
+    });
+  }
 }

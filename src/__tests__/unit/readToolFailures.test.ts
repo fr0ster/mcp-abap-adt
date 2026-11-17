@@ -15,7 +15,6 @@ import type {
   IAdtError,
   IIncludeConfig,
 } from '@mcp-abap-adt/interfaces-adt';
-import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
@@ -471,15 +470,6 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
 });
 
 describe('GetTransport / GetIncludesList: a missing argument', () => {
-  /** How a compliant read answers its missing argument. */
-  const compliant = () =>
-    handleGetClass(
-      { connection: {} as any, logger: undefined } as any,
-      {
-        class_name: '',
-      } as any,
-    );
-
   it('is answered in the shape a compliant read answers its own, before any request', async () => {
     const shape = (result: any) => ({
       isError: result.isError,
@@ -495,8 +485,8 @@ describe('GetTransport / GetIncludesList: a missing argument', () => {
       { connection: {} as any, logger: undefined } as any,
       { object_type: 'PROG/P' },
     );
-    const reference = shape(await compliant());
-    expect(reference).toEqual({ isError: true, types: ['text'] });
+    // A read's own refusal of a missing argument: one text, isError.
+    const reference = { isError: true, types: ['text'] };
     expect(shape(transport)).toEqual(reference);
     expect(shape(includes)).toEqual(reference);
     expect(transport.content[0].text).toBe('Transport number is required');

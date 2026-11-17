@@ -24,13 +24,19 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
+import {
+  DUMP_FILTERS,
+  dumpFiltersRefusal,
+  isOperand,
+} from '../../../lib/dumpFilters';
+import { withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type JsonValue, jsonOrText } from '../../../lib/json';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { afterLast, isBlank } from '../../../lib/plainText';
+import { afterLast } from '../../../lib/plainText';
 import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
@@ -54,115 +60,129 @@ type FeedPageAnswer<T> = {
   incomplete_second?: string;
 };
 
+/** RuntimeListFeeds's arguments but `background`. */
+const FIELDS = {
+  feed_type: z
+    .enum([
+      'descriptors',
+      'variants',
+      'dumps',
+      'system_messages',
+      'gateway_errors',
+    ])
+    .optional()
+    .describe(
+      'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
+    ),
+  feed_types: z
+    .array(
+      z.enum([
+        'descriptors',
+        'variants',
+        'dumps',
+        'system_messages',
+        'gateway_errors',
+      ]),
+    )
+    .optional()
+    .describe(
+      'Several feeds, read together with the same filters (give this or feed_type).',
+    ),
+  user: z
+    .string()
+    .optional()
+    .describe('Entries of this SAP user (exact match).'),
+  runtime_error: z
+    .string()
+    .optional()
+    .describe('Dumps whose runtime error contains this text, in any case.'),
+  exception: z
+    .string()
+    .optional()
+    .describe('Dumps whose exception class contains this text, in any case.'),
+  object_name: z
+    .string()
+    .optional()
+    .describe(
+      'Dumps whose terminated object name contains this text, in any case.',
+    ),
+  package: z
+    .string()
+    .optional()
+    .describe('Dumps whose object package contains this text, in any case.'),
+  component: z
+    .string()
+    .optional()
+    .describe(
+      'Dumps whose application component contains this text, in any case.',
+    ),
+  max_results: z
+    .number()
+    .optional()
+    .describe(
+      `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
+    ),
+  from: z
+    .string()
+    .optional()
+    .describe('Start of time range in YYYYMMDDHHMMSS format.'),
+  to: z
+    .string()
+    .optional()
+    .describe(
+      'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
+    ),
+};
+
+/**
+ * One feed (`feed_type`, by default the descriptors) or a non-empty
+ * `feed_types` alone; for one feed, the dumps filters only on the dumps
+ * feed, each a single operand.
+ */
+function oneFeedForm(
+  args: {
+    feed_type?: string | undefined;
+    feed_types?: readonly string[] | undefined;
+    user?: string | undefined;
+    runtime_error?: string | undefined;
+    exception?: string | undefined;
+    object_name?: string | undefined;
+    package?: string | undefined;
+    component?: string | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const refuse = (message: string, path: string) =>
+    ctx.addIssue({ code: 'custom', message, path: [path] });
+  if (args.feed_types !== undefined) {
+    if (args.feed_type !== undefined || args.feed_types.length === 0) {
+      refuse(
+        'Give exactly one of feed_type or feed_types (a non-empty list of feed types).',
+        'feed_types',
+      );
+    }
+    return;
+  }
+  const feedType = args.feed_type ?? 'descriptors';
+  const refused = dumpFiltersRefusal(feedType, args);
+  if (refused !== undefined) refuse(refused.words, refused.path);
+}
+
 export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
     '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
   ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    feed_type: z
-      .enum([
-        'descriptors',
-        'variants',
-        'dumps',
-        'system_messages',
-        'gateway_errors',
-      ])
-      .optional()
-      .describe(
-        'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
-      ),
-    feed_types: z
-      .array(
-        z.enum([
-          'descriptors',
-          'variants',
-          'dumps',
-          'system_messages',
-          'gateway_errors',
-        ]),
-      )
-      .optional()
-      .describe(
-        'Several feeds, read together with the same filters (give this or feed_type).',
-      ),
-    user: z
-      .string()
-      .optional()
-      .describe('Entries of this SAP user (exact match).'),
-    runtime_error: z
-      .string()
-      .optional()
-      .describe('Dumps whose runtime error contains this text, in any case.'),
-    exception: z
-      .string()
-      .optional()
-      .describe('Dumps whose exception class contains this text, in any case.'),
-    object_name: z
-      .string()
-      .optional()
-      .describe(
-        'Dumps whose terminated object name contains this text, in any case.',
-      ),
-    package: z
-      .string()
-      .optional()
-      .describe('Dumps whose object package contains this text, in any case.'),
-    component: z
-      .string()
-      .optional()
-      .describe(
-        'Dumps whose application component contains this text, in any case.',
-      ),
-    max_results: z
-      .number()
-      .optional()
-      .describe(
-        `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
-      ),
-    from: z
-      .string()
-      .optional()
-      .describe('Start of time range in YYYYMMDDHHMMSS format.'),
-    to: z
-      .string()
-      .optional()
-      .describe(
-        'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
-      ),
-  }),
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(oneFeedForm),
+    z.object(FIELDS).superRefine(oneFeedForm),
+  ),
 } as const;
 
 type RuntimeListFeedsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
-
-/**
- * The dumps feed's filters and the attribute and operator each one is sent
- * as. The attributes are the ones the feed's descriptor declares
- * (`GET /sap/bc/adt/feeds`, `feed:queryAttribute`); `user` offers `equals`
- * and `notEquals` only, the others `contains` as well.
- */
-const DUMP_FILTERS = [
-  ['user', 'user', 'equals'],
-  ['runtime_error', 'runtimeError', 'contains'],
-  ['exception', 'exception', 'contains'],
-  ['object_name', 'objectName', 'contains'],
-  ['package', 'package', 'contains'],
-  ['component', 'component', 'contains'],
-] as const;
-
-/**
- * A value is written into the expression as it stands, so what would end an
- * operand — a blank, a comma, a parenthesis — is refused rather than sent.
- */
-function isOperand(value: string): boolean {
-  if (value.length === 0) return false;
-  for (const character of value) {
-    if (isBlank(character) || ',()'.includes(character)) return false;
-  }
-  return true;
-}
 
 /**
  * The dumps feed's `$query` for the filters given — `and ( … )` of one
@@ -219,16 +239,9 @@ async function feedsOf(
 
   const ctx = { tool: 'RuntimeListFeeds', detail: 'terse' as const };
 
-  const dumpOnly = DUMP_FILTERS.filter(
-    ([param]) => param !== 'user' && args?.[param]?.trim(),
-  ).map(([param]) => param);
-  if (feedType !== 'dumps' && dumpOnly.length > 0) {
-    return return_error(
-      new Error(
-        `${dumpOnly.join(', ')} filter the dumps feed; feed_type is ${feedType}.`,
-      ),
-    );
-  }
+  // A feed of a `feed_types` list answers the refusal as its own entry.
+  const refused = dumpFiltersRefusal(feedType, args);
+  if (refused !== undefined) return return_error(new Error(refused.words));
 
   let query: string | undefined;
   try {
@@ -402,33 +415,9 @@ export async function handleRuntimeListFeedPage(
   const { connection, logger } = context;
   const feedType = args?.feed_type ?? 'dumps';
   const step = PAGE_FEEDS[feedType];
-  if (!step) {
-    return return_error(new Error(`Unknown feed_type: ${String(feedType)}`));
-  }
+  // `HandlerDumpList`'s schema holds the rules: `top` one page at most, the
+  // dumps filters on the dumps feed alone, each one operand.
   const top = args?.top;
-  if (
-    top !== undefined &&
-    (typeof top !== 'number' ||
-      !Number.isInteger(top) ||
-      top < 1 ||
-      top > FEED_PAGE_CAP)
-  ) {
-    return return_error(
-      new Error(
-        `top must be a whole number from 1 to ${FEED_PAGE_CAP}, the most entries SAP answers in one request; read on with the next_to of the answer as to.`,
-      ),
-    );
-  }
-  const dumpOnly = DUMP_FILTERS.filter(
-    ([param]) => param !== 'user' && args?.[param]?.trim(),
-  ).map(([param]) => param);
-  if (feedType !== 'dumps' && dumpOnly.length > 0) {
-    return return_error(
-      new Error(
-        `${dumpOnly.join(', ')} filter the dumps feed; feed_type is ${feedType}.`,
-      ),
-    );
-  }
   let query: string | undefined;
   try {
     query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
@@ -718,17 +707,7 @@ export async function handleRuntimeListFeeds(
       () => feedsOf(context, args),
     );
   }
-  if (
-    args.feed_type !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0
-  ) {
-    return return_error(
-      new Error(
-        'Give exactly one of feed_type or feed_types (a non-empty list of feed types).',
-      ),
-    );
-  }
+  // The schema holds the rule: one feed, or a non-empty `feed_types`.
   const { feed_types: _list, ...rest } = args;
   const single = (
     feedType: RuntimeListFeedsArgs['feed_type'],

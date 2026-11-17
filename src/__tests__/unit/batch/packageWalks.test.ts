@@ -20,9 +20,18 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
-import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
-import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
+import {
+  TOOL_DEFINITION as GetPackageContents,
+  handleGetPackageContents,
+} from '../../../handlers/package/readonly/handleGetPackageContents';
+import {
+  TOOL_DEFINITION as GetObjectsList,
+  handleGetObjectsList,
+} from '../../../handlers/search/readonly/handleGetObjectsList';
+import {
+  TOOL_DEFINITION as GetPackageTree,
+  handleGetPackageTree,
+} from '../../../handlers/system/high/handleGetPackageTree';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -36,6 +45,7 @@ import {
   type SeenEnvelope,
   statusError,
 } from '../../helpers/batchEnvelope';
+import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -572,18 +582,16 @@ describe('GetPackageContents', () => {
     expect(fake.directs).toHaveLength(1);
   });
 
-  it('a missing single argument keeps its words; both given is refused', async () => {
-    const both = await handleGetPackageContents(contextOn(system()), {
-      package_name: 'ZROOT_A',
-      package_names: ['ZROOT_B'],
-    });
-    const none = await handleGetPackageContents(contextOn(system()), {});
-    expect((both as { isError?: boolean }).isError).toBe(true);
-    expect(textOf(both)).toContain(
-      'Give exactly one of package_name or package_names',
+  it('a missing single argument keeps its words; both given is refused, by the schema', () => {
+    expect(
+      schemaWords(GetPackageContents, {
+        package_name: 'ZROOT_A',
+        package_names: ['ZROOT_B'],
+      }),
+    ).toContain('Give exactly one of package_name or package_names');
+    expect(schemaWords(GetPackageContents, {})).toContain(
+      'Package name is required',
     );
-    expect((none as { isError?: boolean }).isError).toBe(true);
-    expect(textOf(none)).toContain('Package name is required');
   });
 });
 
@@ -1194,20 +1202,22 @@ describe('GetObjectsList: the cache', () => {
 });
 
 describe('the single arguments keep their words', () => {
-  it('GetPackageTree without a package', async () => {
-    const result = await handleGetPackageTree(contextOn(system()), {
-      package_name: '',
-    });
-    expect(textOf(result)).toContain('package_name is required');
+  it('GetPackageTree without a package: its schema', () => {
+    expect(schemaWords(GetPackageTree, { package_name: '' })).toContain(
+      'package_name is required',
+    );
   });
 
-  it('GetObjectsList: objects beside a single parent field is refused', async () => {
+  it('GetObjectsList: objects beside a single parent field is refused by its schema', () => {
     for (const field of ['parent_name', 'parent_type', 'parent_tech_name']) {
-      const result = await handleGetObjectsList(contextOn(system()), {
-        objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
-        [field]: 'ZPROG_X',
-      });
-      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(
+        schemaWords(GetObjectsList, {
+          objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
+          [field]: 'ZPROG_X',
+        }),
+      ).toContain(
+        'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
+      );
     }
   });
 });

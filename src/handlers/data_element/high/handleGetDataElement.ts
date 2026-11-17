@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
@@ -8,7 +9,6 @@ import {
 } from '../../../lib/handlers/readVersion';
 import { readDataElementMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetDataElement',
@@ -16,7 +16,9 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Reads the ABAP data element named by data_element_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: z.object({
-    data_element_name: z.string().describe('Data element name.'),
+    data_element_name: requiredText('data_element_name is required').describe(
+      'Data element name.',
+    ),
     version: READ_VERSION_FIELD,
   }),
 } as const;
@@ -29,9 +31,6 @@ export async function handleGetDataElement(
 ) {
   const { connection, logger } = context;
   const { data_element_name, version = 'active' } = args;
-  if (!data_element_name)
-    return return_error(new Error('data_element_name is required'));
-
   const dataElementName = data_element_name.toUpperCase();
   const client = createAdtClient(connection, logger);
 

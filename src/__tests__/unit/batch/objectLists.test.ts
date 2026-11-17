@@ -16,7 +16,10 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
+import {
+  TOOL_DEFINITION as DESCRIBE_BY_LIST,
+  handleDescribeByList,
+} from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import {
@@ -27,6 +30,7 @@ import {
   type SeenEnvelope,
   statusError,
 } from '../../helpers/batchEnvelope';
+import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -726,12 +730,9 @@ describe('DescribeByList', () => {
     ]);
   });
 
-  it('no objects: the parameter error, nothing sent', async () => {
-    const fake = system();
-    await expect(
-      handleDescribeByList(contextOn(fake), { objects: [] }),
-    ).rejects.toThrow('objects (array) is required');
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(0);
+  it('no objects: the parameter error, by the schema', () => {
+    expect(schemaWords(DESCRIBE_BY_LIST, { objects: [] })).toContain(
+      'objects (array) is required',
+    );
   });
 });

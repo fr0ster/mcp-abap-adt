@@ -27,8 +27,12 @@ jest.mock('@mcp-abap-adt/lib/handlers/read', () => {
   };
 });
 
+import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
-import { handleHandlerGetData } from '../handlers/handleHandlerGetData';
+import {
+  TOOL_DEFINITION as GetData_Tool,
+  handleHandlerGetData,
+} from '../handlers/handleHandlerGetData';
 
 // The process declares its system type, as every launcher requires: the
 // type argument is checked against the declared variant's projection.
@@ -72,9 +76,10 @@ describe('HandlerGetData', () => {
     ]);
   });
 
-  it('refuses with neither, asking nothing', async () => {
-    const answered: any = await handleHandlerGetData(context, {});
-    expect(answered.isError).toBe(true);
+  it('refuses with neither, asking nothing: its schema holds the rule', async () => {
+    await expect(
+      defineTool(GetData_Tool, handleHandlerGetData).call(context, {}),
+    ).rejects.toThrow('object_name or sql_query is required');
     expect(calls).toHaveLength(0);
   });
 });

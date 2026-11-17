@@ -3,6 +3,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_PART_FIELD,
@@ -31,7 +32,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: `[read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
-    program_name: z.string().describe('Program name.'),
+    program_name: requiredText('program_name is required').describe(
+      'Program name.',
+    ),
     part: READ_PART_FIELD,
     version: READ_VERSION_FIELD,
     ...SOURCE_RANGE_SHAPE,
@@ -46,7 +49,6 @@ export async function handleGetProgram(
 ) {
   const { connection, logger } = context;
   const { program_name, version = 'active' } = args;
-  if (!program_name) return return_error(new Error('program_name is required'));
   const part = readPartOf(args.part);
   const range = sourceRangeOf(args, part);
   if (range instanceof Error) return return_error(range);

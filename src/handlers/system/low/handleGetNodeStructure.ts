@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
  * GetNodeStructure Handler - Low-level handler for node structure
@@ -84,10 +85,12 @@ export const TOOL_DEFINITION = {
   description:
     '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery.',
   inputSchema: z.object({
-    parent_type: z
-      .string()
-      .describe('Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")'),
-    parent_name: z.string().describe('Parent object name'),
+    parent_type: requiredText('parent_type is required').describe(
+      'Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")',
+    ),
+    parent_name: requiredText('parent_name is required').describe(
+      'Parent object name',
+    ),
     node_id: z
       .string()
       .default('000000')
@@ -165,12 +168,6 @@ async function nodeStructure(
   const { connection, logger } = context;
   const { parent_type, parent_name, node_id, with_short_descriptions } = args;
 
-  if (!parent_type) {
-    return return_error(new Error('parent_type is required'));
-  }
-  if (!parent_name) {
-    return return_error(new Error('parent_name is required'));
-  }
   const variant = variantOf(connection);
   const parentType = tableTypeOf(parent_type, variant);
   if (parentType === undefined) {

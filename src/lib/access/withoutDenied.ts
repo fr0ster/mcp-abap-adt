@@ -7,17 +7,18 @@
  * denied, nothing changes: the same groups and entries.
  */
 import type { ProjectionVariant } from '../adtProjections.js';
+import { systemKindOf } from '../connectionFactory.js';
+import { withRulesOf } from '../handlers/argumentRules.js';
 import { BaseHandlerGroup } from '../handlers/base/BaseHandlerGroup.js';
 import {
   type HandlerEntry,
   type IHandlerGroup,
   invalidArgumentsWords,
   type SapEnvironment,
-  type ToolArgs,
+  schemaOn,
   type ToolDefinition,
   type VariantToolDefinition,
 } from '../handlers/interfaces.js';
-import type { AbapSystemKind } from '../systemKind.js';
 import {
   type DeniedActions,
   type DeniedEntry,
@@ -122,8 +123,18 @@ function narrowed(
   const onprem = leftOn(narrowing, 'onprem', entries);
   const cloud = leftOn(narrowing, 'cloud', entries);
   if (onprem.empty && cloud.empty) return undefined;
-  const stated = (variant: ProjectionVariant, left: LeftOn) =>
-    narrowing.definition(variant, left.values, left.codes);
+  // The narrowed listing keeps the tool's own rules on that variant (its
+  // routes' checks, `HandlerGet`'s), where its builder states none.
+  const stated = (variant: ProjectionVariant, left: LeftOn) => {
+    const narrowed = narrowing.definition(variant, left.values, left.codes);
+    return {
+      ...narrowed,
+      inputSchema: withRulesOf(
+        schemaOn(entry.toolDefinition, variant),
+        narrowed.inputSchema,
+      ),
+    };
+  };
   const variants: { readonly [V in ProjectionVariant]: VariantToolDefinition } =
     { onprem: stated('onprem', onprem), cloud: stated('cloud', cloud) };
   const emptyOn = new Set(
@@ -142,31 +153,20 @@ function narrowed(
     ...(entry.toolDefinition.variants !== undefined ? { variants } : {}),
   };
   const original = entry.call;
-  const refuses = entry.refusesArguments;
   return {
     ...entry,
     toolDefinition,
-    // Before the call takes a connection: the narrowed schema first, then
-    // the original refusal of what it parsed.
-    ...(refuses !== undefined
-      ? {
-          refusesArguments: (args: ToolArgs, variant?: AbapSystemKind) => {
-            const parsed = own.inputSchema.safeParse(args);
-            return parsed.success
-              ? refuses(parsed.data, variant)
-              : new Error(
-                  invalidArgumentsWords(
-                    entry.toolDefinition.name,
-                    parsed.error.issues,
-                  ),
-                );
-          },
-        }
-      : {}),
     // The narrowed schema is the one check of the call's arguments: a
     // property it dropped (`sql_query`) never reaches the original call.
     call: async (context, args) => {
-      const parsed = own.inputSchema.safeParse(args);
+      // The narrowed schema of the connection's variant: the rules of its
+      // type lists too.
+      const parsed = schemaOn(
+        toolDefinition,
+        toolDefinition.variants === undefined
+          ? undefined
+          : systemKindOf(context.connection),
+      ).safeParse(args);
       if (!parsed.success) {
         throw new Error(
           invalidArgumentsWords(entry.toolDefinition.name, parsed.error.issues),

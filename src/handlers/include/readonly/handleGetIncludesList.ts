@@ -36,6 +36,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AnswerObject,
@@ -74,10 +75,57 @@ export const TOOL_DEFINITION = {
   })),
 } as const;
 
-/** GetIncludesList's input on `variant`. */
+/** GetIncludesList's input on `variant`, its in-the-call twin beside it. */
 function includesListSchema(variant: ProjectionVariant) {
-  return z.object({
-    background: LONG_BACKGROUND_FIELD,
+  const fields = includesListFields(variant);
+  return withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...fields })
+      .superRefine(oneIncludesForm),
+    z.object(fields).superRefine(oneIncludesForm),
+  );
+}
+
+/**
+ * One object — `object_name`, not blank, with `object_type` — or a
+ * non-empty `objects` alone.
+ */
+function oneIncludesForm(
+  args: {
+    object_name?: string | undefined;
+    object_type?: string | undefined;
+    objects?: readonly object[] | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const refuse = (message: string, path: string) =>
+    ctx.addIssue({ code: 'custom', message, path: [path] });
+  if (args.objects === undefined) {
+    if (!stated(args.object_name)) {
+      refuse(
+        'Parameter "object_name" (string) is required and cannot be empty.',
+        'object_name',
+      );
+    } else if (args.object_type === undefined) {
+      refuse('Parameter "object_type" (string) is required.', 'object_type');
+    }
+    return;
+  }
+  if (
+    args.object_name !== undefined ||
+    args.object_type !== undefined ||
+    args.objects.length === 0
+  ) {
+    refuse(
+      'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })',
+      'objects',
+    );
+  }
+}
+
+/** GetIncludesList's arguments on `variant` but `background`. */
+function includesListFields(variant: ProjectionVariant) {
+  return {
     object_name: z
       .string()
       .optional()
@@ -120,7 +168,7 @@ function includesListSchema(variant: ProjectionVariant) {
       .describe(
         '[read-only] If true, returns structured JSON with metadata and raw XML.',
       ),
-  });
+  };
 }
 
 /** GetIncludesList's arguments, as its definition's schema parses them. */
@@ -936,41 +984,11 @@ function listAnswer(
   };
 }
 
-/**
- * The refusal of an includes-list call's arguments, before anything is read
- * (`undefined`: none): one object needs its name and its type; a list
- * stands alone and holds at least one object.
- */
-export function includesListArgumentsRefusal(
-  args: IncludesListArgs,
-): string | undefined {
-  if (args.objects === undefined) {
-    const { object_name, object_type } = args;
-    if (typeof object_name !== 'string' || object_name.trim() === '') {
-      return 'Parameter "object_name" (string) is required and cannot be empty.';
-    }
-    if (!object_type || typeof object_type !== 'string') {
-      return 'Parameter "object_type" (string) is required.';
-    }
-    return undefined;
-  }
-  if (
-    args.object_name !== undefined ||
-    args.object_type !== undefined ||
-    !Array.isArray(args.objects) ||
-    args.objects.length === 0
-  ) {
-    return 'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })';
-  }
-  return undefined;
-}
-
 export async function handleGetIncludesList(
   context: HandlerContext,
   args: IncludesListArgs,
 ) {
-  const refusal = includesListArgumentsRefusal(args);
-  if (refusal !== undefined) return return_error(refusal);
+  // The schema holds the rule: one object, or a non-empty `objects`.
   const { logger } = context;
   const listed = args?.objects;
   if (listed === undefined) {
@@ -994,16 +1012,6 @@ export async function handleGetIncludesList(
       logger?.error(`Error getting includes list: ${messageOf(error)}`);
       return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
     }
-  }
-  if (
-    args.object_name !== undefined ||
-    args.object_type !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0
-  ) {
-    return return_error(
-      'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })',
-    );
   }
   const objects = listed.map((o) => ({
     object_name: o.object_name,

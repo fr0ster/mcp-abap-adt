@@ -333,19 +333,19 @@ describe('HandlerSystem', () => {
         'search_source',
         'query',
         { packages: ['ZPKG_A'] },
-        'Invalid arguments for tool SearchSource: Invalid input: expected string, received undefined at query',
+        'HandlerSystem: SearchSource: Invalid input: expected string, received undefined at query',
       ],
       [
         'search_source',
         'packages',
         { query: 'placeholder' },
-        'Invalid arguments for tool SearchSource: Invalid input: expected array, received undefined at packages',
+        'HandlerSystem: SearchSource: Invalid input: expected array, received undefined at packages',
       ],
       [
         'search_object',
         'object_name',
         {},
-        'Invalid arguments for tool SearchObject: Invalid input: expected string, received undefined at object_name',
+        'HandlerSystem: SearchObject: object_name is required at object_name',
       ],
       [
         'where_used',
@@ -364,19 +364,19 @@ describe('HandlerSystem', () => {
         'atc_findings',
         'worklist_id',
         {},
-        'Invalid arguments for tool GetATCFindings: Invalid input: expected string, received undefined at worklist_id',
+        'HandlerSystem: GetATCFindings: worklist_id is required. RunATC answers one on every run. at worklist_id',
       ],
       [
         'atc_results',
         'created_by',
         {},
-        'Invalid arguments for tool ListATCResults: Invalid input: expected string, received undefined at created_by',
+        'HandlerSystem: ListATCResults: created_by is required: a user name, or * for every user. at created_by',
       ],
       [
         'atc_result',
         'display_id',
         {},
-        'Invalid arguments for tool GetATCResult: Invalid input: expected string, received undefined at display_id',
+        'HandlerSystem: GetATCResult: display_id is required. ListATCResults answers one per result. at display_id',
       ],
     ];
 
@@ -517,7 +517,7 @@ describe('HandlerSystem', () => {
         systemOf('atc_findings', { display_id: 'RESULT_A' }),
       );
       expect(answered).toContain(
-        'Invalid arguments for tool GetATCFindings: Invalid input: expected string, received undefined at worklist_id',
+        'HandlerSystem: GetATCFindings: worklist_id is required. RunATC answers one on every run. at worklist_id',
       );
       expect(requests).toBe('[]');
     });

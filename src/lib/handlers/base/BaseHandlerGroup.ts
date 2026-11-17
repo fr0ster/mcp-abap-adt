@@ -25,7 +25,7 @@ import {
 } from '../../listedTool.js';
 import { runLongCall } from '../../longCall.js';
 import { isLongRead, isLongTool } from '../../longTools.js';
-import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
+import { stateSystemKind } from '../../systemKind.js';
 import { normalizeToolContent, type ToolResultLike } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
@@ -142,7 +142,6 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             checks: access.checks,
             checked: checkedArgumentsOf(entry.toolDefinition, access.readOnly),
           },
-      entry.refusesArguments,
     );
   }
 
@@ -152,8 +151,6 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
    * `search`: the tool's search `_meta` (`listedTool`), when it has one.
    * `callContext`: the context each call runs in, asked for when it comes;
    * the group's own by default.
-   * `refusesArguments`: the entry's refusal of a call's arguments, read
-   * before the call's context is asked for.
    */
   protected registerToolOnServer(
     server: McpServer,
@@ -167,7 +164,6 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       readonly checks: IAccessChecks;
       readonly checked: CheckedArguments | undefined;
     },
-    refusesArguments?: HandlerEntry['refusesArguments'],
   ): void {
     server.registerTool(
       toolName,
@@ -199,15 +195,6 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // call asks for none (no provider is called).
           const listed = isLongTool(toolName);
           const read = listed && isLongRead(toolName, args);
-          // Arguments its call would refuse (`HandlerSystem`'s action's
-          // target's): refused before the call's context, nothing sent.
-          const refusedArguments = refusesArguments?.(
-            args,
-            statedSystemKind(this.statedSystemType()),
-          );
-          if (refusedArguments !== undefined) {
-            return return_error(refusedArguments);
-          }
           // A listed long tool is listed here without `background` (a group
           // registered on its own keeps no background runs): its read
           // answers in the call.

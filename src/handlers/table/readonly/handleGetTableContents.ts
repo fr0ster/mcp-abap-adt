@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
@@ -11,7 +12,6 @@ import {
 import { detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
@@ -22,7 +22,9 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
-    table_name: z.string().describe('Name of the ABAP table'),
+    table_name: requiredText('Table name is required').describe(
+      'Name of the ABAP table',
+    ),
     max_rows: z
       .number()
       .optional()
@@ -49,10 +51,6 @@ export async function handleGetTableContents(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
-  if (!args?.table_name) {
-    return return_error('Table name is required');
-  }
-
   const tableName = args.table_name;
   const maxRows = args.max_rows || 100;
   const detail = detailOf(args);

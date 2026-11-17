@@ -38,7 +38,7 @@ export interface ToolDefinition<S extends z.ZodObject = z.ZodObject> {
    * `inputSchema` are the on-premise one's, served when no variant is
    * declared.
    */
-  variants?: { readonly [V in AbapSystemKind]: VariantToolDefinition };
+  variants?: { readonly [V in AbapSystemKind]: VariantToolDefinition<S> };
   /**
    * The members its `object_type` (or `target_type`) offers where no
    * variant is stated: set only on a definition the deny list narrowed, so
@@ -48,9 +48,9 @@ export interface ToolDefinition<S extends z.ZodObject = z.ZodObject> {
 }
 
 /** A tool's description and input schema on one variant. */
-export interface VariantToolDefinition {
+export interface VariantToolDefinition<S extends z.ZodObject = z.ZodObject> {
   readonly description: string;
-  readonly inputSchema: z.ZodObject;
+  readonly inputSchema: S;
   /**
    * The members its `object_type` (or `target_type`) offers there, for a
    * tool whose member picks the object: its search texts name only these.
@@ -98,20 +98,6 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
    */
   readonly heldLockOf?: (args: ToolArgs) => string | undefined;
   /**
-   * The refusal of the call's arguments its call would answer, read before
-   * the call takes a connection (`undefined`: none). Set where the listed
-   * schema cannot express a rule its call checks — `HandlerSystem`'s
-   * per-action arguments, each its target's — so a refused call opens no
-   * connection, logs on nowhere, starts no run and sends nothing. Every
-   * registration path reads it first. `variant`: the kind the instance (or
-   * the group) states, for a refusal that depends on it (`HandlerGet`'s
-   * members); none stated, such a refusal is left to the call.
-   */
-  readonly refusesArguments?: (
-    args: ToolArgs,
-    variant?: AbapSystemKind,
-  ) => Error | undefined;
-  /**
    * The tool begins and ends the communication batch (`HandlerBatch`): a set
    * that serves it has batch mode, and only there does every other tool's
    * description carry its batch sentence.
@@ -125,22 +111,16 @@ export interface HandlerEntry<R extends ToolResultLike = ToolResultLike> {
  * parses a call's arguments with that schema and hands the handler the
  * result; arguments that do not parse are refused, naming each issue, and
  * the handler does not run. The call answers what the handler answers.
- * `refuses`: the argument rules the handler checks itself before anything
- * is sent; given, the entry's `refusesArguments` checks the schema and
- * them before the call takes a connection.
+ * A variant's own rules (its type lists) are its listed schema's, read
+ * before dispatch: by the SDK on a server or a plain registration, by
+ * `HandlerExporter` before the call (`argumentsRefusalOf`).
  */
 export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
   toolDefinition: ToolDefinition<S>,
   handler: (context: HandlerContext, args: z.output<S>) => Promise<R>,
-  refuses?: (args: z.output<S>) => string | undefined,
 ): HandlerEntry<R> {
   return {
     toolDefinition,
-    // With `refuses` (the rules its handler checks before it reads): the
-    // entry refuses those arguments before the call takes a connection.
-    ...(refuses !== undefined
-      ? { refusesArguments: argumentsRefusalOf(toolDefinition, refuses) }
-      : {}),
     call: async (context, args) => {
       const parsed = toolDefinition.inputSchema.safeParse(args);
       if (!parsed.success) {
@@ -154,24 +134,37 @@ export function defineTool<S extends z.ZodObject, R extends ToolResultLike>(
 }
 
 /**
- * The refusal the call of `defineTool(toolDefinition, …)` answers for
- * `args`, without the call: its schema's issues, else `own`'s refusal of
- * the parsed arguments (a rule its handler checks itself), else none.
+ * The schema `toolDefinition` lists on `variant`: that variant's where the
+ * definition states one per variant, else its own (no variant stated, or
+ * one schema for all).
  */
-export function argumentsRefusalOf<S extends z.ZodObject>(
+export function schemaOn<S extends z.ZodObject>(
   toolDefinition: ToolDefinition<S>,
-  own?: (args: z.output<S>) => string | undefined,
-): (args: ToolArgs) => Error | undefined {
-  return (args) => {
-    const parsed = toolDefinition.inputSchema.safeParse(args);
-    if (!parsed.success) {
-      return new Error(
+  variant: AbapSystemKind | undefined,
+): S {
+  return variant === undefined
+    ? toolDefinition.inputSchema
+    : (toolDefinition.variants?.[variant].inputSchema ??
+        toolDefinition.inputSchema);
+}
+
+/**
+ * The refusal the schema `toolDefinition` lists on `variant` answers for
+ * `args` (`undefined`: none): the one check of a call's arguments, read by
+ * a path that calls an entry without the SDK's parse (`HandlerExporter`)
+ * before anything else.
+ */
+export function argumentsRefusalOf(
+  toolDefinition: ToolDefinition,
+  args: ToolArgs,
+  variant: AbapSystemKind | undefined,
+): Error | undefined {
+  const parsed = schemaOn(toolDefinition, variant).safeParse(args);
+  return parsed.success
+    ? undefined
+    : new Error(
         invalidArgumentsWords(toolDefinition.name, parsed.error.issues),
       );
-    }
-    const words = own?.(parsed.data);
-    return words === undefined ? undefined : new Error(words);
-  };
 }
 
 /** The refusal of arguments a tool's schema does not parse: each issue, at its path. */

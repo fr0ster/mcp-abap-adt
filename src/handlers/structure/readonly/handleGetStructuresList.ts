@@ -18,6 +18,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
@@ -50,6 +51,63 @@ import {
 import { child } from '../../../lib/thrownValue';
 import { return_error, return_response } from '../../../lib/utils';
 
+/** GetStructuresList's arguments but `background`. */
+const FIELDS = {
+  structure_name: z
+    .string()
+    .optional()
+    .describe('Structure name (or give structure_names).'),
+  structure_names: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Several structure names, read together (give this or structure_name).',
+    ),
+  version: READ_VERSION_FIELD,
+  include_extensions: z
+    .boolean()
+    .default(true)
+    .optional()
+    .describe(
+      '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
+    ),
+};
+
+/**
+ * `structure_name`, or a non-empty `structure_names` of names alone.
+ */
+function oneStructureForm(
+  args: {
+    structure_name?: string | undefined;
+    structure_names?: string[] | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const listed = args.structure_names;
+  if (listed === undefined) {
+    if (!stated(args.structure_name)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'structure_name is required',
+        path: ['structure_name'],
+      });
+    }
+    return;
+  }
+  if (
+    args.structure_name !== undefined ||
+    listed.length === 0 ||
+    listed.some((name) => !stated(name))
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        'Give exactly one of structure_name or structure_names (a non-empty list of names)',
+      path: ['structure_names'],
+    });
+  }
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetStructuresList',
   available_in: ['onprem', 'cloud'] as const,
@@ -59,27 +117,12 @@ export const TOOL_DEFINITION = {
       'Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; ' +
       'legacy systems (BASIS < 7.50) refuse it (issue #207).',
   ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    structure_name: z
-      .string()
-      .optional()
-      .describe('Structure name (or give structure_names).'),
-    structure_names: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Several structure names, read together (give this or structure_name).',
-      ),
-    version: READ_VERSION_FIELD,
-    include_extensions: z
-      .boolean()
-      .default(true)
-      .optional()
-      .describe(
-        '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
-      ),
-  }),
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(oneStructureForm),
+    z.object(FIELDS).superRefine(oneStructureForm),
+  ),
 } as const;
 
 interface StructureNode {
@@ -214,7 +257,7 @@ function extractSource(result: IAdtResponse<string, IAdtError>): string | null {
 async function structuresListOf(
   context: HandlerContext,
   args: {
-    structure_name?: string | undefined;
+    structure_name: string;
     version?: ReadVersion | undefined;
     include_extensions?: boolean | undefined;
   },
@@ -236,9 +279,6 @@ async function structuresListOf(
       step: 'read append candidate';
       failures: FailureEntry[];
     }> = [];
-    if (!structure_name)
-      return return_error(new Error('structure_name is required'));
-
     const client = createAdtClient(connection, logger);
     const obj = client.getStructure(structureDocuments);
     const utils = client.getUtils(ourUtils);
@@ -1068,48 +1108,22 @@ function listAnswer(
   };
 }
 
-/**
- * The refusal of a structures-list call's arguments, before anything is
- * read (`undefined`: none): `structure_name`, or a non-empty
- * `structure_names` of names alone.
- */
-export function structuresListArgumentsRefusal(
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
-): string | undefined {
-  const listed = args.structure_names;
-  if (listed === undefined) {
-    return args.structure_name ? undefined : 'structure_name is required';
-  }
-  if (
-    args.structure_name !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0 ||
-    listed.some((name) => typeof name !== 'string' || name === '')
-  ) {
-    return 'Give exactly one of structure_name or structure_names (a non-empty list of names)';
-  }
-  return undefined;
-}
-
 export async function handleGetStructuresList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const refusal = structuresListArgumentsRefusal(args);
-  if (refusal !== undefined) return return_error(new Error(refusal));
+  // The schema holds the rule: `structure_name`, or a non-empty
+  // `structure_names` of names alone.
   const listed = args?.structure_names;
   const version = args?.version ?? 'active';
   const includeExtensions = args?.include_extensions !== false;
-  const sequential = (structure_name: string | undefined) => {
+  const sequential = (structure_name: string) => {
     const { structure_names: _list, ...rest } = args;
     return structuresListOf(context, { ...rest, structure_name });
   };
   try {
     if (listed === undefined) {
-      const structure_name = args?.structure_name;
-      if (!structure_name) {
-        return await sequential(structure_name);
-      }
+      const structure_name = args.structure_name ?? '';
       return await withSequentialFallback<McpResult>(
         context,
         async () =>
@@ -1122,16 +1136,6 @@ export async function handleGetStructuresList(
             )
           )[0],
         () => sequential(structure_name),
-      );
-    }
-    if (
-      args.structure_name !== undefined ||
-      !Array.isArray(listed) ||
-      listed.length === 0 ||
-      listed.some((name) => typeof name !== 'string' || name === '')
-    ) {
-      return return_error(
-        'Give exactly one of structure_name or structure_names (a non-empty list of names)',
       );
     }
     const names = listed.map((name) => name.toUpperCase());

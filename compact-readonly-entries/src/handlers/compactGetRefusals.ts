@@ -1,11 +1,10 @@
 /**
- * What each `HandlerGet` route refuses of the arguments it is handed,
- * without the call: its target tool's schema, then the rules its handler
- * checks before it reads (`argumentsRefusalOf`). One table per route
- * table of `compactReadRoutes` / `compactPartRoutes`, member for member —
- * `compactGetRefusals.test.ts` keeps their keys equal — so `HandlerGet`
- * refuses a call before it takes a connection in exactly the words its
- * route would answer.
+ * The target tool of each `HandlerGet` route, as `HandlerGet`'s schema
+ * checks a call: the arguments the route hands its target are checked by
+ * that target's own schema on the variant (`schemaOn`), and a refusal
+ * names the target and says its words, at the argument. One table per
+ * route table of `compactReadRoutes` / `compactPartRoutes`, member for
+ * member — `compactGetRefusals.test.ts` keeps their keys equal.
  */
 
 import {
@@ -13,24 +12,46 @@ import {
   type CompactObjectType,
   HANDLER_GET_DRAFT_TYPES,
 } from '@mcp-abap-adt/lib/compact-shared';
-import { argumentsRefusalOf, type ToolArgs } from '@mcp-abap-adt/lib/handlers';
 import {
-  packageContentsArgumentsRefusal,
-  READ_DEFINITIONS,
-} from '@mcp-abap-adt/lib/handlers/read';
+  schemaOn,
+  type ToolArgs,
+  type ToolDefinition,
+} from '@mcp-abap-adt/lib/handlers';
+import { READ_DEFINITIONS } from '@mcp-abap-adt/lib/handlers/read';
+import type * as z from 'zod';
 import { draftArgsOf } from './compactPartRoutes';
 
-/** A route's refusal of the arguments it is handed (`undefined`: none). */
-export type RouteRefusal = (args: ToolArgs) => Error | undefined;
+type Variant = keyof typeof COMPACT_MAIN_PROGRAMS;
+
+/** A route's check of the arguments it is handed, on `variant`: issues into `ctx`. */
+export type RouteRefusal = (
+  args: ToolArgs,
+  variant: Variant,
+  ctx: z.RefinementCtx,
+) => void;
 
 const D = READ_DEFINITIONS;
-const of = argumentsRefusalOf;
+
+/** The target `definition`'s schema on the arguments: each issue named by the target. */
+function of(definition: ToolDefinition): RouteRefusal {
+  return (args, variant, ctx) => {
+    const parsed = schemaOn(definition, variant).safeParse(args);
+    if (parsed.success) return;
+    for (const issue of parsed.error.issues) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${definition.name}: ${issue.message}`,
+        path: issue.path,
+      });
+    }
+  };
+}
 
 /** An include's read of `part`: GetInclude's, with the part fixed. */
 const includePart =
   (part: 'source' | 'metadata'): RouteRefusal =>
-  (args) =>
-    of(D.GetInclude)({ ...args, part });
+  (args, variant, ctx) =>
+    of(D.GetInclude)({ ...args, part }, variant, ctx);
 
 /** The source read of each object type (`compactReadRouterMap`'s `get`). */
 export const SOURCE_REFUSALS: Partial<Record<CompactObjectType, RouteRefusal>> =
@@ -98,10 +119,8 @@ export const URL_REFUSALS: Partial<Record<CompactObjectType, RouteRefusal>> = {
 export const CONTENTS_REFUSALS: Partial<
   Record<CompactObjectType, RouteRefusal>
 > = {
-  PACKAGE: of(D.GetPackageContents, packageContentsArgumentsRefusal),
+  PACKAGE: of(D.GetPackageContents),
 };
-
-type Variant = keyof typeof COMPACT_MAIN_PROGRAMS;
 
 /** `part: 'main_programs'` on `variant` (`compactMainProgramsRoutes`). */
 export function mainProgramsRefusals(
@@ -120,7 +139,8 @@ export function draftRefusals(
 ): Partial<Record<CompactObjectType, RouteRefusal>> {
   const refusals: Partial<Record<CompactObjectType, RouteRefusal>> = {};
   for (const member of HANDLER_GET_DRAFT_TYPES[variant]) {
-    refusals[member] = (args) => of(D.GetObjectDraft)(draftArgsOf(args));
+    refusals[member] = (args, variant, ctx) =>
+      of(D.GetObjectDraft)(draftArgsOf(args), variant, ctx);
   }
   return refusals;
 }

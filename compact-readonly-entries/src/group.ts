@@ -53,8 +53,14 @@ import {
   TOOL_DEFINITION as HandlerDumpView_Tool,
   handleHandlerDumpView,
 } from './handlers/handleHandlerDumpView';
-import { handlerGetEntry } from './handlers/handleHandlerGet';
-import { handlerGetDataEntry } from './handlers/handleHandlerGetData';
+import {
+  TOOL_DEFINITION as HandlerGet_Tool,
+  handleHandlerGet,
+} from './handlers/handleHandlerGet';
+import {
+  TOOL_DEFINITION as HandlerGetData_Tool,
+  handleHandlerGetData,
+} from './handlers/handleHandlerGetData';
 import {
   TOOL_DEFINITION as HandlerProfileList_Tool,
   handleHandlerProfileList,
@@ -71,7 +77,10 @@ import {
   TOOL_DEFINITION as HandlerServiceBindingValidate_Tool,
   handleHandlerServiceBindingValidate,
 } from './handlers/handleHandlerServiceBindingValidate';
-import { handlerSystemEntry } from './handlers/handleHandlerSystem';
+import {
+  TOOL_DEFINITION as HandlerSystem_Tool,
+  handleHandlerSystem,
+} from './handlers/handleHandlerSystem';
 import {
   TOOL_DEFINITION as HandlerUnitTestResult_Tool,
   handleHandlerUnitTestResult,
@@ -91,8 +100,8 @@ import {
  */
 export function compactReadOnlyEntries(): HandlerEntry[] {
   return [
-    handlerGetEntry(),
-    handlerSystemEntry(),
+    defineTool(HandlerGet_Tool, handleHandlerGet),
+    defineTool(HandlerSystem_Tool, handleHandlerSystem),
     defineTool(HandlerValidate_Tool, handleHandlerValidate),
     defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),
     defineTool(HandlerDeletionCheck_Tool, handleHandlerDeletionCheck),
@@ -137,7 +146,7 @@ export class CompactReadOnlyHandlersGroup extends BaseHandlerGroup {
  * SAP systems; whether to serve it is the customer's decision.
  */
 export function compactDataEntries(): HandlerEntry[] {
-  return [handlerGetDataEntry()];
+  return [defineTool(HandlerGetData_Tool, handleHandlerGetData)];
 }
 
 /** {@link compactDataEntries} as a group: the compact data tool, opt-in. */

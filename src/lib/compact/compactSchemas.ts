@@ -20,8 +20,16 @@ import {
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
+import { dumpFiltersRefusal } from '../dumpFilters';
+import {
+  requiredText,
+  stated,
+  withInCallSchema,
+} from '../handlers/argumentRules';
 import { createArguments } from '../handlers/createArguments';
+import type { ToolDefinition } from '../handlers/interfaces';
 import { listedValues } from '../handlers/listedValues';
+import { READ_DEFINITIONS } from '../handlers/readDefinitions';
 import { READ_VERSION_FIELD } from '../handlers/readVersion';
 import {
   COMPACT_LONG_BACKGROUND_DESCRIPTION,
@@ -33,6 +41,7 @@ import { ANSWER_LEVELS } from '../search-source/answerLevel';
 import { SCAN_OBJECT_TYPES } from '../search-source/packageEnumerator';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
 import { DETAIL_SHAPE } from '../strategies/detail';
+import { FEED_PAGE_MAX } from '../strategies/feedPages';
 import { byVariant } from '../variantDefinition';
 import { exampleCodes, type Left, leftOf, listed, when } from './memberTexts';
 
@@ -1369,7 +1378,9 @@ export const compactProfileListSchema = z.object({});
 
 export const compactProfileViewSchema = z.object({
   background: COMPACT_LONG_BACKGROUND_FIELD,
-  trace_id_or_uri: z.string().describe('Profiler trace id or URI.'),
+  trace_id_or_uri: requiredText(
+    'Parameter "trace_id_or_uri" is required',
+  ).describe('Profiler trace id or URI.'),
   view: z
     .enum(['hitlist', 'statements', 'db_accesses'])
     .describe('Profiler trace view kind.'),
@@ -1398,8 +1409,8 @@ export const compactProfileViewSchema = z.object({
     .describe('Auto drill-down threshold.'),
 });
 
-export const compactDumpListSchema = z.object({
-  background: COMPACT_LONG_BACKGROUND_FIELD,
+/** `HandlerDumpList`'s arguments but `background`. */
+const DUMP_LIST_FIELDS = {
   feed_type: z
     .enum(['dumps', 'system_messages', 'gateway_errors'])
     .default('dumps')
@@ -1445,7 +1456,43 @@ export const compactDumpListSchema = z.object({
     .describe(
       "End of time range (YYYYMMDDHHMMSS), inclusive: the page holds the entries up to that second; a previous answer's next_to is the next page's to, and that page starts at the boundary second, inclusive.",
     ),
-});
+};
+
+/** The refusal of a `top` outside one page. */
+const DUMP_LIST_TOP_WORDS = `top must be a whole number from 1 to ${FEED_PAGE_MAX}, the most entries SAP answers in one request; read on with the next_to of the answer as to.`;
+
+/** `top` one page at most; the dumps filters only on the dumps feed, each one operand. */
+function dumpListRules(
+  args: z.output<z.ZodObject<typeof DUMP_LIST_FIELDS>>,
+  ctx: z.RefinementCtx,
+): void {
+  const top = args.top;
+  if (
+    top !== undefined &&
+    (!Number.isInteger(top) || top < 1 || top > FEED_PAGE_MAX)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: DUMP_LIST_TOP_WORDS,
+      path: ['top'],
+    });
+  }
+  const refused = dumpFiltersRefusal(args.feed_type ?? 'dumps', args);
+  if (refused !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      message: refused.words,
+      path: [refused.path],
+    });
+  }
+}
+
+export const compactDumpListSchema = withInCallSchema(
+  z
+    .object({ background: COMPACT_LONG_BACKGROUND_FIELD, ...DUMP_LIST_FIELDS })
+    .superRefine(dumpListRules),
+  z.object(DUMP_LIST_FIELDS).superRefine(dumpListRules),
+);
 
 export const compactDumpViewSchema = z.object({
   dump_id: z.string().describe("The dump's dump_id, or its URI."),
@@ -2425,12 +2472,52 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
 export function compactSystemSchemaFor(
   variant: ProjectionVariant,
   actions: readonly SystemAction[] = SYSTEM_ACTIONS,
+  rules: ProjectionVariant | undefined = variant,
 ) {
   const properties = systemProperties(variant, actions);
-  return z.object({
-    ...offered(properties, COMPACT_SYSTEM_TAKES, actions),
-    action: properties.action,
-  });
+  const { background, ...taken } = offered(
+    properties,
+    COMPACT_SYSTEM_TAKES,
+    actions,
+  );
+  const rule = actionTargetRule(rules);
+  return withInCallSchema(
+    z
+      .object({ background, ...taken, action: properties.action })
+      .superRefine(rule),
+    z.object({ ...taken, action: properties.action }).superRefine(rule),
+  );
+}
+
+/**
+ * Each action's arguments are its full tool's, checked by that tool's own
+ * schema on `variant` (`SYSTEM_ACTION_TOOLS`; none: its own, the variant's
+ * type lists unread): a refusal names the tool and says its words, at the
+ * argument.
+ */
+function actionTargetRule(variant: ProjectionVariant | undefined) {
+  return (
+    args: { action: SystemAction; background?: boolean | undefined },
+    ctx: z.RefinementCtx,
+  ): void => {
+    const { action, background: _background, ...given } = args;
+    const definition: ToolDefinition =
+      READ_DEFINITIONS[SYSTEM_ACTION_TOOLS[action]];
+    const schema =
+      variant === undefined
+        ? definition.inputSchema
+        : (definition.variants?.[variant].inputSchema ??
+          definition.inputSchema);
+    const parsed = schema.safeParse(given);
+    if (parsed.success) return;
+    for (const issue of parsed.error.issues) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${definition.name}: ${issue.message}`,
+        path: issue.path,
+      });
+    }
+  };
 }
 
 /** What each action reads, with the arguments it takes (`*` required). */
@@ -2496,15 +2583,18 @@ export function handlerSystemDefinitionFor(
 
 /** `HandlerSystem`'s description and schema, per variant, every action. */
 export function handlerSystemDefinition() {
-  return byVariant((variant) =>
-    handlerSystemDefinitionFor(variant, SYSTEM_ACTIONS),
-  );
+  return {
+    ...byVariant((variant) =>
+      handlerSystemDefinitionFor(variant, SYSTEM_ACTIONS),
+    ),
+    // No variant stated: the targets' own schemas, their type lists unread.
+    inputSchema: compactSystemSchemaFor('onprem', SYSTEM_ACTIONS, undefined),
+  };
 }
 
 /** The properties of `HandlerGetData` beside its `sql_query`. */
 function getDataProperties(sql: boolean) {
   return {
-    background: COMPACT_LONG_BACKGROUND_FIELD,
     object_name: z
       .string()
       .optional()
@@ -2523,7 +2613,22 @@ const MAX_ROWS = {
 };
 
 /** Rows of a table or CDS view, or of an SQL SELECT. */
-export const compactGetDataSchema = z.object({
+/** What `HandlerGetData` reads: `sql_query` when stated, else `object_name`; one of them. */
+function oneDataRead(
+  args: { object_name?: string | undefined; sql_query?: string | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (!stated(args.sql_query) && !stated(args.object_name)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'object_name or sql_query is required',
+      path: ['object_name'],
+    });
+  }
+}
+
+/** Rows of a table or CDS view, or of an SQL SELECT: the fields but `background`. */
+const GET_DATA_FIELDS = {
   ...getDataProperties(true),
   sql_query: z
     .string()
@@ -2532,7 +2637,17 @@ export const compactGetDataSchema = z.object({
       'ABAP SQL SELECT naming the columns, conditions and order to read.',
     ),
   ...MAX_ROWS,
-});
+};
+
+export const compactGetDataSchema = withInCallSchema(
+  z
+    .object({ background: COMPACT_LONG_BACKGROUND_FIELD, ...GET_DATA_FIELDS })
+    .superRefine(oneDataRead),
+  z.object(GET_DATA_FIELDS).superRefine(oneDataRead),
+);
+
+/** The table read alone: the fields but `background`. */
+const GET_TABLE_DATA_FIELDS = { ...getDataProperties(false), ...MAX_ROWS };
 
 /**
  * `HandlerGetData`'s description and schema: with `sql`, the table read and
@@ -2560,6 +2675,14 @@ export function handlerGetDataWithoutSqlDefinition() {
     description: withLongToolAdvice(
       '[read-only] Reads the rows of the table or CDS view named by object_name: every column of object_name. Required: object_name. Optional: max_rows (default 100). Response: JSON.',
     ),
-    inputSchema: z.object({ ...getDataProperties(false), ...MAX_ROWS }),
+    inputSchema: withInCallSchema(
+      z
+        .object({
+          background: COMPACT_LONG_BACKGROUND_FIELD,
+          ...GET_TABLE_DATA_FIELDS,
+        })
+        .superRefine(oneDataRead),
+      z.object(GET_TABLE_DATA_FIELDS).superRefine(oneDataRead),
+    ),
   };
 }

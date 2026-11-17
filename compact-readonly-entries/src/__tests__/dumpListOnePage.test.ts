@@ -9,7 +9,7 @@
  *
  * Real adt-clients code runs over the batch proof's counting connection.
  */
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   type Answer,
   countingConnection,
@@ -42,7 +42,11 @@ async function runWith(
     logger: silent,
   } as unknown as HandlerContext;
   const pending = Promise.resolve(
-    handleHandlerDumpList(context, structuredClone(args) as never),
+    // Through its entry: the schema is the one check of a call.
+    defineTool(TOOL_DEFINITION, handleHandlerDumpList).call(
+      context,
+      structuredClone(args),
+    ),
   ) as Promise<Answer>;
   if (mode === 'pending') {
     pending.catch(() => undefined);

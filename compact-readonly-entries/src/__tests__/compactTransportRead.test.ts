@@ -149,7 +149,7 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     await expect(
       handleHandlerGet(compact.context, { object_type: 'TRANSPORT' }),
     ).rejects.toThrow(
-      'Invalid arguments for tool ReadTransportObjects: Invalid input: expected string, received undefined at transport_number',
+      'Invalid arguments for tool ReadTransportObjects: transport_number is required at transport_number',
     );
     expect(compact.sent).toEqual([]);
   });

@@ -106,11 +106,15 @@ describe('a compact read route parses with its target tool’s schema', () => {
     async (objectType, part, target, argument) => {
       const connection = recordingConnection();
       declareSystemKind(connection, 'onprem');
-      await expect(
-        handleHandlerGet({ connection }, { object_type: objectType, part }),
-      ).rejects.toThrow(
-        `Invalid arguments for tool ${target}: Invalid input: expected string, received undefined at ${argument}`,
+      const thrown = await handleHandlerGet(
+        { connection },
+        { object_type: objectType, part },
+      ).then(
+        () => '',
+        (error: Error) => error.message,
       );
+      expect(thrown).toContain(`Invalid arguments for tool ${target}: `);
+      expect(thrown).toContain(` is required at ${argument}`);
       expect(connection.requests).toEqual([]);
     },
   );

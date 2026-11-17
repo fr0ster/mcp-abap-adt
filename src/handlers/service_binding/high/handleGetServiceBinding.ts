@@ -3,6 +3,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_PART_FIELD,
@@ -12,7 +13,6 @@ import {
 import { readServiceBindingMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 import {
   parseServiceBindingPayload,
   type ServiceBindingResponseFormat,
@@ -24,9 +24,9 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
   inputSchema: z.object({
-    service_binding_name: z
-      .string()
-      .describe('Service binding name. Case-insensitive.'),
+    service_binding_name: requiredText(
+      'service_binding_name is required',
+    ).describe('Service binding name. Case-insensitive.'),
     part: READ_PART_FIELD,
     response_format: z
       .enum(['xml', 'json', 'plain'])
@@ -45,9 +45,6 @@ export async function handleGetServiceBinding(
   args: GetServiceBindingArgs,
 ) {
   const { connection, logger } = context;
-  if (!args?.service_binding_name) {
-    return return_error(new Error('service_binding_name is required'));
-  }
   const part = readPartOf(args.part);
 
   // The config field is `bindingName`, not `serviceBindingName` — confirmed

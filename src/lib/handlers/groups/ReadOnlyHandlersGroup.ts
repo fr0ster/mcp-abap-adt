@@ -77,7 +77,6 @@ import {
 import {
   TOOL_DEFINITION as GetIncludesList_Tool,
   handleGetIncludesList,
-  includesListArgumentsRefusal,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import {
   TOOL_DEFINITION as GetMainPrograms_Tool,
@@ -106,7 +105,6 @@ import {
 import {
   TOOL_DEFINITION as GetPackageContents_Tool,
   handleGetPackageContents,
-  packageContentsArgumentsRefusal,
 } from '../../../handlers/package/readonly/handleGetPackageContents';
 import {
   TOOL_DEFINITION as GetProgram_Tool,
@@ -127,7 +125,6 @@ import {
 import {
   TOOL_DEFINITION as GetStructuresList_Tool,
   handleGetStructuresList,
-  structuresListArgumentsRefusal,
 } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   TOOL_DEFINITION as GetTable_Tool,
@@ -210,17 +207,9 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
     return [
       // Existing readonly handlers. GetTableContents is a data tool:
       // DataHandlersGroup's, served only when asked for.
-      defineTool(
-        GetPackageContents_Tool,
-        handleGetPackageContents,
-        packageContentsArgumentsRefusal,
-      ),
+      defineTool(GetPackageContents_Tool, handleGetPackageContents),
       defineTool(GetInclude_Tool, handleGetInclude),
-      defineTool(
-        GetIncludesList_Tool,
-        handleGetIncludesList,
-        includesListArgumentsRefusal,
-      ),
+      defineTool(GetIncludesList_Tool, handleGetIncludesList),
       defineTool(GetMainPrograms_Tool, handleGetMainPrograms),
       defineTool(GetEnhancements_Tool, handleGetEnhancements),
       defineTool(GetEnhancementSpot_Tool, handleGetEnhancementSpot),
@@ -229,11 +218,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       defineTool(ListTransports_Tool, handleListTransports),
       defineTool(ReadTransportObjects_Tool, handleReadTransportObjects),
       defineTool(ReadTransportActionLog_Tool, handleReadTransportActionLog),
-      defineTool(
-        GetStructuresList_Tool,
-        handleGetStructuresList,
-        structuresListArgumentsRefusal,
-      ),
+      defineTool(GetStructuresList_Tool, handleGetStructuresList),
       defineTool(GetObjectVersions_Tool, handleGetObjectVersions),
       defineTool(GetObjectDraft_Tool, handleGetObjectDraft),
       defineTool(GetObjectVersionSource_Tool, handleGetObjectVersionSource),

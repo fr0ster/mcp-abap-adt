@@ -19,7 +19,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { handleGetWhereUsed as getWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
+  TOOL_DEFINITION as GET_WHERE_USED,
+  handleGetWhereUsed as getWhereUsed,
+} from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
   TOOL_DEFINITION as RUNTIME_LIST_FEEDS,
   handleRuntimeListFeeds as runtimeListFeeds,
@@ -36,6 +39,7 @@ import {
   type SeenEnvelope,
   statusError,
 } from '../../helpers/batchEnvelope';
+import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -847,22 +851,17 @@ describe('GetWhereUsed', () => {
     expect(context.batchAvailability?.available()).toBe(false);
   });
 
-  it('exactly one of object_name/object_type or objects', async () => {
+  it('exactly one of object_name/object_type or objects: its schema', () => {
     for (const args of [
       { objects: THREE, object_name: 'ZT_A' },
       { objects: [] },
-      { objects: 'ZT_A' },
     ]) {
-      const fake = system();
-      const result = await withinTurns(
-        handleGetWhereUsed(contextOn(fake), args as never),
-        TURNS,
+      expect(schemaWords(GET_WHERE_USED, args)).toContain(
+        'Give exactly one of',
       );
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('Give exactly one of');
-      expect(fake.envelopes).toHaveLength(0);
-      expect(fake.directs).toHaveLength(0);
     }
+    // Not a list at all: the schema's own type words.
+    expect(schemaWords(GET_WHERE_USED, { objects: 'ZT_A' })).not.toBe('');
   });
 });
 
@@ -1058,22 +1057,18 @@ describe('RuntimeListFeeds', () => {
     expect(context.batchAvailability?.available()).toBe(false);
   });
 
-  it('exactly one of feed_type or feed_types', async () => {
+  it('exactly one of feed_type or feed_types: its schema', () => {
     for (const args of [
       { feed_types: PAGED, feed_type: 'dumps' },
       { feed_types: [] },
-      { feed_types: 'dumps' },
     ]) {
-      const fake = system();
-      const result = await withinTurns(
-        handleRuntimeListFeeds(contextOn(fake), args as never),
-        TURNS,
+      expect(schemaWords(RUNTIME_LIST_FEEDS, args)).toContain(
+        'Give exactly one of',
       );
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('Give exactly one of');
-      expect(fake.envelopes).toHaveLength(0);
-      expect(fake.directs).toHaveLength(0);
     }
+    expect(schemaWords(RUNTIME_LIST_FEEDS, { feed_types: 'dumps' })).not.toBe(
+      '',
+    );
   });
 
   it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {

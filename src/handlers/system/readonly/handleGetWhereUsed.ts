@@ -50,6 +50,11 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
+import {
+  type RuleVariant,
+  stated,
+  withInCallSchema,
+} from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type JsonValue, jsonFields, jsonOrText } from '../../../lib/json';
 import { withLongToolAdvice } from '../../../lib/longTools';
@@ -76,14 +81,71 @@ export const TOOL_DEFINITION = {
     description: withLongToolAdvice(
       '[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }).',
     ),
-    inputSchema: whereUsedSchema(variant),
+    inputSchema: whereUsedSchema(variant, variant),
   })),
+  // No variant stated: its type list unread (the call reads it).
+  inputSchema: whereUsedSchema('onprem', undefined),
 } as const;
 
-/** GetWhereUsed's input on `variant`. */
-function whereUsedSchema(variant: ProjectionVariant) {
-  return z.object({
-    background: LONG_BACKGROUND_FIELD,
+/**
+ * GetWhereUsed's input, described on `variant`, its type list read on
+ * `rules` (none: unread), its in-the-call twin beside it.
+ */
+function whereUsedSchema(variant: ProjectionVariant, rules: RuleVariant) {
+  const fields = whereUsedFields(variant);
+  const rule = oneWhereUsedForm(rules);
+  return withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...fields })
+      .superRefine(rule),
+    z.object(fields).superRefine(rule),
+  );
+}
+
+/**
+ * One object — `object_name` and `object_type`, not blank, the type one
+ * `variant` takes — or a non-empty `objects` alone.
+ */
+function oneWhereUsedForm(variant: RuleVariant) {
+  return (
+    args: {
+      object_name?: string | undefined;
+      object_type?: string | undefined;
+      objects?: readonly object[] | undefined;
+    },
+    ctx: z.RefinementCtx,
+  ): void => {
+    const refuse = (message: string, path: string) =>
+      ctx.addIssue({ code: 'custom', message, path: [path] });
+    if (args.objects === undefined) {
+      if (!stated(args.object_name)) {
+        refuse('Object name is required', 'object_name');
+      } else if (!stated(args.object_type)) {
+        refuse('Object type is required', 'object_type');
+      } else if (
+        variant !== undefined &&
+        whereUsedCodeOn(variant, args.object_type) === undefined
+      ) {
+        refuse(notWhereUsedOn(variant, args.object_type), 'object_type');
+      }
+      return;
+    }
+    if (
+      args.object_name !== undefined ||
+      args.object_type !== undefined ||
+      args.objects.length === 0
+    ) {
+      refuse(
+        'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })',
+        'objects',
+      );
+    }
+  };
+}
+
+/** GetWhereUsed's arguments on `variant` but `background`. */
+function whereUsedFields(variant: ProjectionVariant) {
+  return {
     object_name: z
       .string()
       .optional()
@@ -130,7 +192,7 @@ function whereUsedSchema(variant: ProjectionVariant) {
       .describe(
         "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
       ),
-  });
+  };
 }
 
 type WhereUsedArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -143,7 +205,11 @@ type WhereUsedArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
  * `undefined` for any other text.
  */
 function whereUsedCodeOf(connection: object, text: string) {
-  const variant = variantOf(connection);
+  return whereUsedCodeOn(variantOf(connection), text);
+}
+
+/** {@link whereUsedCodeOf} on `variant`. */
+function whereUsedCodeOn(variant: ProjectionVariant, text: string) {
   return acceptedCodeOf(
     text,
     WHERE_USED_CODES[variant],
@@ -153,7 +219,11 @@ function whereUsedCodeOf(connection: object, text: string) {
 
 /** The refusal of an `object_type` outside its projection: what it takes. */
 function notWhereUsed(connection: object, text: string): string {
-  const variant = variantOf(connection);
+  return notWhereUsedOn(variantOf(connection), text);
+}
+
+/** {@link notWhereUsed} on `variant`. */
+function notWhereUsedOn(variant: ProjectionVariant, text: string): string {
   return notAccepted(
     'object_type',
     text,
@@ -633,31 +703,6 @@ const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
   'ended' in outcome ? outcome.ended : outcome.answers[0];
 
 /**
- * The refusal of a where-used call's arguments, before anything is read
- * (`undefined`: none): one object needs its name and its type; a list
- * stands alone and holds at least one object.
- */
-export function whereUsedArgumentsRefusal(
-  args: WhereUsedArgs,
-): string | undefined {
-  const listed = args.objects;
-  if (listed === undefined) {
-    if (!args.object_name) return 'Object name is required';
-    if (!args.object_type) return 'Object type is required';
-    return undefined;
-  }
-  if (
-    args.object_name !== undefined ||
-    args.object_type !== undefined ||
-    !Array.isArray(listed) ||
-    listed.length === 0
-  ) {
-    return 'Give exactly one of object_name and object_type, or objects (a non-empty list of { object_name, object_type })';
-  }
-  return undefined;
-}
-
-/**
  * Where-used lists of one object or several, read in ADT batch envelopes
  * where a call sends more than one request; the sequential reads where the
  * destination has no communication batch. One object without a type filter
@@ -667,8 +712,7 @@ export async function handleGetWhereUsed(
   context: HandlerContext,
   args: WhereUsedArgs,
 ) {
-  const refusal = whereUsedArgumentsRefusal(args);
-  if (refusal !== undefined) return return_error(refusal);
+  // The schema holds the rule: one object, or a non-empty `objects`.
   const listed = args?.objects;
   if (listed === undefined) {
     const refused = await refusedModule(context, [args]);

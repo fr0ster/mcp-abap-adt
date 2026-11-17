@@ -3,6 +3,12 @@ import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
+import {
+  onEveryVariant,
+  type RuleVariant,
+  requiredText,
+  withInCallSchema,
+} from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
@@ -26,28 +32,67 @@ import {
   type XmlRead,
 } from '../../../lib/xml/tree';
 
+/** SearchObject's arguments but `background`. */
+const FIELDS = {
+  object_name: requiredText('object_name is required').describe(
+    "[read-only] Object name or mask (e.g. 'MARA*')",
+  ),
+  object_type: z
+    .string()
+    .optional()
+    .describe(`[read-only] ${SEARCH_TYPE_DESCRIPTION}`),
+  maxResults: z
+    .number()
+    .default(100)
+    .optional()
+    .describe('[read-only] Maximum number of results to return'),
+  ...DETAIL_SHAPE,
+};
+
+/** On a stated variant, `object_type` (when given, not empty) is a search name of its list. */
+function searchTypeRule(variant: RuleVariant) {
+  return (
+    args: { object_type?: string | undefined },
+    ctx: z.RefinementCtx,
+  ): void => {
+    const type = args.object_type;
+    if (
+      variant !== undefined &&
+      type !== undefined &&
+      type !== '' &&
+      (variant === 'onprem'
+        ? searchNameOf('onprem', type)
+        : searchNameOf('cloud', type)) === undefined
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: notASearchType('object_type', type),
+        path: ['object_type'],
+      });
+    }
+  };
+}
+
+/** The schema on `variant`, `background` listed; its in-the-call twin beside it. */
+function schemaOn(variant: RuleVariant) {
+  const rule = searchTypeRule(variant);
+  return withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(rule),
+    z.object(FIELDS).superRefine(rule),
+  );
+}
+
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
+  ...onEveryVariant(
+    withLongToolAdvice(
+      '[read-only] Search ABAP repository by object name or wildcard pattern (e.g. \'Z*\'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system\'s object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.).',
+    ),
+    schemaOn,
   ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    object_name: z
-      .string()
-      .describe("[read-only] Object name or mask (e.g. 'MARA*')"),
-    object_type: z
-      .string()
-      .optional()
-      .describe(`[read-only] ${SEARCH_TYPE_DESCRIPTION}`),
-    maxResults: z
-      .number()
-      .default(100)
-      .optional()
-      .describe('[read-only] Maximum number of results to return'),
-    ...DETAIL_SHAPE,
-  }),
 } as const;
 
 export interface SearchHit {
@@ -155,10 +200,8 @@ export async function handleSearchObject(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const { connection, logger } = context;
+  // The schema holds the rules: a name, not blank; the type of the list.
   const { object_name, object_type, maxResults } = args;
-  if (!object_name) {
-    return return_error('object_name is required');
-  }
 
   const served = adtClientOf(connection, logger);
   const search = searchOn(

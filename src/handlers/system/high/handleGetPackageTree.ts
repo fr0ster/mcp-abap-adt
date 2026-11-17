@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 /**
  * GetPackageTree Handler - High-level handler for package tree structure
@@ -38,52 +39,84 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
 
+/** GetPackageTree's arguments but `background`. */
+const FIELDS = {
+  package_name: z
+    .string()
+    .optional()
+    .describe('Package name (give this or package_names)'),
+  package_names: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Several package names, read together (give this or package_name)',
+    ),
+  include_subpackages: z
+    .boolean()
+    .default(true)
+    .optional()
+    .describe(
+      'Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true',
+    ),
+  max_depth: z
+    .number()
+    .int()
+    .default(5)
+    .optional()
+    .describe('Maximum depth for recursive package traversal. Default: 5'),
+  include_descriptions: z
+    .boolean()
+    .default(false)
+    .optional()
+    .describe(
+      "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
+    ),
+  debug: z
+    .boolean()
+    .default(false)
+    .optional()
+    .describe(
+      'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
+    ),
+};
+
+/** Exactly one of `package_name` and a non-empty `package_names`. */
+function onePackageForm(
+  args: {
+    package_name?: string | undefined;
+    package_names?: string[] | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const single = stated(args.package_name);
+  const listed = (args.package_names ?? []).length > 0;
+  if (single && listed) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Give exactly one of package_name or package_names',
+      path: ['package_names'],
+    });
+  } else if (!single && !listed) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'package_name is required',
+      path: ['package_name'],
+    });
+  }
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
     '[read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time.',
   ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    package_name: z
-      .string()
-      .optional()
-      .describe('Package name (give this or package_names)'),
-    package_names: z
-      .array(z.string())
-      .optional()
-      .describe(
-        'Several package names, read together (give this or package_name)',
-      ),
-    include_subpackages: z
-      .boolean()
-      .default(true)
-      .optional()
-      .describe(
-        'Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true',
-      ),
-    max_depth: z
-      .number()
-      .int()
-      .default(5)
-      .optional()
-      .describe('Maximum depth for recursive package traversal. Default: 5'),
-    include_descriptions: z
-      .boolean()
-      .default(false)
-      .optional()
-      .describe(
-        "Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false",
-      ),
-    debug: z
-      .boolean()
-      .default(false)
-      .optional()
-      .describe(
-        'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
-      ),
-  }),
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(onePackageForm),
+    z.object(FIELDS).superRefine(onePackageForm),
+  ),
 } as const;
 
 type GetPackageTreeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -344,22 +377,6 @@ function treeOf(
 }
 
 /**
- * The refusal of a package-tree call's arguments, before anything is read
- * (`undefined`: none): exactly one of `package_name` and `package_names`.
- */
-export function packageTreeArgumentsRefusal(
-  args: GetPackageTreeArgs,
-): string | undefined {
-  const single = typeof args.package_name === 'string' && args.package_name;
-  const list = Array.isArray(args.package_names) ? args.package_names : [];
-  if (single && list.length > 0) {
-    return 'Give exactly one of package_name or package_names';
-  }
-  if (!single && list.length === 0) return 'package_name is required';
-  return undefined;
-}
-
-/**
  * Main handler for GetPackageTree MCP tool
  */
 export async function handleGetPackageTree(
@@ -368,10 +385,9 @@ export async function handleGetPackageTree(
 ) {
   const { logger } = context;
   try {
-    const refusal = packageTreeArgumentsRefusal(args);
-    if (refusal !== undefined) return return_error(new Error(refusal));
-    const single = typeof args?.package_name === 'string' && args.package_name;
-    const list = Array.isArray(args?.package_names) ? args.package_names : [];
+    // The schema holds the rule: exactly one of the two forms.
+    const single = stated(args.package_name) ? args.package_name : undefined;
+    const list = args.package_names ?? [];
     const packageNames = (single ? [single] : list).map((name) =>
       name.toUpperCase(),
     );

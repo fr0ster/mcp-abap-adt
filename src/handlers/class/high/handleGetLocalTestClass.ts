@@ -2,6 +2,7 @@ import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
@@ -23,7 +24,9 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   description: `[read-only] Reads the local test classes include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. ${SOURCE_RANGE_WORDS}`,
   inputSchema: z.object({
-    class_name: z.string().describe('Parent class name.'),
+    class_name: requiredText('class_name is required').describe(
+      'Parent class name.',
+    ),
     version: READ_VERSION_FIELD,
     ...SOURCE_RANGE_SHAPE,
   }),
@@ -37,7 +40,6 @@ export async function handleGetLocalTestClass(
 ) {
   const { connection, logger } = context;
   const { class_name, version = 'active' } = args;
-  if (!class_name) return return_error(new Error('class_name is required'));
   const range = sourceRangeOf(args);
   if (range instanceof Error) return return_error(range);
 

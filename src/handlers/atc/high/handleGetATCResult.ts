@@ -2,6 +2,7 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
@@ -11,7 +12,6 @@ import { terseFinding } from '../../../lib/strategies/atcFindings';
 import { parseAtcResult } from '../../../lib/strategies/atcResults';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 
 /**
  * One ATC result by its Display ID, its findings as `GetATCFindings` reads a
@@ -28,7 +28,9 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
-    display_id: z.string().describe('Display ID of a stored ATC result.'),
+    display_id: requiredText(
+      'display_id is required. ListATCResults answers one per result.',
+    ).describe('Display ID of a stored ATC result.'),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -40,14 +42,7 @@ export async function handleGetATCResult(
   args: GetATCResultArgs,
 ) {
   const { connection, logger } = context;
-  const displayId = args?.display_id?.trim();
-  if (!displayId) {
-    return return_error(
-      new Error(
-        'display_id is required. ListATCResults answers one per result.',
-      ),
-    );
-  }
+  const displayId = args.display_id.trim();
 
   const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
   const detail = detailOf(args);

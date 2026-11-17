@@ -1,50 +1,136 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
+  onEveryVariant,
+  type RuleVariant,
+  stated,
+  withInCallSchema,
+} from '../../../lib/handlers/argumentRules';
+import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import { succeeded } from '../../../lib/strategies/stepResponse';
+
+/** GetObjectsList's arguments but `background`. */
+const FIELDS = {
+  parent_name: z
+    .string()
+    .optional()
+    .describe(
+      '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
+    ),
+  parent_tech_name: z
+    .string()
+    .optional()
+    .describe('[read-only] Parent technical name'),
+  parent_type: z
+    .string()
+    .optional()
+    .describe('[read-only] Parent object type (e.g. PROG/P, FUGR)'),
+  objects: z
+    .array(
+      z.object({
+        parent_type: z
+          .string()
+          .describe('Parent object type (e.g. PROG/P, FUGR)'),
+        parent_name: z.string().describe('Parent object name'),
+      }),
+    )
+    .optional()
+    .describe(
+      '[read-only] Several parents, read together (give this or parent_name)',
+    ),
+  with_short_descriptions: z
+    .boolean()
+    .optional()
+    .describe('[read-only] Include short descriptions (default: true)'),
+};
+
+type ObjectsListFields = z.output<z.ZodObject<typeof FIELDS>>;
+
+/**
+ * The rules of a call: a non-empty `objects` alone, each entry with its
+ * type and name; else `parent_name`, `parent_tech_name` and `parent_type`,
+ * none blank; on a stated variant every parent type one of its table's.
+ */
+function objectsListRules(variant: RuleVariant) {
+  return (args: ObjectsListFields, ctx: z.RefinementCtx): void => {
+    const refuse = (message: string, path: string) =>
+      ctx.addIssue({ code: 'custom', message, path: [path] });
+    const typeOf = (argument: string, text: string) => {
+      if (variant !== undefined && tableTypeOf(text, variant) === undefined) {
+        refuse(notATableType(argument, text, variant), argument);
+      }
+    };
+    const { parent_name, parent_tech_name, parent_type, objects } = args;
+    if (objects !== undefined && objects.length > 0) {
+      if (
+        parent_name !== undefined ||
+        parent_tech_name !== undefined ||
+        parent_type !== undefined
+      ) {
+        refuse(
+          'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
+          'objects',
+        );
+        return;
+      }
+      for (const entry of objects) {
+        if (!stated(entry.parent_type) || !stated(entry.parent_name)) {
+          refuse(
+            'Each entry of objects needs parent_type and parent_name (non-empty strings).',
+            'objects',
+          );
+          return;
+        }
+      }
+      for (const entry of objects) {
+        typeOf('objects[].parent_type', entry.parent_type);
+      }
+      return;
+    }
+    if (!stated(parent_name)) {
+      refuse(
+        'Parameter "parent_name" (string) is required and cannot be empty.',
+        'parent_name',
+      );
+    } else if (!stated(parent_tech_name)) {
+      refuse(
+        'Parameter "parent_tech_name" (string) is required and cannot be empty.',
+        'parent_tech_name',
+      );
+    } else if (!stated(parent_type)) {
+      refuse(
+        'Parameter "parent_type" (string) is required and cannot be empty.',
+        'parent_type',
+      );
+    } else {
+      typeOf('parent_type', parent_type);
+    }
+  };
+}
+
+/** The schema on `variant`, `background` listed; its in-the-call twin beside it. */
+function schemaOn(variant: RuleVariant) {
+  const rules = objectsListRules(variant);
+  return withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(rules),
+    z.object(FIELDS).superRefine(rules),
+  );
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
+  ...onEveryVariant(
+    withLongToolAdvice(
+      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
+    ),
+    schemaOn,
   ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    parent_name: z
-      .string()
-      .optional()
-      .describe(
-        '[read-only] Parent object name (with parent_tech_name and parent_type; or give objects)',
-      ),
-    parent_tech_name: z
-      .string()
-      .optional()
-      .describe('[read-only] Parent technical name'),
-    parent_type: z
-      .string()
-      .optional()
-      .describe('[read-only] Parent object type (e.g. PROG/P, FUGR)'),
-    objects: z
-      .array(
-        z.object({
-          parent_type: z
-            .string()
-            .describe('Parent object type (e.g. PROG/P, FUGR)'),
-          parent_name: z.string().describe('Parent object name'),
-        }),
-      )
-      .optional()
-      .describe(
-        '[read-only] Several parents, read together (give this or parent_name)',
-      ),
-    with_short_descriptions: z
-      .boolean()
-      .optional()
-      .describe('[read-only] Include short descriptions (default: true)'),
-  }),
 } as const;
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -344,54 +430,11 @@ function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
     : failureEntry(walk.getError(), 'read node structure');
 }
 
-/**
- * The refusal of an objects-list call's arguments, before anything is read
- * (`undefined`: none): a non-empty `objects` stands alone, each entry with
- * its type and name; else `parent_name`, `parent_tech_name` and
- * `parent_type`, each a non-empty string.
- */
-export function objectsListArgumentsRefusal(
-  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
-): string | undefined {
-  const { parent_name, parent_tech_name, parent_type, objects } = args;
-  if (Array.isArray(objects) && objects.length > 0) {
-    if (
-      parent_name !== undefined ||
-      parent_tech_name !== undefined ||
-      parent_type !== undefined
-    ) {
-      return 'Give exactly one of parent_name, parent_tech_name and parent_type, or objects';
-    }
-    for (const entry of objects) {
-      if (
-        typeof entry?.parent_type !== 'string' ||
-        entry.parent_type.trim() === '' ||
-        typeof entry?.parent_name !== 'string' ||
-        entry.parent_name.trim() === ''
-      ) {
-        return 'Each entry of objects needs parent_type and parent_name (non-empty strings).';
-      }
-    }
-    return undefined;
-  }
-  if (typeof parent_name !== 'string' || parent_name.trim() === '') {
-    return 'Parameter "parent_name" (string) is required and cannot be empty.';
-  }
-  if (typeof parent_tech_name !== 'string' || parent_tech_name.trim() === '') {
-    return 'Parameter "parent_tech_name" (string) is required and cannot be empty.';
-  }
-  if (typeof parent_type !== 'string' || parent_type.trim() === '') {
-    return 'Parameter "parent_type" (string) is required and cannot be empty.';
-  }
-  return undefined;
-}
-
 export async function handleGetObjectsList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const refusal = objectsListArgumentsRefusal(args);
-  if (refusal !== undefined) return return_error(refusal);
+  // The schema holds the rules: the forms, the names, the parent types.
   const {
     parent_name,
     parent_tech_name,
@@ -405,39 +448,19 @@ export async function handleGetObjectsList(
       ? Boolean(with_short_descriptions)
       : true;
 
-  if (Array.isArray(listed) && listed.length > 0) {
-    if (
-      parent_name !== undefined ||
-      parent_tech_name !== undefined ||
-      parent_type !== undefined
-    ) {
-      return return_error(
-        'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
-      );
-    }
-    for (const entry of listed) {
-      if (
-        typeof entry?.parent_type !== 'string' ||
-        entry.parent_type.trim() === '' ||
-        typeof entry?.parent_name !== 'string' ||
-        entry.parent_name.trim() === ''
-      ) {
-        return return_error(
-          'Each entry of objects needs parent_type and parent_name (non-empty strings).',
-        );
-      }
-    }
+  if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];
     for (const entry of listed) {
-      const text = String(entry.parent_type);
+      // The schema accepted the type on this variant: its code. A call that
+      // bypassed the schema gets the schema's words.
       const variant = variantOf(context.connection);
-      const type = tableTypeOf(text, variant);
+      const type = tableTypeOf(entry.parent_type, variant);
       if (type === undefined) {
         return return_error(
-          notATableType('objects[].parent_type', text, variant),
+          notATableType('objects[].parent_type', entry.parent_type, variant),
         );
       }
-      parents.push({ type, name: String(entry.parent_name).toUpperCase() });
+      parents.push({ type, name: entry.parent_name.toUpperCase() });
     }
     let read: ParentWalks = { walks: [] };
     return answer(
@@ -471,39 +494,15 @@ export async function handleGetObjectsList(
     );
   }
 
-  if (
-    !parent_name ||
-    typeof parent_name !== 'string' ||
-    parent_name.trim() === ''
-  ) {
-    return return_error(
-      'Parameter "parent_name" (string) is required and cannot be empty.',
-    );
-  }
-  if (
-    !parent_tech_name ||
-    typeof parent_tech_name !== 'string' ||
-    parent_tech_name.trim() === ''
-  ) {
-    return return_error(
-      'Parameter "parent_tech_name" (string) is required and cannot be empty.',
-    );
-  }
-  if (
-    !parent_type ||
-    typeof parent_type !== 'string' ||
-    parent_type.trim() === ''
-  ) {
-    return return_error(
-      'Parameter "parent_type" (string) is required and cannot be empty.',
-    );
-  }
-
-  const parentName = parent_name.toUpperCase();
+  // The schema required the three, none blank, and the type on this
+  // variant: its code. A call that bypassed the schema gets its words.
+  const parentName = (parent_name ?? '').toUpperCase();
   const variant = variantOf(context.connection);
-  const parentType = tableTypeOf(parent_type, variant);
+  const parentType = tableTypeOf(parent_type ?? '', variant);
   if (parentType === undefined) {
-    return return_error(notATableType('parent_type', parent_type, variant));
+    return return_error(
+      notATableType('parent_type', parent_type ?? '', variant),
+    );
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's

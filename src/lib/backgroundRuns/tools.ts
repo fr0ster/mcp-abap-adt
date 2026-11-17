@@ -13,6 +13,7 @@
  */
 
 import * as z from 'zod';
+import { inCallSchemaOf } from '../handlers/argumentRules.js';
 import type { ToolArgs, ToolDefinition } from '../handlers/interfaces.js';
 import { LONG_TOOL_ADVICE, LONG_TOOL_IN_CALL_ADVICE } from '../longTools';
 
@@ -151,9 +152,16 @@ function inTheCallWords(description: string): string {
   return description.split(LONG_TOOL_ADVICE).join(LONG_TOOL_IN_CALL_ADVICE);
 }
 
+/**
+ * `schema` without `background`: the in-the-call twin its rules were built
+ * with (`withInCallSchema`; zod 4 cannot `.omit` from a schema with an
+ * object-level rule), else the schema with the property omitted.
+ */
 function schemaWithoutBackground(
   schema: ToolDefinition['inputSchema'],
 ): ToolDefinition['inputSchema'] {
+  const inCall = inCallSchemaOf(schema);
+  if (inCall !== undefined) return inCall;
   return Object.keys(schema.shape).includes('background')
     ? schema.omit({ background: true })
     : schema;

@@ -1,9 +1,9 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { return_error } from '../../../lib/utils';
 import { readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
@@ -14,7 +14,9 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
-    run_id: z.string().describe('Run id a unit test run answered.'),
+    run_id: requiredText('run_id is required').describe(
+      'Run id a unit test run answered.',
+    ),
     with_navigation_uris: z
       .boolean()
       .optional()
@@ -33,10 +35,7 @@ export async function handleGetUnitTestResult(
   context: HandlerContext,
   args: GetUnitTestResultArgs,
 ) {
-  const { run_id, with_navigation_uris, format } = args;
-  if (!run_id) return return_error(new Error('run_id is required'));
-
-  // Same v18-convenience departure as `GetUnitTest`: the old `.read({runId})`
+  const { run_id, with_navigation_uris, format } = args; // Same v18-convenience departure as `GetUnitTest`: the old `.read({runId})`
   // this handler called polled status internally before ever answering a
   // result. This tool has no status of its own to poll (`with_long_polling`
   // is not in its surface), so — per the fix ruling — it polls status first

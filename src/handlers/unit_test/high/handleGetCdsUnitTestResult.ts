@@ -1,9 +1,9 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { return_error } from '../../../lib/utils';
 import { readRunOnce, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
@@ -14,7 +14,9 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Retrieve CDS unit test run result for a run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
-    run_id: z.string().describe('Run identifier returned by unit test run.'),
+    run_id: requiredText('run_id is required').describe(
+      'Run identifier returned by unit test run.',
+    ),
     with_navigation_uris: z
       .boolean()
       .default(false)
@@ -34,10 +36,7 @@ export async function handleGetCdsUnitTestResult(
   context: HandlerContext,
   args: GetCdsUnitTestResultArgs,
 ) {
-  const { run_id, with_navigation_uris, format } = args;
-  if (!run_id) return return_error(new Error('run_id is required'));
-
-  // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getResult` unchanged
+  const { run_id, with_navigation_uris, format } = args; // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getResult` unchanged
   // — same `readRunOnce` reconstruction as `GetUnitTestResult`, for
   // the same reason (no status of its own to poll on this tool's surface).
   const cdsUnitTest = testRunner(context, 'class');

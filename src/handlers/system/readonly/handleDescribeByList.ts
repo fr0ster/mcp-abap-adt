@@ -1,8 +1,14 @@
 import * as z from 'zod';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+
+/** The refusal of a call without objects. */
+const OBJECTS_REQUIRED =
+  'Missing or invalid parameters: objects (array) is required and must not be empty.';
+
 export const TOOL_DEFINITION = {
   name: 'DescribeByList',
   available_in: ['onprem', 'cloud'] as const,
@@ -11,20 +17,21 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
-    objects: z.array(
-      z.object({
-        name: z
-          .string()
-          .optional()
-          .describe(
+    objects: z
+      .array(
+        z.object({
+          name: requiredText('object_name is required').describe(
             '[read-only] Object name (required, must be valid ABAP object name or mask)',
           ),
-        type: z
-          .string()
-          .optional()
-          .describe('[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)'),
+          type: z
+            .string()
+            .optional()
+            .describe('[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)'),
+        }),
+      )
+      .refine((objects) => objects.length > 0, {
+        message: OBJECTS_REQUIRED,
       }),
-    ),
   }),
 } as const;
 
@@ -161,30 +168,14 @@ async function describeOneByOne(
   args: DescribeArgs | undefined,
 ): Promise<McpResult> {
   const { logger } = context;
-  const objects = args?.objects;
-  if (!args || !Array.isArray(objects) || objects.length === 0) {
-    throw Object.assign(
-      new Error(
-        'Missing or invalid parameters: objects (array) is required and must not be empty.',
-      ),
-      {
-        status: 400,
-        body: {
-          error: {
-            message:
-              'Missing or invalid parameters: objects (array) is required and must not be empty.',
-            code: 'INVALID_PARAMS',
-          },
-        },
-      },
-    );
-  }
+  // The schema holds the rule: a non-empty `objects`.
+  const objects = args?.objects ?? [];
   logger?.info(`Describing ${objects.length} objects via search`);
   const results: ContentEntry[] = [];
   try {
     for (const obj of objects) {
       const first = await handleSearchObject(context, {
-        object_name: obj.name ?? '',
+        object_name: obj.name,
         object_type: obj.type,
       });
       // A credential failure is every object's: the call ends with it as it
@@ -196,7 +187,7 @@ async function describeOneByOne(
       if (emptyOrFailed(first)) {
         try {
           second = await handleSearchObject(context, {
-            object_name: obj.name ?? '',
+            object_name: obj.name,
           });
         } catch {
           continue;
@@ -232,7 +223,7 @@ async function describeInEnvelopes(
   const typed = await runPhase(context, objects, (obj, batch) =>
     handleSearchObject(
       { ...context, connection: batch },
-      { object_name: obj.name ?? '', object_type: obj.type },
+      { object_name: obj.name, object_type: obj.type },
     ),
   );
   const typedAnswer = (i: number): McpResult | undefined => {
@@ -305,10 +296,7 @@ export async function handleDescribeByList(
   context: HandlerContext,
   args: DescribeArgs,
 ) {
-  const objects = args?.objects;
-  if (!args || !Array.isArray(objects) || objects.length === 0) {
-    return describeOneByOne(context, args);
-  }
+  // The schema holds the rule: a non-empty `objects`.
   return withSequentialFallback<McpResult>(
     context,
     () => describeInEnvelopes(context, args),

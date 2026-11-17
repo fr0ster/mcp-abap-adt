@@ -141,17 +141,15 @@ describe('GetTableType', () => {
     expect(COMPACT_READ_TAKES.members.TABLE_TYPE).toContain('version');
   });
 
-  it('refuses an empty table_type_name, sending nothing', async () => {
+  it('refuses an empty table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const result = await handleGetTableType(
-      { connection, logger: undefined },
-      { table_type_name: '' },
-    );
-    expect(result.isError).toBe(true);
-    const first = result.content[0];
-    expect(first && 'text' in first ? first.text : '').toBe(
-      'table_type_name is required',
-    );
+    const refused = expect(
+      defineTool(GET_TABLE_TYPE, handleGetTableType).call(
+        { connection, logger: undefined },
+        { table_type_name: '' },
+      ),
+    ).rejects.toThrow('table_type_name is required at table_type_name');
+    await refused;
     expect(connection.requests).toHaveLength(0);
   });
 

@@ -4,10 +4,10 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 import { parseXml } from '../../../lib/xml/node';
 import { child, isElement, listOf } from '../../../lib/xml/tree';
 
@@ -16,7 +16,11 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem'] as const,
   description:
     '[read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns main_programs, a list of { name, type, uri } — type PROG/P for a program, FUGR/F for a function group.',
-  inputSchema: z.object({ include_name: z.string().describe('Include name.') }),
+  inputSchema: z.object({
+    include_name: requiredText('Include name is required').describe(
+      'Include name.',
+    ),
+  }),
 } as const;
 
 type GetMainProgramsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -66,7 +70,6 @@ export async function handleGetMainPrograms(
 ) {
   const { connection, logger } = context;
   const { include_name } = args;
-  if (!include_name) return return_error('Include name is required');
   const includeName = include_name.toUpperCase();
   logger?.info(`Fetching main programs of include: ${includeName}`);
   // One request; SAP's refusal is the method's error as it is.

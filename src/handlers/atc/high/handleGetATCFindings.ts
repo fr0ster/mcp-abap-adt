@@ -2,6 +2,7 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
@@ -13,7 +14,6 @@ import {
 } from '../../../lib/strategies/atcFindings';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
 
 /**
  * What an ATC run found, by worklist.
@@ -33,9 +33,9 @@ export const TOOL_DEFINITION = {
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
-    worklist_id: z
-      .string()
-      .describe('Worklist identifier an ATC run answered.'),
+    worklist_id: requiredText(
+      'worklist_id is required. RunATC answers one on every run.',
+    ).describe('Worklist identifier an ATC run answered.'),
     ...DETAIL_SHAPE,
   }),
 } as const;
@@ -47,12 +47,7 @@ export async function handleGetATCFindings(
   args: GetATCFindingsArgs,
 ) {
   const { connection, logger } = context;
-  const worklistId = args?.worklist_id?.trim();
-  if (!worklistId) {
-    return return_error(
-      new Error('worklist_id is required. RunATC answers one on every run.'),
-    );
-  }
+  const worklistId = args.worklist_id.trim();
 
   const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
   const detail = detailOf(args);

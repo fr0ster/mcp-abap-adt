@@ -21,7 +21,7 @@ import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { load as loadYaml } from 'js-yaml';
 import { CORE_PARAMETERS, readCoreConfig } from '../../config/coreParameters';
-import { hydrateSystemContextFromEnvFile } from '../../config/envFileContext';
+import { readEnvFileContext } from '../../config/envFileContext';
 import { coreHelp, main } from '../../launcher';
 
 /** The words of a refusal `read` throws, or undefined when it reads. */
@@ -110,10 +110,8 @@ describe('--deferred-logon: its forms and their precedence', () => {
     it('MCP_DEFERRED_LOGON stated in it changes nothing', () => {
       const envFile = path.join(dir, 'destination.env');
       fs.writeFileSync(envFile, 'MCP_DEFERRED_LOGON=true\n');
-      const env: NodeJS.ProcessEnv = {};
-      hydrateSystemContextFromEnvFile(envFile, env);
-      assert.equal(env.MCP_DEFERRED_LOGON, undefined);
-      assert.equal(deferred([`--env-path=${envFile}`], env), false);
+      assert.deepEqual(readEnvFileContext(envFile), {});
+      assert.equal(deferred([`--env-path=${envFile}`], {}), false);
     });
   });
 

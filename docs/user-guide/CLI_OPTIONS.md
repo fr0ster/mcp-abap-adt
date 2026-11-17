@@ -191,8 +191,8 @@ How the server communicates with the SAP system: `http` (HTTP/HTTPS) or `rfc` (v
 SDK, any system it supports). **Required for a destination: there is no default.** Without it a
 stdio destination does not start (exit `1`, naming the places it can be set). It may be set as
 `--connection-type`, in the process environment, in the destination's own `.env` (the `--env` /
-`--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`; it joins the environment, never over
-a value already set) or as YAML `connection-type`. Precedence: the CLI flag, then the environment,
+`--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`; read below the process environment,
+never copied into it) or as YAML `connection-type`. Precedence: the CLI flag, then the environment,
 then YAML. A service key carries no connection type.
 
 ```bash
@@ -203,7 +203,7 @@ RFC requires the SAP NW RFC library at run time — SAP GUI's 64-bit `sapnwrfc.d
 else the SAP NW RFC SDK installed and on the library search path. See
 [RFC Setup Guide](../installation/RFC_SETUP.md). The same option can be set with
 `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` `.env`
-(which joins the environment, never over a value already set), or YAML `connection-type: rfc`.
+(read below the process environment, never copied into it), or YAML `connection-type: rfc`.
 Precedence: the CLI flag, then the environment, then YAML.
 
 ### --ashost, --sysnr, --mshost, --msserv, --sysid, --group, --saprouter, --client, --language
@@ -622,7 +622,7 @@ These are typically set in the destination's `.env` file:
 - `SAP_URL` - SAP system URL (required over HTTP; an RFC destination states none, and one that does is refused)
 - `SAP_CLIENT` - SAP client number (required over RFC)
 - `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X" cannot be used: authType`). `saml`, `certificate` and `kerberos` are not supported
-- `SAP_SYSTEM_TYPE` - SAP system type: `cloud`, `onprem` or `legacy` (same as `--system-type`). **Required (19.0.0): there is no default** — not for the tools offered (e.g., a program's writes require `onprem`), not for the connector (a `jwt` destination is no longer taken for cloud), and the kind is never guessed from the URL. Without it a stdio destination does not start (exit `1`, naming the parameter), and neither do Streamable HTTP / SSE (exit `1` before anything listens). Inspection-only stdio (no destination) needs it too: it lists the tools of that system type's ADT type table, and without it the start is refused (exit `1`). It may be set in the process environment or in the `--env` / `--env-path` `.env` (which joins the environment, never over a value already set), as `--system-type` or as YAML `system-type`. Precedence: the CLI flag, then the environment, then YAML. `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
+- `SAP_SYSTEM_TYPE` - SAP system type: `cloud`, `onprem` or `legacy` (same as `--system-type`). **Required (19.0.0): there is no default** — not for the tools offered (e.g., a program's writes require `onprem`), not for the connector (a `jwt` destination is no longer taken for cloud), and the kind is never guessed from the URL. Without it a stdio destination does not start (exit `1`, naming the parameter), and neither do Streamable HTTP / SSE (exit `1` before anything listens). Inspection-only stdio (no destination) needs it too: it lists the tools of that system type's ADT type table, and without it the start is refused (exit `1`). It may be set in the process environment or in the `--env` / `--env-path` `.env` (read below the process environment, never copied into it), as `--system-type` or as YAML `system-type`. No binary writes the value it resolved into the process environment (24.0.0): it is passed to the server. Precedence: the CLI flag, then the environment, then YAML. `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth). On-premise, also the login the responsible of created objects falls back to when no `SAP_RESPONSIBLE` is stated (the destination's own first, then the process environment's); not on a cloud system, whose login is the system's user. The environment is read once: a change while the server runs is not picked up
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` or `rfc`. **Required for a destination: there is no default** (see [--connection-type](#--connection-typetype)). Process environment, or the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<name>.env` for `--mcp=<name>`)

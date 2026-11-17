@@ -79,6 +79,14 @@ let root: string;
 let keysDir: string;
 let sessionsDir: string;
 let stdioStart: jest.SpyInstance;
+/** The servers the launcher started, in order. */
+let started: StdioServer[] = [];
+
+/** The system type the launcher passed the server it started (D26 B4). */
+function startedSystemType(): string | undefined {
+  const server: unknown = started[0];
+  return (server as { systemType?: string } | undefined)?.systemType;
+}
 
 beforeEach(() => {
   // Real path: on macOS the temp dir is under /var, a link to /private/var.
@@ -109,9 +117,12 @@ beforeEach(() => {
   // (a case about the type itself deletes or restates it).
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   constructed.mockClear();
+  started = [];
   stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+    .mockImplementation(async function (this: StdioServer) {
+      started.push(this);
+    });
   // The connection at start is the launcher's own step: not made here.
   jest
     .spyOn(StdioServer.prototype, 'connectAtStart')
@@ -495,7 +506,9 @@ describe('one destination per process', () => {
     const { exits } = await run(['--system-type=cloud']);
     expect(exits).toEqual([]);
     expect(stdioStart).toHaveBeenCalledWith(undefined);
-    expect(process.env.SAP_SYSTEM_TYPE).toBe('cloud');
+    // Passed to the server; the process environment is not written.
+    expect(startedSystemType()).toBe('cloud');
+    expect(process.env.SAP_SYSTEM_TYPE).toBeUndefined();
   });
 });
 
@@ -687,8 +700,8 @@ describe('factoryConfigFrom: the env file', () => {
 
 /**
  * The connection type a destination's .env states, as in 15.x: the file's
- * SAP_CONNECTION_TYPE joins the process environment (never over a value
- * already there), and the precedence is CLI, then that environment, then YAML.
+ * SAP_CONNECTION_TYPE is read below the process environment (never copied
+ * into it), and the precedence is CLI, then that environment, then YAML.
  */
 describe('SAP_CONNECTION_TYPE inside the env file', () => {
   async function settingsOf(argv: string[]) {
@@ -837,9 +850,12 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
     return file;
   };
   async function systemTypeOf(argv: string[]) {
+    const before = { ...process.env };
     const result = await run([...argv]);
     expect(result.exits).toEqual([]);
-    return process.env.SAP_SYSTEM_TYPE;
+    // Passed to the server; the process environment is unchanged.
+    expect(process.env).toEqual(before);
+    return startedSystemType();
   }
 
   it('the file beats YAML system-type', async () => {

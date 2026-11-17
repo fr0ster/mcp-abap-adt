@@ -163,9 +163,6 @@ export async function launch(
     deps.exit(1);
     return undefined;
   }
-  // The connector and the tool filter read the system kind from the
-  // environment (`resolveSystemKind`).
-  process.env.SAP_SYSTEM_TYPE = config.systemType;
   // The access restrictions: the denied actions applied to the registry,
   // one strategy for every instance, and the start line, once per process.
   const restricted = restrictedStart(
@@ -178,6 +175,9 @@ export async function launch(
   );
   deps.stderr(restricted.startLine);
   const server = new SseServer(restricted.registry, {
+    // The kind resolved here, passed explicitly: nothing is written into
+    // the process environment.
+    systemType: config.systemType,
     ...(restricted.accessChecks !== undefined && {
       accessChecks: restricted.accessChecks,
     }),

@@ -64,7 +64,10 @@ import {
   readCoreConfig,
   statedLoginTimeout,
 } from './config/coreParameters';
-import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
+import {
+  readEnvFileContext,
+  withEnvFileContext,
+} from './config/envFileContext';
 import { getPlatformPaths } from './config/platformPaths';
 import { StdioServer } from './StdioServer.js';
 import {
@@ -391,9 +394,8 @@ class LauncherRefusal extends Error {
 }
 
 /**
- * A parameter the env file may state: the CLI, then the process environment
- * — which by now holds what the env file states, never over a value set
- * before — then YAML. A config made by hand, with no source, is taken as it
+ * A parameter the env file may state: the CLI, then the process environment,
+ * then the env file (`withEnvFileContext`), then YAML. A config made by hand, with no source, is taken as it
  * is. A word in the environment that is not one of `values` is refused naming
  * the key, never quoting it: it may come from a file.
  */
@@ -402,7 +404,7 @@ function effectiveFromEnvironment<T extends string>(
   source: string | undefined,
   key: string,
   values: readonly T[],
-  env: NodeJS.ProcessEnv,
+  env: Readonly<Record<string, string | undefined>>,
 ): T | undefined {
   const overridable =
     source === key ||
@@ -427,7 +429,7 @@ function effectiveFromEnvironment<T extends string>(
 /** The connection type: see {@link effectiveFromEnvironment}. */
 export function effectiveConnectionType(
   config: CoreConfig,
-  env: NodeJS.ProcessEnv,
+  env: Readonly<Record<string, string | undefined>>,
 ): CoreConfig['connectionType'] {
   return effectiveFromEnvironment(
     config.connectionType,
@@ -494,7 +496,7 @@ export function effectiveMessageServer(
  */
 export function effectiveSystemType(
   config: CoreConfig,
-  env: NodeJS.ProcessEnv,
+  env: Readonly<Record<string, string | undefined>>,
 ): CoreConfig['systemType'] {
   return effectiveFromEnvironment(
     config.systemType,
@@ -796,16 +798,19 @@ async function launchStdio(
   options: LauncherOptions,
   deps: LauncherDeps,
 ): Promise<void> {
-  // The destination's own file joins the process environment first — never
-  // over a value already there — so its SAP_CONNECTION_TYPE and
-  // SAP_SYSTEM_TYPE count (as in 15.x): the --env file, or for --mcp=<name>
-  // the destination's <sessions>/<name>.env the broker reads (#320).
-  hydrateSystemContextFromEnvFile(destinationEnvFileOf(config));
+  // The destination's own file states SAP_CONNECTION_TYPE and
+  // SAP_SYSTEM_TYPE below the process environment (as in 15.x): the --env
+  // file, or for --mcp=<name> the destination's <sessions>/<name>.env the
+  // broker reads (#320). Read as a file: nothing joins process.env.
+  const stated = withEnvFileContext(
+    process.env,
+    readEnvFileContext(destinationEnvFileOf(config)),
+  );
   let connectionType: CoreConfig['connectionType'];
   let systemType: CoreConfig['systemType'];
   try {
-    connectionType = effectiveConnectionType(config, process.env);
-    systemType = effectiveSystemType(config, process.env);
+    connectionType = effectiveConnectionType(config, stated);
+    systemType = effectiveSystemType(config, stated);
   } catch (error) {
     const refusal = thrownAs(error, LauncherRefusal);
     deps.stderr(
@@ -814,9 +819,8 @@ async function launchStdio(
     deps.exit(1);
     return;
   }
-  if (connectionType) process.env.SAP_CONNECTION_TYPE = connectionType;
-  // The connector reads the system type from the environment.
-  if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
+  // Passed explicitly from here on: to the factory with the config, and
+  // the system type to the server.
   config = { ...config, connectionType, systemType };
 
   // The command's tool set: fixed by the command, but for the data tools,
@@ -962,6 +966,8 @@ async function launchStdio(
     destination ? factory : undefined,
     {
       version: options.version,
+      // The kind resolved above: every connection the server builds.
+      systemType,
       // The process's runtime session files, beside the destination's
       // sessions (`--auth-broker-path` moves both).
       leftoverSessions: new LeftoverSessions({

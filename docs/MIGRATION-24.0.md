@@ -118,6 +118,16 @@ A value a start states is read as stated, or the start is refused naming it.
   argument; without it, `SAP_SYSTEM_TYPE` answers as before. A connection your `freshConnection`
   factory returns runs on that kind too (the long calls, background runs, the debugger,
   `force_new_connection`).
+- **No launcher writes `process.env`.** After `mcp-abap-adt`, `mcp-abap-adt-http` or
+  `mcp-abap-adt-sse` started, `SAP_SYSTEM_TYPE` and `SAP_CONNECTION_TYPE` in the process
+  environment are what the process was started with, not what the launcher resolved (from
+  `--system-type`, YAML or the destination's `.env`). Code in the same process that read them there
+  takes the value from its own configuration instead. `StdioServer`, `StreamableHttpServer` and
+  `SseServer` take a `systemType` option: an embedder passes the kind (without it,
+  `SAP_SYSTEM_TYPE` answers). `hydrateSystemContextFromEnvFile` (`@mcp-abap-adt/core`,
+  `@mcp-abap-adt/server-runtime`) is removed: `readEnvFileContext(path)` answers the file's
+  `SAP_CONNECTION_TYPE` / `SAP_SYSTEM_TYPE`, and `withEnvFileContext(env, context)` the values
+  with the environment's first, writing neither.
 
 ## RFC destinations: the address is stated
 

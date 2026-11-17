@@ -18,7 +18,10 @@ import {
   type LineMatchStrategy,
   type SapAnswerStrategy,
 } from '@mcp-abap-adt/lib/embeddable';
-import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type {
+  IHandlersRegistry,
+  SapEnvironment,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
   getProtocol,
@@ -60,6 +63,12 @@ import {
 } from './InstancePool.js';
 
 export interface StreamableHttpServerOptions {
+  /**
+   * The SAP system type: the kind of every connection the server builds and
+   * hands a tool, and the tools it lists. The launcher passes the one it
+   * resolved; absent, `SAP_SYSTEM_TYPE` answers.
+   */
+  systemType?: SapEnvironment | undefined;
   /**
    * The idle bound on held state, in minutes: each instance's state ends
    * after this long without a tool call. At least 30; default 30.
@@ -245,6 +254,7 @@ export class StreamableHttpServer extends BaseMcpServer {
       name: 'mcp-abap-adt',
       version: opts?.version ?? RUNTIME_VERSION,
       logger: opts?.logger ?? noopLogger,
+      systemType: opts?.systemType,
       // Validated by the base: a misconfiguration stops the start.
       stateIdleMinutes: opts?.stateIdleMinutes,
       // From the options as given: the silent default above is never the state's.
@@ -590,6 +600,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         version: string,
         logger: Logger,
         state: {
+          systemType?: SapEnvironment | undefined;
           stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
@@ -650,6 +661,8 @@ export class StreamableHttpServer extends BaseMcpServer {
       this.version,
       this.logger,
       {
+        // Every pooled instance builds for the server's kind.
+        systemType: this.systemType,
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
         // A handle the pool already files is drawn again.

@@ -28,7 +28,7 @@ import {
   CORE_PARAMETERS,
   readCoreConfig,
 } from '../../../../server-runtime/src/stdio/config/coreParameters';
-import { hydrateSystemContextFromEnvFile } from '../../../../server-runtime/src/stdio/config/envFileContext';
+import { readEnvFileContext } from '../../../../server-runtime/src/stdio/config/envFileContext';
 import { coreHelp } from '../../../../server-runtime/src/stdio/launcher';
 import {
   ENABLE_DATA_TOOLS_CLI,
@@ -172,12 +172,14 @@ describe("the data-tools flag and a destination's .env", () => {
     try {
       const file = path.join(dir, 'destination.env');
       fs.writeFileSync(file, `${ENV}=true\nSAP_SYSTEM_TYPE=onprem\n`);
-      const env: NodeJS.ProcessEnv = {};
-      hydrateSystemContextFromEnvFile(file, env);
-      // The file's system type joins, so the hydrate ran; the flag does not.
-      assert.equal(env.SAP_SYSTEM_TYPE, 'onprem');
-      assert.equal(env[ENV], undefined);
-      assert.equal(readCoreConfig([], env, null).enableDataTools, false);
+      // The file's system type is read, so the read ran; the flag is not.
+      assert.deepEqual(readEnvFileContext(file), {
+        SAP_SYSTEM_TYPE: 'onprem',
+      });
+      assert.equal(
+        readCoreConfig([`--env-path=${file}`], {}, null).enableDataTools,
+        false,
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

@@ -18,7 +18,10 @@ import {
   closeInstance,
   InstanceBatch,
 } from '@mcp-abap-adt/lib/embeddable';
-import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type {
+  IHandlersRegistry,
+  SapEnvironment,
+} from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
   getProtocol,
@@ -51,6 +54,12 @@ import { RUNTIME_VERSION } from '../runtimeVersion.js';
 import { SdkTransport } from '../sdkTransport.js';
 
 export interface SseServerOptions {
+  /**
+   * The SAP system type: the kind of every connection the server builds and
+   * hands a tool, and the tools it lists. The launcher passes the one it
+   * resolved; absent, `SAP_SYSTEM_TYPE` answers.
+   */
+  systemType?: SapEnvironment | undefined;
   /**
    * The idle bound on held state, in minutes: each instance's state ends
    * after this long without a tool call. At least 30; default 30.
@@ -190,6 +199,8 @@ export class SseServer {
   private readonly accessChecks: IAccessChecks | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
+  /** The SAP system type every stream's instance builds for. */
+  private readonly systemType: SapEnvironment | undefined;
   /** The running background runs' owner: this server's, shared by every stream's instance. */
   private readonly runOwner = new BackgroundRunOwner();
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
@@ -200,6 +211,7 @@ export class SseServer {
     private readonly handlersRegistry: IHandlersRegistry,
     opts?: SseServerOptions,
   ) {
+    this.systemType = opts?.systemType;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3001;
     this.ssePath = opts?.ssePath ?? '/sse';
@@ -413,6 +425,7 @@ export class SseServer {
         readonly loggerImpl: Logger,
         readonly ver: string,
         state: {
+          systemType?: SapEnvironment | undefined;
           stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
@@ -448,6 +461,8 @@ export class SseServer {
       this.logger,
       this.version,
       {
+        // Every stream's instance builds for the server's kind.
+        systemType: this.systemType,
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
         ...(this.sapAnswerStrategy !== undefined && {

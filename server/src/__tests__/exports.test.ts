@@ -153,9 +153,18 @@ function checkedExports(): Map<string, string[]> {
   return names;
 }
 
+/**
+ * Names 24.0.0 removed on purpose, each a MIGRATION-24.0 entry:
+ * `hydrateSystemContextFromEnvFile` wrote the env file into `process.env`
+ * (D26 B4; `readEnvFileContext` and `withEnvFileContext` read it instead).
+ */
+const REMOVED_IN_24_0_0 = new Set(['hydrateSystemContextFromEnvFile']);
+const kept = (names: readonly string[]) =>
+  names.filter((name) => !REMOVED_IN_24_0_0.has(name));
+
 describe('@mcp-abap-adt/core keeps every name 19.1.0 exported', () => {
   describe.each(ENTRIES)('%s', (_name, _file, loaded, before) => {
-    it.each(before.values)('exports the value %s', (name) => {
+    it.each(kept(before.values))('exports the value %s', (name) => {
       expect(loaded).toHaveProperty(name);
       expect((loaded as Record<string, unknown>)[name]).toBeDefined();
     });
@@ -168,8 +177,14 @@ describe('@mcp-abap-adt/core keeps every name 19.1.0 exported', () => {
     '%s, as the checker reads it',
     (_name, file, _l, before) => {
       const exported = checked.get(path.join(SRC, file)) ?? [];
-      it.each([...before.values, ...before.types])('exports %s', (name) => {
-        expect(exported).toContain(name);
+      it.each(kept([...before.values, ...before.types]))(
+        'exports %s',
+        (name) => {
+          expect(exported).toContain(name);
+        },
+      );
+      it.each([...REMOVED_IN_24_0_0])('no longer exports %s', (name) => {
+        expect(exported).not.toContain(name);
       });
     },
   );

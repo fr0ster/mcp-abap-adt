@@ -20,7 +20,7 @@ const GONE_FROM_LIB = [
 const CORE_NAMES = [
   'getPlatformPaths',
   'resolveEnvFilePath',
-  'hydrateSystemContextFromEnvFile',
+  'readEnvFileContext',
   'ENV_FILE_CONTEXT_KEYS',
 ];
 

@@ -20,7 +20,10 @@ import {
   type StartedConnection,
   sapAnswerOf,
 } from '@mcp-abap-adt/lib/embeddable';
-import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type {
+  IHandlersRegistry,
+  SapEnvironment,
+} from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
 import {
@@ -40,6 +43,12 @@ import { destinationSource } from './destinationSource.js';
 
 export interface StdioServerOptions {
   name?: string;
+  /**
+   * The SAP system type: the kind of every connection the server builds and
+   * hands a tool, and the tools it lists. The launcher passes the one it
+   * resolved; absent, `SAP_SYSTEM_TYPE` answers.
+   */
+  systemType?: SapEnvironment | undefined;
   version?: string;
   logger?: Logger;
   /** Where the state's lifecycle lines go; default stderr, always on. */
@@ -120,6 +129,7 @@ export class StdioServer extends BaseMcpServer {
       name: opts?.name ?? 'mcp-abap-adt',
       version: opts?.version ?? RUNTIME_VERSION,
       logger: opts?.logger ?? noopLogger,
+      systemType: opts?.systemType,
       // No idle bound on stdio: the server's life and its state are the
       // client's — a stop tool, the client closing stdin, the backend's
       // answer or the process's shutdown ends them, never the server's clock.

@@ -1,16 +1,19 @@
 /**
  * `--env-path` gives the env file to the auth broker, which never fills
- * `process.env`. Only what decides the start before any destination is read
- * is bridged: the connection type and the system type. The client, the
- * language and the RFC address are the destination's own means (24.0.0):
- * none of them reaches `process.env`.
+ * `process.env`. The start reads only what decides it before any
+ * destination is read — the connection type and the system type — from the
+ * file itself (`readEnvFileContext`), below the process environment
+ * (`withEnvFileContext`), and writes nothing into `process.env` (24.0.0).
+ * The client, the language and the RFC address are the destination's own
+ * means: the start does not read them from the file.
  */
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   ENV_FILE_CONTEXT_KEYS,
-  hydrateSystemContextFromEnvFile,
+  readEnvFileContext,
+  withEnvFileContext,
 } from '../../config/envFileContext';
 
 function envFile(content: string): string {
@@ -19,19 +22,17 @@ function envFile(content: string): string {
   return path;
 }
 
-describe('hydrateSystemContextFromEnvFile', () => {
-  it('bridges the connection type and the system type', () => {
-    const env: NodeJS.ProcessEnv = {};
-    hydrateSystemContextFromEnvFile(
-      envFile(
-        'SAP_URL=https://host\nSAP_CONNECTION_TYPE=rfc\nSAP_SYSTEM_TYPE=onprem\nSAP_USERNAME=SAPUSER01\n',
+describe('readEnvFileContext', () => {
+  it('reads the connection type and the system type, and writes nothing', () => {
+    const before = { ...process.env };
+    expect(
+      readEnvFileContext(
+        envFile(
+          'SAP_URL=https://host\nSAP_CONNECTION_TYPE=rfc\nSAP_SYSTEM_TYPE=onprem\nSAP_USERNAME=SAPUSER01\n',
+        ),
       ),
-      env,
-    );
-    expect(env).toEqual({
-      SAP_CONNECTION_TYPE: 'rfc',
-      SAP_SYSTEM_TYPE: 'onprem',
-    });
+    ).toEqual({ SAP_CONNECTION_TYPE: 'rfc', SAP_SYSTEM_TYPE: 'onprem' });
+    expect(process.env).toEqual(before);
     expect([...ENV_FILE_CONTEXT_KEYS]).toEqual([
       'SAP_CONNECTION_TYPE',
       'SAP_SYSTEM_TYPE',
@@ -48,36 +49,27 @@ describe('hydrateSystemContextFromEnvFile', () => {
     'SAP_SYSID',
     'SAP_GROUP',
     'SAP_SAPROUTER',
-  ])("%s stays the destination's: it does not reach the environment", (key) => {
-    const env: NodeJS.ProcessEnv = {};
-    hydrateSystemContextFromEnvFile(envFile(`${key}=value-one\n`), env);
-    expect(env).toEqual({});
+    'SAP_RESPONSIBLE',
+    'SAP_MASTER_SYSTEM',
+  ])("%s stays the destination's: the start does not read it", (key) => {
+    expect(readEnvFileContext(envFile(`${key}=value-one\n`))).toEqual({});
   });
 
-  it("the responsible and master system stay the file's destination's: they are not bridged", () => {
-    // The file is the `default` destination's own .env, read per destination
-    // (IDestinations.systemContextFor). Copied into the process environment
-    // they would become every other destination's fallback over HTTP/SSE.
-    const env: NodeJS.ProcessEnv = {};
-    hydrateSystemContextFromEnvFile(
-      envFile(
-        'SAP_RESPONSIBLE=USER_OF_FILE\nSAP_MASTER_SYSTEM=SYSTEM_OF_FILE\nSAP_USERNAME=SAPUSER01\n',
-      ),
-      env,
-    );
-    expect(env).toEqual({});
+  it('states nothing without a file', () => {
+    expect(readEnvFileContext(undefined)).toEqual({});
+    expect(readEnvFileContext('/nonexistent/session.env')).toEqual({});
   });
+});
 
-  it('leaves a value the process already has', () => {
-    const env: NodeJS.ProcessEnv = { SAP_SYSTEM_TYPE: 'cloud' };
-    hydrateSystemContextFromEnvFile(envFile('SAP_SYSTEM_TYPE=onprem\n'), env);
-    expect(env.SAP_SYSTEM_TYPE).toBe('cloud');
-  });
-
-  it('changes nothing without a file', () => {
-    const env: NodeJS.ProcessEnv = {};
-    hydrateSystemContextFromEnvFile(undefined, env);
-    hydrateSystemContextFromEnvFile('/nonexistent/session.env', env);
-    expect(env).toEqual({});
+describe('withEnvFileContext', () => {
+  it('the process environment wins over the file; an empty value does not', () => {
+    const env = { SAP_SYSTEM_TYPE: 'cloud', SAP_CONNECTION_TYPE: '' };
+    expect(
+      withEnvFileContext(env, {
+        SAP_SYSTEM_TYPE: 'onprem',
+        SAP_CONNECTION_TYPE: 'http',
+      }),
+    ).toEqual({ SAP_SYSTEM_TYPE: 'cloud', SAP_CONNECTION_TYPE: 'http' });
+    expect(env).toEqual({ SAP_SYSTEM_TYPE: 'cloud', SAP_CONNECTION_TYPE: '' });
   });
 });

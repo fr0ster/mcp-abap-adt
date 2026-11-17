@@ -523,9 +523,9 @@ export function readCoreConfig(
   return {
     configFile: str(values.configFile),
     systemType: wordValue(values.systemType, SYSTEM_TYPES),
-    // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins
-    // the environment later, and the launcher resolves the precedence then
-    // (effectiveSystemType), as for the connection type.
+    // Never written to process.env: the launcher resolves it against the
+    // env file's SAP_SYSTEM_TYPE (effectiveSystemType), as for the
+    // connection type, and passes it to the server.
     systemTypeSource: source('systemType'),
     batchKeepRawParts: values.batchKeepRawParts === true,
     enableDataTools: values.enableDataTools === true,

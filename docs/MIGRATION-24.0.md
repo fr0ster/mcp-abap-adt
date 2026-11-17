@@ -4,7 +4,9 @@
 a tool's arguments are a zod schema — their type and the one check of a call — and an entry carries
 its call, typed by that schema. A client over MCP sees the tools as in 23.1.0, except the data tools, off unless enabled
 ("Callers of `GetSqlQuery`, `GetTableContents` and `HandlerGetData`", below), batch mode,
-which only the compact binaries serve now ("Callers of batch mode in the full binaries", below), the two
+which only the compact binaries serve now ("Callers of batch mode in the full binaries", below), compact
+`HandlerSystem` in place of `HandlerSearch` and `HandlerWhereUsed` ("compact callers: `HandlerSystem`
+replaces `HandlerSearch` and `HandlerWhereUsed`", below), the two
 arguments that become required (below) and the arguments some tools now declare because their
 handlers read them. An embedder that defines, registers or calls tools in TypeScript changes its
 code. Go through the section that fits how you use the server; the [CHANGELOG](../CHANGELOG.md) has
@@ -543,9 +545,10 @@ the module's metadata first and goes on only when the group the metadata names
 `ActivateFunctionModule`, `DeleteFunctionModule`, `CheckFunctionModule`,
 `GetFunctionModuleVersions`, `GetObjectVersions` (`function_module`),
 `RunFunctionModuleUnitTest` (runner `sync`, and runner `async` with `function_group_name`),
-`ActivateObjects` (every `FUGR/FF` entry), `GetWhereUsed` (every `GROUP|FM_NAME`), and compact
-`HandlerGet`, `HandlerUpdate`, `HandlerActivate`, `HandlerDelete`, `HandlerDeletionCheck`,
-`HandlerCheckRun`, `HandlerLock`, `HandlerUnlock` and `HandlerWhereUsed` for `FUNCTION_MODULE`.
+`ActivateObjects` (every `FUGR/FF` entry), `GetWhereUsed` (every `GROUP|FM_NAME`; compact
+`HandlerSystem` `where_used` is its call), and compact `HandlerGet`, `HandlerUpdate`,
+`HandlerActivate`, `HandlerDelete`, `HandlerDeletionCheck`, `HandlerCheckRun`, `HandlerLock` and
+`HandlerUnlock` for `FUNCTION_MODULE`.
 SAP ignores the group in a module's address, so 23.x read, locked, wrote, activated and deleted
 the module whichever group the call named.
 
@@ -727,7 +730,7 @@ passes `background: false`. `timeout` and `time_budget_ms` are gone. A running r
 `background` (`RuntimeRunClass`, `RuntimeRunProgram`, `HandlerProfileRun`) is unchanged: no
 default, without it the call waits.
 
-The long tools: `GetWhereUsed`, `SearchObject`, `SearchSource`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `RuntimeListFeeds`, `ListTransports`, `GetSqlQuery`, `GetTableContents`, `GetObjectInfo`, `DescribeByList`, `GetATCFindings`, `ListATCResults`, `GetATCResult`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`; compact `HandlerWhereUsed`, `HandlerSearch`, `HandlerDumpList`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` (`tools/long-handlers.json`). Each runs on an ABAP session of
+The long tools: `GetWhereUsed`, `SearchObject`, `SearchSource`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `RuntimeListFeeds`, `ListTransports`, `GetSqlQuery`, `GetTableContents`, `GetObjectInfo`, `DescribeByList`, `GetATCFindings`, `ListATCResults`, `GetATCResult`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`; compact `HandlerSystem`, `HandlerDumpList`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` (`tools/long-handlers.json`). Each runs on an ABAP session of
 its own, logged off after SAP's answer.
 
 **What changes for you:**
@@ -838,8 +841,8 @@ SAP's refusal; on `DOCUMENT_NOT_PATCHED`, read the object again and repeat the c
 ## compact callers: refusals in the target tool's words
 
 A compact route calls its target tool's entry, so its arguments are parsed with the target's own
-schema before anything is sent: `HandlerGet` (every read and part), `HandlerSearch`,
-`HandlerWhereUsed`, `HandlerGetData`, and the creates and updates `HandlerCreate` and
+schema before anything is sent: `HandlerGet` (every read and part), `HandlerSystem` (every
+action), `HandlerGetData`, and the creates and updates `HandlerCreate` and
 `HandlerUpdate` delegate. An argument the target requires that the compact call left out (an
 object's name, `run_id`), or a value outside a list the target declares (`package_type`), is
 refused in the target schema's words, naming the target, where 23.x ran the
@@ -849,6 +852,67 @@ schema defaults).
 
 **What you do:** nothing for a call that worked; a client that matched a refusal's words reads the
 new ones.
+
+
+## compact callers: `HandlerSystem` replaces `HandlerSearch` and `HandlerWhereUsed`
+
+**Changed, breaking:** compact serves the system-wide reads as one tool, `HandlerSystem`, with a
+required `action`. Each action calls exactly one full tool and takes that tool's arguments, named
+and typed as there; the action alone picks the tool:
+
+| `action` | The full tool it calls | Required |
+| --- | --- | --- |
+| `search_source` | `SearchSource` | `query`, `packages` |
+| `search_object` | `SearchObject` | `object_name` |
+| `where_used` | `GetWhereUsed` | `object_name` and `object_type`, or `objects` |
+| `package_tree` | `GetPackageTree` | `package_name` or `package_names` |
+| `transports` | `ListTransports` | — |
+| `atc_findings` | `GetATCFindings` | `worklist_id` |
+| `atc_results` | `ListATCResults` | `created_by` |
+| `atc_result` | `GetATCResult` | `display_id` |
+
+`HandlerSearch` and `HandlerWhereUsed` are removed; a call to either is answered as an unknown
+tool. Six reads are new to compact: `search_source`, `package_tree`, `transports`,
+`atc_findings`, `atc_results`, `atc_result`.
+
+**What you do:**
+- **`HandlerSearch`** `(query, object_type, max_results)` → `HandlerSystem` `(action:
+  "search_object", object_name: <query>, object_type, maxResults: <max_results>)`: `query` is
+  `object_name`, `max_results` is `maxResults`, the default count 100 as before; `search_object`
+  also takes `detail`.
+- **`HandlerWhereUsed`** `(object_type, object_name, function_group_name, max_results)` →
+  `HandlerSystem` `(action: "where_used", object_name, object_type)` with `GetWhereUsed`'s
+  arguments. `object_type` is a where-used code or a name standing for one, not a compact name:
+  `CLASS` → `class`, `INTERFACE` → `interface`, `PROGRAM` → `program`, `INCLUDE` → `include`,
+  `FUNCTION_GROUP` → `functiongroup`, `FUNCTION_MODULE` → `functionmodule`, `PACKAGE` →
+  `package`, `TABLE` → `table`, `STRUCTURE` → `structure`, `DOMAIN` → `domain`, `DATA_ELEMENT` →
+  `dataelement`, `DDL` → `view`, `TABLE_TYPE` → `TTYP/DA`. A function module is named
+  `object_name: "GROUP|MODULE"` (there is no `function_group_name`). `objects` reads several
+  objects together; `enable_all_types`, `enable_only_types` and `disable_types` filter the types.
+  `where_used` answers every reference: the compact cut at `max_results` (default 100) and
+  `returned_references` are gone.
+- **Arguments of another action.** An argument only another action takes, with that action's
+  type, and a key no action declares are dropped; a wrong-typed or ill-valued argument — of the
+  action itself or of another action — is refused before dispatch, in `HandlerSystem`'s name
+  (`Input validation error: Invalid arguments for tool HandlerSystem: …`), so the listing keeps
+  each argument's type. A missing required argument is refused in the target tool's words, with
+  nothing sent.
+- **A long tool.** Without `background` a call answers a `run_handle` at once, read with
+  `HandlerBackgroundRunGet` and cancelled with `HandlerBackgroundRunDiscard`; `background: false`
+  answers in the call. A server without a background-run strategy lists it without `background`
+  and answers in the call.
+- **Batch mode.** `search_object`, `where_used` of one object without a type filter and not a
+  function module, `atc_findings`, `atc_results` and `atc_result` are recorded; `search_source`,
+  `package_tree` and `transports` are refused `batch_not_recordable` in batch mode, as their full
+  tools' reads chain.
+- **Access restrictions.** A deny entry `HandlerWhereUsed.<TYPE>` matches nothing now and is named
+  in the start line; `HandlerSystem` is denied by its tool entry (`HandlerSystem`).
+- **Embedders:** `compactSearchSchema`, `compactWhereUsedSchema`, `compactWhereUsedSchemaFor`,
+  `COMPACT_WHERE_USED_TAKES`, `compactWhereUsedDescription`, `COMPACT_WHERE_USED` and
+  `COMPACT_WHERE_USED_ROUTES` are gone from `@mcp-abap-adt/lib/compact-shared`; `SYSTEM_ACTIONS`,
+  `SYSTEM_ACTION_TOOLS`, `COMPACT_SYSTEM_TAKES`, `compactSystemSchemaFor` and
+  `handlerSystemDefinition` are new. `CompactReadOnlyHandlersGroup` serves `HandlerSystem` in their
+  place.
 
 
 ## compact users: `HandlerCreate` `BEHAVIOR_IMPLEMENTATION` takes `behavior_definition`

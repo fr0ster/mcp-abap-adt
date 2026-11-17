@@ -98,6 +98,10 @@ batch mode; one that read the debugger batch's answers with `BatchAnswers` regis
 - `ConnectionContext.sessionId` and `metadata` are gone: remove them from the contexts you pass
   to `setConnectionContext`.
 - `RouteRegistrationOptions.addJsonMiddleware` is gone: neither server read it.
+- `exposition` and `readOnlyDedupStrategy` beside `handlersRegistry` no longer compile: they
+  shaped only the default registry. Drop them, or build the registry they describe yourself.
+  `EmbeddableMcpServerOptions` is a union now; an `interface` that extended it extends
+  `EmbeddableMcpServerBaseOptions` instead.
 
 ## Starts: nothing stated is ignored
 

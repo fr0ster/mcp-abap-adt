@@ -42,7 +42,8 @@ const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
 /**
  * Options for EmbeddableMcpServer
  */
-export interface EmbeddableMcpServerOptions {
+/** The options of {@link EmbeddableMcpServer} whichever registry it serves. */
+export interface EmbeddableMcpServerBaseOptions {
   /**
    * ABAP connection to use for all handler calls
    * Injected from consumer (e.g., CloudSdkAbapConnection in cloud-llm-hub)
@@ -259,6 +260,20 @@ export interface EmbeddableMcpServerOptions {
    */
   stateLogger?: StateLogger;
 }
+
+/**
+ * {@link EmbeddableMcpServer}'s options: a `handlersRegistry` given, or the
+ * default registry built from `exposition` and `readOnlyDedupStrategy` —
+ * never both, since a given registry replaces the default one and the two
+ * would do nothing beside it.
+ */
+export type EmbeddableMcpServerOptions =
+  | (EmbeddableMcpServerBaseOptions & {
+      handlersRegistry: IHandlersRegistry;
+      exposition?: never;
+      readOnlyDedupStrategy?: never;
+    })
+  | (EmbeddableMcpServerBaseOptions & { handlersRegistry?: undefined });
 
 /**
  * Embeddable MCP Server for integration with external applications

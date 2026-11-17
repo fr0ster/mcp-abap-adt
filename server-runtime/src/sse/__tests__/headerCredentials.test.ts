@@ -40,6 +40,11 @@ beforeEach(async () => {
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   standIn = await adtStandIn();
+  await startSse();
+});
+
+/** The SSE server, its one kind fixed now (`SAP_SYSTEM_TYPE` as it is), listening. */
+async function startSse(): Promise<void> {
   sse = new SseServer(registry, {});
   const app = express();
   app.use(express.json());
@@ -48,7 +53,7 @@ beforeEach(async () => {
     const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
   });
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-});
+}
 
 afterEach(async () => {
   for (const controller of open.splice(0)) controller.abort();
@@ -173,7 +178,15 @@ describe("a connection's credential is its opening GET's", () => {
 
 describe('a request the server does not serve', () => {
   it('an embedder’s own SseServer host with no SAP_SYSTEM_TYPE (the binary does not start without it): a call is refused system_type_required, nothing sent', async () => {
+    // Its one kind is fixed at construction: a server built without one.
+    await sse.stop().catch(() => undefined);
+    await new Promise<void>((resolve) => {
+      server.closeAllConnections();
+      server.close(() => resolve());
+    });
     delete process.env.SAP_SYSTEM_TYPE;
+    await startSse();
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
     const session = await connect(basic('USER_A', 'pass-a'));
     const answer = await session.probe('k1');
     expect(answer.isError).toBe(true);

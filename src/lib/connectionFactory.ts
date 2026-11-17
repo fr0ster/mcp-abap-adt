@@ -320,11 +320,11 @@ const records = new WeakMap<object, ConnectionRecord>();
  * guessed, not from the URL either. What a missing kind means is the
  * host's rules'.
  *
- * The one resolver of the kind a call is checked and dispatched on: the
- * server's precheck (the environment its fallback), a plain registration
- * and `HandlerExporter` (`env` empty: the environment is not read) and an
- * entry's call all read it, with the kind they state as `declared`; it
- * reads and records nothing.
+ * A call is dispatched on the one kind of the server, the registration or
+ * the exporter that runs it, stamped on its connection before the call
+ * (`declareSystemKind`, `stateSystemKind`); one whose recorded or declared
+ * kind is another is refused `system_type_conflict` before (the owner,
+ * 2026-11-17). This reads that kind; it records nothing.
  */
 export function systemKindOf(
   connection: object,

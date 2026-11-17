@@ -6,7 +6,11 @@ import {
 import { runWithCallTransport } from '../../callTransport.js';
 import { siblingRecordOf } from '../../connectionFactory.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
-import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
+import {
+  declaredSystemKindOf,
+  statedSystemKind,
+  stateSystemKind,
+} from '../../systemKind.js';
 import type { ToolArgs } from '../interfaces.js';
 
 /**
@@ -43,15 +47,23 @@ export function inStatedScope<T>(
   if (connection) {
     // A connection the factory built keeps the kind it was built for: a
     // handler stated for another kind is refused, never run on either.
-    const built = siblingRecordOf(connection)?.kind;
+    // One kind: the one stated. A connection built for another (the
+    // factory's record) or declared for another (`declareSystemKind`) is
+    // refused, never run on either.
     const stated = statedSystemKind(scope.systemType);
-    if (built !== undefined && stated !== undefined && built !== stated) {
-      return Promise.reject(
-        new ServerRefusal(
-          'system_type_conflict',
-          systemTypeConflictWords(built, stated),
-        ),
-      );
+    const declared = declaredSystemKindOf(connection);
+    for (const other of [
+      siblingRecordOf(connection)?.kind,
+      declared === 'none' ? undefined : declared,
+    ]) {
+      if (other !== undefined && stated !== undefined && other !== stated) {
+        return Promise.reject(
+          new ServerRefusal(
+            'system_type_conflict',
+            systemTypeConflictWords(other, stated),
+          ),
+        );
+      }
     }
     stateSystemKind(connection, scope.systemType);
   }

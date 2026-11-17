@@ -1175,22 +1175,21 @@ describe('BaseMcpServer.registerHandlers', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it("a factory-built connection follows its recorded settings, not the server's systemType", async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+  it("a factory-built connection of another kind than the server's: system_type_conflict, nothing looked up, the tool not run", async () => {
     const server = new EmbeddableMcpServer({
       connection: onPremUserConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
       systemType: 'cloud',
     });
-    // On-premise by its settings: the 404 is the function unavailable, and
-    // the tool runs with the configuration.
+    // One kind per server (the owner, 2026-11-17): the connection was built
+    // for on-premise, the server states cloud.
     const result = (await callTool(server, 'WithContext')) as {
       isError?: boolean;
+      content: Array<{ text: string }>;
     };
-    expect(result.isError).toBeUndefined();
-    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('system_type_conflict');
+    expect(lookup).not.toHaveBeenCalled();
   });
 
   it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; nothing is kept, the next call asks again', async () => {

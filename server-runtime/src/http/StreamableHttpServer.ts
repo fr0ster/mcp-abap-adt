@@ -67,7 +67,8 @@ export interface StreamableHttpServerOptions {
   /**
    * The SAP system type: the kind of every connection the server builds and
    * hands a tool, and the tools it lists. The launcher passes the one it
-   * resolved; absent, `SAP_SYSTEM_TYPE` answers.
+   * resolved; absent, `SAP_SYSTEM_TYPE` as it is at construction answers —
+   * one kind for the server's life.
    */
   systemType?: SapEnvironment | undefined;
   /**
@@ -604,6 +605,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         logger: Logger,
         state: {
           systemType?: SapEnvironment | undefined;
+          systemTypeFromEnvironment?: false;
           stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
@@ -666,6 +668,8 @@ export class StreamableHttpServer extends BaseMcpServer {
       {
         // Every pooled instance builds for the server's kind.
         systemType: this.systemType,
+        // The server's one kind, fixed at its construction: never re-read.
+        systemTypeFromEnvironment: false,
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
         // A handle the pool already files is drawn again.

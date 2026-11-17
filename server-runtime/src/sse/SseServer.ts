@@ -18,9 +18,10 @@ import {
   closeInstance,
   InstanceBatch,
 } from '@mcp-abap-adt/lib/embeddable';
-import type {
-  IHandlersRegistry,
-  SapEnvironment,
+import {
+  type IHandlersRegistry,
+  type SapEnvironment,
+  statedEnvironment,
 } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
@@ -58,7 +59,8 @@ export interface SseServerOptions {
   /**
    * The SAP system type: the kind of every connection the server builds and
    * hands a tool, and the tools it lists. The launcher passes the one it
-   * resolved; absent, `SAP_SYSTEM_TYPE` answers.
+   * resolved; absent, `SAP_SYSTEM_TYPE` as it is at construction answers —
+   * one kind for the server's life.
    */
   systemType?: SapEnvironment | undefined;
   /**
@@ -212,7 +214,10 @@ export class SseServer {
     private readonly handlersRegistry: IHandlersRegistry,
     opts?: SseServerOptions,
   ) {
-    this.systemType = opts?.systemType;
+    // One kind per server, fixed here: the stated `systemType`, else
+    // `SAP_SYSTEM_TYPE` as it is now; every stream's instance takes it.
+    this.systemType =
+      opts?.systemType ?? statedEnvironment(process.env.SAP_SYSTEM_TYPE);
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3001;
     this.ssePath = opts?.ssePath ?? '/sse';
@@ -429,6 +434,7 @@ export class SseServer {
         readonly ver: string,
         state: {
           systemType?: SapEnvironment | undefined;
+          systemTypeFromEnvironment?: false;
           stateIdleMinutes?: number | undefined;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
@@ -466,6 +472,8 @@ export class SseServer {
       {
         // Every stream's instance builds for the server's kind.
         systemType: this.systemType,
+        // The server's one kind, fixed at its construction: never re-read.
+        systemTypeFromEnvironment: false,
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
         ...(this.sapAnswerStrategy !== undefined && {

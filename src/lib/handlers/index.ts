@@ -13,7 +13,7 @@ import '../instance.js';
 
 /** The variant declared for a connection: what a type argument is checked against. */
 export { variantOf } from '../clients.js';
-export type { SearchMeta } from '../listedTool.js';
+export { type SearchMeta, statedEnvironment } from '../listedTool.js';
 export type { ToolContentItem, ToolResultLike } from '../toolResult.js';
 export {
   nonBlankText,

@@ -143,6 +143,8 @@ describe('nothing is looked up without a resolver', () => {
   it('an instance: its tool runs, no systeminformation sent, nothing refused', async () => {
     const { connection, lookups } = recorded(NO_ENDPOINT);
     const server = new EmbeddableMcpServer({
+      // One kind per server: a call needs it (the owner, 2026-11-17).
+      systemType: 'onprem',
       connection: connection as never,
       handlersRegistry: new CompositeHandlersRegistry([
         new ReportingGroup({ connection: null as never }),
@@ -193,6 +195,8 @@ describe('a resolver and no rules: the information applied, nothing refused', ()
   it('the system names its user: it is the responsible', async () => {
     const { connection, lookups } = recorded(NAMED);
     const server = new EmbeddableMcpServer({
+      // One kind per server: a call needs it (the owner, 2026-11-17).
+      systemType: 'onprem',
       connection: connection as never,
       handlersRegistry: new CompositeHandlersRegistry([
         new ReportingGroup({ connection: null as never }),

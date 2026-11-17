@@ -40,6 +40,7 @@ import {
   batchNotRecordableWords,
   batchNotServedWords,
   ServerRefusal,
+  systemTypeConflictWords,
 } from '../lib/auth/serverRefusal.js';
 import { answerBackgroundStarted } from '../lib/backgroundRuns/answers.js';
 import type {
@@ -85,6 +86,7 @@ import { runWithCallTransport } from '../lib/callTransport.js';
 import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
   createAbapConnection,
+  siblingRecordOf,
   systemKindOf,
   withSystemKindOf,
 } from '../lib/connectionFactory.js';
@@ -98,13 +100,12 @@ import {
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
-import {
-  argumentsRefusalOf,
-  type HandlerEntry,
-  type IHandlerGroup,
-  type IHandlersRegistry,
-  type SapEnvironment,
-  type ToolArgs,
+import type {
+  HandlerEntry,
+  IHandlerGroup,
+  IHandlersRegistry,
+  SapEnvironment,
+  ToolArgs,
 } from '../lib/handlers/interfaces.js';
 import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
@@ -184,6 +185,7 @@ import {
 } from '../lib/systemContext.js';
 import {
   type AbapSystemKind,
+  declaredSystemKindOf,
   declareSystemKind,
   statedSystemKind,
 } from '../lib/systemKind.js';
@@ -309,9 +311,11 @@ export abstract class BaseMcpServer extends McpServer {
   >();
 
   /**
-   * Per-instance SAP system type: the kind of every connection the
-   * instance builds and hands a tool, and the tools it lists. Absent,
-   * `SAP_SYSTEM_TYPE` answers ({@link statedSystemType}).
+   * The instance's one SAP system type, fixed at construction: its
+   * `systemType` option, else `SAP_SYSTEM_TYPE` as it was then. The kind of
+   * every connection it builds and hands a tool, the variant it lists its
+   * tools for and checks and dispatches their calls on. Absent: no kind —
+   * every call that takes a connection is refused `system_type_required`.
    */
   protected readonly systemType?: SapEnvironment | undefined;
   /** What the instance's `systemContext` option states, as a destination would. */
@@ -435,6 +439,14 @@ export abstract class BaseMcpServer extends McpServer {
     version?: string | undefined;
     logger?: Logger | undefined;
     systemType?: SapEnvironment | undefined;
+    /**
+     * `false`: the instance's kind is `systemType` alone — the kind its
+     * server fixed at its own construction (`StreamableHttpServer`,
+     * `SseServer` hand each instance theirs), `SAP_SYSTEM_TYPE` not read.
+     * Absent: an embedder's instance, `SAP_SYSTEM_TYPE` at construction
+     * its fallback.
+     */
+    systemTypeFromEnvironment?: false | undefined;
     /**
      * The system context this instance states (an embedder's
      * `systemContext`): entered for its calls where neither the request nor
@@ -603,7 +615,14 @@ export abstract class BaseMcpServer extends McpServer {
     this.longSessionPort = this.longSessionPortOf(this.longSession);
     this.stateHandleArgument = options.stateHandleArgument === true;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
-    this.systemType = options.systemType;
+    // One kind per server, fixed here: the stated `systemType`, else
+    // `SAP_SYSTEM_TYPE` as it is now (an embedder's fallback). Nothing
+    // reads the environment for it later.
+    this.systemType =
+      options.systemType ??
+      (options.systemTypeFromEnvironment === false
+        ? undefined
+        : statedEnvironment(process.env.SAP_SYSTEM_TYPE));
     this.instanceSystemContext = destinationContextOf(options.systemContext);
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;
@@ -1380,45 +1399,41 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * The system type this instance states: its `systemType` option, else
-   * `SAP_SYSTEM_TYPE` (the environment below the explicit option). The one
-   * place the listing, the calls and the connections it builds read it.
+   * The system type this instance states: the one fixed at construction
+   * ({@link systemType}). The one place the listing, the calls and the
+   * connections it builds read it.
    */
   private statedSystemType(): string | undefined {
-    return this.systemType ?? process.env.SAP_SYSTEM_TYPE;
+    return this.systemType;
   }
 
   /**
-   * The system type the tools are listed for: the instance's `systemType`;
-   * else the kind recorded on the connection the host injected (the
-   * factory's record, `declareSystemKind`) — the kind its calls are
-   * dispatched on, which the environment does not override; else
-   * `SAP_SYSTEM_TYPE`.
+   * Why a call on this instance cannot run, before its connection is taken
+   * (`undefined`: it can): no kind — `system_type_required`; a connection
+   * the host injected whose recorded kind (the factory's record) or
+   * declared kind (`declareSystemKind`) is not the instance's —
+   * `system_type_conflict`. Nothing is re-read per call: the instance's
+   * kind is the one kind of its listing, its checks and its dispatch.
    */
-  private listedSystemType(): string | undefined {
-    if (this.systemType !== undefined) return this.systemType;
+  private kindRefusal(): ServerRefusal | undefined {
+    // No source of connections (stdio's inspection-only mode): the call is
+    // the instance's own to refuse (`getConnection`).
+    if (this.connectionContext === null) return undefined;
+    const kind = statedSystemKind(this.systemType);
+    if (kind === undefined) return new ServerRefusal('system_type_required');
     const context = this.connectionContext;
-    const recorded =
-      context?.kind === 'injected'
-        ? systemKindOf(context.connection, {}, undefined)
-        : undefined;
-    return recorded ?? process.env.SAP_SYSTEM_TYPE;
-  }
-
-  /**
-   * The kind a call runs on, known before its connection is taken: the
-   * kind this instance states, else the one recorded on the connection the
-   * host injected (the factory's record, `declareSystemKind`); `undefined`
-   * when neither names one — the kind is never guessed.
-   */
-  private kindBeforeConnection(): AbapSystemKind | undefined {
-    const context = this.connectionContext;
-    // A connection the instance builds is built for the kind it states.
-    if (context?.kind !== 'injected') {
-      return statedSystemKind(this.statedSystemType());
+    if (context?.kind !== 'injected') return undefined;
+    const recorded = siblingRecordOf(context.connection)?.kind;
+    const declared = declaredSystemKindOf(context.connection);
+    for (const other of [recorded, declared]) {
+      if (other !== undefined && other !== 'none' && other !== kind) {
+        return new ServerRefusal(
+          'system_type_conflict',
+          systemTypeConflictWords(other, kind),
+        );
+      }
     }
-    // The host's: as it is dispatched (`declareSystemKind`, `systemKindOf`).
-    return systemKindOf(context.connection, process.env, this.systemType);
+    return undefined;
   }
 
   /**
@@ -1707,7 +1722,7 @@ export abstract class BaseMcpServer extends McpServer {
           // states none) nothing is filtered — every tool of the set is
           // listed as it is, and a call that would reach a system is refused
           // `system_type_required` before anything is sent.
-          const environment = statedEnvironment(this.listedSystemType());
+          const environment = statedEnvironment(this.statedSystemType());
           const name = entry.toolDefinition.name;
           if (this.backgroundRuns === undefined && isBackgroundRunTool(name)) {
             continue;
@@ -1790,25 +1805,12 @@ export abstract class BaseMcpServer extends McpServer {
             if (longTool && !longRead && statesBackground(args)) {
               return return_error(new Error(BACKGROUND_NOT_FOR_RUN_WORDS));
             }
-            // A tool stated per variant (a type list) is read on the kind
-            // of the call, before anything is taken: none stated or
-            // recorded is `system_type_required` — no connection, no flow,
-            // no run, nothing sent; a value off that variant's list is
-            // refused in its schema's words.
-            if (entry.toolDefinition.variants !== undefined) {
-              const kind = this.kindBeforeConnection();
-              if (kind === undefined) {
-                return this.refusalAnswer(
-                  new ServerRefusal('system_type_required'),
-                );
-              }
-              const refused = argumentsRefusalOf(
-                entry.toolDefinition,
-                args,
-                kind,
-              );
-              if (refused !== undefined) return this.refusalAnswer(refused);
-            }
+            // One kind per instance: none, or a connection recorded or
+            // declared for another, refuses the call before anything is
+            // taken — no connection, no flow, no run, nothing sent.
+            const kindRefused = this.kindRefusal();
+            if (kindRefused !== undefined)
+              return this.refusalAnswer(kindRefused);
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —

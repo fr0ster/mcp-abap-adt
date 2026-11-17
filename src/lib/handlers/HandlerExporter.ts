@@ -16,7 +16,6 @@ import {
   longToolInTheCall,
   withoutBackgroundParameter,
 } from '../backgroundRuns/tools.js';
-import { systemKindOf } from '../connectionFactory.js';
 import { noopLogger } from '../handlerLogger.js';
 import { isLongTool } from '../longTools.js';
 import {
@@ -26,7 +25,7 @@ import {
 } from '../requestSystemResolution.js';
 import type { LineMatchStrategy } from '../search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../search-source/readFailure.js';
-import type { AbapSystemKind } from '../systemKind.js';
+import { statedSystemKind } from '../systemKind.js';
 import { readOnlyToolNames } from '../toolSet.js';
 import { return_error } from '../utils.js';
 import type { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
@@ -405,15 +404,13 @@ export class HandlerExporter {
         // on the other paths: a refused call reaches no scope, no resolver,
         // no access check and no handler. Read on the kind this exporter
         // states, else the one the connection was built for.
-        // A tool stated per variant needs the kind: the exporter's, else
-        // the one recorded on the connection (`SAP_SYSTEM_TYPE` is not
-        // read); none is `system_type_required`, before anything else.
-        let kind: AbapSystemKind | undefined;
-        if (entry.toolDefinition.variants !== undefined) {
-          kind = systemKindOf(context.connection, {}, this.systemType);
-          if (kind === undefined) {
-            return Promise.reject(new ServerRefusal('system_type_required'));
-          }
+        // One kind: the exporter's. A tool stated per variant is checked on
+        // it; stating none, the tool has no kind — `system_type_required`,
+        // before anything else. A connection recorded or declared for
+        // another kind is refused `system_type_conflict` (`inStatedScope`).
+        const kind = statedSystemKind(this.systemType);
+        if (entry.toolDefinition.variants !== undefined && kind === undefined) {
+          return Promise.reject(new ServerRefusal('system_type_required'));
         }
         const refused = argumentsRefusalOf(entry.toolDefinition, args, kind);
         if (refused !== undefined) return Promise.reject(refused);

@@ -3681,18 +3681,6 @@
     ],
     "semantic": "Read or analyze an ABAP profiler trace: the hit list, the statements, the database accesses."
   },
-  "HandlerSearch": {
-    "keywords": [
-      "search",
-      "find object",
-      "search by name",
-      "wildcard",
-      "pattern",
-      "name starts with",
-      "lookup"
-    ],
-    "semantic": "Find repository objects by their name or a name pattern with wildcards."
-  },
   "HandlerServiceBindingListTypes": {
     "keywords": [
       "service binding types",
@@ -3902,40 +3890,6 @@
       "object_type"
     ],
     "semantic": "Check that a new object can be created with the given name and package."
-  },
-  "HandlerWhereUsed": {
-    "keywords": [
-      "where used",
-      "where-used list",
-      "used by",
-      "usages",
-      "references",
-      "callers",
-      "who calls",
-      "who uses",
-      "impact analysis",
-      "class",
-      "function module",
-      "BAPI",
-      "table",
-      "CDS view"
-    ],
-    "semantic": "Who calls this method or function module (BAPI), and who uses this class, table or CDS view: the where-used list of an object.",
-    "members": {
-      "CLASS": [
-        "class"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "DDL": [
-        "CDS view"
-      ]
-    }
   },
   "ListATCResults": {
     "keywords": [
@@ -4879,5 +4833,23 @@
       "name check"
     ],
     "semantic": "Check that a new service binding can be created with the given name, service definition and package."
+  },
+  "HandlerSystem": {
+    "keywords": [
+      "search source code",
+      "grep",
+      "find object",
+      "search by name",
+      "wildcard",
+      "where used",
+      "used by",
+      "references",
+      "package tree",
+      "subpackages",
+      "transport requests",
+      "ATC findings",
+      "ATC results"
+    ],
+    "semantic": "Read across the system by action: search source code in packages, find objects by name or pattern, list where an object is used, show a package tree, list transport requests, and read ATC findings and results."
   }
 }

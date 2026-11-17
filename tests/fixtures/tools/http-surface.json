@@ -372,10 +372,10 @@
     "HandlerProfileRun": "target_type*, class_name, program_name, profiler_id, background, state_handle",
     "HandlerProfileSchedule": "description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing, state_handle",
     "HandlerProfileView": "background, trace_id_or_uri*, view*, mode, top, with_system_events, id, with_details, auto_drill_down_threshold, state_handle",
-    "HandlerSearch": "background, query*, object_type, max_results, state_handle",
     "HandlerServiceBindingListTypes": "response_format, state_handle",
     "HandlerServiceBindingValidate": "service_binding_name*, service_definition_name*, service_binding_version, package_name*, description, state_handle",
     "HandlerSession": "action*, state_handle",
+    "HandlerSystem": "background, action*, query, query2, exclude, packages, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version, object_name, object_type, maxResults, detail, objects, enable_all_types, enable_only_types, disable_types, package_name, package_names, max_depth, include_descriptions, debug, user, modifiable_only, worklist_id, created_by, central_only, age_min, age_max, display_id, state_handle",
     "HandlerTransportCreate": "transport_type, description*, target_system, owner, task_type, state_handle",
     "HandlerTransportMoveObjects": "transport_number*, target_number*, objects*, state_handle",
     "HandlerTransportSortAndCompress": "transport_number*, state_handle",
@@ -384,8 +384,7 @@
     "HandlerUnitTestStatus": "run_id*, with_long_polling, state_handle",
     "HandlerUnlock": "object_type*, object_name*, lock_handle*, state_handle",
     "HandlerUpdate": "object_type*, lock_handle*, transport_request, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, part, ddl_source, table_name, structure_name, data_element_name, interface_name, include_name, table_type_name, service_definition_name, service_binding_name, service_name, service_version, name, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, binding_variant, desired_publication_state, state_handle",
-    "HandlerValidate": "object_type*, object_name*, package_name, super_package, superclass, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, state_handle",
-    "HandlerWhereUsed": "background, object_type*, object_name*, function_group_name, max_results, state_handle"
+    "HandlerValidate": "object_type*, object_name*, package_name, super_package, superclass, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, state_handle"
   },
   "mcp-abap-adt-compact-http-ro": {
     "HandlerBackgroundRunDiscard": "run_handle*, state_handle",
@@ -402,13 +401,12 @@
     "HandlerGetData": "background, object_name, sql_query, max_rows, state_handle",
     "HandlerProfileList": "state_handle",
     "HandlerProfileView": "background, trace_id_or_uri*, view*, mode, top, with_system_events, id, with_details, auto_drill_down_threshold, state_handle",
-    "HandlerSearch": "background, query*, object_type, max_results, state_handle",
     "HandlerServiceBindingListTypes": "response_format, state_handle",
     "HandlerServiceBindingValidate": "service_binding_name*, service_definition_name*, service_binding_version, package_name*, description, state_handle",
     "HandlerSession": "action*, state_handle",
+    "HandlerSystem": "background, action*, query, query2, exclude, packages, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version, object_name, object_type, maxResults, detail, objects, enable_all_types, enable_only_types, disable_types, package_name, package_names, max_depth, include_descriptions, debug, user, modifiable_only, worklist_id, created_by, central_only, age_min, age_max, display_id, state_handle",
     "HandlerUnitTestResult": "run_id*, with_navigation_uris, format, detail, state_handle",
     "HandlerUnitTestStatus": "run_id*, with_long_polling, state_handle",
-    "HandlerValidate": "object_type*, object_name*, package_name, super_package, superclass, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, state_handle",
-    "HandlerWhereUsed": "background, object_type*, object_name*, function_group_name, max_results, state_handle"
+    "HandlerValidate": "object_type*, object_name*, package_name, super_package, superclass, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, state_handle"
   }
 }

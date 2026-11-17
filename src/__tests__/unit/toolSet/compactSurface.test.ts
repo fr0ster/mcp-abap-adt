@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 35 tools — 29, plus the four debug tools and `HandlerDebugBatch` the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
+ * The compact surface stays frozen — the same 34 tools — 28, plus the four debug tools and `HandlerDebugBatch` the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture
@@ -12,7 +12,10 @@
  * (a caller that worked still works), but not lose one, and not lose or rename a
  * tool. The count is asserted first, so a fixture that stopped being read cannot
  * make the rest vacuous. One loss is decided (`REMOVED`): `HandlerCreate`'s
- * `program_type` (24.0.0, D2), which SAP ignores on create.
+ * `program_type` (24.0.0, D2), which SAP ignores on create. Two tools left
+ * by decision (24.0.0, D25): `HandlerSearch` and `HandlerWhereUsed`, whose
+ * calls are `HandlerSystem`'s `search_object` and `where_used`; the fixture
+ * holds `HandlerSystem` in their place.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -77,8 +80,8 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(35);
-    expect(current).toHaveLength(35);
+    expect(frozen).toHaveLength(34);
+    expect(current).toHaveLength(34);
   });
 
   it('has the same tools', () => {

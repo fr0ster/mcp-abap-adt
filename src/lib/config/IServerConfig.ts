@@ -18,7 +18,11 @@ export interface TlsConfig {
   cert: string;
   /** Path to TLS private key file (PEM) */
   key: string;
-  /** Path to CA certificate file (PEM), optional */
+  /**
+   * Intermediate CA certificate(s) (PEM), optional: sent with the server's
+   * certificate, completing the chain. Not a trust store for clients: no
+   * client certificate is requested.
+   */
   ca?: string;
 }
 

@@ -152,7 +152,7 @@ state-idle-minutes: 30
 | `http.allowed-hosts` | string[] | - | DNS-rebinding protection: exact Host header values to allow, including port. NOT browser CORS — no Access-Control-Allow-Origin headers are emitted |
 | `http.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `http.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set); a non-allowlisted Host/Origin gets HTTP 403 |
-| `http.tls.cert`, `http.tls.key`, `http.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+| `http.tls.cert`, `http.tls.key`, `http.tls.ca` | string | - | TLS files (PEM); cert and key together. `ca`, optional beside them: intermediate CA certificate(s) the server sends with its own certificate, completing the chain clients verify — not a trust store for clients (no client certificate is requested); a root CA given there is not sent |
 | `state-idle-minutes` | number | `30` | The idle bound on held state; see [Held State](#held-state) |
 
 `state-idle-minutes` here bounds each pooled instance's held state, reached again by its
@@ -187,7 +187,7 @@ state-idle-minutes: 30
 | `sse.allowed-hosts` | string[] | - | DNS-rebinding protection: exact Host header values to allow, including port |
 | `sse.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `sse.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set) |
-| `sse.tls.cert`, `sse.tls.key`, `sse.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+| `sse.tls.cert`, `sse.tls.key`, `sse.tls.ca` | string | - | TLS files (PEM); cert and key together. `ca`, optional beside them: intermediate CA certificate(s) the server sends with its own certificate, completing the chain clients verify — not a trust store for clients (no client certificate is requested); a root CA given there is not sent |
 | `state-idle-minutes` | number | `30` | The idle bound on held state; see [Held State](#held-state) |
 
 `state-idle-minutes` here bounds each SSE connection's instance, which holds its state until the

@@ -367,7 +367,7 @@ naming the binary that serves the tools it asked for.
 - `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--http-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
-- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together)
+- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together; `--tls-ca`: intermediate certificates sent with the server's certificate, not a trust store for clients)
 
 **`mcp-abap-adt-sse` (HTTP+SSE):**
 - `--sse-host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
@@ -377,7 +377,7 @@ naming the binary that serves the tools it asked for.
 - `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
 - `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
-- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together)
+- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together; `--tls-ca`: intermediate certificates sent with the server's certificate, not a trust store for clients)
 
 **Environment Variables:**
 

@@ -446,7 +446,7 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 | `--http-enable-dns-protection` | `MCP_HTTP_ENABLE_DNS_PROTECTION` | `http.enable-dns-protection` | flag | Enable DNS-rebinding protection, with `--http-allowed-hosts` and/or `--http-allowed-origins`: either without the other is refused at startup (it would check nothing) |
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `http.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `http.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
-| `--tls-ca=<path>` | `MCP_TLS_CA` | `http.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
+| `--tls-ca=<path>` | `MCP_TLS_CA` | `http.tls.ca` | path | Intermediate CA certificate(s) (PEM) the server sends with its own certificate, completing the chain clients verify; optional, beside cert and key. Not a trust store for clients — no client certificate is requested — and a root CA given here is not sent |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 
 Per request, the system context comes from the headers `x-sap-responsible`,
@@ -515,7 +515,7 @@ answered `400`; a `GET` or `POST` with `x-mcp-destination` is answered `400`.
 | `--sse-enable-dns-protection` | `MCP_SSE_ENABLE_DNS_PROTECTION` | `sse.enable-dns-protection` | flag | Enable DNS-rebinding protection, with `--sse-allowed-hosts` and/or `--sse-allowed-origins`: either without the other is refused at startup (it would check nothing) |
 | `--tls-cert=<path>` | `MCP_TLS_CERT` | `sse.tls.cert` | path | TLS certificate (PEM); with `--tls-key`, HTTPS |
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `sse.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
-| `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
+| `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | Intermediate CA certificate(s) (PEM) the server sends with its own certificate, completing the chain clients verify; optional, beside cert and key. Not a trust store for clients — no client certificate is requested — and a root CA given here is not sent |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 
 The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /

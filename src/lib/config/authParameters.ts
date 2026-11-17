@@ -1032,7 +1032,7 @@ export function tlsRows(yamlPrefix: 'http' | 'sse'): readonly Parameter[] {
       kind: 'string',
       valueHint: '=<path>',
       section: 'TLS/HTTPS',
-      help: 'CA certificate file (PEM), optional',
+      help: 'Intermediate CA certificate(s) (PEM) the server sends with its own certificate, completing the chain clients verify. Not a trust store for clients: no client certificate is requested. A root CA given here is not sent. Only beside --tls-cert and --tls-key',
     },
   ];
 }

@@ -64,11 +64,13 @@ through the same code: the tools, descriptions, schemas and search members of th
 that would reach a system is refused `system_type_required` before anything is sent.
 `SAP_SYSTEM_TYPE` is not read on this path, for the listing or for a call.
 
-The exporter keeps no background-run store and no debugger, so it hands out neither, on every
-path (`getHandlerEntries()`, `createRegistry()`, `registerOnServer`): no background-run tool
-(`GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`), no `background` parameter on
-`RuntimeRunClass` / `RuntimeRunProgram` or on a listed long tool (its read runs in the call), and
-no debugger tool (its options have no
+The exporter keeps no background-run store and no debugger, so on its own paths
+(`getHandlerEntries()`, `registerOnServer`, `createRegistry()` registered on a plain `McpServer`)
+it hands out neither: no background-run tool (`GetBackgroundRun`, `ListBackgroundRuns`,
+`DiscardBackgroundRun`), no `background` parameter on `RuntimeRunClass` / `RuntimeRunProgram` or
+on a listed long tool (its read runs in the call), and no debugger tool. A `createRegistry()`
+registry handed to a server runs its run tools as the server's own: with `background` on a server
+given `backgroundRuns` (24.0.0) (its options have no
 `includeDebug`). A server instance (`EmbeddableMcpServer`) serves them.
 
 ## Connection Provider
@@ -214,7 +216,8 @@ Its `call` is wrapped. The wrapper, before the handler runs:
   connection of the `context` it is called with. The handler runs on that kind; with no
   `systemType` stated, the connection has none, and a call that would reach a
   system is refused `system_type_required` before anything is sent.
-  `SAP_SYSTEM_TYPE` is not read for it;
+  `SAP_SYSTEM_TYPE` is not read for it. A connection `createAbapConnection` built
+  for the other kind is refused `system_type_conflict` (24.0.0), naming both kinds;
 - runs it in the call-transport scope with its call's own
   `transport_request` (the failure renderer's transport hint);
 - with a `systemContextResolver` (none by default since 19.0.0), fills the
@@ -273,8 +276,9 @@ Both contracts and both shipped strategies are exported from
 `registerOnServer` the exporter's options apply, and an embedder's own
 context is not a way to pass them (the exporter sets the context's fields
 from its options). On `createRegistry()` the tools run in the contexts of the
-server the registry is handed to: there the server's own
-`sapAnswerStrategy` / `lineMatchStrategy` options apply.
+server the registry is handed to: there the server's own `systemType`, resolver,
+rules, logger and `sapAnswerStrategy` / `lineMatchStrategy` options apply, never the
+exporter's.
 
 ## Logging
 
@@ -283,6 +287,9 @@ Pass a logger (`Logger` from `@mcp-abap-adt/logger`):
 ```typescript
 const exporter = new HandlerExporter({ systemType: "onprem", logger });
 ```
+
+The handlers `getHandlerEntries()` hands out run with it, over the logger of the context you
+call them with (24.0.0); without one, your context's logger stays.
 
 ## See Also
 

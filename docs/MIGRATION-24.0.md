@@ -110,6 +110,12 @@ A value a start states is read as stated, or the start is refused naming it.
   `allowedHosts` / `allowedOrigins` / `enableDnsRebindingProtection` on `StreamableHttpServer` and
   `SseServer` alike. Each is refused now, at start or construction: state the flag and at least
   one list, or neither.
+- **An embedder's `systemType` is the kind of every connection the server builds** (the logon, a
+  leftover session taken up or logged off, its runtime file), not only of the tools it lists;
+  `SAP_SYSTEM_TYPE` answers only when the option is absent. An embedder that set both to the same
+  value changes nothing; one that relied on `SAP_SYSTEM_TYPE` for the connection while stating
+  another `systemType` now gets the stated kind. `sessionIdentity` takes the kind as its fourth
+  argument; without it, `SAP_SYSTEM_TYPE` answers as before.
 
 ## RFC destinations: the address is stated
 

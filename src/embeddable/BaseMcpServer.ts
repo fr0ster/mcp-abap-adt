@@ -180,7 +180,11 @@ import {
   getStatedSystemContext,
   systemContextFromConfiguration,
 } from '../lib/systemContext.js';
-import { declareSystemKind } from '../lib/systemKind.js';
+import {
+  type AbapSystemKind,
+  declareSystemKind,
+  statedSystemKind,
+} from '../lib/systemKind.js';
 import {
   isErrorResult,
   normalizeToolContent,
@@ -303,8 +307,9 @@ export abstract class BaseMcpServer extends McpServer {
   >();
 
   /**
-   * Per-instance SAP system type. Overrides process.env.SAP_SYSTEM_TYPE
-   * for `available_in` filtering at handler registration time.
+   * Per-instance SAP system type: the kind of every connection the
+   * instance builds and hands a tool, and the tools it lists. Absent,
+   * `SAP_SYSTEM_TYPE` answers ({@link statedSystemType}).
    */
   protected readonly systemType?: SapEnvironment | undefined;
   /** The access-check strategy the host gave; `undefined`: none. */
@@ -1344,15 +1349,40 @@ export abstract class BaseMcpServer extends McpServer {
     return connection;
   }
 
+  /**
+   * The system type this instance states: its `systemType` option, else
+   * `SAP_SYSTEM_TYPE` (the environment below the explicit option). The one
+   * place the listing, the calls and the connections it builds read it.
+   */
+  private statedSystemType(): string | undefined {
+    return this.systemType ?? process.env.SAP_SYSTEM_TYPE;
+  }
+
+  /**
+   * The kind of a connection this instance builds ({@link statedSystemType});
+   * refused `system_type_required` when none is stated, before anything is
+   * built or sent.
+   */
+  private builtKind(): AbapSystemKind {
+    const kind = statedSystemKind(this.statedSystemType());
+    if (kind === undefined) throw new ServerRefusal('system_type_required');
+    return kind;
+  }
+
   /** A connection built from `resolved`, owned as `built`, and connected with its logon. */
   private async connectedLogon(
     resolved: ResolvedConnection,
   ): Promise<IAbapConnection> {
     // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
+    // Built for the instance's kind, with its logger.
     const connection = createAbapConnection(
       resolved.settings,
       resolved.credential,
+      this.logger,
+      undefined,
+      undefined,
+      this.builtKind(),
     );
     // The instance's own from here on: it ends with a logoff.
     own(connection, { owner: this, role: 'built' });
@@ -1407,9 +1437,10 @@ export abstract class BaseMcpServer extends McpServer {
       connection = createAbapConnection(
         resolved.settings,
         resolved.credential,
-        undefined,
+        this.logger,
         undefined,
         claimed.cookies,
+        this.builtKind(),
       );
     } catch (error) {
       owner.release(claimed);
@@ -1613,9 +1644,7 @@ export abstract class BaseMcpServer extends McpServer {
           // states none) nothing is filtered — every tool of the set is
           // listed as it is, and a call that would reach a system is refused
           // `system_type_required` before anything is sent.
-          const environment = statedEnvironment(
-            this.systemType ?? process.env.SAP_SYSTEM_TYPE,
-          );
+          const environment = statedEnvironment(this.statedSystemType());
           const name = entry.toolDefinition.name;
           if (this.backgroundRuns === undefined && isBackgroundRunTool(name)) {
             continue;
@@ -2622,6 +2651,7 @@ export abstract class BaseMcpServer extends McpServer {
       context.destination,
       resolved.settings,
       resolved.systemContext?.login,
+      statedSystemKind(this.statedSystemType()),
     );
   }
 
@@ -2699,9 +2729,10 @@ export abstract class BaseMcpServer extends McpServer {
       const connection = createAbapConnection(
         resolved.settings,
         resolved.credential,
-        undefined,
+        this.logger,
         undefined,
         claimed.cookies,
+        this.builtKind(),
       );
       // For this one operation: ended here, or by the instance's close.
       own(connection, { owner: this, role: 'fresh' });

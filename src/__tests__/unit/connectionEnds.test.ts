@@ -156,7 +156,12 @@ async function authorizeOn(connection: unknown): Promise<void> {
 
 class Server extends BaseMcpServer {
   constructor() {
-    super({ name: 'ends', logger: silent, stateLogger: { error() {} } });
+    super({
+      name: 'ends',
+      systemType: 'onprem',
+      logger: silent,
+      stateLogger: { error() {} },
+    });
   }
   use(context: ConnectionContext) {
     this.setConnectionContext(context);

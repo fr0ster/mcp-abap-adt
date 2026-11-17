@@ -64,6 +64,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { resolveSystemKind } from '../connectionFactory';
 import { type JsonValue, jsonAt, parseJson } from '../json';
 import { isEnded, whenLogoffCompleted } from '../ownedConnections';
+import type { AbapSystemKind } from '../systemKind';
 import {
   nodeProcessProbe,
   type ProcessProbe,
@@ -209,6 +210,8 @@ export function sessionIdentity(
   destination: string,
   settings: SapConfig,
   login?: string,
+  /** The kind the session is built for (the server's); absent, `SAP_SYSTEM_TYPE`. */
+  kind?: AbapSystemKind,
 ): SessionIdentity | undefined {
   // Narrowed by the wire: an HTTP config states its URL.
   if (settings.connectionType === 'rfc') return undefined;
@@ -217,7 +220,7 @@ export function sessionIdentity(
     destination,
     url: withoutTrailingSlashes(settings.url.trim()),
     client: (settings.client ?? '').trim(),
-    system: resolveSystemKind(settings),
+    system: kind ?? resolveSystemKind(settings),
     wire: 'http',
     user: user === '' ? null : user,
   };

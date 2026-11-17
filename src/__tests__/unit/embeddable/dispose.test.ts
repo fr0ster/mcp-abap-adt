@@ -78,6 +78,7 @@ class TestServer extends BaseMcpServer {
   constructor() {
     super({
       name: 'dispose-test',
+      systemType: 'onprem',
       version: '1.0.0',
       logger: silent,
       stateLogger: { error() {} },

@@ -185,9 +185,12 @@ export interface EmbeddableMcpServerOptions {
   systemContext?: Partial<IAdtSystemContext>;
 
   /**
-   * SAP system type for this server instance. Governs which tools are
-   * registered via the `available_in` filter (none stated: every tool is
-   * listed). Overrides the process-global `SAP_SYSTEM_TYPE` env var.
+   * SAP system type for this server instance: the kind of every connection
+   * it builds — the logon, a leftover session taken up or logged off, its
+   * runtime file — and hands a tool, and which tools are registered via the
+   * `available_in` filter (none stated: every tool is listed). It wins over
+   * the process-global `SAP_SYSTEM_TYPE` env var, which answers only when
+   * the option is absent.
    *
    * Use this when a single host serves multiple SAP systems (e.g., a proxy
    * that handles both OnPremise and cloud destinations per request) —

@@ -77,7 +77,12 @@ const credential: IAuthProvider = {
 
 class Server extends BaseMcpServer {
   constructor() {
-    super({ name: 'closed', logger: silent, stateLogger: { error() {} } });
+    super({
+      name: 'closed',
+      systemType: 'onprem',
+      logger: silent,
+      stateLogger: { error() {} },
+    });
     this.setConnectionContext({
       kind: 'built',
       sessionId: 's',

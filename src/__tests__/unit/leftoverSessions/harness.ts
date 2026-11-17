@@ -19,6 +19,7 @@ import {
   TokenAuthProvider,
 } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -80,6 +81,10 @@ class StandServer extends BaseMcpServer {
   }
   register(registry: CompositeHandlersRegistry): void {
     this.registerHandlers(registry);
+  }
+  /** The instance's connection, as a tool call takes it. */
+  connectionForTest(): Promise<IAbapConnection> {
+    return this.getConnection(new AbortController().signal);
   }
   /** The connection born as a stdio start makes it (`bornAtStart`). */
   born(signal: AbortSignal): Promise<StartedConnection> {
@@ -149,6 +154,10 @@ export async function leftoverStand(
     extra?: Parameters<typeof probeGroup>[0];
     /** The rules a host passes (core passes responsible-rules); none by default. */
     systemContextRules?: SystemContextRules;
+    /** The instance's `systemType` option; none by default (`SAP_SYSTEM_TYPE` answers). */
+    systemType?: 'onprem' | 'cloud';
+    /** The instance's logger; a silent one by default. */
+    logger?: typeof silent;
   } = {},
 ): Promise<LeftoverStand> {
   const standIn = await adtStandIn();
@@ -163,7 +172,8 @@ export async function leftoverStand(
   });
   const server = new StandServer({
     name: 'leftover-stand',
-    logger: silent,
+    logger: options.logger ?? silent,
+    ...(options.systemType !== undefined && { systemType: options.systemType }),
     ...(options.noOwner ? {} : { leftoverSessions: owner }),
     ...(options.systemContextRules !== undefined && {
       systemContextRules: options.systemContextRules,

@@ -5,9 +5,10 @@
  * factory builds (`createAbapConnection`) and the configured one
  * (`getManagedConnection`). Each acquisition is pinned by file and count,
  * so a new path fails here until it is reviewed for the kind check — and
- * the two points every call passes check the kind before the connection
- * is handed on: `getConnection` (`kindRefusal`) and `openFreshConnection`
- * (`kindConflictOf`, before the host's connection is connected).
+ * the points a connection passes check the kind before it is handed on:
+ * `getConnection` and a stdio start's `bornAtStart` (`kindRefusal`), and
+ * `openFreshConnection` (`admitOnKind`, before the host's connection is
+ * connected). Pinned beside them: a source resolved, a birth, a build.
  */
 
 import * as fs from 'node:fs';
@@ -63,13 +64,28 @@ const PRIMITIVES = [
   'hostFactories.get(',
   'createAbapConnection(',
   'getManagedConnection(',
+  // The builders and connectors beside them: a source resolved, a birth
+  // (a logon or a leftover session taken up), a connection built.
+  '.source.resolve(',
+  'bornAtStart(',
+  'birthEntry(',
+  'buildConnection(',
+  'connectedLogon(',
 ] as const;
 
 /** The reviewed acquisitions: file → primitive → count (declarations and comments included). */
 const PINNED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-  'server-runtime/src/stdio/StdioServer.ts': { '.getConnection(': 2 },
+  'server-runtime/src/stdio/StdioServer.ts': {
+    '.getConnection(': 2,
+    'bornAtStart(': 1,
+  },
   'src/embeddable/BaseMcpServer.ts': {
     '.getConnection(': 5,
+    '.source.resolve(': 3,
+    'birthEntry(': 3,
+    'bornAtStart(': 1,
+    'buildConnection(': 4,
+    'connectedLogon(': 3,
     'createAbapConnection(': 3,
   },
   'src/handlers/package/high/handleDeletePackage.ts': {
@@ -119,6 +135,19 @@ describe('the paths that hand a connection to work', () => {
     expect(check).toBeLessThan(body.indexOf('context.source.resolve('));
   });
 
+  it('bornAtStart checks the one kind before it resolves or builds', () => {
+    const text = fs.readFileSync(
+      path.join(ROOT, 'src/embeddable/BaseMcpServer.ts'),
+      'utf8',
+    );
+    const start = text.indexOf('protected async bornAtStart(');
+    const body = text.slice(start, text.indexOf('\n  }\n', start));
+    const check = body.indexOf('this.kindRefusal()');
+    expect(check).toBeGreaterThan(0);
+    expect(check).toBeLessThan(body.indexOf('context.source.resolve('));
+    expect(check).toBeLessThan(body.indexOf('this.birthEntry('));
+  });
+
   it('openFreshConnection checks the host’s connection before it connects it', () => {
     const text = fs.readFileSync(
       path.join(ROOT, 'src/lib/packageSessions.ts'),
@@ -127,7 +156,7 @@ describe('the paths that hand a connection to work', () => {
     const start = text.indexOf('export async function openFreshConnection(');
     const body = text.slice(start, text.indexOf('\n}\n', start));
     const factory = body.indexOf('hostFactories.get(');
-    const check = body.indexOf('kindConflictOf(', factory);
+    const check = body.indexOf('admitOnKind(', factory);
     expect(check).toBeGreaterThan(factory);
     expect(check).toBeLessThan(body.indexOf('connectedOrClosed(given'));
   });

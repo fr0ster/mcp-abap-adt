@@ -1,6 +1,6 @@
 import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { runWithCallTransport } from '../../callTransport.js';
-import { kindConflictOf } from '../../connectionFactory.js';
+import { admitOnKind } from '../../connectionFactory.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
 import { statedSystemKind, stateSystemKind } from '../../systemKind.js';
 import type { ToolArgs } from '../interfaces.js';
@@ -42,7 +42,7 @@ export function inStatedScope<T>(
     // One kind: the one stated. A connection built for another (the
     // factory's record) or declared for another (`declareSystemKind`) is
     // refused, never run on either.
-    const conflict = kindConflictOf(
+    const conflict = admitOnKind(
       connection,
       statedSystemKind(scope.systemType),
     );

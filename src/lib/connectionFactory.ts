@@ -341,30 +341,35 @@ export function systemKindOf(
 }
 
 /**
- * The one check of the one kind (the owner, 2026-11-17), wherever a
- * connection is handed to work — the main one (`getConnection`), a fresh
- * one (`openFreshConnection`), a plain registration's or an exporter's
- * (`inStatedScope`): its recorded kind (the factory's record) or its
- * declared kind (`declareSystemKind`), when it is another than `kind`, is
- * `system_type_conflict`, before it is connected or used; `undefined`
- * when it agrees, or no kind is in force.
+ * The one admission of a connection on the one kind (the owner,
+ * 2026-11-17), wherever a connection is handed to work — the main one
+ * (`getConnection`), a fresh one (`openFreshConnection`), a plain
+ * registration's or an exporter's (`inStatedScope`): its recorded kind (the
+ * factory's record) or declared kind (`declareSystemKind`), when it is
+ * another than `kind`, is `system_type_conflict`, before it is connected or
+ * used; a connection with no kind of its own is given `kind` (declared), so
+ * its dispatch never falls back to `SAP_SYSTEM_TYPE`. A recorded or
+ * declared kind is never overwritten. `undefined`: admitted, or no kind is
+ * in force.
  */
-export function kindConflictOf(
+export function admitOnKind(
   connection: object,
   kind: AbapSystemKind | undefined,
 ): ServerRefusal | undefined {
   if (kind === undefined) return undefined;
+  const recorded = records.get(connection)?.kind;
   const declared = declaredSystemKindOf(connection);
-  for (const other of [
-    records.get(connection)?.kind,
-    declared === 'none' ? undefined : declared,
-  ]) {
+  const stated = declared === 'none' ? undefined : declared;
+  for (const other of [recorded, stated]) {
     if (other !== undefined && other !== kind) {
       return new ServerRefusal(
         'system_type_conflict',
         systemTypeConflictWords(other, kind),
       );
     }
+  }
+  if (recorded === undefined && stated === undefined) {
+    declareSystemKind(connection, kind);
   }
   return undefined;
 }

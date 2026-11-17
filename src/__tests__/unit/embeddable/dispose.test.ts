@@ -25,7 +25,7 @@ jest.mock('../../../lib/connectionFactory', () => ({
   // A view over a connection keeps its kind: the kind is mocked above.
   withSystemKindOf: jest.fn((view: object) => view),
   // The one kind agrees: the kind is mocked above.
-  kindConflictOf: jest.fn(() => undefined),
+  admitOnKind: jest.fn(() => undefined),
 }));
 
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';

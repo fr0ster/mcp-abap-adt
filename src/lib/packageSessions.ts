@@ -36,8 +36,8 @@ import { isLatched } from './activeTools';
 import { ClosedInstanceRefusal } from './auth/failures';
 import { ServerRefusal } from './auth/serverRefusal';
 import {
+  admitOnKind,
   createAbapConnection,
-  kindConflictOf,
   siblingRecordOf,
   systemKindOf,
   withSystemKindOf,
@@ -138,7 +138,7 @@ export async function openFreshConnection(
   // The one kind: a connection the host's factory built or declared for
   // another kind than the one it is fresh for is refused before its
   // connect — nothing sent.
-  const conflict = kindConflictOf(returned, systemKindOf(connection));
+  const conflict = admitOnKind(returned, systemKindOf(connection));
   if (conflict !== undefined) throw conflict;
   const given = withSystemKindOf(returned, connection);
   own(given, { role: 'fresh' });

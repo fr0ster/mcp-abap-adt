@@ -84,8 +84,8 @@ import {
 import { runWithCallTransport } from '../lib/callTransport.js';
 import { CompactBackgroundRunHandlersGroup } from '../lib/compact/backgroundRuns/group.js';
 import {
+  admitOnKind,
   createAbapConnection,
-  kindConflictOf,
   systemKindOf,
   withSystemKindOf,
 } from '../lib/connectionFactory.js';
@@ -1427,7 +1427,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (kind === undefined) return new ServerRefusal('system_type_required');
     const context = this.connectionContext;
     return context?.kind === 'injected'
-      ? kindConflictOf(context.connection, kind)
+      ? admitOnKind(context.connection, kind)
       : undefined;
   }
 
@@ -1588,6 +1588,10 @@ export abstract class BaseMcpServer extends McpServer {
         'Connection context not set. Call setConnectionContext() first.',
       );
     }
+    // The one kind, as at every connection handed out (`getConnection`):
+    // none is refused before the source is resolved or anything is built.
+    const refused = this.kindRefusal();
+    if (refused !== undefined) throw refused;
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
     const { entry, claimed, outcome } = this.birthEntry(resolved);

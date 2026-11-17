@@ -20,6 +20,7 @@ import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../lib/auth/serverRefusal';
 import {
   isBackgroundRunTool,
+  isBackgroundTool,
   longToolInTheCall,
 } from '../../../lib/backgroundRuns/tools';
 import { variantOf } from '../../../lib/clients';
@@ -83,6 +84,26 @@ async function listedOn(server: McpServer): Promise<Listed> {
   }
 }
 
+/**
+ * What a server instance lists, its run tools' `background` left out: a
+ * server runs an exported registry's run tools as its own (`background`
+ * kept, refused in words without background runs, D26 E10), where a plain
+ * registration keeps no runs and lists them without it.
+ */
+async function servedListing(
+  server: McpServer,
+  exported: boolean,
+): Promise<Listed> {
+  const listed = await listedOn(server);
+  if (!exported) return listed;
+  return listed.map((tool) => {
+    if (!isBackgroundTool(tool.name)) return tool;
+    const { background: _background, ...properties } =
+      tool.inputSchema.properties ?? {};
+    return { ...tool, inputSchema: { ...tool.inputSchema, properties } };
+  });
+}
+
 /** What a plain SDK server lists for `registry`. */
 async function plainListing(registry: IHandlersRegistry): Promise<Listed> {
   const server = new McpServer({ name: 'plain', version: '1.0.0' });
@@ -131,7 +152,8 @@ const REGISTRIES: Readonly<
 
 describe.each(Object.entries(REGISTRIES))(
   'a plain registration of %s',
-  (_label, registeredFor) => {
+  (label, registeredFor) => {
+    const exported = label.startsWith('HandlerExporter');
     const registryFor = (systemType?: SapEnvironment) =>
       registeredFor(systemType).registry;
     const previous = process.env.SAP_SYSTEM_TYPE;
@@ -148,8 +170,9 @@ describe.each(Object.entries(REGISTRIES))(
       'stating %s lists what a BaseMcpServer stating it lists: tools, descriptions, schemas, search members',
       async (systemType) => {
         const plain = await plainListing(registryFor(systemType));
-        const stated = await listedOn(
+        const stated = await servedListing(
           new StatedServer(registryFor(systemType), systemType),
+          exported,
         );
         expect(plain).toEqual(stated);
       },
@@ -164,7 +187,9 @@ describe.each(Object.entries(REGISTRIES))(
     it('stating none lists the definitions as they are', async () => {
       const { registry, definitions } = registeredFor();
       const plain = await plainListing(registry);
-      expect(plain).toEqual(await listedOn(new StatedServer(registryFor())));
+      expect(plain).toEqual(
+        await servedListing(new StatedServer(registryFor()), exported),
+      );
       // A plain registration keeps no background runs: no background-run tool.
       expect(plain.map((tool) => tool.name)).toEqual(
         definitions

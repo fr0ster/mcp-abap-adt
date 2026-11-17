@@ -841,8 +841,9 @@ function exporterWith(
   groups: IHandlerGroup[],
   options?: ConstructorParameters<typeof HandlerExporter>[0],
 ): HandlerExporter {
-  // The kind is required at construction; the connections here record their own.
-  const exporter = new HandlerExporter({ systemType: 'onprem', ...options });
+  // States no kind: the connections here record their own, and a stated
+  // kind contradicting one is refused (D26 E11).
+  const exporter = new HandlerExporter({ ...options });
   (exporter as unknown as { handlerGroups: IHandlerGroup[] }).handlerGroups =
     groups;
   return exporter;

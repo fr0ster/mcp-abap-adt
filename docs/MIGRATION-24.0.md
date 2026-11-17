@@ -102,6 +102,8 @@ A value a start states is read as stated, or the start is refused naming it.
   were read by nothing — the first of two values won, a misspelled key left its value at the
   default. Each stops the start now, naming it and the parameter it may mean: correct the name,
   drop the extra value.
+- **`--http-json-response=false` gives SSE streams** (and its variable and YAML key). Before, a
+  stated `false` answered JSON like an absent flag; leave the flag out to keep JSON.
 
 ## RFC destinations: the address is stated
 

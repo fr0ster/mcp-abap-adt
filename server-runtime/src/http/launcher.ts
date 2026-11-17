@@ -191,7 +191,8 @@ export async function launch(
     stateLogger: stderrStateLogger,
     host: config.host,
     port: config.port,
-    enableJsonResponse: config.httpJsonResponse || undefined,
+    // As stated: `false` gives SSE streams; absent, the server's default.
+    enableJsonResponse: config.httpJsonResponse,
     path: config.httpPath,
     logger: noopLogger,
     tls: config.tls,

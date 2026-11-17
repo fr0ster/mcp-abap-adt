@@ -82,6 +82,10 @@ import {
   handleHandlerServiceBindingValidate,
 } from './handlers/handleHandlerServiceBindingValidate';
 import {
+  TOOL_DEFINITION as HandlerSystem_Tool,
+  handleHandlerSystem,
+} from './handlers/handleHandlerSystem';
+import {
   TOOL_DEFINITION as HandlerUnitTestResult_Tool,
   handleHandlerUnitTestResult,
 } from './handlers/handleHandlerUnitTestResult';
@@ -107,6 +111,7 @@ export function compactReadOnlyEntries(): HandlerEntry[] {
     defineTool(HandlerGet_Tool, handleHandlerGet),
     defineTool(HandlerSearch_Tool, handleHandlerSearch),
     defineTool(HandlerWhereUsed_Tool, handleHandlerWhereUsed),
+    defineTool(HandlerSystem_Tool, handleHandlerSystem),
     defineTool(HandlerValidate_Tool, handleHandlerValidate),
     defineTool(HandlerCheckRun_Tool, handleHandlerCheckRun),
     defineTool(HandlerDeletionCheck_Tool, handleHandlerDeletionCheck),

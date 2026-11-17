@@ -55,6 +55,7 @@ export {
 } from './compactRoutes.js';
 export {
   COMPACT_MAIN_PROGRAMS,
+  COMPACT_SYSTEM_TAKES,
   compactActivateSchema,
   compactActivateSchemaFor,
   compactActivateSchemaWithNamesFor,
@@ -86,6 +87,7 @@ export {
   compactSearchSchema,
   compactServiceBindingListTypesSchema,
   compactServiceBindingValidateSchema,
+  compactSystemSchemaFor,
   compactTransportCreateSchema,
   compactTransportMoveObjectsSchema,
   compactTransportSortAndCompressSchema,
@@ -103,9 +105,14 @@ export {
   DELETABLE_TYPES,
   DELETION_CHECK_TYPES,
   EMPTIED_INCLUDE_TYPES,
+  HANDLER_SYSTEM_DESCRIPTION,
   handlerGetDataDefinition,
   handlerGetDataWithoutSqlDefinition,
   handlerGetDataWithSqlDefinition,
+  handlerSystemDefinition,
+  SYSTEM_ACTION_TOOLS,
+  SYSTEM_ACTIONS,
+  type SystemAction,
 } from './compactSchemas.js';
 export { handlerDebugBatchDefinition } from './debug/handleHandlerDebugBatch.js';
 export { handlerDebugBreakpointsDefinition } from './debug/handleHandlerDebugBreakpoints.js';

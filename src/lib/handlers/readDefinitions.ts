@@ -4,6 +4,9 @@
  * definition and its handler), so a routed call is parsed with the target's
  * own schema. Read tools only: this module is part of the read barrel.
  */
+import { TOOL_DEFINITION as GetATCFindings } from '../../handlers/atc/high/handleGetATCFindings.js';
+import { TOOL_DEFINITION as GetATCResult } from '../../handlers/atc/high/handleGetATCResult.js';
+import { TOOL_DEFINITION as ListATCResults } from '../../handlers/atc/high/handleListATCResults.js';
 import { TOOL_DEFINITION as GetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition.js';
 import { TOOL_DEFINITION as GetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation.js';
 import { TOOL_DEFINITION as GetClass } from '../../handlers/class/high/handleGetClass.js';
@@ -28,15 +31,18 @@ import { TOOL_DEFINITION as SearchObject } from '../../handlers/search/readonly/
 import { TOOL_DEFINITION as GetServiceBinding } from '../../handlers/service_binding/high/handleGetServiceBinding.js';
 import { TOOL_DEFINITION as GetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition.js';
 import { TOOL_DEFINITION as GetStructure } from '../../handlers/structure/high/handleGetStructure.js';
+import { TOOL_DEFINITION as GetPackageTree } from '../../handlers/system/high/handleGetPackageTree.js';
 import { TOOL_DEFINITION as GetNodeStructureLow } from '../../handlers/system/low/handleGetNodeStructure.js';
 import { TOOL_DEFINITION as GetVirtualFoldersLow } from '../../handlers/system/low/handleGetVirtualFolders.js';
 import { TOOL_DEFINITION as GetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure.js';
 import { TOOL_DEFINITION as GetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl.js';
 import { TOOL_DEFINITION as GetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery.js';
 import { TOOL_DEFINITION as GetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed.js';
+import { TOOL_DEFINITION as SearchSource } from '../../handlers/system/readonly/handleSearchSource.js';
 import { TOOL_DEFINITION as GetTable } from '../../handlers/table/high/handleGetTable.js';
 import { TOOL_DEFINITION as GetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 import { TOOL_DEFINITION as GetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
+import { TOOL_DEFINITION as ListTransports } from '../../handlers/transport/readonly/handleListTransports.js';
 import { TOOL_DEFINITION as ReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 import { TOOL_DEFINITION as GetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';
 import { TOOL_DEFINITION as GetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
@@ -78,4 +84,10 @@ export const READ_DEFINITIONS = {
   GetWhereUsed,
   GetSqlQuery,
   GetTableContents,
+  SearchSource,
+  GetPackageTree,
+  ListTransports,
+  GetATCFindings,
+  ListATCResults,
+  GetATCResult,
 } as const;

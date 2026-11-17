@@ -16,6 +16,7 @@ import {
   COMPACT_WHERE_USED,
   type ProjectionVariant,
   supported,
+  whereUsedTypeDescription,
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
@@ -29,8 +30,11 @@ import {
   withLongToolAdvice,
 } from '../longTools';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../masterLanguage';
+import { ANSWER_LEVELS } from '../search-source/answerLevel';
+import { SCAN_OBJECT_TYPES } from '../search-source/packageEnumerator';
 import { SEARCH_TYPE_DESCRIPTION } from '../searchTypes';
 import { DETAIL_SHAPE } from '../strategies/detail';
+import { byVariant } from '../variantDefinition';
 import { exampleCodes, type Left, leftOf, listed, when } from './memberTexts';
 
 /**
@@ -2038,6 +2042,335 @@ export function compactWhereUsedSchemaFor<
 export const compactWhereUsedSchema = compactWhereUsedSchemaFor(
   COMPACT_WHERE_USED.onprem,
 );
+
+/**
+ * `HandlerSystem`'s actions, each one full tool's read (DO21): the action
+ * alone picks the tool.
+ */
+export const SYSTEM_ACTIONS = [
+  'search_source',
+  'search_object',
+  'where_used',
+  'package_tree',
+  'transports',
+  'atc_findings',
+  'atc_results',
+  'atc_result',
+] as const;
+
+/** One of {@link SYSTEM_ACTIONS}. */
+export type SystemAction = (typeof SYSTEM_ACTIONS)[number];
+
+/** The full tool each action calls, by its entry. */
+export const SYSTEM_ACTION_TOOLS = {
+  search_source: 'SearchSource',
+  search_object: 'SearchObject',
+  where_used: 'GetWhereUsed',
+  package_tree: 'GetPackageTree',
+  transports: 'ListTransports',
+  atc_findings: 'GetATCFindings',
+  atc_results: 'ListATCResults',
+  atc_result: 'GetATCResult',
+} as const satisfies Readonly<Record<SystemAction, string>>;
+
+/** The `detail` the detail-taking actions pass on, without the full tool's default. */
+const SYSTEM_DETAIL = z
+  .enum(['terse', 'full', 'raw'])
+  .optional()
+  .describe(
+    `search_object, transports, atc_findings, atc_result: ${DETAIL_SHAPE.detail.description ?? ''}`,
+  );
+
+/**
+ * Every property an action of `HandlerSystem` takes on `variant`, each typed
+ * as its full tool types it, optional, with no default (the full tool's own
+ * parse applies its defaults), its words naming the action(s) that take it.
+ */
+function systemProperties(variant: ProjectionVariant) {
+  return {
+    background: COMPACT_LONG_BACKGROUND_FIELD,
+    action: listedValues(SYSTEM_ACTIONS).describe(
+      'The read: search_source (source text in packages), search_object (objects by name or mask), where_used (the objects that use an object), package_tree (a package tree), transports (transport requests), atc_findings (the findings of an ATC run), atc_results (the stored ATC results), atc_result (one stored ATC result).',
+    ),
+    query: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'search_source: primary substring to match (case-insensitive, ABAP CS).',
+      ),
+    query2: z
+      .string()
+      .optional()
+      .describe(
+        'search_source: a second substring; when set, both query and query2 must appear on the same line.',
+      ),
+    exclude: z
+      .array(z.string())
+      .max(3)
+      .optional()
+      .describe(
+        'search_source: up to 3 substrings; a line containing any of them is dropped.',
+      ),
+    packages: z
+      .array(z.string().min(1))
+      .min(1)
+      .optional()
+      .describe(
+        'search_source: packages to scan, each an exact package name or a mask (`*` zero or more characters, `?` one character; `+`, `_`, `%` and `#` are characters of the name).',
+      ),
+    include_subpackages: z
+      .boolean()
+      .optional()
+      .describe(
+        'search_source: recurse into subpackages (default true); package_tree: expand subpackages recursively (default true).',
+      ),
+    object_filter: z
+      .string()
+      .optional()
+      .describe(
+        'search_source: glob applied to object names within each package (e.g. "Z*").',
+      ),
+    object_types: z
+      .array(z.enum(SCAN_OBJECT_TYPES))
+      .optional()
+      .describe(
+        'search_source: object types to scan, by main type: PROG (programs and program includes), FUGR, CLAS, INTF, DDLS, BDEF, DDLX, SRVD (default all of them).',
+      ),
+    exclude_comments: z
+      .boolean()
+      .optional()
+      .describe(
+        "search_source: skip col-1 '*' and full-line '\"' comment lines (default false).",
+      ),
+    max_hits_per_object: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        'search_source: the most hits answered per object; absent, every hit.',
+      ),
+    max_hits: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        'search_source: the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.',
+      ),
+    answer: z
+      .enum(ANSWER_LEVELS)
+      .optional()
+      .describe(
+        'search_source: what each hit is answered as: snippets (the default), lines or objects.',
+      ),
+    version: z
+      .enum(['active', 'inactive', 'workingArea'])
+      .optional()
+      .describe(
+        'search_source: the version every source is read at (default active).',
+      ),
+    object_name: z
+      .string()
+      .optional()
+      .describe(
+        "search_object: object name or mask (e.g. 'MARA*'); where_used: name of the object (with object_type), a function module as 'GROUP|FM_NAME'.",
+      ),
+    object_type: z
+      .string()
+      .optional()
+      .describe(
+        `search_object: ${SEARCH_TYPE_DESCRIPTION} where_used: ${whereUsedTypeDescription(variant)}`,
+      ),
+    maxResults: z
+      .number()
+      .optional()
+      .describe(
+        'search_object: maximum number of results to return (default 100).',
+      ),
+    detail: SYSTEM_DETAIL,
+    objects: z
+      .array(
+        z.object({
+          object_name: z
+            .string()
+            .describe(
+              "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
+            ),
+          object_type: z
+            .string()
+            .describe('Type of the ABAP object, as object_type takes it'),
+        }),
+      )
+      .optional()
+      .describe(
+        'where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.',
+      ),
+    enable_all_types: z
+      .boolean()
+      .optional()
+      .describe(
+        'where_used: true selects every object type of the where-used scope (default false, the SAP default scope).',
+      ),
+    enable_only_types: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').",
+      ),
+    disable_types: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "where_used: ADT object types removed from the scope (e.g. ['CLAS/OC']).",
+      ),
+    package_name: z
+      .string()
+      .optional()
+      .describe('package_tree: package name (give this or package_names).'),
+    package_names: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'package_tree: several package names, read together (give this or package_name).',
+      ),
+    max_depth: z
+      .number()
+      .int()
+      .optional()
+      .describe('package_tree: maximum depth of the walk (default 5).'),
+    include_descriptions: z
+      .boolean()
+      .optional()
+      .describe(
+        "package_tree: each object's description in the answer (default false).",
+      ),
+    debug: z
+      .boolean()
+      .optional()
+      .describe(
+        'package_tree: diagnostic metadata in the answer (counts, types, hierarchy; default false).',
+      ),
+    user: z
+      .string()
+      .optional()
+      .describe(
+        "transports: the SAP user id whose requests are listed (default the session's user).",
+      ),
+    modifiable_only: z
+      .boolean()
+      .optional()
+      .describe(
+        'transports: only modifiable (unreleased) requests (default true).',
+      ),
+    worklist_id: z
+      .string()
+      .optional()
+      .describe('atc_findings: worklist identifier an ATC run answered.'),
+    created_by: z
+      .string()
+      .optional()
+      .describe(
+        'atc_results: whose results: a user name, or * for every user.',
+      ),
+    central_only: z
+      .boolean()
+      .optional()
+      .describe('atc_results: true lists central results only.'),
+    age_min: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('atc_results: youngest age to list, in days.'),
+    age_max: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('atc_results: oldest age to list, in days.'),
+    display_id: z
+      .string()
+      .optional()
+      .describe('atc_result: display ID of a stored ATC result.'),
+  } as const;
+}
+
+/** A property of `HandlerSystem`. */
+type SystemProperty = keyof ReturnType<typeof systemProperties>;
+
+/**
+ * What each action of `HandlerSystem` takes: exactly its full tool's
+ * arguments, `background` the tool's own.
+ */
+export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
+  every: ['background', 'action'],
+  members: {
+    search_source: [
+      'query',
+      'query2',
+      'exclude',
+      'packages',
+      'include_subpackages',
+      'object_filter',
+      'object_types',
+      'exclude_comments',
+      'max_hits_per_object',
+      'max_hits',
+      'answer',
+      'version',
+    ],
+    search_object: ['object_name', 'object_type', 'maxResults', 'detail'],
+    where_used: [
+      'object_name',
+      'object_type',
+      'objects',
+      'enable_all_types',
+      'enable_only_types',
+      'disable_types',
+    ],
+    package_tree: [
+      'package_name',
+      'package_names',
+      'include_subpackages',
+      'max_depth',
+      'include_descriptions',
+      'debug',
+    ],
+    transports: ['user', 'modifiable_only', 'detail'],
+    atc_findings: ['worklist_id', 'detail'],
+    atc_results: ['created_by', 'central_only', 'age_min', 'age_max'],
+    atc_result: ['display_id', 'detail'],
+  },
+});
+
+/** `HandlerSystem`'s input on `variant`: one flat object, `action` required. */
+export function compactSystemSchemaFor(variant: ProjectionVariant) {
+  return z.object(systemProperties(variant));
+}
+
+/** `HandlerSystem`'s description: what each action reads, its arguments and its answer. */
+export const HANDLER_SYSTEM_DESCRIPTION = withLongToolAdvice(
+  '[read-only] Reads the ABAP repository and its transports and ATC results, one read per action: ' +
+    'search_source(query*, packages*, query2, exclude, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, max_hits, answer, version) the source lines of the objects in packages that contain query; ' +
+    'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask; ' +
+    'where_used(object_name* and object_type*, or objects*; enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package; ' +
+    'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree; ' +
+    "transports(user, modifiable_only, detail) the transport requests of user, by default the session's user; " +
+    'atc_findings(worklist_id*, detail) the findings of the ATC run whose worklist is worklist_id; ' +
+    'atc_results(created_by*, central_only, age_min, age_max) the stored ATC results, newest first; ' +
+    'atc_result(display_id*, detail) the stored ATC result display_id with its findings. ' +
+    'Each argument is described with the actions that take it. Response: JSON, per action: search_source the hits (package, object type, object name, include, line, snippet) with the scanned and truncated counters; search_object the objects found; where_used the references with their total (one entry per object for objects); package_tree the tree (one entry per package for package_names); transports the requests; atc_findings and atc_result the findings with the counts per priority; atc_results one entry per result.',
+);
+
+/** `HandlerSystem`'s description and schema, per variant. */
+export function handlerSystemDefinition() {
+  return byVariant((variant) => ({
+    description: HANDLER_SYSTEM_DESCRIPTION,
+    inputSchema: compactSystemSchemaFor(variant),
+  }));
+}
 
 /** The properties of `HandlerGetData` beside its `sql_query`. */
 function getDataProperties(sql: boolean) {

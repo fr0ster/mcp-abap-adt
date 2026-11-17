@@ -207,6 +207,96 @@ async function httpTools(
   }
 }
 
+/** A client connected to one binary's server, and how to end both. */
+export interface BinaryClient {
+  readonly client: Client;
+  close(): Promise<void>;
+}
+
+/**
+ * A client of the `kind` binary on `transport`, its server started as
+ * {@link listBinaries} starts it (SAP headers naming `standIn` over HTTP
+ * and SSE). The caller declares `SAP_SYSTEM_TYPE` first.
+ */
+export async function binaryClient(
+  transport: ServedTransport,
+  kind: ToolSetKind,
+  standIn: AdtStandIn,
+): Promise<BinaryClient> {
+  const client = new Client({ name: 'binary-client', version: '1' });
+  const toolSet = toolSets[transport][kind];
+  if (transport === 'stdio') {
+    const server = new StdioServer(
+      registryOf(toolSet, 'stdio', { dataTools: true }),
+      undefined,
+      {
+        batch: new InstanceBatch({ keepRawParts: false }),
+        ...backgroundRunsOf(toolSet),
+      },
+    );
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.start(undefined, serverSide);
+    await client.connect(clientSide);
+    return { client, close: () => client.close() };
+  }
+  const headers = sapHeaders(standIn.url);
+  if (transport === 'sse') {
+    const sse = new SseServer(registryOf(toolSet, 'sse', { dataTools: true }), {
+      host: '127.0.0.1',
+      port: 0,
+      batch: { keepRawParts: false },
+      ...backgroundRunsOf(toolSet),
+    });
+    await sse.start();
+    const port = boundPort(sse);
+    await client.connect(
+      new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), {
+        requestInit: { headers },
+        eventSourceInit: {
+          fetch: (url, init) =>
+            fetch(url, {
+              ...init,
+              headers: { ...(init?.headers ?? {}), ...headers },
+            }),
+        },
+      }),
+    );
+    return {
+      client,
+      close: async () => {
+        await client.close();
+        await sse.stop();
+      },
+    };
+  }
+  const mcp = new StreamableHttpServer(
+    registryOf(toolSet, 'http', { dataTools: true }),
+    {
+      host: '127.0.0.1',
+      port: 0,
+      batch: { keepRawParts: false },
+      ...backgroundRunsOf(toolSet),
+    },
+  );
+  await mcp.start();
+  const port = boundPort(mcp);
+  await client.connect(
+    clientTransport(
+      new StreamableHTTPClientTransport(
+        new URL(`http://127.0.0.1:${port}/mcp/stream/http`),
+        { requestInit: { headers } },
+      ),
+    ),
+  );
+  return {
+    client,
+    close: async () => {
+      await client.close();
+      await mcp.stop();
+    },
+  };
+}
+
 /**
  * The listing of every binary (the four kinds on the three transports) on
  * each of `systemTypes`, each declared through `SAP_SYSTEM_TYPE` as a

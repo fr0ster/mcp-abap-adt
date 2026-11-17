@@ -93,6 +93,7 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
     view: 'hitlist',
   },
   HandlerGet: { object_type: 'CLASS', class_name: 'PLACEHOLDER_CLASS' },
+  HandlerSystem: { action: 'search_object', object_name: 'PLACEHOLDER*' },
 };
 
 const placeholderContext = {

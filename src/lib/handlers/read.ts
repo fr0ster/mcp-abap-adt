@@ -16,6 +16,9 @@
 
 import '../instance.js';
 
+export { handleGetATCFindings } from '../../handlers/atc/high/handleGetATCFindings.js';
+export { handleGetATCResult } from '../../handlers/atc/high/handleGetATCResult.js';
+export { handleListATCResults } from '../../handlers/atc/high/handleListATCResults.js';
 export { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition.js';
 export { handleGetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation.js';
 export { handleGetClass } from '../../handlers/class/high/handleGetClass.js';
@@ -62,6 +65,7 @@ export {
 } from '../../handlers/service_binding/high/handleValidateServiceBinding.js';
 export { handleGetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition.js';
 export { handleGetStructure } from '../../handlers/structure/high/handleGetStructure.js';
+export { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree.js';
 // The metadata readers and the preview-URL tool: `part` on the compact read
 // routes to these, and a package that carries only read routes must be able to
 // import them without reaching a write handler.
@@ -82,9 +86,11 @@ export {
   handleRuntimeListFeeds,
 } from '../../handlers/system/readonly/handleRuntimeListFeeds.js';
 export { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles.js';
+export { handleSearchSource } from '../../handlers/system/readonly/handleSearchSource.js';
 export { handleGetTable } from '../../handlers/table/high/handleGetTable.js';
 export { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 export { handleGetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
+export { handleListTransports } from '../../handlers/transport/readonly/handleListTransports.js';
 export { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 export { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest.js';
 export {

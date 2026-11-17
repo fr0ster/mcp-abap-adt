@@ -72,6 +72,7 @@ const COMPACT_LONG_READS: ReadonlySet<string> = new Set([
   'HandlerGetData',
   'HandlerProfileView',
   'HandlerGet',
+  'HandlerSystem',
 ]);
 
 /** The tools that read and discard a run of `tool`: compact's for a compact tool. */

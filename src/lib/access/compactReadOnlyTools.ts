@@ -9,6 +9,7 @@ export const COMPACT_READ_ONLY_TOOL_NAMES: readonly string[] = [
   'HandlerGet',
   'HandlerSearch',
   'HandlerWhereUsed',
+  'HandlerSystem',
   'HandlerValidate',
   'HandlerCheckRun',
   'HandlerDeletionCheck',

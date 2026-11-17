@@ -27,12 +27,10 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
-  codesWithNames,
-  MAIN_TYPE_SENTENCE,
-  NAME_CASE_SENTENCE,
   type ProjectionVariant,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
+  whereUsedTypeDescription,
 } from '../../../lib/adtProjections';
 import { acceptedCodeOf, notAccepted } from '../../../lib/adtTypeCode';
 import {
@@ -81,14 +79,6 @@ export const TOOL_DEFINITION = {
     inputSchema: whereUsedSchema(variant),
   })),
 } as const;
-
-/**
- * What `object_type` takes on `variant`: a where-used code
- * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
- */
-function whereUsedTypeDescription(variant: ProjectionVariant): string {
-  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
-}
 
 /** GetWhereUsed's input on `variant`. */
 function whereUsedSchema(variant: ProjectionVariant) {

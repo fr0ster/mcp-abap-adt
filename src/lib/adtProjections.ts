@@ -443,6 +443,14 @@ export function codesWithNames(
 }
 
 /**
+ * What GetWhereUsed's `object_type` takes on `variant`: a where-used code
+ * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
+ */
+export function whereUsedTypeDescription(variant: ProjectionVariant): string {
+  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
+}
+
+/**
  * HandlerWhereUsed's `object_type`: each compact name with the name of
  * {@link TYPE_NAMES} it is handed to GetWhereUsed as, or its code where no
  * name stands for it (a table type, `TTYP/DA`).

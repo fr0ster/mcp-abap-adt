@@ -148,5 +148,11 @@
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
     "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes (with include_descriptions as single requests, several at a time), as GetPackageContents; background applies to its reads only — UNIT_TEST / CDS_UNIT_TEST and the parts activation_status / activation_results read a run in SAP, run as an ordinary call on the instance's connection, and refuse a background"
+  },
+  {
+    "tool": "HandlerSystem",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSystem.ts#handleHandlerSystem",
+    "sends": "as the full tool its action names: search_source as SearchSource, search_object as SearchObject, where_used as GetWhereUsed, package_tree as GetPackageTree, transports as ListTransports, atc_findings as GetATCFindings, atc_results as ListATCResults, atc_result as GetATCResult; every action reads"
   }
 ]

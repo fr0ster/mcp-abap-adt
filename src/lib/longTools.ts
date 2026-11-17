@@ -46,6 +46,7 @@ export const LONG_TOOLS: readonly string[] = [
   'HandlerGetData',
   'HandlerProfileView',
   'HandlerGet',
+  'HandlerSystem',
 ];
 
 const LISTED = new Set(LONG_TOOLS);

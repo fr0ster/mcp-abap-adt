@@ -32,8 +32,21 @@
  * of its own (`DebugCreateMemorySnapshot`); each answer names the snapshot's
  * file. After the run ends, `MemorySnapshotGet` reads the first and
  * `MemorySnapshotDelta` compares the two — exactly those, found in
- * `MemorySnapshotList` (detail `full`) by their file names. Nothing deletes
- * them: no tool can, and SAP removes snapshots over time.
+ * `MemorySnapshotList` (detail `full`). Nothing deletes them: no tool can,
+ * and SAP removes snapshots over time.
+ *
+ * **Which rows are the case's own.** A file name is not unique in the list:
+ * SAP names a snapshot `abDbgMemory_<work process>_<count>`, the count
+ * starting again in each debug session, so an earlier run's snapshot of the
+ * same user can carry the same name (measured on the cloud: two rows of
+ * `abDbgMemory_032_0001`, four days apart), and a delta against it is SAP's
+ * "different roll areas" 400. So the probe takes SAP's own UTC time
+ * (`GET TIME STAMP`) before it stops, the case reads it at the stop
+ * (`DebugGetVariables`, `LV_STARTED`) before it takes the snapshots, and a
+ * row is the case's only when its file name ends in the file the create
+ * answered and its `timestamp` is not before that time — both times SAP's,
+ * compared as UTC digits. More than one such row for a file fails the case,
+ * naming the count; it never picks one.
  *
  * **Why the case waits.** SAP lists a new snapshot only later (measured on
  * premise: the list was unchanged within a run, after the stop and the
@@ -81,6 +94,8 @@ function probeSource(name: string): string {
     `CLASS ${n} IMPLEMENTATION.`,
     '  METHOD if_oo_adt_classrun~main.',
     '    DATA lv_counter TYPE i.',
+    '    DATA lv_started TYPE p LENGTH 8.',
+    '    GET TIME STAMP FIELD lv_started.',
     '    lv_counter = 1. "BP:mark',
     '    lv_counter = lv_counter + 1.',
     '    lv_counter = lv_counter + 1. "BP:second',
@@ -115,6 +130,17 @@ const LIST_LIMIT_MS = 15 * 60_000;
 
 /** The files of the snapshots the case took, in order. */
 const snapshotFiles: string[] = [];
+
+/**
+ * The run's start as SAP's clock gave it, UTC, `YYYYMMDDhhmmss`: the
+ * probe's `lv_started` read at the stop, before the snapshots were taken.
+ */
+const snapshotsNotBefore: { at?: string } = {};
+
+/** A UTC time's digits, `YYYYMMDDhhmmss`: `2026-11-17T07:11:09Z` and `20261117071109` alike. */
+function utcDigits(text: string): string {
+  return [...text].filter((c) => c >= '0' && c <= '9').join('');
+}
 
 /** The listener's state handle once it started; whether a debugger batch is open. */
 const session: { handle?: string; batchOpen?: boolean } = {};
@@ -418,6 +444,28 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
   });
 
   it('DebugCreateMemorySnapshot takes two snapshots at the stop', async () => {
+    // SAP's own time before the snapshots: the probe took it before the stop.
+    const read = succeeded(
+      'DebugGetVariables LV_STARTED',
+      await livePrepare('DebugGetVariables', {
+        state_handle: handle(),
+        names: ['LV_STARTED'],
+      }),
+    );
+    const variables = payloadOf(read);
+    const rows = Array.isArray(variables)
+      ? variables
+      : member(variables, 'variables');
+    const started = Array.isArray(rows)
+      ? rows.find(
+          (row) => String(member(row, 'name')).toUpperCase() === 'LV_STARTED',
+        )
+      : undefined;
+    const startedAt = utcDigits(String(member(started, 'value')));
+    if (startedAt.length !== 14) {
+      throw new Error(`the probe's start time is unreadable: ${read.text}`);
+    }
+    snapshotsNotBefore.at = startedAt;
     for (const at of [1, 2]) {
       const made = succeeded(
         `DebugCreateMemorySnapshot ${at}`,
@@ -518,10 +566,16 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
 
   it('MemorySnapshotGet reads a snapshot it took, MemorySnapshotDelta compares the two', async () => {
     const [first, second] = snapshotFiles;
-    if (first === undefined || second === undefined) {
+    const notBefore = snapshotsNotBefore.at;
+    if (
+      first === undefined ||
+      second === undefined ||
+      notBefore === undefined
+    ) {
       throw new Error('the case took no two snapshots');
     }
-    // Until both files are listed (the header: why the case waits).
+    // Until both files are listed (the header: why the case waits), each by
+    // exactly one row of this run: its file, taken at or after the run's start.
     const idOf = new Map<string, string>();
     const started = Date.now();
     for (;;) {
@@ -530,13 +584,20 @@ liveSuite(['onprem', 'cloud'], 'The ABAP debugger at a stop', () => {
         await livePrepare('MemorySnapshotList', { detail: 'full' }),
       );
       const rows = payloadOf(list);
-      for (const row of Array.isArray(rows) ? rows : []) {
-        const fileName = String(member(row, 'fileName'));
-        for (const file of [first, second]) {
-          if (fileName.endsWith(`/${file}`)) {
-            idOf.set(file, String(member(row, 'id')));
-          }
+      const ours = (Array.isArray(rows) ? rows : []).filter(
+        (row) => utcDigits(String(member(row, 'timestamp'))) >= notBefore,
+      );
+      for (const file of [first, second]) {
+        const matching = ours.filter((row) =>
+          String(member(row, 'fileName')).endsWith(`/${file}`),
+        );
+        if (matching.length > 1) {
+          throw new Error(
+            `${matching.length} snapshots of ${file} are listed taken at or after ${notBefore}: the case cannot tell its own`,
+          );
         }
+        const [row] = matching;
+        if (row !== undefined) idOf.set(file, String(member(row, 'id')));
       }
       if (idOf.size === 2) break;
       const waited = Date.now() - started;

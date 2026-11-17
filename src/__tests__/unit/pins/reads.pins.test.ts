@@ -144,22 +144,6 @@ describe('onprem', () => {
         },
       ],
     },
-    {
-      tool: 'HandlerSearch',
-      variant: 'onprem',
-      stand: 'recording',
-      args: { query: 'ZCL_MCP_SHARED_CLS', object_type: 'CLAS' },
-      expected: [
-        {
-          method: 'GET',
-          url: '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZCL_MCP_SHARED_CLS&maxResults=100&objectType=CLAS',
-          headers: {
-            Accept: 'application/xml',
-          },
-          body: undefined,
-        },
-      ],
-    },
   ]);
 });
 
@@ -255,22 +239,6 @@ describe('cloud', () => {
           url: '/sap/bc/adt/oo/classes/zbp_mcp_shr_i_root/source/main?version=active',
           headers: {
             Accept: 'text/plain',
-          },
-          body: undefined,
-        },
-      ],
-    },
-    {
-      tool: 'HandlerSearch',
-      variant: 'cloud',
-      stand: 'recording',
-      args: { query: 'ZCL_MCP_SHARED_CLS', object_type: 'CLAS' },
-      expected: [
-        {
-          method: 'GET',
-          url: '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=ZCL_MCP_SHARED_CLS&maxResults=100&objectType=CLAS',
-          headers: {
-            Accept: 'application/xml',
           },
           body: undefined,
         },

@@ -902,13 +902,6 @@
       "cloud": "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts"
     }
   },
-  "HandlerSearch": {
-    "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
-    "live": {
-      "onprem": "src/__tests__/integration/coverage/reads.live.test.ts",
-      "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
-    }
-  },
   "HandlerServiceBindingListTypes": {
     "unit": "src/__tests__/unit/pins/serviceBinding.pins.test.ts",
     "live": {

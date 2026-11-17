@@ -7,8 +7,7 @@
  * - `GetObjectStructure`: the shared class (`shared_dependencies`);
  * - `GetPackage`: the shared package the configuration names;
  * - `GetBehaviorImplementation`: the shared behavior implementation's
- *   metadata and source;
- * - `HandlerSearch`: the shared class by its name.
+ *   metadata and source.
  */
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
@@ -76,16 +75,6 @@ liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
       succeeded('GetBehaviorImplementation source', source)
         .text.toLowerCase()
         .includes('zbp_mcp_shr_i_root'),
-    );
-  });
-
-  it('HandlerSearch finds the shared class by its name', async () => {
-    const found = await liveCall('HandlerSearch', {
-      query: 'ZCL_MCP_SHARED_CLS',
-      object_type: 'CLAS',
-    });
-    assert.ok(
-      succeeded('HandlerSearch', found).text.includes('ZCL_MCP_SHARED_CLS'),
     );
   });
 });

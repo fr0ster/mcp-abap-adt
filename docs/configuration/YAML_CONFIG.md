@@ -221,6 +221,15 @@ with the known key it may mean: `system_type` → `Config file key "system_type"
 of this binary; did you mean "system-type"?`; `http.json_response` the same. Before 24.0.0 such a
 key was read by nothing, and the value it meant to set stayed at its default.
 
+**A section or a value of the wrong shape is refused** (24.0.0), naming its key: a section
+(`http`, `sse`, `http.tls`, `restrictions`, …) must be a mapping of its keys — a list or a value
+there is refused (`Config file key "http" is a list: it must be a mapping of its keys (…)`), and
+nothing under it is read; a key that takes one value (a port, a host, a path, an enum) refuses a
+list or a mapping, and a list key (`allowed-hosts`) refuses a mapping or an item that is itself a
+list or a mapping. Before, a section given as a list was skipped: `http: [{enable-dns-protection:
+true, …}]` started with the protection off. YAML `null` and an empty value are not given, for a
+section as for a key.
+
 ### Configuration only (no secrets)
 
 `.env` files and environment variables hold secrets and the session; YAML holds configuration

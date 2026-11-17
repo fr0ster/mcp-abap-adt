@@ -20,7 +20,7 @@
  * Plain code over the arguments, no regular expression.
  */
 
-import { type JsonValue, jsonAt } from '../json';
+import { isJsonObject, type JsonValue, jsonAt } from '../json';
 import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
@@ -273,12 +273,45 @@ function splitList(text: string): string[] {
 }
 
 /** Convert one raw value to its typed form, or say why not. */
+/**
+ * What a config file value is when it is not one value: `a list`, `a
+ * mapping`; `undefined` for a string, a number or a boolean.
+ */
+function compoundShapeOf(raw: JsonValue): string | undefined {
+  if (Array.isArray(raw)) return 'a list';
+  return raw !== null && typeof raw === 'object' ? 'a mapping' : undefined;
+}
+
 function convert(
   p: Parameter,
   name: string,
   raw: JsonValue | undefined,
 ): ParameterValue | undefined {
   if (raw === undefined || raw === null) return undefined;
+
+  // Only a config file gives a list or a mapping: where the row takes one
+  // value (a list row: a list of values), it is refused, naming the key —
+  // never read through its text (`[object Object]`, `a,b`).
+  const shape = compoundShapeOf(raw);
+  if (p.kind === 'list') {
+    if (shape === 'a mapping') {
+      throw new ParameterRefusal(
+        `Invalid ${name}: a mapping where a list is expected`,
+      );
+    }
+    if (
+      Array.isArray(raw) &&
+      raw.some((item) => item !== null && typeof item === 'object')
+    ) {
+      throw new ParameterRefusal(
+        `Invalid ${name}: every item of the list is one value, not a list or a mapping`,
+      );
+    }
+  } else if (shape !== undefined && p.kind !== 'custom' && p.kind !== 'flag') {
+    throw new ParameterRefusal(
+      `Invalid ${name}: ${shape} where one value is expected`,
+    );
+  }
 
   if (p.kind === 'custom') {
     if (typeof raw === 'string' && raw.trim() === '') return undefined;
@@ -655,6 +688,39 @@ function unknownYamlKeys(table: ParameterTable, yaml: YamlConfig): string[] {
   return found;
 }
 
+/**
+ * Every section of a config file that is not a mapping of its keys: at each
+ * level a row's YAML key passes through (`http` and `http.tls` of
+ * `http.tls.cert`), the value must be a mapping, YAML null or an empty
+ * value (not given). A list or a value there is refused, naming the key and
+ * the keys it holds — never skipped, so nothing stated is ignored. The keys
+ * under a refused section are not read (and not refused again).
+ */
+function sectionShapeErrors(table: ParameterTable, yaml: YamlConfig): string[] {
+  const sections = new Map<string, Set<string>>();
+  for (const p of table.rows) {
+    if (p.yaml === undefined) continue;
+    const segments = p.yaml.split('.');
+    for (let depth = 1; depth < segments.length; depth += 1) {
+      const section = segments.slice(0, depth).join('.');
+      const held = sections.get(section) ?? new Set<string>();
+      held.add(segments[depth] ?? '');
+      sections.set(section, held);
+    }
+  }
+  const found: string[] = [];
+  for (const [section, held] of sections) {
+    const value = jsonAt(yaml, ...section.split('.'));
+    if (value === undefined || value === null || isJsonObject(value)) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    const shape = Array.isArray(value) ? 'a list' : 'a value';
+    found.push(
+      `Config file key "${section}" is ${shape}: it must be a mapping of its keys (${[...held].join(', ')})`,
+    );
+  }
+  return found;
+}
+
 /** Every refusal of a YAML file against the table: removed keys, secrets, values. */
 export function validateYamlParameters(
   table: ParameterTable,
@@ -669,6 +735,7 @@ export function validateYamlParameters(
         `Config file key "${key}" looks like a secret or a session value. YAML is configuration only: put secrets and the session in .env or the environment`,
     ),
   );
+  errors.push(...sectionShapeErrors(table, yaml));
   errors.push(...unknownYamlKeys(table, yaml));
   for (const p of table.rows) {
     if (p.yaml === undefined) continue;
@@ -954,6 +1021,12 @@ export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
  * read by plain code — ASCII digits only, as a string or a YAML number.
  */
 export function parseShutdownTimeout(raw: JsonValue, name: string): number {
+  const shape = compoundShapeOf(raw);
+  if (shape !== undefined) {
+    throw new ParameterRefusal(
+      `Invalid ${name}: ${shape} where a whole number of seconds is expected`,
+    );
+  }
   const text = typeof raw === 'string' ? raw.trim() : String(raw);
   let digits = text.length > 0;
   for (let i = 0; i < text.length; i += 1) {

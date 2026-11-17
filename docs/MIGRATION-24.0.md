@@ -130,7 +130,11 @@ A value a start states is read as stated, or the start is refused naming it.
   parameter given twice and a YAML key no parameter reads (`system_type`, `http.json_response`)
   were read by nothing — the first of two values won, a misspelled key left its value at the
   default. Each stops the start now, naming it and the parameter it may mean: correct the name,
-  drop the extra value.
+  drop the extra value. A YAML section or value of the wrong shape is refused the same way,
+  naming its key: a section (`http`, `sse`, `http.tls`, `restrictions`) given as a list or a
+  value — `http: [{enable-dns-protection: true}]` started with the protection off —, a list or
+  a mapping where one value is expected, a mapping where a list is. Write the section as a
+  mapping of its keys; `null` and an empty value still count as not given.
 - **`--http-json-response=false` gives SSE streams** (and its variable and YAML key). Before, a
   stated `false` answered JSON like an absent flag; leave the flag out to keep JSON.
 - **DNS-rebinding protection and its lists go together.** `--http-allowed-hosts` /

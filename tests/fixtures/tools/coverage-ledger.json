@@ -916,6 +916,13 @@
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
     }
   },
+  "HandlerSystem#package_tree": {
+    "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/packageTree.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/packageTree.live.test.ts"
+    }
+  },
   "HandlerSystem#search_object": {
     "unit": "src/__tests__/unit/pins/handlerSystem.pins.test.ts",
     "live": {

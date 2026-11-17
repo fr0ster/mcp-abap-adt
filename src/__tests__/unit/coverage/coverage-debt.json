@@ -372,7 +372,6 @@
   "HandlerSystem#atc_findings",
   "HandlerSystem#atc_result",
   "HandlerSystem#atc_results",
-  "HandlerSystem#package_tree",
   "HandlerUnlock#BEHAVIOR_DEFINITION",
   "HandlerUnlock#BEHAVIOR_IMPLEMENTATION",
   "HandlerUnlock#CLASS",

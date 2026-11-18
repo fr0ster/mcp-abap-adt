@@ -23,7 +23,6 @@
   "src/__tests__/integration/coverage/atc.live.test.ts",
   "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
   "src/__tests__/integration/coverage/createLanguage.live.test.ts",
-  "src/__tests__/integration/coverage/csrfRepeat.live.test.ts",
   "src/__tests__/integration/coverage/debugger.live.test.ts",
   "src/__tests__/integration/coverage/dumpsProfiles.live.test.ts",
   "src/__tests__/integration/coverage/enhancements.live.test.ts",

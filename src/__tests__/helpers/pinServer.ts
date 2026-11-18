@@ -92,8 +92,6 @@ export interface PinServer {
    * the store, never polled.
    */
   runsEnded(): Promise<void>;
-  /** The instance's connection, as the next call would take it. */
-  held(): Promise<IAbapConnection>;
   close(): Promise<void>;
 }
 
@@ -174,12 +172,6 @@ class PinMcpServer extends BaseMcpServer {
   register(registry: CompositeHandlersRegistry): void {
     this.registerHandlers(registry);
   }
-  /** The instance's connection as a call takes it (built and logged on when none is), given back at once. */
-  async held(): Promise<IAbapConnection> {
-    const connection = await this.getConnection(new AbortController().signal);
-    this.connectionReleased(connection);
-    return connection;
-  }
 }
 
 /** A set's stdio groups, and the groups only its Streamable HTTP binary adds. */
@@ -219,8 +211,6 @@ export function pinServer(
   variant: SystemKind,
   stand: AdtStandIn,
   setup?: PinSetup,
-  /** What the server logs at `info` goes here; nothing else is logged. */
-  info?: (message: string) => void,
 ): Promise<PinServer> {
   return inProcessServer(
     variant,
@@ -234,8 +224,6 @@ export function pinServer(
       credential: new BasicAuthProvider(PIN_USER, 'pin-password'),
     },
     setup,
-    {},
-    info,
   );
 }
 
@@ -249,10 +237,6 @@ export async function inProcessServer(
   source: ServerSource,
   setup?: PinSetup,
   restriction: ServerRestriction = {},
-  /** What the server logs at `info` goes here; nothing else is logged. */
-  info?: (message: string) => void,
-  /** Called at each start of a system lookup, before the shipped resolver. */
-  onLookup?: () => void,
 ): Promise<PinServer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pin-server-'));
   const runtime = path.join(dir, 'runtime');
@@ -275,18 +259,9 @@ export async function inProcessServer(
   const runs = new PinBackgroundRuns();
   const server = new PinMcpServer({
     name: 'pin-server',
-    logger:
-      info === undefined
-        ? silent
-        : { ...silent, info: (message: string) => info(message) },
+    logger: silent,
     systemType: variant,
-    systemContextResolver:
-      onLookup === undefined
-        ? defaultSystemContextResolver
-        : (connection) => {
-            onLookup();
-            return defaultSystemContextResolver(connection);
-          },
+    systemContextResolver: defaultSystemContextResolver,
     batch: new InstanceBatch({ keepRawParts: false }),
     backgroundRuns: runs,
     leftoverSessions,
@@ -314,7 +289,6 @@ export async function inProcessServer(
     call: (tool, args) => client.callTool(tool, args),
     listed: async () => (await client.listTools()).map((tool) => tool.name),
     runsEnded: () => runs.ended(),
-    held: () => server.held(),
     close: async () => {
       await client.close();
       await server.terminalClose();

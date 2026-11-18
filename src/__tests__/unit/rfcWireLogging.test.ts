@@ -30,9 +30,8 @@ beforeEach(() => {
  */
 jest.mock('@mcp-abap-adt/connection', () => ({
   ...jest.requireActual('@mcp-abap-adt/connection'),
-  // A connection object is all the factory keeps of what this returns; its
-  // requests the factory's ledger wraps (`withRequestLedger`).
-  createConnection: jest.fn(() => ({ makeAdtRequest: async () => ({}) })),
+  // A connection object is all the factory keeps of what this returns.
+  createConnection: jest.fn(() => ({})),
 }));
 
 const rfcConfig = {

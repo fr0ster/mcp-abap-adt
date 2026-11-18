@@ -23,7 +23,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { ServerRefusal, systemTypeConflictWords } from './auth/serverRefusal';
-import { withRequestLedger } from './firstRequest';
 import { asciiLower } from './plainText';
 import {
   type AbapSystemKind,
@@ -484,9 +483,6 @@ export function createAbapConnection(
       }),
     );
   })();
-  // Its requests counted for a call that watches them (`watchRequests`):
-  // the dispatch repeats a call SAP refused before any of it ran.
-  withRequestLedger(built);
 
   records.set(built, {
     settings,

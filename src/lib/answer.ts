@@ -28,6 +28,7 @@ import {
   type JsonValue,
   parseJson,
 } from './json';
+import type { SourcePosition } from './sourceHref';
 import type { AnswerDetail } from './strategies/projections';
 import {
   type FailedRequest,
@@ -35,6 +36,7 @@ import {
   safeRequest,
   thrownCleanup,
 } from './strategies/safeFields';
+import { locatedMessages } from './strategies/sourceMessages';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
 import { cleanupOf, type StepError } from './strategies/stepResponse';
 import {
@@ -162,10 +164,15 @@ interface MessageCarrier {
     text: string;
     code?: string;
     t100?: { id: string; no: string; values?: ReadonlyArray<string> };
-    line?: string;
     uri?: string;
     /** The object an activation run's message is about (`objName`). */
     objectName?: string;
+    /** `objDescr`: the object, and its part, as SAP describes it. */
+    object?: string;
+    /** Where the message stands in its source (`#start=` of its href). */
+    position?: SourcePosition;
+    /** The source an activation run's message's href names. */
+    source_uri?: string;
   }>;
 }
 
@@ -312,15 +319,28 @@ export function failurePayload(
   // substituted into the sentence are the only thing in the corpus a caller can
   // match on without reading English, and `no` stays the zero-padded string SAP
   // sent — SADT_RESOURCE/26 is a key no system knows.
+  //
+  // Where each message stands is read from SAP's document the strategy read
+  // them from (`locatedMessages`): a checklist's or a check run's message
+  // states its object (`objDescr`) and its href, whose `#start=` is the
+  // source position. A strategy's `line` is a checklist `msg`'s ordinal, not
+  // a source line, and is not answered.
+  const body = wireValueOf(error.response?.data);
   if (error.messages !== undefined) {
-    payload.messages = error.messages.map((m) => {
+    const messages =
+      body.kind === 'text'
+        ? locatedMessages(error.messages, body.text)
+        : error.messages;
+    payload.messages = messages.map((m) => {
       const out: { [key: string]: AnswerValue } = {
         type: m.type,
         text: m.text,
       };
-      if (m.code !== undefined) out.code = m.code;
-      if (m.line !== undefined) out.line = m.line;
+      if (m.object !== undefined) out.object = m.object;
       if (m.uri !== undefined) out.uri = m.uri;
+      if (m.source_uri !== undefined) out.source_uri = m.source_uri;
+      if (m.position !== undefined) out.position = m.position;
+      if (m.code !== undefined) out.code = m.code;
       if (m.objectName !== undefined) out.objectName = m.objectName;
       if (m.t100 !== undefined) {
         const t100: { [key: string]: AnswerValue } = {
@@ -373,7 +393,6 @@ export function failurePayload(
   //
   // The empty string is not a document — emitting `raw_body: ""` would read as
   // "SAP sent an empty body" when nothing was sent at all.
-  const body = wireValueOf(error.response?.data);
   const answeredOk =
     typeof status === 'number' && status >= 200 && status < 300;
   if (
